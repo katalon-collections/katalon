@@ -12,7 +12,7 @@ Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galerien, Bib
 | Phase 3 – CRUD alle 4 Typen + Relationen | ✅ Fertig (Objekte vollständig, weitere folgen) |
 | Phase 4 – Auth (JWT) + Audit Log | ✅ Fertig |
 | Phase 5 – Media & IIIF | 🔄 Grundgerüst vorhanden |
-| Phase 6 – Admin-UI (React/TypeScript) | 🔄 In Arbeit — Shell läuft, Screens folgen |
+| Phase 6 – Admin-UI (React/TypeScript) | ✅ Fertig — alle 6 Screens implementiert |
 | Phase 7 – Elasticsearch + Versionierung | ⏳ Ausstehend |
 | Phase 8 – Public-Portal | ⏳ Ausstehend |
 | Phase 9 – Authority-Adapter (GND, Geonames) | ⏳ Ausstehend |

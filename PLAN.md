@@ -6,13 +6,13 @@
 
 | Phase | Beschreibung | Status |
 |---|---|---|
-| 0 | Infra (Docker Compose, Dockerfiles, pyproject.toml, config, main) | 🔄 In Arbeit |
-| 1 | Core-DB (ORM-Models, Alembic-Init + erste Migration) | ⏳ Ausstehend |
-| 2 | Schema-Engine (field_definitions, Vokabulare) | ⏳ Ausstehend |
-| 3 | CRUD alle 4 Typen + Relationen | ⏳ Ausstehend |
-| 4 | Auth (JWT, Rollen) + Audit Log | ⏳ Ausstehend |
-| 5 | Media & IIIF (Upload, Celery, Cantaloupe) | ⏳ Ausstehend |
-| 6 | Admin-UI (React + TypeScript, alle 6 Screens) | ⏳ Ausstehend |
+| 0 | Infra (Docker Compose, Dockerfiles, pyproject.toml, config, main) | ✅ Fertig |
+| 1 | Core-DB (ORM-Models, Alembic-Init + erste Migration) | ✅ Fertig |
+| 2 | Schema-Engine (field_definitions, Vokabulare) | ✅ Fertig |
+| 3 | CRUD alle 4 Typen + Relationen | ✅ Fertig (Objekte vollständig) |
+| 4 | Auth (JWT, Rollen) + Audit Log | ✅ Fertig |
+| 5 | Media & IIIF (Upload, Celery, Cantaloupe) | ✅ Grundgerüst fertig |
+| 6 | Admin-UI (React + TypeScript, alle 6 Screens) | ✅ Fertig |
 | 7 | Elasticsearch + Versionierung (Snapshots) | ⏳ Ausstehend |
 | 8 | Public-Portal (React) | ⏳ Ausstehend |
 | 9 | Authority-Plugin-System (GND, Geonames) | ⏳ Ausstehend |
