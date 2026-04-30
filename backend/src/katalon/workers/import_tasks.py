@@ -19,10 +19,10 @@ def import_records_task(
 ) -> dict[str, Any]:
     from katalon.services.importer_service import apply_mapping
     from katalon.database import AsyncSessionLocal
-    from katalon.core.models import KatalonObject, Entity, Occurrence
+    from katalon.core.models import Object, Entity, Occurrence
 
     model_map = {
-        "object": KatalonObject,
+        "object": Object,
         "entity": Entity,
         "occurrence": Occurrence,
     }

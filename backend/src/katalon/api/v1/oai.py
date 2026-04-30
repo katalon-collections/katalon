@@ -5,13 +5,13 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep
-from katalon.core.models import KatalonObject, Entity, Place, Occurrence
+from katalon.core.models import Object, Entity, Place, Occurrence
 from katalon.services import oaipmh_service
 
 router = APIRouter(prefix="/oai", tags=["oai-pmh"])
 
 _MODEL_MAP = {
-    "object": KatalonObject,
+    "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
@@ -37,7 +37,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             xml = oaipmh_service._error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
         else:
             set_spec = params.get("set", "object")
-            model = _MODEL_MAP.get(set_spec, KatalonObject)
+            model = _MODEL_MAP.get(set_spec, Object)
             result = await db.execute(select(model).limit(100))
             records = list(result.scalars().all())
             xml = oaipmh_service.list_records(records, set_spec, base_url)

@@ -26,7 +26,7 @@ def remove_record_task(record_id: str) -> None:
 def reindex_all_task() -> None:
     """Full reindex – reads all records from DB and pushes to ES."""
     from katalon.database import AsyncSessionLocal
-    from katalon.core.models import KatalonObject, Entity, Place, Occurrence
+    from katalon.core.models import Object, Entity, Place, Occurrence
     from katalon.integrations.elasticsearch import ensure_index, index_document
 
     async def _reindex() -> None:
@@ -35,7 +35,7 @@ def reindex_all_task() -> None:
         await ensure_index()
         async with AsyncSessionLocal() as session:
             for model, rtype in [
-                (KatalonObject, "object"),
+                (Object, "object"),
                 (Entity, "entity"),
                 (Place, "place"),
                 (Occurrence, "occurrence"),
