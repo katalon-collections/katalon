@@ -96,6 +96,18 @@ services:
       dockerfile: ./docker/Dockerfile.admin
     ports:
       - "3000:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://localhost/index.html > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
 
   portal:
     build:
@@ -103,6 +115,18 @@ services:
       dockerfile: ./docker/Dockerfile.portal
     ports:
       - "3001:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://localhost/index.html > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
@@ -111,9 +135,12 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - api
-      - admin
-      - portal
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
 
 volumes:
   db_data:

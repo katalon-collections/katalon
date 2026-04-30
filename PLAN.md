@@ -74,3 +74,32 @@ Vollständiges Konzept → `KONZEPT.md` Abschnitt 11.
 - [ ] OpenAPI-Codegen für TypeScript-Client (nach Phase 3)
 - [ ] Fuzzy-Datum UI-Komponente: Präzisions-Selektor (Jahr/Monat/Tag + „ca.")
 - [ ] Theme-Loader: SSR-inject vs. client-side (kein Flash-of-unstyled-content)
+
+---
+
+## Offene Aufgaben (aus README)
+
+Diese Aufgaben wurden in der `README.md` als noch offen markiert. Sie sind priorisiert nach kurzfristiger Wirkung für Demos und Präsentationen.
+
+### Priorität 1 — Admin-Workflows
+- Schemata: Neues Feld anlegen, Feld bearbeiten, löschen und Sortierung persistent machen (aktuell mock-basiert).
+- Objekte: Objekt-CRUD an die echte API anbinden (Erstellen, Aktualisieren, Löschen, Statuswechsel, Audit-Log schreiben).
+- Vokabular: Neuer Term anlegen / editieren / löschen und hierarchische Beziehungen speichern.
+- Bilderupload: Endpunkt + Celery-Processing + Cantaloupe-Manifest-Verknüpfung End-to-End herstellen.
+- Suche im Admin-Panel: Topbar/Sidebar-Suchen mit API-Integration (nicht nur lokal filtern).
+
+### Priorität 2 — Präsentationsoberfläche (Portal)
+- Public-Portal: Startseite, Suche, Detailansicht so fertigstellen, dass sie für Demos nutzbar ist.
+- IIIF-Viewer: Objekt-Detail mit echten Manifests und Kacheln verbinden.
+- Theme-Demo: Beispiel-Theme bereitstellen und Theme-Wechsel demonstrieren.
+
+### Priorität 3 — Ergänzungen
+- Fehler- und Ladezustände in UI-Screens verbessern.
+- CRUD für Entitäten, Orte und Occurrences im Admin nachziehen.
+
+### Vorschlag für Agentenreihenfolge
+1. Schema-Editor + Vokabular-CRUD an API anbinden.
+2. Objekt-CRUD + Medienupload implementieren.
+3. Globale Suche im Admin an den Search-Service anbinden.
+4. Public-Portal mit IIIF und Theme-Demo ausstatten.
+5. Restliche Typen (Entity, Place, Occurrence) im Admin ergänzen.
