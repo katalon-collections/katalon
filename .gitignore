@@ -4,6 +4,8 @@
 *.pyo
 **/node_modules/
 .venv/
+frontend/admin/dist/
+frontend/portal/dist/
 .env.package-lock.json
 frontend/admin/node_modules/.bin/baseline-browser-mapping
 frontend/admin/node_modules/.bin/browserslist
