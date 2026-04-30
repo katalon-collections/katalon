@@ -18,7 +18,7 @@
 | 9 | Authority-Plugin-System (GND, Geonames) | ✅ Fertig (ABC, GND/Geonames-Adapter, /v1/authority/search+fetch) |
 | 10 | Smart Importer (Excel/CSV ETL) | ✅ Fertig (CSV-Parse, Mapping, Dry-Run, Celery-Import, /v1/importer) |
 | 11 | OAI-PMH | ✅ Fertig (Identify, ListRecords, GetRecord, ListSets, ListMetadataFormats, Dublin Core) |
-| 12 | Hardening (Rate Limiting, Performance) | ⏳ Ausstehend |
+| 12 | Hardening (Rate Limiting, Performance) | ✅ Fertig (slowapi 200 req/min, Unit-Tests health+importer+oai) |
 
 ---
 
