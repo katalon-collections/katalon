@@ -9,6 +9,7 @@ from katalon.core.models import Entity, RecordSnapshot
 from katalon.core.schemas import EntityCreate, EntityRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
+from katalon.services import search_service
 
 router = APIRouter(prefix="/entities", tags=["entities"])
 
@@ -45,6 +46,10 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser
     db.add(entity)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
+    try:
+        await search_service.index_record("entity", entity)
+    except Exception:
+        pass
     return entity
 
 
@@ -72,6 +77,10 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     entity.metadata_ = data.metadata_
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"status": data.status, "metadata": data.metadata_}})
+    try:
+        await search_service.index_record("entity", entity)
+    except Exception:
+        pass
     return entity
 
 
@@ -82,6 +91,10 @@ async def delete_entity(entity_id: uuid.UUID, db: DBDep, current_user: CurrentUs
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="delete")
+    try:
+        await search_service.remove_record(entity.id)
+    except Exception:
+        pass
     await db.delete(entity)
 
 

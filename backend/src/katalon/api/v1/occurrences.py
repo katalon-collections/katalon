@@ -8,6 +8,7 @@ from katalon.core.models import Occurrence, RecordSnapshot
 from katalon.core.schemas import OccurrenceCreate, OccurrenceRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
+from katalon.services import search_service
 
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
@@ -41,6 +42,10 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
     db.add(occ)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
+    try:
+        await search_service.index_record("occurrence", occ)
+    except Exception:
+        pass
     return occ
 
 
@@ -68,6 +73,10 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     occ.metadata_ = data.metadata_
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"status": data.status}})
+    try:
+        await search_service.index_record("occurrence", occ)
+    except Exception:
+        pass
     return occ
 
 
@@ -78,4 +87,8 @@ async def delete_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: CurrentU
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="delete")
+    try:
+        await search_service.remove_record(occ.id)
+    except Exception:
+        pass
     await db.delete(occ)
