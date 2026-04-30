@@ -8,7 +8,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U katalon"]
+      test: [ "CMD-SHELL", "pg_isready -U katalon" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -16,7 +16,7 @@ services:
   redis:
     image: redis:7-alpine
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -30,19 +30,19 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v red"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v red" ]
       interval: 15s
       timeout: 10s
       retries: 20
 
   cantaloupe:
-    image: ghcr.io/cantaloupe-project/cantaloupe:5.0.6
+    image: islandora/cantaloupe:main
     volumes:
       - media_data:/var/lib/cantaloupe/images
     environment:
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8182/iiif/3"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -68,7 +68,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -92,15 +92,15 @@ services:
 
   admin:
     build:
-      context: ./frontend/admin
-      dockerfile: ../../docker/Dockerfile.admin
+      context: .
+      dockerfile: ./docker/Dockerfile.admin
     ports:
       - "3000:80"
 
   portal:
     build:
-      context: ./frontend/portal
-      dockerfile: ../../docker/Dockerfile.portal
+      context: .
+      dockerfile: ./docker/Dockerfile.portal
     ports:
       - "3001:80"
 
