@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 # ---------------------------------------------------------------------------
@@ -30,10 +30,9 @@ class FieldDefinitionCreate(BaseModel):
 
 
 class FieldDefinitionRead(FieldDefinitionCreate):
-    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    id: uuid.UUID
 
 
 # ---------------------------------------------------------------------------
@@ -46,10 +45,9 @@ class VocabularyCreate(BaseModel):
 
 
 class VocabularyRead(VocabularyCreate):
-    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    id: uuid.UUID
 
 
 class VocabularyTermCreate(BaseModel):
@@ -60,10 +58,9 @@ class VocabularyTermCreate(BaseModel):
 
 
 class VocabularyTermRead(VocabularyTermCreate):
-    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    id: uuid.UUID
 
 
 # ---------------------------------------------------------------------------
@@ -71,12 +68,10 @@ class VocabularyTermRead(VocabularyTermCreate):
 # ---------------------------------------------------------------------------
 
 class RecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     status: str = "draft"
     metadata_: dict = {}
-
-    class Config:
-        from_attributes = True
-        populate_by_name = True
 
 
 class ObjectCreate(RecordBase):
@@ -134,11 +129,10 @@ class RelationCreate(BaseModel):
 
 
 class RelationRead(RelationCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ---------------------------------------------------------------------------
@@ -152,14 +146,13 @@ class UserCreate(BaseModel):
 
 
 class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     email: str
     role: str
     is_active: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):
@@ -188,6 +181,8 @@ class Page(BaseModel):
 # ---------------------------------------------------------------------------
 
 class AuditLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     record_type: str
     record_id: uuid.UUID
@@ -195,9 +190,6 @@ class AuditLogRead(BaseModel):
     action: str
     changed_fields: dict
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ---------------------------------------------------------------------------
@@ -209,12 +201,11 @@ class SnapshotCreate(BaseModel):
 
 
 class SnapshotRead(SnapshotCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     record_type: str
     record_id: uuid.UUID
     snapshot: dict
     created_by: uuid.UUID | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True

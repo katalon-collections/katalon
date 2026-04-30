@@ -53,7 +53,7 @@ export function AppShell() {
     <div className="app">
       <Sidebar route={route} setRoute={setRoute} />
       <div className="main">
-        <Topbar crumbs={crumbs} />
+        <Topbar crumbs={crumbs} onNavigate={(r, id) => { if (id) setEditId(id); setRoute(r) }} />
         {renderScreen()}
       </div>
     </div>

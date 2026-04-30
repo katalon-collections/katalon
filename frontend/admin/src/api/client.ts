@@ -1,4 +1,4 @@
-import type { AuditEntry, FieldDefinition, KatalonObject, Page, Token, Vocabulary, VocabularyTerm } from '../types'
+import type { AuditEntry, FieldDefinition, KatalonObject, Page, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -57,6 +57,14 @@ export const vocabularies = {
   createTerm: (vocabId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/${vocabId}/terms`, { method: 'POST', body: JSON.stringify(data) }),
   updateTerm: (termId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTerm: (termId: string) => req<void>(`/v1/vocabularies/terms/${termId}`, { method: 'DELETE' }),
+}
+
+// Search
+export const search = {
+  query: (q: string, pageSize = 8) => {
+    const qs = new URLSearchParams({ q, page_size: String(pageSize) }).toString()
+    return req<SearchResponse>(`/v1/search?${qs}`)
+  },
 }
 
 // Audit

@@ -65,3 +65,19 @@ export interface Token {
   access_token: string
   token_type: string
 }
+
+export interface SearchResult {
+  id: string
+  record_type: string
+  title: string
+  status: string | null
+  score: number | null
+}
+
+export interface SearchResponse {
+  total: number
+  page: number
+  page_size: number
+  items: SearchResult[]
+  facets: Record<string, { value: string; count: number }[]>
+}
