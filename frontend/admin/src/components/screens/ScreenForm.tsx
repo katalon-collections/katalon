@@ -1,15 +1,21 @@
-import { useState, useEffect } from 'react'
-import { objects, schema } from '../../api/client'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { objects, schema, media } from '../../api/client'
+import type { MediaFile } from '../../api/client'
 import type { FieldDefinition, KatalonObject, Status } from '../../types'
-import { ChevD, Plus, Upload, X } from '../ui/Icons'
+import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 
-interface Props { objectId?: string; onBack?: () => void }
+interface Props {
+  objectId?: string
+  onBack?: () => void
+  onSaved?: (id: string) => void
+}
 
-export function ScreenForm({ objectId, onBack }: Props) {
+export function ScreenForm({ objectId, onBack, onSaved }: Props) {
   const isNew = !objectId || objectId === 'new'
+  const currentId = isNew ? null : objectId!
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [idno, setIdno] = useState('')
@@ -21,12 +27,26 @@ export function ScreenForm({ objectId, onBack }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [title, setTitle] = useState(isNew ? 'Neues Objekt' : '…')
 
+  // media state
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // saved object id (set after create to enable media upload)
+  const [savedId, setSavedId] = useState<string | null>(currentId)
+
+  const loadMedia = useCallback((id: string) => {
+    media.list(id).then(setMediaFiles).catch(() => {})
+  }, [])
+
   useEffect(() => {
     setLoading(true)
-    const loadSchema = schema.list('object')
-    const loadObj = isNew ? Promise.resolve(null) : objects.get(objectId!)
+    const loadSchemaP = schema.list('object')
+    const loadObjP = isNew ? Promise.resolve(null) : objects.get(objectId!)
 
-    Promise.all([loadSchema, loadObj])
+    Promise.all([loadSchemaP, loadObjP])
       .then(([fieldDefs, obj]) => {
         setFields(fieldDefs)
         if (obj) {
@@ -40,6 +60,10 @@ export function ScreenForm({ objectId, onBack }: Props) {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [objectId, isNew])
+
+  useEffect(() => {
+    if (savedId) loadMedia(savedId)
+  }, [savedId, loadMedia])
 
   function setField(name: string, value: unknown) {
     setValues(v => ({ ...v, [name]: value }))
@@ -64,16 +88,57 @@ export function ScreenForm({ objectId, onBack }: Props) {
     try {
       const payload: Partial<KatalonObject> = { idno: idno || null, status, metadata_: values }
       if (isNew) {
-        await objects.create(payload)
+        const created = await objects.create(payload)
+        setSavedId(created.id)
+        onSaved?.(created.id)
+        loadMedia(created.id)
       } else {
         await objects.update(objectId!, payload)
+        onBack?.()
       }
-      onBack?.()
     } catch (e) {
       setError((e as Error).message)
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleUpload(file: File) {
+    const id = savedId
+    if (!id) return
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const f = await media.upload(id, file)
+      setMediaFiles(prev => [...prev, f])
+    } catch (e) {
+      setUploadError((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDeleteMedia(mediaId: string) {
+    if (!savedId || !window.confirm('Medium wirklich löschen?')) return
+    try {
+      await media.delete(savedId, mediaId)
+      setMediaFiles(prev => prev.filter(f => f.id !== mediaId))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleUpload(file)
+    e.target.value = ''
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleUpload(file)
   }
 
   if (loading) {
@@ -83,6 +148,9 @@ export function ScreenForm({ objectId, onBack }: Props) {
       </div>
     )
   }
+
+  const hasSavedId = Boolean(savedId)
+  const justCreated = isNew && hasSavedId
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -100,16 +168,26 @@ export function ScreenForm({ objectId, onBack }: Props) {
               </button>
             ))}
           </div>
-          <button className="btn gh" onClick={onBack} disabled={saving}>Verwerfen</button>
-          <button className="btn pri" onClick={handleSave} disabled={saving}>
-            {saving ? 'Speichert…' : 'Speichern'}
+          <button className="btn gh" onClick={onBack} disabled={saving}>
+            {justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
+          {!justCreated && (
+            <button className="btn pri" onClick={handleSave} disabled={saving}>
+              {saving ? 'Speichert…' : 'Speichern'}
+            </button>
+          )}
         </div>
       </div>
 
       {error && (
         <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '8px 24px', fontSize: 13, color: '#b91c1c', flexShrink: 0 }}>
           {error}
+        </div>
+      )}
+
+      {justCreated && (
+        <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
+          Objekt gespeichert. Bilder können jetzt hochgeladen werden.
         </div>
       )}
 
@@ -121,7 +199,7 @@ export function ScreenForm({ objectId, onBack }: Props) {
               <div className="bd">
                 <div className="field">
                   <div className="lbl">Inventar-Nr.</div>
-                  <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" />
+                  <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" disabled={justCreated} />
                 </div>
 
                 {fields.map(f => {
@@ -143,11 +221,12 @@ export function ScreenForm({ objectId, onBack }: Props) {
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                               <input className="fld" value={v}
                                 onChange={e => updateRepeat(f.name, i, e.target.value)}
-                                placeholder={f.label.de ?? f.name} />
-                              <button className="btn sm ico gh" onClick={() => removeRepeat(f.name, i)}><X size={12} /></button>
+                                placeholder={f.label.de ?? f.name}
+                                disabled={justCreated} />
+                              <button className="btn sm ico gh" onClick={() => removeRepeat(f.name, i)} disabled={justCreated}><X size={12} /></button>
                             </div>
                           ))}
-                          <button className="btn sm gh" onClick={() => addRepeat(f.name)}>
+                          <button className="btn sm gh" onClick={() => addRepeat(f.name)} disabled={justCreated}>
                             <Plus size={12} /> Weiteren Wert
                           </button>
                         </>
@@ -155,19 +234,22 @@ export function ScreenForm({ objectId, onBack }: Props) {
                         <textarea className="fld" rows={4}
                           value={(val as string) ?? ''}
                           onChange={e => setField(f.name, e.target.value)}
-                          placeholder={f.label.de ?? f.name} />
+                          placeholder={f.label.de ?? f.name}
+                          disabled={justCreated} />
                       ) : f.field_type === 'boolean' ? (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <input type="checkbox" className="ck"
                             checked={Boolean(val)}
-                            onChange={e => setField(f.name, e.target.checked)} />
+                            onChange={e => setField(f.name, e.target.checked)}
+                            disabled={justCreated} />
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
                       ) : (
                         <input className="fld"
                           value={(val as string) ?? ''}
                           onChange={e => setField(f.name, e.target.value)}
-                          placeholder={f.label.de ?? f.name} />
+                          placeholder={f.label.de ?? f.name}
+                          disabled={justCreated} />
                       )}
                     </div>
                   )
@@ -182,17 +264,55 @@ export function ScreenForm({ objectId, onBack }: Props) {
 
           <div>
             <div className="card" style={{ marginBottom: 14 }}>
-              <div className="hd">Medien</div>
+              <div className="hd">
+                <span>Medien</span>
+                {mediaFiles.length > 0 && <span className="sub">{mediaFiles.length} Datei{mediaFiles.length !== 1 ? 'en' : ''}</span>}
+              </div>
               <div className="bd">
-                <div className="dz" style={{ padding: '24px 16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-                    <Upload size={28} style={{ color: 'var(--fg-4)' }} />
+                {mediaFiles.length > 0 && (
+                  <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {mediaFiles.map(f => (
+                      <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
+                        <Image size={14} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
+                        <span style={{ fontSize: 11, color: f.status === 'ready' ? '#16a34a' : f.status === 'error' ? '#dc2626' : 'var(--fg-3)', flexShrink: 0 }}>
+                          {f.status}
+                        </span>
+                        <button className="btn sm ico gh dn" onClick={() => handleDeleteMedia(f.id)}><Trash size={11} /></button>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: 12 }}>Bilder hierher ziehen oder</div>
-                  <label style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>
-                    auswählen<input type="file" style={{ display: 'none' }} accept="image/*" />
-                  </label>
-                </div>
+                )}
+
+                {hasSavedId ? (
+                  <div
+                    className="dz"
+                    style={{ padding: '20px 16px', opacity: uploading ? 0.5 : 1, border: dragOver ? '2px dashed var(--accent)' : undefined }}
+                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={onDrop}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                      <Upload size={24} style={{ color: 'var(--fg-4)' }} />
+                    </div>
+                    {uploading ? (
+                      <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Hochladen…</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
+                        <label style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>
+                          &nbsp;auswählen
+                          <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp" onChange={onFileChange} />
+                        </label>
+                      </>
+                    )}
+                    {uploadError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{uploadError}</div>}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }}>
+                    Objekt zuerst speichern, dann Bilder hochladen.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -217,7 +337,7 @@ export function ScreenForm({ objectId, onBack }: Props) {
                 {showAudit && (
                   <div className="bd" style={{ padding: '8px 0' }}>
                     <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
-                      Audit-Log unter Katalon → Audit-Log verfügbar.
+                      Vollständiges Log unter Katalon → Audit-Log.
                     </div>
                   </div>
                 )}

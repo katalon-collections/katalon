@@ -59,6 +59,33 @@ export const vocabularies = {
   deleteTerm: (termId: string) => req<void>(`/v1/vocabularies/terms/${termId}`, { method: 'DELETE' }),
 }
 
+// Media
+export interface MediaFile {
+  id: string
+  filename: string
+  mime_type: string
+  status: string
+  is_primary: boolean
+  created_at: string
+}
+
+export const media = {
+  list: (objectId: string) => req<MediaFile[]>(`/v1/objects/${objectId}/media`),
+  upload: async (objectId: string, file: File): Promise<MediaFile> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    if (_token) headers['Authorization'] = `Bearer ${_token}`
+    const res = await fetch(`${BASE}/v1/objects/${objectId}/media`, { method: 'POST', body: formData, headers })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail ?? res.statusText)
+    }
+    return res.json()
+  },
+  delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
+}
+
 // Search
 export const search = {
   query: (q: string, pageSize = 8) => {

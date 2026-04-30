@@ -40,7 +40,7 @@ export function AppShell() {
   function renderScreen() {
     switch (route) {
       case 'list':     return <ScreenList onOpen={(id) => { setEditId(id); setRoute('form') }} />
-      case 'form':     return <ScreenForm objectId={editId ?? undefined} onBack={() => setRoute('list')} />
+      case 'form':     return <ScreenForm objectId={editId ?? undefined} onBack={() => setRoute('list')} onSaved={(id) => setEditId(id)} />
       case 'schema':   return <ScreenSchema />
       case 'vocab':    return <ScreenVocab />
       case 'import':   return <ScreenImporter />
