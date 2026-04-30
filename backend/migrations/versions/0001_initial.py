@@ -72,7 +72,6 @@ def upgrade() -> None:
     op.create_table(
         "places",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("geom", sa.Column("geom", nullable=True), nullable=True),
         sa.Column("status", sa.String(32), nullable=False, server_default="draft"),
         sa.Column("metadata", postgresql.JSONB, nullable=False, server_default="{}"),
         sa.Column("search_vector", postgresql.TSVECTOR, nullable=True),
