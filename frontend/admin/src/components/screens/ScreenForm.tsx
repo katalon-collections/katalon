@@ -1,8 +1,7 @@
-import { useState } from 'react'
-import { MOCK_FIELDS, MOCK_OBJECTS } from '../../api/mock-data'
-import { StatusBadge } from '../ui/StatusBadge'
+import { useState, useEffect } from 'react'
+import { objects, schema } from '../../api/client'
+import type { FieldDefinition, KatalonObject, Status } from '../../types'
 import { ChevD, Plus, Upload, X } from '../ui/Icons'
-import type { Status } from '../../types'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
@@ -10,42 +9,86 @@ const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Int
 interface Props { objectId?: string; onBack?: () => void }
 
 export function ScreenForm({ objectId, onBack }: Props) {
-  const existing = MOCK_OBJECTS.find(o => o.id === objectId)
-  const meta = (existing?.metadata_ ?? {}) as Record<string, unknown>
+  const isNew = !objectId || objectId === 'new'
 
-  const [status, setStatus] = useState<Status>((existing?.status ?? 'draft') as Status)
-  const [values, setValues] = useState<Record<string, unknown>>(meta)
+  const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [idno, setIdno] = useState('')
+  const [status, setStatus] = useState<Status>('draft')
+  const [values, setValues] = useState<Record<string, unknown>>({})
   const [showAudit, setShowAudit] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [title, setTitle] = useState(isNew ? 'Neues Objekt' : '…')
+
+  useEffect(() => {
+    setLoading(true)
+    const loadSchema = schema.list('object')
+    const loadObj = isNew ? Promise.resolve(null) : objects.get(objectId!)
+
+    Promise.all([loadSchema, loadObj])
+      .then(([fieldDefs, obj]) => {
+        setFields(fieldDefs)
+        if (obj) {
+          setIdno(obj.idno ?? '')
+          setStatus(obj.status as Status)
+          setValues(obj.metadata_)
+          const m = obj.metadata_ as Record<string, unknown>
+          setTitle(String(m.title ?? obj.idno ?? obj.id))
+        }
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [objectId, isNew])
 
   function setField(name: string, value: unknown) {
     setValues(v => ({ ...v, [name]: value }))
   }
-
   function addRepeat(name: string) {
     const cur = (values[name] as string[] | undefined) ?? []
     setValues(v => ({ ...v, [name]: [...cur, ''] }))
   }
-
   function removeRepeat(name: string, idx: number) {
     const cur = (values[name] as string[]) ?? []
     setValues(v => ({ ...v, [name]: cur.filter((_, i) => i !== idx) }))
   }
-
   function updateRepeat(name: string, idx: number, val: string) {
     const cur = [...((values[name] as string[]) ?? [])]
     cur[idx] = val
     setValues(v => ({ ...v, [name]: cur }))
   }
 
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      const payload: Partial<KatalonObject> = { idno: idno || null, status, metadata_: values }
+      if (isNew) {
+        await objects.create(payload)
+      } else {
+        await objects.update(objectId!, payload)
+      }
+      onBack?.()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="scroll">
+        <div className="empty" style={{ paddingTop: 80 }}>Lade…</div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Sticky header */}
       <div style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>
-          {existing ? (meta.title as string) : 'Neues Objekt'}
-        </div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Status selector */}
           <div style={{ display: 'flex', border: '1px solid var(--border-s)', borderRadius: 6, overflow: 'hidden' }}>
             {STATUSES.map(s => (
               <button key={s} onClick={() => setStatus(s)}
@@ -57,19 +100,31 @@ export function ScreenForm({ objectId, onBack }: Props) {
               </button>
             ))}
           </div>
-          <button className="btn gh" onClick={onBack}>Verwerfen</button>
-          <button className="btn pri">Speichern</button>
+          <button className="btn gh" onClick={onBack} disabled={saving}>Verwerfen</button>
+          <button className="btn pri" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichert…' : 'Speichern'}
+          </button>
         </div>
       </div>
 
+      {error && (
+        <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '8px 24px', fontSize: 13, color: '#b91c1c', flexShrink: 0 }}>
+          {error}
+        </div>
+      )}
+
       <div className="scroll">
         <div className="form-grid">
-          {/* Left: dynamic fields */}
           <div>
             <div className="card">
               <div className="hd">Metadaten</div>
               <div className="bd">
-                {MOCK_FIELDS.map(f => {
+                <div className="field">
+                  <div className="lbl">Inventar-Nr.</div>
+                  <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" />
+                </div>
+
+                {fields.map(f => {
                   const val = values[f.name]
                   const repeatable = f.is_repeatable
                   const vals = repeatable ? ((val as string[] | undefined) ?? []) : undefined
@@ -108,13 +163,6 @@ export function ScreenForm({ objectId, onBack }: Props) {
                             onChange={e => setField(f.name, e.target.checked)} />
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
-                      ) : f.field_type === 'date' ? (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input className="fld" style={{ flex: 2 }}
-                            value={(val as string) ?? ''}
-                            onChange={e => setField(f.name, e.target.value)}
-                            placeholder='z.B. 1958 oder ca. 1920–1930' />
-                        </div>
                       ) : (
                         <input className="fld"
                           value={(val as string) ?? ''}
@@ -124,11 +172,14 @@ export function ScreenForm({ objectId, onBack }: Props) {
                     </div>
                   )
                 })}
+
+                {fields.length === 0 && (
+                  <div className="empty">Keine Felder definiert. Schema unter Konfiguration → Schemata anlegen.</div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: media + relations */}
           <div>
             <div className="card" style={{ marginBottom: 14 }}>
               <div className="hd">Medien</div>
@@ -156,28 +207,22 @@ export function ScreenForm({ objectId, onBack }: Props) {
               </div>
             </div>
 
-            <div className="card">
-              <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
-                <span>Letzte Änderungen</span>
-                <div className="grow" />
-                <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
-              </div>
-              {showAudit && (
-                <div className="bd" style={{ padding: '8px 0' }}>
-                  {[
-                    { who: 'M. Bauer', when: 'vor 2 Std', what: 'Status geändert' },
-                    { who: 'M. Bauer', when: 'vor 4 Std', what: 'Datierung aktualisiert' },
-                    { who: 'T. Hofer', when: 'gestern',   what: 'Angelegt' },
-                  ].map((e, i) => (
-                    <div key={i} style={{ padding: '6px 16px', display: 'flex', gap: 10, fontSize: 12, color: 'var(--fg-3)' }}>
-                      <span style={{ flex: 1 }}>{e.what}</span>
-                      <span>{e.who}</span>
-                      <span>{e.when}</span>
-                    </div>
-                  ))}
+            {!isNew && (
+              <div className="card">
+                <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
+                  <span>Letzte Änderungen</span>
+                  <div className="grow" />
+                  <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
                 </div>
-              )}
-            </div>
+                {showAudit && (
+                  <div className="bd" style={{ padding: '8px 0' }}>
+                    <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
+                      Audit-Log unter Katalon → Audit-Log verfügbar.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
