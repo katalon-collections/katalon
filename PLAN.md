@@ -15,7 +15,7 @@
 | 6 | Admin-UI (React + TypeScript, alle 6 Screens) | ✅ Fertig |
 | 7 | Elasticsearch + Versionierung (Snapshots) | ✅ Fertig (ES-Client, Search-Service, Celery-Reindex, GET /v1/search) |
 | 8 | Public-Portal (React) + Theme-System (Drop-in Bundles) | ✅ Fertig (Homepage, Suche, Detail, Theme-aware) |
-| 9 | Authority-Plugin-System (GND, Geonames) | ⏳ Ausstehend |
+| 9 | Authority-Plugin-System (GND, Geonames) | ✅ Fertig (ABC, GND/Geonames-Adapter, /v1/authority/search+fetch) |
 | 10 | Smart Importer (Excel/CSV ETL) | ⏳ Ausstehend |
 | 11 | OAI-PMH | ⏳ Ausstehend |
 | 12 | Hardening (Rate Limiting, Performance) | ⏳ Ausstehend |
