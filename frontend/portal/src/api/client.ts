@@ -14,6 +14,13 @@ export interface ObjectSummary {
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
 
+export interface FacetBucket { value: string; count: number }
+export interface SearchResponse {
+  total: number; page: number; page_size: number
+  items: Array<{ id: string; record_type: string; title: string; status: string | null; score: number | null }>
+  facets: Record<string, FacetBucket[]>
+}
+
 export const api = {
   objects: {
     list: (p?: { page?: number; q?: string; status?: string }) => {
@@ -25,5 +32,15 @@ export const api = {
       return get<Page<ObjectSummary>>(`/v1/objects?${qs}`)
     },
     get: (id: string) => get<ObjectSummary>(`/v1/objects/${id}`),
+  },
+  search: {
+    query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number }) => {
+      const qs = new URLSearchParams(
+        Object.entries(p)
+          .filter(([, v]) => v != null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString()
+      return get<SearchResponse>(`/v1/search?${qs}`)
+    },
   },
 }
