@@ -6,6 +6,7 @@ import { ScreenSchema } from '../screens/ScreenSchema'
 import { ScreenVocab } from '../screens/ScreenVocab'
 import { ScreenImporter } from '../screens/ScreenImporter'
 import { ScreenAudit } from '../screens/ScreenAudit'
+import { ScreenForm } from '../screens/ScreenForm'
 
 const CRUMBS: Record<string, string[]> = {
   list:     ['Katalon', 'Objekte'],
@@ -39,6 +40,7 @@ export function AppShell() {
   function renderScreen() {
     switch (route) {
       case 'list':     return <ScreenList onOpen={(id) => { setEditId(id); setRoute('form') }} />
+      case 'form':     return <ScreenForm objectId={editId ?? undefined} onBack={() => setRoute('list')} />
       case 'schema':   return <ScreenSchema />
       case 'vocab':    return <ScreenVocab />
       case 'import':   return <ScreenImporter />
