@@ -13,12 +13,14 @@ def _run(coro: Any) -> Any:
 @celery_app.task(name="katalon.index_record")
 def index_record_task(record_type: str, record_id: str, doc: dict) -> None:
     from katalon.integrations.elasticsearch import index_document
+
     _run(index_document(record_id, {"record_type": record_type, **doc}))
 
 
 @celery_app.task(name="katalon.remove_record")
 def remove_record_task(record_id: str) -> None:
     from katalon.integrations.elasticsearch import delete_document
+
     _run(delete_document(record_id))
 
 
@@ -47,10 +49,16 @@ def reindex_all_task() -> None:
                     metadata: dict = {}
                     if getattr(rec, "metadata", None):
                         md = rec.metadata
-                        title_field = md.get("title") or md.get("name") or md.get("label")
+                        title_field = (
+                            md.get("title") or md.get("name") or md.get("label")
+                        )
                         if isinstance(title_field, list) and title_field:
                             first = title_field[0]
-                            title = first.get("value", "") if isinstance(first, dict) else str(first)
+                            title = (
+                                first.get("value", "")
+                                if isinstance(first, dict)
+                                else str(first)
+                            )
                         elif isinstance(title_field, str):
                             title = title_field
                         metadata = md
@@ -59,8 +67,12 @@ def reindex_all_task() -> None:
                         "title": title,
                         "status": getattr(rec, "status", None),
                         "metadata": metadata,
-                        "created_at": rec.created_at.isoformat() if rec.created_at else None,
-                        "updated_at": rec.updated_at.isoformat() if rec.updated_at else None,
+                        "created_at": (
+                            rec.created_at.isoformat() if rec.created_at else None
+                        ),
+                        "updated_at": (
+                            rec.updated_at.isoformat() if rec.updated_at else None
+                        ),
                     }
                     await index_document(str(rec.id), doc)
 

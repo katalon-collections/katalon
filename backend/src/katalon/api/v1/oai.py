@@ -34,7 +34,9 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
         prefix = params.get("metadataPrefix", "oai_dc")
         if prefix != "oai_dc":
             root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
+            xml = oaipmh_service._error(
+                root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}"
+            )
         else:
             set_spec = params.get("set", "object")
             model = _MODEL_MAP.get(set_spec, Object)
@@ -51,6 +53,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             model = _MODEL_MAP.get(record_type)
             if model:
                 from uuid import UUID
+
                 try:
                     uid = UUID(record_id)
                     result = await db.execute(select(model).where(model.id == uid))
@@ -59,25 +62,36 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                         xml = oaipmh_service.get_record(rec, record_type, base_url)
                     else:
                         root = oaipmh_service._root()
-                        xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
+                        xml = oaipmh_service._error(
+                            root, "idDoesNotExist", f"No record: {identifier}"
+                        )
                 except (ValueError, Exception):
                     root = oaipmh_service._root()
-                    xml = oaipmh_service._error(root, "idDoesNotExist", "Invalid identifier format")
+                    xml = oaipmh_service._error(
+                        root, "idDoesNotExist", "Invalid identifier format"
+                    )
             else:
                 root = oaipmh_service._root()
-                xml = oaipmh_service._error(root, "idDoesNotExist", "Unknown record type")
+                xml = oaipmh_service._error(
+                    root, "idDoesNotExist", "Unknown record type"
+                )
         else:
             root = oaipmh_service._root()
             xml = oaipmh_service._error(root, "idDoesNotExist", "Malformed identifier")
 
     elif verb == "ListMetadataFormats":
         from xml.etree.ElementTree import Element, SubElement, tostring
+
         root = oaipmh_service._root()
         lmf = SubElement(root, "ListMetadataFormats")
         fmt = SubElement(lmf, "metadataFormat")
         SubElement(fmt, "metadataPrefix").text = "oai_dc"
-        SubElement(fmt, "schema").text = "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
-        SubElement(fmt, "metadataNamespace").text = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+        SubElement(fmt, "schema").text = (
+            "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
+        )
+        SubElement(fmt, "metadataNamespace").text = (
+            "http://www.openarchives.org/OAI/2.0/oai_dc/"
+        )
         xml = tostring(root, encoding="unicode", xml_declaration=True)
 
     else:
