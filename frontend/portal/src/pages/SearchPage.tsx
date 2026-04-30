@@ -1,28 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-
-const RESULTS = [
-  { id: 'OBJ-2026-00412', title: 'Bahnhofstraße bei Nacht', creator: 'Henri Cartier', year: '1958', medium: 'Silbergelatine', tags: ['Architektur', 'Nacht', 'Stadt'] },
-  { id: 'OBJ-2026-00409', title: 'Markttag in der Altstadt', creator: 'G. Albrecht', year: '1965', medium: 'Silbergelatine', tags: ['Markt', 'Alltag', 'Stadt'] },
-  { id: 'OBJ-2026-00406', title: 'Tramhaltestelle Paradeplatz', creator: 'Henri Cartier', year: '1960', medium: 'Silbergelatine', tags: ['Verkehr', 'Stadt'] },
-]
-
-const FACETS = [
-  { label: 'Sammlung', values: [{ v: 'Stadtarchiv Zürich', n: 8 }, { v: 'Sammlung Maier', n: 3 }] },
-  { label: 'Material', values: [{ v: 'Silbergelatine', n: 7 }, { v: 'Chromogen-Druck', n: 3 }, { v: 'Negativ, Glas', n: 2 }] },
-  { label: 'Jahrzehnt', values: [{ v: '1950er', n: 2 }, { v: '1960er', n: 4 }, { v: '1970er', n: 3 }] },
-]
+import { api, type FacetBucket, type SearchResponse } from '../api/client'
 
 export function SearchPage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const q = params.get('q') ?? ''
+  const typeFilt = params.get('type') ?? ''
+  const page = parseInt(params.get('page') ?? '1', 10)
   const [localQ, setLocalQ] = useState(q)
+  const [data, setData] = useState<SearchResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    api.search
+      .query({ q: q || undefined, type: typeFilt || undefined, page, page_size: 20 })
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [q, typeFilt, page])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (localQ.trim()) navigate(`/search?q=${encodeURIComponent(localQ.trim())}`)
   }
+
+  function setType(t: string) {
+    const next = new URLSearchParams(params)
+    if (t) next.set('type', t)
+    else next.delete('type')
+    next.set('page', '1')
+    setParams(next)
+  }
+
+  function setPage(n: number) {
+    const next = new URLSearchParams(params)
+    next.set('page', String(n))
+    setParams(next)
+  }
+
+  const total = data?.total ?? 0
+  const totalPages = data ? Math.ceil(data.total / data.page_size) : 1
+  const typesFacet: FacetBucket[] = data?.facets?.['by_type'] ?? []
+  const statusFacet: FacetBucket[] = data?.facets?.['by_status'] ?? []
 
   return (
     <div className="container page">
@@ -39,45 +60,62 @@ export function SearchPage() {
         </button>
       </form>
       <div style={{ color: 'var(--fg-3)', fontSize: 13, marginBottom: 4 }}>
-        {RESULTS.length} Treffer für „{q}"
+        {loading ? 'Suche…' : `${total} Treffer${q ? ` für „${q}"` : ''}`}
       </div>
 
       <div className="search-layout">
         <aside className="facets">
-          {FACETS.map(f => (
-            <div key={f.label} style={{ marginBottom: 20 }}>
-              <h3>{f.label}</h3>
-              {f.values.map(v => (
-                <div key={v.v} className="facet-item">
-                  <span>{v.v}</span>
-                  <span className="ct">{v.n}</span>
+          {typesFacet.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <h3>Typ</h3>
+              <div className="facet-item" onClick={() => setType('')} style={{ cursor: 'pointer', fontWeight: !typeFilt ? 600 : undefined }}>
+                <span>Alle</span>
+              </div>
+              {typesFacet.map(b => (
+                <div key={b.value} className="facet-item" onClick={() => setType(b.value)} style={{ cursor: 'pointer', fontWeight: typeFilt === b.value ? 600 : undefined }}>
+                  <span>{b.value}</span>
+                  <span className="ct">{b.count}</span>
                 </div>
               ))}
             </div>
-          ))}
+          )}
+          {statusFacet.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <h3>Status</h3>
+              {statusFacet.map(b => (
+                <div key={b.value} className="facet-item">
+                  <span>{b.value}</span>
+                  <span className="ct">{b.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </aside>
 
         <div className="result-list">
-          {RESULTS.map(r => (
+          {loading && <div style={{ padding: 24, color: 'var(--fg-3)' }}>Lade…</div>}
+          {!loading && data?.items.length === 0 && (
+            <div style={{ padding: 24, color: 'var(--fg-3)' }}>Keine Ergebnisse.</div>
+          )}
+          {!loading && data?.items.map(r => (
             <div key={r.id} className="result-row" onClick={() => navigate(`/objects/${r.id}`)}>
               <div className="thumb-sm" />
               <div className="body">
-                <div className="title">{r.title}</div>
-                <div className="desc">{r.creator} · {r.year} · {r.medium}</div>
-                <div className="tags">
-                  {r.tags.map(t => <span key={t} className="tag">{t}</span>)}
-                </div>
+                <div className="title">{r.title || r.id}</div>
+                <div className="desc">{r.record_type} · {r.status ?? '—'}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pagination">
-        {[1, 2, 3].map(n => (
-          <button key={n} className={`page-btn${n === 1 ? ' active' : ''}`}>{n}</button>
-        ))}
-      </div>
+      {totalPages > 1 && (
+        <div className="pagination">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button key={n} className={`page-btn${n === page ? ' active' : ''}`} onClick={() => setPage(n)}>{n}</button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
