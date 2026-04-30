@@ -8,6 +8,7 @@ from katalon.core.models import Place, RecordSnapshot
 from katalon.core.schemas import PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
+from katalon.services import search_service
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -40,6 +41,10 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
     db.add(place)
     await db.flush()
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="create")
+    try:
+        await search_service.index_record("place", place)
+    except Exception:
+        pass
     return place
 
 
@@ -69,6 +74,10 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"status": data.status}})
+    try:
+        await search_service.index_record("place", place)
+    except Exception:
+        pass
     return place
 
 
@@ -79,4 +88,8 @@ async def delete_place(place_id: uuid.UUID, db: DBDep, current_user: CurrentUser
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="delete")
+    try:
+        await search_service.remove_record(place.id)
+    except Exception:
+        pass
     await db.delete(place)
