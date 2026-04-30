@@ -1,0 +1,121 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: katalon
+      POSTGRES_PASSWORD: katalon
+      POSTGRES_DB: katalon
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U katalon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v red"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  cantaloupe:
+    image: ghcr.io/cantaloupe-project/cantaloupe:5.0.6
+    volumes:
+      - media_data:/var/lib/cantaloupe/images
+    environment:
+      - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8182/iiif/3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
+      REDIS_URL: redis://redis:6379/0
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      CANTALOUPE_URL: http://cantaloupe:8182
+      SECRET_KEY: change-me-in-production
+      MEDIA_ROOT: /var/lib/katalon/media
+    volumes:
+      - media_data:/var/lib/katalon/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
+      REDIS_URL: redis://redis:6379/0
+      CANTALOUPE_URL: http://cantaloupe:8182
+      MEDIA_ROOT: /var/lib/katalon/media
+    volumes:
+      - media_data:/var/lib/katalon/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: ./frontend/admin
+      dockerfile: ../../docker/Dockerfile.admin
+    ports:
+      - "3000:80"
+
+  portal:
+    build:
+      context: ./frontend/portal
+      dockerfile: ../../docker/Dockerfile.portal
+    ports:
+      - "3001:80"
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - admin
+      - portal
+
+volumes:
+  db_data:
+  es_data:
+  media_data:
