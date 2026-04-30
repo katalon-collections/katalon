@@ -14,7 +14,7 @@
 | 5 | Media & IIIF (Upload, Celery, Cantaloupe) | ✅ Grundgerüst fertig |
 | 6 | Admin-UI (React + TypeScript, alle 6 Screens) | ✅ Fertig |
 | 7 | Elasticsearch + Versionierung (Snapshots) | ⏳ Ausstehend |
-| 8 | Public-Portal (React) | ⏳ Ausstehend |
+| 8 | Public-Portal (React) + Theme-System (Drop-in Bundles) | ⏳ Ausstehend |
 | 9 | Authority-Plugin-System (GND, Geonames) | ⏳ Ausstehend |
 | 10 | Smart Importer (Excel/CSV ETL) | ⏳ Ausstehend |
 | 11 | OAI-PMH | ⏳ Ausstehend |
@@ -52,9 +52,25 @@ Das Admin-UI folgt dem Design-Prototypen aus `design-prompts/02_admin_ui.md`.
 
 ---
 
+## Theme-System Discovery-Portal (Post-MVP)
+
+Das Public-Portal wird vollständig themebar via Drop-in Bundle. Kein Rebuild nötig.
+
+**Ablauf:**
+1. Theme-Verzeichnis nach `/var/lib/katalon/themes/<name>/` legen
+2. `PORTAL_THEME=<name>` in `.env` setzen
+3. `docker compose restart portal`
+
+**Bundle-Inhalt:** `theme.json` (CSS-Tokens, Fonts, Logo-Pfade) + `custom.css` + Assets.
+
+Vollständiges Konzept → `KONZEPT.md` Abschnitt 11.
+
+---
+
 ## Offene Entscheidungen
 
 - [ ] React-Router v6 für Admin-UI
 - [ ] TanStack Query für API-State-Management
 - [ ] OpenAPI-Codegen für TypeScript-Client (nach Phase 3)
 - [ ] Fuzzy-Datum UI-Komponente: Präzisions-Selektor (Jahr/Monat/Tag + „ca.")
+- [ ] Theme-Loader: SSR-inject vs. client-side (kein Flash-of-unstyled-content)

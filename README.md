@@ -105,3 +105,19 @@ IBM Plex Sans + IBM Plex Mono · Dark Navy Sidebar · 6 Screens:
 - **Audit-Log** — Änderungshistorie
 
 **Screens ohne Design (Post-MVP):** Entitäten, Orte, Occurrences, Benutzer, Einstellungen
+
+## Theme-System (Post-MVP)
+
+Das Discovery-Portal ist vollständig themebar per **Drop-in Bundle** — kein Rebuild, kein Store.
+
+```bash
+# 1. Theme ablegen
+cp -r mein-archiv/ /var/lib/katalon/themes/mein-archiv/
+
+# 2. Aktivieren
+echo "PORTAL_THEME=mein-archiv" >> .env
+docker compose restart portal
+```
+
+Ein Theme-Bundle besteht aus `theme.json` (CSS-Tokens, Fonts, Logo) + optionalem `custom.css`.  
+Das Admin-UI ist bewusst nicht themebar. Details → `KONZEPT.md` Abschnitt 11.
