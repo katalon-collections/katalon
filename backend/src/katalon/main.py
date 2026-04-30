@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from katalon.api.v1 import auth, audit, entities, media, objects, occurrences, places, relations, schema_admin, search, theme, vocabularies
+from katalon.api.v1 import auth, audit, authority, entities, media, objects, occurrences, places, relations, schema_admin, search, theme, vocabularies
 from katalon.config import settings
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(relations.router, prefix="/v1")
 app.include_router(media.router, prefix="/v1")
 app.include_router(theme.router, prefix="/v1")
 app.include_router(search.router, prefix="/v1")
+app.include_router(authority.router, prefix="/v1")
 
 
 @app.get("/health", tags=["system"])
