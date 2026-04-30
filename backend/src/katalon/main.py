@@ -1,8 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-from katalon.api.v1 import auth, audit, authority, entities, importer, media, objects, occurrences, oai, places, relations, schema_admin, search, theme, vocabularies
+from katalon.api.v1 import (
+    auth, audit, authority, entities, importer, media, objects,
+    occurrences, oai, places, relations, schema_admin, search, theme, vocabularies,
+)
 from katalon.config import settings
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(
     title="Katalon API",
@@ -12,6 +21,9 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
