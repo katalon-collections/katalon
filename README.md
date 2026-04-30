@@ -17,7 +17,7 @@ Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galerien, Bib
 | Phase 8 – Public-Portal + Theme-System | ✅ Fertig |
 | Phase 9 – Authority-Adapter (GND, Geonames) | ✅ Fertig |
 | Phase 10 – Smart Importer | ✅ Fertig |
-| Phase 11 – OAI-PMH | ⏳ Ausstehend |
+| Phase 11 – OAI-PMH | ✅ Fertig |
 | Phase 12 – Hardening | ⏳ Ausstehend |
 
 ## Schnellstart (Entwicklung)
