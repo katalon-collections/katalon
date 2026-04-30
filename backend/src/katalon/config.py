@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     media_root: str = "/var/lib/katalon/media"
     max_upload_size_mb: int = 100
 
+    portal_theme: str | None = None
+
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
 
