@@ -10,6 +10,7 @@ from katalon.core.models import Object, RecordSnapshot
 from katalon.core.schemas import ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
+from katalon.services import search_service
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 
@@ -53,6 +54,10 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
     db.add(obj)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
+    try:
+        await search_service.index_record("object", obj)
+    except Exception:
+        pass
     return obj
 
 
@@ -91,6 +96,10 @@ async def update_object(
         action="update",
         changed_fields={"old": old_fields, "new": {"status": data.status, "metadata": data.metadata_}},
     )
+    try:
+        await search_service.index_record("object", obj)
+    except Exception:
+        pass
     return obj
 
 
@@ -101,6 +110,10 @@ async def delete_object(object_id: uuid.UUID, db: DBDep, current_user: CurrentUs
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete")
+    try:
+        await search_service.remove_record(obj.id)
+    except Exception:
+        pass
     await db.delete(obj)
 
 
