@@ -1,14 +1,12 @@
 import uuid
 
-import httpx
-
 from katalon.config import settings
 
 
-def build_manifest(media_file_id: uuid.UUID) -> dict:
+def build_manifest(media_file_id: uuid.UUID, filename: str) -> dict:
     """Build a minimal IIIF Presentation API 3.0 manifest for a media file."""
     base = f"{settings.cantaloupe_url}/iiif/3"
-    identifier = str(media_file_id)
+    identifier = filename  # e.g. "<uuid>.jpg" — matches the file on disk
 
     return {
         "@context": "http://iiif.io/api/presentation/3/context.json",

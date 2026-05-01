@@ -44,12 +44,11 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
 
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    dest_dir = Path(settings.media_root) / str(object_id)
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    Path(settings.media_root).mkdir(parents=True, exist_ok=True)
 
     file_id = uuid.uuid4()
     suffix = Path(file.filename or "upload").suffix or ".bin"
-    dest_path = dest_dir / f"{file_id}{suffix}"
+    dest_path = Path(settings.media_root) / f"{file_id}{suffix}"
 
     size = 0
     async with aiofiles.open(dest_path, "wb") as out:

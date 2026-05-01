@@ -44,9 +44,14 @@ services:
       - ./frontend/admin:/app
       - /app/node_modules
     ports:
-      - "3000:5173"
+      - "4000:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   portal:
     build:
@@ -56,6 +61,11 @@ services:
       - ./frontend/portal:/app
       - /app/node_modules
     ports:
-      - "3001:5173"
+      - "4001:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
