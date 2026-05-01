@@ -1,3 +1,4 @@
+import { getTokenUser } from '../../api/client'
 import { History, Gear, Image, Layers, Lightning, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 import { Search } from '../ui/Icons'
 
@@ -31,9 +32,14 @@ const NAV: NavItem[] = [
 interface Props {
   route: Route
   setRoute: (r: Route) => void
+  onLogout: () => void
 }
 
-export function Sidebar({ route, setRoute }: Props) {
+export function Sidebar({ route, setRoute, onLogout }: Props) {
+  const user = getTokenUser()
+  const initials = user?.email ? user.email[0].toUpperCase() : 'A'
+  const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }
+
   return (
     <aside className="sb">
       <div className="sb-brand">
@@ -67,11 +73,20 @@ export function Sidebar({ route, setRoute }: Props) {
       </nav>
 
       <div className="sb-foot">
-        <div className="sb-av">MB</div>
-        <div>
-          <b>Mira Bauer</b>
-          <small>Kuratorin</small>
+        <div className="sb-av">{initials}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.email ?? '—'}
+          </b>
+          <small>{roleLabel[user?.role ?? ''] ?? user?.role ?? ''}</small>
         </div>
+        <button
+          onClick={onLogout}
+          title="Abmelden"
+          style={{ background: 'none', border: 0, color: 'var(--sb-mute)', cursor: 'pointer', padding: '4px', borderRadius: 4, flexShrink: 0 }}
+        >
+          ⏻
+        </button>
       </div>
     </aside>
   )

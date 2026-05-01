@@ -3,16 +3,40 @@ import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Pa
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
 let _token: string | null = localStorage.getItem('katalon_token')
+let _onUnauthorized: (() => void) | null = null
 
 export function setToken(t: string | null) {
   _token = t
   t ? localStorage.setItem('katalon_token', t) : localStorage.removeItem('katalon_token')
 }
 
+export function hasToken(): boolean {
+  return Boolean(_token)
+}
+
+export function getTokenUser(): { email: string; role: string } | null {
+  if (!_token) return null
+  try {
+    const payload = JSON.parse(atob(_token.split('.')[1]))
+    return { email: payload.email ?? '', role: payload.role ?? '' }
+  } catch {
+    return null
+  }
+}
+
+export function onUnauthorized(cb: () => void) {
+  _onUnauthorized = cb
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
   if (_token) headers['Authorization'] = `Bearer ${_token}`
   const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  if (res.status === 401) {
+    setToken(null)
+    _onUnauthorized?.()
+    throw new Error('Sitzung abgelaufen. Bitte neu anmelden.')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail ?? res.statusText)

@@ -168,6 +168,10 @@ export function ScreenSchema() {
 
   async function handleSave() {
     if (!form) return
+    if (!form.name.trim()) {
+      setSaveError('Interner Name darf nicht leer sein.')
+      return
+    }
     setSaving(true)
     setSaveError(null)
     const data = {

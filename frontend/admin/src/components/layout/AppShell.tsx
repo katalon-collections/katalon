@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { hasToken, onUnauthorized, setToken } from '../../api/client'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ScreenList } from '../screens/ScreenList'
@@ -7,6 +8,7 @@ import { ScreenVocab } from '../screens/ScreenVocab'
 import { ScreenImporter } from '../screens/ScreenImporter'
 import { ScreenAudit } from '../screens/ScreenAudit'
 import { ScreenForm } from '../screens/ScreenForm'
+import { ScreenLogin } from '../screens/ScreenLogin'
 
 const CRUMBS: Record<string, string[]> = {
   list:              ['Katalon', 'Objekte'],
@@ -38,8 +40,22 @@ function Placeholder({ label }: { label: string }) {
 }
 
 export function AppShell() {
+  const [loggedIn, setLoggedIn] = useState(hasToken)
   const [route, setRoute] = useState('list')
   const [editId, setEditId] = useState<string | null>(null)
+
+  useEffect(() => {
+    onUnauthorized(() => setLoggedIn(false))
+  }, [])
+
+  function handleLogout() {
+    setToken(null)
+    setLoggedIn(false)
+  }
+
+  if (!loggedIn) {
+    return <ScreenLogin onLogin={() => setLoggedIn(true)} />
+  }
 
   const crumbs = CRUMBS[route] ?? ['Katalon']
 
@@ -63,7 +79,7 @@ export function AppShell() {
 
   return (
     <div className="app">
-      <Sidebar route={route} setRoute={setRoute} />
+      <Sidebar route={route} setRoute={setRoute} onLogout={handleLogout} />
       <div className="main">
         <Topbar crumbs={crumbs} onNavigate={(r, id) => { if (id) setEditId(id); setRoute(r) }} />
         {renderScreen()}
