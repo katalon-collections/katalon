@@ -1,19 +1,45 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy import select
 
 from katalon.api.v1 import (
     auth, audit, authority, entities, importer, media, objects,
     occurrences, oai, places, relations, schema_admin, search, theme, vocabularies,
 )
+from katalon.api.v1.auth import hash_password
 from katalon.config import settings
+from katalon.core.models import User
+from katalon.database import AsyncSessionLocal
+
+async def _ensure_admin() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).limit(1))
+        if result.scalar_one_or_none() is None:
+            admin = User(
+                email=settings.default_admin_email,
+                hashed_password=hash_password(settings.default_admin_password),
+                role="admin",
+            )
+            db.add(admin)
+            await db.commit()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _ensure_admin()
+    yield
+
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Katalon API",
     description="Metadata Management System for GLAM collections",
     version="0.1.0",

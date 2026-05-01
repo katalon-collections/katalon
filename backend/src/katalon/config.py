@@ -18,6 +18,9 @@ class Settings(BaseSettings):
 
     portal_theme: str | None = None
 
+    default_admin_email: str = "admin@katalon.dev"
+    default_admin_password: str = "admin"
+
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
 

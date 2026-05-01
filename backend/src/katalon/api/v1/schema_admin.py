@@ -22,6 +22,8 @@ async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
 
 @router.post("", response_model=FieldDefinitionRead, status_code=201)
 async def create_field(data: FieldDefinitionCreate, db: DBDep, _: CurrentUser) -> FieldDefinition:
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
@@ -32,6 +34,8 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep, _: CurrentUser) -
 async def update_field(
     field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep, _: CurrentUser
 ) -> FieldDefinition:
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     result = await db.execute(select(FieldDefinition).where(FieldDefinition.id == field_id))
     field = result.scalar_one_or_none()
     if not field:

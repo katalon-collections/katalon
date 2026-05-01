@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Annotated
 
+import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,23 +15,22 @@ from katalon.core.schemas import Token, UserCreate, UserRead
 from katalon.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DBDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return _bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
+def create_access_token(user_id: uuid.UUID, role: str, email: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     return jwt.encode(
-        {"sub": str(user_id), "role": role, "exp": expire},
+        {"sub": str(user_id), "role": role, "email": email, "exp": expire},
         settings.secret_key,
         algorithm=settings.algorithm,
     )
@@ -64,4 +63,4 @@ async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Konto deaktiviert")
-    return Token(access_token=create_access_token(user.id, user.role))
+    return Token(access_token=create_access_token(user.id, user.role, user.email))
