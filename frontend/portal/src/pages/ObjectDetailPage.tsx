@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, type MediaFile, type ObjectSummary } from '../api/client'
+import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
 
 const TYPE_LABEL_MAP: Record<string, string> = {
   title: 'Titel', name: 'Name', creator: 'Urheber:in', photographer: 'Fotograf:in',
@@ -81,7 +81,7 @@ export function ObjectDetailPage() {
         <div>
           {primaryMedia ? (
             <img
-              src={`/v1/objects/${obj.id}/media/${primaryMedia.id}/file`}
+              src={`${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file`}
               alt={title}
               style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -132,7 +132,7 @@ export function ObjectDetailPage() {
                 background: '#e4e6eb', border: f.is_primary ? '2px solid var(--accent)' : '1px solid var(--border)',
               }}>
                 <img
-                  src={`/v1/objects/${obj.id}/media/${f.id}/file`}
+                  src={`${BASE}/v1/objects/${obj.id}/media/${f.id}/file`}
                   alt={f.filename}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={e => { (e.target as HTMLImageElement).style.opacity = '0' }}

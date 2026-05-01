@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, BASE } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import type { AnyRecord, FieldDefinition, RecordType, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
@@ -380,8 +380,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                     {mediaFiles.length > 0 && (
                       <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {mediaFiles.map(f => (
-                          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '14px 1fr auto auto auto', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
-                            <Image size={14} style={{ color: f.is_primary ? 'var(--accent)' : 'var(--fg-3)' }} />
+                          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto auto auto', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
+                            {f.status === 'ready' ? (
+                              <img
+                                src={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`}
+                                alt={f.filename}
+                                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, background: 'var(--bg-s)' }}
+                                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                              />
+                            ) : (
+                              <div style={{ width: 40, height: 40, borderRadius: 4, background: 'var(--bg-s)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Image size={14} style={{ color: 'var(--fg-3)' }} />
+                              </div>
+                            )}
                             <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.filename}>{f.filename}</span>
                             <select
                               className="fld"

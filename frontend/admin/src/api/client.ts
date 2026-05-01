@@ -1,6 +1,6 @@
 import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
 
-const BASE = import.meta.env.VITE_API_URL ?? ''
+export const BASE = import.meta.env.VITE_API_URL ?? ''
 
 let _token: string | null = localStorage.getItem('katalon_token')
 let _onUnauthorized: (() => void) | null = null
