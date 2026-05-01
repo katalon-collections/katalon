@@ -3,7 +3,7 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.config import settings
@@ -16,15 +16,22 @@ router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
 ALLOWED_MIME = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
 
 
+def _serialize(f: MediaFile) -> dict:
+    return {
+        "id": str(f.id),
+        "filename": f.filename,
+        "mime_type": f.mime_type,
+        "status": f.status,
+        "is_primary": f.is_primary,
+        "media_type": f.media_type,
+        "created_at": f.created_at.isoformat(),
+    }
+
+
 @router.get("", response_model=list[dict])
 async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict]:
     result = await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))
-    files = result.scalars().all()
-    return [
-        {"id": str(f.id), "filename": f.filename, "mime_type": f.mime_type,
-         "status": f.status, "is_primary": f.is_primary, "created_at": f.created_at.isoformat()}
-        for f in files
-    ]
+    return [_serialize(f) for f in result.scalars().all()]
 
 
 @router.post("", status_code=201)
@@ -53,7 +60,7 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
                 raise HTTPException(status_code=413, detail="Datei zu groß")
             await out.write(chunk)
 
-    existing_count = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
+    existing = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
     media = MediaFile(
         id=file_id,
         object_id=object_id,
@@ -61,14 +68,42 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         mime_type=file.content_type,
         file_path=str(dest_path),
         status="pending",
-        is_primary=len(existing_count) == 0,
+        is_primary=len(existing) == 0,
     )
     db.add(media)
     await db.flush()
 
     generate_iiif_tiles.delay(str(file_id))
 
-    return {"id": str(file_id), "filename": media.filename, "status": "pending"}
+    return _serialize(media)
+
+
+class MediaPatch(BaseModel):
+    media_type: str | None = None
+    is_primary: bool | None = None
+
+
+@router.patch("/{media_id}", response_model=dict)
+async def patch_media(
+    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user: CurrentUser
+) -> dict:
+    result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Medium nicht gefunden")
+
+    if data.media_type is not None:
+        media.media_type = data.media_type
+
+    if data.is_primary is True:
+        all_files = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
+        for f in all_files:
+            f.is_primary = f.id == media_id
+    elif data.is_primary is False:
+        media.is_primary = False
+
+    await db.flush()
+    return _serialize(media)
 
 
 @router.delete("/{media_id}", status_code=204)

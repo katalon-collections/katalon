@@ -126,6 +126,7 @@ export interface MediaFile {
   mime_type: string
   status: string
   is_primary: boolean
+  media_type: string | null
   created_at: string
 }
 
@@ -143,6 +144,8 @@ export const media = {
     }
     return res.json()
   },
+  patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean }) =>
+    req<MediaFile>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
 }
 

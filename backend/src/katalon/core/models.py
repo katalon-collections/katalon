@@ -202,6 +202,7 @@ class MediaFile(Base):
     iiif_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     object: Mapped["Object"] = relationship(back_populates="media_files")

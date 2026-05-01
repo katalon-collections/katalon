@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import type { AnyRecord, FieldDefinition, RecordType, Status } from '../../types'
+import type { AnyRecord, FieldDefinition, RecordType, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -58,10 +58,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [error, setError]     = useState<string | null>(null)
   const [title, setTitle]     = useState(isNew ? `Neues ${label}` : '…')
 
-  const [mediaFiles, setMediaFiles]   = useState<MediaFile[]>([])
-  const [uploading, setUploading]     = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [dragOver, setDragOver]       = useState(false)
+  const [mediaFiles, setMediaFiles]     = useState<MediaFile[]>([])
+  const [uploading, setUploading]       = useState(false)
+  const [uploadError, setUploadError]   = useState<string | null>(null)
+  const [dragOver, setDragOver]         = useState(false)
+  const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
@@ -109,6 +110,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   useEffect(() => {
     if (savedId && showMedia) loadMedia(savedId)
   }, [savedId, showMedia, loadMedia])
+
+  useEffect(() => {
+    if (!showMedia) return
+    vocabularies.list()
+      .then(vocabs => {
+        const mt = vocabs.find(v => v.name === 'media_types')
+        if (mt) return vocabularies.listTerms(mt.id)
+        return []
+      })
+      .then(setMediaTypeTerms)
+      .catch(() => {})
+  }, [showMedia])
 
   function setField(name: string, value: unknown) { setValues(v => ({ ...v, [name]: value })) }
   function addRepeat(name: string) {
@@ -171,6 +184,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     try {
       await media.delete(savedId, mediaId)
       setMediaFiles(prev => prev.filter(f => f.id !== mediaId))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  async function handleSetPrimary(mediaId: string) {
+    if (!savedId) return
+    try {
+      await media.patch(savedId, mediaId, { is_primary: true })
+      setMediaFiles(prev => prev.map(f => ({ ...f, is_primary: f.id === mediaId })))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  async function handleSetMediaType(mediaId: string, mediaType: string | null) {
+    if (!savedId) return
+    try {
+      const updated = await media.patch(savedId, mediaId, { media_type: mediaType })
+      setMediaFiles(prev => prev.map(f => f.id === mediaId ? { ...f, media_type: updated.media_type } : f))
     } catch (e) {
       alert((e as Error).message)
     }
@@ -345,14 +378,31 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   </div>
                   <div className="bd">
                     {mediaFiles.length > 0 && (
-                      <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {mediaFiles.map(f => (
-                          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
-                            <Image size={14} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
-                            <span style={{ fontSize: 11, color: f.status === 'ready' ? '#16a34a' : f.status === 'error' ? '#dc2626' : 'var(--fg-3)', flexShrink: 0 }}>
-                              {f.status}
-                            </span>
+                          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '14px 1fr auto auto auto', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
+                            <Image size={14} style={{ color: f.is_primary ? 'var(--accent)' : 'var(--fg-3)' }} />
+                            <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.filename}>{f.filename}</span>
+                            <select
+                              className="fld"
+                              style={{ fontSize: 11, padding: '2px 6px', height: 26, minWidth: 110 }}
+                              value={f.media_type ?? ''}
+                              onChange={e => handleSetMediaType(f.id, e.target.value || null)}
+                            >
+                              <option value="">— Typ —</option>
+                              {mediaTypeTerms.map(t => (
+                                <option key={t.id} value={t.term}>{t.label.de ?? t.term}</option>
+                              ))}
+                            </select>
+                            <button
+                              className={`btn sm${f.is_primary ? ' pri' : ' gh'}`}
+                              style={{ fontSize: 11, padding: '2px 8px' }}
+                              onClick={() => handleSetPrimary(f.id)}
+                              title={f.is_primary ? 'Primärbild' : 'Als Primärbild setzen'}
+                              disabled={f.is_primary}
+                            >
+                              {f.is_primary ? '★' : '☆'}
+                            </button>
                             <button className="btn sm ico gh dn" onClick={() => handleDeleteMedia(f.id)}><Trash size={11} /></button>
                           </div>
                         ))}

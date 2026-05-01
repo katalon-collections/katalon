@@ -14,7 +14,7 @@ from katalon.api.v1 import (
 )
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
-from katalon.core.models import User
+from katalon.core.models import User, Vocabulary, VocabularyTerm
 from katalon.database import AsyncSessionLocal
 
 async def _ensure_admin() -> None:
@@ -30,9 +30,33 @@ async def _ensure_admin() -> None:
             await db.commit()
 
 
+_DEFAULT_MEDIA_TYPES = [
+    ("vorderseite", {"de": "Vorderseite", "en": "Front"}),
+    ("rueckseite",  {"de": "Rückseite",   "en": "Back"}),
+    ("detail",      {"de": "Detail",      "en": "Detail"}),
+    ("uebersicht",  {"de": "Übersicht",   "en": "Overview"}),
+    ("innen",       {"de": "Innen",       "en": "Interior"}),
+    ("signatur",    {"de": "Signatur",    "en": "Signature"}),
+]
+
+
+async def _ensure_media_types_vocab() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Vocabulary).where(Vocabulary.name == "media_types"))
+        vocab = result.scalar_one_or_none()
+        if vocab is None:
+            vocab = Vocabulary(name="media_types", is_hierarchical=False)
+            db.add(vocab)
+            await db.flush()
+            for term_key, label in _DEFAULT_MEDIA_TYPES:
+                db.add(VocabularyTerm(vocabulary_id=vocab.id, term=term_key, label=label))
+            await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _ensure_admin()
+    await _ensure_media_types_vocab()
     yield
 
 

@@ -28,8 +28,13 @@ Default-Admin-User wird beim ersten Start angelegt (`admin@katalon.dev / admin`)
 Audit Log bei jedem Create/Update/Delete.
 
 ### Phase 5 – Media ✅ / IIIF ⚠️
-Upload, Celery-Task, Speicherung. IIIF-Manifest-Endpoint vorhanden.
+Upload (Single-File), Celery-Task, Speicherung. IIIF-Manifest-Endpoint vorhanden.
+`media_type`-Feld pro Datei; konfigurierbare Typen via Vokabular "media_types" (Vorderseite, Rückseite, Detail …).
 Cantaloupe-Integration für Tile-Generierung noch nicht verdrahtet (Endpoint antwortet, produziert aber keine echten IIIF-Tiles).
+
+**Noch offen in Phase 5:**
+- Batch-Medienimport (ZIP oder Ordner mit CSV-Mapping → Phase 10.1)
+- PATCH-Endpoint für `media_type` + `is_primary` ✅ (implementiert)
 
 ### Phase 6 – Admin-UI ✅ (mit Lücken)
 Alle 4 Typen: Listen-Screen + Formular (dynamisch aus Schema, wiederholbare Felder, Status-Selector).
@@ -92,6 +97,11 @@ Admin-UI: Dropdown im Feld-Editor, Autocomplete bei der Erfassung.
 4-Schritte-Wizard: Upload → Mapping → Dry Run → Import.
 Backend-Endpoint `/v1/importer` vorhanden (Stub).
 Admin-UI: ScreenImporter ist Stub.
+
+### Phase 10.1 – Batch-Medienimport
+ZIP-Archiv mit Bildern + CSV/JSON-Mapping-Datei (Dateiname → Objekt-ID + media_type).
+Celery-Task für asynchrone Verarbeitung, Fortschritts-Anzeige im Admin.
+Wiederverwendet Vokabular "media_types" für Typ-Mapping.
 
 ### Phase 11 – OAI-PMH
 Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
