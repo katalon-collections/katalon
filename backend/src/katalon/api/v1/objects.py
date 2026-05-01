@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Object, RecordSnapshot
+from katalon.core.models import MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
@@ -136,6 +136,19 @@ async def create_snapshot(
     db.add(snap)
     await db.flush()
     return snap
+
+
+@router.get("/{object_id}/iiif/manifest")
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep) -> dict:
+    result = await db.execute(
+        select(MediaFile)
+        .where(MediaFile.object_id == object_id, MediaFile.status == "ready")
+        .order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
+    )
+    media = result.scalars().first()
+    if not media or not media.iiif_manifest:
+        raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
+    return media.iiif_manifest
 
 
 @router.get("/{object_id}/snapshots", response_model=list[SnapshotRead])

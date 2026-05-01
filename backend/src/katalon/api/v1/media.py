@@ -3,6 +3,7 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -103,6 +104,15 @@ async def patch_media(
 
     await db.flush()
     return _serialize(media)
+
+
+@router.get("/{media_id}/file")
+async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> FileResponse:
+    result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
+    media = result.scalar_one_or_none()
+    if not media or not Path(media.file_path).exists():
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return FileResponse(media.file_path, media_type=media.mime_type, filename=media.filename)
 
 
 @router.delete("/{media_id}", status_code=204)
