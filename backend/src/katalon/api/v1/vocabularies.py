@@ -24,7 +24,7 @@ async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
 async def create_vocabulary(data: VocabularyCreate, db: DBDep, _: CurrentUser) -> Vocabulary:
     vocab = Vocabulary(**data.model_dump())
     db.add(vocab)
-    await db.flush()
+    await db.commit()
     return vocab
 
 
