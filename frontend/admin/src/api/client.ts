@@ -138,6 +138,11 @@ export const media = {
     const headers: Record<string, string> = {}
     if (_token) headers['Authorization'] = `Bearer ${_token}`
     const res = await fetch(`${BASE}/v1/objects/${objectId}/media`, { method: 'POST', body: formData, headers })
+    if (res.status === 401) {
+      setToken(null)
+      _onUnauthorized?.()
+      throw new Error('Sitzung abgelaufen. Bitte neu anmelden.')
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }))
       throw new Error(err.detail ?? res.statusText)
