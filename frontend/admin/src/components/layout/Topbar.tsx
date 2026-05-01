@@ -8,7 +8,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 interface Props {
-  crumbs: string[]
+  crumbs: Array<{ label: string; route?: string }>
   onNavigate?: (route: string, id?: string) => void
 }
 
@@ -56,9 +56,14 @@ export function Topbar({ crumbs, onNavigate }: Props) {
       <div className="cr">
         {crumbs.map((c, i) =>
           i === crumbs.length - 1 ? (
-            <b key={i}>{c}</b>
+            <b key={i}>{c.label}</b>
+          ) : c.route ? (
+            <span key={i}>
+              <button onClick={() => onNavigate?.(c.route!)}>{c.label}</button>
+              <span className="sep"> / </span>
+            </span>
           ) : (
-            <span key={i}>{c}<span className="sep"> / </span></span>
+            <span key={i}>{c.label}<span className="sep"> / </span></span>
           )
         )}
       </div>

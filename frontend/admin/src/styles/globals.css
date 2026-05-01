@@ -65,6 +65,8 @@ svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .cr { display: flex; align-items: center; gap: 8px; color: var(--fg-3); font-size: 12.5px; }
 .cr b { color: var(--fg); font-weight: 500; }
 .cr .sep { color: var(--fg-5); }
+.cr button { background: none; border: 0; padding: 0; color: var(--fg-3); font: inherit; font-size: 12.5px; cursor: pointer; }
+.cr button:hover { color: var(--fg); text-decoration: underline; }
 .tb .sp { flex: 1; }
 .tb .gs { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; height: 30px; width: 300px; color: var(--fg-3); font-size: 12.5px; }
 .tb .gs input { border: 0; outline: 0; flex: 1; background: transparent; font: inherit; color: var(--fg); }
