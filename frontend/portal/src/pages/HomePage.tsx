@@ -1,22 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const SAMPLE = [
-  { id: 'OBJ-2026-00412', title: 'Bahnhofstraße bei Nacht', creator: 'Henri Cartier', year: '1958' },
-  { id: 'OBJ-2026-00409', title: 'Markttag in der Altstadt', creator: 'G. Albrecht', year: '1965' },
-  { id: 'OBJ-2026-00408', title: 'Kinder am See', creator: 'G. Albrecht', year: '1962' },
-  { id: 'OBJ-2026-00406', title: 'Tramhaltestelle Paradeplatz', creator: 'Henri Cartier', year: '1960' },
-  { id: 'OBJ-2026-00403', title: 'Bauarbeiter Limmatquai', creator: 'Hans Brunner', year: '1950' },
-  { id: 'OBJ-2026-00401', title: 'Gartenfest auf dem Dach', creator: 'Lina Maier', year: '1971' },
-]
+import { api, type ObjectSummary } from '../api/client'
 
 export function HomePage() {
   const [q, setQ] = useState('')
+  const [recent, setRecent] = useState<ObjectSummary[]>([])
+  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    api.objects.list({ page_size: 12 })
+      .then(d => setRecent(d.items))
+      .catch(() => setRecent([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   function search(e: React.FormEvent) {
     e.preventDefault()
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+    navigate(`/search?q=${encodeURIComponent(q.trim())}`)
   }
 
   return (
@@ -41,17 +42,37 @@ export function HomePage() {
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 0, color: 'var(--fg-2)' }}>
           Neueste Zugänge
         </h2>
-        <div className="obj-grid">
-          {SAMPLE.map(obj => (
-            <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
-              <div className="thumb">📷</div>
-              <div className="info">
-                <div className="title">{obj.title}</div>
-                <div className="meta">{obj.creator} · {obj.year}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+
+        {loading && (
+          <div style={{ marginTop: 32, color: 'var(--fg-3)', fontSize: 14 }}>Lade…</div>
+        )}
+
+        {!loading && recent.length === 0 && (
+          <div style={{ marginTop: 32, color: 'var(--fg-3)', fontSize: 14 }}>
+            Noch keine Objekte vorhanden.
+          </div>
+        )}
+
+        {!loading && recent.length > 0 && (
+          <div className="obj-grid">
+            {recent.map(obj => {
+              const m = obj.metadata_ as Record<string, unknown>
+              const title = String(m.title ?? m.name ?? obj.idno ?? obj.id)
+              const creator = String(m.creator ?? m.photographer ?? '')
+              const year = String(m.year ?? m.date ?? '')
+              const sub = [creator, year].filter(Boolean).join(' · ')
+              return (
+                <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
+                  <div className="thumb" />
+                  <div className="info">
+                    <div className="title">{title}</div>
+                    {sub && <div className="meta">{sub}</div>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </>
   )

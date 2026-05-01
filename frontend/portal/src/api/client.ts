@@ -12,6 +12,11 @@ export interface ObjectSummary {
   created_at: string; updated_at: string
 }
 
+export interface MediaFile {
+  id: string; filename: string; mime_type: string
+  status: string; is_primary: boolean; created_at: string
+}
+
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
 
 export interface FacetBucket { value: string; count: number }
@@ -23,15 +28,16 @@ export interface SearchResponse {
 
 export const api = {
   objects: {
-    list: (p?: { page?: number; q?: string; status?: string }) => {
+    list: (p?: { page?: number; q?: string; status?: string; page_size?: number }) => {
       const qs = new URLSearchParams(
-        Object.entries({ status: 'public', page_size: '24', ...p })
+        Object.entries({ page_size: '24', ...p })
           .filter(([, v]) => v != null)
           .map(([k, v]) => [k, String(v)])
       ).toString()
       return get<Page<ObjectSummary>>(`/v1/objects?${qs}`)
     },
     get: (id: string) => get<ObjectSummary>(`/v1/objects/${id}`),
+    media: (id: string) => get<MediaFile[]>(`/v1/objects/${id}/media`),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number }) => {
