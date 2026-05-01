@@ -49,6 +49,21 @@ alembic -c migrations/alembic.ini upgrade head
 uvicorn katalon.main:app --reload
 ```
 
+### Demo-Daten einspielen (ICS-Beispieldatensatz)
+
+Legt Felddefinitionen, Vokabulare und Beispieldatensätze nach dem Datenmodell der Internationalen Computerspielesammlung an (Computerspiele als Objekte, Werke/Werkversionen als Occurrences, Entitäten und Orte vollständig verknüpft):
+
+```bash
+# API muss laufen (docker compose up)
+uv run --project backend python backend/scripts/seed_ics_demo.py
+
+# Andere Instanz oder andere Zugangsdaten:
+uv run --project backend python backend/scripts/seed_ics_demo.py \
+  --base-url http://localhost:8000 \
+  --email admin@katalon.dev \
+  --password admin
+```
+
 ### Admin-Frontend lokal
 
 ```bash
