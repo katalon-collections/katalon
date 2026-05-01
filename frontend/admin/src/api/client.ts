@@ -1,4 +1,4 @@
-import type { AuditEntry, FieldDefinition, KatalonObject, Page, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
+import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -39,6 +39,42 @@ export const objects = {
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/objects/${id}`, { method: 'DELETE' }),
+}
+
+// Entities
+export const entities = {
+  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<Entity>>(`/v1/entities${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<Entity>(`/v1/entities/${id}`),
+  create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/entities/${id}`, { method: 'DELETE' }),
+}
+
+// Places
+export const places = {
+  list: (params?: { page?: number; page_size?: number; status?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<Place>(`/v1/places/${id}`),
+  create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/places/${id}`, { method: 'DELETE' }),
+}
+
+// Occurrences
+export const occurrences = {
+  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<Occurrence>>(`/v1/occurrences${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<Occurrence>(`/v1/occurrences/${id}`),
+  create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/occurrences/${id}`, { method: 'DELETE' }),
 }
 
 // Schema

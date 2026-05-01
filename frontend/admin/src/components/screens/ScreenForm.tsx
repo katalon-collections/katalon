@@ -1,40 +1,69 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, schema, media } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import type { FieldDefinition, KatalonObject, Status } from '../../types'
+import type { AnyRecord, FieldDefinition, RecordType, Status } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 
+const TYPE_LABELS: Record<RecordType, string> = {
+  object:     'Objekt',
+  entity:     'Entität',
+  place:      'Ort',
+  occurrence: 'Occurrence',
+}
+
+const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
+  entity:     'entity_type',
+  occurrence: 'occurrence_type',
+}
+
+function getApi(recordType: RecordType) {
+  switch (recordType) {
+    case 'object':     return objects
+    case 'entity':     return entities
+    case 'place':      return places
+    case 'occurrence': return occurrences
+  }
+}
+
 interface Props {
-  objectId?: string
+  recordType: RecordType
+  recordId?: string
   onBack?: () => void
   onSaved?: (id: string) => void
 }
 
-export function ScreenForm({ objectId, onBack, onSaved }: Props) {
-  const isNew = !objectId || objectId === 'new'
-  const currentId = isNew ? null : objectId!
+export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
+  const isNew = !recordId || recordId === 'new'
+  const currentId = isNew ? null : recordId!
+  const api = getApi(recordType)
+  const label = TYPE_LABELS[recordType]
+  const subtypeKey = SUBTYPE_KEY[recordType]
+  const showIdno  = recordType === 'object'
+  const showMedia = recordType === 'object'
+  const showGeo   = recordType === 'place'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
-  const [idno, setIdno] = useState('')
-  const [status, setStatus] = useState<Status>('draft')
-  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [idno, setIdno]       = useState('')
+  const [subtype, setSubtype] = useState('')
+  const [lat, setLat]         = useState('')
+  const [lon, setLon]         = useState('')
+  const [status, setStatus]   = useState<Status>('draft')
+  const [values, setValues]   = useState<Record<string, unknown>>({})
   const [showAudit, setShowAudit] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [title, setTitle] = useState(isNew ? 'Neues Objekt' : '…')
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+  const [title, setTitle]     = useState(isNew ? `Neues ${label}` : '…')
 
-  // media state
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [mediaFiles, setMediaFiles]   = useState<MediaFile[]>([])
+  const [uploading, setUploading]     = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [dragOver, setDragOver] = useState(false)
+  const [dragOver, setDragOver]       = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // saved object id (set after create to enable media upload)
   const [savedId, setSavedId] = useState<string | null>(currentId)
 
   const loadMedia = useCallback((id: string) => {
@@ -43,38 +72,51 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
 
   useEffect(() => {
     setLoading(true)
-    const loadSchemaP = schema.list('object')
-    const loadObjP = isNew ? Promise.resolve(null) : objects.get(objectId!)
+    setTitle(isNew ? `Neues ${label}` : '…')
+    setSavedId(currentId)
+    setIdno('')
+    setSubtype('')
+    setLat('')
+    setLon('')
+    setStatus('draft')
+    setValues({})
+    setMediaFiles([])
 
-    Promise.all([loadSchemaP, loadObjP])
-      .then(([fieldDefs, obj]) => {
+    const loadSchemaP = schema.list(recordType)
+    const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
+
+    Promise.all([loadSchemaP, loadRecP])
+      .then(([fieldDefs, rec]) => {
         setFields(fieldDefs)
-        if (obj) {
-          setIdno(obj.idno ?? '')
-          setStatus(obj.status as Status)
-          setValues(obj.metadata_)
-          const m = obj.metadata_ as Record<string, unknown>
-          setTitle(String(m.title ?? obj.idno ?? obj.id))
+        if (rec) {
+          setStatus(rec.status as Status)
+          setValues(rec.metadata_)
+          const m = rec.metadata_ as Record<string, unknown>
+          if (showIdno)  setIdno((rec as { idno?: string | null }).idno ?? '')
+          if (subtypeKey) setSubtype(String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? ''))
+          if (showGeo) {
+            const p = rec as { lat?: number | null; lon?: number | null }
+            setLat(p.lat != null ? String(p.lat) : '')
+            setLon(p.lon != null ? String(p.lon) : '')
+          }
+          setTitle(String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? rec.id))
         }
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [objectId, isNew])
+  }, [recordId, recordType, isNew])
 
   useEffect(() => {
-    if (savedId) loadMedia(savedId)
-  }, [savedId, loadMedia])
+    if (savedId && showMedia) loadMedia(savedId)
+  }, [savedId, showMedia, loadMedia])
 
-  function setField(name: string, value: unknown) {
-    setValues(v => ({ ...v, [name]: value }))
-  }
+  function setField(name: string, value: unknown) { setValues(v => ({ ...v, [name]: value })) }
   function addRepeat(name: string) {
     const cur = (values[name] as string[] | undefined) ?? []
     setValues(v => ({ ...v, [name]: [...cur, ''] }))
   }
   function removeRepeat(name: string, idx: number) {
-    const cur = (values[name] as string[]) ?? []
-    setValues(v => ({ ...v, [name]: cur.filter((_, i) => i !== idx) }))
+    setValues(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
   }
   function updateRepeat(name: string, idx: number, val: string) {
     const cur = [...((values[name] as string[]) ?? [])]
@@ -86,14 +128,21 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
     setSaving(true)
     setError(null)
     try {
-      const payload: Partial<KatalonObject> = { idno: idno || null, status, metadata_: values }
+      const payload: Record<string, unknown> = { status, metadata_: values }
+      if (showIdno)   payload.idno = idno || null
+      if (subtypeKey) payload[subtypeKey] = subtype
+      if (showGeo) {
+        payload.lat = lat ? parseFloat(lat) : null
+        payload.lon = lon ? parseFloat(lon) : null
+      }
+
       if (isNew) {
-        const created = await objects.create(payload)
+        const created = await (api.create as (d: typeof payload) => Promise<AnyRecord>)(payload)
         setSavedId(created.id)
         onSaved?.(created.id)
-        loadMedia(created.id)
+        if (showMedia) loadMedia(created.id)
       } else {
-        await objects.update(objectId!, payload)
+        await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
         onBack?.()
       }
     } catch (e) {
@@ -104,12 +153,11 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
   }
 
   async function handleUpload(file: File) {
-    const id = savedId
-    if (!id) return
+    if (!savedId) return
     setUploading(true)
     setUploadError(null)
     try {
-      const f = await media.upload(id, file)
+      const f = await media.upload(savedId, file)
       setMediaFiles(prev => [...prev, f])
     } catch (e) {
       setUploadError((e as Error).message)
@@ -149,8 +197,8 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
     )
   }
 
-  const hasSavedId = Boolean(savedId)
-  const justCreated = isNew && hasSavedId
+  const hasSavedId   = Boolean(savedId)
+  const justCreated  = isNew && hasSavedId
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -187,20 +235,40 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
 
       {justCreated && (
         <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
-          Objekt gespeichert. Bilder können jetzt hochgeladen werden.
+          {label} gespeichert.{showMedia ? ' Bilder können jetzt hochgeladen werden.' : ''}
         </div>
       )}
 
       <div className="scroll">
-        <div className="form-grid">
+        <div className={showMedia || showGeo ? 'form-grid' : undefined} style={showMedia || showGeo ? undefined : { padding: '20px 24px', maxWidth: 680 }}>
           <div>
             <div className="card">
               <div className="hd">Metadaten</div>
               <div className="bd">
-                <div className="field">
-                  <div className="lbl">Inventar-Nr.</div>
-                  <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" disabled={justCreated} />
-                </div>
+                {showIdno && (
+                  <div className="field">
+                    <div className="lbl">Inventar-Nr.</div>
+                    <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" disabled={justCreated} />
+                  </div>
+                )}
+
+                {subtypeKey && (
+                  <div className="field">
+                    <div className="lbl">{subtypeKey === 'entity_type' ? 'Entitätstyp' : 'Occurrence-Typ'}</div>
+                    <input className="fld" value={subtype} onChange={e => setSubtype(e.target.value)}
+                      placeholder={subtypeKey === 'entity_type' ? 'z.B. person, organisation' : 'z.B. event, work'} disabled={justCreated} />
+                  </div>
+                )}
+
+                {showGeo && (
+                  <div className="field">
+                    <div className="lbl">Koordinaten</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input className="fld mono" value={lat} onChange={e => setLat(e.target.value)} placeholder="Breite (lat)" disabled={justCreated} />
+                      <input className="fld mono" value={lon} onChange={e => setLon(e.target.value)} placeholder="Länge (lon)" disabled={justCreated} />
+                    </div>
+                  </div>
+                )}
 
                 {fields.map(f => {
                   const val = values[f.name]
@@ -255,95 +323,121 @@ export function ScreenForm({ objectId, onBack, onSaved }: Props) {
                   )
                 })}
 
-                {fields.length === 0 && (
+                {fields.length === 0 && !showIdno && !subtypeKey && !showGeo && (
                   <div className="empty">Keine Felder definiert. Schema unter Konfiguration → Schemata anlegen.</div>
                 )}
+                {fields.length === 0 && (showIdno || subtypeKey || showGeo) && (
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)', paddingTop: 4 }}>
+                    Keine weiteren dynamischen Felder. Schema unter Konfiguration → Schemata anlegen.
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div>
-            <div className="card" style={{ marginBottom: 14 }}>
-              <div className="hd">
-                <span>Medien</span>
-                {mediaFiles.length > 0 && <span className="sub">{mediaFiles.length} Datei{mediaFiles.length !== 1 ? 'en' : ''}</span>}
-              </div>
-              <div className="bd">
-                {mediaFiles.length > 0 && (
-                  <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {mediaFiles.map(f => (
-                      <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
-                        <Image size={14} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
-                        <span style={{ fontSize: 11, color: f.status === 'ready' ? '#16a34a' : f.status === 'error' ? '#dc2626' : 'var(--fg-3)', flexShrink: 0 }}>
-                          {f.status}
-                        </span>
-                        <button className="btn sm ico gh dn" onClick={() => handleDeleteMedia(f.id)}><Trash size={11} /></button>
+          {(showMedia || showGeo) && (
+            <div>
+              {showMedia && (
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div className="hd">
+                    <span>Medien</span>
+                    {mediaFiles.length > 0 && <span className="sub">{mediaFiles.length} Datei{mediaFiles.length !== 1 ? 'en' : ''}</span>}
+                  </div>
+                  <div className="bd">
+                    {mediaFiles.length > 0 && (
+                      <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {mediaFiles.map(f => (
+                          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
+                            <Image size={14} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
+                            <span style={{ fontSize: 11, color: f.status === 'ready' ? '#16a34a' : f.status === 'error' ? '#dc2626' : 'var(--fg-3)', flexShrink: 0 }}>
+                              {f.status}
+                            </span>
+                            <button className="btn sm ico gh dn" onClick={() => handleDeleteMedia(f.id)}><Trash size={11} /></button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {hasSavedId ? (
-                  <div
-                    className="dz"
-                    style={{ padding: '20px 16px', opacity: uploading ? 0.5 : 1, border: dragOver ? '2px dashed var(--accent)' : undefined }}
-                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={onDrop}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                      <Upload size={24} style={{ color: 'var(--fg-4)' }} />
-                    </div>
-                    {uploading ? (
-                      <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Hochladen…</div>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
-                        <label style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>
-                          &nbsp;auswählen
-                          <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp" onChange={onFileChange} />
-                        </label>
-                      </>
                     )}
-                    {uploadError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{uploadError}</div>}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }}>
-                    Objekt zuerst speichern, dann Bilder hochladen.
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="card">
-              <div className="hd">
-                <span>Relationen</span>
-                <div className="grow" />
-                <button className="btn sm gh"><Plus size={12} /> Hinzufügen</button>
-              </div>
-              <div className="bd">
-                <div className="empty" style={{ padding: '20px 0' }}>Noch keine Relationen.</div>
-              </div>
-            </div>
-
-            {!isNew && (
-              <div className="card">
-                <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
-                  <span>Letzte Änderungen</span>
-                  <div className="grow" />
-                  <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
+                    {hasSavedId ? (
+                      <div
+                        className="dz"
+                        style={{ padding: '20px 16px', opacity: uploading ? 0.5 : 1, border: dragOver ? '2px dashed var(--accent)' : undefined }}
+                        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={onDrop}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                          <Upload size={24} style={{ color: 'var(--fg-4)' }} />
+                        </div>
+                        {uploading ? (
+                          <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Hochladen…</div>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
+                            <label style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>
+                              &nbsp;auswählen
+                              <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp" onChange={onFileChange} />
+                            </label>
+                          </>
+                        )}
+                        {uploadError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{uploadError}</div>}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }}>
+                        Objekt zuerst speichern, dann Bilder hochladen.
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {showAudit && (
-                  <div className="bd" style={{ padding: '8px 0' }}>
-                    <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
-                      Vollständiges Log unter Katalon → Audit-Log.
-                    </div>
-                  </div>
-                )}
+              )}
+
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="hd">
+                  <span>Relationen</span>
+                  <div className="grow" />
+                  <button className="btn sm gh"><Plus size={12} /> Hinzufügen</button>
+                </div>
+                <div className="bd">
+                  <div className="empty" style={{ padding: '20px 0' }}>Noch keine Relationen.</div>
+                </div>
               </div>
-            )}
-          </div>
+
+              {!isNew && (
+                <div className="card">
+                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
+                    <span>Letzte Änderungen</span>
+                    <div className="grow" />
+                    <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
+                  </div>
+                  {showAudit && (
+                    <div className="bd" style={{ padding: '8px 0' }}>
+                      <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
+                        Vollständiges Log unter Katalon → Audit-Log.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!showMedia && !showGeo && !isNew && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
+                <span>Letzte Änderungen</span>
+                <div className="grow" />
+                <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
+              </div>
+              {showAudit && (
+                <div className="bd" style={{ padding: '8px 0' }}>
+                  <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
+                    Vollständiges Log unter Katalon → Audit-Log.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

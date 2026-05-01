@@ -9,14 +9,20 @@ import { ScreenAudit } from '../screens/ScreenAudit'
 import { ScreenForm } from '../screens/ScreenForm'
 
 const CRUMBS: Record<string, string[]> = {
-  list:     ['Katalon', 'Objekte'],
-  form:     ['Katalon', 'Objekte', 'Bearbeiten'],
-  schema:   ['Katalon', 'Konfiguration', 'Schemata'],
-  vocab:    ['Katalon', 'Konfiguration', 'Vokabular'],
-  import:   ['Katalon', 'Importer'],
-  audit:    ['Katalon', 'Audit-Log'],
-  users:    ['Katalon', 'Verwaltung', 'Benutzer'],
-  settings: ['Katalon', 'Einstellungen'],
+  list:              ['Katalon', 'Objekte'],
+  form:              ['Katalon', 'Objekte', 'Bearbeiten'],
+  'entities-list':   ['Katalon', 'Entitäten'],
+  'entities-form':   ['Katalon', 'Entitäten', 'Bearbeiten'],
+  'places-list':     ['Katalon', 'Orte'],
+  'places-form':     ['Katalon', 'Orte', 'Bearbeiten'],
+  'occurrences-list': ['Katalon', 'Occurrences'],
+  'occurrences-form': ['Katalon', 'Occurrences', 'Bearbeiten'],
+  schema:            ['Katalon', 'Konfiguration', 'Schemata'],
+  vocab:             ['Katalon', 'Konfiguration', 'Vokabular'],
+  import:            ['Katalon', 'Importer'],
+  audit:             ['Katalon', 'Audit-Log'],
+  users:             ['Katalon', 'Verwaltung', 'Benutzer'],
+  settings:          ['Katalon', 'Einstellungen'],
 }
 
 function Placeholder({ label }: { label: string }) {
@@ -39,13 +45,19 @@ export function AppShell() {
 
   function renderScreen() {
     switch (route) {
-      case 'list':     return <ScreenList onOpen={(id) => { setEditId(id); setRoute('form') }} />
-      case 'form':     return <ScreenForm objectId={editId ?? undefined} onBack={() => setRoute('list')} onSaved={(id) => setEditId(id)} />
-      case 'schema':   return <ScreenSchema />
-      case 'vocab':    return <ScreenVocab />
-      case 'import':   return <ScreenImporter />
-      case 'audit':    return <ScreenAudit />
-      default:         return <Placeholder label={crumbs[crumbs.length - 1]} />
+      case 'list':              return <ScreenList recordType="object"     onOpen={(id) => { setEditId(id); setRoute('form') }} />
+      case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => setRoute('list')} onSaved={(id) => setEditId(id)} />
+      case 'entities-list':     return <ScreenList recordType="entity"     onOpen={(id) => { setEditId(id); setRoute('entities-form') }} />
+      case 'entities-form':     return <ScreenForm recordType="entity"     recordId={editId ?? undefined} onBack={() => setRoute('entities-list')} onSaved={(id) => setEditId(id)} />
+      case 'places-list':       return <ScreenList recordType="place"      onOpen={(id) => { setEditId(id); setRoute('places-form') }} />
+      case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => setRoute('places-list')} onSaved={(id) => setEditId(id)} />
+      case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => { setEditId(id); setRoute('occurrences-form') }} />
+      case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => setRoute('occurrences-list')} onSaved={(id) => setEditId(id)} />
+      case 'schema':            return <ScreenSchema />
+      case 'vocab':             return <ScreenVocab />
+      case 'import':            return <ScreenImporter />
+      case 'audit':             return <ScreenAudit />
+      default:                  return <Placeholder label={crumbs[crumbs.length - 1]} />
     }
   }
 

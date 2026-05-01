@@ -1,4 +1,5 @@
 export type Status = 'draft' | 'internal' | 'public'
+export type RecordType = 'object' | 'entity' | 'place' | 'occurrence'
 
 export interface KatalonObject {
   id: string
@@ -17,6 +18,27 @@ export interface Entity {
   created_at: string
   updated_at: string
 }
+
+export interface Place {
+  id: string
+  status: Status
+  lat: number | null
+  lon: number | null
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface Occurrence {
+  id: string
+  occurrence_type: string
+  status: Status
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type AnyRecord = KatalonObject | Entity | Place | Occurrence
 
 export interface FieldDefinition {
   id: string

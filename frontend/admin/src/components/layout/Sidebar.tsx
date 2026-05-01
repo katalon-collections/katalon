@@ -1,4 +1,4 @@
-import { History, Gear, Image, Layers, Tag, Upload, Users } from '../ui/Icons'
+import { History, Gear, Image, Layers, Lightning, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 import { Search } from '../ui/Icons'
 
 type Route = string
@@ -14,9 +14,12 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { g: 'Inhalte' },
-  { id: 'list',   label: 'Objekte',        Icon: Image,   ct: '15.2k', routes: ['list', 'form'] },
-  { id: 'import', label: 'Importer',       Icon: Upload,  ct: '2 aktiv' },
-  { id: 'audit',  label: 'Audit-Log',      Icon: History },
+  { id: 'list',             label: 'Objekte',       Icon: Image,     routes: ['list', 'form'] },
+  { id: 'entities-list',   label: 'Entitäten',      Icon: User,      routes: ['entities-list', 'entities-form'] },
+  { id: 'places-list',     label: 'Orte',           Icon: MapPin,    routes: ['places-list', 'places-form'] },
+  { id: 'occurrences-list', label: 'Occurrences',   Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
+  { id: 'import',          label: 'Importer',       Icon: Upload,    ct: '2 aktiv' },
+  { id: 'audit',           label: 'Audit-Log',      Icon: History },
   { g: 'Konfiguration' },
   { id: 'schema', label: 'Schemata',       Icon: Layers,  ct: '5' },
   { id: 'vocab',  label: 'Vokabular',      Icon: Tag,     ct: '4' },
