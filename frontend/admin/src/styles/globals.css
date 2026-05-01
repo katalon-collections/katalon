@@ -255,5 +255,6 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .evt .body .diff .rem { color: #b91c1c; background: #fde7e7; padding: 1px 5px; border-radius: 3px; display: inline-block; text-decoration: line-through; }
 
 /* Misc */
+.hover-row:hover { background: var(--panel-2); }
 .empty { padding: 60px 20px; text-align: center; color: var(--fg-3); font-size: 13px; }
 hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }

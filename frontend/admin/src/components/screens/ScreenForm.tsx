@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, BASE } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, BASE } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import type { AnyRecord, FieldDefinition, RecordType, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, FieldDefinition, RecordType, Relation, SearchResult, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -67,9 +67,41 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
 
+  const [rels, setRels]           = useState<Relation[]>([])
+  const [relTitles, setRelTitles] = useState<Record<string, string>>({})
+  const [addOpen, setAddOpen]     = useState(false)
+  const [addTargetType, setAddTargetType] = useState<RecordType>('object')
+  const [addSearchQ, setAddSearchQ]       = useState('')
+  const [addResults, setAddResults]       = useState<SearchResult[]>([])
+  const [addSearching, setAddSearching]   = useState(false)
+  const [addRelType, setAddRelType]       = useState('')
+  const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
+  const [addSaving, setAddSaving]         = useState(false)
+
   const loadMedia = useCallback((id: string) => {
     media.list(id).then(setMediaFiles).catch(() => {})
   }, [])
+
+  const loadRelations = useCallback(async (id: string) => {
+    try {
+      const loaded = await relationsApi.list({ from_type: recordType, from_id: id })
+      setRels(loaded)
+      const titleMap: Record<string, string> = {}
+      await Promise.all(loaded.map(async r => {
+        const key = `${r.to_type}/${r.to_id}`
+        try {
+          const rec = await (getApi(r.to_type as RecordType).get as (id: string) => Promise<AnyRecord>)(r.to_id)
+          const m = rec.metadata_ as Record<string, unknown>
+          titleMap[key] = String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? r.to_id)
+        } catch {
+          titleMap[key] = r.to_id.slice(0, 8) + '…'
+        }
+      }))
+      setRelTitles(titleMap)
+    } catch {
+      // silently ignore
+    }
+  }, [recordType])
 
   useEffect(() => {
     setLoading(true)
@@ -82,6 +114,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setStatus('draft')
     setValues({})
     setMediaFiles([])
+    setRels([])
+    setRelTitles({})
+    setAddOpen(false)
 
     const loadSchemaP = schema.list(recordType)
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
@@ -105,6 +140,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
+
+    if (!isNew && currentId) loadRelations(currentId)
   }, [recordId, recordType, isNew])
 
   useEffect(() => {
@@ -122,6 +159,42 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       .then(setMediaTypeTerms)
       .catch(() => {})
   }, [showMedia])
+
+  useEffect(() => {
+    if (!addOpen || addSearchQ.trim().length < 2) { setAddResults([]); return }
+    setAddSearching(true)
+    const timer = setTimeout(() => {
+      searchApi.query(addSearchQ.trim(), addTargetType, 6)
+        .then(r => setAddResults(r.items))
+        .catch(() => setAddResults([]))
+        .finally(() => setAddSearching(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [addSearchQ, addTargetType, addOpen])
+
+  async function handleAddRelation() {
+    if (!addSelected || !addRelType.trim() || !savedId) return
+    setAddSaving(true)
+    try {
+      const created = await relationsApi.create({
+        from_type: recordType, from_id: savedId,
+        to_type: addSelected.record_type, to_id: addSelected.id,
+        relation_type: addRelType.trim(),
+      })
+      setRels(prev => [...prev, created])
+      setRelTitles(prev => ({ ...prev, [`${created.to_type}/${created.to_id}`]: addSelected.title }))
+      setAddOpen(false); setAddSearchQ(''); setAddRelType(''); setAddSelected(null); setAddResults([])
+    } catch (e) { alert((e as Error).message) }
+    finally { setAddSaving(false) }
+  }
+
+  async function handleDeleteRelation(id: string) {
+    if (!window.confirm('Relation wirklich löschen?')) return
+    try {
+      await relationsApi.delete(id)
+      setRels(prev => prev.filter(r => r.id !== id))
+    } catch (e) { alert((e as Error).message) }
+  }
 
   function setField(name: string, value: unknown) { setValues(v => ({ ...v, [name]: value })) }
   function addRepeat(name: string) {
@@ -232,6 +305,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
 
   const hasSavedId   = Boolean(savedId)
   const justCreated  = isNew && hasSavedId
+  const showTwoCol   = showMedia || !isNew
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -273,7 +347,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       )}
 
       <div className="scroll">
-        <div className={showMedia || showGeo ? 'form-grid' : undefined} style={showMedia || showGeo ? undefined : { padding: '20px 24px', maxWidth: 680 }}>
+        <div className={showTwoCol ? 'form-grid' : undefined} style={showTwoCol ? undefined : { padding: '20px 24px', maxWidth: 680 }}>
           <div>
             <div className="card">
               <div className="hd">Metadaten</div>
@@ -368,7 +442,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
             </div>
           </div>
 
-          {(showMedia || showGeo) && (
+          {showTwoCol && (
             <div>
               {showMedia && (
                 <div className="card" style={{ marginBottom: 14 }}>
@@ -453,16 +527,92 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                 </div>
               )}
 
-              <div className="card" style={{ marginBottom: 14 }}>
-                <div className="hd">
-                  <span>Relationen</span>
-                  <div className="grow" />
-                  <button className="btn sm gh"><Plus size={12} /> Hinzufügen</button>
+              {!isNew && (
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div className="hd">
+                    <span>Relationen</span>
+                    {rels.length > 0 && <span className="sub">{rels.length}</span>}
+                    <div className="grow" />
+                    {!addOpen && hasSavedId && (
+                      <button className="btn sm gh" onClick={() => setAddOpen(true)}><Plus size={12} /> Hinzufügen</button>
+                    )}
+                  </div>
+                  <div className="bd">
+                    {rels.length > 0 && (
+                      <div style={{ marginBottom: addOpen ? 12 : 0 }}>
+                        {rels.map(r => (
+                          <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                            <span style={{ color: 'var(--fg-2)', fontFamily: 'var(--mono)' }}>{r.relation_type}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.to_type}: ${r.to_id}`}>
+                              <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{r.to_type}</span>
+                              {relTitles[`${r.to_type}/${r.to_id}`] ?? r.to_id.slice(0, 8) + '…'}
+                            </span>
+                            <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {rels.length === 0 && !addOpen && (
+                      <div className="empty" style={{ padding: '16px 0' }}>Noch keine Relationen.</div>
+                    )}
+                    {addOpen && (
+                      <div style={{ borderTop: rels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: rels.length > 0 ? 12 : 0 }}>
+                        <div className="field" style={{ marginBottom: 8 }}>
+                          <div className="lbl">Ziel-Typ</div>
+                          <select className="fld" value={addTargetType} onChange={e => { setAddTargetType(e.target.value as RecordType); setAddSelected(null); setAddResults([]) }}>
+                            <option value="object">Objekt</option>
+                            <option value="entity">Entität</option>
+                            <option value="place">Ort</option>
+                            <option value="occurrence">Occurrence</option>
+                          </select>
+                        </div>
+                        <div className="field" style={{ marginBottom: 8 }}>
+                          <div className="lbl">Datensatz suchen</div>
+                          {addSelected ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, flex: 1 }}>{addSelected.title}</span>
+                              <button className="btn sm ico gh" onClick={() => { setAddSelected(null); setAddSearchQ('') }}><X size={12} /></button>
+                            </div>
+                          ) : (
+                            <>
+                              <input className="fld" value={addSearchQ} onChange={e => setAddSearchQ(e.target.value)}
+                                placeholder="Suchbegriff (mind. 2 Zeichen)…" autoFocus />
+                              {addSearching && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Suche…</div>}
+                              {addResults.length > 0 && !addSearching && (
+                                <div style={{ border: '1px solid var(--border-s)', borderRadius: 4, marginTop: 4, maxHeight: 140, overflowY: 'auto' }}>
+                                  {addResults.map(r => (
+                                    <div key={r.id} onClick={() => { setAddSelected(r); setAddSearchQ('') }}
+                                      style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border-s)' }}
+                                      className="hover-row">
+                                      {r.title}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {addSearchQ.trim().length >= 2 && addResults.length === 0 && !addSearching && (
+                                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Keine Ergebnisse.</div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="field" style={{ marginBottom: 10 }}>
+                          <div className="lbl">Relationstyp</div>
+                          <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
+                            placeholder="z.B. depicts, created_by, part_of" />
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn pri sm" onClick={handleAddRelation} disabled={!addSelected || !addRelType.trim() || addSaving}>
+                            {addSaving ? 'Speichert…' : 'Speichern'}
+                          </button>
+                          <button className="btn gh sm" onClick={() => { setAddOpen(false); setAddSearchQ(''); setAddRelType(''); setAddSelected(null); setAddResults([]) }}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="bd">
-                  <div className="empty" style={{ padding: '20px 0' }}>Noch keine Relationen.</div>
-                </div>
-              </div>
+              )}
 
               {!isNew && (
                 <div className="card">
@@ -478,23 +628,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!showMedia && !showGeo && !isNew && (
-            <div className="card" style={{ marginTop: 16 }}>
-              <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
-                <span>Letzte Änderungen</span>
-                <div className="grow" />
-                <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
-              </div>
-              {showAudit && (
-                <div className="bd" style={{ padding: '8px 0' }}>
-                  <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
-                    Vollständiges Log unter Katalon → Audit-Log.
-                  </div>
                 </div>
               )}
             </div>

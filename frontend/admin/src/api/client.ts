@@ -1,4 +1,4 @@
-import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
+import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -149,11 +149,23 @@ export const media = {
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
 }
 
+// Relations
+export const relations = {
+  list: (params?: { from_type?: string; from_id?: string; to_type?: string; to_id?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Relation[]>(`/v1/relations${qs ? `?${qs}` : ''}`)
+  },
+  create: (data: { from_type: string; from_id: string; to_type: string; to_id: string; relation_type: string; metadata_?: Record<string, unknown> }) =>
+    req<Relation>('/v1/relations', { method: 'POST', body: JSON.stringify({ metadata_: {}, ...data }) }),
+  delete: (id: string) => req<void>(`/v1/relations/${id}`, { method: 'DELETE' }),
+}
+
 // Search
 export const search = {
-  query: (q: string, pageSize = 8) => {
-    const qs = new URLSearchParams({ q, page_size: String(pageSize) }).toString()
-    return req<SearchResponse>(`/v1/search?${qs}`)
+  query: (q: string, type?: string, pageSize = 8) => {
+    const params: Record<string, string> = { q, page_size: String(pageSize) }
+    if (type) params.type = type
+    return req<SearchResponse>(`/v1/search?${new URLSearchParams(params)}`)
   },
 }
 

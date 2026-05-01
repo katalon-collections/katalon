@@ -66,6 +66,17 @@ export interface VocabularyTerm {
   parent_id: string | null
 }
 
+export interface Relation {
+  id: string
+  from_type: string
+  from_id: string
+  to_type: string
+  to_id: string
+  relation_type: string
+  metadata_: Record<string, unknown>
+  created_at: string
+}
+
 export interface AuditEntry {
   id: string
   record_type: string
