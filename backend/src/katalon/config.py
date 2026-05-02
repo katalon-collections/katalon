@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     elasticsearch_url: str = "http://localhost:9200"
     cantaloupe_url: str = "http://localhost:8182"
+    cantaloupe_public_url: str = ""  # if set, used in IIIF manifests instead of cantaloupe_url
 
     secret_key: str = "dev-secret-key-change-in-production"
     algorithm: str = "HS256"
