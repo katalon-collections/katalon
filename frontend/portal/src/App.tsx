@@ -1,12 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Link, Route, Routes, useNavigate } from 'react-router-dom'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
+import { api, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { ObjectDetailPage } from './pages/ObjectDetailPage'
 import { EntityDetailPage } from './pages/EntityDetailPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
+import { StaticPageView } from './pages/StaticPageView'
 
 function Header() {
   const navigate = useNavigate()
@@ -27,9 +29,23 @@ function Header() {
 }
 
 function Footer() {
+  const [pages, setPages] = useState<StaticPageSummary[]>([])
+  useEffect(() => { api.pages.list().then(setPages).catch(() => {}) }, [])
   return (
     <footer className="site-footer">
-      Katalon · Metadata Management System · <a href="/api/docs" style={{ color: 'inherit' }}>API</a>
+      Katalon · Metadata Management System
+      {pages.map(p => {
+        const lang = 'de'
+        const label = (p.title as Record<string, string>)[lang] ?? Object.values(p.title)[0] ?? p.slug
+        return (
+          <span key={p.slug}>
+            {' · '}
+            <Link to={`/page/${p.slug}`} style={{ color: 'inherit' }}>{label}</Link>
+          </span>
+        )
+      })}
+      {' · '}
+      <a href="/api/docs" style={{ color: 'inherit' }}>API</a>
     </footer>
   )
 }
@@ -45,6 +61,7 @@ function AppInner() {
         <Route path="/objects/:id" element={<ObjectDetailPage />} />
         <Route path="/entities/:id" element={<EntityDetailPage />} />
         <Route path="/places/:id" element={<PlaceDetailPage />} />
+        <Route path="/page/:slug" element={<StaticPageView />} />
       </Routes>
       <Footer />
     </>
