@@ -10,10 +10,10 @@ const TYPES = [
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
 ]
 
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo', 'pid'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
-  boolean: 'Boolean', vocab: 'Vokabular', relation: 'Relation', geo: 'Geodaten',
+  boolean: 'Boolean', vocab: 'Vokabular', relation: 'Relation', geo: 'Geodaten', pid: 'PID',
 }
 
 type FieldFormState = {

@@ -210,6 +210,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setValues(v => ({ ...v, [name]: cur }))
   }
 
+  type PidEntry = { value: string; label: string }
+  function addPid(name: string) {
+    const cur = (values[name] as PidEntry[] | undefined) ?? []
+    setValues(v => ({ ...v, [name]: [...cur, { value: '', label: '' }] }))
+  }
+  function removePid(name: string, idx: number) {
+    setValues(v => ({ ...v, [name]: ((v[name] as PidEntry[]) ?? []).filter((_, i) => i !== idx) }))
+  }
+  function updatePid(name: string, idx: number, key: 'value' | 'label', val: string) {
+    const cur = [...((values[name] as PidEntry[]) ?? [])]
+    cur[idx] = { ...cur[idx], [key]: val }
+    setValues(v => ({ ...v, [name]: cur }))
+  }
+
   async function handleSave() {
     setSaving(true)
     setError(null)
@@ -382,6 +396,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   const repeatable = f.is_repeatable
                   const vals = repeatable ? ((val as string[] | undefined) ?? []) : undefined
 
+                  const pidEntries = f.field_type === 'pid' && repeatable
+                    ? ((val as PidEntry[] | undefined) ?? [])
+                    : undefined
+                  const pidSingle = f.field_type === 'pid' && !repeatable
+                    ? ((val as PidEntry | undefined) ?? { value: '', label: '' })
+                    : undefined
+
                   return (
                     <div key={f.id} className="field">
                       <div className="lbl">
@@ -390,7 +411,39 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                         {repeatable && <span className="h">wiederholbar</span>}
                       </div>
 
-                      {repeatable ? (
+                      {f.field_type === 'pid' ? (
+                        repeatable ? (
+                          <>
+                            {(pidEntries ?? []).map((entry, i) => (
+                              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                <input className="fld mono" value={entry.value}
+                                  onChange={e => updatePid(f.name, i, 'value', e.target.value)}
+                                  placeholder="URI / ID (z.B. https://d-nb.info/…)"
+                                  disabled={justCreated} style={{ flex: 2 }} />
+                                <input className="fld" value={entry.label}
+                                  onChange={e => updatePid(f.name, i, 'label', e.target.value)}
+                                  placeholder="Anzeigebezeichnung"
+                                  disabled={justCreated} style={{ flex: 1 }} />
+                                <button className="btn sm ico gh" onClick={() => removePid(f.name, i)} disabled={justCreated}><X size={12} /></button>
+                              </div>
+                            ))}
+                            <button className="btn sm gh" onClick={() => addPid(f.name)} disabled={justCreated}>
+                              <Plus size={12} /> PID hinzufügen
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input className="fld mono" value={pidSingle!.value}
+                              onChange={e => setField(f.name, { ...pidSingle!, value: e.target.value })}
+                              placeholder="URI / ID (z.B. https://d-nb.info/…)"
+                              disabled={justCreated} style={{ flex: 2 }} />
+                            <input className="fld" value={pidSingle!.label}
+                              onChange={e => setField(f.name, { ...pidSingle!, label: e.target.value })}
+                              placeholder="Anzeigebezeichnung"
+                              disabled={justCreated} style={{ flex: 1 }} />
+                          </div>
+                        )
+                      ) : repeatable ? (
                         <>
                           {(vals ?? []).map((v, i) => (
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
