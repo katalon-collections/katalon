@@ -10,15 +10,27 @@ def _public_base() -> str:
     return settings.cantaloupe_public_url or settings.cantaloupe_url
 
 
+class CantaloupeError(Exception):
+    """Permanent error from Cantaloupe (e.g. unreadable image). Should not be retried."""
+
+
 async def fetch_image_info(filename: str) -> tuple[int | None, int | None]:
-    """Fetch info.json from Cantaloupe to get image dimensions and trigger lazy processing."""
+    """Fetch info.json from Cantaloupe to get image dimensions and trigger lazy processing.
+
+    Raises CantaloupeError on HTTP 4xx (permanent). Returns (None, None) on transient errors.
+    """
     url = f"{settings.cantaloupe_url}/iiif/3/{filename}/info.json"
+    timeout = settings.cantaloupe_task_timeout
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=float(timeout)) as client:
             resp = await client.get(url)
+            if resp.status_code >= 400 and resp.status_code < 500:
+                raise CantaloupeError(f"Cantaloupe returned {resp.status_code} for {filename}")
             resp.raise_for_status()
             data = resp.json()
             return data.get("width"), data.get("height")
+    except CantaloupeError:
+        raise
     except Exception:
         return None, None
 

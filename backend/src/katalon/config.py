@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     default_admin_email: str = "admin@katalon.dev"
     default_admin_password: str = "admin"
 
+    cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
+
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:4000", "http://localhost:4001"]
 
