@@ -177,6 +177,17 @@ export const search = {
   },
 }
 
+// Authority
+export interface AuthorityHit {
+  source: string; external_id: string; label: string; description: string; extra: Record<string, unknown>
+}
+export const authority = {
+  search: (source: string, q: string, limit = 10) =>
+    req<AuthorityHit[]>(`/v1/authorities/search?source=${encodeURIComponent(source)}&q=${encodeURIComponent(q)}&limit=${limit}`),
+  fetch: (source: string, id: string) =>
+    req<AuthorityHit>(`/v1/authorities/fetch?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`),
+}
+
 // Audit
 export const audit = {
   list: (params?: { record_type?: string; action?: string; limit?: number }) => {
