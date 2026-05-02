@@ -73,9 +73,15 @@ async def search(
     status: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    extra_filters: dict[str, str] | None = None,
+    facet_fields: list[str] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
-    raw = await search_documents(query, record_type, status, from_, page_size)
+    raw = await search_documents(
+        query, record_type, status, from_, page_size,
+        extra_filters=extra_filters,
+        facet_fields=facet_fields,
+    )
 
     hits = raw.get("hits", {})
     total = hits.get("total", {}).get("value", 0)
