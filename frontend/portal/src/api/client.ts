@@ -39,6 +39,15 @@ export interface Relation {
   created_at: string
 }
 
+export interface StaticPageSummary {
+  id: string
+  slug: string
+  title: Record<string, string>
+  content: Record<string, string>
+  is_published: boolean
+  sort_order: number
+}
+
 export interface PortalConfig {
   site_title: string
   site_subtitle: string
@@ -86,6 +95,10 @@ export const api = {
   },
   portal: {
     config: () => get<PortalConfig>('/v1/portal/config'),
+  },
+  pages: {
+    list: () => get<StaticPageSummary[]>('/v1/pages'),
+    get:  (slug: string) => get<StaticPageSummary>(`/v1/pages/${slug}`),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number }) => {

@@ -263,6 +263,23 @@ class AuthoritySource(Base):
 
 
 # ---------------------------------------------------------------------------
+# Static pages (FAQ, Impressum, etc.)
+# ---------------------------------------------------------------------------
+
+
+class StaticPage(Base):
+    __tablename__ = "static_pages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    slug: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    title: Mapped[dict] = mapped_column(JSONB, default=dict)    # {"de": "...", "en": "..."}
+    content: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "Markdown...", "en": "..."}
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+# ---------------------------------------------------------------------------
 # Portal configuration (singleton row, key="default")
 # ---------------------------------------------------------------------------
 
