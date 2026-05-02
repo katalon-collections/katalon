@@ -10,27 +10,49 @@ from katalon.integrations.elasticsearch import (
 )
 
 
+def _extract_title(md: dict) -> str:
+    """Extract a display title from metadata, handling both plain strings and repeatable-field lists."""
+    for key in ("title", "name", "label"):
+        val = md.get(key)
+        if not val:
+            continue
+        if isinstance(val, list) and val:
+            first = val[0]
+            return first.get("value", "") if isinstance(first, dict) else str(first)
+        if isinstance(val, str):
+            return val
+    return ""
+
+
+def _flatten_text(md: dict) -> str:
+    """Return a single search_text string with all metadata values concatenated."""
+    parts: list[str] = []
+    for val in md.values():
+        if isinstance(val, str):
+            parts.append(val)
+        elif isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict):
+                    parts.append(item.get("value", ""))
+                elif isinstance(item, str):
+                    parts.append(item)
+    return " ".join(p for p in parts if p)
+
+
 def _build_doc(record_type: str, record: Any) -> dict[str, Any]:
-    title = ""
-    metadata: dict = {}
+    # The Python attribute is metadata_ (DB column name is metadata)
+    md: dict = getattr(record, "metadata_", None) or {}
 
-    if hasattr(record, "metadata") and record.metadata:
-        md = record.metadata
-        title_field = md.get("title") or md.get("name") or md.get("label")
-        if isinstance(title_field, list) and title_field:
-            title = title_field[0].get("value", "") if isinstance(title_field[0], dict) else str(title_field[0])
-        elif isinstance(title_field, str):
-            title = title_field
-        metadata = md
-
-    if not title and hasattr(record, "identifier"):
-        title = record.identifier or ""
+    title = _extract_title(md)
+    if not title:
+        title = getattr(record, "idno", None) or ""
 
     return {
         "record_type": record_type,
         "title": title,
         "status": getattr(record, "status", None),
-        "metadata": metadata,
+        "metadata": md,
+        "search_text": _flatten_text(md),
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
     }
