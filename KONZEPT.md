@@ -363,9 +363,102 @@ services:
 
 ---
 
-## 11. Nicht im Scope
+## 11. Theme-System für das Discovery-Portal (Post-MVP)
+
+Das Public-Portal soll vollständig themebar sein — ohne Code-Änderungen, ohne Build-Prozess auf Seite der Institution.
+
+### Ziel
+
+Institutionen können das Aussehen des Discovery-Portals (Farben, Typo, Layout-Varianten, Logo, Favicon) durch ein **Theme-Bundle** komplett ändern. Das Admin-UI bleibt immer einheitlich (kein Theming nötig).
+
+### Theme-Bundle-Struktur
+
+Ein Theme ist ein einzelnes Verzeichnis, das per Drop-in installiert wird:
+
+```
+themes/
+└── mein-archiv/
+    ├── theme.json        ← Metadaten + Design-Tokens (Pflicht)
+    ├── logo.svg          ← Logo (optional)
+    ├── favicon.ico       ← Favicon (optional)
+    ├── custom.css        ← CSS-Overrides (lädt nach Base-CSS, optional)
+    └── preview.png       ← Vorschaubild für Theme-Auswahl (optional)
+```
+
+**`theme.json` Beispiel:**
+```json
+{
+  "name": "Stadtarchiv Basel",
+  "version": "1.0.0",
+  "author": "Stadtarchiv Basel",
+  "tokens": {
+    "--accent":    "#8b2635",
+    "--accent-50": "#fdf2f3",
+    "--accent-ink":"#6b1c28",
+    "--bg":        "#f8f6f1",
+    "--panel":     "#ffffff",
+    "--fg":        "#1a1208",
+    "--sb-bg":     "#2c1810",
+    "--sb-fg":     "#e8ddd5"
+  },
+  "fonts": {
+    "body": "https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap",
+    "mono": null
+  },
+  "logo": "logo.svg",
+  "favicon": "favicon.ico"
+}
+```
+
+### Installation (Drop-in, kein Rebuild)
+
+```bash
+# Theme ins Daten-Volume legen
+cp -r mein-archiv/ /var/lib/katalon/themes/mein-archiv/
+
+# Aktives Theme in .env setzen
+PORTAL_THEME=mein-archiv
+
+# Docker-Container neu starten (kein Build nötig)
+docker compose restart portal
+```
+
+Das Portal liest `theme.json` beim Start via `GET /v1/theme` und injiziert die Tokens als CSS Custom Properties in `<head>`. Kein Vite-Build, kein Node auf dem Server nötig.
+
+### Technische Umsetzung (Portal)
+
+```
+frontend/portal/src/theme/
+├── loader.ts     ← lädt theme.json via API
+├── inject.ts     ← setzt CSS-Variablen auf :root vor erstem Paint
+└── defaults.ts   ← Fallback-Tokens (Katalon-Standard)
+
+/var/lib/katalon/themes/   ← Docker volume, per symlink als /public/themes erreichbar
+```
+
+Backend-Endpunkt: `GET /v1/theme` → liefert aktives `theme.json` + URLs zu Logo/CSS.
+
+### Was Themes steuern können
+
+| Bereich | Beispiele |
+|---|---|
+| Farben | Akzent, Hintergrund, Text, Sidebar, Badges |
+| Typografie | Google Fonts URL oder lokale Schrift |
+| Branding | Logo (SVG/PNG), Favicon |
+| CSS-Overrides | Alles Weitere via `custom.css` |
+
+### Bewusste Einschränkungen
+
+- **Kein JavaScript** im Theme (Sicherheit)
+- Kein Einfluss auf Suchlogik oder Datenstruktur
+- Admin-UI ist nicht themebar (einheitliches Werkzeug)
+
+---
+
+## 12. Nicht im Scope (MVP)
 
 - Video/Audio-Transcoding
 - Leihverkehr / Standortverwaltung
 - Typ-Hierarchien (Post-MVP)
 - Sets (Nice-to-have, Post-MVP)
+- Theme-System Discovery-Portal (Post-MVP → Konzept in Abschnitt 11)

@@ -1,0 +1,71 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  elasticsearch:
+    ports:
+      - "9200:9200"
+
+  cantaloupe:
+    ports:
+      - "8182:8182"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend.dev
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/migrations:/app/migrations
+      - media_data:/var/lib/katalon/media
+    command: uvicorn katalon.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend.dev
+    volumes:
+      - ./backend/src:/app/src
+      - media_data:/var/lib/katalon/media
+    command: celery -A katalon.workers.celery_app worker --loglevel=info
+
+  admin:
+    build:
+      context: ./frontend/admin
+      dockerfile: ../../docker/Dockerfile.admin.dev
+    volumes:
+      - ./frontend/admin:/app
+      - /app/node_modules
+    ports:
+      - "4000:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  portal:
+    build:
+      context: ./frontend/portal
+      dockerfile: ../../docker/Dockerfile.portal.dev
+    volumes:
+      - ./frontend/portal:/app
+      - /app/node_modules
+    ports:
+      - "4001:5174"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5174/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
