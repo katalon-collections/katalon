@@ -34,6 +34,7 @@ INDEX_SETTINGS: dict[str, Any] = {
             "title":       {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
             "status":      {"type": "keyword"},
             "metadata":    {"type": "object", "dynamic": True},
+            "search_text": {"type": "text", "analyzer": "katalon_default"},
             "created_at":  {"type": "date"},
             "updated_at":  {"type": "date"},
         }
@@ -76,7 +77,7 @@ async def search_documents(
     filters: list[dict] = []
 
     if query:
-        must.append({"multi_match": {"query": query, "fields": ["title^3", "metadata.*"], "type": "best_fields"}})
+        must.append({"multi_match": {"query": query, "fields": ["title^3", "search_text^2", "metadata.*"], "type": "best_fields"}})
     else:
         must.append({"match_all": {}})
 

@@ -57,6 +57,11 @@ async def _ensure_media_types_vocab() -> None:
 async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
+    try:
+        from katalon.integrations.elasticsearch import ensure_index
+        await ensure_index()
+    except Exception:
+        pass  # ES may not be available in all environments
     yield
 
 
