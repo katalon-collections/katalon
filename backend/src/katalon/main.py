@@ -10,11 +10,11 @@ from sqlalchemy import select
 
 from katalon.api.v1 import (
     auth, audit, authority, entities, importer, media, objects,
-    occurrences, oai, places, relations, schema_admin, search, theme, users, vocabularies,
+    occurrences, oai, places, portal, relations, schema_admin, search, theme, users, vocabularies,
 )
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
-from katalon.core.models import User, Vocabulary, VocabularyTerm
+from katalon.core.models import PortalConfig, User, Vocabulary, VocabularyTerm
 from katalon.database import AsyncSessionLocal
 
 async def _ensure_admin() -> None:
@@ -53,10 +53,19 @@ async def _ensure_media_types_vocab() -> None:
             await db.commit()
 
 
+async def _ensure_portal_config() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+        if result.scalar_one_or_none() is None:
+            db.add(PortalConfig(key="default"))
+            await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
+    await _ensure_portal_config()
     try:
         from katalon.integrations.elasticsearch import ensure_index
         await ensure_index()
@@ -100,6 +109,7 @@ app.include_router(occurrences.router, prefix="/v1")
 app.include_router(relations.router, prefix="/v1")
 app.include_router(media.router, prefix="/v1")
 app.include_router(theme.router, prefix="/v1")
+app.include_router(portal.router, prefix="/v1")
 app.include_router(search.router, prefix="/v1")
 app.include_router(authority.router, prefix="/v1")
 app.include_router(importer.router, prefix="/v1")

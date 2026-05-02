@@ -39,6 +39,15 @@ export interface Relation {
   created_at: string
 }
 
+export interface PortalConfig {
+  site_title: string
+  site_subtitle: string
+  hero_text: string
+  featured_object_ids: string[]
+  accent_color: string
+  logo_url: string
+}
+
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
 
 export interface FacetBucket { value: string; count: number }
@@ -74,6 +83,9 @@ export const api = {
           const toRels = await get<Relation[]>(`/v1/relations?to_type=${type}&to_id=${id}&limit=50`)
           return [...fromRels, ...toRels]
         }),
+  },
+  portal: {
+    config: () => get<PortalConfig>('/v1/portal/config'),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number }) => {
