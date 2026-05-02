@@ -5,6 +5,8 @@ import { loadAndApplyTheme } from './theme/loader'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { ObjectDetailPage } from './pages/ObjectDetailPage'
+import { EntityDetailPage } from './pages/EntityDetailPage'
+import { PlaceDetailPage } from './pages/PlaceDetailPage'
 
 function Header() {
   const navigate = useNavigate()
@@ -12,9 +14,9 @@ function Header() {
     <header className="site-header">
       <Link to="/" className="logo">Katalon</Link>
       <nav>
-        <Link to="/search?q=">Objekte</Link>
-        <Link to="/search?q=">Personen</Link>
-        <Link to="/search?q=">Orte</Link>
+        <Link to="/search?q=&type=object">Objekte</Link>
+        <Link to="/search?q=&type=entity">Personen</Link>
+        <Link to="/search?q=&type=place">Orte</Link>
       </nav>
       <div className="sp" />
       <form className="search-bar" onSubmit={e => { e.preventDefault(); const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement).value; if (q) navigate(`/search?q=${encodeURIComponent(q)}`) }}>
@@ -41,6 +43,8 @@ function AppInner() {
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/objects/:id" element={<ObjectDetailPage />} />
+        <Route path="/entities/:id" element={<EntityDetailPage />} />
+        <Route path="/places/:id" element={<PlaceDetailPage />} />
       </Routes>
       <Footer />
     </>

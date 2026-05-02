@@ -97,15 +97,23 @@ export function SearchPage() {
           {!loading && data?.items.length === 0 && (
             <div style={{ padding: 24, color: 'var(--fg-3)' }}>Keine Ergebnisse.</div>
           )}
-          {!loading && data?.items.map(r => (
-            <div key={r.id} className="result-row" onClick={() => navigate(`/objects/${r.id}`)}>
-              <div className="thumb-sm" />
-              <div className="body">
-                <div className="title">{r.title || r.id}</div>
-                <div className="desc">{r.record_type} · {r.status ?? '—'}</div>
+          {!loading && data?.items.map(r => {
+            const path = r.record_type === 'entity' ? `/entities/${r.id}`
+              : r.record_type === 'place' ? `/places/${r.id}`
+              : `/objects/${r.id}`
+            const typeLabel: Record<string, string> = {
+              object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
+            }
+            return (
+              <div key={r.id} className="result-row" onClick={() => navigate(path)}>
+                <div className="thumb-sm" />
+                <div className="body">
+                  <div className="title">{r.title || r.id}</div>
+                  <div className="desc">{typeLabel[r.record_type] ?? r.record_type} · {r.status ?? '—'}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
