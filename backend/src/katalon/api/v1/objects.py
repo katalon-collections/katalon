@@ -168,3 +168,34 @@ async def list_snapshots(object_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
         .order_by(RecordSnapshot.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+@router.post("/{object_id}/snapshots/{snapshot_id}/restore", response_model=ObjectRead)
+async def restore_snapshot(
+    object_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+) -> Object:
+    snap_result = await db.execute(
+        select(RecordSnapshot).where(
+            RecordSnapshot.id == snapshot_id,
+            RecordSnapshot.record_type == "object",
+            RecordSnapshot.record_id == object_id,
+        )
+    )
+    snap = snap_result.scalar_one_or_none()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot nicht gefunden")
+
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+
+    data = snap.snapshot
+    if "idno" in data:
+        obj.idno = data["idno"]
+    if "status" in data:
+        obj.status = data["status"]
+    if "metadata" in data:
+        obj.metadata_ = data["metadata"]
+    await db.flush()
+    return obj

@@ -115,3 +115,13 @@ export interface SearchResponse {
   items: SearchResult[]
   facets: Record<string, { value: string; count: number }[]>
 }
+
+export interface Snapshot {
+  id: string
+  record_type: string
+  record_id: string
+  label: string
+  snapshot: Record<string, unknown>
+  created_by: string | null
+  created_at: string
+}
