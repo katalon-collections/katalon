@@ -34,6 +34,7 @@ class FieldDefinitionRead(FieldDefinitionCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    is_deleted: bool = False
 
 
 # ---------------------------------------------------------------------------

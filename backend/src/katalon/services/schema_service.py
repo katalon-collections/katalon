@@ -11,7 +11,10 @@ from katalon.core.models import FieldDefinition
 async def get_field_definitions(
     db: AsyncSession, target_type: str, target_subtype: str | None = None
 ) -> list[FieldDefinition]:
-    q = select(FieldDefinition).where(FieldDefinition.target_type == target_type)
+    q = select(FieldDefinition).where(
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.is_deleted.is_(False),
+    )
     if target_subtype:
         q = q.where(
             or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == target_subtype)
