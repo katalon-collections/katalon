@@ -10,7 +10,7 @@ from katalon.workers.celery_app import celery_app
 async def _process(media_file_id: uuid.UUID) -> dict:
     from katalon.database import AsyncSessionLocal
     from katalon.core.models import MediaFile
-    from katalon.integrations.cantaloupe import build_manifest
+    from katalon.integrations.cantaloupe import build_manifest, fetch_image_info
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(MediaFile).where(MediaFile.id == media_file_id))
@@ -19,7 +19,11 @@ async def _process(media_file_id: uuid.UUID) -> dict:
             return {"status": "error", "detail": "not found"}
 
         filename = Path(media.file_path).name
-        manifest = build_manifest(media_file_id, filename)
+
+        # Trigger Cantaloupe processing and get image dimensions for IIIF canvas
+        width, height = await fetch_image_info(filename)
+
+        manifest = build_manifest(media_file_id, filename, width=width, height=height)
         media.iiif_manifest = manifest
         media.status = "ready"
         await session.commit()

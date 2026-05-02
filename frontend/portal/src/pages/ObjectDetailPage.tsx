@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
+
+// Lazy-load to avoid SSR/bundle issues with the viewer
+const IIIFViewer = lazy(() =>
+  import('@samvera/clover-iiif').then(m => ({ default: m.Viewer }))
+)
 
 const TYPE_LABEL_MAP: Record<string, string> = {
   title: 'Titel', name: 'Name', creator: 'Urheber:in', photographer: 'Fotograf:in',
@@ -19,6 +24,17 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+function ViewerFallback({ objectId, media }: { objectId: string; media: MediaFile }) {
+  return (
+    <img
+      src={`${BASE}/v1/objects/${objectId}/media/${media.id}/file`}
+      alt=""
+      style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+    />
+  )
+}
+
 export function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -26,10 +42,12 @@ export function ObjectDetailPage() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewerError, setViewerError] = useState(false)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setViewerError(false)
     Promise.all([
       api.objects.get(id),
       api.objects.media(id).catch(() => [] as MediaFile[]),
@@ -40,9 +58,7 @@ export function ObjectDetailPage() {
   }, [id])
 
   if (loading) {
-    return (
-      <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
-    )
+    return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
   }
 
   if (error || !obj) {
@@ -56,8 +72,11 @@ export function ObjectDetailPage() {
   const m = obj.metadata_ as Record<string, unknown>
   const title = String(m.title ?? m.name ?? obj.idno ?? obj.id)
 
-  const primaryMedia = mediaFiles.find(f => f.is_primary && f.status === 'ready')
-    ?? mediaFiles.find(f => f.status === 'ready')
+  const readyMedia = mediaFiles.filter(f => f.status === 'ready')
+  const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
+
+  const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
+  const showViewer = readyMedia.length > 0 && !viewerError
 
   const knownKeys = new Set(Object.keys(TYPE_LABEL_MAP))
   const extraMeta = Object.entries(m).filter(([k]) => !knownKeys.has(k))
@@ -79,15 +98,30 @@ export function ObjectDetailPage() {
 
       <div className="detail-layout">
         <div>
-          {primaryMedia ? (
-            <img
-              src={`${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file`}
-              alt={title}
-              style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
+          {showViewer ? (
+            <div style={{ borderRadius: 10, overflow: 'hidden', background: '#0f172a' }}>
+              <Suspense fallback={
+                primaryMedia
+                  ? <ViewerFallback objectId={obj.id} media={primaryMedia} />
+                  : <div style={{ height: 300, display: 'grid', placeItems: 'center', color: '#94a3b8' }}>Lade Viewer…</div>
+              }>
+                <IIIFViewer
+                  iiifContent={manifestUrl}
+                  options={{
+                    showTitle: false,
+                    showIIIFBadge: false,
+                  }}
+                  // @ts-expect-error event prop not typed in older versions
+                  onError={() => setViewerError(true)}
+                />
+              </Suspense>
+            </div>
+          ) : primaryMedia ? (
+            <ViewerFallback objectId={obj.id} media={primaryMedia} />
           ) : (
-            <div className="detail-viewer">Kein Bild verfügbar</div>
+            <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
+              Kein Bild verfügbar
+            </div>
           )}
 
           {m.description != null && (
@@ -109,39 +143,18 @@ export function ObjectDetailPage() {
             m[k] ? <MetaRow key={k} label={label} value={String(m[k])} /> : null
           )}
           {extraMeta.map(([k, v]) =>
-            v && typeof v !== 'object' ? (
-              <MetaRow key={k} label={k} value={String(v)} />
-            ) : null
+            v && typeof v !== 'object' ? <MetaRow key={k} label={k} value={String(v)} /> : null
           )}
-          <div style={{ marginTop: 16 }}>
-            <a href={`/v1/objects/${obj.id}/iiif/manifest`} target="_blank" rel="noreferrer"
-               style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-              IIIF Manifest ↗
-            </a>
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {readyMedia.length > 0 && (
+              <a href={manifestUrl} target="_blank" rel="noreferrer"
+                 style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
+              </a>
+            )}
           </div>
         </aside>
       </div>
-
-      {mediaFiles.length > 1 && (
-        <div style={{ marginTop: 32 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Weitere Medien</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {mediaFiles.map(f => (
-              <div key={f.id} style={{
-                width: 100, height: 100, borderRadius: 8, overflow: 'hidden',
-                background: '#e4e6eb', border: f.is_primary ? '2px solid var(--accent)' : '1px solid var(--border)',
-              }}>
-                <img
-                  src={`${BASE}/v1/objects/${obj.id}/media/${f.id}/file`}
-                  alt={f.filename}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={e => { (e.target as HTMLImageElement).style.opacity = '0' }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
