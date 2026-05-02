@@ -14,7 +14,7 @@ from katalon.api.v1 import (
 )
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
-from katalon.core.models import PortalConfig, User, Vocabulary, VocabularyTerm
+from katalon.core.models import AuthoritySource as AuthoritySourceModel, PortalConfig, User, Vocabulary, VocabularyTerm
 from katalon.database import AsyncSessionLocal
 
 async def _ensure_admin() -> None:
@@ -53,6 +53,33 @@ async def _ensure_media_types_vocab() -> None:
             await db.commit()
 
 
+_DEFAULT_AUTHORITY_SOURCES = [
+    ("gnd",       "Gemeinsame Normdatei (DNB)",        "katalon.integrations.gnd_adapter.GNDAdapter",         True),
+    ("geonames",  "GeoNames",                          "katalon.integrations.geonames_adapter.GeonamesAdapter", False),
+    ("viaf",      "VIAF (Virtual Int. Authority File)", "katalon.integrations.viaf_adapter.VIAFAdapter",        False),
+    ("wikidata",  "Wikidata",                          "katalon.integrations.wikidata_adapter.WikidataAdapter", False),
+    ("tgn",       "Getty Thesaurus of Geographic Names","katalon.integrations.tgn_adapter.TGNAdapter",          False),
+    ("iconclass", "ICONCLASS",                         "katalon.integrations.iconclass_adapter.ICONCLASSAdapter", False),
+]
+
+
+async def _ensure_authority_sources() -> None:
+    async with AsyncSessionLocal() as db:
+        for src_id, label, adapter_class, is_enabled in _DEFAULT_AUTHORITY_SOURCES:
+            result = await db.execute(
+                select(AuthoritySourceModel).where(AuthoritySourceModel.id == src_id)
+            )
+            if result.scalar_one_or_none() is None:
+                db.add(AuthoritySourceModel(
+                    id=src_id,
+                    label=label,
+                    adapter_class=adapter_class,
+                    config={},
+                    is_enabled=is_enabled,
+                ))
+        await db.commit()
+
+
 async def _ensure_portal_config() -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
@@ -66,6 +93,7 @@ async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
     await _ensure_portal_config()
+    await _ensure_authority_sources()
     try:
         from katalon.integrations.elasticsearch import ensure_index
         await ensure_index()
