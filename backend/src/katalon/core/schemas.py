@@ -157,6 +157,18 @@ class UserRead(BaseModel):
     created_at: datetime
 
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    password: str | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
