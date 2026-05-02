@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, BASE } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import type { AnyRecord, FieldDefinition, RecordType, Relation, SearchResult, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -53,6 +53,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [status, setStatus]   = useState<Status>('draft')
   const [values, setValues]   = useState<Record<string, unknown>>({})
   const [showAudit, setShowAudit] = useState(false)
+  const [showSnapshots, setShowSnapshots] = useState(false)
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [snapLabel, setSnapLabel] = useState('')
+  const [snapCreating, setSnapCreating] = useState(false)
+  const [snapRestoring, setSnapRestoring] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
@@ -81,6 +86,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const loadMedia = useCallback((id: string) => {
     media.list(id).then(setMediaFiles).catch(() => {})
   }, [])
+
+  const loadSnapshots = useCallback((id: string) => {
+    if (recordType === 'object') {
+      objects.snapshots.list(id).then(setSnapshots).catch(() => {})
+    }
+  }, [recordType])
 
   const loadRelations = useCallback(async (id: string) => {
     try {
@@ -151,6 +162,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   useEffect(() => {
     if (savedId && showMedia) loadMedia(savedId)
   }, [savedId, showMedia, loadMedia])
+
+  useEffect(() => {
+    if (savedId) loadSnapshots(savedId)
+  }, [savedId, loadSnapshots])
 
   useEffect(() => {
     if (!showMedia) return
@@ -668,6 +683,74 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {!isNew && recordType === 'object' && savedId && (
+                <div className="card">
+                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowSnapshots(s => !s)}>
+                    <span>Versionen ({snapshots.length})</span>
+                    <div className="grow" />
+                    <ChevD size={14} style={{ transform: showSnapshots ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
+                  </div>
+                  {showSnapshots && (
+                    <div className="bd" style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--fg)' }}
+                          placeholder="Bezeichnung (z.B. 'vor Bearbeitung')"
+                          value={snapLabel}
+                          onChange={e => setSnapLabel(e.target.value)}
+                        />
+                        <button
+                          style={{ fontSize: 12, padding: '4px 10px', background: 'var(--accent)', color: '#fff', border: 0, borderRadius: 4, cursor: 'pointer' }}
+                          disabled={snapCreating || !snapLabel.trim()}
+                          onClick={async () => {
+                            if (!snapLabel.trim() || !savedId) return
+                            setSnapCreating(true)
+                            try {
+                              const snap = await objects.snapshots.create(savedId, snapLabel.trim())
+                              setSnapshots(s => [snap, ...s])
+                              setSnapLabel('')
+                            } finally {
+                              setSnapCreating(false)
+                            }
+                          }}
+                        >
+                          {snapCreating ? '…' : 'Speichern'}
+                        </button>
+                      </div>
+                      {snapshots.length === 0 && (
+                        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Noch keine Versionen.</div>
+                      )}
+                      {snapshots.map(snap => (
+                        <div key={snap.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600 }}>{snap.label}</div>
+                            <div style={{ color: 'var(--fg-3)' }}>{new Date(snap.created_at).toLocaleString('de')}</div>
+                          </div>
+                          <button
+                            style={{ fontSize: 11, padding: '3px 8px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}
+                            disabled={snapRestoring === snap.id}
+                            onClick={async () => {
+                              if (!savedId || !window.confirm(`Version „${snap.label}" wiederherstellen?`)) return
+                              setSnapRestoring(snap.id)
+                              try {
+                                const restored = await objects.snapshots.restore(savedId, snap.id)
+                                setStatus(restored.status as Status)
+                                setIdno(restored.idno ?? '')
+                                setValues(restored.metadata_ as Record<string, unknown>)
+                              } finally {
+                                setSnapRestoring(null)
+                              }
+                            }}
+                          >
+                            {snapRestoring === snap.id ? '…' : 'Wiederherstellen'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

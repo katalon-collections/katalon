@@ -1,4 +1,4 @@
-import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Token, Vocabulary, VocabularyTerm } from '../types'
+import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Snapshot, Token, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -63,6 +63,11 @@ export const objects = {
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/objects/${id}`, { method: 'DELETE' }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/objects/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/objects/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string) => req<KatalonObject>(`/v1/objects/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+  },
 }
 
 // Entities
