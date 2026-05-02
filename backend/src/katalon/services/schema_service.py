@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import FieldDefinition
 
 
-async def get_field_definitions(db: AsyncSession, target_type: str) -> list[FieldDefinition]:
-    result = await db.execute(
-        select(FieldDefinition)
-        .where(FieldDefinition.target_type == target_type)
-        .order_by(FieldDefinition.sort_order)
-    )
+async def get_field_definitions(
+    db: AsyncSession, target_type: str, target_subtype: str | None = None
+) -> list[FieldDefinition]:
+    q = select(FieldDefinition).where(FieldDefinition.target_type == target_type)
+    if target_subtype:
+        q = q.where(
+            or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == target_subtype)
+        )
+    result = await db.execute(q.order_by(FieldDefinition.sort_order))
     return list(result.scalars().all())
 
 
@@ -35,10 +38,10 @@ def _validate_pid_value(value: object, settings: dict, field_name: str) -> str |
 
 
 async def validate_metadata(
-    db: AsyncSession, record_type: str, metadata: dict
+    db: AsyncSession, record_type: str, metadata: dict, target_subtype: str | None = None
 ) -> list[str]:
     """Return list of validation error messages (empty = valid)."""
-    fields = await get_field_definitions(db, record_type)
+    fields = await get_field_definitions(db, record_type, target_subtype)
     errors: list[str] = []
 
     for field in fields:

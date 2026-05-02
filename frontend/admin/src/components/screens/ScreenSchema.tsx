@@ -10,6 +10,8 @@ const TYPES = [
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
 ]
 
+const SUBTYPE_TYPES = new Set(['entity', 'occurrence'])
+
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo', 'pid'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
@@ -18,6 +20,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 
 type FieldFormState = {
   target_type: string
+  target_subtype: string
   name: string
   label_de: string
   label_en: string
@@ -27,13 +30,14 @@ type FieldFormState = {
   sort_order: number
 }
 
-function emptyForm(targetType: string, sortOrder: number): FieldFormState {
-  return { target_type: targetType, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder }
+function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
   return {
     target_type: f.target_type,
+    target_subtype: f.target_subtype ?? '',
     name: f.name,
     label_de: f.label.de ?? '',
     label_en: f.label.en ?? '',
@@ -49,13 +53,14 @@ interface FieldDetailProps {
   isNew: boolean
   saving: boolean
   error: string | null
+  showSubtype: boolean
   onChange: (form: FieldFormState) => void
   onSave: () => void
   onDelete: () => void
   onClose: () => void
 }
 
-function FieldDetail({ form, isNew, saving, error, onChange, onSave, onDelete, onClose }: FieldDetailProps) {
+function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose }: FieldDetailProps) {
   function set<K extends keyof FieldFormState>(key: K, value: FieldFormState[K]) {
     onChange({ ...form, [key]: value })
   }
@@ -92,6 +97,13 @@ function FieldDetail({ form, isNew, saving, error, onChange, onSave, onDelete, o
             </select>
           </div>
         </div>
+        {showSubtype && (
+          <div className="field">
+            <div className="lbl">Subtyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(leer = gilt für alle Subtypen)</span></div>
+            <input className="fld mono" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)}
+              placeholder="z.B. person, organisation, event, work" disabled={!isNew} />
+          </div>
+        )}
         <div className="fg-2">
           <div className="field">
             <div className="lbl">Sortierung</div>
@@ -123,6 +135,7 @@ function FieldDetail({ form, isNew, saving, error, onChange, onSave, onDelete, o
 
 export function ScreenSchema() {
   const [activeType, setActiveType] = useState('object')
+  const [activeSubtype, setActiveSubtype] = useState('')
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null)
@@ -131,13 +144,15 @@ export function ScreenSchema() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  const showSubtype = SUBTYPE_TYPES.has(activeType)
+
   const loadFields = useCallback(() => {
     setLoading(true)
-    schema.list(activeType)
+    schema.list(activeType, (showSubtype && activeSubtype) ? activeSubtype : undefined)
       .then(setFields)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [activeType])
+  }, [activeType, activeSubtype, showSubtype])
 
   useEffect(() => {
     setActiveFieldId(null)
@@ -146,10 +161,17 @@ export function ScreenSchema() {
     loadFields()
   }, [loadFields])
 
+  useEffect(() => {
+    setActiveSubtype('')
+    setActiveFieldId(null)
+    setIsNew(false)
+    setForm(null)
+  }, [activeType])
+
   function openNew() {
     setIsNew(true)
     setActiveFieldId(null)
-    setForm(emptyForm(activeType, fields.length))
+    setForm(emptyForm(activeType, fields.length, activeSubtype))
     setSaveError(null)
   }
 
@@ -176,6 +198,7 @@ export function ScreenSchema() {
     setSaveError(null)
     const data = {
       target_type: form.target_type,
+      target_subtype: form.target_subtype.trim() || null,
       name: form.name,
       label: { de: form.label_de, en: form.label_en },
       field_type: form.field_type as FieldDefinition['field_type'],
@@ -251,6 +274,7 @@ export function ScreenSchema() {
               isNew={isNew}
               saving={saving}
               error={saveError}
+              showSubtype={showSubtype}
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}
@@ -258,11 +282,22 @@ export function ScreenSchema() {
             />
           ) : (
             <>
+              {showSubtype && (
+                <div style={{ padding: '14px 24px 0' }}>
+                  <div className="field" style={{ maxWidth: 320 }}>
+                    <div className="lbl">Subtyp-Filter</div>
+                    <input className="fld mono" value={activeSubtype}
+                      onChange={e => setActiveSubtype(e.target.value)}
+                      placeholder="z.B. person — leer = alle anzeigen"
+                    />
+                  </div>
+                </div>
+              )}
               {loading ? (
                 <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>
               ) : (
                 <>
-                  <div style={{ marginBottom: 12, color: 'var(--fg-3)', fontSize: 12 }}>
+                  <div style={{ margin: '12px 24px 4px', color: 'var(--fg-3)', fontSize: 12 }}>
                     {fields.length} Felder
                   </div>
                   {fields.map(f => (
@@ -270,6 +305,9 @@ export function ScreenSchema() {
                       <span className="gp"><Grip size={14} /></span>
                       <span className="nm">{f.label.de ?? f.name}</span>
                       <span className="key">{f.name}</span>
+                      {f.target_subtype && (
+                        <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
+                      )}
                       <span className="typ">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</span>
                       {f.is_required && <span className="req-mark">Pflicht</span>}
                       {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}

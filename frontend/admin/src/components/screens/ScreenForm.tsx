@@ -118,18 +118,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setRelTitles({})
     setAddOpen(false)
 
-    const loadSchemaP = schema.list(recordType)
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
 
-    Promise.all([loadSchemaP, loadRecP])
-      .then(([fieldDefs, rec]) => {
-        setFields(fieldDefs)
+    loadRecP
+      .then(async rec => {
+        let recSubtype: string | undefined
         if (rec) {
           setStatus(rec.status as Status)
           setValues(rec.metadata_)
           const m = rec.metadata_ as Record<string, unknown>
           if (showIdno)  setIdno((rec as { idno?: string | null }).idno ?? '')
-          if (subtypeKey) setSubtype(String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? ''))
+          if (subtypeKey) {
+            recSubtype = String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? '') || undefined
+            setSubtype(recSubtype ?? '')
+          }
           if (showGeo) {
             const p = rec as { lat?: number | null; lon?: number | null }
             setLat(p.lat != null ? String(p.lat) : '')
@@ -137,6 +139,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
           }
           setTitle(String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? rec.id))
         }
+        const fieldDefs = await schema.list(recordType, recSubtype)
+        setFields(fieldDefs)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))

@@ -1,7 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import or_, select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import FieldDefinition
@@ -11,12 +11,17 @@ router = APIRouter(prefix="/schema", tags=["schema"])
 
 
 @router.get("/{target_type}", response_model=list[FieldDefinitionRead])
-async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
-    result = await db.execute(
-        select(FieldDefinition)
-        .where(FieldDefinition.target_type == target_type)
-        .order_by(FieldDefinition.sort_order)
-    )
+async def list_fields(
+    target_type: str,
+    db: DBDep,
+    subtype: str | None = Query(default=None, description="Filter to generic + this subtype"),
+) -> list[FieldDefinition]:
+    q = select(FieldDefinition).where(FieldDefinition.target_type == target_type)
+    if subtype:
+        q = q.where(
+            or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == subtype)
+        )
+    result = await db.execute(q.order_by(FieldDefinition.sort_order))
     return list(result.scalars().all())
 
 

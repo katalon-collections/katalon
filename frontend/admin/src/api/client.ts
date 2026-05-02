@@ -103,7 +103,10 @@ export const occurrences = {
 
 // Schema
 export const schema = {
-  list:   (targetType: string) => req<FieldDefinition[]>(`/v1/schema/${targetType}`),
+  list:   (targetType: string, subtype?: string) => {
+    const qs = subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''
+    return req<FieldDefinition[]>(`/v1/schema/${targetType}${qs}`)
+  },
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/schema/${id}`, { method: 'DELETE' }),

@@ -20,6 +20,7 @@ class StatusEnum(str):
 
 class FieldDefinitionCreate(BaseModel):
     target_type: str
+    target_subtype: str | None = None
     name: str
     label: dict = {}
     field_type: str

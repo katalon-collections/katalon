@@ -35,7 +35,7 @@ async def list_occurrences(
 
 @router.post("", response_model=OccurrenceRead, status_code=201)
 async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
-    errors = await validate_metadata(db, "occurrence", data.metadata_)
+    errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     occ = Occurrence(occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
@@ -64,7 +64,7 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
-    errors = await validate_metadata(db, "occurrence", data.metadata_)
+    errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {"status": occ.status, "metadata": occ.metadata_}

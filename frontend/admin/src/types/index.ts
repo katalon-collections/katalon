@@ -43,9 +43,10 @@ export type AnyRecord = KatalonObject | Entity | Place | Occurrence
 export interface FieldDefinition {
   id: string
   target_type: string
+  target_subtype: string | null
   name: string
   label: Record<string, string>
-  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'relation' | 'boolean' | 'richtext'
+  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'relation' | 'boolean' | 'richtext' | 'pid'
   is_required: boolean
   is_repeatable: boolean
   sort_order: number

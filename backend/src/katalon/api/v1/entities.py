@@ -39,7 +39,7 @@ async def list_entities(
 
 @router.post("", response_model=EntityRead, status_code=201)
 async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
-    errors = await validate_metadata(db, "entity", data.metadata_)
+    errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     entity = Entity(entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
@@ -68,7 +68,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    errors = await validate_metadata(db, "entity", data.metadata_)
+    errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {"status": entity.status, "metadata": entity.metadata_}

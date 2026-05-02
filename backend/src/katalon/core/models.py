@@ -110,6 +110,7 @@ class FieldDefinition(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     target_type: Mapped[str] = mapped_column(String(32), index=True)  # object/entity/place/occurrence
+    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)  # e.g. person, organisation
     name: Mapped[str] = mapped_column(String(128))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
     field_type: Mapped[str] = mapped_column(String(32))  # text/date/number/geo/vocab/relation/boolean
@@ -119,7 +120,6 @@ class FieldDefinition(Base):
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     __table_args__ = (
-        UniqueConstraint("target_type", "name", name="uq_field_def_type_name"),
         Index("ix_field_defs_target_type", "target_type"),
     )
 
