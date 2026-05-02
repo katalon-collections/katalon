@@ -1,7 +1,8 @@
 import uuid
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -139,16 +140,24 @@ async def create_snapshot(
 
 
 @router.get("/{object_id}/iiif/manifest")
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep) -> dict:
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
+    from katalon.integrations.cantaloupe import build_object_manifest
+
     result = await db.execute(
         select(MediaFile)
         .where(MediaFile.object_id == object_id, MediaFile.status == "ready")
         .order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
     )
-    media = result.scalars().first()
-    if not media or not media.iiif_manifest:
+    media_files = result.scalars().all()
+    if not media_files:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
-    return media.iiif_manifest
+
+    media_items = [
+        (Path(m.file_path).name, m.iiif_manifest)
+        for m in media_files
+    ]
+    manifest_id = str(request.url)
+    return build_object_manifest(manifest_id, media_items)
 
 
 @router.get("/{object_id}/snapshots", response_model=list[SnapshotRead])

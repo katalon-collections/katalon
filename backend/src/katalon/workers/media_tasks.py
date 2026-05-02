@@ -20,7 +20,7 @@ async def _process(media_file_id: uuid.UUID) -> dict:
 
         filename = Path(media.file_path).name
 
-        # Trigger Cantaloupe processing and get image dimensions
+        # Trigger Cantaloupe processing and get image dimensions for IIIF canvas
         width, height = await fetch_image_info(filename)
 
         manifest = build_manifest(media_file_id, filename, width=width, height=height)
