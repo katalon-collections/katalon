@@ -13,6 +13,15 @@ from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 router = APIRouter(prefix="/schema", tags=["schema"])
 
 
+def _enqueue_reindex(target_type: str) -> None:
+    """Fire-and-forget: enqueue a type-specific ES reindex after schema changes."""
+    try:
+        from katalon.workers.index_tasks import bulk_reindex_type_task
+        bulk_reindex_type_task.delay(target_type)
+    except Exception:
+        pass  # ES / Celery may not be available in all environments
+
+
 class ImportResult(BaseModel):
     created: int
     updated: int
@@ -79,11 +88,13 @@ async def delete_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> None:
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
     field.is_deleted = True
+    target_type = field.target_type
+    await db.flush()
+    _enqueue_reindex(target_type)
 
 
 @router.post("/{field_id}/restore", response_model=FieldDefinitionRead)
 async def restore_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> FieldDefinition:
-    """Restore a soft-deleted field definition."""
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(True)
@@ -93,6 +104,9 @@ async def restore_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> Field
     if not field:
         raise HTTPException(status_code=404, detail="Gelöschte Felddefinition nicht gefunden")
     field.is_deleted = False
+    target_type = field.target_type
+    await db.flush()
+    _enqueue_reindex(target_type)
     return field
 
 

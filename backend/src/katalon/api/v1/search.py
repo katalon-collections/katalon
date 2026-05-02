@@ -51,7 +51,19 @@ async def search(
 
 @router.post("/reindex", tags=["search"])
 async def trigger_reindex() -> dict[str, str]:
-    """Enqueue a full reindex Celery task."""
+    """Enqueue a full reindex Celery task (all types)."""
     from katalon.workers.index_tasks import reindex_all_task
     reindex_all_task.delay()
     return {"status": "queued"}
+
+
+@router.post("/reindex/{target_type}", tags=["search"])
+async def trigger_reindex_type(target_type: str) -> dict[str, str]:
+    """Enqueue a type-specific reindex (e.g. after schema changes)."""
+    valid = {"object", "entity", "place", "occurrence"}
+    if target_type not in valid:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=f"Ungültiger Typ. Erlaubt: {', '.join(sorted(valid))}")
+    from katalon.workers.index_tasks import bulk_reindex_type_task
+    bulk_reindex_type_task.delay(target_type)
+    return {"status": "queued", "target_type": target_type}
