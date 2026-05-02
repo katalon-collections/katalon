@@ -24,6 +24,7 @@ class PortalConfigRead(BaseModel):
     site_subtitle: str
     hero_text: str
     featured_object_ids: list[str]
+    facet_fields: list[str]
     accent_color: str
     logo_url: str
 
@@ -36,6 +37,7 @@ class PortalConfigUpdate(BaseModel):
     site_subtitle: str | None = None
     hero_text: str | None = None
     featured_object_ids: list[str] | None = None
+    facet_fields: list[str] | None = None
     accent_color: str | None = None
     logo_url: str | None = None
 

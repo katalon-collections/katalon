@@ -98,6 +98,8 @@ async def search_documents(
     status: str | None,
     from_: int,
     size: int,
+    extra_filters: dict[str, str] | None = None,
+    facet_fields: list[str] | None = None,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -113,18 +115,17 @@ async def search_documents(
         filters.append({"term": {"record_type": record_type}})
     if status:
         filters.append({"term": {"status": status}})
+    for field, value in (extra_filters or {}).items():
+        filters.append({"term": {f"metadata.{field}.keyword": value}})
 
-    es_query: dict[str, Any] = {
-        "bool": {
-            "must": must,
-            "filter": filters,
-        }
-    }
+    es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
     aggs: dict[str, Any] = {
         "by_type":   {"terms": {"field": "record_type", "size": 10}},
         "by_status": {"terms": {"field": "status", "size": 10}},
     }
+    for field in facet_fields or []:
+        aggs[f"meta_{field}"] = {"terms": {"field": f"metadata.{field}.keyword", "size": 20}}
 
     result = await es.search(
         index=INDEX_NAME,

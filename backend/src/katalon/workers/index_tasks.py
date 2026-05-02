@@ -47,7 +47,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(model))
             records = [
-                (str(rec.id), {"record_type": target_type, **_build_doc(rec)})
+                (str(rec.id), _build_doc(target_type, rec))
                 for rec in result.scalars().all()
             ]
         count = await reindex_type(target_type, records)
