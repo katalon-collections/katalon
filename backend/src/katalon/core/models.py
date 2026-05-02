@@ -117,6 +117,7 @@ class FieldDefinition(Base):
     is_repeatable: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (
         UniqueConstraint("target_type", "name", name="uq_field_def_type_name"),

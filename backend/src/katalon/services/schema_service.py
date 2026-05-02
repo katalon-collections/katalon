@@ -9,7 +9,7 @@ from katalon.core.models import FieldDefinition
 async def get_field_definitions(db: AsyncSession, target_type: str) -> list[FieldDefinition]:
     result = await db.execute(
         select(FieldDefinition)
-        .where(FieldDefinition.target_type == target_type)
+        .where(FieldDefinition.target_type == target_type, FieldDefinition.is_deleted.is_(False))
         .order_by(FieldDefinition.sort_order)
     )
     return list(result.scalars().all())
