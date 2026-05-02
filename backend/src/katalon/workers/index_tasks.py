@@ -24,6 +24,38 @@ def remove_record_task(record_id: str) -> None:
     _run(delete_document(record_id))
 
 
+@celery_app.task(name="katalon.bulk_reindex_type")
+def bulk_reindex_type_task(target_type: str) -> dict:
+    """Reindex all records of a single type (e.g. after schema changes)."""
+    from katalon.database import AsyncSessionLocal
+    from katalon.core.models import Object, Entity, Place, Occurrence
+    from katalon.services.search_service import _build_doc
+    from katalon.integrations.elasticsearch import reindex_type
+    from sqlalchemy import select
+
+    _MODEL_MAP: dict = {
+        "object": Object,
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+    }
+
+    async def _do() -> dict:
+        model = _MODEL_MAP.get(target_type)
+        if model is None:
+            return {"status": "error", "detail": f"Unknown type: {target_type}"}
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(model))
+            records = [
+                (str(rec.id), {"record_type": target_type, **_build_doc(rec)})
+                for rec in result.scalars().all()
+            ]
+        count = await reindex_type(target_type, records)
+        return {"status": "ok", "indexed": count, "target_type": target_type}
+
+    return _run(_do())
+
+
 @celery_app.task(name="katalon.reindex_all")
 def reindex_all_task() -> None:
     """Full reindex – reads all records from DB and pushes to ES."""

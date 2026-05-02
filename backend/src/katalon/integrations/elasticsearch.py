@@ -42,6 +42,7 @@ INDEX_SETTINGS: dict[str, Any] = {
 }
 
 INDEX_NAME = "katalon_records"
+ALIAS_NAME = "katalon"  # stable alias used by all queries
 
 
 async def ensure_index() -> None:
@@ -49,6 +50,33 @@ async def ensure_index() -> None:
     exists = await es.indices.exists(index=INDEX_NAME)
     if not exists:
         await es.indices.create(index=INDEX_NAME, body=INDEX_SETTINGS)
+    # Ensure the alias points to the main index
+    alias_exists = await es.indices.exists_alias(name=ALIAS_NAME)
+    if not alias_exists:
+        await es.indices.put_alias(index=INDEX_NAME, name=ALIAS_NAME)
+
+
+async def reindex_type(target_type: str, records: list[tuple[str, dict[str, Any]]]) -> int:
+    """Delete all docs of target_type and re-index the supplied records.
+
+    Returns the number of documents indexed.
+    """
+    es = get_es()
+    # Delete existing docs for this type
+    await es.delete_by_query(
+        index=INDEX_NAME,
+        body={"query": {"term": {"record_type": target_type}}},
+        refresh=True,
+    )
+    if not records:
+        return 0
+    ops: list[dict] = []
+    for doc_id, body in records:
+        ops.append({"index": {"_index": INDEX_NAME, "_id": doc_id}})
+        ops.append(body)
+    resp = await es.bulk(body=ops, refresh=True)
+    errors = [item for item in resp["items"] if "error" in item.get("index", {})]
+    return len(records) - len(errors)
 
 
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
