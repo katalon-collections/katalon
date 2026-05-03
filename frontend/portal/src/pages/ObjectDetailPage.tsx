@@ -34,6 +34,7 @@ export function ObjectDetailPage() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewerError, setViewerError] = useState(false)
   // Hook must be called BEFORE any conditional returns
   const fieldLabels = useFieldLabels('object')
 
@@ -69,7 +70,6 @@ export function ObjectDetailPage() {
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
   const excludedKeys = new Set(['description', 'keywords'])
-  const [viewerError, setViewerError] = useState(false)
   const showViewer = readyMedia.length > 0 && !viewerError
 
   return (
