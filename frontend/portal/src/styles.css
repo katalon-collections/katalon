@@ -40,7 +40,7 @@ input, select, textarea { font-family: inherit; }
 .site-header .search-bar input::placeholder { color: rgba(255,255,255,.45); }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.page { padding: 40px 0 80px; }
+.page { padding: 40px 24px 80px; }
 
 /* Hero */
 .hero { background: var(--header-bg, #0b1a33); color: var(--header-fg, #fff); padding: 64px 0 56px; text-align: center; }

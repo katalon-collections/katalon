@@ -1,12 +1,7 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
-
-// Lazy-load to avoid SSR/bundle issues with the viewer
-const IIIFViewer = lazy(() =>
-  import('@samvera/clover-iiif').then(m => ({ default: m.Viewer }))
-)
 
 
 
@@ -38,12 +33,9 @@ export function ObjectDetailPage() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewerError, setViewerError] = useState(false)
-
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    setViewerError(false)
     Promise.all([
       api.objects.get(id),
       api.objects.media(id).catch(() => [] as MediaFile[]),
@@ -72,7 +64,6 @@ export function ObjectDetailPage() {
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
-  const showViewer = readyMedia.length > 0 && !viewerError
 
   const fieldLabels = useFieldLabels('object')
   const excludedKeys = new Set(['description', 'keywords'])
@@ -94,25 +85,7 @@ export function ObjectDetailPage() {
 
       <div className="detail-layout">
         <div>
-          {showViewer ? (
-            <div style={{ borderRadius: 10, overflow: 'hidden', background: '#0f172a' }}>
-              <Suspense fallback={
-                primaryMedia
-                  ? <ViewerFallback objectId={obj.id} media={primaryMedia} />
-                  : <div style={{ height: 300, display: 'grid', placeItems: 'center', color: '#94a3b8' }}>Lade Viewer…</div>
-              }>
-                <IIIFViewer
-                  iiifContent={manifestUrl}
-                  options={{
-                    showTitle: false,
-                    showIIIFBadge: false,
-                  }}
-                  // @ts-expect-error event prop not typed in older versions
-                  onError={() => setViewerError(true)}
-                />
-              </Suspense>
-            </div>
-          ) : primaryMedia ? (
+          {primaryMedia ? (
             <ViewerFallback objectId={obj.id} media={primaryMedia} />
           ) : (
             <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
