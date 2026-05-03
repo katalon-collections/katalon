@@ -31,6 +31,13 @@ services:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend.dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
+      REDIS_URL: redis://redis:6379/0
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      CANTALOUPE_URL: http://cantaloupe:8182
+      SECRET_KEY: change-me-in-production
+      MEDIA_ROOT: /var/lib/katalon/media
     volumes:
       - ./backend/src:/app/src
       - media_data:/var/lib/katalon/media

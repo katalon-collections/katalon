@@ -1,18 +1,10 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
+import { useFieldLabels } from '../hooks/useFieldLabels'
+import { IIIFViewer } from '../components/IIIFViewer'
 
-// Lazy-load to avoid SSR/bundle issues with the viewer
-const IIIFViewer = lazy(() =>
-  import('@samvera/clover-iiif').then(m => ({ default: m.Viewer }))
-)
 
-const TYPE_LABEL_MAP: Record<string, string> = {
-  title: 'Titel', name: 'Name', creator: 'Urheber:in', photographer: 'Fotograf:in',
-  year: 'Jahr', date: 'Datierung', medium: 'Material/Technik', technique: 'Technik',
-  rights: 'Rechte', license: 'Lizenz', description: 'Beschreibung',
-  keywords: 'Schlagwörter', location: 'Aufnahmeort', format: 'Format', dimensions: 'Maße',
-}
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
@@ -43,11 +35,12 @@ export function ObjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewerError, setViewerError] = useState(false)
+  // Hook must be called BEFORE any conditional returns
+  const fieldLabels = useFieldLabels('object')
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    setViewerError(false)
     Promise.all([
       api.objects.get(id),
       api.objects.media(id).catch(() => [] as MediaFile[]),
@@ -76,10 +69,8 @@ export function ObjectDetailPage() {
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
+  const excludedKeys = new Set(['description', 'keywords'])
   const showViewer = readyMedia.length > 0 && !viewerError
-
-  const knownKeys = new Set(Object.keys(TYPE_LABEL_MAP))
-  const extraMeta = Object.entries(m).filter(([k]) => !knownKeys.has(k))
 
   return (
     <div className="container page">
@@ -99,23 +90,7 @@ export function ObjectDetailPage() {
       <div className="detail-layout">
         <div>
           {showViewer ? (
-            <div style={{ borderRadius: 10, overflow: 'hidden', background: '#0f172a' }}>
-              <Suspense fallback={
-                primaryMedia
-                  ? <ViewerFallback objectId={obj.id} media={primaryMedia} />
-                  : <div style={{ height: 300, display: 'grid', placeItems: 'center', color: '#94a3b8' }}>Lade Viewer…</div>
-              }>
-                <IIIFViewer
-                  iiifContent={manifestUrl}
-                  options={{
-                    showTitle: false,
-                    showIIIFBadge: false,
-                  }}
-                  // @ts-expect-error event prop not typed in older versions
-                  onError={() => setViewerError(true)}
-                />
-              </Suspense>
-            </div>
+            <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
           ) : primaryMedia ? (
             <ViewerFallback objectId={obj.id} media={primaryMedia} />
           ) : (
@@ -139,18 +114,28 @@ export function ObjectDetailPage() {
 
         <aside className="detail-meta">
           {obj.idno && <MetaRow label="Inventar-Nr." value={obj.idno} />}
-          {Object.entries(TYPE_LABEL_MAP).map(([k, label]) =>
-            m[k] ? <MetaRow key={k} label={label} value={String(m[k])} /> : null
-          )}
-          {extraMeta.map(([k, v]) =>
-            v && typeof v !== 'object' ? <MetaRow key={k} label={k} value={String(v)} /> : null
+          {Object.entries(m).map(([k, v]) =>
+            !excludedKeys.has(k) && v && typeof v !== 'object'
+              ? <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
+              : null
           )}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {readyMedia.length > 0 && (
-              <a href={manifestUrl} target="_blank" rel="noreferrer"
-                 style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
-              </a>
+              <>
+                <a href={manifestUrl} target="_blank" rel="noreferrer"
+                   style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                  IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
+                </a>
+                <button
+                  onClick={() => navigator.clipboard.writeText(manifestUrl)}
+                  style={{
+                    fontSize: 11, color: 'var(--fg-3)', background: 'none', border: 'none',
+                    padding: 0, cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  📋 Manifest-URL kopieren
+                </button>
+              </>
             )}
           </div>
         </aside>

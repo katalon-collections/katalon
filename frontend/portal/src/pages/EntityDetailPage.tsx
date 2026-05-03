@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, BASE, type EntitySummary, type ObjectSummary, type Relation } from '../api/client'
+import { api, type EntitySummary, type ObjectSummary, type Relation } from '../api/client'
+import { useFieldLabels } from '../hooks/useFieldLabels'
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
@@ -24,6 +25,7 @@ export function EntityDetailPage() {
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fieldLabels = useFieldLabels('entity')
 
   useEffect(() => {
     if (!id) return
@@ -107,7 +109,7 @@ export function EntityDetailPage() {
         <aside className="detail-meta">
           {Object.entries(m).map(([k, v]) =>
             v && typeof v !== 'object' ? (
-              <MetaRow key={k} label={k} value={String(v)} />
+              <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
             ) : null
           )}
           <MetaRow label="Typ" value={typeLabel} />

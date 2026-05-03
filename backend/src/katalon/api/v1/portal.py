@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import PortalConfig
 
 router = APIRouter(prefix="/portal", tags=["portal"])
@@ -16,6 +16,7 @@ _DEFAULTS = {
     "featured_object_ids": [],
     "accent_color": "#1e3a8a",
     "logo_url": "",
+    "facet_fields": [],
 }
 
 
@@ -59,7 +60,7 @@ async def get_portal_config(db: DBDep) -> PortalConfig:
 
 @router.put("/config", response_model=PortalConfigRead)
 async def update_portal_config(
-    data: PortalConfigUpdate, db: DBDep, _: CurrentUser
+    data: PortalConfigUpdate, db: DBDep, _=require_role("admin")
 ) -> PortalConfig:
     config = await _get_or_create(db)
     for field, value in data.model_dump(exclude_none=True).items():

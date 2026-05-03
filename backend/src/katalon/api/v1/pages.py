@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import uuid
 
+import re
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import StaticPage
+
+_SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
 router = APIRouter(prefix="/pages", tags=["pages"])
 
@@ -18,6 +22,13 @@ class PageCreate(BaseModel):
     content: dict = {}
     is_published: bool = False
     sort_order: int = 0
+
+    @field_validator('slug')
+    @classmethod
+    def validate_slug(cls, v: str) -> str:
+        if not _SLUG_RE.match(v):
+            raise ValueError('Slug muss URL-sicher sein (nur Kleinbuchstaben, Zahlen, Bindestriche)')
+        return v
 
 
 class PageUpdate(BaseModel):
@@ -80,7 +91,13 @@ async def update_page(slug: str, data: PageUpdate, db: DBDep, _: CurrentUser) ->
     page = result.scalar_one_or_none()
     if not page:
         raise HTTPException(status_code=404, detail="Seite nicht gefunden")
-    for field, value in data.model_dump(exclude_none=True).items():
+    dump = data.model_dump(exclude_none=True)
+    new_slug = dump.get('slug')
+    if new_slug is not None and new_slug != slug:
+        existing = await db.execute(select(StaticPage).where(StaticPage.slug == new_slug))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail=f"Slug '{new_slug}' bereits vergeben")
+    for field, value in dump.items():
         setattr(page, field, value)
     await db.flush()
     return page

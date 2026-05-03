@@ -39,9 +39,14 @@ def _flatten_text(md: dict) -> str:
     return " ".join(p for p in parts if p)
 
 
+def _clean_metadata(md: dict) -> dict:
+    """Remove empty-string keys that break Elasticsearch indexing."""
+    return {k: v for k, v in md.items() if k}
+
+
 def _build_doc(record_type: str, record: Any) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
-    md: dict = getattr(record, "metadata_", None) or {}
+    md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
 
     title = _extract_title(md)
     if not title:

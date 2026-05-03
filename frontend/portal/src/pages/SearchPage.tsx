@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type FacetBucket, type SearchResponse } from '../api/client'
+import { api, BASE, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 
 const TYPE_LABELS: Record<string, string> = {
   object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
@@ -17,6 +17,7 @@ export function SearchPage() {
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [facetFields, setFacetFields] = useState<string[]>([])
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
 
   // Load configurable facet fields from portal config
   useEffect(() => {
@@ -49,7 +50,27 @@ export function SearchPage() {
     ).toString()
     fetch(`${import.meta.env.VITE_API_URL ?? ''}/v1/search?${qs}`)
       .then(r => r.json())
-      .then(setData)
+      .then(async (result: SearchResponse) => {
+        setData(result)
+        // Load thumbnails for object results
+        const thumbMap: Record<string, string> = {}
+        await Promise.all(
+          result.items
+            .filter(r => r.record_type === 'object')
+            .map(r =>
+              api.objects.media(r.id)
+                .then(media => {
+                  const ready = media.filter((m: MediaFile) => m.status === 'ready')
+                  const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
+                  if (primary) {
+                    thumbMap[r.id] = `${BASE}/v1/objects/${r.id}/media/${primary.id}/file`
+                  }
+                })
+                .catch(() => {})
+            )
+        )
+        setThumbnails(thumbMap)
+      })
       .catch(() => setData(null))
       .finally(() => setLoading(false))
   }, [q, typeFilt, statusFilt, page, facetFields.join(','), JSON.stringify(metaFilters)])
@@ -169,10 +190,15 @@ export function SearchPage() {
           {!loading && data?.items.map(r => {
             const path = r.record_type === 'entity' ? `/entities/${r.id}`
               : r.record_type === 'place' ? `/places/${r.id}`
+              : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
               : `/objects/${r.id}`
             return (
               <div key={r.id} className="result-row" onClick={() => navigate(path)}>
-                <div className="thumb-sm" />
+                <div className="thumb-sm">
+                  {thumbnails[r.id] ? (
+                    <img src={thumbnails[r.id]} alt="" loading="lazy" />
+                  ) : null}
+                </div>
                 <div className="body">
                   <div className="title">{r.title || r.id}</div>
                   <div className="desc">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, type ObjectSummary, type PlaceSummary, type Relation } from '../api/client'
+import { api, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 
 function MetaRow({ label, value }: { label: string; value: string }) {
@@ -13,57 +13,35 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function StaticMap({ lat, lon, name }: { lat: number; lon: number; name: string }) {
-  // OpenStreetMap embed via iframe (no extra dependency needed)
-  const bbox = `${lon - 0.05},${lat - 0.03},${lon + 0.05},${lat + 0.03}`
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`
-  return (
-    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 16 }}>
-      <iframe
-        src={src}
-        title={`Karte: ${name}`}
-        width="100%"
-        height="300"
-        style={{ border: 0, display: 'block' }}
-        loading="lazy"
-      />
-      <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--fg-3)', background: 'var(--panel)' }}>
-        {lat.toFixed(5)}, {lon.toFixed(5)} ·{' '}
-        <a
-          href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=13/${lat}/${lon}`}
-          target="_blank" rel="noreferrer"
-          style={{ color: 'var(--fg-3)' }}
-        >
-          OpenStreetMap ↗
-        </a>
-      </div>
-    </div>
-  )
+const OCCURRENCE_TYPE_LABELS: Record<string, string> = {
+  work: 'Werk', event: 'Ereignis', concept: 'Konzept', other: 'Sonstiges',
 }
 
-export function PlaceDetailPage() {
+export function OccurrenceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [place, setPlace] = useState<PlaceSummary | null>(null)
+  const [occurrence, setOccurrence] = useState<OccurrenceSummary | null>(null)
   const [relations, setRelations] = useState<Relation[]>([])
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const fieldLabels = useFieldLabels('place')
+  const fieldLabels = useFieldLabels('occurrence')
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    api.places.get(id)
-      .then(async p => {
-        setPlace(p)
-        const rels = await api.relations.forRecord('place', id).catch(() => [] as Relation[])
+    api.occurrences.get(id)
+      .then(async o => {
+        setOccurrence(o)
+        const rels = await api.relations.forRecord('occurrence', id).catch(() => [] as Relation[])
         setRelations(rels)
         const objIds = rels
           .filter(r => r.from_type === 'object' || r.to_type === 'object')
           .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
           .slice(0, 12)
-        const objs = await Promise.all(objIds.map(oid => api.objects.get(oid).catch(() => null)))
+        const objs = await Promise.all(
+          objIds.map(oid => api.objects.get(oid).catch(() => null))
+        )
         setLinkedObjects(objs.filter((o): o is ObjectSummary => o !== null))
       })
       .catch(e => setError(e.message))
@@ -71,37 +49,34 @@ export function PlaceDetailPage() {
   }, [id])
 
   if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
-  if (error || !place) return (
+  if (error || !occurrence) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? 'Ort nicht gefunden.'}</div>
+      <div style={{ color: '#dc2626' }}>{error ?? 'Eintrag nicht gefunden.'}</div>
     </div>
   )
 
-  const m = place.metadata_ as Record<string, unknown>
-  const title = String(m.name ?? m.title ?? m.label ?? place.id)
-  const hasCoords = place.lat != null && place.lon != null
+  const m = occurrence.metadata_ as Record<string, unknown>
+  const title = String(m.title ?? m.name ?? m.label ?? occurrence.id)
+  const typeLabel = OCCURRENCE_TYPE_LABELS[occurrence.occurrence_type] ?? occurrence.occurrence_type
 
   return (
     <div className="container page">
       <div className="bc">
         <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
         <span className="sep">/</span>
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>Orte</a>
+        <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=occurrence') }}>Werke &amp; Ereignisse</a>
         <span className="sep">/</span>
         <span>{title}</span>
       </div>
 
-      <div style={{ marginBottom: 6 }}>
-        <span className="tag">{place.status}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <span className="tag" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{typeLabel}</span>
+        <span className="tag">{occurrence.status}</span>
       </div>
       <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em' }}>{title}</h1>
 
       <div className="detail-layout">
         <div>
-          {hasCoords && (
-            <StaticMap lat={place.lat!} lon={place.lon!} name={title} />
-          )}
-
           {m.description != null && (
             <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}>
               {String(m.description)}
@@ -132,11 +107,11 @@ export function PlaceDetailPage() {
 
         <aside className="detail-meta">
           {Object.entries(m).map(([k, v]) =>
-            v && typeof v !== 'object' ? <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} /> : null
+            v && typeof v !== 'object' ? (
+              <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
+            ) : null
           )}
-          {hasCoords && (
-            <MetaRow label="Koordinaten" value={`${place.lat!.toFixed(5)}, ${place.lon!.toFixed(5)}`} />
-          )}
+          <MetaRow label="Typ" value={typeLabel} />
           {relations.length > 0 && (
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-3)' }}>
               {relations.length} Verknüpfung{relations.length !== 1 ? 'en' : ''}

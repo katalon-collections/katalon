@@ -8,7 +8,9 @@ import { SearchPage } from './pages/SearchPage'
 import { ObjectDetailPage } from './pages/ObjectDetailPage'
 import { EntityDetailPage } from './pages/EntityDetailPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
+import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function Header() {
   const navigate = useNavigate()
@@ -19,6 +21,7 @@ function Header() {
         <Link to="/search?q=&type=object">Objekte</Link>
         <Link to="/search?q=&type=entity">Personen</Link>
         <Link to="/search?q=&type=place">Orte</Link>
+        <Link to="/search?q=&type=occurrence">Werke</Link>
       </nav>
       <div className="sp" />
       <form className="search-bar" onSubmit={e => { e.preventDefault(); const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement).value; if (q) navigate(`/search?q=${encodeURIComponent(q)}`) }}>
@@ -58,9 +61,10 @@ function AppInner() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/objects/:id" element={<ObjectDetailPage />} />
+        <Route path="/objects/:id" element={<ErrorBoundary><ObjectDetailPage /></ErrorBoundary>} />
         <Route path="/entities/:id" element={<EntityDetailPage />} />
         <Route path="/places/:id" element={<PlaceDetailPage />} />
+        <Route path="/occurrences/:id" element={<OccurrenceDetailPage />} />
         <Route path="/page/:slug" element={<StaticPageView />} />
       </Routes>
       <Footer />

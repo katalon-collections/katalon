@@ -25,6 +25,12 @@ export interface PlaceSummary {
   created_at: string; updated_at: string
 }
 
+export interface OccurrenceSummary {
+  id: string; occurrence_type: string; status: string
+  metadata_: Record<string, unknown>
+  created_at: string; updated_at: string
+}
+
 export interface MediaFile {
   id: string; filename: string; mime_type: string
   status: string; is_primary: boolean; created_at: string
@@ -53,6 +59,7 @@ export interface PortalConfig {
   site_subtitle: string
   hero_text: string
   featured_object_ids: string[]
+  facet_fields: string[]
   accent_color: string
   logo_url: string
 }
@@ -84,6 +91,9 @@ export const api = {
   },
   places: {
     get: (id: string) => get<PlaceSummary>(`/v1/places/${id}`),
+  },
+  occurrences: {
+    get: (id: string) => get<OccurrenceSummary>(`/v1/occurrences/${id}`),
   },
   relations: {
     forRecord: (type: string, id: string) =>

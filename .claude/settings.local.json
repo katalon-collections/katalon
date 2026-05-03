@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(docker-compose ps *)",
+      "Bash(docker exec *)",
+      "Bash(curl *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\)[0]; print\\(d['State']\\)\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
