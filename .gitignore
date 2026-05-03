@@ -3,6 +3,7 @@
 *.pyc
 *.pyo
 **/node_modules/
+**/.vite/
 .venv/
 frontend/admin/dist/
 frontend/portal/dist/
