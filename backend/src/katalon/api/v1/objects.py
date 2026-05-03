@@ -148,7 +148,7 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> di
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    if obj.status != "public":
+    if obj.status not in ("public", "published"):
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
     result = await db.execute(
