@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { IIIFViewer } from '../components/IIIFViewer'
 
 
 
@@ -68,6 +69,8 @@ export function ObjectDetailPage() {
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
   const excludedKeys = new Set(['description', 'keywords'])
+  const [viewerError, setViewerError] = useState(false)
+  const showViewer = readyMedia.length > 0 && !viewerError
 
   return (
     <div className="container page">
@@ -86,7 +89,9 @@ export function ObjectDetailPage() {
 
       <div className="detail-layout">
         <div>
-          {primaryMedia ? (
+          {showViewer ? (
+            <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
+          ) : primaryMedia ? (
             <ViewerFallback objectId={obj.id} media={primaryMedia} />
           ) : (
             <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
@@ -116,10 +121,21 @@ export function ObjectDetailPage() {
           )}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {readyMedia.length > 0 && (
-              <a href={manifestUrl} target="_blank" rel="noreferrer"
-                 style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
-              </a>
+              <>
+                <a href={manifestUrl} target="_blank" rel="noreferrer"
+                   style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                  IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
+                </a>
+                <button
+                  onClick={() => navigator.clipboard.writeText(manifestUrl)}
+                  style={{
+                    fontSize: 11, color: 'var(--fg-3)', background: 'none', border: 'none',
+                    padding: 0, cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  📋 Manifest-URL kopieren
+                </button>
+              </>
             )}
           </div>
         </aside>
