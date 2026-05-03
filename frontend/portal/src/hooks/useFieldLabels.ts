@@ -12,16 +12,23 @@ export function useFieldLabels(targetType: string) {
   const [labels, setLabels] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    fetch(`${BASE}/v1/schema/fields?target_type=${targetType}`)
+    let cancelled = false
+    fetch(`${BASE}/v1/schema/${targetType}`)
       .then(r => r.ok ? r.json() : [])
       .then((fields: FieldDefinition[]) => {
+        if (cancelled) return
         const map: Record<string, string> = {}
         for (const f of fields) {
-          map[f.name] = f.label?.de ?? f.label?.en ?? f.name
+          if (f && f.name) {
+            map[f.name] = f.label?.de ?? f.label?.en ?? f.name
+          }
         }
         setLabels(map)
       })
-      .catch(() => setLabels({}))
+      .catch(() => {
+        if (!cancelled) setLabels({})
+      })
+    return () => { cancelled = true }
   }, [targetType])
 
   return labels
