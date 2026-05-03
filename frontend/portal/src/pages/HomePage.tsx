@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type ObjectSummary, type PortalConfig } from '../api/client'
+import { api, BASE, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
 
 const DEFAULT_CONFIG: PortalConfig = {
   site_title: 'Sammlung',
@@ -17,6 +17,7 @@ export function HomePage() {
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_CONFIG)
   const [featured, setFeatured] = useState<ObjectSummary[]>([])
   const [recent, setRecent] = useState<ObjectSummary[]>([])
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
@@ -40,7 +41,24 @@ export function HomePage() {
         )
         setFeatured(featuredItems)
         const d = await api.objects.list({ page_size: 12 }).catch(() => ({ items: [] as ObjectSummary[] }))
-        setRecent(d.items.filter(o => !featuredIds.includes(o.id)))
+        const allObjects = d.items.filter(o => !featuredIds.includes(o.id))
+        setRecent(allObjects)
+        // Load thumbnails for all visible objects
+        const thumbMap: Record<string, string> = {}
+        await Promise.all(
+          [...featuredItems, ...allObjects].map(obj =>
+            api.objects.media(obj.id)
+              .then(media => {
+                const ready = media.filter((m: MediaFile) => m.status === 'ready')
+                const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
+                if (primary) {
+                  thumbMap[obj.id] = `${BASE}/v1/objects/${obj.id}/media/${primary.id}/file`
+                }
+              })
+              .catch(() => {})
+          )
+        )
+        setThumbnails(thumbMap)
         setLoading(false)
       })
   }, [])
@@ -90,7 +108,11 @@ export function HomePage() {
             <div className="obj-grid">
               {featured.map(obj => (
                 <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
-                  <div className="thumb" />
+                  <div className="thumb">
+                    {thumbnails[obj.id] ? (
+                      <img src={thumbnails[obj.id]} alt="" loading="lazy" />
+                    ) : null}
+                  </div>
                   <div className="info">
                     <div className="title">{objTitle(obj)}</div>
                     {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
@@ -119,7 +141,11 @@ export function HomePage() {
           <div className="obj-grid">
             {recent.map(obj => (
               <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
-                <div className="thumb" />
+                <div className="thumb">
+                  {thumbnails[obj.id] ? (
+                    <img src={thumbnails[obj.id]} alt="" loading="lazy" />
+                  ) : null}
+                </div>
                 <div className="info">
                   <div className="title">{objTitle(obj)}</div>
                   {objSub(obj) && <div className="meta">{objSub(obj)}</div>}

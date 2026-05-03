@@ -70,7 +70,10 @@ input, select, textarea { font-family: inherit; }
 .obj-card .thumb {
   aspect-ratio: 4/3; background: linear-gradient(135deg, #cfd5e1, #a4afc4);
   display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.5);
-  font-size: 36px;
+  font-size: 36px; overflow: hidden;
+}
+.obj-card .thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
 }
 .obj-card .info { padding: 12px 14px 14px; }
 .obj-card .title { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; line-height: 1.3; }
@@ -89,7 +92,8 @@ input, select, textarea { font-family: inherit; }
   border-radius: 8px; padding: 14px 16px; display: flex; gap: 16px; align-items: flex-start; cursor: pointer;
 }
 .result-row:hover { border-color: var(--accent-100, #dde3f5); background: var(--accent-50, #eef2fb); }
-.result-row .thumb-sm { width: 64px; height: 64px; border-radius: 6px; background: linear-gradient(135deg, #cfd5e1, #a4afc4); flex-shrink: 0; }
+.result-row .thumb-sm { width: 64px; height: 64px; border-radius: 6px; background: linear-gradient(135deg, #cfd5e1, #a4afc4); flex-shrink: 0; overflow: hidden; }
+.result-row .thumb-sm img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .result-row .body { flex: 1; min-width: 0; }
 .result-row .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
 .result-row .desc { font-size: 13px; color: var(--fg-3, #5a6173); }

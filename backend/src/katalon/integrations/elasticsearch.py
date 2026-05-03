@@ -107,7 +107,16 @@ async def search_documents(
     filters: list[dict] = []
 
     if query:
-        must.append({"multi_match": {"query": query, "fields": ["title^3", "search_text^2", "metadata.*"], "type": "best_fields"}})
+        # Use query_string with wildcard on metadata fields, but exclude date fields
+        # to avoid parsing text as dates. search_text already contains all text values.
+        must.append({
+            "multi_match": {
+                "query": query,
+                "fields": ["title^3", "search_text^2"],
+                "type": "best_fields",
+                "lenient": True,
+            }
+        })
     else:
         must.append({"match_all": {}})
 

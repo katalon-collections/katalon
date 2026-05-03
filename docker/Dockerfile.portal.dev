@@ -2,5 +2,14 @@ FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
+# Patch broken ESM exports in @samvera/clover-iiif
+RUN sed -i 's|from "./image"|from "./image/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && \
+    sed -i 's|from "./primitives"|from "./primitives/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && \
+    sed -i 's|from "./scroll"|from "./scroll/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && \
+    sed -i 's|from "./slider"|from "./slider/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && \
+    sed -i 's|from "./viewer"|from "./viewer/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && \
+    sed -i 's|from "./helpers"|from "./helpers/index.mjs"|g' node_modules/@samvera/clover-iiif/dist/index.mjs
 EXPOSE 5173
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Re-install on startup to ensure native bindings match container arch,
+# then patch clover-iiif and start dev server
+CMD sh -c "npm install && sed -i 's|from \"./image\"|from \"./image/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && sed -i 's|from \"./primitives\"|from \"./primitives/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && sed -i 's|from \"./scroll\"|from \"./scroll/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && sed -i 's|from \"./slider\"|from \"./slider/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && sed -i 's|from \"./viewer\"|from \"./viewer/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && sed -i 's|from \"./helpers\"|from \"./helpers/index.mjs\"|g' node_modules/@samvera/clover-iiif/dist/index.mjs && npm run dev -- --host 0.0.0.0"
