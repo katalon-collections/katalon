@@ -1,18 +1,14 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
+import { useFieldLabels } from '../hooks/useFieldLabels'
 
 // Lazy-load to avoid SSR/bundle issues with the viewer
 const IIIFViewer = lazy(() =>
   import('@samvera/clover-iiif').then(m => ({ default: m.Viewer }))
 )
 
-const TYPE_LABEL_MAP: Record<string, string> = {
-  title: 'Titel', name: 'Name', creator: 'Urheber:in', photographer: 'Fotograf:in',
-  year: 'Jahr', date: 'Datierung', medium: 'Material/Technik', technique: 'Technik',
-  rights: 'Rechte', license: 'Lizenz', description: 'Beschreibung',
-  keywords: 'Schlagwörter', location: 'Aufnahmeort', format: 'Format', dimensions: 'Maße',
-}
+
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
@@ -78,8 +74,8 @@ export function ObjectDetailPage() {
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
   const showViewer = readyMedia.length > 0 && !viewerError
 
-  const knownKeys = new Set(Object.keys(TYPE_LABEL_MAP))
-  const extraMeta = Object.entries(m).filter(([k]) => !knownKeys.has(k))
+  const fieldLabels = useFieldLabels('object')
+  const excludedKeys = new Set(['description', 'keywords'])
 
   return (
     <div className="container page">
@@ -139,11 +135,10 @@ export function ObjectDetailPage() {
 
         <aside className="detail-meta">
           {obj.idno && <MetaRow label="Inventar-Nr." value={obj.idno} />}
-          {Object.entries(TYPE_LABEL_MAP).map(([k, label]) =>
-            m[k] ? <MetaRow key={k} label={label} value={String(m[k])} /> : null
-          )}
-          {extraMeta.map(([k, v]) =>
-            v && typeof v !== 'object' ? <MetaRow key={k} label={k} value={String(v)} /> : null
+          {Object.entries(m).map(([k, v]) =>
+            !excludedKeys.has(k) && v && typeof v !== 'object'
+              ? <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
+              : null
           )}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {readyMedia.length > 0 && (

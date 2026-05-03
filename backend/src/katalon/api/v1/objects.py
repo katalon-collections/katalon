@@ -143,6 +143,14 @@ async def create_snapshot(
 async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
     from katalon.integrations.cantaloupe import build_object_manifest
 
+    # Only serve manifest for public objects (or require auth for non-public)
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    if obj.status != "public":
+        raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
+
     result = await db.execute(
         select(MediaFile)
         .where(MediaFile.object_id == object_id, MediaFile.status == "ready")

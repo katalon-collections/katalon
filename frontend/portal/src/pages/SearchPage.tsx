@@ -169,6 +169,7 @@ export function SearchPage() {
           {!loading && data?.items.map(r => {
             const path = r.record_type === 'entity' ? `/entities/${r.id}`
               : r.record_type === 'place' ? `/places/${r.id}`
+              : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
               : `/objects/${r.id}`
             return (
               <div key={r.id} className="result-row" onClick={() => navigate(path)}>
