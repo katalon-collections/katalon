@@ -33,6 +33,9 @@ export function ObjectDetailPage() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Hook must be called BEFORE any conditional returns
+  const fieldLabels = useFieldLabels('object')
+
   useEffect(() => {
     if (!id) return
     setLoading(true)
@@ -64,8 +67,6 @@ export function ObjectDetailPage() {
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
-
-  const fieldLabels = useFieldLabels('object')
   const excludedKeys = new Set(['description', 'keywords'])
 
   return (
