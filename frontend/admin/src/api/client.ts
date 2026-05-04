@@ -245,3 +245,44 @@ export const staticPages = {
     req<StaticPage>(`/v1/pages/${slug}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (slug: string) => req<void>(`/v1/pages/${slug}`, { method: 'DELETE' }),
 }
+
+// Importer
+export interface UploadResult {
+  headers: string[]
+  row_count: number
+  preview: Record<string, string>[]
+  rows: Record<string, string>[]
+}
+
+export interface DryRunResult {
+  total: number
+  valid: number
+  errors: { row: number | null; message: string }[]
+  warnings: { row: number | null; message: string }[]
+  preview: Record<string, unknown>[]
+}
+
+export interface TaskStatus {
+  state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
+  result?: { created: number; errors: { row: number; error: string }[] }
+  error?: string
+}
+
+export const importer = {
+  upload: async (file: File): Promise<UploadResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    if (_token) headers['Authorization'] = `Bearer ${_token}`
+    const res = await fetch(`${BASE}/v1/importer/upload`, { method: 'POST', body: formData, headers })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
+    if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
+    return res.json()
+  },
+  dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
+  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
+  taskStatus: (taskId: string): Promise<TaskStatus> =>
+    req<TaskStatus>(`/v1/importer/task/${taskId}`),
+}
