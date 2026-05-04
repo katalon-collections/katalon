@@ -12,6 +12,7 @@ export interface KatalonObject {
 
 export interface Entity {
   id: string
+  idno: string | null
   entity_type: string
   status: Status
   metadata_: Record<string, unknown>
@@ -21,6 +22,7 @@ export interface Entity {
 
 export interface Place {
   id: string
+  idno: string | null
   status: Status
   lat: number | null
   lon: number | null
@@ -31,6 +33,7 @@ export interface Place {
 
 export interface Occurrence {
   id: string
+  idno: string | null
   occurrence_type: string
   status: Status
   metadata_: Record<string, unknown>

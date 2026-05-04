@@ -37,7 +37,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
     errors = await validate_metadata(db, "place", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    place = Place(status=data.status, metadata_=data.metadata_)
+    place = Place(idno=data.idno, status=data.status, metadata_=data.metadata_)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
@@ -69,14 +69,15 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     errors = await validate_metadata(db, "place", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"status": place.status, "metadata": place.metadata_}
+    old = {"idno": place.idno, "status": place.status, "metadata": place.metadata_}
+    place.idno = data.idno
     place.status = data.status
     place.metadata_ = data.metadata_
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"status": data.status}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status}})
     try:
         await search_service.index_record("place", place)
     except Exception:

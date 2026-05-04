@@ -42,7 +42,7 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser
     errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    entity = Entity(entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
+    entity = Entity(idno=data.idno, entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
     db.add(entity)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
@@ -71,12 +71,13 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"status": entity.status, "metadata": entity.metadata_}
+    old = {"idno": entity.idno, "status": entity.status, "metadata": entity.metadata_}
+    entity.idno = data.idno
     entity.entity_type = data.entity_type
     entity.status = data.status
     entity.metadata_ = data.metadata_
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"status": data.status, "metadata": data.metadata_}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status, "metadata": data.metadata_}})
     try:
         await search_service.index_record("entity", entity)
     except Exception:

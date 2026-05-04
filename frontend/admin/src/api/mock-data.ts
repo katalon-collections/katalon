@@ -38,9 +38,9 @@ export const MOCK_TERMS: VocabularyTerm[] = [
 ]
 
 export const MOCK_AUDIT: AuditEntry[] = [
-  { id: 'a1', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'publish', changed_fields: {}, created_at: '2026-04-30T10:42:00Z' },
-  { id: 'a2', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'update',  changed_fields: { old: { date: '1958' }, new: { date: '1957–1959' } }, created_at: '2026-04-30T10:31:00Z' },
-  { id: 'a3', record_type: 'object', record_id: 'OBJ-2026-00410', user_id: 'u2', user_name: 'editor@katalon.local', action: 'create',  changed_fields: {}, created_at: '2026-04-30T09:18:00Z' },
-  { id: 'a4', record_type: 'object', record_id: 'OBJ-2026-00409', user_id: 'u3', user_name: 'viewer@katalon.local', action: 'update',  changed_fields: { old: { status: 'internal' }, new: { status: 'public' } }, created_at: '2026-04-29T16:51:00Z' },
-  { id: 'a5', record_type: 'object', record_id: 'OBJ-2026-00399', user_id: 'u1', user_name: 'admin@katalon.local', action: 'delete',  changed_fields: {}, created_at: '2026-04-29T14:09:00Z' },
+  { id: 'a1', record_type: 'object', record_id: 'OBJ-2026-00412', record_label: 'FOT.1958.0412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'publish', changed_fields: {}, created_at: '2026-04-30T10:42:00Z' },
+  { id: 'a2', record_type: 'object', record_id: 'OBJ-2026-00412', record_label: 'FOT.1958.0412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'update',  changed_fields: { old: { date: '1958' }, new: { date: '1957–1959' } }, created_at: '2026-04-30T10:31:00Z' },
+  { id: 'a3', record_type: 'object', record_id: 'OBJ-2026-00410', record_label: 'FOT.1942.0049', user_id: 'u2', user_name: 'editor@katalon.local', action: 'create',  changed_fields: {}, created_at: '2026-04-30T09:18:00Z' },
+  { id: 'a4', record_type: 'object', record_id: 'OBJ-2026-00409', record_label: 'FOT.1965.0233', user_id: 'u3', user_name: 'viewer@katalon.local', action: 'update',  changed_fields: { old: { status: 'internal' }, new: { status: 'public' } }, created_at: '2026-04-29T16:51:00Z' },
+  { id: 'a5', record_type: 'object', record_id: 'OBJ-2026-00399', record_label: 'FOT.1960.0721', user_id: 'u1', user_name: 'admin@katalon.local', action: 'delete',  changed_fields: {}, created_at: '2026-04-29T14:09:00Z' },
 ]

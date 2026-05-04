@@ -41,7 +41,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const api = getApi(recordType)
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
-  const showIdno  = recordType === 'object'
+  const showIdno  = true
   const showMedia = recordType === 'object'
   const showGeo   = recordType === 'place'
 

@@ -41,7 +41,7 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
     errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    occ = Occurrence(occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
+    occ = Occurrence(idno=data.idno, occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
     db.add(occ)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
@@ -70,12 +70,13 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"status": occ.status, "metadata": occ.metadata_}
+    old = {"idno": occ.idno, "status": occ.status, "metadata": occ.metadata_}
+    occ.idno = data.idno
     occ.occurrence_type = data.occurrence_type
     occ.status = data.status
     occ.metadata_ = data.metadata_
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"status": data.status}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status}})
     try:
         await search_service.index_record("occurrence", occ)
     except Exception:

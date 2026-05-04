@@ -87,6 +87,7 @@ class ObjectRead(ObjectCreate):
 
 
 class EntityCreate(RecordBase):
+    idno: str | None = None
     entity_type: str
 
 
@@ -97,6 +98,7 @@ class EntityRead(EntityCreate):
 
 
 class PlaceCreate(RecordBase):
+    idno: str | None = None
     lat: float | None = None
     lon: float | None = None
 
@@ -108,6 +110,7 @@ class PlaceRead(PlaceCreate):
 
 
 class OccurrenceCreate(RecordBase):
+    idno: str | None = None
     occurrence_type: str
 
 

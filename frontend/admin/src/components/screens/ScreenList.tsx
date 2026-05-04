@@ -118,7 +118,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
     return new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  const showIdno = recordType === 'object'
+  const showIdno = true
   const showSubtype = Boolean(cfg.subtypeKey)
   const showSecondary = Boolean(cfg.secondaryKey)
   const colCount = 5 + (showIdno ? 1 : 0) + (showSubtype ? 1 : 0) + (showSecondary ? 1 : 0)
@@ -174,7 +174,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
               <th className="col-ck">
                 <input type="checkbox" className={`ck${someSel && !allSel ? ' ind' : ''}`} checked={allSel} onChange={toggleAll} />
               </th>
-              {showIdno    && <th>Inventar-Nr.</th>}
+              {showIdno    && <th>ID-Nr.</th>}
               {showSubtype && <th>{cfg.subtypeLabel}</th>}
               <th>{cfg.primaryLabel}</th>
               <th>Status</th>
