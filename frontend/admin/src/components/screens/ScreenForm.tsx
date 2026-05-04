@@ -71,6 +71,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [uploadError, setUploadError]   = useState<string | null>(null)
   const [dragOver, setDragOver]         = useState(false)
   const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
+  const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
@@ -186,6 +187,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       .then(setMediaTypeTerms)
       .catch(() => {})
   }, [showMedia])
+
+  useEffect(() => {
+    vocabularies.list()
+      .then(vocabs => {
+        const rt = vocabs.find(v => v.name === 'relation_types')
+        if (rt) return vocabularies.listTerms(rt.id)
+        return []
+      })
+      .then(setRelTypeTerms)
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!addOpen || addSearchQ.trim().length < 2) { setAddResults([]); return }
@@ -659,7 +671,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
               {!isNew && (
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div className="hd">
-                    <span>Relationen</span>
+                    <span>Beziehungen</span>
                     {rels.length > 0 && <span className="sub">{rels.length}</span>}
                     <div className="grow" />
                     {!addOpen && hasSavedId && (
@@ -669,16 +681,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   <div className="bd">
                     {rels.length > 0 && (
                       <div style={{ marginBottom: addOpen ? 12 : 0 }}>
-                        {rels.map(r => (
-                          <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
-                            <span style={{ color: 'var(--fg-2)', fontFamily: 'var(--mono)' }}>{r.relation_type}</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.to_type}: ${r.to_id}`}>
-                              <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{r.to_type}</span>
-                              {relTitles[`${r.to_type}/${r.to_id}`] ?? r.to_id.slice(0, 8) + '…'}
-                            </span>
-                            <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
-                          </div>
-                        ))}
+                        {rels.map(r => {
+                          const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence' }
+                          return (
+                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                              <span style={{ color: 'var(--fg-2)', fontFamily: 'var(--mono)' }}>{r.relation_type}</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.to_type}: ${r.to_id}`}>
+                                <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[r.to_type] ?? r.to_type}</span>
+                                {relTitles[`${r.to_type}/${r.to_id}`] ?? r.to_id.slice(0, 8) + '…'}
+                              </span>
+                              <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                     {rels.length === 0 && !addOpen && (
@@ -726,8 +741,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                         </div>
                         <div className="field" style={{ marginBottom: 10 }}>
                           <div className="lbl">Relationstyp</div>
-                          <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
-                            placeholder="z.B. depicts, created_by, part_of" />
+                          {relTypeTerms.length > 0 ? (
+                            <select className="fld" value={addRelType} onChange={e => setAddRelType(e.target.value)}>
+                              <option value="">— Typ wählen —</option>
+                              {relTypeTerms.map(t => (
+                                <option key={t.id} value={t.term}>{t.label.de ?? t.term}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
+                              placeholder="z.B. depicts, created_by, part_of" />
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="btn pri sm" onClick={handleAddRelation} disabled={!addSelected || !addRelType.trim() || addSaving}>
