@@ -55,6 +55,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
+    _enqueue_reindex(data.target_type)
     return field
 
 
@@ -74,6 +75,8 @@ async def update_field(
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
     for k, v in data.model_dump().items():
         setattr(field, k, v)
+    await db.flush()
+    _enqueue_reindex(field.target_type)
     return field
 
 
@@ -206,6 +209,7 @@ async def import_schema(
 
     if not dry_run and (created > 0 or updated > 0):
         await db.flush()
+        _enqueue_reindex(target_type)
 
     return ImportResult(
         created=created,
