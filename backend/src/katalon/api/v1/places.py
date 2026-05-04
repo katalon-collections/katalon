@@ -19,10 +19,13 @@ async def list_places(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     status: str | None = None,
+    q: str | None = None,
 ) -> dict:
     query = select(Place)
     if status:
         query = query.where(Place.status == status)
+    if q:
+        query = query.where(Place.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(Place.updated_at.desc())
     items = (await db.execute(query)).scalars().all()

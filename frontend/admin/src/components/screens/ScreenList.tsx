@@ -81,7 +81,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       page_size: PAGE_SIZE,
       status: tab === 'all' ? undefined : tab,
     }
-    if (recordType === 'object' && debouncedQ) params.q = debouncedQ
+    if (debouncedQ) params.q = debouncedQ
     ;(api.list as (p: typeof params) => Promise<Page<AnyRecord>>)(params)
       .then(d => { setData(d); setSel(new Set()) })
       .catch(e => setError(e.message))
@@ -147,16 +147,14 @@ export function ScreenList({ recordType, onOpen }: Props) {
       </div>
 
       <div className="toolbar">
-        {recordType === 'object' && (
-          <div className="search">
-            <Search className="ic" size={14} />
-            <input
-              placeholder="Titel, Inventar-Nr., Urheber…"
-              value={q}
-              onChange={e => handleSearch(e.target.value)}
-            />
-          </div>
-        )}
+        <div className="search">
+          <Search className="ic" size={14} />
+          <input
+            placeholder="Suchen…"
+            value={q}
+            onChange={e => handleSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {someSel && (

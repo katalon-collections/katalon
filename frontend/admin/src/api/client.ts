@@ -72,7 +72,7 @@ export const objects = {
 
 // Entities
 export const entities = {
-  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Entity>>(`/v1/entities${qs ? `?${qs}` : ''}`)
   },
@@ -84,7 +84,7 @@ export const entities = {
 
 // Places
 export const places = {
-  list: (params?: { page?: number; page_size?: number; status?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },
@@ -96,7 +96,7 @@ export const places = {
 
 // Occurrences
 export const occurrences = {
-  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Occurrence>>(`/v1/occurrences${qs ? `?${qs}` : ''}`)
   },
