@@ -424,6 +424,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
               </button>
             ))}
           </div>
+          {!isNew && status === 'public' && (
+            <a
+              className="btn gh"
+              href={`http://localhost:3001/record/${recordType}/${recordId}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              Im Portal ansehen ↗
+            </a>
+          )}
           <button className="btn gh" onClick={onBack} disabled={saving}>
             {justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
