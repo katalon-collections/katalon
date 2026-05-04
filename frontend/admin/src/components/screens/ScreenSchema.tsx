@@ -28,10 +28,11 @@ type FieldFormState = {
   is_required: boolean
   is_repeatable: boolean
   sort_order: number
+  validation_regex: string
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '' }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -45,6 +46,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     is_required: f.is_required,
     is_repeatable: f.is_repeatable,
     sort_order: f.sort_order,
+    validation_regex: (f.settings?.validation_regex as string) ?? '',
   }
 }
 
@@ -120,6 +122,14 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             </label>
           </div>
         </div>
+        {form.field_type === 'text' && (
+          <div className="field">
+            <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+            <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
+              placeholder="^97[89]-[0-9]{10}$" />
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Beispiele: ISBN-13, ISSN, DOI</div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
             {saving ? 'Speichert…' : 'Speichern'}
@@ -205,7 +215,7 @@ export function ScreenSchema() {
       is_required: form.is_required,
       is_repeatable: form.is_repeatable,
       sort_order: form.sort_order,
-      settings: {},
+      settings: form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {},
     }
     try {
       if (isNew) {

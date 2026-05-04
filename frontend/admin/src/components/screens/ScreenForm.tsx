@@ -263,18 +263,36 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setValues(v => ({ ...v, [name]: cur }))
   }
 
-  function validateDates(): Record<string, string> {
+  function validateFields(): Record<string, string> {
     const errors: Record<string, string> = {}
     for (const f of fields) {
-      if (f.field_type !== 'date') continue
       const val = values[f.name]
-      const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
-      for (const v of toCheck) {
-        if (!v) continue
-        const ok = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)
-        if (!ok) {
-          errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
-          break
+      // Date validation
+      if (f.field_type === 'date') {
+        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
+        for (const v of toCheck) {
+          if (!v) continue
+          const ok = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)
+          if (!ok) {
+            errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+            break
+          }
+        }
+      }
+      // Regex validation
+      if (f.field_type === 'text' && f.settings?.validation_regex) {
+        const regex = f.settings.validation_regex as string
+        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
+        for (const v of toCheck) {
+          if (!v) continue
+          try {
+            if (!new RegExp(regex).test(v)) {
+              errors[f.name] = 'Eingabe entspricht nicht dem erwarteten Format.'
+              break
+            }
+          } catch {
+            // invalid regex on backend, ignore
+          }
         }
       }
     }
@@ -284,11 +302,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   async function handleSave() {
     setSaving(true)
     setError(null)
-    const dateErrors = validateDates()
-    if (Object.keys(dateErrors).length > 0) {
-      setDateFieldErrors(dateErrors)
+    const fieldErrors = validateFields()
+    if (Object.keys(fieldErrors).length > 0) {
+      setDateFieldErrors(fieldErrors)
       setSaving(false)
-      setError('Bitte korrigieren Sie die markierten Datumsfelder.')
+      setError('Bitte korrigieren Sie die markierten Felder.')
       return
     }
     setDateFieldErrors({})
@@ -556,11 +574,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                           )}
                         </>
                       ) : (
-                        <input className="fld"
-                          value={(val as string) ?? ''}
-                          onChange={e => setField(f.name, e.target.value)}
-                          placeholder={f.label.de ?? f.name}
-                          disabled={justCreated} />
+                        <>
+                          <input className="fld"
+                            value={(val as string) ?? ''}
+                            onChange={e => {
+                              setField(f.name, e.target.value)
+                              if (dateFieldErrors[f.name]) {
+                                setDateFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                              }
+                            }}
+                            placeholder={f.label.de ?? f.name}
+                            disabled={justCreated}
+                            style={dateFieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          {dateFieldErrors[f.name] && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors[f.name]}</div>
+                          )}
+                        </>
                       )}
                     </div>
                   )

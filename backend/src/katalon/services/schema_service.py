@@ -75,8 +75,19 @@ async def validate_metadata(
         if field.is_repeatable:
             if not isinstance(value, list):
                 errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")
+            else:
+                regex = field.settings.get("validation_regex")
+                if regex and field.field_type == "text":
+                    for idx, item in enumerate(value):
+                        if isinstance(item, str) and not re.fullmatch(regex, item):
+                            errors.append(f"Feld '{field.name}' (Wert {idx + 1}): entspricht nicht dem erwarteten Format.")
         else:
             if isinstance(value, list):
                 errors.append(f"Feld '{field.name}' darf keine Liste sein (nicht wiederholbar).")
+            else:
+                regex = field.settings.get("validation_regex")
+                if regex and field.field_type == "text" and isinstance(value, str):
+                    if not re.fullmatch(regex, value):
+                        errors.append(f"Feld '{field.name}': entspricht nicht dem erwarteten Format.")
 
     return errors
