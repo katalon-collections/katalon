@@ -18,6 +18,7 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [heroText, setHeroText] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [featuredIds, setFeaturedIds] = useState('')
+  const [facetFields, setFacetFields] = useState('')
   const [accentColor, setAccentColor] = useState('')
 
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
@@ -38,6 +39,7 @@ export function ScreenSettings({ onNavigate }: Props) {
         setHeroText(c.hero_text)
         setLogoUrl(c.logo_url)
         setFeaturedIds((c.featured_object_ids ?? []).join('\n'))
+        setFacetFields((c.facet_fields ?? []).join('\n'))
         setAccentColor(c.accent_color)
       })
       .catch((e: Error) => setError(e.message))
@@ -57,6 +59,7 @@ export function ScreenSettings({ onNavigate }: Props) {
           hero_text: heroText,
           logo_url: logoUrl,
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
+          facet_fields: facetFields.split('\n').map(s => s.trim()).filter(Boolean),
           accent_color: accentColor,
         }),
       })
@@ -136,6 +139,11 @@ export function ScreenSettings({ onNavigate }: Props) {
                 <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
                 <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)}
                   style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2\nuuid-3'} />
+              </div>
+              <div className="field">
+                <div className="lbl">Facetten-Felder <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(ein Feldname pro Zeile — erscheinen als Filter in der Portal-Suche)</span></div>
+                <textarea className="fld mono" rows={4} value={facetFields} onChange={e => setFacetFields(e.target.value)}
+                  style={{ resize: 'vertical', fontSize: 12 }} placeholder={'creator\nmaterial\nlocation'} />
               </div>
               <div className="field">
                 <div className="lbl">Akzentfarbe</div>
