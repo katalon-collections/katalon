@@ -28,10 +28,10 @@ export function onUnauthorized(cb: () => void) {
   _onUnauthorized = cb
 }
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
   if (_token) headers['Authorization'] = `Bearer ${_token}`
-  const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  const res = await fetch(path.startsWith('http') ? path : `${BASE}${path}`, { ...init, headers })
   if (res.status === 401) {
     setToken(null)
     _onUnauthorized?.()

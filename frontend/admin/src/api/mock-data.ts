@@ -12,15 +12,15 @@ export const MOCK_OBJECTS: KatalonObject[] = [
 ]
 
 export const MOCK_FIELDS: FieldDefinition[] = [
-  { id: 'f1', target_type: 'object', name: 'title',       label: { de: 'Titel',            en: 'Title' },          field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 0,  settings: {} },
-  { id: 'f2', target_type: 'object', name: 'alt_titles',  label: { de: 'Weitere Titel',    en: 'Alt. Titles' },    field_type: 'text',     is_required: false, is_repeatable: true,  sort_order: 1,  settings: {} },
-  { id: 'f3', target_type: 'object', name: 'inventory',   label: { de: 'Inventar-Nr.',     en: 'Inventory No.' },  field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 2,  settings: {} },
-  { id: 'f4', target_type: 'object', name: 'creator',     label: { de: 'Urheber:in',       en: 'Creator' },        field_type: 'relation', is_required: false, is_repeatable: true,  sort_order: 3,  settings: {} },
-  { id: 'f5', target_type: 'object', name: 'date',        label: { de: 'Datierung',        en: 'Date' },           field_type: 'date',     is_required: false, is_repeatable: false, sort_order: 4,  settings: {} },
-  { id: 'f6', target_type: 'object', name: 'medium',      label: { de: 'Material/Technik', en: 'Medium' },         field_type: 'vocab',    is_required: false, is_repeatable: false, sort_order: 5,  settings: { vocabulary: 'photo_medium' } },
-  { id: 'f7', target_type: 'object', name: 'tags',        label: { de: 'Schlagwörter',     en: 'Tags' },           field_type: 'vocab',    is_required: false, is_repeatable: true,  sort_order: 6,  settings: { vocabulary: 'iconclass' } },
-  { id: 'f8', target_type: 'object', name: 'rights',      label: { de: 'Rechtevermerk',    en: 'Rights' },         field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 7,  settings: {} },
-  { id: 'f9', target_type: 'object', name: 'description', label: { de: 'Beschreibung',     en: 'Description' },    field_type: 'richtext', is_required: false, is_repeatable: false, sort_order: 8,  settings: {} },
+  { id: 'f1', target_type: 'object', target_subtype: null, name: 'title',       label: { de: 'Titel',            en: 'Title' },          field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 0,  settings: {} },
+  { id: 'f2', target_type: 'object', target_subtype: null, name: 'alt_titles',  label: { de: 'Weitere Titel',    en: 'Alt. Titles' },    field_type: 'text',     is_required: false, is_repeatable: true,  sort_order: 1,  settings: {} },
+  { id: 'f3', target_type: 'object', target_subtype: null, name: 'inventory',   label: { de: 'Inventar-Nr.',     en: 'Inventory No.' },  field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 2,  settings: {} },
+  { id: 'f4', target_type: 'object', target_subtype: null, name: 'creator',     label: { de: 'Urheber:in',       en: 'Creator' },        field_type: 'relation', is_required: false, is_repeatable: true,  sort_order: 3,  settings: {} },
+  { id: 'f5', target_type: 'object', target_subtype: null, name: 'date',        label: { de: 'Datierung',        en: 'Date' },           field_type: 'date',     is_required: false, is_repeatable: false, sort_order: 4,  settings: {} },
+  { id: 'f6', target_type: 'object', target_subtype: null, name: 'medium',      label: { de: 'Material/Technik', en: 'Medium' },         field_type: 'vocab',    is_required: false, is_repeatable: false, sort_order: 5,  settings: { vocabulary: 'photo_medium' } },
+  { id: 'f7', target_type: 'object', target_subtype: null, name: 'tags',        label: { de: 'Schlagwörter',     en: 'Tags' },           field_type: 'vocab',    is_required: false, is_repeatable: true,  sort_order: 6,  settings: { vocabulary: 'iconclass' } },
+  { id: 'f8', target_type: 'object', target_subtype: null, name: 'rights',      label: { de: 'Rechtevermerk',    en: 'Rights' },         field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 7,  settings: {} },
+  { id: 'f9', target_type: 'object', target_subtype: null, name: 'description', label: { de: 'Beschreibung',     en: 'Description' },    field_type: 'richtext', is_required: false, is_repeatable: false, sort_order: 8,  settings: {} },
 ]
 
 export const MOCK_VOCABS: Vocabulary[] = [
@@ -38,9 +38,9 @@ export const MOCK_TERMS: VocabularyTerm[] = [
 ]
 
 export const MOCK_AUDIT: AuditEntry[] = [
-  { id: 'a1', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', action: 'publish', changed_fields: {}, created_at: '2026-04-30T10:42:00Z' },
-  { id: 'a2', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', action: 'update',  changed_fields: { old: { date: '1958' }, new: { date: '1957–1959' } }, created_at: '2026-04-30T10:31:00Z' },
-  { id: 'a3', record_type: 'object', record_id: 'OBJ-2026-00410', user_id: 'u2', action: 'create',  changed_fields: {}, created_at: '2026-04-30T09:18:00Z' },
-  { id: 'a4', record_type: 'object', record_id: 'OBJ-2026-00409', user_id: 'u3', action: 'update',  changed_fields: { old: { status: 'internal' }, new: { status: 'public' } }, created_at: '2026-04-29T16:51:00Z' },
-  { id: 'a5', record_type: 'object', record_id: 'OBJ-2026-00399', user_id: 'u1', action: 'delete',  changed_fields: {}, created_at: '2026-04-29T14:09:00Z' },
+  { id: 'a1', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'publish', changed_fields: {}, created_at: '2026-04-30T10:42:00Z' },
+  { id: 'a2', record_type: 'object', record_id: 'OBJ-2026-00412', user_id: 'u1', user_name: 'admin@katalon.local', action: 'update',  changed_fields: { old: { date: '1958' }, new: { date: '1957–1959' } }, created_at: '2026-04-30T10:31:00Z' },
+  { id: 'a3', record_type: 'object', record_id: 'OBJ-2026-00410', user_id: 'u2', user_name: 'editor@katalon.local', action: 'create',  changed_fields: {}, created_at: '2026-04-30T09:18:00Z' },
+  { id: 'a4', record_type: 'object', record_id: 'OBJ-2026-00409', user_id: 'u3', user_name: 'viewer@katalon.local', action: 'update',  changed_fields: { old: { status: 'internal' }, new: { status: 'public' } }, created_at: '2026-04-29T16:51:00Z' },
+  { id: 'a5', record_type: 'object', record_id: 'OBJ-2026-00399', user_id: 'u1', user_name: 'admin@katalon.local', action: 'delete',  changed_fields: {}, created_at: '2026-04-29T14:09:00Z' },
 ]

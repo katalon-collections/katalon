@@ -29,7 +29,7 @@ export function ScreenUsers() {
     setLoading(true)
     req<UserRead[]>(`${BASE}/v1/users`)
       .then(setUsers)
-      .catch(e => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }
 

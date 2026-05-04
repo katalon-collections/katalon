@@ -28,13 +28,13 @@ export function ScreenSettings({ onNavigate }: Props) {
   useEffect(() => {
     setLoading(true)
     req<PortalConfigRead>(`${BASE}/v1/portal/config`)
-      .then(c => {
+      .then((c: PortalConfigRead) => {
         setConfig(c)
         setSiteTitle(c.site_title)
         setSiteSubtitle(c.site_subtitle)
         setAccentColor(c.accent_color)
       })
-      .catch(e => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
