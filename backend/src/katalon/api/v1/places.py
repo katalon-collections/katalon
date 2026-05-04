@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Place, RecordSnapshot
-from katalon.core.schemas import PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services import search_service
@@ -96,3 +96,9 @@ async def delete_place(place_id: uuid.UUID, db: DBDep, current_user: CurrentUser
     except Exception:
         pass
     await db.delete(place)
+
+
+@router.get("/{place_id}/audit-log", response_model=list[AuditLogRead])
+async def list_place_audit_log(place_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
+    from katalon.api.v1.audit import list_audit_log
+    return await list_audit_log(db, record_type="place", record_id=place_id, limit=100)

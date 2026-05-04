@@ -201,6 +201,7 @@ class AuditLogRead(BaseModel):
     record_type: str
     record_id: uuid.UUID
     user_id: uuid.UUID | None
+    user_name: str | None = None
     action: str
     changed_fields: dict
     created_at: datetime

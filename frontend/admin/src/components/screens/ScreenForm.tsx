@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, BASE } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import type { AnyRecord, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -53,6 +53,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [status, setStatus]   = useState<Status>('draft')
   const [values, setValues]   = useState<Record<string, unknown>>({})
   const [showAudit, setShowAudit] = useState(false)
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [snapLabel, setSnapLabel] = useState('')
@@ -92,6 +94,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       objects.snapshots.list(id).then(setSnapshots).catch(() => {})
     }
   }, [recordType])
+
+  const loadAudit = useCallback((id: string) => {
+    setAuditLoading(true)
+    api.audit(id).then(setAuditEntries).catch(() => {}).finally(() => setAuditLoading(false))
+  }, [api])
 
   const loadRelations = useCallback(async (id: string) => {
     try {
@@ -756,16 +763,29 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
 
               {!isNew && (
                 <div className="card">
-                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowAudit(a => !a)}>
-                    <span>Letzte Änderungen</span>
+                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => {
+                    if (!showAudit && savedId) loadAudit(savedId)
+                    setShowAudit(a => !a)
+                  }}>
+                    <span>Audit-Log</span>
                     <div className="grow" />
                     <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
                   </div>
                   {showAudit && (
                     <div className="bd" style={{ padding: '8px 0' }}>
-                      <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>
-                        Vollständiges Log unter Katalon → Audit-Log.
-                      </div>
+                      {auditLoading && <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>Lade…</div>}
+                      {!auditLoading && auditEntries.length === 0 && (
+                        <div style={{ padding: '6px 16px', fontSize: 12, color: 'var(--fg-3)' }}>Keine Einträge.</div>
+                      )}
+                      {!auditLoading && auditEntries.map(evt => (
+                        <div key={evt.id} style={{ padding: '6px 16px', fontSize: 12, borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600 }}>{evt.action}</span>
+                            <span style={{ color: 'var(--fg-3)' }}>{new Date(evt.created_at).toLocaleString('de-CH')}</span>
+                          </div>
+                          <div style={{ color: 'var(--fg-2)' }}>von {evt.user_name ?? evt.user_id ?? '—'}</div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

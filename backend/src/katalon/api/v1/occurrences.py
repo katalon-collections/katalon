@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Occurrence, RecordSnapshot
-from katalon.core.schemas import OccurrenceCreate, OccurrenceRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import AuditLogRead, OccurrenceCreate, OccurrenceRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services import search_service
@@ -95,3 +95,9 @@ async def delete_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: CurrentU
     except Exception:
         pass
     await db.delete(occ)
+
+
+@router.get("/{occ_id}/audit-log", response_model=list[AuditLogRead])
+async def list_occurrence_audit_log(occ_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
+    from katalon.api.v1.audit import list_audit_log
+    return await list_audit_log(db, record_type="occurrence", record_id=occ_id, limit=100)

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import MediaFile, Object, RecordSnapshot
-from katalon.core.schemas import ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import AuditLogRead, ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services import search_service
@@ -207,3 +207,9 @@ async def restore_snapshot(
         obj.metadata_ = data["metadata"]
     await db.flush()
     return obj
+
+
+@router.get("/{object_id}/audit-log", response_model=list[AuditLogRead])
+async def list_object_audit_log(object_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
+    from katalon.api.v1.audit import list_audit_log
+    return await list_audit_log(db, record_type="object", record_id=object_id, limit=100)

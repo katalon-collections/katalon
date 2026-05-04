@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Entity, RecordSnapshot
-from katalon.core.schemas import EntityCreate, EntityRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import AuditLogRead, EntityCreate, EntityRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services import search_service
@@ -110,3 +110,9 @@ async def create_snapshot(entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep,
     db.add(snap)
     await db.flush()
     return snap
+
+
+@router.get("/{entity_id}/audit-log", response_model=list[AuditLogRead])
+async def list_entity_audit_log(entity_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
+    from katalon.api.v1.audit import list_audit_log
+    return await list_audit_log(db, record_type="entity", record_id=entity_id, limit=100)

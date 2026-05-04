@@ -17,9 +17,8 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function shortId(id: string | null) {
-  if (!id) return '—'
-  return id.length > 8 ? id.slice(-8) : id
+function userDisplay(entry: AuditEntry) {
+  return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '—')
 }
 
 export function ScreenAudit() {
@@ -83,8 +82,8 @@ export function ScreenAudit() {
                   )}
                 </div>
                 <div className="who">
-                  <div className="av">{shortId(evt.user_id)[0]?.toUpperCase() ?? '?'}</div>
-                  {shortId(evt.user_id)}
+                  <div className="av">{(userDisplay(evt)[0] ?? '?').toUpperCase()}</div>
+                  {userDisplay(evt)}
                 </div>
               </div>
             )

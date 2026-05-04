@@ -60,6 +60,7 @@ export const objects = {
     return req<Page<KatalonObject>>(`/v1/objects${qs ? `?${qs}` : ''}`)
   },
   get:    (id: string) => req<KatalonObject>(`/v1/objects/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/objects/${id}/audit-log`),
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/objects/${id}`, { method: 'DELETE' }),
@@ -77,6 +78,7 @@ export const entities = {
     return req<Page<Entity>>(`/v1/entities${qs ? `?${qs}` : ''}`)
   },
   get:    (id: string) => req<Entity>(`/v1/entities/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/entities/${id}/audit-log`),
   create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/entities/${id}`, { method: 'DELETE' }),
@@ -89,6 +91,7 @@ export const places = {
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },
   get:    (id: string) => req<Place>(`/v1/places/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/places/${id}/audit-log`),
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/places/${id}`, { method: 'DELETE' }),
@@ -101,6 +104,7 @@ export const occurrences = {
     return req<Page<Occurrence>>(`/v1/occurrences${qs ? `?${qs}` : ''}`)
   },
   get:    (id: string) => req<Occurrence>(`/v1/occurrences/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/occurrences/${id}/audit-log`),
   create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/occurrences/${id}`, { method: 'DELETE' }),

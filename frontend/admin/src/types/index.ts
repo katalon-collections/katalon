@@ -83,6 +83,7 @@ export interface AuditEntry {
   record_type: string
   record_id: string
   user_id: string | null
+  user_name: string | null
   action: 'create' | 'update' | 'delete' | 'publish'
   changed_fields: Record<string, unknown>
   created_at: string
