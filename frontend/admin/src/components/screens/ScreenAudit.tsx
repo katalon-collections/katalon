@@ -65,9 +65,9 @@ export function ScreenAudit() {
                 <div className="ic">{ACTION_ICON[evt.action]}</div>
                 <div className="body">
                   <div className="ti">
-                    {ACTION_LABELS[evt.action] ?? evt.action}: <b>{String(evt.record_id)}</b>
+                    {ACTION_LABELS[evt.action] ?? evt.action}: <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
                   </div>
-                  <div className="sub">{evt.record_type} · {evt.action}</div>
+                  <div className="sub">{evt.record_type} · {evt.record_id.slice(-8)}</div>
                   {diff.old && (
                     <div className="diff">
                       {Object.entries(diff.old).map(([k, v]) => (

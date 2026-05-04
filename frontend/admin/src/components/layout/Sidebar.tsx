@@ -26,7 +26,7 @@ const NAV: NavItem[] = [
   { id: 'schema', label: 'Schemata',       Icon: Layers,  ct: '5', roles: ['admin'] },
   { id: 'vocab',  label: 'Vokabular',      Icon: Tag,     ct: '4', roles: ['admin'] },
   { g: 'Verwaltung', roles: ['admin'] },
-  { id: 'users',  label: 'Benutzer',       Icon: Users,   ct: '12', roles: ['admin'] },
+  { id: 'users',  label: 'Benutzer',       Icon: Users,   roles: ['admin'] },
   { id: 'settings', label: 'Einstellungen', Icon: Gear },
 ]
 
@@ -47,12 +47,6 @@ export function Sidebar({ route, setRoute, onLogout }: Props) {
         <div className="logo">K</div>
         <div className="sb-name">Katalon</div>
         <div className="sb-env">Stage</div>
-      </div>
-
-      <div className="sb-search">
-        <Search className="ic" size={14} />
-        <input placeholder="Suchen…" />
-        <span className="kbd">⌘K</span>
       </div>
 
       <nav className="sb-nav">

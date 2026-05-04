@@ -200,6 +200,7 @@ class AuditLogRead(BaseModel):
     id: uuid.UUID
     record_type: str
     record_id: uuid.UUID
+    record_label: str | None = None
     user_id: uuid.UUID | None
     user_name: str | None = None
     action: str

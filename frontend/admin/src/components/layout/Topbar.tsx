@@ -46,8 +46,12 @@ export function Topbar({ crumbs, onNavigate }: Props) {
     setOpen(false)
     if (r.record_type === 'object') {
       onNavigate?.('form', r.id)
-    } else {
-      onNavigate?.(r.record_type + 's')
+    } else if (r.record_type === 'entity') {
+      onNavigate?.('entities-form', r.id)
+    } else if (r.record_type === 'place') {
+      onNavigate?.('places-form', r.id)
+    } else if (r.record_type === 'occurrence') {
+      onNavigate?.('occurrences-form', r.id)
     }
   }
 
@@ -77,7 +81,7 @@ export function Topbar({ crumbs, onNavigate }: Props) {
           onFocus={() => { if (results.length > 0) setOpen(true) }}
         />
         {loading && <span style={{ fontSize: 11, color: 'var(--fg-4)', marginRight: 4 }}>…</span>}
-        <span className="kbd">⌘K</span>
+        {/* <span className="kbd">⌘K</span> */}
 
         {open && results.length > 0 && (
           <div style={{

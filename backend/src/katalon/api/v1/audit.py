@@ -4,10 +4,41 @@ from fastapi import APIRouter, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep
-from katalon.core.models import AuditLog, User
+from katalon.core.models import AuditLog, Entity, Object, Occurrence, Place, User
 from katalon.core.schemas import AuditLogRead
 
 router = APIRouter(prefix="/audit", tags=["audit"])
+
+
+async def _resolve_record_labels(db, logs: list[AuditLog]) -> dict[uuid.UUID, str]:
+    """Fetch display labels (idno or title/name from metadata) for audit log records."""
+    by_type: dict[str, list[uuid.UUID]] = {}
+    for log in logs:
+        by_type.setdefault(log.record_type, []).append(log.record_id)
+
+    labels: dict[uuid.UUID, str] = {}
+
+    if "object" in by_type:
+        result = await db.execute(select(Object.id, Object.idno, Object.metadata_).where(Object.id.in_(by_type["object"])))
+        for id_, idno, md in result.all():
+            labels[id_] = idno or (md.get("title") if md else None) or str(id_)[:8]
+
+    if "entity" in by_type:
+        result = await db.execute(select(Entity.id, Entity.metadata_).where(Entity.id.in_(by_type["entity"])))
+        for id_, md in result.all():
+            labels[id_] = (md.get("name") if md else None) or str(id_)[:8]
+
+    if "place" in by_type:
+        result = await db.execute(select(Place.id, Place.metadata_).where(Place.id.in_(by_type["place"])))
+        for id_, md in result.all():
+            labels[id_] = (md.get("name") if md else None) or str(id_)[:8]
+
+    if "occurrence" in by_type:
+        result = await db.execute(select(Occurrence.id, Occurrence.metadata_).where(Occurrence.id.in_(by_type["occurrence"])))
+        for id_, md in result.all():
+            labels[id_] = (md.get("title") if md else None) or str(id_)[:8]
+
+    return labels
 
 
 @router.get("", response_model=list[AuditLogRead])
@@ -31,12 +62,16 @@ async def list_audit_log(
 
     result = await db.execute(query)
     rows = result.all()
+    logs = [log for log, _ in rows]
+    labels = await _resolve_record_labels(db, logs)
+
     out: list[AuditLogRead] = []
     for log, user_email in rows:
         out.append(AuditLogRead(
             id=log.id,
             record_type=log.record_type,
             record_id=log.record_id,
+            record_label=labels.get(log.record_id, str(log.record_id)[:8]),
             user_id=log.user_id,
             user_name=user_email or (str(log.user_id)[:8] if log.user_id else None),
             action=log.action,
