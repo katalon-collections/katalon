@@ -39,10 +39,15 @@ async def list_entities(
 
 @router.post("", response_model=EntityRead, status_code=201)
 async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    entity = Entity(idno=data.idno, entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
+    existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    entity = Entity(idno=data.idno.strip(), entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
     db.add(entity)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
@@ -64,15 +69,20 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep) -> Entity:
 
 @router.put("/{entity_id}", response_model=EntityRead)
 async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip(), Entity.id != entity_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {"idno": entity.idno, "status": entity.status, "metadata": entity.metadata_}
-    entity.idno = data.idno
+    entity.idno = data.idno.strip()
     entity.entity_type = data.entity_type
     entity.status = data.status
     entity.metadata_ = data.metadata_

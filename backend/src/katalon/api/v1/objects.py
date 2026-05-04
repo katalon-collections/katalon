@@ -47,11 +47,17 @@ async def list_objects(
 
 @router.post("", response_model=ObjectRead, status_code=201)
 async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser) -> Object:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     errors = await validate_metadata(db, "object", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
 
-    obj = Object(idno=data.idno, status=data.status, metadata_=data.metadata_)
+    existing = await db.execute(select(Object).where(Object.idno == data.idno.strip()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+
+    obj = Object(idno=data.idno.strip(), status=data.status, metadata_=data.metadata_)
     db.add(obj)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
@@ -75,17 +81,23 @@ async def get_object(object_id: uuid.UUID, db: DBDep) -> Object:
 async def update_object(
     object_id: uuid.UUID, data: ObjectCreate, db: DBDep, current_user: CurrentUser
 ) -> Object:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
 
+    existing = await db.execute(select(Object).where(Object.idno == data.idno.strip(), Object.id != object_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+
     errors = await validate_metadata(db, "object", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
 
-    old_fields = {"status": obj.status, "metadata": obj.metadata_}
-    obj.idno = data.idno
+    old_fields = {"idno": obj.idno, "status": obj.status, "metadata": obj.metadata_}
+    obj.idno = data.idno.strip()
     obj.status = data.status
     obj.metadata_ = data.metadata_
 

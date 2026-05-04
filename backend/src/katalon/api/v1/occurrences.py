@@ -38,10 +38,15 @@ async def list_occurrences(
 
 @router.post("", response_model=OccurrenceRead, status_code=201)
 async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    occ = Occurrence(idno=data.idno, occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
+    existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    occ = Occurrence(idno=data.idno.strip(), occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
     db.add(occ)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
@@ -63,15 +68,20 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep) -> Occurrence:
 
 @router.put("/{occ_id}", response_model=OccurrenceRead)
 async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip(), Occurrence.id != occ_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {"idno": occ.idno, "status": occ.status, "metadata": occ.metadata_}
-    occ.idno = data.idno
+    occ.idno = data.idno.strip()
     occ.occurrence_type = data.occurrence_type
     occ.status = data.status
     occ.metadata_ = data.metadata_

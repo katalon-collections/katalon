@@ -34,10 +34,15 @@ async def list_places(
 
 @router.post("", response_model=PlaceRead, status_code=201)
 async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     errors = await validate_metadata(db, "place", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    place = Place(idno=data.idno, status=data.status, metadata_=data.metadata_)
+    existing = await db.execute(select(Place).where(Place.idno == data.idno.strip()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    place = Place(idno=data.idno.strip(), status=data.status, metadata_=data.metadata_)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
@@ -62,15 +67,20 @@ async def get_place(place_id: uuid.UUID, db: DBDep) -> Place:
 
 @router.put("/{place_id}", response_model=PlaceRead)
 async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
+    if not data.idno or not data.idno.strip():
+        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    existing = await db.execute(select(Place).where(Place.idno == data.idno.strip(), Place.id != place_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     errors = await validate_metadata(db, "place", data.metadata_)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {"idno": place.idno, "status": place.status, "metadata": place.metadata_}
-    place.idno = data.idno
+    place.idno = data.idno.strip()
     place.status = data.status
     place.metadata_ = data.metadata_
     if data.lat is not None and data.lon is not None:

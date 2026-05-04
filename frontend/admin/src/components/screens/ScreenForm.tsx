@@ -265,6 +265,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
 
   function validateFields(): Record<string, string> {
     const errors: Record<string, string> = {}
+    // idno is required for all record types
+    if (!idno.trim()) {
+      errors['__idno'] = 'ID-Nr. ist ein Pflichtfeld.'
+    }
     for (const f of fields) {
       const val = values[f.name]
       // Date validation
@@ -451,8 +455,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
               <div className="bd">
                 {showIdno && (
                   <div className="field">
-                    <div className="lbl">Inventar-Nr.</div>
-                    <input className="fld mono" value={idno} onChange={e => setIdno(e.target.value)} placeholder="z.B. FOT.1958.0412" disabled={justCreated} />
+                    <div className="lbl">ID-Nr. <span className="req">*</span></div>
+                    <input
+                      className="fld mono"
+                      value={idno}
+                      onChange={e => setIdno(e.target.value)}
+                      placeholder="z.B. FOT.1958.0412"
+                      disabled={justCreated}
+                      style={dateFieldErrors['__idno'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                    />
+                    {dateFieldErrors['__idno'] && (
+                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors['__idno']}</div>
+                    )}
                   </div>
                 )}
 
