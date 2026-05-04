@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, BASE } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, BASE, PORTAL_URL } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
@@ -427,7 +427,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
           {!isNew && status === 'public' && (
             <a
               className="btn gh"
-              href={`http://localhost:3001/record/${recordType}/${recordId}`}
+              href={`${PORTAL_URL}/record/${recordType}/${recordId}`}
               target="_blank"
               rel="noreferrer"
               style={{ textDecoration: 'none' }}

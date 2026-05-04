@@ -54,6 +54,7 @@ services:
       - "4000:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_PORTAL_URL=http://localhost:3001
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
       interval: 10s
