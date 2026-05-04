@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Help, Search } from '../ui/Icons'
+import { /* Bell, Help, */ Search } from '../ui/Icons'
 import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
@@ -113,8 +113,9 @@ export function Topbar({ crumbs, onNavigate }: Props) {
           </div>
         )}
       </div>
-      <button className="ib" title="Hilfe"><Help size={15} /></button>
-      <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button>
+      {/* Hilfe und Benachrichtigungen ausgeblendet bis Implementierung (Issue #46) */}
+      {/* <button className="ib" title="Hilfe"><Help size={15} /></button> */}
+      {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
     </div>
   )
 }
