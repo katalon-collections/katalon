@@ -15,6 +15,9 @@ export function ScreenSettings({ onNavigate }: Props) {
 
   const [siteTitle, setSiteTitle] = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
+  const [heroText, setHeroText] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [featuredIds, setFeaturedIds] = useState('')
   const [accentColor, setAccentColor] = useState('')
 
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
@@ -32,6 +35,9 @@ export function ScreenSettings({ onNavigate }: Props) {
         setConfig(c)
         setSiteTitle(c.site_title)
         setSiteSubtitle(c.site_subtitle)
+        setHeroText(c.hero_text)
+        setLogoUrl(c.logo_url)
+        setFeaturedIds((c.featured_object_ids ?? []).join('\n'))
         setAccentColor(c.accent_color)
       })
       .catch((e: Error) => setError(e.message))
@@ -48,6 +54,9 @@ export function ScreenSettings({ onNavigate }: Props) {
         body: JSON.stringify({
           site_title: siteTitle,
           site_subtitle: siteSubtitle,
+          hero_text: heroText,
+          logo_url: logoUrl,
+          featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
           accent_color: accentColor,
         }),
       })
@@ -114,6 +123,21 @@ export function ScreenSettings({ onNavigate }: Props) {
                 <input className="fld" value={siteSubtitle} onChange={e => setSiteSubtitle(e.target.value)} />
               </div>
               <div className="field">
+                <div className="lbl">Willkommenstext (Hero)</div>
+                <textarea className="fld" rows={3} value={heroText} onChange={e => setHeroText(e.target.value)}
+                  style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+              <div className="field">
+                <div className="lbl">Logo-URL <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <input className="fld" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
+                  placeholder="https://…/logo.svg" />
+              </div>
+              <div className="field">
+                <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
+                <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)}
+                  style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2\nuuid-3'} />
+              </div>
+              <div className="field">
                 <div className="lbl">Akzentfarbe</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
@@ -161,12 +185,6 @@ export function ScreenSettings({ onNavigate }: Props) {
             </div>
           </div>
 
-          <div className="card">
-            <div className="hd">Portal-Konfiguration</div>
-            <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
-              Für erweiterte Portal-Einstellungen (Startseite, Facetten, Statische Seiten) siehe Phase 8.1.
-            </div>
-          </div>
         </div>
       )}
     </div>
