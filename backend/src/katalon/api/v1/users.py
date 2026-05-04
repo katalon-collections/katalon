@@ -10,7 +10,7 @@ from katalon.core.schemas import PasswordChange, UserCreate, UserRead, UserUpdat
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-_VALID_ROLES = {"admin", "editor", "viewer"}
+_VALID_ROLES = {"admin", "editor", "cataloger", "viewer"}
 
 
 @router.get("", response_model=list[UserRead], dependencies=[require_role("admin")])

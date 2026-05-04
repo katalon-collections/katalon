@@ -11,6 +11,7 @@ interface NavItem {
   Icon?: React.FC<{ size?: number; className?: string }>
   ct?: string
   routes?: string[]
+  roles?: string[]
 }
 
 const NAV: NavItem[] = [
@@ -21,11 +22,11 @@ const NAV: NavItem[] = [
   { id: 'occurrences-list', label: 'Occurrences',   Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
   { id: 'import',          label: 'Importer',       Icon: Upload,    ct: '2 aktiv' },
   { id: 'audit',           label: 'Audit-Log',      Icon: History },
-  { g: 'Konfiguration' },
-  { id: 'schema', label: 'Schemata',       Icon: Layers,  ct: '5' },
-  { id: 'vocab',  label: 'Vokabular',      Icon: Tag,     ct: '4' },
-  { g: 'Verwaltung' },
-  { id: 'users',  label: 'Benutzer',       Icon: Users,   ct: '12' },
+  { g: 'Konfiguration', roles: ['admin'] },
+  { id: 'schema', label: 'Schemata',       Icon: Layers,  ct: '5', roles: ['admin'] },
+  { id: 'vocab',  label: 'Vokabular',      Icon: Tag,     ct: '4', roles: ['admin'] },
+  { g: 'Verwaltung', roles: ['admin'] },
+  { id: 'users',  label: 'Benutzer',       Icon: Users,   ct: '12', roles: ['admin'] },
   { id: 'settings', label: 'Einstellungen', Icon: Gear },
 ]
 
@@ -38,7 +39,7 @@ interface Props {
 export function Sidebar({ route, setRoute, onLogout }: Props) {
   const user = getTokenUser()
   const initials = user?.email ? user.email[0].toUpperCase() : 'A'
-  const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }
+  const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', cataloger: 'Katalogisierer', viewer: 'Betrachter' }
 
   return (
     <aside className="sb">
@@ -55,10 +56,14 @@ export function Sidebar({ route, setRoute, onLogout }: Props) {
       </div>
 
       <nav className="sb-nav">
-        {NAV.map((it, i) =>
-          it.g ? (
-            <div key={`g${i}`} className="sb-grp">{it.g}</div>
-          ) : (
+        {NAV.map((it, i) => {
+          if (it.g) {
+            const visible = !it.roles || it.roles.includes(user?.role ?? '')
+            return visible ? <div key={`g${i}`} className="sb-grp">{it.g}</div> : null
+          }
+          const visible = !it.roles || it.roles.includes(user?.role ?? '')
+          if (!visible) return null
+          return (
             <button
               key={it.id}
               className={`sb-it${route === it.id || (it.routes ?? []).includes(route) ? ' active' : ''}`}
@@ -69,7 +74,7 @@ export function Sidebar({ route, setRoute, onLogout }: Props) {
               {it.ct && <span className="ct">{it.ct}</span>}
             </button>
           )
-        )}
+        })}
       </nav>
 
       <div className="sb-foot">

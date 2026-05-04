@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import Vocabulary, VocabularyTerm
 from katalon.core.schemas import (
     VocabularyCreate, VocabularyRead,
@@ -53,8 +53,8 @@ async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
     return list(result.scalars().all())
 
 
-@router.post("", response_model=VocabularyRead, status_code=201)
-async def create_vocabulary(data: VocabularyCreate, db: DBDep, _: CurrentUser) -> Vocabulary:
+@router.post("", response_model=VocabularyRead, status_code=201, dependencies=[require_role("admin")])
+async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
     vocab = Vocabulary(**data.model_dump())
     db.add(vocab)
     await db.commit()
@@ -128,9 +128,9 @@ async def get_ancestors(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> l
 # Term CRUD
 # ---------------------------------------------------------------------------
 
-@router.post("/{vocab_id}/terms", response_model=VocabularyTermRead, status_code=201)
+@router.post("/{vocab_id}/terms", response_model=VocabularyTermRead, status_code=201, dependencies=[require_role("admin")])
 async def create_term(
-    vocab_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep, _: CurrentUser
+    vocab_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
 ) -> VocabularyTerm:
     term = VocabularyTerm(**data.model_dump() | {"vocabulary_id": vocab_id})
     db.add(term)
@@ -138,9 +138,9 @@ async def create_term(
     return term
 
 
-@router.put("/terms/{term_id}", response_model=VocabularyTermRead)
+@router.put("/terms/{term_id}", response_model=VocabularyTermRead, dependencies=[require_role("admin")])
 async def update_term(
-    term_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep, _: CurrentUser
+    term_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
 ) -> VocabularyTerm:
     result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
     term = result.scalar_one_or_none()
@@ -151,8 +151,8 @@ async def update_term(
     return term
 
 
-@router.delete("/terms/{term_id}", status_code=204)
-async def delete_term(term_id: uuid.UUID, db: DBDep, _: CurrentUser) -> None:
+@router.delete("/terms/{term_id}", status_code=204, dependencies=[require_role("admin")])
+async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
     term = result.scalar_one_or_none()
     if not term:

@@ -10,6 +10,7 @@ import { ScreenAudit } from '../screens/ScreenAudit'
 import { ScreenForm } from '../screens/ScreenForm'
 import { ScreenLogin } from '../screens/ScreenLogin'
 import { ScreenSettings } from '../screens/ScreenSettings'
+import { ScreenUsers } from '../screens/ScreenUsers'
 
 type Crumb = { label: string; route?: string }
 
@@ -103,6 +104,7 @@ export function AppShell() {
       case 'vocab':             return <ScreenVocab />
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
+      case 'users':             return <ScreenUsers />
       case 'settings':          return <ScreenSettings onNavigate={(r) => navigate(r)} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }

@@ -52,3 +52,12 @@ def require_role(*roles: str):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user
     return Depends(_check)
+
+
+def require_admin_or_editor():
+    """Allow admin, editor, and cataloger for content operations."""
+    return require_role("admin", "editor", "cataloger")
+
+
+def require_admin():
+    return require_role("admin")

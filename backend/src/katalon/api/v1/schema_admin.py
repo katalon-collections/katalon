@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FieldDefinition
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 
@@ -48,8 +48,8 @@ async def list_fields(
     return list(result.scalars().all())
 
 
-@router.post("", response_model=FieldDefinitionRead, status_code=201)
-async def create_field(data: FieldDefinitionCreate, db: DBDep, _: CurrentUser) -> FieldDefinition:
+@router.post("", response_model=FieldDefinitionRead, status_code=201, dependencies=[require_role("admin")])
+async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinition:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     field = FieldDefinition(**data.model_dump())
@@ -58,9 +58,9 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep, _: CurrentUser) -
     return field
 
 
-@router.put("/{field_id}", response_model=FieldDefinitionRead)
+@router.put("/{field_id}", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
 async def update_field(
-    field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep, _: CurrentUser
+    field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep
 ) -> FieldDefinition:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
@@ -77,8 +77,8 @@ async def update_field(
     return field
 
 
-@router.delete("/{field_id}", status_code=204)
-async def delete_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> None:
+@router.delete("/{field_id}", status_code=204, dependencies=[require_role("admin")])
+async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -93,8 +93,8 @@ async def delete_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> None:
     _enqueue_reindex(target_type)
 
 
-@router.post("/{field_id}/restore", response_model=FieldDefinitionRead)
-async def restore_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> FieldDefinition:
+@router.post("/{field_id}/restore", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
+async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinition:
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(True)
@@ -110,11 +110,10 @@ async def restore_field(field_id: uuid.UUID, db: DBDep, _: CurrentUser) -> Field
     return field
 
 
-@router.post("/import", response_model=ImportResult, status_code=200)
+@router.post("/import", response_model=ImportResult, status_code=200, dependencies=[require_role("admin")])
 async def import_schema(
     file: UploadFile,
     db: DBDep,
-    _: CurrentUser,
     dry_run: bool = Query(False, description="Preview changes without writing to DB"),
     overwrite: bool = Query(False, description="Overwrite existing fields"),
 ) -> ImportResult:

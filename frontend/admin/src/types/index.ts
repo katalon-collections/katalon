@@ -136,3 +136,11 @@ export interface PortalConfigRead {
   accent_color: string
   logo_url: string
 }
+
+export interface UserRead {
+  id: string
+  email: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
