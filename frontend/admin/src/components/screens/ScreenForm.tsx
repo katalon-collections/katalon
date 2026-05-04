@@ -531,25 +531,40 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   </div>
                   <div className="bd">
                     {mediaFiles.length > 0 && (
-                      <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
                         {mediaFiles.map(f => (
-                          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto auto auto', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
-                            {f.status === 'ready' ? (
-                              <img
-                                src={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`}
-                                alt={f.filename}
-                                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, background: 'var(--bg-s)' }}
-                                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                              />
-                            ) : (
-                              <div style={{ width: 40, height: 40, borderRadius: 4, background: 'var(--bg-s)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Image size={14} style={{ color: 'var(--fg-3)' }} />
-                              </div>
-                            )}
-                            <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.filename}>{f.filename}</span>
+                          <div key={f.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)', background: 'var(--bg-s)' }}>
+                            <a href={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1', overflow: 'hidden' }}>
+                              {f.status === 'ready' ? (
+                                <img
+                                  src={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`}
+                                  alt={f.filename}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                              ) : null}
+                              {f.status !== 'ready' && (
+                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Image size={20} style={{ color: 'var(--fg-3)' }} />
+                                </div>
+                              )}
+                            </a>
+                            <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={f.filename}>{f.filename}</span>
+                              <button
+                                className={`btn sm${f.is_primary ? ' pri' : ' gh'}`}
+                                style={{ fontSize: 10, padding: '1px 4px', flexShrink: 0 }}
+                                onClick={() => handleSetPrimary(f.id)}
+                                title={f.is_primary ? 'Primärbild' : 'Als Primärbild setzen'}
+                                disabled={f.is_primary}
+                              >
+                                {f.is_primary ? '★' : '☆'}
+                              </button>
+                              <button className="btn sm ico gh dn" style={{ padding: '1px 4px' }} onClick={() => handleDeleteMedia(f.id)} title="Löschen"><Trash size={10} /></button>
+                            </div>
                             <select
                               className="fld"
-                              style={{ fontSize: 11, padding: '2px 6px', height: 26, minWidth: 110 }}
+                              style={{ fontSize: 10, padding: '2px 4px', height: 22, borderRadius: 0, border: '0 solid var(--border-s)', borderTopWidth: 1 }}
                               value={f.media_type ?? ''}
                               onChange={e => handleSetMediaType(f.id, e.target.value || null)}
                             >
@@ -558,16 +573,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                                 <option key={t.id} value={t.term}>{t.label.de ?? t.term}</option>
                               ))}
                             </select>
-                            <button
-                              className={`btn sm${f.is_primary ? ' pri' : ' gh'}`}
-                              style={{ fontSize: 11, padding: '2px 8px' }}
-                              onClick={() => handleSetPrimary(f.id)}
-                              title={f.is_primary ? 'Primärbild' : 'Als Primärbild setzen'}
-                              disabled={f.is_primary}
-                            >
-                              {f.is_primary ? '★' : '☆'}
-                            </button>
-                            <button className="btn sm ico gh dn" onClick={() => handleDeleteMedia(f.id)}><Trash size={11} /></button>
                           </div>
                         ))}
                       </div>
