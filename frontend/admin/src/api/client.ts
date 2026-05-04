@@ -111,6 +111,14 @@ export const occurrences = {
   delete: (id: string) => req<void>(`/v1/occurrences/${id}`, { method: 'DELETE' }),
 }
 
+export interface SchemaImportResult {
+  created: number
+  updated: number
+  skipped: number
+  errors: string[]
+  fields: FieldDefinition[]
+}
+
 // Schema
 export const schema = {
   list:   (targetType: string, subtype?: string) => {
@@ -120,6 +128,19 @@ export const schema = {
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/schema/${id}`, { method: 'DELETE' }),
+  import: async (file: File, opts: { dryRun?: boolean; overwrite?: boolean } = {}): Promise<SchemaImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    if (_token) headers['Authorization'] = `Bearer ${_token}`
+    const qs = new URLSearchParams()
+    if (opts.dryRun) qs.set('dry_run', 'true')
+    if (opts.overwrite) qs.set('overwrite', 'true')
+    const res = await fetch(`${BASE}/v1/schema/import${qs.toString() ? `?${qs}` : ''}`, { method: 'POST', body: formData, headers })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
+    if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
+    return res.json()
+  },
 }
 
 // Vocabularies

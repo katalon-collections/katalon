@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { schema } from '../../api/client'
+import type { SchemaImportResult } from '../../api/client'
 import type { FieldDefinition } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
@@ -143,6 +144,80 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
   )
 }
 
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [dryRun, setDryRun] = useState(true)
+  const [overwrite, setOverwrite] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<SchemaImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleImport() {
+    const file = fileRef.current?.files?.[0]
+    if (!file) { setError('Bitte eine Datei auswählen.'); return }
+    setBusy(true)
+    setError(null)
+    setResult(null)
+    try {
+      const res = await schema.import(file, { dryRun, overwrite })
+      setResult(res)
+      if (!dryRun) onDone()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="card" style={{ width: 480, maxWidth: '90vw' }}>
+        <div className="hd">
+          <span>Schema-Import</span>
+          <div className="grow" />
+          <button className="btn sm" onClick={onClose}>Schließen</button>
+        </div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-2)', margin: '0 0 12px' }}>
+            YAML- oder JSON-Datei mit Felddefinitionen für einen Typ importieren.
+          </p>
+          <div className="field">
+            <div className="lbl">Datei (YAML / JSON)</div>
+            <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="fld" />
+          </div>
+          <div className="field" style={{ display: 'flex', gap: 16, flexDirection: 'row', paddingTop: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" className="ck" checked={dryRun} onChange={e => setDryRun(e.target.checked)} />
+              Dry-Run (nur Vorschau)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" className="ck" checked={overwrite} onChange={e => setOverwrite(e.target.checked)} />
+              Bestehende überschreiben
+            </label>
+          </div>
+          {error && <div style={{ fontSize: 12, color: '#dc2626', margin: '8px 0' }}>{error}</div>}
+          {result && (
+            <div style={{ fontSize: 12, background: 'var(--accent-50)', borderRadius: 6, padding: '10px 12px', margin: '8px 0' }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{dryRun ? 'Vorschau (kein Schreiben)' : 'Import abgeschlossen'}</div>
+              <div>Neu: {result.created} · Aktualisiert: {result.updated} · Übersprungen: {result.skipped}</div>
+              {result.errors.length > 0 && (
+                <div style={{ color: '#b91c1c', marginTop: 4 }}>
+                  Fehler: {result.errors.map((e, i) => <div key={i}>{e}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button className="btn pri" onClick={handleImport} disabled={busy}>
+              {busy ? 'Lädt…' : dryRun ? 'Vorschau' : 'Importieren'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ScreenSchema() {
   const [activeType, setActiveType] = useState('object')
   const [activeSubtype, setActiveSubtype] = useState('')
@@ -153,6 +228,7 @@ export function ScreenSchema() {
   const [form, setForm] = useState<FieldFormState | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [showImport, setShowImport] = useState(false)
 
   const showSubtype = SUBTYPE_TYPES.has(activeType)
 
@@ -250,9 +326,13 @@ export function ScreenSchema() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {showImport && (
+        <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadFields() }} />
+      )}
       <div className="ph">
         <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ</div></div>
         <div className="right">
+          <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
           <button className="btn pri" onClick={openNew}><Plus size={13} /> Neues Feld</button>
         </div>
       </div>
