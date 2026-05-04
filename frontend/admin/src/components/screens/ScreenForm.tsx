@@ -803,8 +803,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                               ))}
                             </select>
                           ) : (
-                            <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
-                              placeholder="z.B. depicts, created_by, part_of" />
+                            <>
+                              <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
+                                placeholder="z.B. depicts, created_by, part_of" />
+                              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+                                Kein Vokabular <span style={{ fontFamily: 'var(--mono)' }}>relation_types</span> definiert — freie Eingabe aktiv.
+                                Vokabular anlegen unter <em>Konfiguration → Vokabular</em>.
+                              </div>
+                            </>
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
