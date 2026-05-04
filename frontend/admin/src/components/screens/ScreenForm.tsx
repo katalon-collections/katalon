@@ -55,6 +55,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [showAudit, setShowAudit] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
+  const [dateFieldErrors, setDateFieldErrors] = useState<Record<string, string>>({})
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [snapLabel, setSnapLabel] = useState('')
@@ -250,9 +251,35 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setValues(v => ({ ...v, [name]: cur }))
   }
 
+  function validateDates(): Record<string, string> {
+    const errors: Record<string, string> = {}
+    for (const f of fields) {
+      if (f.field_type !== 'date') continue
+      const val = values[f.name]
+      const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
+      for (const v of toCheck) {
+        if (!v) continue
+        const ok = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)
+        if (!ok) {
+          errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+          break
+        }
+      }
+    }
+    return errors
+  }
+
   async function handleSave() {
     setSaving(true)
     setError(null)
+    const dateErrors = validateDates()
+    if (Object.keys(dateErrors).length > 0) {
+      setDateFieldErrors(dateErrors)
+      setSaving(false)
+      setError('Bitte korrigieren Sie die markierten Datumsfelder.')
+      return
+    }
+    setDateFieldErrors({})
     try {
       const payload: Record<string, unknown> = { status, metadata_: values }
       if (showIdno)   payload.idno = idno || null
@@ -498,6 +525,24 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             disabled={justCreated} />
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
+                      ) : f.field_type === 'date' ? (
+                        <>
+                          <input className="fld"
+                            type="text"
+                            value={(val as string) ?? ''}
+                            onChange={e => {
+                              setField(f.name, e.target.value)
+                              if (dateFieldErrors[f.name]) {
+                                setDateFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                              }
+                            }}
+                            placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
+                            disabled={justCreated}
+                            style={dateFieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          {dateFieldErrors[f.name] && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors[f.name]}</div>
+                          )}
+                        </>
                       ) : (
                         <input className="fld"
                           value={(val as string) ?? ''}
