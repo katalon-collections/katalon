@@ -126,3 +126,13 @@ export interface Snapshot {
   created_by: string | null
   created_at: string
 }
+
+export interface PortalConfigRead {
+  site_title: string
+  site_subtitle: string
+  hero_text: string
+  featured_object_ids: string[]
+  facet_fields: string[]
+  accent_color: string
+  logo_url: string
+}
