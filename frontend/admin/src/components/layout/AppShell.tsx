@@ -11,6 +11,7 @@ import { ScreenForm } from '../screens/ScreenForm'
 import { ScreenLogin } from '../screens/ScreenLogin'
 import { ScreenSettings } from '../screens/ScreenSettings'
 import { ScreenUsers } from '../screens/ScreenUsers'
+import { ScreenPages } from '../screens/ScreenPages'
 
 type Crumb = { label: string; route?: string }
 
@@ -25,6 +26,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   'occurrences-form': [{ label: 'Katalon' }, { label: 'Occurrences', route: 'occurrences-list' }, { label: 'Bearbeiten' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
+  pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
   import:             [{ label: 'Katalon' }, { label: 'Importer' }],
   audit:              [{ label: 'Katalon' }, { label: 'Audit-Log' }],
   users:              [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer' }],
@@ -102,6 +104,7 @@ export function AppShell() {
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} />
       case 'schema':            return <ScreenSchema />
       case 'vocab':             return <ScreenVocab />
+      case 'pages':             return <ScreenPages />
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />
