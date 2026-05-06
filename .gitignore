@@ -3116,3 +3116,4 @@ frontend/admin/node_modules/yallist/package.json
 frontend/admin/node_modules/yallist/README.md
 frontend/admin/node_modules/yallist/yallist.js
 docker-compose.log
+.claude/settings.local.json
