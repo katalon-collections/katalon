@@ -31,6 +31,9 @@ export function SearchPage() {
   params.forEach((value, key) => {
     if (key.startsWith('meta_')) metaFilters[key.slice(5)] = value
   })
+  const relEntity = params.get('rel_entity') ?? ''
+  const relPlace = params.get('rel_place') ?? ''
+  const relOccurrence = params.get('rel_occurrence') ?? ''
 
   useEffect(() => {
     setLoading(true)
@@ -41,6 +44,9 @@ export function SearchPage() {
       page,
       page_size: 20,
       facets: facetFields.length > 0 ? facetFields.join(',') : undefined,
+      rel_entity: relEntity || undefined,
+      rel_place: relPlace || undefined,
+      rel_occurrence: relOccurrence || undefined,
     }
     // Pass meta_ filters as extra query params
     const qs = new URLSearchParams(
@@ -73,7 +79,7 @@ export function SearchPage() {
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false))
-  }, [q, typeFilt, statusFilt, page, facetFields.join(','), JSON.stringify(metaFilters)])
+  }, [q, typeFilt, statusFilt, page, facetFields.join(','), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,6 +97,10 @@ export function SearchPage() {
   function setMetaFilter(field: string, value: string) {
     const key = `meta_${field}`
     setFilter(key, value)
+  }
+
+  function setRelFilter(paramKey: string, value: string) {
+    setFilter(paramKey, value)
   }
 
   function setPage(n: number) {
@@ -180,6 +190,28 @@ export function SearchPage() {
               />
             )
           })}
+          {(!typeFilt || typeFilt === 'object') && (
+            <>
+              <FacetPanel
+                label="Personen/Org."
+                buckets={data?.facets?.['related_entities'] ?? []}
+                active={relEntity}
+                onSelect={v => setRelFilter('rel_entity', v)}
+              />
+              <FacetPanel
+                label="Orte"
+                buckets={data?.facets?.['related_places'] ?? []}
+                active={relPlace}
+                onSelect={v => setRelFilter('rel_place', v)}
+              />
+              <FacetPanel
+                label="Werke/Ereignisse"
+                buckets={data?.facets?.['related_occurrences'] ?? []}
+                active={relOccurrence}
+                onSelect={v => setRelFilter('rel_occurrence', v)}
+              />
+            </>
+          )}
         </aside>
 
         <div className="result-list">

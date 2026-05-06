@@ -30,13 +30,16 @@ INDEX_SETTINGS: dict[str, Any] = {
     },
     "mappings": {
         "properties": {
-            "record_type": {"type": "keyword"},
-            "title":       {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
-            "status":      {"type": "keyword"},
-            "metadata":    {"type": "object", "dynamic": True},
-            "search_text": {"type": "text", "analyzer": "katalon_default"},
-            "created_at":  {"type": "date"},
-            "updated_at":  {"type": "date"},
+            "record_type":         {"type": "keyword"},
+            "title":               {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
+            "status":              {"type": "keyword"},
+            "metadata":            {"type": "object", "dynamic": True},
+            "search_text":         {"type": "text", "analyzer": "katalon_default"},
+            "created_at":          {"type": "date"},
+            "updated_at":          {"type": "date"},
+            "related_entities":    {"type": "keyword"},
+            "related_places":      {"type": "keyword"},
+            "related_occurrences": {"type": "keyword"},
         }
     },
 }
@@ -50,6 +53,9 @@ async def ensure_index() -> None:
     exists = await es.indices.exists(index=INDEX_NAME)
     if not exists:
         await es.indices.create(index=INDEX_NAME, body=INDEX_SETTINGS)
+    else:
+        # Idempotently apply mapping changes (e.g. new fields)
+        await es.indices.put_mapping(index=INDEX_NAME, body=INDEX_SETTINGS["mappings"])
     # Ensure the alias points to the main index
     alias_exists = await es.indices.exists_alias(name=ALIAS_NAME)
     if not alias_exists:
@@ -100,6 +106,7 @@ async def search_documents(
     size: int,
     extra_filters: dict[str, str] | None = None,
     facet_fields: list[str] | None = None,
+    rel_filters: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -126,12 +133,17 @@ async def search_documents(
         filters.append({"term": {"status": status}})
     for field, value in (extra_filters or {}).items():
         filters.append({"term": {f"metadata.{field}.keyword": value}})
+    for field, value in (rel_filters or {}).items():
+        filters.append({"term": {field: value}})
 
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
     aggs: dict[str, Any] = {
-        "by_type":   {"terms": {"field": "record_type", "size": 10}},
-        "by_status": {"terms": {"field": "status", "size": 10}},
+        "by_type":             {"terms": {"field": "record_type", "size": 10}},
+        "by_status":           {"terms": {"field": "status", "size": 10}},
+        "related_entities":    {"terms": {"field": "related_entities", "size": 30}},
+        "related_places":      {"terms": {"field": "related_places", "size": 30}},
+        "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
     }
     for field in facet_fields or []:
         aggs[f"meta_{field}"] = {"terms": {"field": f"metadata.{field}.keyword", "size": 20}}

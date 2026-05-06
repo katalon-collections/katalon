@@ -41,15 +41,19 @@ def bulk_reindex_type_task(target_type: str) -> dict:
     }
 
     async def _do() -> dict:
+        from katalon.services.search_service import _load_relation_titles
+
         model = _MODEL_MAP.get(target_type)
         if model is None:
             return {"status": "error", "detail": f"Unknown type: {target_type}"}
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(model))
-            records = [
-                (str(rec.id), _build_doc(target_type, rec))
-                for rec in result.scalars().all()
-            ]
+            records = []
+            for rec in result.scalars().all():
+                rel_data = None
+                if target_type == "object":
+                    rel_data = await _load_relation_titles(target_type, rec.id, session)
+                records.append((str(rec.id), _build_doc(target_type, rec, rel_data)))
         count = await reindex_type(target_type, records)
         return {"status": "ok", "indexed": count, "target_type": target_type}
 
@@ -66,6 +70,7 @@ def reindex_all_task() -> None:
 
     async def _reindex() -> None:
         from sqlalchemy import select
+        from katalon.services.search_service import _load_relation_titles
 
         await ensure_index()
         async with AsyncSessionLocal() as session:
@@ -77,6 +82,6 @@ def reindex_all_task() -> None:
             ]:
                 result = await session.execute(select(model))
                 for rec in result.scalars().all():
-                    await _index(rtype, rec)
+                    await _index(rtype, rec, session)
 
     _run(_reindex())

@@ -112,7 +112,7 @@ export const api = {
     get:  (slug: string) => get<StaticPageSummary>(`/v1/pages/${slug}`),
   },
   search: {
-    query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number }) => {
+    query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; [key: string]: string | number | undefined }) => {
       const qs = new URLSearchParams(
         Object.entries(p)
           .filter(([, v]) => v != null)

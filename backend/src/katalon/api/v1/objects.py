@@ -62,7 +62,7 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
     try:
-        await search_service.index_record("object", obj)
+        await search_service.index_record("object", obj, db)
     except Exception:
         pass
     return obj
@@ -110,7 +110,7 @@ async def update_object(
         changed_fields={"old": old_fields, "new": {"status": data.status, "metadata": data.metadata_}},
     )
     try:
-        await search_service.index_record("object", obj)
+        await search_service.index_record("object", obj, db)
     except Exception:
         pass
     return obj

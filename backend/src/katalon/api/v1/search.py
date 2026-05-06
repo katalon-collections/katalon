@@ -40,6 +40,9 @@ async def search(
     facets: Annotated[str | None, Query(description="Comma-separated metadata fields to aggregate")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    rel_entity: Annotated[str | None, Query(description="Filter objects by related entity name")] = None,
+    rel_place: Annotated[str | None, Query(description="Filter objects by related place name")] = None,
+    rel_occurrence: Annotated[str | None, Query(description="Filter objects by related occurrence name")] = None,
 ) -> SearchResponse:
     # Extra metadata filters: any query param starting with "meta_"
     extra_filters: dict[str, str] = {
@@ -48,6 +51,13 @@ async def search(
         if k.startswith("meta_") and v
     }
     facet_fields = [f.strip() for f in facets.split(",") if f.strip()] if facets else []
+    rel_filters: dict[str, str] = {}
+    if rel_entity:
+        rel_filters["related_entities"] = rel_entity
+    if rel_place:
+        rel_filters["related_places"] = rel_place
+    if rel_occurrence:
+        rel_filters["related_occurrences"] = rel_occurrence
     result = await search_service.search(
         query=q,
         record_type=type,
@@ -56,6 +66,7 @@ async def search(
         page_size=page_size,
         extra_filters=extra_filters or None,
         facet_fields=facet_fields or None,
+        rel_filters=rel_filters or None,
     )
     return SearchResponse(**result)
 
