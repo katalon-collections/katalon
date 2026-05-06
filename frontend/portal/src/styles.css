@@ -151,3 +151,21 @@ input, select, textarea { font-family: inherit; }
   .result-row .thumb-sm { width: 48px; height: 48px; }
   .detail-meta { padding: 16px; }
 }
+
+/* Markdown-Ausgabe (StaticPageView) */
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  font-weight: 700; letter-spacing: -.015em; margin: 1.4em 0 .5em;
+}
+.prose h1 { font-size: 1.6em; }
+.prose h2 { font-size: 1.3em; }
+.prose h3 { font-size: 1.1em; }
+.prose p { margin: 0 0 1em; }
+.prose ul, .prose ol { padding-left: 1.5em; margin: 0 0 1em; }
+.prose li { margin-bottom: .25em; }
+.prose a { color: var(--accent, #1e3a8a); text-decoration: underline; }
+.prose strong { font-weight: 600; }
+.prose em { font-style: italic; }
+.prose code { font-family: 'IBM Plex Mono', monospace; font-size: .88em; background: var(--panel, #f1f5f9); padding: 1px 5px; border-radius: 3px; }
+.prose pre { background: var(--panel, #f1f5f9); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 0 0 1em; }
+.prose pre code { background: none; padding: 0; }
+.prose blockquote { border-left: 3px solid var(--accent, #1e3a8a); margin: 0 0 1em; padding: 4px 0 4px 16px; color: var(--fg-2, #4b5563); }
