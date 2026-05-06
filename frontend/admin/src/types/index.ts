@@ -139,6 +139,7 @@ export interface PortalConfigRead {
   facet_fields: string[]
   accent_color: string
   logo_url: string
+  color_tokens: Record<string, string>
 }
 
 export interface UserRead {

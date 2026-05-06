@@ -298,6 +298,7 @@ class PortalConfig(Base):
     facet_fields: Mapped[list] = mapped_column(JSONB, default=list)  # e.g. ["creator", "year"]
     accent_color: Mapped[str] = mapped_column(String(32), default="#1e3a8a")
     logo_url: Mapped[str] = mapped_column(String(512), default="")
+    color_tokens: Mapped[dict] = mapped_column(JSONB, default=dict)  # extra CSS var overrides
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

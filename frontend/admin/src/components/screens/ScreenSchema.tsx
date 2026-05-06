@@ -181,6 +181,26 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <p style={{ fontSize: 13, color: 'var(--fg-2)', margin: '0 0 12px' }}>
             YAML- oder JSON-Datei mit Felddefinitionen für einen Typ importieren.
           </p>
+          <details style={{ marginBottom: 12, fontSize: 12 }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--fg-3)', userSelect: 'none' }}>Format-Hilfe</summary>
+            <pre style={{ margin: '8px 0 0', padding: '10px 12px', background: 'var(--panel)', borderRadius: 6, overflowX: 'auto', lineHeight: 1.5, fontSize: 11 }}>{`target_type: object   # object | entity | place | occurrence
+fields:
+  - name: title
+    label:
+      de: Titel
+      en: Title
+    field_type: text   # text | date | number | geo | vocab | relation | boolean
+    is_required: true
+    is_repeatable: false
+    sort_order: 0
+    settings: {}
+
+  - name: material
+    label: {de: Material}
+    field_type: vocab
+    settings:
+      vocabulary: materials`}</pre>
+          </details>
           <div className="field">
             <div className="lbl">Datei (YAML / JSON)</div>
             <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="fld" />

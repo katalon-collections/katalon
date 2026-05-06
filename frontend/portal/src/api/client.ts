@@ -62,6 +62,7 @@ export interface PortalConfig {
   facet_fields: string[]
   accent_color: string
   logo_url: string
+  color_tokens: Record<string, string>
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

@@ -126,20 +126,25 @@ export function ScreenPages() {
           {pages.map(p => (
             <div
               key={p.slug}
-              className={`item${activeSlug === p.slug ? ' active' : ''}`}
-              onClick={() => openPage(p)}
+              className="schema-list"
+              style={{ display: 'block' }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="nm">{p.title.de || p.slug}</div>
-                <div className="sub">{p.slug} {!p.is_published && '· Entwurf'}</div>
-              </div>
-              <button
-                className="btn sm ico gh dn"
-                style={{ flexShrink: 0 }}
-                onClick={e => { e.stopPropagation(); handleDelete(p.slug) }}
+              <div
+                className={`item${activeSlug === p.slug ? ' active' : ''}`}
+                onClick={() => openPage(p)}
               >
-                <Trash size={12} />
-              </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="nm">{p.title.de || p.slug}</div>
+                  <div className="sub">{p.slug}{!p.is_published ? ' · Entwurf' : ''}</div>
+                </div>
+                <button
+                  className="btn sm ico gh dn"
+                  style={{ flexShrink: 0 }}
+                  onClick={e => { e.stopPropagation(); handleDelete(p.slug) }}
+                >
+                  <Trash size={12} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

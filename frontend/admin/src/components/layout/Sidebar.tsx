@@ -28,7 +28,7 @@ const NAV: NavItem[] = [
   { id: 'pages',  label: 'Statische Seiten', Icon: File,              roles: ['admin'] },
   { g: 'Verwaltung', roles: ['admin'] },
   { id: 'users',  label: 'Benutzer',       Icon: Users,   roles: ['admin'] },
-  { id: 'settings', label: 'Einstellungen', Icon: Gear },
+  { id: 'settings', label: 'Einstellungen', Icon: Gear, roles: ['admin'] },
 ]
 
 interface Props {

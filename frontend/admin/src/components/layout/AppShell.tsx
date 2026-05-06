@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { hasToken, onUnauthorized, setToken } from '../../api/client'
+import { hasToken, onUnauthorized, setToken, getTokenUser } from '../../api/client'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ScreenList } from '../screens/ScreenList'
@@ -90,6 +90,9 @@ export function AppShell() {
     return <ScreenLogin onLogin={() => setLoggedIn(true)} />
   }
 
+  const currentUser = getTokenUser()
+  const isAdmin = currentUser?.role === 'admin'
+
   const crumbs = CRUMBS[route] ?? [{ label: 'Katalon' }]
 
   function renderScreen() {
@@ -108,7 +111,7 @@ export function AppShell() {
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />
-      case 'settings':          return <ScreenSettings onNavigate={(r) => navigate(r)} />
+      case 'settings':          return isAdmin ? <ScreenSettings onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
   }

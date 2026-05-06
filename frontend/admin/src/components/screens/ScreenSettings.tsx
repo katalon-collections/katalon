@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { req, BASE } from '../../api/client'
 import type { PortalConfigRead } from '../../types'
 
@@ -12,6 +12,8 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const [siteTitle, setSiteTitle] = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
@@ -20,6 +22,10 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [featuredIds, setFeaturedIds] = useState('')
   const [facetFields, setFacetFields] = useState('')
   const [accentColor, setAccentColor] = useState('')
+  const [headerBg, setHeaderBg] = useState('')
+  const [headerFg, setHeaderFg] = useState('')
+  const [pageBg, setPageBg] = useState('')
+  const [panelBg, setPanelBg] = useState('')
 
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
@@ -41,6 +47,11 @@ export function ScreenSettings({ onNavigate }: Props) {
         setFeaturedIds((c.featured_object_ids ?? []).join('\n'))
         setFacetFields((c.facet_fields ?? []).join('\n'))
         setAccentColor(c.accent_color)
+        const ct = c.color_tokens ?? {}
+        setHeaderBg(ct['--header-bg'] ?? '')
+        setHeaderFg(ct['--header-fg'] ?? '')
+        setPageBg(ct['--bg'] ?? '')
+        setPanelBg(ct['--panel'] ?? '')
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -61,6 +72,10 @@ export function ScreenSettings({ onNavigate }: Props) {
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
           facet_fields: facetFields.split('\n').map(s => s.trim()).filter(Boolean),
           accent_color: accentColor,
+          color_tokens: Object.fromEntries(
+            [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
+              .filter(([, v]) => v.trim())
+          ),
         }),
       })
       setSaved(true)
@@ -69,6 +84,31 @@ export function ScreenSettings({ onNavigate }: Props) {
       setError((e as Error).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    setLogoUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const token = localStorage.getItem('katalon_token')
+      const res = await fetch(`${BASE}/v1/portal/logo`, {
+        method: 'POST',
+        body: fd,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail ?? `Fehler ${res.status}`)
+      }
+      const c: PortalConfigRead = await res.json()
+      setLogoUrl(c.logo_url)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLogoUploading(false)
     }
   }
 
@@ -131,9 +171,23 @@ export function ScreenSettings({ onNavigate }: Props) {
                   style={{ resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
               <div className="field">
-                <div className="lbl">Logo-URL <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
-                <input className="fld" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
-                  placeholder="https://…/logo.svg" />
+                <div className="lbl">Logo <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {logoUrl && (
+                    <img src={logoUrl} alt="Logo-Vorschau"
+                      style={{ height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />
+                  )}
+                  <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
+                    {logoUploading ? 'Lädt hoch…' : 'Logo hochladen'}
+                  </button>
+                  {logoUrl && (
+                    <button className="btn sm gh" onClick={() => setLogoUrl('')} title="Logo entfernen">✕</button>
+                  )}
+                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
+                </div>
+                <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
+                  placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
               </div>
               <div className="field">
                 <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
@@ -145,13 +199,24 @@ export function ScreenSettings({ onNavigate }: Props) {
                 <textarea className="fld mono" rows={4} value={facetFields} onChange={e => setFacetFields(e.target.value)}
                   style={{ resize: 'vertical', fontSize: 12 }} placeholder={'creator\nmaterial\nlocation'} />
               </div>
-              <div className="field">
-                <div className="lbl">Akzentfarbe</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
-                  <input className="fld mono" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ flex: 1 }} />
+              {[
+                { lbl: 'Akzentfarbe', val: accentColor, set: setAccentColor },
+                { lbl: 'Kopfzeile — Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
+                { lbl: 'Kopfzeile — Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
+                { lbl: 'Seitenhintergrund', val: pageBg, set: setPageBg, ph: '#f4f5f7' },
+                { lbl: 'Panel-/Kartenfarbe', val: panelBg, set: setPanelBg, ph: '#ffffff' },
+              ].map(({ lbl, val, set, ph }) => (
+                <div className="field" key={lbl}>
+                  <div className="lbl">{lbl}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="color" value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
+                      style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
+                    <input className="fld mono" value={val} onChange={e => set(e.target.value)}
+                      placeholder={ph ?? ''} style={{ flex: 1 }} />
+                    {val && <button className="btn sm gh" onClick={() => set('')} title="Zurücksetzen">✕</button>}
+                  </div>
                 </div>
-              </div>
+              ))}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button className="btn pri" onClick={handleSaveConfig} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
                 {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}

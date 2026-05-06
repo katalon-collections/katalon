@@ -54,7 +54,18 @@ function Footer() {
 }
 
 function AppInner() {
-  useEffect(() => { loadAndApplyTheme() }, [])
+  useEffect(() => {
+    loadAndApplyTheme()
+    // Apply portal config color_tokens on top of the base theme
+    api.portal.config().then(c => {
+      const tokens = c.color_tokens ?? {}
+      const root = document.documentElement
+      for (const [k, v] of Object.entries(tokens)) {
+        if (v) root.style.setProperty(k, v as string)
+      }
+      if (c.accent_color) root.style.setProperty('--accent', c.accent_color)
+    }).catch(() => {})
+  }, [])
   return (
     <>
       <Header />
