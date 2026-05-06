@@ -40,10 +40,10 @@ async def _load_registry() -> dict[str, AuthoritySource]:
             )
             db_sources = result.scalars().all()
 
-        registry: dict[str, AuthoritySource] = {}
+        # Start with all builtins, then apply DB overrides for enabled sources
+        registry: dict[str, AuthoritySource] = dict(_BUILTIN)
         for src in db_sources:
             if src.id in _BUILTIN:
-                # Use builtin with optional config override
                 adapter = _BUILTIN[src.id]
                 for key, val in (src.config or {}).items():
                     if hasattr(adapter, key):
@@ -58,7 +58,7 @@ async def _load_registry() -> dict[str, AuthoritySource]:
                     registry[src.id] = cls(**(src.config or {}))
                 except Exception:
                     pass
-        _cache = registry or dict(_BUILTIN)
+        _cache = registry
     except Exception:
         _cache = dict(_BUILTIN)
     return _cache
