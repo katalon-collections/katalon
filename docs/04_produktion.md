@@ -9,6 +9,21 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - Öffentliche IP-Adresse, DNS-Einträge für deine Domains gesetzt
 - TLS-Zertifikate (Let's Encrypt empfohlen)
 
+## Checkliste vor dem ersten Produktionsstart
+
+- [ ] Domainname(n) entschieden und DNS-Einträge gesetzt
+- [ ] URL-Layout gewählt (Subdomain oder Subpfad, → Abschnitt 4)
+- [ ] TLS-Zertifikate ausgestellt
+- [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `DEFAULT_ADMIN_PASSWORD`, `CORS_ORIGINS`
+- [ ] `DEFAULT_ADMIN_PASSWORD` ist kein Standardwert
+- [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
+- [ ] `docker-compose.prod.yml` VITE-Build-Argumente auf eigene URLs gesetzt
+- [ ] Wikidata-Adapter: `User-Agent` in `backend/src/katalon/integrations/wikidata_adapter.py` auf eigene Instanz-URL und Kontaktadresse aktualisieren (Wikidata-Policy erfordert identifizierbaren User-Agent)
+- [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
+- [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
+- [ ] Nach erstem Start: `alembic upgrade head` ausgeführt
+- [ ] Nach erstem Start: Admin-Passwort geändert
+
 ## 1. Repository klonen
 
 ```bash
@@ -62,33 +77,112 @@ Automatische Erneuerung (crontab):
 
 Lege `fullchain.pem` und `privkey.pem` in `docker/certs/`.
 
-## 4. nginx-Konfiguration anpassen
+## 4. URL-Layout wählen und nginx anpassen
 
-In `docker/nginx.prod.conf` die Domains ersetzen:
+Es gibt zwei unterstützte Layouts. Einmal entscheiden, dann konsequent durchziehen.
 
-```bash
-# Alle Vorkommen von example.org und admin.example.org ersetzen
-sed -i 's/example\.org/deine-domain.de/g; s/admin\.example\.org/admin.deine-domain.de/g' docker/nginx.prod.conf
+---
+
+### Option A — Subdomain (Standard, empfohlen)
+
+```
+https://meineurl.de           → Public-Portal
+https://admin.meineurl.de     → Admin-UI
 ```
 
-## 5. Frontend-URLs anpassen
+`docker/nginx.prod.conf` ist für dieses Layout vorbereitet. Domains ersetzen:
 
-Die React-Apps müssen wissen, wo die API liegt. Setze VITE-Build-Argumente in `docker-compose.prod.yml`:
+```bash
+sed -i 's/example\.org/meineurl.de/g; s/admin\.example\.org/admin.meineurl.de/g' docker/nginx.prod.conf
+```
+
+TLS-Zertifikate für beide Domains ausstellen:
+
+```bash
+certbot certonly --standalone -d meineurl.de -d admin.meineurl.de
+```
+
+`docker-compose.prod.yml` — VITE-Build-Argumente:
 
 ```yaml
 admin:
   build:
     args:
-      VITE_API_URL: https://admin.deine-domain.de
-      VITE_PORTAL_URL: https://deine-domain.de
+      VITE_API_URL: https://admin.meineurl.de
+      VITE_PORTAL_URL: https://meineurl.de
 
 portal:
   build:
     args:
-      VITE_API_URL: https://deine-domain.de
+      VITE_API_URL: https://meineurl.de
 ```
 
-Alternativ: Die Apps lesen `VITE_API_URL` aus dem Vite-Build. Stelle sicher, dass die Dockerfiles `ARG`s für diese Variablen enthalten (→ ggf. Dockerfiles entsprechend erweitern).
+---
+
+### Option B — Subpfad (eine Domain, zwei Pfade)
+
+```
+https://meineurl.de              → Public-Portal
+https://meineurl.de/cataloging   → Admin-UI
+```
+
+Vite muss die Asset-Pfade beim Build einbetten. Dafür in `frontend/admin/vite.config.ts` ergänzen:
+
+```ts
+export default defineConfig({
+  base: '/cataloging/',   // ← neu
+  // … Rest unverändert
+})
+```
+
+`docker/nginx.prod.conf` — den separaten `server`-Block für `admin.example.org` ersetzen durch einen `location`-Block im Portal-Server:
+
+```nginx
+# Im Portal-Server-Block ergänzen (nach dem /v1/-Block):
+location /cataloging/ {
+    proxy_pass http://admin/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Den `server`-Block für `admin.example.org` sowie den zugehörigen HTTP-Redirect-Eintrag komplett entfernen.
+
+Nur ein Zertifikat nötig:
+
+```bash
+certbot certonly --standalone -d meineurl.de
+```
+
+`docker-compose.prod.yml`:
+
+```yaml
+admin:
+  build:
+    args:
+      VITE_API_URL: https://meineurl.de
+      VITE_PORTAL_URL: https://meineurl.de
+
+portal:
+  build:
+    args:
+      VITE_API_URL: https://meineurl.de
+```
+
+---
+
+### TLS-Volume in docker-compose.prod.yml (beide Optionen)
+
+```yaml
+nginx:
+  volumes:
+    - ./docker/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+    - ./docker/certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+    - ./docker/certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+  ports:
+    - "80:80"
+    - "443:443"
+```
 
 ## 6. Images bauen und starten
 
