@@ -77,6 +77,26 @@ export interface SearchResponse {
 export interface VocabSummary { id: string; name: string; is_hierarchical: boolean }
 export interface VocabTerm { id: string; term: string; label: Record<string, string>; parent_id: string | null }
 
+const TYPE_ENDPOINT: Record<string, string> = {
+  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences',
+}
+
+/** Fetch the display title of any record by type + id. Returns null on failure. */
+export async function fetchRecordTitle(type: string, id: string): Promise<string | null> {
+  const endpoint = TYPE_ENDPOINT[type] ?? `${type}s`
+  try {
+    const res = await fetch(`${BASE}/v1/${endpoint}/${id}`)
+    if (!res.ok) return null
+    const rec = await res.json() as { metadata_?: Record<string, unknown>; idno?: string | null; id: string }
+    const m = rec.metadata_ ?? {}
+    const raw = m.name ?? m.title ?? m.label ?? m.display_name ?? m.place_name ?? rec.idno ?? rec.id
+    if (typeof raw === 'string') return raw || null
+    return String(raw) || null
+  } catch {
+    return null
+  }
+}
+
 export const api = {
   objects: {
     list: (p?: { page?: number; q?: string; status?: string; page_size?: number }) => {

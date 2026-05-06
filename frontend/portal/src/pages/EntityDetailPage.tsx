@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, type EntitySummary, type ObjectSummary, type Relation } from '../api/client'
-import { useFieldLabels } from '../hooks/useFieldLabels'
+import { api, fetchRecordTitle, type EntitySummary, type ObjectSummary, type Relation } from '../api/client'
+import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
+import { authorityUrl, renderFieldValue } from '../utils/renderFieldValue'
 
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
   return (
     <div className="meta-row">
       <span className="key">{label}</span>
-      <span className="val">{value}</span>
+      <span className="val">
+        {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
+      </span>
     </div>
   )
 }
@@ -27,9 +30,10 @@ export function EntityDetailPage() {
   const [entity, setEntity] = useState<EntitySummary | null>(null)
   const [relations, setRelations] = useState<Relation[]>([])
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
+  const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const fieldLabels = useFieldLabels('entity')
+  const fieldDefs = useFieldDefinitions('entity')
   const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
 
@@ -41,15 +45,23 @@ export function EntityDetailPage() {
         setEntity(e)
         const rels = await api.relations.forRecord('entity', id).catch(() => [] as Relation[])
         setRelations(rels)
-        // Load linked objects
+
         const objIds = rels
           .filter(r => r.from_type === 'object' || r.to_type === 'object')
           .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
           .slice(0, 12)
-        const objs = await Promise.all(
-          objIds.map(oid => api.objects.get(oid).catch(() => null))
-        )
+        const objs = await Promise.all(objIds.map(oid => api.objects.get(oid).catch(() => null)))
         setLinkedObjects(objs.filter((o): o is ObjectSummary => o !== null))
+
+        const nonObjRels = rels.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
+        const pairs = nonObjRels.map(rel => {
+          const isFrom = rel.from_id === e.id
+          return { type: isFrom ? rel.to_type : rel.from_type, id: isFrom ? rel.to_id : rel.from_id }
+        })
+        const entries = await Promise.all(pairs.map(p => fetchRecordTitle(p.type, p.id).then(t => ({ key: `${p.type}/${p.id}`, title: t }))))
+        const map: Record<string, string> = {}
+        for (const entry of entries) if (entry.title) map[entry.key] = entry.title
+        setRelationTitles(map)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -63,9 +75,11 @@ export function EntityDetailPage() {
   )
 
   const m = entity.metadata_ as Record<string, unknown>
-  const title = String(m.name ?? m.title ?? m.label ?? entity.id)
+  const title = String(m.name ?? m.title ?? m.label ?? m.display_name ?? entity.id)
   const typeLabel = ENTITY_TYPE_LABELS[entity.entity_type] ?? entity.entity_type
   const description = String(m.description ?? '')
+
+  const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
 
   return (
     <div className="container page">
@@ -112,9 +126,7 @@ export function EntityDetailPage() {
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
                   const otitle = String(om.title ?? om.name ?? obj.idno ?? obj.id)
-                  const rel = relations.find(r =>
-                    r.from_id === obj.id || r.to_id === obj.id
-                  )
+                  const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
                   return (
                     <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
                       <div className="thumb" />
@@ -135,20 +147,20 @@ export function EntityDetailPage() {
           )}
 
           <RelationsList
-            relations={relations.filter(r =>
-              r.from_type !== 'object' && r.to_type !== 'object'
-            )}
+            relations={relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')}
             currentId={entity.id}
             resolveLabel={resolveRelationType}
+            titles={relationTitles}
           />
         </div>
 
         <aside className="detail-meta">
-          {Object.entries(m).map(([k, v]) =>
-            v && typeof v !== 'object' ? (
-              <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
-            ) : null
-          )}
+          {visibleFields.map(f => {
+            const rawValue = m[f.name]
+            const rendered = renderFieldValue(rawValue)
+            const href = f.field_type === 'authority' ? authorityUrl(rawValue) : undefined
+            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+          })}
           <MetaRow label="Typ" value={typeLabel} />
         </aside>
       </div>

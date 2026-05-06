@@ -1,0 +1,57 @@
+const AUTHORITY_BASE: Record<string, string> = {
+  gnd:       'https://d-nb.info/gnd/',
+  wikidata:  'https://www.wikidata.org/wiki/',
+  viaf:      'https://viaf.org/viaf/',
+  geonames:  'https://www.geonames.org/',
+  tgn:       'https://vocab.getty.edu/page/tgn/',
+  iconclass: 'https://iconclass.org/',
+}
+
+/** Returns the external URL for an authority field value, or undefined. */
+export function authorityUrl(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const obj = value as Record<string, unknown>
+  const source = typeof obj.source === 'string' ? obj.source : ''
+  const externalId = typeof obj.external_id === 'string' ? obj.external_id : ''
+  if (!source || !externalId) return undefined
+  const base = AUTHORITY_BASE[source]
+  return base ? base + externalId : undefined
+}
+
+/**
+ * Converts a metadata field value to a human-readable string for display.
+ * Returns null if the value is empty / should be skipped.
+ */
+export function renderFieldValue(value: unknown): string | null {
+  if (value == null) return null
+
+  // Authority entry: {source, external_id, label}
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if (typeof obj.label === 'string' && obj.label) return obj.label
+    if (typeof obj.value === 'string' && obj.value) return obj.value
+    return null
+  }
+
+  // Repeatable field stored as array
+  if (Array.isArray(value)) {
+    const parts = value
+      .map(item => {
+        if (typeof item === 'string') return item
+        if (typeof item === 'object' && item !== null) {
+          const o = item as Record<string, unknown>
+          if (typeof o.label === 'string' && o.label) return o.label
+          if (typeof o.value === 'string' && o.value) return o.value
+          if (typeof o.name === 'string' && o.name) return o.name
+        }
+        return null
+      })
+      .filter((s): s is string => s !== null && s !== '')
+    return parts.length > 0 ? parts.join(', ') : null
+  }
+
+  // Primitive
+  if (typeof value === 'boolean') return value ? 'Ja' : 'Nein'
+  const s = String(value)
+  return s || null
+}

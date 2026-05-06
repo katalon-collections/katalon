@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
-import { useFieldLabels } from '../hooks/useFieldLabels'
+import { api, BASE, fetchRecordTitle, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
+import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
+import { authorityUrl, renderFieldValue } from '../utils/renderFieldValue'
 
-
-
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
   return (
     <div className="meta-row">
       <span className="key">{label}</span>
-      <span className="val">{value}</span>
+      <span className="val">
+        {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
+      </span>
     </div>
   )
 }
@@ -40,8 +41,8 @@ export function ObjectDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewerError, setViewerError] = useState(false)
   const [relations, setRelations] = useState<Relation[]>([])
-  // Hooks must be called BEFORE any conditional returns
-  const fieldLabels = useFieldLabels('object')
+  const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
+  const fieldDefs = useFieldDefinitions('object')
   const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
 
@@ -53,7 +54,21 @@ export function ObjectDetailPage() {
       api.objects.media(id).catch(() => [] as MediaFile[]),
       api.relations.forRecord('object', id).catch(() => [] as Relation[]),
     ])
-      .then(([o, m, r]) => { setObj(o); setMediaFiles(m); setRelations(r) })
+      .then(([o, m, r]) => {
+        setObj(o)
+        setMediaFiles(m)
+        setRelations(r)
+        const pairs = r.map(rel => {
+          const isFrom = rel.from_id === o.id
+          return { type: isFrom ? rel.to_type : rel.from_type, id: isFrom ? rel.to_id : rel.from_id }
+        })
+        Promise.all(pairs.map(p => fetchRecordTitle(p.type, p.id).then(t => ({ key: `${p.type}/${p.id}`, title: t }))))
+          .then(entries => {
+            const map: Record<string, string> = {}
+            for (const e of entries) if (e.title) map[e.key] = e.title
+            setRelationTitles(map)
+          })
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -77,11 +92,12 @@ export function ObjectDetailPage() {
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
-  const excludedKeys = new Set(['description', 'keywords'])
   const showViewer = readyMedia.length > 0 && !viewerError
 
   const description = String(m.description ?? '')
   const ogImage = primaryMedia ? `${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
+
+  const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
 
   return (
     <div className="container page">
@@ -144,16 +160,18 @@ export function ObjectDetailPage() {
             relations={relations}
             currentId={obj.id}
             resolveLabel={resolveRelationType}
+            titles={relationTitles}
           />
         </div>
 
         <aside className="detail-meta">
           {obj.idno && <MetaRow label="Inventar-Nr." value={obj.idno} />}
-          {Object.entries(m).map(([k, v]) =>
-            !excludedKeys.has(k) && v && typeof v !== 'object'
-              ? <MetaRow key={k} label={fieldLabels[k] ?? k} value={String(v)} />
-              : null
-          )}
+          {visibleFields.map(f => {
+            const rawValue = m[f.name]
+            const rendered = renderFieldValue(rawValue)
+            const href = f.field_type === 'authority' ? authorityUrl(rawValue) : undefined
+            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+          })}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {readyMedia.length > 0 && (
               <>
