@@ -173,6 +173,33 @@ class PasswordChange(BaseModel):
     new_password: str
 
 
+# ---------------------------------------------------------------------------
+# API Keys
+# ---------------------------------------------------------------------------
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    expires_at: datetime | None = None
+
+
+class ApiKeyRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    key_prefix: str
+    is_active: bool
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime | None
+
+
+class ApiKeyCreated(ApiKeyRead):
+    """Returned only once at creation – contains the full plaintext key."""
+    key: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

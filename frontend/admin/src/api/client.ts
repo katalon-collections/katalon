@@ -316,3 +316,23 @@ export const oaiSets = {
   update: (id: string, data: OAISetPayload) => req<OAISet>(`/v1/oai-sets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/oai-sets/${id}`, { method: 'DELETE' }),
 }
+
+// API Keys
+import type { ApiKey, ApiKeyCreated } from '../types'
+
+export const apiKeys = {
+  /** List API keys for the current user */
+  listOwn: () => req<ApiKey[]>('/v1/users/me/api-keys'),
+  /** Create a new API key for the current user */
+  createOwn: (name: string, expires_at?: string | null) =>
+    req<ApiKeyCreated>('/v1/users/me/api-keys', { method: 'POST', body: JSON.stringify({ name, expires_at: expires_at ?? null }) }),
+  /** Revoke an API key owned by the current user */
+  revokeOwn: (keyId: string) => req<void>(`/v1/users/me/api-keys/${keyId}`, { method: 'DELETE' }),
+  /** (Admin) List API keys for a specific user */
+  listForUser: (userId: string) => req<ApiKey[]>(`/v1/users/${userId}/api-keys`),
+  /** (Admin) Create an API key for a specific user */
+  createForUser: (userId: string, name: string, expires_at?: string | null) =>
+    req<ApiKeyCreated>(`/v1/users/${userId}/api-keys`, { method: 'POST', body: JSON.stringify({ name, expires_at: expires_at ?? null }) }),
+  /** (Admin) Revoke an API key for a specific user */
+  revokeForUser: (userId: string, keyId: string) => req<void>(`/v1/users/${userId}/api-keys/${keyId}`, { method: 'DELETE' }),
+}

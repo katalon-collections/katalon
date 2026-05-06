@@ -1,12 +1,134 @@
 import { useState, useEffect } from 'react'
-import { req, BASE } from '../../api/client'
-import type { UserRead } from '../../types'
+import { req, BASE, apiKeys } from '../../api/client'
+import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
 
 const ROLES: Record<string, string> = {
   admin: 'Administrator',
   editor: 'Redakteur',
   cataloger: 'Katalogisierer',
   viewer: 'Betrachter',
+}
+
+function ApiKeysPanel({ userId }: { userId: string }) {
+  const [keys, setKeys] = useState<ApiKey[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [created, setCreated] = useState<ApiKeyCreated | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { loadKeys() }, [userId])
+
+  function loadKeys() {
+    setLoading(true)
+    apiKeys.listForUser(userId)
+      .then(setKeys)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  async function handleCreate() {
+    if (!newKeyName.trim()) return
+    setCreating(true)
+    setError(null)
+    setCreated(null)
+    try {
+      const result = await apiKeys.createForUser(userId, newKeyName.trim())
+      setCreated(result)
+      setNewKeyName('')
+      loadKeys()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function handleRevoke(keyId: string) {
+    if (!window.confirm('API-Schlüssel wirklich widerrufen?')) return
+    try {
+      await apiKeys.revokeForUser(userId, keyId)
+      loadKeys()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  return (
+    <div style={{ background: 'var(--bg-s, #f9fafb)', border: '1px solid var(--border-s)', borderRadius: 6, padding: '12px 16px', marginTop: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>API-Schlüssel</div>
+
+      {created && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 10, fontSize: 12 }}>
+          <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>✓ Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
+          <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
+            {created.key}
+          </code>
+          <button
+            className="btn sm gh"
+            style={{ marginTop: 6 }}
+            onClick={() => { navigator.clipboard.writeText(created.key) }}
+          >
+            Kopieren
+          </button>
+        </div>
+      )}
+
+      {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
+
+      {loading ? (
+        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Lade…</div>
+      ) : (
+        <>
+          {keys.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 10 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
+                  <th style={{ width: 80 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map(k => (
+                  <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
+                    <td style={{ padding: '4px 8px' }}>{k.name}</td>
+                    <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
+                      {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                      <button className="btn sm ico gh dn" onClick={() => handleRevoke(k.id)} title="Widerrufen">🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {keys.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>Keine API-Schlüssel vorhanden.</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              className="fld"
+              style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+              placeholder="Name des neuen Schlüssels"
+              value={newKeyName}
+              onChange={e => setNewKeyName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            />
+            <button className="btn sm pri" onClick={handleCreate} disabled={creating || !newKeyName.trim()}>
+              {creating ? '…' : 'Erstellen'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 export function ScreenUsers() {
@@ -20,6 +142,8 @@ export function ScreenUsers() {
   const [role, setRole] = useState('cataloger')
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadUsers()
@@ -79,6 +203,14 @@ export function ScreenUsers() {
     }
   }
 
+  function toggleKeys(userId: string) {
+    setExpandedKeys(prev => {
+      const next = new Set(prev)
+      next.has(userId) ? next.delete(userId) : next.add(userId)
+      return next
+    })
+  }
+
   return (
     <div className="scroll">
       <div className="ph">
@@ -129,40 +261,60 @@ export function ScreenUsers() {
                 <th>E-Mail</th>
                 <th>Rolle</th>
                 <th>Status</th>
+                <th>API-Schlüssel</th>
                 <th className="col-act" />
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id}>
-                  <td>{u.email}</td>
-                  <td>{ROLES[u.role] ?? u.role}</td>
-                  <td>
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      background: u.is_active ? '#dcfce7' : '#f3f4f6',
-                      color: u.is_active ? '#166534' : '#6b7280',
-                    }}>
-                      {u.is_active ? 'Aktiv' : 'Inaktiv'}
-                    </span>
-                  </td>
-                  <td className="col-act">
-                    <div className="row-actions">
-                      <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
-                        {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                <>
+                  <tr key={u.id}>
+                    <td>{u.email}</td>
+                    <td>{ROLES[u.role] ?? u.role}</td>
+                    <td>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        background: u.is_active ? '#dcfce7' : '#f3f4f6',
+                        color: u.is_active ? '#166534' : '#6b7280',
+                      }}>
+                        {u.is_active ? 'Aktiv' : 'Inaktiv'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn sm gh"
+                        onClick={() => toggleKeys(u.id)}
+                        title="API-Schlüssel verwalten"
+                        style={{ fontSize: 11 }}
+                      >
+                        {expandedKeys.has(u.id) ? '▲ Schlüssel' : '▼ Schlüssel'}
                       </button>
-                      <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
-                        🗑
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="col-act">
+                      <div className="row-actions">
+                        <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
+                          {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                        </button>
+                        <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
+                          🗑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedKeys.has(u.id) && (
+                    <tr key={`${u.id}-keys`}>
+                      <td colSpan={5} style={{ padding: '0 8px 12px' }}>
+                        <ApiKeysPanel userId={u.id} />
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan={4} className="empty">Keine Benutzer gefunden.</td></tr>
+                <tr><td colSpan={5} className="empty">Keine Benutzer gefunden.</td></tr>
               )}
             </tbody>
           </table>
