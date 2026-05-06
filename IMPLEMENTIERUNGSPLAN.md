@@ -93,10 +93,15 @@ Dateien (neu):
 - `frontend/admin/src/components/screens/ScreenPortalConfig.tsx`
 - `frontend/portal/src/hooks/usePortalConfig.ts`
 
-### Phase 9 – Authority-Plugin-System
-GND, Geonames, VIAF. Adapter-Klasse `AuthoritySource(ABC)` im Backend vorhanden.
-Endpoints `/v1/authority/search` und `/v1/authority/fetch` vorhanden, aber keine Adapter implementiert.
-Admin-UI: Dropdown im Feld-Editor, Autocomplete bei der Erfassung.
+### Phase 9 – Authority-Plugin-System ✅
+6 Adapter implementiert: GND (lobid.org), Geonames, VIAF, Wikidata, Getty TGN (SPARQL), ICONCLASS.
+Abstrakte Basisklasse `AuthoritySource(ABC)`, DB-Registry mit Lazy Loading, Cache-Invalidierung.
+Endpoints: `GET /v1/authorities/`, `/v1/authorities/search`, `/v1/authorities/fetch`.
+41 Unit-Tests (Adapter + Service-Layer) vollständig grün.
+
+**Noch offen:**
+- Admin-UI: Autocomplete-Feld bei der Erfassung (authority-Felder im Formular)
+- Admin-UI: Authority-Quelle pro Feld im Schema-Editor konfigurierbar
 
 ### Phase 10 – Importer-Wizard
 4-Schritte-Wizard: Upload → Mapping → Dry Run → Import.
@@ -123,12 +128,12 @@ Needs: ListSets, ResumptionToken für große Collections, Tests.
 
 ## Nächste Schritte (Reihenfolge)
 
-1. **Jetzt:** Daten erfassen → erste echte Objekte anlegen, Elasticsearch-Index befüllen
-2. **Danach:** Facettiertes Browsing im Portal fertigstellen (Filter greifen auf ES-Facetten)
-3. Portal-Konfiguration (welche Felder sichtbar)
-4. Relationen-Panel im Admin
-5. Snapshot-UI
-6. Importer-Wizard
+1. **Jetzt:** #78 Relation-Type-Labels aus Vokabular im Portal auflösen
+2. Admin-UI: Authority-Autocomplete in ScreenForm (Felder mit `field_type = "authority"`)
+3. Relationen-Panel im Admin-Formular (Phase 6.1)
+4. Snapshot-UI im Admin-Formular (Phase 7)
+5. Batch-Medienimport (Phase 10.1)
+6. Cantaloupe Tile-Generierung End-to-End (Issue #13)
 
 ---
 

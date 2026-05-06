@@ -15,7 +15,7 @@
 | 6     | Admin-UI (React + TypeScript, alle Screens)                       | ✅ Fertig                                                                                |
 | 7     | Elasticsearch + Versionierung (Snapshots)                         | ✅ Fertig (ES-Client, Search-Service, Celery-Reindex, GET /v1/search)                    |
 | 8     | Public-Portal (React) + Theme-System (Drop-in Bundles)            | ✅ Fertig (Homepage, Suche, Detail, Theme-aware)                                         |
-| 9     | Authority-Plugin-System (GND, Geonames)                           | ✅ Fertig (ABC, GND/Geonames-Adapter, /v1/authority/search+fetch)                        |
+| 9     | Authority-Plugin-System (GND, Geonames, VIAF, Wikidata, TGN, ICONCLASS) | ✅ Fertig (6 Adapter, DB-Registry, 41 Unit-Tests, /v1/authorities/search+fetch)     |
 | 10    | Smart Importer (Excel/CSV ETL)                                    | ✅ Fertig (CSV-Parse, Mapping, Dry-Run, Celery-Import, /v1/importer)                     |
 | 11    | OAI-PMH                                                           | ✅ Fertig (Identify, ListRecords, GetRecord, ListSets, ListMetadataFormats, Dublin Core) |
 | 12    | Hardening (Rate Limiting, Performance)                            | ✅ Fertig (slowapi 200 req/min, Unit-Tests health+importer+oai)                          |
@@ -42,10 +42,10 @@
 
 ## Nächste Aufgaben (priorisiert)
 
-### Priorität 1 — Portal-Detailseiten (offene Core-Issues)
+### Priorität 1 — Offene Core-Issues
 
-- [#77](https://github.com/karkraeg/Katalon/issues/77) „Zurück zur Suche" — letzte Suchanfrage auf Detailseiten wiederherstellen (post-mvp)
-- [#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen (post-mvp)
+- [#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen → **in Arbeit**
+- Admin-UI Authority-Autocomplete (Felder mit `field_type = "authority"` in ScreenForm)
 
 ### Priorität 2 — Deployment-Nacharbeit
 
@@ -53,8 +53,8 @@
 
 ### Priorität 3 — Langfristig
 
-- CRUD für weitere Admin-Typen (Entity, Place, Occurrence) vollständig ausbauen
-- IIIF-Viewer-Integration End-to-End (echte Manifests + Deep Zoom)
+- Batch-Medienimport (ZIP + CSV-Mapping, Issue #18)
+- IIIF-Viewer-Integration End-to-End (Issue #13)
 - Fehler- und Ladezustände in UI-Screens verbessern
 
 ---

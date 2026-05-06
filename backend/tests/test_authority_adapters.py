@@ -1,7 +1,10 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from katalon.integrations.gnd_adapter import GNDAdapter
+from katalon.integrations.geonames_adapter import GeonamesAdapter
+from katalon.integrations.tgn_adapter import TGNAdapter
+from katalon.integrations.iconclass_adapter import ICONCLASSAdapter
 from katalon.integrations.viaf_adapter import VIAFAdapter
 from katalon.integrations.wikidata_adapter import WikidataAdapter
 
@@ -239,3 +242,207 @@ async def test_wikidata_fetch_404_returns_none() -> None:
     with patch("katalon.integrations.wikidata_adapter.httpx.AsyncClient", _http({}, status=404)):
         hit = await WikidataAdapter().fetch("Q99999")
     assert hit is None
+
+
+# ── Geonames ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_geonames_search_parses_results() -> None:
+    data = {"geonames": [
+        {
+            "geonameId": 2950159,
+            "name": "Berlin",
+            "countryName": "Germany",
+            "fclName": "city, village,...",
+            "fcl": "P",
+            "lat": "52.52437",
+            "lng": "13.41053",
+        }
+    ]}
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http(data)):
+        hits = await GeonamesAdapter().search("berlin")
+    assert len(hits) == 1
+    assert hits[0].external_id == "2950159"
+    assert hits[0].label == "Berlin"
+    assert "Germany" in hits[0].description
+    assert hits[0].extra["lat"] == "52.52437"
+    assert hits[0].source == "geonames"
+
+
+@pytest.mark.asyncio
+async def test_geonames_search_empty_returns_empty() -> None:
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http({"geonames": []})):
+        hits = await GeonamesAdapter().search("xyz")
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_geonames_fetch_returns_hit() -> None:
+    data = {
+        "name": "Berlin",
+        "fclName": "Hauptstadt",
+        "lat": "52.52437",
+        "lng": "13.41053",
+        "countryName": "Germany",
+    }
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http(data)):
+        hit = await GeonamesAdapter().fetch("2950159")
+    assert hit is not None
+    assert hit.label == "Berlin"
+    assert hit.description == "Hauptstadt"
+    assert hit.extra["countryName"] == "Germany"
+
+
+@pytest.mark.asyncio
+async def test_geonames_fetch_404_returns_none() -> None:
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http({}, status=404)):
+        hit = await GeonamesAdapter().fetch("99999")
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_geonames_fetch_status_error_returns_none() -> None:
+    data = {"status": {"message": "the user does not exist.", "value": 10}}
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http(data)):
+        hit = await GeonamesAdapter().fetch("99999")
+    assert hit is None
+
+
+# ── TGN ───────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_tgn_search_parses_bindings() -> None:
+    data = {
+        "results": {
+            "bindings": [
+                {
+                    "place": {"value": "http://vocab.getty.edu/tgn/7003712"},
+                    "label": {"value": "Marrakech"},
+                    "lat": {"value": "31.63416"},
+                    "long": {"value": "-8.00028"},
+                }
+            ]
+        }
+    }
+    with patch("katalon.integrations.tgn_adapter.httpx.AsyncClient", _http(data)):
+        hits = await TGNAdapter().search("marrakesch")
+    assert len(hits) == 1
+    assert hits[0].external_id == "7003712"
+    assert hits[0].label == "Marrakech"
+    assert hits[0].extra["lat"] == "31.63416"
+    assert hits[0].source == "tgn"
+
+
+@pytest.mark.asyncio
+async def test_tgn_search_empty_bindings_returns_empty() -> None:
+    data = {"results": {"bindings": []}}
+    with patch("katalon.integrations.tgn_adapter.httpx.AsyncClient", _http(data)):
+        hits = await TGNAdapter().search("xyz")
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_tgn_fetch_parses_graph_prefers_german() -> None:
+    data = {
+        "@graph": [
+            {
+                "@id": "http://vocab.getty.edu/tgn/7003712",
+                "skos:prefLabel": [
+                    {"@value": "Marrakesch", "@language": "de"},
+                    {"@value": "Marrakech", "@language": "en"},
+                ],
+            }
+        ]
+    }
+    with patch("katalon.integrations.tgn_adapter.httpx.AsyncClient", _http(data)):
+        hit = await TGNAdapter().fetch("7003712")
+    assert hit is not None
+    assert hit.label == "Marrakesch"
+    assert hit.external_id == "7003712"
+    assert hit.source == "tgn"
+
+
+@pytest.mark.asyncio
+async def test_tgn_fetch_404_returns_none() -> None:
+    with patch("katalon.integrations.tgn_adapter.httpx.AsyncClient", _http({}, status=404)):
+        hit = await TGNAdapter().fetch("9999999")
+    assert hit is None
+
+
+# ── ICONCLASS ─────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_iconclass_fetch_prefers_german_label() -> None:
+    data = {
+        "txt": {"de": ["Madonna mit Kind"], "en": ["Madonna with Child"]},
+        "kw": {"de": ["Kunst", "Religion"]},
+        "p": ["71A"],
+    }
+    with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(data)):
+        hit = await ICONCLASSAdapter().fetch("71A1")
+    assert hit is not None
+    assert hit.label == "Madonna mit Kind"
+    assert "Kunst" in hit.description
+    assert hit.extra["broader"] == ["71A"]
+    assert hit.source == "iconclass"
+
+
+@pytest.mark.asyncio
+async def test_iconclass_fetch_fallback_to_english() -> None:
+    data = {
+        "txt": {"en": ["Madonna with Child"]},
+        "kw": {},
+        "p": [],
+    }
+    with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(data)):
+        hit = await ICONCLASSAdapter().fetch("71A1")
+    assert hit is not None
+    assert hit.label == "Madonna with Child"
+
+
+@pytest.mark.asyncio
+async def test_iconclass_fetch_not_found_returns_none() -> None:
+    with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http({}, status=404)):
+        hit = await ICONCLASSAdapter().fetch("9999")
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_iconclass_search_fetches_details_for_first_five() -> None:
+    adapter = ICONCLASSAdapter()
+    search_data = {"result": ["71A1", "71A2", "71A3"]}
+    detail_hit = AsyncMock(return_value=_http({"txt": {"de": ["Detail"]}, "kw": {}, "p": []}))
+
+    from katalon.integrations.authority import AuthorityHit
+    fake_detail = AuthorityHit(source="iconclass", external_id="71A1", label="Detail", description="")
+
+    with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(search_data)):
+        with patch.object(adapter, "_fetch_notation", AsyncMock(return_value=fake_detail)):
+            hits = await adapter.search("madonna")
+
+    assert len(hits) == 3
+    assert all(h.label == "Detail" for h in hits)
+
+
+@pytest.mark.asyncio
+async def test_iconclass_search_stubs_beyond_five() -> None:
+    adapter = ICONCLASSAdapter()
+    notations = [f"7{i}A1" for i in range(7)]
+    search_data = {"result": notations}
+
+    from katalon.integrations.authority import AuthorityHit
+    fake_detail = AuthorityHit(source="iconclass", external_id="x", label="Detail", description="")
+
+    with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(search_data)):
+        with patch.object(adapter, "_fetch_notation", AsyncMock(return_value=fake_detail)) as mock_fetch:
+            hits = await adapter.search("test")
+
+    assert len(hits) == 7
+    assert mock_fetch.call_count == 5
+    detail_hits = [h for h in hits if h.label == "Detail"]
+    stub_hits = [h for h in hits if h.label != "Detail"]
+    assert len(detail_hits) == 5
+    assert len(stub_hits) == 2
