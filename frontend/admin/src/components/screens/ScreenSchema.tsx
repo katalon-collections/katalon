@@ -41,10 +41,11 @@ type FieldFormState = {
   sort_order: number
   validation_regex: string
   authority_source: string
+  show_in_detail: boolean
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd' }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -60,6 +61,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     sort_order: f.sort_order,
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
+    show_in_detail: f.show_in_detail ?? true,
   }
 }
 
@@ -132,6 +134,10 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_repeatable} onChange={e => set('is_repeatable', e.target.checked)} />
               <span style={{ fontSize: 13 }}>Wiederholbar</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
+              <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
             </label>
           </div>
         </div>
@@ -331,6 +337,7 @@ export function ScreenSchema() {
       is_required: form.is_required,
       is_repeatable: form.is_repeatable,
       sort_order: form.sort_order,
+      show_in_detail: form.show_in_detail,
       settings: {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),

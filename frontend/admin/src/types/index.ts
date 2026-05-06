@@ -54,6 +54,7 @@ export interface FieldDefinition {
   is_repeatable: boolean
   sort_order: number
   settings: Record<string, unknown>
+  show_in_detail: boolean
 }
 
 export interface Vocabulary {

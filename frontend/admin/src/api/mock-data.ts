@@ -12,15 +12,15 @@ export const MOCK_OBJECTS: KatalonObject[] = [
 ]
 
 export const MOCK_FIELDS: FieldDefinition[] = [
-  { id: 'f1', target_type: 'object', target_subtype: null, name: 'title',       label: { de: 'Titel',            en: 'Title' },          field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 0,  settings: {} },
-  { id: 'f2', target_type: 'object', target_subtype: null, name: 'alt_titles',  label: { de: 'Weitere Titel',    en: 'Alt. Titles' },    field_type: 'text',     is_required: false, is_repeatable: true,  sort_order: 1,  settings: {} },
-  { id: 'f3', target_type: 'object', target_subtype: null, name: 'inventory',   label: { de: 'Inventar-Nr.',     en: 'Inventory No.' },  field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 2,  settings: {} },
-  { id: 'f4', target_type: 'object', target_subtype: null, name: 'creator',     label: { de: 'Urheber:in',       en: 'Creator' },        field_type: 'relation', is_required: false, is_repeatable: true,  sort_order: 3,  settings: {} },
-  { id: 'f5', target_type: 'object', target_subtype: null, name: 'date',        label: { de: 'Datierung',        en: 'Date' },           field_type: 'date',     is_required: false, is_repeatable: false, sort_order: 4,  settings: {} },
-  { id: 'f6', target_type: 'object', target_subtype: null, name: 'medium',      label: { de: 'Material/Technik', en: 'Medium' },         field_type: 'vocab',    is_required: false, is_repeatable: false, sort_order: 5,  settings: { vocabulary: 'photo_medium' } },
-  { id: 'f7', target_type: 'object', target_subtype: null, name: 'tags',        label: { de: 'Schlagwörter',     en: 'Tags' },           field_type: 'vocab',    is_required: false, is_repeatable: true,  sort_order: 6,  settings: { vocabulary: 'iconclass' } },
-  { id: 'f8', target_type: 'object', target_subtype: null, name: 'rights',      label: { de: 'Rechtevermerk',    en: 'Rights' },         field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 7,  settings: {} },
-  { id: 'f9', target_type: 'object', target_subtype: null, name: 'description', label: { de: 'Beschreibung',     en: 'Description' },    field_type: 'richtext', is_required: false, is_repeatable: false, sort_order: 8,  settings: {} },
+  { id: 'f1', target_type: 'object', target_subtype: null, name: 'title',       label: { de: 'Titel',            en: 'Title' },          field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 0,  settings: {}, show_in_detail: true },
+  { id: 'f2', target_type: 'object', target_subtype: null, name: 'alt_titles',  label: { de: 'Weitere Titel',    en: 'Alt. Titles' },    field_type: 'text',     is_required: false, is_repeatable: true,  sort_order: 1,  settings: {}, show_in_detail: true },
+  { id: 'f3', target_type: 'object', target_subtype: null, name: 'inventory',   label: { de: 'Inventar-Nr.',     en: 'Inventory No.' },  field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 2,  settings: {}, show_in_detail: true },
+  { id: 'f4', target_type: 'object', target_subtype: null, name: 'creator',     label: { de: 'Urheber:in',       en: 'Creator' },        field_type: 'relation', is_required: false, is_repeatable: true,  sort_order: 3,  settings: {}, show_in_detail: true },
+  { id: 'f5', target_type: 'object', target_subtype: null, name: 'date',        label: { de: 'Datierung',        en: 'Date' },           field_type: 'date',     is_required: false, is_repeatable: false, sort_order: 4,  settings: {}, show_in_detail: true },
+  { id: 'f6', target_type: 'object', target_subtype: null, name: 'medium',      label: { de: 'Material/Technik', en: 'Medium' },         field_type: 'vocab',    is_required: false, is_repeatable: false, sort_order: 5,  settings: { vocabulary: 'photo_medium' }, show_in_detail: true },
+  { id: 'f7', target_type: 'object', target_subtype: null, name: 'tags',        label: { de: 'Schlagwörter',     en: 'Tags' },           field_type: 'vocab',    is_required: false, is_repeatable: true,  sort_order: 6,  settings: { vocabulary: 'iconclass' }, show_in_detail: true },
+  { id: 'f8', target_type: 'object', target_subtype: null, name: 'rights',      label: { de: 'Rechtevermerk',    en: 'Rights' },         field_type: 'text',     is_required: true,  is_repeatable: false, sort_order: 7,  settings: {}, show_in_detail: true },
+  { id: 'f9', target_type: 'object', target_subtype: null, name: 'description', label: { de: 'Beschreibung',     en: 'Description' },    field_type: 'richtext', is_required: false, is_repeatable: false, sort_order: 8,  settings: {}, show_in_detail: false },
 ]
 
 export const MOCK_VOCABS: Vocabulary[] = [

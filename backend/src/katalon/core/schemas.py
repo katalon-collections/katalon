@@ -28,6 +28,7 @@ class FieldDefinitionCreate(BaseModel):
     is_repeatable: bool = False
     sort_order: int = 0
     settings: dict = {}
+    show_in_detail: bool = True
 
 
 class FieldDefinitionRead(FieldDefinitionCreate):
