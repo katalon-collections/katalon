@@ -12,7 +12,7 @@ from katalon.integrations.elasticsearch import (
 
 def _extract_title(md: dict) -> str:
     """Extract a display title from metadata, handling both plain strings and repeatable-field lists."""
-    for key in ("title", "name", "label"):
+    for key in ("title", "name", "display_name", "place_name", "label"):
         val = md.get(key)
         if not val:
             continue
