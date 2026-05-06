@@ -1,6 +1,6 @@
 # Katalon – Fortschrittsplan
 
-> Letzte Aktualisierung: 2026-05-04
+> Letzte Aktualisierung: 2026-05-06
 
 ## Implementierungsstatus
 
@@ -24,36 +24,32 @@
 
 ## Post-MVP Erweiterungen (umgesetzt)
 
-| Feature                                        | Branch / Commit       | Beschreibung                                                      |
-|------------------------------------------------|-----------------------|-------------------------------------------------------------------|
-| Statische Seiten (Admin)                       | feat/static-pages     | ScreenPages, CRUD `/v1/pages`                                     |
-| Facetten-Konfiguration (Portal-Settings)       | —                     | `facet_fields` in PortalConfig                                    |
-| Portal-Farbkonfiguration                       | fix/pages-sidebar-…   | `color_tokens` JSONB, Migration 0008, Color-Picker in Settings    |
-| Logo-Upload                                    | fix/pages-sidebar-…   | `POST /v1/portal/logo`, `GET /v1/portal/logo/file`, Upload-UI     |
-| Settings nur für Admins                        | fix/pages-sidebar-…   | Route-Guard in AppShell, Sidebar-Filter                           |
-| Schema-Import Hilfe                            | fix/pages-sidebar-…   | `<details>`-Hilfetext mit YAML-Beispiel im ImportModal            |
+| Feature                                        | PR    | Beschreibung                                                                          |
+|------------------------------------------------|-------|---------------------------------------------------------------------------------------|
+| Statische Seiten (Admin)                       | #80   | ScreenPages, CRUD `/v1/pages`                                                         |
+| Facetten-Konfiguration (Portal-Settings)       | —     | `facet_fields` in PortalConfig                                                        |
+| Portal-Farbkonfiguration                       | #82   | `color_tokens` JSONB, Migration 0008, Color-Picker in Settings                        |
+| Logo-Upload                                    | #82   | `POST /v1/portal/logo`, `GET /v1/portal/logo/file`, Upload-UI                         |
+| Settings nur für Admins                        | #82   | Route-Guard in AppShell, Sidebar-Filter                                               |
+| Schema-Import Hilfe                            | #82   | `<details>`-Hilfetext mit YAML-Beispiel im ImportModal                                |
+| Markdown-Rendering StaticPageView              | #87   | `marked` + `DOMPurify`, `.prose`-CSS-Klasse (Closes #72)                              |
+| OpenGraph- und Meta-Tags                       | #88   | `react-helmet-async`, alle 4 Detailseiten + StaticPageView (Closes #74)               |
+| IIIF `link:alternate` im `<head>`              | #88   | `<link rel="alternate" type="application/ld+json">` auf ObjectDetailPage (Closes #75) |
+| Karte auf PlaceDetailPage                      | —     | OSM-iframe mit Marker, graceful degradation (Closes #73)                              |
+| Relation-Facetten beim Objekt-Browsing         | #89   | Denormalisierung in ES, 3 neue FacetPanel, URL-Filter (Closes #83)                    |
 
 ---
 
 ## Nächste Aufgaben (priorisiert)
 
-### Priorität 1 — Relation-Facetten im Portal (Issue #83)
+### Priorität 1 — Portal-Detailseiten (offene Core-Issues)
 
-Beim Objekt-Browsing nach verknüpften Entitäten/Orten/Occurrences filtern können.
+- [#77](https://github.com/karkraeg/Katalon/issues/77) „Zurück zur Suche" — letzte Suchanfrage auf Detailseiten wiederherstellen (post-mvp)
+- [#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen (post-mvp)
 
-**Technischer Ansatz:**
-- Denormalisierung: beim Indexieren eines Objekts Titel der verknüpften Records als `related_entities`, `related_places`, `related_occurrences` (keyword) in ES-Doc einbetten
-- `ensure_index` + `put_mapping` für neue Felder
-- Search-API: `rel_entity`/`rel_place`/`rel_occurrence`-Filter, dedizierte Aggregationen
-- Portal-Frontend: 3 neue FacetPanels, URL-Params
+### Priorität 2 — Deployment-Nacharbeit
 
-→ Nach Deployment einmaliger Reindex: `POST /v1/search/reindex`
-
-### Priorität 2 — Portal-Detailseiten
-
-- [#75](https://github.com/karkraeg/Katalon/issues/75) IIIF-Manifest-Link auf ObjectDetailPage
-- [#77](https://github.com/karkraeg/Katalon/issues/77) „Zurück zur Suche" — letzte Suchanfrage wiederherstellen
-- [#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen
+- Nach nächstem Deployment: `POST /v1/search/reindex` aufrufen (Relation-Daten in bestehende ES-Dokumente einbetten)
 
 ### Priorität 3 — Langfristig
 

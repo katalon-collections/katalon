@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-01
+## Stand: 2026-05-06
 
 ---
 
@@ -55,16 +55,21 @@ Snapshot-Endpoints im Backend vorhanden.
 - Snapshot-UI in Admin-Formular (Knopf + Versionsliste)
 - Re-Index-Task via Celery (Massenreindex bei Schema-Änderungen)
 
-### Phase 8 – Public-Portal ⚠️
-Homepage, Suchergebnisse, Objekt-Detail-Seite an echte API verdrahtet.
+### Phase 8 – Public-Portal ✅ (mit laufenden Verbesserungen)
+Homepage, Suchergebnisse, alle 4 Detailseiten, Theme-System.
 Portal-Container liefert Static Files korrekt aus, nginx proxied `/v1/` zum API.
 
-**Noch offen – Priorität hoch:**
-- **Facettiertes Browsing**: Elasticsearch liefert Facetten (`by_type`, `by_status`), aber die Filterfunktion im Portal ist noch nicht vollständig (Typ-Filter existiert, Datums- und Metadaten-Facetten fehlen)
-- **Portal-Konfiguration**: Welche Felder in Suchergebnissen/Detailseite erscheinen, ist hardcodiert. Admin-seitige Konfigurationsmöglichkeit (`/v1/theme`) existiert im Backend, aber keine UI.
-- IIIF-Viewer (Placeholder – wartet auf Cantaloupe-Tiles)
-- Entitäts-Detail-Seite
-- Orts-Detail-Seite (mit Karte)
+**Neu seit 2026-05-06:**
+- Markdown-Rendering in StaticPageView (marked + DOMPurify, #72)
+- Karte auf PlaceDetailPage (OSM-iframe, #73)
+- OpenGraph/Meta-Tags auf allen Detailseiten (react-helmet-async, #74)
+- IIIF `link:alternate` im `<head>` auf ObjectDetailPage (#75)
+- Relation-Facetten beim Objekt-Browsing (denormalisiert in ES, #83)
+
+**Noch offen:**
+- IIIF-Viewer (Cantaloupe-Tiles noch nicht End-to-End verdrahtet)
+- „Zurück zur Suche" auf Detailseiten (#77, post-mvp)
+- Relation-Type-Labels aus Vokabular (#78, post-mvp)
 
 ---
 
