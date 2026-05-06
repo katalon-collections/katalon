@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { schema } from '../../api/client'
+import { schema, vocabularies } from '../../api/client'
 import type { SchemaImportResult } from '../../api/client'
-import type { FieldDefinition } from '../../types'
+import type { FieldDefinition, Vocabulary } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
 const TYPES = [
@@ -42,10 +42,11 @@ type FieldFormState = {
   validation_regex: string
   authority_source: string
   show_in_detail: boolean
+  vocabulary_id: string
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, vocabulary_id: '' }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -62,6 +63,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
     show_in_detail: f.show_in_detail ?? true,
+    vocabulary_id: (f.settings?.vocabulary_id as string) ?? '',
   }
 }
 
@@ -81,6 +83,11 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
   function set<K extends keyof FieldFormState>(key: K, value: FieldFormState[K]) {
     onChange({ ...form, [key]: value })
   }
+
+  const [allVocabs, setAllVocabs] = useState<Vocabulary[]>([])
+  useEffect(() => {
+    vocabularies.list().then(setAllVocabs).catch(() => {})
+  }, [])
 
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
@@ -154,6 +161,15 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             <div className="lbl">Normdaten-Quelle</div>
             <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
               {AUTHORITY_SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+        )}
+        {form.field_type === 'vocab' && (
+          <div className="field">
+            <div className="lbl">Vokabular <span className="req">*</span></div>
+            <select className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
+              <option value="">— Vokabular wählen —</option>
+              {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
         )}
@@ -341,6 +357,7 @@ export function ScreenSchema() {
       settings: {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
+        ...(form.field_type === 'vocab' && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
       },
     }
     try {

@@ -20,6 +20,126 @@ const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
 }
 
 export type AuthorityEntry = { source: string; external_id: string; label: string }
+export type VocabEntry = { id: string; label: string }
+
+function VocabInput({ vocabId, value, onChange, disabled }: {
+  vocabId: string
+  value: VocabEntry | null
+  onChange: (v: VocabEntry | null) => void
+  disabled?: boolean
+}) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<VocabularyTerm[]>([])
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node
+      if (inputRef.current?.contains(t) || dropRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      const spaceAbove = r.top - 8
+      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+      setDropPos({
+        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+        left: r.left,
+        width: r.width,
+        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+      })
+    }
+  }, [open])
+
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (!vocabId || q.trim().length < 1) { setResults([]); setOpen(false); return }
+    timer.current = setTimeout(() => {
+      setBusy(true)
+      vocabularies.searchTerms(vocabId, q.trim())
+        .then(r => { setResults(r); setOpen(r.length > 0) })
+        .catch(() => setResults([]))
+        .finally(() => setBusy(false))
+    }, 200)
+    return () => clearTimeout(timer.current)
+  }, [q, vocabId])
+
+  function pick(term: VocabularyTerm) {
+    onChange({ id: term.id, label: term.label.de ?? term.label.en ?? term.term })
+    setQ(''); setResults([]); setOpen(false)
+  }
+
+  if (value) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '3px 8px', borderRadius: 4,
+          background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+        }}>
+          {value.label}
+        </span>
+        {!disabled && (
+          <button className="btn sm ico gh" onClick={() => onChange(null)} title="Entfernen">
+            <X size={12} />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        className="fld"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder={vocabId ? 'Tippen zum Suchen…' : 'Kein Vokabular zugewiesen'}
+        disabled={disabled || !vocabId}
+      />
+      {busy && (
+        <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
+          Suche…
+        </div>
+      )}
+      {open && results.length > 0 && dropPos && (
+        <div ref={dropRef} style={{
+          position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
+          background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
+        }}>
+          {results.map(term => (
+            <button
+              key={term.id}
+              onMouseDown={e => { e.preventDefault(); pick(term) }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)',
+                background: 'none', cursor: 'pointer',
+              }}
+              className="authority-hit"
+            >
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{term.label.de ?? term.label.en ?? term.term}</div>
+              <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{term.term}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function AuthorityInput({ source, value, onChange, disabled }: {
   source: string
@@ -403,6 +523,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setValues(v => ({ ...v, [name]: ((v[name] as AuthorityEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
+  function setVocab(name: string, val: VocabEntry | null) {
+    setValues(v => ({ ...v, [name]: val ?? undefined }))
+  }
+  function addVocab(name: string, val: VocabEntry) {
+    const cur = (values[name] as VocabEntry[] | undefined) ?? []
+    setValues(v => ({ ...v, [name]: [...cur, val] }))
+  }
+  function removeVocab(name: string, idx: number) {
+    setValues(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
+  }
+
   function validateFields(): Record<string, string> {
     const errors: Record<string, string> = {}
     // idno is required for all record types
@@ -659,7 +790,44 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                         {repeatable && <span className="h">wiederholbar</span>}
                       </div>
 
-                      {f.field_type === 'authority' ? (
+                      {f.field_type === 'vocab' ? (
+                        repeatable ? (
+                          <>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                              {((val as VocabEntry[] | undefined) ?? []).map((entry, i) => (
+                                <span key={i} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                                  padding: '3px 8px', borderRadius: 4,
+                                  background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+                                }}>
+                                  {entry.label}
+                                  <button
+                                    className="btn sm ico gh"
+                                    style={{ marginLeft: 2, padding: 0 }}
+                                    onClick={() => removeVocab(f.name, i)}
+                                    disabled={justCreated}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <VocabInput
+                              vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                              value={null}
+                              onChange={v => { if (v) addVocab(f.name, v) }}
+                              disabled={justCreated}
+                            />
+                          </>
+                        ) : (
+                          <VocabInput
+                            vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                            value={(val as VocabEntry | undefined) ?? null}
+                            onChange={v => setVocab(f.name, v)}
+                            disabled={justCreated}
+                          />
+                        )
+                      ) : f.field_type === 'authority' ? (
                         repeatable ? (
                           <>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
