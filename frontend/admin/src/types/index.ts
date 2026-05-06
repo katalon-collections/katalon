@@ -150,3 +150,19 @@ export interface UserRead {
   is_active: boolean
   created_at: string
 }
+
+export interface ApiKey {
+  id: string
+  user_id: string
+  name: string
+  key_prefix: string
+  is_active: boolean
+  created_at: string
+  last_used_at: string | null
+  expires_at: string | null
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  /** The full plaintext key – only available immediately after creation */
+  key: string
+}

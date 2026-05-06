@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE } from '../../api/client'
-import type { PortalConfigRead } from '../../types'
+import { req, BASE, apiKeys } from '../../api/client'
+import type { ApiKey, ApiKeyCreated, PortalConfigRead } from '../../types'
 
 interface Props {
   onNavigate?: (route: string) => void
@@ -34,6 +34,48 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [pwdConfirm, setPwdConfirm] = useState('')
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState(false)
+
+  const [ownKeys, setOwnKeys] = useState<ApiKey[]>([])
+  const [ownKeysLoading, setOwnKeysLoading] = useState(true)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [keyCreating, setKeyCreating] = useState(false)
+  const [keyCreated, setKeyCreated] = useState<ApiKeyCreated | null>(null)
+  const [keyError, setKeyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiKeys.listOwn()
+      .then(setOwnKeys)
+      .catch(() => {/* silently ignore */})
+      .finally(() => setOwnKeysLoading(false))
+  }, [])
+
+  async function handleCreateOwnKey() {
+    if (!newKeyName.trim()) return
+    setKeyCreating(true)
+    setKeyError(null)
+    setKeyCreated(null)
+    try {
+      const result = await apiKeys.createOwn(newKeyName.trim())
+      setKeyCreated(result)
+      setNewKeyName('')
+      const updated = await apiKeys.listOwn()
+      setOwnKeys(updated)
+    } catch (e) {
+      setKeyError((e as Error).message)
+    } finally {
+      setKeyCreating(false)
+    }
+  }
+
+  async function handleRevokeOwnKey(keyId: string) {
+    if (!window.confirm('API-Schlüssel wirklich widerrufen?')) return
+    try {
+      await apiKeys.revokeOwn(keyId)
+      setOwnKeys(prev => prev.filter(k => k.id !== keyId))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -255,6 +297,72 @@ export function ScreenSettings({ onNavigate }: Props) {
               {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
               {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
               <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="hd">API-Schlüssel</div>
+            <div className="bd">
+              <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+                API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
+              </p>
+
+              {keyCreated && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>✓ Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
+                  <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
+                    {keyCreated.key}
+                  </code>
+                  <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated.key)}>
+                    Kopieren
+                  </button>
+                </div>
+              )}
+
+              {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
+
+              {!ownKeysLoading && ownKeys.length > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
+                      <th style={{ width: 60 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ownKeys.map(k => (
+                      <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
+                        <td style={{ padding: '4px 8px' }}>{k.name}</td>
+                        <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
+                        <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
+                        <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
+                          {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
+                        </td>
+                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                          <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  className="fld"
+                  style={{ flex: 1 }}
+                  placeholder="Name des neuen Schlüssels"
+                  value={newKeyName}
+                  onChange={e => setNewKeyName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
+                />
+                <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
+                  {keyCreating ? 'Erstelle…' : 'Erstellen'}
+                </button>
+              </div>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ from katalon.api.v1 import (
     auth, audit, authority, entities, importer, media, objects,
     occurrences, oai, oai_sets, pages, places, portal, relations, schema_admin, search, theme, users, vocabularies,
 )
+from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
 from katalon.core.models import AuthoritySource as AuthoritySourceModel, PortalConfig, User, Vocabulary, VocabularyTerm
@@ -144,6 +145,7 @@ app.include_router(authority.router, prefix="/v1")
 app.include_router(importer.router, prefix="/v1")
 app.include_router(oai.router, prefix="/v1")
 app.include_router(oai_sets.router, prefix="/v1")
+app.include_router(api_keys_router, prefix="/v1")
 
 
 @app.get("/health", tags=["system"])
