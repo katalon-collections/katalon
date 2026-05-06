@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
+import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 
 function MetaRow({ label, value }: { label: string; value: string }) {
@@ -28,6 +30,7 @@ export function OccurrenceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldLabels = useFieldLabels('occurrence')
+  const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
 
   useEffect(() => {
@@ -108,11 +111,19 @@ export function OccurrenceDetailPage() {
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
                   const otitle = String(om.title ?? om.name ?? obj.idno ?? obj.id)
+                  const rel = relations.find(r =>
+                    r.from_id === obj.id || r.to_id === obj.id
+                  )
                   return (
                     <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
                       <div className="thumb" />
                       <div className="info">
                         <div className="title">{otitle}</div>
+                        {rel && (
+                          <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
+                            {resolveRelationType(rel.relation_type)}
+                          </div>
+                        )}
                         {obj.idno && <div className="meta">{obj.idno}</div>}
                       </div>
                     </div>
@@ -121,6 +132,14 @@ export function OccurrenceDetailPage() {
               </div>
             </section>
           )}
+
+          <RelationsList
+            relations={relations.filter(r =>
+              r.from_type !== 'object' && r.to_type !== 'object'
+            )}
+            currentId={occurrence.id}
+            resolveLabel={resolveRelationType}
+          />
         </div>
 
         <aside className="detail-meta">
@@ -130,11 +149,6 @@ export function OccurrenceDetailPage() {
             ) : null
           )}
           <MetaRow label="Typ" value={typeLabel} />
-          {relations.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-3)' }}>
-              {relations.length} Verknüpfung{relations.length !== 1 ? 'en' : ''}
-            </div>
-          )}
         </aside>
       </div>
     </div>

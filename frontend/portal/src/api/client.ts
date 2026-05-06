@@ -74,6 +74,9 @@ export interface SearchResponse {
   facets: Record<string, FacetBucket[]>
 }
 
+export interface VocabSummary { id: string; name: string; is_hierarchical: boolean }
+export interface VocabTerm { id: string; term: string; label: Record<string, string>; parent_id: string | null }
+
 export const api = {
   objects: {
     list: (p?: { page?: number; q?: string; status?: string; page_size?: number }) => {
@@ -110,6 +113,10 @@ export const api = {
   pages: {
     list: () => get<StaticPageSummary[]>('/v1/pages'),
     get:  (slug: string) => get<StaticPageSummary>(`/v1/pages/${slug}`),
+  },
+  vocabularies: {
+    list: () => get<VocabSummary[]>('/v1/vocabularies'),
+    terms: (id: string) => get<VocabTerm[]>(`/v1/vocabularies/${id}/terms`),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; [key: string]: string | number | undefined }) => {

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
+import { api, BASE, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
+import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 
 
@@ -37,8 +39,10 @@ export function ObjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewerError, setViewerError] = useState(false)
-  // Hook must be called BEFORE any conditional returns
+  const [relations, setRelations] = useState<Relation[]>([])
+  // Hooks must be called BEFORE any conditional returns
   const fieldLabels = useFieldLabels('object')
+  const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
 
   useEffect(() => {
@@ -47,8 +51,9 @@ export function ObjectDetailPage() {
     Promise.all([
       api.objects.get(id),
       api.objects.media(id).catch(() => [] as MediaFile[]),
+      api.relations.forRecord('object', id).catch(() => [] as Relation[]),
     ])
-      .then(([o, m]) => { setObj(o); setMediaFiles(m) })
+      .then(([o, m, r]) => { setObj(o); setMediaFiles(m); setRelations(r) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -134,6 +139,12 @@ export function ObjectDetailPage() {
               {(m.keywords as string[]).map((t, i) => <span key={i} className="tag">{t}</span>)}
             </div>
           )}
+
+          <RelationsList
+            relations={relations}
+            currentId={obj.id}
+            resolveLabel={resolveRelationType}
+          />
         </div>
 
         <aside className="detail-meta">
