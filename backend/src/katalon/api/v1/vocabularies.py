@@ -1,8 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import Vocabulary, VocabularyTerm
@@ -66,12 +66,24 @@ async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
 # ---------------------------------------------------------------------------
 
 @router.get("/{vocab_id}/terms", response_model=list[VocabularyTermRead])
-async def list_terms(vocab_id: uuid.UUID, db: DBDep) -> list[VocabularyTerm]:
-    result = await db.execute(
+async def list_terms(
+    vocab_id: uuid.UUID,
+    db: DBDep,
+    q: str | None = Query(None, description="Search term (filters by term or label)"),
+) -> list[VocabularyTerm]:
+    stmt = (
         select(VocabularyTerm)
         .where(VocabularyTerm.vocabulary_id == vocab_id)
         .order_by(VocabularyTerm.term)
+        .limit(20)
     )
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        stmt = stmt.where(
+            (VocabularyTerm.term.ilike(pattern))
+            | (text("label::text ILIKE :pattern").bindparams(pattern=pattern))
+        )
+    result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
