@@ -62,6 +62,7 @@ export interface PortalConfig {
   facet_fields: string[]
   accent_color: string
   logo_url: string
+  placeholder_image_url: string
   color_tokens: Record<string, string>
 }
 

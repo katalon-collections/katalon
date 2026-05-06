@@ -19,6 +19,7 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [siteSubtitle, setSiteSubtitle] = useState('')
   const [heroText, setHeroText] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [placeholderImageUrl, setPlaceholderImageUrl] = useState('')
   const [featuredIds, setFeaturedIds] = useState('')
   const [facetFields, setFacetFields] = useState('')
   const [accentColor, setAccentColor] = useState('')
@@ -28,6 +29,9 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [panelBg, setPanelBg] = useState('')
 
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
+
+  const [reindexing, setReindexing] = useState<string | null>(null)
+  const [reindexMsg, setReindexMsg] = useState<string | null>(null)
 
   const [pwdCurrent, setPwdCurrent] = useState('')
   const [pwdNew, setPwdNew] = useState('')
@@ -86,6 +90,7 @@ export function ScreenSettings({ onNavigate }: Props) {
         setSiteSubtitle(c.site_subtitle)
         setHeroText(c.hero_text)
         setLogoUrl(c.logo_url)
+        setPlaceholderImageUrl(c.placeholder_image_url ?? '')
         setFeaturedIds((c.featured_object_ids ?? []).join('\n'))
         setFacetFields((c.facet_fields ?? []).join('\n'))
         setAccentColor(c.accent_color)
@@ -111,6 +116,7 @@ export function ScreenSettings({ onNavigate }: Props) {
           site_subtitle: siteSubtitle,
           hero_text: heroText,
           logo_url: logoUrl,
+          placeholder_image_url: placeholderImageUrl,
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
           facet_fields: facetFields.split('\n').map(s => s.trim()).filter(Boolean),
           accent_color: accentColor,
@@ -151,6 +157,23 @@ export function ScreenSettings({ onNavigate }: Props) {
       setError((e as Error).message)
     } finally {
       setLogoUploading(false)
+    }
+  }
+
+  async function handleReindex(type?: string) {
+    const key = type ?? 'all'
+    if (!window.confirm(type ? `Alle ${type}-Datensätze neu indizieren?` : 'Alle Datensätze vollständig neu indizieren?')) return
+    setReindexing(key)
+    setReindexMsg(null)
+    try {
+      const url = type ? `${BASE}/v1/search/reindex/${type}` : `${BASE}/v1/search/reindex`
+      await req(url, { method: 'POST' })
+      setReindexMsg('Reindizierung gestartet — läuft im Hintergrund.')
+      setTimeout(() => setReindexMsg(null), 5000)
+    } catch (e) {
+      setReindexMsg(`Fehler: ${(e as Error).message}`)
+    } finally {
+      setReindexing(null)
     }
   }
 
@@ -230,6 +253,15 @@ export function ScreenSettings({ onNavigate }: Props) {
                 </div>
                 <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
                   placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
+              </div>
+              <div className="field">
+                <div className="lbl">Platzhalter-Bild <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(für Objekte ohne Bild)</span></div>
+                <input className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)}
+                  placeholder="https://..." style={{ fontSize: 12 }} />
+                {placeholderImageUrl && (
+                  <img src={placeholderImageUrl} alt="Platzhalter-Vorschau"
+                    style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />
+                )}
               </div>
               <div className="field">
                 <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
@@ -361,6 +393,41 @@ export function ScreenSettings({ onNavigate }: Props) {
                 />
                 <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
                   {keyCreating ? 'Erstelle…' : 'Erstellen'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="hd">Suche &amp; Indexierung</div>
+            <div className="bd">
+              <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+                Nach Schema-Änderungen oder Datenimporten muss der Suchindex manuell aktualisiert werden.
+                Die Reindizierung läuft asynchron im Hintergrund.
+              </p>
+              {reindexMsg && (
+                <div style={{ fontSize: 12, color: reindexMsg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
+                  {reindexMsg}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {(['object', 'entity', 'place', 'occurrence'] as const).map(t => (
+                  <button
+                    key={t}
+                    className="btn sm gh"
+                    onClick={() => handleReindex(t)}
+                    disabled={reindexing !== null}
+                  >
+                    {reindexing === t ? 'Läuft…' : `${t} reindizieren`}
+                  </button>
+                ))}
+                <button
+                  className="btn sm pri"
+                  onClick={() => handleReindex()}
+                  disabled={reindexing !== null}
+                  style={{ marginLeft: 8 }}
+                >
+                  {reindexing === 'all' ? 'Läuft…' : 'Alles reindizieren'}
                 </button>
               </div>
             </div>

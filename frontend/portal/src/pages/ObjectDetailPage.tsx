@@ -7,6 +7,7 @@ import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
+import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, renderFieldValue } from '../utils/renderFieldValue'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
@@ -45,6 +46,7 @@ export function ObjectDetailPage() {
   const fieldDefs = useFieldDefinitions('object')
   const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
+  const portalConfig = usePortalConfig()
 
   useEffect(() => {
     if (!id) return
@@ -138,6 +140,12 @@ export function ObjectDetailPage() {
             <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
           ) : primaryMedia ? (
             <ViewerFallback objectId={obj.id} media={primaryMedia} />
+          ) : portalConfig.placeholder_image_url ? (
+            <img
+              src={portalConfig.placeholder_image_url}
+              alt=""
+              style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+            />
           ) : (
             <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
               Kein Bild verfügbar

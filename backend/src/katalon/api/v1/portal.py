@@ -32,6 +32,7 @@ _DEFAULTS = {
     "featured_object_ids": [],
     "accent_color": "#1e3a8a",
     "logo_url": "",
+    "placeholder_image_url": "",
     "facet_fields": [],
     "color_tokens": {},
 }
@@ -45,6 +46,7 @@ class PortalConfigRead(BaseModel):
     facet_fields: list[str]
     accent_color: str
     logo_url: str
+    placeholder_image_url: str
     color_tokens: dict
 
     class Config:
@@ -59,6 +61,7 @@ class PortalConfigUpdate(BaseModel):
     facet_fields: list[str] | None = None
     accent_color: str | None = None
     logo_url: str | None = None
+    placeholder_image_url: str | None = None
     color_tokens: dict | None = None
 
 
