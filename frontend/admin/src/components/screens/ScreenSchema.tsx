@@ -13,11 +13,21 @@ const TYPES = [
 
 const SUBTYPE_TYPES = new Set(['entity', 'occurrence'])
 
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo', 'pid'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo', 'pid', 'authority'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
   boolean: 'Boolean', vocab: 'Vokabular', relation: 'Relation', geo: 'Geodaten', pid: 'PID',
+  authority: 'Normdaten (Authority)',
 }
+
+const AUTHORITY_SOURCES = [
+  { id: 'gnd',       label: 'GND (Gemeinsame Normdatei)' },
+  { id: 'wikidata',  label: 'Wikidata' },
+  { id: 'viaf',      label: 'VIAF' },
+  { id: 'geonames',  label: 'Geonames' },
+  { id: 'tgn',       label: 'Getty TGN' },
+  { id: 'iconclass', label: 'ICONCLASS' },
+]
 
 type FieldFormState = {
   target_type: string
@@ -30,10 +40,11 @@ type FieldFormState = {
   is_repeatable: boolean
   sort_order: number
   validation_regex: string
+  authority_source: string
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '' }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd' }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -48,6 +59,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     is_repeatable: f.is_repeatable,
     sort_order: f.sort_order,
     validation_regex: (f.settings?.validation_regex as string) ?? '',
+    authority_source: (f.settings?.source as string) ?? 'gnd',
   }
 }
 
@@ -129,6 +141,14 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
               placeholder="^97[89]-[0-9]{10}$" />
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Beispiele: ISBN-13, ISSN, DOI</div>
+          </div>
+        )}
+        {form.field_type === 'authority' && (
+          <div className="field">
+            <div className="lbl">Normdaten-Quelle</div>
+            <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
+              {AUTHORITY_SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -311,7 +331,10 @@ export function ScreenSchema() {
       is_required: form.is_required,
       is_repeatable: form.is_repeatable,
       sort_order: form.sort_order,
-      settings: form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {},
+      settings: {
+        ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
+        ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
+      },
     }
     try {
       if (isNew) {
