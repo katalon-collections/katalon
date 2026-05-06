@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { api, type StaticPageSummary } from '../api/client'
@@ -34,9 +35,17 @@ export function StaticPageView() {
   const content = (page.content as Record<string, string>)[lang] ?? Object.values(page.content)[0] ?? ''
 
   const html = DOMPurify.sanitize(marked.parse(content) as string)
+  const plainText = content.replace(/[#*`_[\]()>]/g, '').slice(0, 160)
 
   return (
     <div className="container page">
+      <Helmet>
+        <title>{title}</title>
+        {plainText && <meta name="description" content={plainText} />}
+        <meta property="og:title" content={title} />
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:type" content="article" />
+      </Helmet>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>{title}</h1>
       <div
         className="prose"

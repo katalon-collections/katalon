@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Link, Route, Routes, useNavigate } from 'react-router-dom'
+import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
 import { api, type StaticPageSummary } from './api/client'
@@ -68,6 +69,9 @@ function AppInner() {
   }, [])
   return (
     <>
+      <Helmet defaultTitle="Katalon" titleTemplate="%s – Katalon">
+        <meta name="description" content="Metadata Management System für Sammlungen" />
+      </Helmet>
       <Header />
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -84,5 +88,5 @@ function AppInner() {
 }
 
 export function App() {
-  return <BrowserRouter><AppInner /></BrowserRouter>
+  return <HelmetProvider><BrowserRouter><AppInner /></BrowserRouter></HelmetProvider>
 }

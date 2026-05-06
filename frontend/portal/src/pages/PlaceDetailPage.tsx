@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api, type ObjectSummary, type PlaceSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 
@@ -80,9 +81,18 @@ export function PlaceDetailPage() {
   const m = place.metadata_ as Record<string, unknown>
   const title = String(m.name ?? m.title ?? m.label ?? place.id)
   const hasCoords = place.lat != null && place.lon != null
+  const description = String(m.description ?? '')
 
   return (
     <div className="container page">
+      <Helmet>
+        <title>{title}</title>
+        {description && <meta name="description" content={description} />}
+        <meta property="og:title" content={title} />
+        {description && <meta property="og:description" content={description} />}
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:type" content="article" />
+      </Helmet>
       <div className="bc">
         <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
         <span className="sep">/</span>

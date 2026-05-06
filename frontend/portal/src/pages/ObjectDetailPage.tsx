@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
@@ -72,8 +73,23 @@ export function ObjectDetailPage() {
   const excludedKeys = new Set(['description', 'keywords'])
   const showViewer = readyMedia.length > 0 && !viewerError
 
+  const description = String(m.description ?? '')
+  const ogImage = primaryMedia ? `${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
+
   return (
     <div className="container page">
+      <Helmet>
+        <title>{title}</title>
+        {description && <meta name="description" content={description} />}
+        <meta property="og:title" content={title} />
+        {description && <meta property="og:description" content={description} />}
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:type" content="article" />
+        {ogImage && <meta property="og:image" content={ogImage} />}
+        {readyMedia.length > 0 && (
+          <link rel="alternate" type="application/ld+json" href={manifestUrl} />
+        )}
+      </Helmet>
       <div className="bc">
         <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
         <span className="sep">/</span>
