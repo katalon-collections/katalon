@@ -13,10 +13,11 @@ const TYPES = [
 
 const SUBTYPE_TYPES = new Set(['entity', 'occurrence'])
 
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'relation', 'geo', 'pid', 'authority'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
-  boolean: 'Boolean', vocab: 'Vokabular', relation: 'Relation', geo: 'Geodaten', pid: 'PID',
+  boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
+  relation: 'Relation', geo: 'Geodaten', pid: 'PID',
   authority: 'Normdaten (Authority)',
 }
 
@@ -164,9 +165,12 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             </select>
           </div>
         )}
-        {form.field_type === 'vocab' && (
+        {(form.field_type === 'vocab' || form.field_type === 'vocab_free') && (
           <div className="field">
-            <div className="lbl">Vokabular <span className="req">*</span></div>
+            <div className="lbl">
+              Vokabular {form.field_type === 'vocab' && <span className="req">*</span>}
+              {form.field_type === 'vocab_free' && <span style={{ fontSize: 11, color: 'var(--fg-3)', marginLeft: 4 }}>(optional — nur für Vorschläge)</span>}
+            </div>
             <select className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
               <option value="">— Vokabular wählen —</option>
               {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -357,7 +361,7 @@ export function ScreenSchema() {
       settings: {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
-        ...(form.field_type === 'vocab' && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
+        ...((form.field_type === 'vocab' || form.field_type === 'vocab_free') && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
       },
     }
     try {

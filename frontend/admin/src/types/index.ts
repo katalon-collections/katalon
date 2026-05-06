@@ -49,7 +49,7 @@ export interface FieldDefinition {
   target_subtype: string | null
   name: string
   label: Record<string, string>
-  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'authority'
+  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'authority'
   is_required: boolean
   is_repeatable: boolean
   sort_order: number

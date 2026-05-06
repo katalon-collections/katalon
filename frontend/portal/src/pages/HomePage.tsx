@@ -10,6 +10,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   facet_fields: [],
   accent_color: '#1e3a8a',
   logo_url: '',
+  placeholder_image_url: '',
   color_tokens: {},
 }
 

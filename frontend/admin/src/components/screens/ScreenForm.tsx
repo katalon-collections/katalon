@@ -141,6 +141,132 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
   )
 }
 
+/**
+ * Text input with optional vocabulary suggestions.
+ * - Non-repeatable: use `value` + `onChange` (live update on each keystroke).
+ * - Repeatable: use `onAdd` (fires with committed text, then clears the input).
+ */
+function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder }: {
+  vocabId: string
+  value?: string
+  onChange?: (v: string) => void
+  onAdd?: (v: string) => void
+  disabled?: boolean
+  placeholder?: string
+}) {
+  const [draft, setDraft] = useState(value ?? '')
+  const [results, setResults] = useState<VocabularyTerm[]>([])
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  // Sync controlled value
+  useEffect(() => { if (value !== undefined) setDraft(value) }, [value])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node
+      if (inputRef.current?.contains(t) || dropRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      const spaceAbove = r.top - 8
+      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+      setDropPos({
+        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+        left: r.left, width: r.width,
+        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+      })
+    }
+  }, [open])
+
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (!vocabId || draft.trim().length < 1) { setResults([]); setOpen(false); return }
+    timer.current = setTimeout(() => {
+      setBusy(true)
+      vocabularies.searchTerms(vocabId, draft.trim())
+        .then(r => { setResults(r); setOpen(r.length > 0) })
+        .catch(() => setResults([]))
+        .finally(() => setBusy(false))
+    }, 200)
+    return () => clearTimeout(timer.current)
+  }, [draft, vocabId])
+
+  function commit(text: string) {
+    if (!text.trim()) return
+    if (onAdd) {
+      onAdd(text.trim())
+      setDraft('')
+    } else {
+      onChange?.(text)
+    }
+    setResults([]); setOpen(false)
+  }
+
+  function pick(term: VocabularyTerm) {
+    commit(term.label.de ?? term.label.en ?? term.term)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        className="fld"
+        value={draft}
+        onChange={e => {
+          setDraft(e.target.value)
+          if (!onAdd) onChange?.(e.target.value)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
+          if (e.key === 'Escape') { setOpen(false); setResults([]) }
+        }}
+        placeholder={placeholder ?? (vocabId ? 'Tippen zum Suchen oder frei eingeben…' : 'Freitext eingeben')}
+        disabled={disabled}
+      />
+      {busy && (
+        <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
+          Suche…
+        </div>
+      )}
+      {open && results.length > 0 && dropPos && (
+        <div ref={dropRef} style={{
+          position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
+          background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
+        }}>
+          {results.map(term => (
+            <button
+              key={term.id}
+              onMouseDown={e => { e.preventDefault(); pick(term) }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)',
+                background: 'none', cursor: 'pointer',
+              }}
+              className="authority-hit"
+            >
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{term.label.de ?? term.label.en ?? term.term}</div>
+              <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{term.term}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AuthorityInput({ source, value, onChange, disabled }: {
   source: string
   value: AuthorityEntry | null
@@ -526,6 +652,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   function setVocab(name: string, val: VocabEntry | null) {
     setValues(v => ({ ...v, [name]: val ?? undefined }))
   }
+  function addFreeVocab(name: string, val: string) {
+    if (!val.trim()) return
+    const cur = (values[name] as string[] | undefined) ?? []
+    setValues(v => ({ ...v, [name]: [...cur, val.trim()] }))
+  }
+  function removeFreeVocab(name: string, idx: number) {
+    setValues(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
+  }
+
   function addVocab(name: string, val: VocabEntry) {
     const cur = (values[name] as VocabEntry[] | undefined) ?? []
     setValues(v => ({ ...v, [name]: [...cur, val] }))
@@ -824,6 +959,43 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                             value={(val as VocabEntry | undefined) ?? null}
                             onChange={v => setVocab(f.name, v)}
+                            disabled={justCreated}
+                          />
+                        )
+                      ) : f.field_type === 'vocab_free' ? (
+                        repeatable ? (
+                          <>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                              {((val as string[] | undefined) ?? []).map((entry, i) => (
+                                <span key={i} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                                  padding: '3px 8px', borderRadius: 4,
+                                  background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+                                }}>
+                                  {entry}
+                                  <button
+                                    className="btn sm ico gh"
+                                    style={{ marginLeft: 2, padding: 0 }}
+                                    onClick={() => removeFreeVocab(f.name, i)}
+                                    disabled={justCreated}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <VocabFreeInput
+                              vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                              onAdd={v => addFreeVocab(f.name, v)}
+                              disabled={justCreated}
+                              placeholder="Eingeben und Enter drücken oder Vorschlag wählen"
+                            />
+                          </>
+                        ) : (
+                          <VocabFreeInput
+                            vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                            value={(val as string | undefined) ?? ''}
+                            onChange={v => setValues(prev => ({ ...prev, [f.name]: v }))}
                             disabled={justCreated}
                           />
                         )
