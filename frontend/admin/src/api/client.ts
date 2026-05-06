@@ -286,3 +286,32 @@ export const importer = {
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
 }
+
+// OAI Sets
+export interface OAISet {
+  id: string
+  set_spec: string
+  set_name: string
+  filter_record_type: string | null
+  filter_q: string | null
+  filter_status: string | null
+  filter_metadata: Record<string, string>
+  created_at: string
+  updated_at: string
+}
+
+export interface OAISetPayload {
+  set_spec: string
+  set_name: string
+  filter_record_type: string | null
+  filter_q: string | null
+  filter_status: string | null
+  filter_metadata: Record<string, string>
+}
+
+export const oaiSets = {
+  list:   () => req<OAISet[]>('/v1/oai-sets'),
+  create: (data: OAISetPayload) => req<OAISet>('/v1/oai-sets', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: OAISetPayload) => req<OAISet>(`/v1/oai-sets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/oai-sets/${id}`, { method: 'DELETE' }),
+}

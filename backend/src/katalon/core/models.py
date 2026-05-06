@@ -303,6 +303,25 @@ class PortalConfig(Base):
 
 
 # ---------------------------------------------------------------------------
+# OAI-PMH Sets (query-based, admin-configurable)
+# ---------------------------------------------------------------------------
+
+
+class OAISet(Base):
+    __tablename__ = "oai_sets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    set_spec: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    set_name: Mapped[str] = mapped_column(String(256))
+    filter_record_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    filter_q: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filter_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    filter_metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+# ---------------------------------------------------------------------------
 # Users
 # ---------------------------------------------------------------------------
 

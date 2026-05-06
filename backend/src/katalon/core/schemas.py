@@ -183,6 +183,27 @@ class TokenData(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# OAI Sets
+# ---------------------------------------------------------------------------
+
+class OAISetCreate(BaseModel):
+    set_spec: str
+    set_name: str
+    filter_record_type: str | None = None
+    filter_q: str | None = None
+    filter_status: str | None = None
+    filter_metadata: dict = {}
+
+
+class OAISetRead(OAISetCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
 

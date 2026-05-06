@@ -12,6 +12,7 @@ import { ScreenLogin } from '../screens/ScreenLogin'
 import { ScreenSettings } from '../screens/ScreenSettings'
 import { ScreenUsers } from '../screens/ScreenUsers'
 import { ScreenPages } from '../screens/ScreenPages'
+import { ScreenOAISets } from '../screens/ScreenOAISets'
 
 type Crumb = { label: string; route?: string }
 
@@ -27,6 +28,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
   pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
+  'oai-sets':         [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'OAI-PMH Sets' }],
   import:             [{ label: 'Katalon' }, { label: 'Importer' }],
   audit:              [{ label: 'Katalon' }, { label: 'Audit-Log' }],
   users:              [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer' }],
@@ -108,6 +110,7 @@ export function AppShell() {
       case 'schema':            return <ScreenSchema />
       case 'vocab':             return <ScreenVocab />
       case 'pages':             return <ScreenPages />
+      case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />

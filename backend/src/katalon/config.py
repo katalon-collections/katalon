@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     default_admin_email: str = "admin@katalon.dev"
     default_admin_password: str = "admin"
 
+    oai_admin_email: str = "admin@katalon.dev"
+
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 
     debug: bool = False
