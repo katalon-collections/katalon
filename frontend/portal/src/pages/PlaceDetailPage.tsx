@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, type ObjectSummary, type PlaceSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useBackToSearch } from '../hooks/useBackToSearch'
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
@@ -51,6 +52,7 @@ export function PlaceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldLabels = useFieldLabels('place')
+  const backSearch = useBackToSearch()
 
   useEffect(() => {
     if (!id) return
@@ -94,9 +96,15 @@ export function PlaceDetailPage() {
         <meta property="og:type" content="article" />
       </Helmet>
       <div className="bc">
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
-        <span className="sep">/</span>
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>Orte</a>
+        {backSearch ? (
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+        ) : (
+          <>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <span className="sep">/</span>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>Orte</a>
+          </>
+        )}
         <span className="sep">/</span>
         <span>{title}</span>
       </div>

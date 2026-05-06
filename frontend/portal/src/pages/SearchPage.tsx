@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
+import { saveLastSearch } from '../hooks/useBackToSearch'
 
 const TYPE_LABELS: Record<string, string> = {
   object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
@@ -225,7 +226,7 @@ export function SearchPage() {
               : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
               : `/objects/${r.id}`
             return (
-              <div key={r.id} className="result-row" onClick={() => navigate(path)}>
+              <div key={r.id} className="result-row" onClick={() => { saveLastSearch(window.location.pathname + window.location.search); navigate(path) }}>
                 <div className="thumb-sm">
                   {thumbnails[r.id] ? (
                     <img src={thumbnails[r.id]} alt="" loading="lazy" />

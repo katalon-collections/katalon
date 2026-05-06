@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useBackToSearch } from '../hooks/useBackToSearch'
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
@@ -27,6 +28,7 @@ export function OccurrenceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldLabels = useFieldLabels('occurrence')
+  const backSearch = useBackToSearch()
 
   useEffect(() => {
     if (!id) return
@@ -72,9 +74,15 @@ export function OccurrenceDetailPage() {
         <meta property="og:type" content="article" />
       </Helmet>
       <div className="bc">
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
-        <span className="sep">/</span>
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=occurrence') }}>Werke &amp; Ereignisse</a>
+        {backSearch ? (
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+        ) : (
+          <>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <span className="sep">/</span>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=occurrence') }}>Werke &amp; Ereignisse</a>
+          </>
+        )}
         <span className="sep">/</span>
         <span>{title}</span>
       </div>

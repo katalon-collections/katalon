@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { api, BASE, type MediaFile, type ObjectSummary } from '../api/client'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
+import { useBackToSearch } from '../hooks/useBackToSearch'
 
 
 
@@ -38,6 +39,7 @@ export function ObjectDetailPage() {
   const [viewerError, setViewerError] = useState(false)
   // Hook must be called BEFORE any conditional returns
   const fieldLabels = useFieldLabels('object')
+  const backSearch = useBackToSearch()
 
   useEffect(() => {
     if (!id) return
@@ -91,9 +93,15 @@ export function ObjectDetailPage() {
         )}
       </Helmet>
       <div className="bc">
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
-        <span className="sep">/</span>
-        <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=') }}>Suche</a>
+        {backSearch ? (
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+        ) : (
+          <>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <span className="sep">/</span>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=') }}>Suche</a>
+          </>
+        )}
         <span className="sep">/</span>
         <span>{title}</span>
       </div>
