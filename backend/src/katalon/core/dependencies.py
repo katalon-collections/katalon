@@ -1,8 +1,9 @@
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,27 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def try_get_current_user(request: Request, db: DBDep) -> User | None:
+    """Like get_current_user but returns None instead of raising 401."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, token = get_authorization_scheme_param(authorization)
+    if not token or scheme.lower() != "bearer":
+        return None
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id_str: str | None = payload.get("sub")
+        if not user_id_str:
+            return None
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
+        user = result.scalar_one_or_none()
+        return user if user and user.is_active else None
+    except (JWTError, ValueError):
+        return None
+
+
+OptionalCurrentUser = Annotated[User | None, Depends(try_get_current_user)]
 
 
 def require_role(*roles: str):

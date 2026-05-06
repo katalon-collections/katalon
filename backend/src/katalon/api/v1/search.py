@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
+from katalon.core.dependencies import OptionalCurrentUser, require_role
 from katalon.services import search_service
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -34,6 +35,7 @@ class SearchResponse(BaseModel):
 @router.get("", response_model=SearchResponse)
 async def search(
     request: Request,
+    current_user: OptionalCurrentUser,
     q: Annotated[str | None, Query(description="Full-text query")] = None,
     type: Annotated[str | None, Query(description="Filter by record_type")] = None,
     status: Annotated[str | None, Query(description="Filter by status")] = None,
@@ -44,6 +46,10 @@ async def search(
     rel_place: Annotated[str | None, Query(description="Filter objects by related place name")] = None,
     rel_occurrence: Annotated[str | None, Query(description="Filter objects by related occurrence name")] = None,
 ) -> SearchResponse:
+    # Unauthenticated callers may only see public records
+    if current_user is None and not status:
+        status = "public"
+
     # Extra metadata filters: any query param starting with "meta_"
     extra_filters: dict[str, str] = {
         k[5:]: v
@@ -71,17 +77,15 @@ async def search(
     return SearchResponse(**result)
 
 
-@router.post("/reindex", tags=["search"])
+@router.post("/reindex", dependencies=[require_role("admin")])
 async def trigger_reindex() -> dict[str, str]:
-    """Enqueue a full reindex Celery task (all types)."""
     from katalon.workers.index_tasks import reindex_all_task
     reindex_all_task.delay()
     return {"status": "queued"}
 
 
-@router.post("/reindex/{target_type}", tags=["search"])
+@router.post("/reindex/{target_type}", dependencies=[require_role("admin")])
 async def trigger_reindex_type(target_type: str) -> dict[str, str]:
-    """Enqueue a type-specific reindex (e.g. after schema changes)."""
     valid = {"object", "entity", "place", "occurrence"}
     if target_type not in valid:
         from fastapi import HTTPException

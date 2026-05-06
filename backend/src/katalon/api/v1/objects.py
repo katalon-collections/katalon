@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
 from katalon.services.audit_service import log_change
@@ -16,9 +16,13 @@ from katalon.services import search_service
 router = APIRouter(prefix="/objects", tags=["objects"])
 
 
+_PUBLIC_STATUSES = ("public", "published")
+
+
 @router.get("", response_model=dict)
 async def list_objects(
     db: DBDep,
+    current_user: OptionalCurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     status: str | None = None,
@@ -27,6 +31,8 @@ async def list_objects(
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
+    elif current_user is None:
+        query = query.where(Object.status.in_(_PUBLIC_STATUSES))
     if q:
         query = query.where(Object.search_vector.match(q))
 
@@ -69,10 +75,12 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
 
 
 @router.get("/{object_id}", response_model=ObjectRead)
-async def get_object(object_id: uuid.UUID, db: DBDep) -> Object:
+async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    if current_user is None and obj.status not in _PUBLIC_STATUSES:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     return obj
 

@@ -56,6 +56,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       ELASTICSEARCH_URL: http://elasticsearch:9200
       CANTALOUPE_URL: http://cantaloupe:8182
+      # Public URL used in IIIF manifests — must be reachable from browsers.
+      # Change to your domain for production (e.g. https://example.com).
+      CANTALOUPE_PUBLIC_URL: http://localhost
       SECRET_KEY: change-me-in-production
       MEDIA_ROOT: /var/lib/katalon/media
     volumes:
@@ -82,6 +85,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       ELASTICSEARCH_URL: http://elasticsearch:9200
       CANTALOUPE_URL: http://cantaloupe:8182
+      CANTALOUPE_PUBLIC_URL: http://localhost
       MEDIA_ROOT: /var/lib/katalon/media
     volumes:
       - media_data:/var/lib/katalon/media
