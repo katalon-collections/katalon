@@ -109,6 +109,7 @@ Wichtige Endpunkte:
 | GET            | `/v1/schema/{target_type}`        | Felddefinitionen abrufen               |
 | GET/POST       | `/v1/schema/import`               | Schema aus YAML/JSON importieren       |
 | GET            | `/v1/vocabularies`                | Vokabulare auflisten                   |
+| POST           | `/v1/vocabularies/{id}/import`    | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
 | GET            | `/v1/search`                      | Volltext- und Facettensuche            |
 | GET            | `/v1/portal/config`               | Portal-Konfiguration                   |
 | POST           | `/v1/portal/logo`                 | Logo hochladen                         |
