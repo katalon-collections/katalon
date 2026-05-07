@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import VocabularyTerm
 
+DEFAULT_LABEL_LANGUAGE = "de"
+
 
 @dataclass
 class ImportTerm:
@@ -142,7 +144,7 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
     terms: dict[str, ImportTerm] = {}
     errors: list[dict[str, Any]] = []
 
-    def walk(node: Any, parent_term: str | None) -> None:
+    def parse_term_node(node: Any, parent_term: str | None) -> None:
         if not isinstance(node, dict):
             errors.append({"row": None, "message": "Eintrag ist kein Objekt"})
             return
@@ -156,7 +158,7 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
         if isinstance(raw_label, dict):
             label = {str(k): _norm(str(v)) for k, v in raw_label.items() if _norm(str(v))}
         elif isinstance(raw_label, str) and _norm(raw_label):
-            label = {"de": _norm(raw_label)}
+            label = {DEFAULT_LABEL_LANGUAGE: _norm(raw_label)}
 
         this_parent = _norm(str(node.get("parent_term", ""))) or parent_term
         external_id = _norm(str(node.get("external_id", ""))) or None
@@ -179,10 +181,10 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
             errors.append({"row": None, "message": f"children für '{term}' muss eine Liste sein"})
             return
         for child in children:
-            walk(child, term)
+            parse_term_node(child, term)
 
     for item in raw_items:
-        walk(item, None)
+        parse_term_node(item, None)
 
     return list(terms.values()), errors
 
@@ -199,12 +201,12 @@ async def import_vocabulary_terms(
     )
     existing_terms = list(result.scalars().all())
     existing_by_term = {t.term: t for t in existing_terms}
-    all_known_terms = set(existing_by_term) | {t.term for t in terms}
+    combined_term_names = set(existing_by_term) | {t.term for t in terms}
 
     errors: list[dict[str, Any]] = []
     valid_terms: list[ImportTerm] = []
     for item in terms:
-        if item.parent_term and item.parent_term not in all_known_terms:
+        if item.parent_term and item.parent_term not in combined_term_names:
             errors.append(
                 {
                     "row": item.row,
@@ -253,8 +255,6 @@ async def import_vocabulary_terms(
             db.add(term_model)
         if item.label:
             term_model.label = item.label
-        if item.external_id:
-            term_model.label = term_model.label | {"external_id": item.external_id}
         touched[item.term] = term_model
     await db.flush()
 

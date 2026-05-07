@@ -33,6 +33,7 @@ export function ScreenVocab() {
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [importStrategy, setImportStrategy] = useState<'append' | 'replace'>('append')
   const [importBusy, setImportBusy] = useState(false)
+  const [importFeedback, setImportFeedback] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<null | {
     created: number
     updated: number
@@ -86,6 +87,7 @@ export function ScreenVocab() {
   }
 
   async function handleFile(file: File | null) {
+    setImportFeedback(null)
     setImportResult(null)
     setImportFile(file)
     setCsvHeaders([])
@@ -201,10 +203,11 @@ export function ScreenVocab() {
   async function runVocabularyImport(dryRun: boolean) {
     if (!activeVocab || !importFile) return
     if (isCsvImport && !hasTermMapping) {
-      alert("Bitte mindestens eine Spalte auf 'Term' mappen.")
+      setImportFeedback("Bitte mindestens eine Spalte auf 'Term' mappen.")
       return
     }
     setImportBusy(true)
+    setImportFeedback(null)
     try {
       const result = await vocabularies.importTerms(activeVocab, importFile, {
         dryRun,
@@ -216,7 +219,7 @@ export function ScreenVocab() {
         loadTerms()
       }
     } catch (e) {
-      alert((e as Error).message)
+      setImportFeedback((e as Error).message)
     } finally {
       setImportBusy(false)
     }
@@ -363,17 +366,21 @@ export function ScreenVocab() {
                     <button className="btn pri" disabled={!importFile || importBusy} onClick={() => void runVocabularyImport(false)}>Import ausführen</button>
                   </div>
 
+                  {importFeedback && (
+                    <div style={{ marginTop: 8, color: '#b91c1c', fontSize: 12 }}>{importFeedback}</div>
+                  )}
+
                   {importResult && (
                     <div style={{ marginTop: 10, fontSize: 12 }}>
                       <div>
                         {importResult.dry_run ? 'Dry-Run' : 'Import'} · erstellt: {importResult.created} · aktualisiert: {importResult.updated} · gelöscht: {importResult.deleted}
                       </div>
                       {importResult.errors.length > 0 && (
-                        <div style={{ marginTop: 6, color: '#b91c1c' }}>
+                        <ul role="alert" style={{ marginTop: 6, color: '#b91c1c', paddingLeft: 16 }}>
                           {importResult.errors.map((err, idx) => (
-                            <div key={`${err.row ?? 'x'}-${idx}`}>Zeile {err.row ?? '—'}: {err.message}</div>
+                            <li key={`${err.row ?? 'x'}-${idx}`}>Zeile {err.row ?? '—'}: {err.message}</li>
                           ))}
-                        </div>
+                        </ul>
                       )}
                     </div>
                   )}

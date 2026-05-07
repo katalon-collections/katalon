@@ -204,9 +204,15 @@ async def import_terms(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         if not parsed_mapping:
             raise HTTPException(status_code=422, detail="CSV-Import benötigt ein Mapping")
-        terms, errors = vocabulary_import_service.parse_csv_terms(content, parsed_mapping)
+        try:
+            terms, errors = vocabulary_import_service.parse_csv_terms(content, parsed_mapping)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"CSV konnte nicht verarbeitet werden: {exc}") from exc
     elif filename.endswith(".json"):
-        terms, errors = vocabulary_import_service.parse_json_terms(content)
+        try:
+            terms, errors = vocabulary_import_service.parse_json_terms(content)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"JSON konnte nicht verarbeitet werden: {exc}") from exc
     else:
         raise HTTPException(status_code=422, detail="Nur CSV/TSV oder JSON werden unterstützt")
 
