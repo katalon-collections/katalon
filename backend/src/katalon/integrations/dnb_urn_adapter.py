@@ -37,7 +37,10 @@ class DnbUrnAdapter:
         data = response.json()
         urn = data.get("suggestedUrn")
         if not isinstance(urn, str) or not urn:
-            raise DnbUrnAdapterError("DNB-API lieferte keine gültige URN-Suggestion.")
+            raise DnbUrnAdapterError(
+                "DNB-API lieferte keine gültige URN-Suggestion "
+                f"(suggestedUrn={data.get('suggestedUrn')!r})."
+            )
         return urn
 
     async def register_urn(self, urn: str, target_url: str) -> str:
@@ -53,7 +56,10 @@ class DnbUrnAdapter:
         data = response.json()
         registered = data.get("urn")
         if not isinstance(registered, str) or not registered:
-            raise DnbUrnAdapterError("DNB-API lieferte keine registrierte URN zurück.")
+            raise DnbUrnAdapterError(
+                "DNB-API lieferte keine registrierte URN zurück "
+                f"(urn={data.get('urn')!r})."
+            )
         return registered
 
     async def mint_and_register(self, target_url: str) -> str:

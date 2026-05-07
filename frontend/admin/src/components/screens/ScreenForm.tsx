@@ -1072,6 +1072,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                                 className="btn sm gh"
                                 onClick={() => registerUrn(f.name, true)}
                                 disabled={justCreated || !savedId || registeringPidField === f.name}
+                                title={!savedId ? 'Datensatz zuerst speichern, dann URN registrieren.' : undefined}
                               >
                                 {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
                               </button>
@@ -1100,6 +1101,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                                 className="btn sm gh"
                                 onClick={() => registerUrn(f.name, false)}
                                 disabled={justCreated || !savedId || registeringPidField === f.name}
+                                title={!savedId ? 'Datensatz zuerst speichern, dann URN registrieren.' : undefined}
                               >
                                 {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
                               </button>

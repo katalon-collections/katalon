@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 import httpx
@@ -11,6 +12,7 @@ from katalon.services import pid_service
 from katalon.services.audit_service import log_change
 
 router = APIRouter(prefix="/pids", tags=["pids"])
+logger = logging.getLogger(__name__)
 
 
 class DnbUrnRegisterIn(BaseModel):
@@ -47,8 +49,9 @@ async def register_dnb_urn(
     except httpx.HTTPStatusError as exc:
         detail = f"DNB-URN-API Fehler: HTTP {exc.response.status_code}"
         raise HTTPException(status_code=502, detail=detail)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("Unexpected error during DNB URN registration")
+        raise HTTPException(status_code=500, detail="URN-Registrierung fehlgeschlagen.")
 
     await log_change(
         db,
