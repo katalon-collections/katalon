@@ -111,9 +111,15 @@ Wichtige Endpunkte:
 | GET            | `/v1/vocabularies`                | Vokabulare auflisten                   |
 | POST           | `/v1/vocabularies/{id}/import`    | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
 | GET            | `/v1/search`                      | Volltext- und Facettensuche            |
+| POST           | `/v1/pids/urn/register`           | URN via DNB-API registrieren (PID-Feld) |
 | GET            | `/v1/portal/config`               | Portal-Konfiguration                   |
 | POST           | `/v1/portal/logo`                 | Logo hochladen                         |
 | GET            | `/v1/audit`                       | Audit-Log abrufen                      |
+
+### DNB-URN (PID)
+
+- URN-Vergabe ist per Umgebungsvariablen konfigurierbar (`DNB_URN_*` in `.env.example`).
+- Für lokale Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
 
 ### Vokabular-Import (CSV/JSON)
 

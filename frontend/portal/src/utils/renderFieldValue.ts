@@ -7,6 +7,8 @@ const AUTHORITY_BASE: Record<string, string> = {
   iconclass: 'https://iconclass.org/',
 }
 
+const PID_RESOLVER_BASE = 'https://nbn-resolving.org/'
+
 /** Returns the external URL for an authority field value, or undefined. */
 export function authorityUrl(value: unknown): string | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
@@ -16,6 +18,15 @@ export function authorityUrl(value: unknown): string | undefined {
   if (!source || !externalId) return undefined
   const base = AUTHORITY_BASE[source]
   return base ? base + externalId : undefined
+}
+
+/** Returns resolver URL for PID field values ({value, label}) if it looks like an URN. */
+export function pidUrl(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const obj = value as Record<string, unknown>
+  const pidValue = typeof obj.value === 'string' ? obj.value.trim() : ''
+  if (!pidValue.toLowerCase().startsWith('urn:')) return undefined
+  return `${PID_RESOLVER_BASE}${pidValue}`
 }
 
 /**

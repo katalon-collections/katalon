@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, BASE, PORTAL_URL } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
@@ -439,6 +439,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
+  const [registeringPidField, setRegisteringPidField] = useState<string | null>(null)
   const [title, setTitle]     = useState(isNew ? `Neues ${label}` : '…')
 
   const [mediaFiles, setMediaFiles]     = useState<MediaFile[]>([])
@@ -636,6 +637,30 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     const cur = [...((values[name] as PidEntry[]) ?? [])]
     cur[idx] = { ...cur[idx], [key]: val }
     setValues(v => ({ ...v, [name]: cur }))
+  }
+
+  async function registerUrn(fieldName: string, repeatable: boolean) {
+    if (!savedId) return
+    setRegisteringPidField(fieldName)
+    try {
+      const result = await pids.registerDnbUrn({
+        record_type: recordType,
+        record_id: savedId,
+        field_name: fieldName,
+        target_url: `${PORTAL_URL}/record/${recordType}/${savedId}`,
+        label: 'URN',
+      })
+      if (repeatable) {
+        const cur = (values[fieldName] as PidEntry[] | undefined) ?? []
+        setField(fieldName, [...cur, result.value])
+      } else {
+        setField(fieldName, result.value)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setRegisteringPidField(null)
+    }
   }
 
   function setAuthority(name: string, val: AuthorityEntry | null) {
@@ -1042,6 +1067,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                       ) : f.field_type === 'pid' ? (
                         repeatable ? (
                           <>
+                            <div style={{ marginBottom: 6 }}>
+                              <button
+                                className="btn sm gh"
+                                onClick={() => registerUrn(f.name, true)}
+                                disabled={justCreated || !savedId || registeringPidField === f.name}
+                              >
+                                {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
+                              </button>
+                            </div>
                             {(pidEntries ?? []).map((entry, i) => (
                               <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                                 <input className="fld mono" value={entry.value}
@@ -1060,15 +1094,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             </button>
                           </>
                         ) : (
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <input className="fld mono" value={pidSingle!.value}
-                              onChange={e => setField(f.name, { ...pidSingle!, value: e.target.value })}
-                              placeholder="URI / ID (z.B. https://d-nb.info/…)"
-                              disabled={justCreated} style={{ flex: 2 }} />
-                            <input className="fld" value={pidSingle!.label}
-                              onChange={e => setField(f.name, { ...pidSingle!, label: e.target.value })}
-                              placeholder="Anzeigebezeichnung"
-                              disabled={justCreated} style={{ flex: 1 }} />
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <div>
+                              <button
+                                className="btn sm gh"
+                                onClick={() => registerUrn(f.name, false)}
+                                disabled={justCreated || !savedId || registeringPidField === f.name}
+                              >
+                                {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <input className="fld mono" value={pidSingle!.value}
+                                onChange={e => setField(f.name, { ...pidSingle!, value: e.target.value })}
+                                placeholder="URI / ID (z.B. https://d-nb.info/…)"
+                                disabled={justCreated} style={{ flex: 2 }} />
+                              <input className="fld" value={pidSingle!.label}
+                                onChange={e => setField(f.name, { ...pidSingle!, label: e.target.value })}
+                                placeholder="Anzeigebezeichnung"
+                                disabled={justCreated} style={{ flex: 1 }} />
+                            </div>
                           </div>
                         )
                       ) : repeatable ? (
