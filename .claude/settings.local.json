@@ -11,7 +11,9 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(gh issue *)",
-      "Bash(gh label *)"
+      "Bash(gh label *)",
+      "Bash(python3 -c \"import sys,json; [print\\(f['name'], '-', f['field_type']\\) for f in json.load\\(sys.stdin\\)]\")",
+      "Bash(python3 -)"
     ]
   }
 }
