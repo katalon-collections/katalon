@@ -119,6 +119,7 @@ Wichtige Endpunkte:
 ### DNB-URN (PID)
 
 - URN-Vergabe ist per Umgebungsvariablen konfigurierbar (`DNB_URN_*` in `.env.example`).
+- URN-Registrierung ist derzeit auf den Record-Typ **`object`** eingeschränkt.
 - Für lokale Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
 
 ### Vokabular-Import (CSV/JSON)

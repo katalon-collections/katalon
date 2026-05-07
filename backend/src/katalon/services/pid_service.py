@@ -32,6 +32,9 @@ async def register_dnb_urn_for_record(
     target_url: str,
     label: str = "URN",
 ) -> dict[str, Any]:
+    if record_type != "object":
+        raise ValueError("URN-Registrierung ist nur für Objekte erlaubt.")
+
     model = _MODEL_BY_TYPE.get(record_type)
     if model is None:
         raise ValueError("Ungültiger record_type.")
