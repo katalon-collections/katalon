@@ -1,15 +1,19 @@
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select, text
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import Vocabulary, VocabularyTerm
 from katalon.core.schemas import (
-    VocabularyCreate, VocabularyRead,
-    VocabularyTermCreate, VocabularyTermRead,
+    VocabularyCreate,
+    VocabularyRead,
+    VocabularyTermCreate,
+    VocabularyTermRead,
 )
+from katalon.services import vocabulary_import_service
 
 router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
 
@@ -170,3 +174,65 @@ async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
     await db.delete(term)
+
+
+@router.post(
+    "/{vocab_id}/import",
+    dependencies=[require_role("admin")],
+)
+async def import_terms(
+    vocab_id: uuid.UUID,
+    file: UploadFile,
+    db: DBDep,
+    _: CurrentUser,
+    strategy: Literal["append", "replace"] = Query("append"),
+    dry_run: bool = Query(True),
+    mapping: str | None = Form(None),
+) -> dict:
+    """Import vocabulary terms from CSV or JSON with optional dry-run."""
+    vocab_result = await db.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
+    if vocab_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+
+    content = await file.read()
+    filename = (file.filename or "").lower()
+
+    if filename.endswith(".csv") or filename.endswith(".tsv"):
+        try:
+            parsed_mapping = vocabulary_import_service.parse_mapping(mapping)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not parsed_mapping:
+            raise HTTPException(status_code=422, detail="CSV-Import benötigt ein Mapping")
+        try:
+            terms, errors = vocabulary_import_service.parse_csv_terms(content, parsed_mapping)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"CSV konnte nicht verarbeitet werden: {exc}") from exc
+    elif filename.endswith(".json"):
+        try:
+            terms, errors = vocabulary_import_service.parse_json_terms(content)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"JSON konnte nicht verarbeitet werden: {exc}") from exc
+    else:
+        raise HTTPException(status_code=422, detail="Nur CSV/TSV oder JSON werden unterstützt")
+
+    if errors:
+        return {
+            "strategy": strategy,
+            "dry_run": dry_run,
+            "created": 0,
+            "updated": 0,
+            "deleted": 0,
+            "errors": errors,
+        }
+
+    result = await vocabulary_import_service.import_vocabulary_terms(
+        db=db,
+        vocab_id=vocab_id,
+        terms=terms,
+        strategy=strategy,
+        dry_run=dry_run,
+    )
+    result["strategy"] = strategy
+    result["dry_run"] = dry_run
+    return result
