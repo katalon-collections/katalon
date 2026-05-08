@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { req, BASE, apiKeys } from '../../api/client'
+import { apiKeys, users as usersApi } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
 
 const ROLES: Record<string, string> = {
@@ -132,7 +132,7 @@ function ApiKeysPanel({ userId }: { userId: string }) {
 }
 
 export function ScreenUsers() {
-  const [users, setUsers] = useState<UserRead[]>([])
+  const [userList, setUserList] = useState<UserRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -144,6 +144,10 @@ export function ScreenUsers() {
   const [formLoading, setFormLoading] = useState(false)
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const [expandedCredentials, setExpandedCredentials] = useState<Set<string>>(new Set())
+  const [draftEmail, setDraftEmail] = useState<Record<string, string>>({})
+  const [draftPassword, setDraftPassword] = useState<Record<string, string>>({})
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     loadUsers()
@@ -151,24 +155,21 @@ export function ScreenUsers() {
 
   function loadUsers() {
     setLoading(true)
-    req<UserRead[]>(`${BASE}/v1/users`)
-      .then(setUsers)
+    usersApi.list()
+      .then(setUserList)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }
 
   async function handleCreate() {
     setFormError(null)
-    if (!email.trim() || !password.trim()) {
+      if (!email.trim() || !password.trim()) {
       setFormError('E-Mail und Passwort sind Pflicht.')
       return
     }
     setFormLoading(true)
     try {
-      await req<UserRead>(`${BASE}/v1/users`, {
-        method: 'POST',
-        body: JSON.stringify({ email, password, role }),
-      })
+      await usersApi.create({ email, password, role })
       setShowForm(false)
       setEmail('')
       setPassword('')
@@ -183,10 +184,7 @@ export function ScreenUsers() {
 
   async function handleToggleActive(user: UserRead) {
     try {
-      await req<UserRead>(`${BASE}/v1/users/${user.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ is_active: !user.is_active }),
-      })
+      await usersApi.update(user.id, { is_active: !user.is_active })
       loadUsers()
     } catch (e) {
       alert((e as Error).message)
@@ -196,7 +194,7 @@ export function ScreenUsers() {
   async function handleDelete(user: UserRead) {
     if (!window.confirm(`Benutzer ${user.email} wirklich löschen?`)) return
     try {
-      await req(`${BASE}/v1/users/${user.id}`, { method: 'DELETE' })
+      await usersApi.remove(user.id)
       loadUsers()
     } catch (e) {
       alert((e as Error).message)
@@ -209,6 +207,46 @@ export function ScreenUsers() {
       next.has(userId) ? next.delete(userId) : next.add(userId)
       return next
     })
+  }
+
+  function toggleCredentials(user: UserRead) {
+    setSaveError(null)
+    setExpandedCredentials(prev => {
+      const next = new Set(prev)
+      next.has(user.id) ? next.delete(user.id) : next.add(user.id)
+      return next
+    })
+    setDraftEmail(prev => ({ ...prev, [user.id]: prev[user.id] ?? user.email }))
+    setDraftPassword(prev => ({ ...prev, [user.id]: prev[user.id] ?? '' }))
+  }
+
+  async function handleSaveCredentials(user: UserRead) {
+    const nextEmail = (draftEmail[user.id] ?? '').trim()
+    const nextPassword = draftPassword[user.id] ?? ''
+    if (!nextEmail) {
+      setSaveError('E-Mail darf nicht leer sein.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      setSaveError('Bitte eine gültige E-Mail-Adresse eingeben.')
+      return
+    }
+    if (nextPassword && (nextPassword.length < 8 || !/[A-Za-z]/.test(nextPassword) || !/[0-9]/.test(nextPassword))) {
+      setSaveError('Neues Passwort muss mindestens 8 Zeichen sowie Buchstaben und Zahlen enthalten.')
+      return
+    }
+    try {
+      await usersApi.update(user.id, { email: nextEmail, ...(nextPassword ? { password: nextPassword } : {}) })
+      setDraftPassword(prev => ({ ...prev, [user.id]: '' }))
+      setExpandedCredentials(prev => {
+        const next = new Set(prev)
+        next.delete(user.id)
+        return next
+      })
+      loadUsers()
+    } catch (e) {
+      setSaveError((e as Error).message)
+    }
   }
 
   return (
@@ -262,11 +300,11 @@ export function ScreenUsers() {
                 <th>Rolle</th>
                 <th>Status</th>
                 <th>API-Schlüssel</th>
-                <th className="col-act" />
-              </tr>
+                 <th className="col-act" />
+               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+               {userList.map(u => (
                 <>
                   <tr key={u.id}>
                     <td>{u.email}</td>
@@ -295,25 +333,50 @@ export function ScreenUsers() {
                     </td>
                     <td className="col-act">
                       <div className="row-actions">
-                        <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
-                          {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
-                        </button>
-                        <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
-                          🗑
-                        </button>
+                         <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
+                           {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                         </button>
+                         <button className="btn sm gh" onClick={() => toggleCredentials(u)}>
+                           {expandedCredentials.has(u.id) ? 'Schließen' : 'Zugangsdaten'}
+                         </button>
+                         <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
+                           🗑
+                         </button>
                       </div>
                     </td>
                   </tr>
-                  {expandedKeys.has(u.id) && (
-                    <tr key={`${u.id}-keys`}>
-                      <td colSpan={5} style={{ padding: '0 8px 12px' }}>
-                        <ApiKeysPanel userId={u.id} />
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-              {users.length === 0 && (
+                   {expandedKeys.has(u.id) && (
+                     <tr key={`${u.id}-keys`}>
+                       <td colSpan={5} style={{ padding: '0 8px 12px' }}>
+                         <ApiKeysPanel userId={u.id} />
+                       </td>
+                     </tr>
+                   )}
+                   {expandedCredentials.has(u.id) && (
+                     <tr key={`${u.id}-credentials`}>
+                       <td colSpan={5} style={{ padding: '0 8px 12px' }}>
+                         <div style={{ background: 'var(--bg-s, #f9fafb)', border: '1px solid var(--border-s)', borderRadius: 6, padding: '12px 16px', marginTop: 4 }}>
+                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zugangsdaten ändern</div>
+                           <div className="field">
+                             <div className="lbl">E-Mail</div>
+                             <input className="fld" type="email" value={draftEmail[u.id] ?? ''} onChange={e => setDraftEmail(prev => ({ ...prev, [u.id]: e.target.value }))} />
+                           </div>
+                           <div className="field">
+                             <div className="lbl">Neues Passwort (optional)</div>
+                             <input className="fld" type="password" value={draftPassword[u.id] ?? ''} onChange={e => setDraftPassword(prev => ({ ...prev, [u.id]: e.target.value }))} />
+                           </div>
+                           {saveError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{saveError}</div>}
+                           <div style={{ display: 'flex', gap: 8 }}>
+                             <button className="btn pri" onClick={() => handleSaveCredentials(u)}>Speichern</button>
+                             <button className="btn gh" onClick={() => toggleCredentials(u)}>Abbrechen</button>
+                           </div>
+                         </div>
+                       </td>
+                     </tr>
+                   )}
+                 </>
+               ))}
+               {userList.length === 0 && (
                 <tr><td colSpan={5} className="empty">Keine Benutzer gefunden.</td></tr>
               )}
             </tbody>

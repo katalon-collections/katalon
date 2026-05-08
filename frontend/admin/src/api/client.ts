@@ -1,4 +1,4 @@
-import type { AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Snapshot, Token, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -52,6 +52,19 @@ export const auth = {
     const body = new URLSearchParams({ username: email, password })
     return req<Token>('/v1/auth/token', { method: 'POST', body: body.toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
   },
+}
+
+export const users = {
+  list: () => req<UserRead[]>('/v1/users'),
+  create: (data: { email: string; password: string; role: string }) =>
+    req<UserRead>('/v1/users', { method: 'POST', body: JSON.stringify(data) }),
+  update: (userId: string, data: { email?: string; password?: string; role?: string; is_active?: boolean }) =>
+    req<UserRead>(`/v1/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (userId: string) => req<void>(`/v1/users/${userId}`, { method: 'DELETE' }),
+  changeOwnPassword: (current_password: string, new_password: string) =>
+    req<void>('/v1/users/me/password', { method: 'PUT', body: JSON.stringify({ current_password, new_password }) }),
+  changeOwnEmail: (new_email: string, current_password: string) =>
+    req<UserRead>('/v1/users/me/email', { method: 'PUT', body: JSON.stringify({ new_email, current_password }) }),
 }
 
 // Objects
@@ -388,9 +401,6 @@ export const oaiSets = {
   update: (id: string, data: OAISetPayload) => req<OAISet>(`/v1/oai-sets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/oai-sets/${id}`, { method: 'DELETE' }),
 }
-
-// API Keys
-import type { ApiKey, ApiKeyCreated } from '../types'
 
 export const apiKeys = {
   /** List API keys for the current user */
