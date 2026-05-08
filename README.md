@@ -120,21 +120,88 @@ OpenAPI-Dokumentation: `http://localhost:8000/docs`
 
 Wichtige Endpunkte:
 
-| Methode        | Pfad                           | Beschreibung                           |
-|----------------|--------------------------------|----------------------------------------|
-| POST           | `/v1/auth/token`               | JWT-Login                              |
-| GET            | `/v1/objects`                  | Objekte auflisten (Pagination, Filter) |
-| POST           | `/v1/objects`                  | Neues Objekt anlegen                   |
-| GET/PUT/DELETE | `/v1/objects/{id}`             | Objekt lesen/aktualisieren/löschen     |
-| GET            | `/v1/search`                   | Volltext- und Facettensuche            |
-| GET            | `/v1/schema/{target_type}`     | Felddefinitionen abrufen               |
-| GET/POST       | `/v1/schema/import`            | Schema aus YAML/JSON importieren       |
-| GET            | `/v1/vocabularies`             | Vokabulare auflisten                   |
-| POST           | `/v1/vocabularies/{id}/import` | Vokabular-Terme importieren            |
-| GET            | `/v1/authorities/search`       | Normdaten-Suche                        |
-| GET            | `/v1/oai`                      | OAI-PMH Endpoint                       |
+| Methode        | Pfad                              | Beschreibung                           |
+|----------------|-----------------------------------|----------------------------------------|
+| POST           | `/v1/auth/token`                  | JWT-Login                              |
+| GET            | `/v1/objects`                     | Objekte auflisten (Pagination, Filter) |
+| POST           | `/v1/objects`                     | Neues Objekt anlegen                   |
+| GET/PUT/DELETE | `/v1/objects/{id}`                | Objekt lesen/aktualisieren/löschen     |
+| GET            | `/v1/schema/{target_type}`        | Felddefinitionen abrufen               |
+| GET/POST       | `/v1/schema/import`               | Schema aus YAML/JSON importieren       |
+| GET            | `/v1/vocabularies`                | Vokabulare auflisten                   |
+| POST           | `/v1/vocabularies/{id}/import`    | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
+| GET            | `/v1/search`                      | Volltext- und Facettensuche            |
+| POST           | `/v1/pids/urn/register`           | URN via DNB-API registrieren (PID-Feld) |
+| GET            | `/v1/authorities/search`          | Normdaten-Suche                        |
+| GET            | `/v1/oai`                         | OAI-PMH Endpoint                       |
+| GET            | `/v1/portal/config`               | Portal-Konfiguration                   |
+| POST           | `/v1/portal/logo`                 | Logo hochladen                         |
+| GET            | `/v1/audit`                       | Audit-Log abrufen                      |
 
----
+### DNB-URN (PID)
+
+- URN-Vergabe ist per Umgebungsvariablen konfigurierbar (`DNB_URN_*` in `.env.example`).
+- URN-Registrierung ist derzeit auf den Record-Typ **`object`** eingeschränkt.
+- Für lokale Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
+
+### Vokabular-Import (CSV/JSON)
+
+Endpoint: `POST /v1/vocabularies/{vocab_id}/import?dry_run=true|false&strategy=append|replace`  
+Request: `multipart/form-data` mit `file` und optional `mapping` (nur CSV/TSV).
+
+#### Welche Felder sind nötig?
+
+- **Kein `id` erforderlich** (IDs werden intern erzeugt).
+- **Kein `title` erforderlich**.
+- Pflicht ist nur der **Term-Schlüssel** (`term`), also der interne Begriff.
+- Optional:
+  - `label:<sprache>` (z. B. `label:de`, `label:en`) für Anzeigenamen/Übersetzungen
+  - `parent_term` für Hierarchie
+  - `external_id` als externe Kennung im Importdatensatz
+
+#### CSV/TSV
+
+CSV braucht ein Mapping-Feld (`mapping` als JSON), z. B.:
+
+```json
+{
+  "begriff": "term",
+  "anzeige_de": "label:de",
+  "anzeige_en": "label:en",
+  "oberbegriff": "parent_term",
+  "gnd_id": "external_id"
+}
+```
+
+Beispiel-CSV:
+
+```csv
+begriff;anzeige_de;anzeige_en;oberbegriff;gnd_id
+kunst;Kunst;Art;;
+malerei;Malerei;Painting;kunst;4065684-4
+```
+
+#### JSON (auch hierarchisch)
+
+Unterstützt flache Listen oder verschachtelte `children`:
+
+```json
+[
+  {
+    "term": "kunst",
+    "label": {"de": "Kunst", "en": "Art"},
+    "children": [
+      {"term": "malerei", "label": {"de": "Malerei", "en": "Painting"}}
+    ]
+  }
+]
+```
+
+#### Dry-Run und Strategie
+
+- `dry_run=true`: prüft Datei, schreibt nichts in die DB (Vorschau + Fehlerliste).
+- `strategy=append`: vorhandene Terme bleiben, gleiche `term`-Werte werden aktualisiert.
+- `strategy=replace`: vorhandene Terme des Vokabulars werden ersetzt.
 
 ## Admin-UI
 

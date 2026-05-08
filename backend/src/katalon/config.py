@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     default_admin_password: str = "admin"
 
     oai_admin_email: str = "admin@katalon.dev"
+    geonames_username: str = "demo"
+
+    dnb_urn_enabled: bool = False
+    dnb_urn_api_url: str = "https://api.nbn-resolving.org/v2/"
+    dnb_urn_namespace: str = ""
+    dnb_urn_username: str = ""
+    dnb_urn_password: str = ""
+    dnb_urn_resolver_url: str = "https://nbn-resolving.org/"
 
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 

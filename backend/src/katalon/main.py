@@ -9,8 +9,8 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from katalon.api.v1 import (
-    auth, audit, authority, entities, importer, media, objects,
-    occurrences, oai, oai_sets, pages, places, portal, relations, schema_admin, search, theme, users, vocabularies,
+    auth, audit, authority, dnb_urn_mock, entities, importer, media, objects,
+    occurrences, oai, oai_sets, pages, pids, places, portal, relations, schema_admin, search, theme, users, vocabularies,
 )
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
@@ -143,10 +143,12 @@ app.include_router(portal.router, prefix="/v1")
 app.include_router(pages.router, prefix="/v1")
 app.include_router(search.router, prefix="/v1")
 app.include_router(authority.router, prefix="/v1")
+app.include_router(pids.router, prefix="/v1")
 app.include_router(importer.router, prefix="/v1")
 app.include_router(oai.router, prefix="/v1")
 app.include_router(oai_sets.router, prefix="/v1")
 app.include_router(api_keys_router, prefix="/v1")
+app.include_router(dnb_urn_mock.router, prefix="/v1")
 
 
 @app.get("/health", tags=["system"])

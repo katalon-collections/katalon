@@ -279,6 +279,19 @@ export const authority = {
     req<AuthorityHit>(`/v1/authorities/fetch?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`),
 }
 
+export const pids = {
+  registerDnbUrn: (data: {
+    record_type: string
+    record_id: string
+    field_name: string
+    target_url: string
+    label?: string
+  }) => req<{ urn: string; resolver_url: string; value: { value: string; label: string } }>(
+    '/v1/pids/urn/register',
+    { method: 'POST', body: JSON.stringify(data) },
+  ),
+}
+
 // Audit
 export const audit = {
   list: (params?: { record_type?: string; action?: string; limit?: number }) => {

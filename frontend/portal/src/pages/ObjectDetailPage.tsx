@@ -8,7 +8,7 @@ import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
-import { authorityUrl, renderFieldValue } from '../utils/renderFieldValue'
+import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -177,7 +177,11 @@ export function ObjectDetailPage() {
           {visibleFields.map(f => {
             const rawValue = m[f.name]
             const rendered = renderFieldValue(rawValue)
-            const href = f.field_type === 'authority' ? authorityUrl(rawValue) : undefined
+            const href = f.field_type === 'authority'
+              ? authorityUrl(rawValue)
+              : f.field_type === 'pid'
+                ? pidUrl(rawValue)
+                : undefined
             return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
