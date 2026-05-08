@@ -1,6 +1,9 @@
 import asyncio
+import mimetypes
+import shutil
 import uuid
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import select
 
@@ -56,3 +59,171 @@ def generate_iiif_tiles(self, media_file_id: str) -> dict:
             asyncio.run(_set_error(uuid.UUID(media_file_id), str(exc)))
             return {"status": "error", "detail": str(exc)}
         raise self.retry(exc=exc, countdown=2 ** self.request.retries * 10)
+
+
+async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict:
+    from katalon.config import settings
+    from katalon.core.models import MediaFile, Object, Vocabulary, VocabularyTerm
+    from katalon.database import AsyncSessionLocal
+    from katalon.services.media_batch_import_service import (
+        folder_or_filename_object_id,
+        normalize_filename,
+        parse_mapping_csv,
+    )
+
+    images_dir = job_dir / "images"
+    mapping_path = job_dir / "mapping.csv"
+    files = [p for p in images_dir.rglob("*") if p.is_file()]
+
+    by_basename: dict[str, list[Path]] = {}
+    for f in files:
+        by_basename.setdefault(normalize_filename(f.name), []).append(f)
+
+    report: dict[str, list[dict[str, str | int | None]]] = {
+        "missing_files": [],
+        "duplicate_files": [],
+        "unmatched_files": [],
+        "errors": [],
+    }
+
+    planned: list[tuple[Path, str, str | None]] = []
+    if mapping_path.exists():
+        rows, mapping_errors = parse_mapping_csv(mapping_path.read_bytes())
+        report["errors"].extend(mapping_errors)
+        for row in rows:
+            matches = by_basename.get(normalize_filename(row.filename), [])
+            if not matches:
+                report["missing_files"].append({"row": row.row, "filename": row.filename})
+                continue
+            if len(matches) > 1:
+                report["duplicate_files"].append({"row": row.row, "filename": row.filename})
+                continue
+            planned.append((matches[0], row.object_id, row.media_type))
+    else:
+        for file_path in files:
+            rel = str(file_path.relative_to(images_dir))
+            object_id = folder_or_filename_object_id(rel)
+            if not object_id:
+                report["unmatched_files"].append({"filename": rel})
+                continue
+            planned.append((file_path, object_id, None))
+
+    for name, dup in by_basename.items():
+        if len(dup) > 1:
+            report["duplicate_files"].append({"row": None, "filename": name, "count": len(dup)})
+
+    total = len(planned)
+    created = 0
+    failed = 0
+    processed = 0
+
+    async with AsyncSessionLocal() as session:
+        vocab_result = await session.execute(select(Vocabulary).where(Vocabulary.name == "media_types"))
+        vocab = vocab_result.scalar_one_or_none()
+        media_terms: set[str] = set()
+        if vocab is not None:
+            terms_result = await session.execute(
+                select(VocabularyTerm.term).where(VocabularyTerm.vocabulary_id == vocab.id)
+            )
+            media_terms = {t for t in terms_result.scalars().all()}
+        media_vocab_ready = vocab is not None and bool(media_terms)
+
+        media_root = Path(settings.media_root)
+        media_root.mkdir(parents=True, exist_ok=True)
+
+        for file_path, object_id_raw, media_type in planned:
+            processed += 1
+            task.update_state(
+                state="STARTED",
+                meta={"total": total, "processed": processed, "created": created, "failed": failed},
+            )
+            rel_name = str(file_path.relative_to(images_dir))
+            try:
+                object_id = uuid.UUID(object_id_raw)
+            except ValueError:
+                failed += 1
+                report["errors"].append({"row": None, "message": f"Ungültige Objekt-ID für Datei {rel_name}"})
+                continue
+
+            object_exists = (
+                await session.execute(select(Object.id).where(Object.id == object_id))
+            ).scalar_one_or_none()
+            if object_exists is None:
+                failed += 1
+                report["errors"].append({"row": None, "message": f"Objekt nicht gefunden für Datei {rel_name}"})
+                continue
+
+            if media_type and not media_vocab_ready:
+                failed += 1
+                report["errors"].append({
+                    "row": None,
+                    "message": f"media_types-Vokabular nicht verfügbar für Datei {rel_name}",
+                })
+                continue
+            if media_type and media_type not in media_terms:
+                failed += 1
+                report["errors"].append({
+                    "row": None,
+                    "message": f"Ungültiger media_type '{media_type}' für Datei {rel_name}",
+                })
+                continue
+
+            mime, _ = mimetypes.guess_type(file_path.name)
+            if mime not in {"image/jpeg", "image/png", "image/tiff", "image/webp"}:
+                failed += 1
+                report["errors"].append({
+                    "row": None,
+                    "message": f"Nicht unterstützter Dateityp für Datei {rel_name}",
+                })
+                continue
+
+            file_id = uuid.uuid4()
+            suffix = file_path.suffix or ".bin"
+            dest_path = media_root / f"{file_id}{suffix}"
+            shutil.copy2(file_path, dest_path)
+
+            existing = (
+                await session.execute(select(MediaFile.id).where(MediaFile.object_id == object_id))
+            ).scalars().first()
+            media = MediaFile(
+                id=file_id,
+                object_id=object_id,
+                filename=file_path.name,
+                mime_type=mime,
+                file_path=str(dest_path),
+                status="pending",
+                is_primary=existing is None,
+                media_type=media_type,
+            )
+            session.add(media)
+            await session.flush()
+            generate_iiif_tiles.delay(str(file_id))
+            created += 1
+
+        await session.commit()
+
+    return {
+        "batch_id": str(job_id),
+        "total_files": len(files),
+        "planned": total,
+        "created": created,
+        "failed": failed,
+        "report": report,
+    }
+
+
+@celery_app.task(name="katalon.import_media_batch", bind=True)
+def import_media_batch_task(self: Any, job_id: str, job_dir: str) -> dict:
+    try:
+        result = asyncio.run(_import_media_batch(uuid.UUID(job_id), Path(job_dir), self))
+        try:
+            shutil.rmtree(job_dir, ignore_errors=False)
+        except OSError:
+            pass
+        return result
+    except Exception as exc:
+        try:
+            shutil.rmtree(job_dir, ignore_errors=False)
+        except OSError:
+            pass
+        raise exc

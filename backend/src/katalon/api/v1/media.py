@@ -1,18 +1,24 @@
+import io
+import shutil
+import zipfile
 import uuid
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, UploadFile
+from celery.result import AsyncResult
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.config import settings
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, require_admin_or_editor
 from katalon.core.models import MediaFile, Object
-from katalon.workers.media_tasks import generate_iiif_tiles
+from katalon.workers.celery_app import celery_app
+from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
 router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
+batch_router = APIRouter(prefix="/media", tags=["media"])
 
 ALLOWED_MIME = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
 
@@ -123,3 +129,87 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
     Path(media.file_path).unlink(missing_ok=True)
     await db.delete(media)
+
+
+def _safe_join(root: Path, relative: str) -> Path:
+    rel = Path(relative)
+    target = (root / rel).resolve()
+    if not target.is_relative_to(root.resolve()):
+        raise HTTPException(status_code=400, detail="Ungültiger Dateipfad im Archiv")
+    return target
+
+
+@batch_router.post(
+    "/batch-import",
+    dependencies=[require_admin_or_editor()],
+)
+async def start_batch_import(
+    archive: UploadFile | None = File(None),
+    mapping: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
+) -> dict:
+    if archive is None and not files:
+        raise HTTPException(status_code=422, detail="Bitte ZIP-Datei oder Bildordner hochladen")
+
+    if archive is not None and archive.filename and not archive.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=422, detail="Archiv muss eine ZIP-Datei sein")
+
+    staging_root = Path(settings.media_root) / "_batch_imports"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    job_id = uuid.uuid4()
+    job_dir = staging_root / str(job_id)
+    images_dir = job_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    if archive is not None:
+        archive_bytes = await archive.read()
+        try:
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zf:
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    output_path = _safe_join(images_dir, info.filename)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(info) as src, output_path.open("wb") as dst:
+                        shutil.copyfileobj(src, dst)
+        except zipfile.BadZipFile as exc:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail=f"Ungültiges ZIP-Archiv: {exc}") from exc
+
+    for upload in files or []:
+        if not upload.filename:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail="Upload enthält Datei ohne Namen")
+        output_path = _safe_join(images_dir, upload.filename)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(output_path, "wb") as out:
+            while chunk := await upload.read(65536):
+                await out.write(chunk)
+
+    if mapping is not None:
+        mapping_name = (mapping.filename or "").lower()
+        if not (mapping_name.endswith(".csv") or mapping_name.endswith(".tsv")):
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail="Mapping-Datei muss CSV/TSV sein")
+        mapping_path = job_dir / "mapping.csv"
+        async with aiofiles.open(mapping_path, "wb") as out:
+            while chunk := await mapping.read(65536):
+                await out.write(chunk)
+
+    task = import_media_batch_task.delay(str(job_id), str(job_dir))
+    return {"status": "queued", "task_id": task.id, "batch_id": str(job_id)}
+
+
+@batch_router.get(
+    "/batch-import/task/{task_id}",
+    dependencies=[require_admin_or_editor()],
+)
+async def batch_import_status(task_id: str) -> dict:
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    meta = result.info if isinstance(result.info, dict) else None
+    if state == "SUCCESS":
+        return {"state": state, "result": result.result}
+    if state == "FAILURE":
+        return {"state": state, "error": str(result.result), "meta": meta}
+    return {"state": state, "meta": meta}

@@ -48,8 +48,8 @@ Katalon ist ein Metadata Management System für den GLAM-Sektor. Die Architektur
 | `redis` | `redis:7-alpine` | Celery-Broker und -Backend | – |
 | `elasticsearch` | `elasticsearch:8` | Volltextsuche, OAI-PMH-Quelle | Volume `es_data` |
 | `cantaloupe` | `islandora/cantaloupe` | IIIF Image API 3, Tile-Generierung | Volume `media_data` |
-| `admin` | Node build → nginx | Admin-UI (React), port 4000 | – |
-| `portal` | Node build → nginx | Public-Portal (React), port 4001 | – |
+| `admin` | Node build → nginx | Admin-UI (React), port 3000 | – |
+| `portal` | Node build → nginx | Public-Portal (React), port 3001 | – |
 | `nginx` | `nginx:alpine` | Reverse Proxy, TLS (nur Produktion) | – |
 
 ## Backend-Struktur
@@ -242,7 +242,7 @@ Das Portal-Theme wird vollständig über CSS Custom Properties gesteuert. Die We
 
 ## Deployment
 
-- **Entwicklung:** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`  
+- **Entwicklung:** `docker compose up`  
 - **Produktion:** `docker compose -f docker-compose.yml -f docker-compose.prod.yml up`
 
 Produktions-Besonderheiten: nginx übernimmt TLS-Terminierung, interne Services exponieren keine Ports nach außen (`ports: !reset []`), alle Secrets über `.env`.

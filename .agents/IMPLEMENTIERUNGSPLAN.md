@@ -8,7 +8,7 @@
 
 ### Phase 0 – Infra ✅
 Docker Compose: api, worker, db (PostGIS), elasticsearch, redis, cantaloupe, admin, portal, nginx.
-`docker/nginx.static.conf` für statische SPA-Container; `docker/nginx.conf` als Reverse Proxy.
+`docker/nginx.admin.conf` und `docker/nginx.portal.conf` für statische SPA-Container; `docker/nginx.conf` als Reverse Proxy.
 
 ### Phase 1 – Core-Datenbank ✅
 ORM-Models für alle 4 Primärtypen, Relationen, Audit Log, Snapshots, Media, Vokabulare, Users.

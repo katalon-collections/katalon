@@ -13,7 +13,8 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 ## Dateien in diesem Verzeichnis
 
 - `KONZEPT.md` – vollständiges Konzeptdokument mit Datenmodell
-- `IMPLEMENTIERUNGSPLAN.md` – detaillierter Phasenplan
+- `.agents/IMPLEMENTIERUNGSPLAN.md` – detaillierter Phasenplan
+- `.agents/DEV.md` – Entwickler-Setup und Workflows
 - `design-prompts/01_discovery_portal.md` – Design-Prompt Public-Portal
 - `design-prompts/02_admin_ui.md` – Design-Prompt Admin-UI
 
@@ -146,4 +147,4 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 ## Nächster logischer Schritt
 
-Phase 0: `docker-compose.yml` + `backend/pyproject.toml` + Alembic-Init anlegen.
+Siehe `.agents/IMPLEMENTIERUNGSPLAN.md` für aktuelle Prioritäten.

@@ -185,6 +185,31 @@ export interface MediaFile {
   created_at: string
 }
 
+export interface MediaBatchStatus {
+  state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
+  result?: {
+    batch_id: string
+    total_files: number
+    planned: number
+    created: number
+    failed: number
+    report: {
+      missing_files: { row: number | null; filename: string }[]
+      duplicate_files: { row: number | null; filename: string; count?: number }[]
+      unmatched_files: { filename: string }[]
+      errors: { row: number | null; message: string }[]
+    }
+  }
+  meta?: { total: number; processed: number; created: number; failed: number }
+  error?: string
+}
+
+type FolderFile = File & { webkitRelativePath?: string }
+
+function fileFormName(file: FolderFile): string {
+  return file.webkitRelativePath || file.name
+}
+
 export const media = {
   list: (objectId: string) => req<MediaFile[]>(`/v1/objects/${objectId}/media`),
   upload: async (objectId: string, file: File): Promise<MediaFile> => {
@@ -207,6 +232,20 @@ export const media = {
   patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean }) =>
     req<MediaFile>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
+  batchImport: async (archive: File | null, mapping: File | null, files: File[]): Promise<{ status: string; task_id: string; batch_id: string }> => {
+    const formData = new FormData()
+    if (archive) formData.append('archive', archive)
+    if (mapping) formData.append('mapping', mapping)
+    for (const file of files) formData.append('files', file, fileFormName(file as FolderFile))
+    const headers: Record<string, string> = {}
+    if (_token) headers['Authorization'] = `Bearer ${_token}`
+    const res = await fetch(`${BASE}/v1/media/batch-import`, { method: 'POST', body: formData, headers })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
+    if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
+    return res.json()
+  },
+  batchTaskStatus: (taskId: string): Promise<MediaBatchStatus> =>
+    req<MediaBatchStatus>(`/v1/media/batch-import/task/${taskId}`),
 }
 
 // Relations

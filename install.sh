@@ -28,6 +28,7 @@ err()   { echo -e "${RED}✖${NC}  $*" >&2; }
 
 # --- Argumente parsen ------------------------------------------------------
 
+UP=false
 DEMO=false
 RESET=false
 DEV=false
@@ -50,6 +51,7 @@ show_help() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --up)
+            UP=true
             shift
             ;;
         --demo)
@@ -85,7 +87,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Ohne Argumente Hilfe anzeigen
-if [[ "$DEMO" == false && "$RESET" == false && "$DEV" == false && "$DOWN" == false ]]; then
+if [[ "$UP" == false && "$DEMO" == false && "$RESET" == false && "$DEV" == false && "$DOWN" == false ]]; then
     show_help
     exit 0
 fi
