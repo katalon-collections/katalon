@@ -50,6 +50,18 @@ Mindestens diese Werte anpassen:
 | `CORS_ORIGINS` | Komma-separierte Liste erlaubter Frontends |
 | `OAI_ADMIN_EMAIL` | Erscheint im OAI-PMH Identify-Response |
 
+### Instanzspezifische Docker-Compose-Anpassungen
+
+Wenn du eigene Ports, Volume-Pfade oder zusätzliche Umgebungsvariablen brauchst, ändere dafür **nicht** die zentrale `docker-compose.yml`.
+
+Stattdessen:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+```
+
+`docker-compose.override.yml` wird automatisch von Docker Compose mitgeladen und bleibt bei Updates unangetastet.
+
 ## 3. TLS-Zertifikate einrichten
 
 ### Option A: Let's Encrypt mit certbot (empfohlen)

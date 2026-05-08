@@ -12,5 +12,6 @@ frontend/admin/node_modules/.bin/
 frontend/admin/node_modules/.vite/
 frontend/admin/node_modules/
 docker-compose.log
+docker-compose.override.yml
 .claude/settings.local.json
 .env
