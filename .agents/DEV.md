@@ -1,41 +1,89 @@
 # Katalon Development Setup
 
-Two development workflows are available:
+Three development workflows are available. Choose based on what you need.
 
-## 1. Local Development (Recommended for rapid iteration)
+---
 
-**Fastest feedback loops. Code changes reload instantly.**
+## 1. Docker Dev Stack (Recommended)
+
+**Everything in Docker, but with live reload. No local Python or Node installation needed beyond Docker.**
+
+Source code is mounted into the containers as volumes — saving a file reloads the process automatically. No image rebuild required for code changes.
+
+```bash
+cd /Users/karl/Coding/Katalon
+
+# First time: build the dev images
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+
+# Start everything
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### What reloads automatically
+
+| Service | Mechanism | Trigger |
+|---|---|---|
+| API (FastAPI) | `uvicorn --reload` | Any `.py` file change in `backend/src/` |
+| Admin UI | Vite HMR | Any file change in `frontend/admin/src/` |
+| Portal UI | Vite HMR | Any file change in `frontend/portal/src/` |
+| Celery Worker | **Manual** | `docker compose restart worker` |
+
+### Access
+
+- **Admin UI**: <http://localhost:4000>
+- **Portal UI**: <http://localhost:4001>
+- **API**: <http://localhost:8000>
+- **API Docs**: <http://localhost:8000/api/docs>
+
+### Run migrations after startup
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
+```
+
+---
+
+## 2. Local Development (Fastest feedback, more setup)
+
+**Python and Node run directly on your machine. Requires uv and Node 20+.**
+
+Useful when you want the absolute fastest feedback loop or need debugger support.
 
 ### Prerequisites
 
 ```bash
-# Create venv
+# Python env
 cd /Users/karl/Coding/Katalon
 uv venv
-
-# Activate
 source .venv/bin/activate
+cd backend && uv pip install -e ".[dev]" && cd ..
 ```
 
-### Start Services
-
-Terminal 1 - Database:
+### Start backing services
 
 ```bash
-docker compose up -d db
+docker compose up -d db redis elasticsearch cantaloupe
 ```
 
-Terminal 2 - Python API (auto-reloads):
+### Start the application (separate terminals)
 
 ```bash
-cd /Users/karl/Coding/Katalon/backend
+# Terminal 1 — API
+cd backend
 uvicorn katalon.main:app --reload --port 8000
-```
 
-Terminal 3 - Admin Frontend (hot-reload):
+# Terminal 2 — Celery worker
+cd backend
+celery -A katalon.workers.celery_app worker --loglevel=info
 
-```bash
-cd /Users/karl/Coding/Katalon/frontend/admin
+# Terminal 3 — Admin UI
+cd frontend/admin
+npm install  # first time only
+npm run dev
+
+# Terminal 4 — Portal UI
+cd frontend/portal
 npm install  # first time only
 npm run dev
 ```
@@ -43,97 +91,83 @@ npm run dev
 ### Access
 
 - **Admin UI**: <http://localhost:5173>
+- **Portal UI**: <http://localhost:5174>
 - **API Docs**: <http://localhost:8000/api/docs>
-- **API Health**: <http://localhost:8000/health>
 
 ---
 
-## 2. Full Docker Compose Stack
+## 3. Full Docker Stack (Production-like)
 
-**For production-like testing, end-to-end validation.**
+**For end-to-end testing, nginx routing, and verifying the production build.**
 
-### Start Everything
+No live reload — requires image rebuild for code changes. Use this to verify the production build works, not for active development.
 
 ```bash
-cd /Users/karl/Coding/Katalon
-docker compose down  # clean first time
-docker compose build --no-cache
-docker compose up
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 ```
-
-### Access
 
 - **Admin UI**: <http://localhost:3000>
 - **Portal UI**: <http://localhost:3001>
-- **API Docs**: <http://localhost:8000/api/docs>
-- **Nginx**: <http://localhost>
-
-### Services Included
-
-- PostgreSQL 16 + PostGIS
-- Redis 7
-- Elasticsearch 8.13
-- Cantaloupe IIIF Server
-- FastAPI Backend
-- Celery Worker
-- Admin React App
-- Portal React App
-- Nginx Reverse Proxy
-
----
-
-## Switching Between Modes
-
-**To switch from local to Docker:**
-
-```bash
-docker compose up -d db redis elasticsearch cantaloupe
-# Kill local terminals, then restart with docker compose
-docker compose up
-```
-
-**To switch from Docker to local:**
-
-```bash
-docker compose down
-# Kill docker, restart local terminal servers
-```
+- **API**: proxied via nginx at <http://localhost>
 
 ---
 
 ## Common Tasks
 
-### Run Tests Locally
+### Run tests
 
 ```bash
-cd /Users/karl/Coding/Katalon/backend
-source ../.venv/bin/activate
-pytest tests/
+# Local
+cd backend && pytest tests/
+
+# Docker dev stack
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api pytest tests/
 ```
 
-### Database Migrations (Alembic)
+### Database migrations
 
 ```bash
-cd /Users/karl/Coding/Katalon/backend
-alembic upgrade head
+# Local
+cd backend && alembic upgrade head
+
+# Docker dev stack
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
-### Reset Local Database
+### Reset local database (dev stack)
 
 ```bash
-docker compose down db
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 docker volume rm katalon_db_data
-docker compose up -d db
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
-### View API Logs (Docker)
+See `dev_reset.md` for a full reset including Elasticsearch.
+
+### Rebuild a single service after Dockerfile change
 
 ```bash
-docker logs katalon-api-1 -f
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build api
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d api
 ```
 
-### Shell into Container
+### Reload Celery worker after worker code change
 
 ```bash
-docker exec -it katalon-api-1 /bin/bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml restart worker
+```
+
+### Tail logs
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f api
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f worker
+```
+
+### Shell into a container
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api bash
 ```

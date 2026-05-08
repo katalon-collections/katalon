@@ -1,11 +1,15 @@
 # Projektkonzept: Katalon
-**Ein modernes Metadata Management System für den GLAM-Sektor**
+**Eine moderne Sammlungsdatenbank für den GLAM-Sektor**
 
 ---
 
 ## 1. Die Motivation
 
-Die Archivwelt steht vor einem technologischen Wendepunkt. Etablierte Systeme wie **CollectiveAccess** haben über Jahrzehnte bewiesen, dass ein flexibles Metadatenschema (*Configuration over Coding*) der richtige Ansatz ist. Dennoch leiden diese Systeme unter massiver Legacy-Last:
+### Was Katalon ist
+
+Katalon ist eine **Sammlungsdatenbank** für Galerien, Bibliotheken, Archive und Museen (GLAM). Das Kernversprechen: frei konfigurierbare Metadaten für physische und digitale Sammlungsobjekte, Personen, Orte und Ereignisse — mit einem öffentlichen Discovery-Portal und einer sauberen REST-API.
+
+Der direkte Vorläufer ist **CollectiveAccess**, das über Jahrzehnte bewiesen hat, dass ein flexibles Metadatenschema (*Configuration over Coding*) der richtige Ansatz ist. Dennoch leidet es unter massiver Legacy-Last:
 
 - Monolithische PHP-Architektur, schwer wartbar und erweiterbar
 - Komplexe XML-Konfigurationen mit hoher Einstiegshürde
@@ -13,6 +17,14 @@ Die Archivwelt steht vor einem technologischen Wendepunkt. Etablierte Systeme wi
 - Keine native Python/Datenscience-Integration
 
 **Katalon** überführt die Flexibilität in Python + React: dynamische Schemata, kontrollierte Vokabulare, Entitätsrelationen – aber mit einer sauberen REST-API, zwei React-Frontends und einer modernen Deployment-Infrastruktur.
+
+### Was Katalon nicht ist
+
+Katalon ist **kein Bibliothekssystem**. Es gibt kein MARC-Datenmodell, keine Exemplarverwaltung, keinen Ausleihverkehr, keine Z39.50-Schnittstelle. Wer einen OPAC oder ein Bibliotheksintegrationssystem sucht, braucht Koha, FOLIO oder ähnliches.
+
+Katalon ist auch **kein institutionelles Repositorium** im Sinne von DSpace oder InvenioRDM — kein Einreichungs-Workflow, kein Embargo-Management, kein DOI-Minting. Ein flexibles Schema kann zwar born-digital Dokumente beschreiben (PDF-Anhänge, Reports, Forschungsdaten), aber das ist ein sekundärer Anwendungsfall, kein Kernversprechen.
+
+**Der Fokus liegt auf Sammlungsobjekten:** Fotografien, Kunstwerke, Archivmaterialien, archäologische Funde, Naturalienkabinette, Instrumente — und allem, was dazu gehört (wer hat es gemacht, wo war es, was zeigt es).
 
 ---
 
@@ -60,7 +72,7 @@ Ein Sammler besitzt tausende historische Fotografien aus Marokko. Sein Ziel:
 | Suche | Elasticsearch 8.x |
 | Bildserver | Cantaloupe (IIIF Image API) |
 | Task Queue | Celery + Redis |
-| Storage | Local (Docker Volumes) |
+| Storage | Lokales Dateisystem (Bind Mount, konfigurierbar) |
 | Admin-UI | React + TypeScript (Vite) |
 | Public-Portal | React + TypeScript (Vite) |
 | Deployment | Docker Compose |
@@ -73,12 +85,26 @@ Katalon kennt vier gleichwertige Primärtypen. Alle haben **frei konfigurierbare
 
 | Typ | Beschreibung | Beispiele |
 |---|---|---|
-| **Object** | Physische oder digitale Artefakte | Fotografie, Dokument, Gemälde |
+| **Object** | Physische oder digitale Artefakte | Fotografie, Dokument, Gemälde, Born-Digital-PDF |
 | **Entity** | Personen oder Organisationen | Fotograf, Verlag, Institution |
-| **Place** | Geografische Orte | Stadtbezirk, Gebäude, Region |
-| **Occurrence** | Werke, Ereignisse, abstrakte Konzepte (FRBR) | Musikwerk, Ausstellung, Publikation |
+| **Place** | Geografische Orte mit Koordinaten | Stadtbezirk, Gebäude, Grabungsstätte |
+| **Occurrence** | Ereignisse, abstrakte Werke und Konzepte | Ausstellung, Kampagne, Musikwerk, historisches Ereignis |
 
 Typ-Hierarchien (Untertypen mit eigenen Pflichtfeldern) sind **Post-MVP**.
+
+### Zur Herkunft des Begriffs „Occurrence"
+
+„Occurrence" ist dem System **CollectiveAccess** entlehnt, wo es als Sammelbegriff für alles gilt, das kein Objekt, keine Entität und kein Ort ist. Es ist kein Industriestandard — der internationale Referenzrahmen **CIDOC-CRM** (ISO 21127) nennt das entsprechende Konzept *E5 Event*, kommerzielle Systeme wie Axiell/EMu verwenden ebenfalls „Event".
+
+„Event" wäre intuitiver, aber zu eng: Eine Ausstellung ist ein Ereignis, ein abstraktes Werk im Sinne der *Functional Requirements for Bibliographic Records* (FRBR) — also „Beethovens 9. Sinfonie" als intellektuelle Schöpfung unabhängig von Aufnahmen oder Noten — ist keins. Dafür kennt CIDOC-CRM eine eigene Klasse (*E28 Conceptual Object*). Katalon fasst beides unter Occurrence zusammen.
+
+**Praktische Faustregel:**
+- Ist es ein konkretes Ding mit einer Datei, einer Inventarnummer oder einem physischen Standort → **Object**
+- Ist es eine Person oder Organisation → **Entity**
+- Ist es ein Ort → **Place**
+- Ist es ein Ereignis, eine Ausstellung, ein Werk, eine Kampagne, ein Konzept — also etwas, das die anderen drei verbindet oder kontextualisiert → **Occurrence**
+
+Wie Objects mit `object_type` und Entities mit `entity_type` hat auch Occurrence ein `occurrence_type`-Feld. Institutionen legen eigene Untertypen an und benennen sie frei: „Werk", „Komposition", „Ausstellung", „Grabungskampagne". Der Typ „Occurrence" selbst ist nicht umbenennbar — die Differenzierung geschieht ausschließlich über Untertypen.
 
 ---
 
@@ -455,10 +481,22 @@ Backend-Endpunkt: `GET /v1/theme` → liefert aktives `theme.json` + URLs zu Log
 
 ---
 
-## 12. Nicht im Scope (MVP)
+## 12. Nicht im Scope
 
+### Nie im Scope
+
+- Bibliotheks-OPAC, MARC, Exemplarverwaltung, Ausleihverkehr
 - Video/Audio-Transcoding
 - Leihverkehr / Standortverwaltung
-- Typ-Hierarchien (Post-MVP)
-- Sets (Nice-to-have, Post-MVP)
-- Theme-System Discovery-Portal (Post-MVP → Konzept in Abschnitt 11)
+- Z39.50, SRU-Server (Harvesting via OAI-PMH ist im Scope)
+
+### Post-MVP (konzipiert, aber noch nicht gebaut)
+
+- Theme-System Discovery-Portal (Konzept → Abschnitt 11)
+- Typ-Hierarchien (Untertypen mit eigenen Pflichtfeldern)
+- Sets / Konvolute
+- S3 / Object Storage (→ Issue #121)
+- Chunked Upload für Dateien >100 MB (→ Issue #120)
+- PDF- und weitere Medientypen (→ Issues #123, #125)
+- Kartenansicht / Radius-Suche für Orte (→ Issue #124)
+- „Register in place" (Medien ohne Kopieren verknüpfen, → Issue #122)
