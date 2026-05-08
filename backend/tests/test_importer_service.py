@@ -39,4 +39,4 @@ def test_dry_run_empty_mapping() -> None:
     rows = [{"title": "Foto 1"}]
     mapping: dict = {}
     result = dry_run(rows, mapping)
-    assert result["errors"][0]["row"] == 1
+    assert result["errors"][0]["row"] == 2  # row 1 is the header; first data row is row 2

@@ -40,7 +40,7 @@ export function ScreenLogin({ onLogin }: Props) {
             fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, fontSize: 20,
           }}>K</div>
           <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-.01em' }}>Katalon</div>
-          <div style={{ color: 'var(--fg-3)', fontSize: 13, marginTop: 4 }}>Metadata Management System</div>
+          <div style={{ color: 'var(--fg-3)', fontSize: 13, marginTop: 4 }}>Digital Collection Management System</div>
         </div>
 
         <div className="card">
@@ -91,10 +91,6 @@ export function ScreenLogin({ onLogin }: Props) {
               </button>
             </form>
           </div>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--fg-4)' }}>
-          Standard-Zugangsdaten: admin@katalon.dev / admin
         </div>
       </div>
     </div>
