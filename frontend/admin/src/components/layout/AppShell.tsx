@@ -114,7 +114,7 @@ export function AppShell() {
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />
-      case 'settings':          return isAdmin ? <ScreenSettings onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
+      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => navigate(r)} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
   }
@@ -123,7 +123,7 @@ export function AppShell() {
     <div className="app">
       <Sidebar route={route} setRoute={(r) => navigate(r)} onLogout={handleLogout} />
       <div className="main">
-        <Topbar crumbs={crumbs} onNavigate={(r, id) => navigate(r, id)} />
+        <Topbar crumbs={crumbs} onNavigate={(r, id) => navigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
         {renderScreen()}
       </div>
     </div>

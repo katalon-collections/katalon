@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE, apiKeys } from '../../api/client'
+import { req, BASE, apiKeys, users } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, PortalConfigRead } from '../../types'
 
 interface Props {
   onNavigate?: (route: string) => void
+  isAdmin: boolean
 }
 
-export function ScreenSettings({ onNavigate }: Props) {
+export function ScreenSettings({ onNavigate, isAdmin }: Props) {
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(isAdmin)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +39,10 @@ export function ScreenSettings({ onNavigate }: Props) {
   const [pwdConfirm, setPwdConfirm] = useState('')
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState(false)
+  const [emailNew, setEmailNew] = useState('')
+  const [emailPassword, setEmailPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailSuccess, setEmailSuccess] = useState(false)
 
   const [ownKeys, setOwnKeys] = useState<ApiKey[]>([])
   const [ownKeysLoading, setOwnKeysLoading] = useState(true)
@@ -82,6 +87,7 @@ export function ScreenSettings({ onNavigate }: Props) {
   }
 
   useEffect(() => {
+    if (!isAdmin) return
     setLoading(true)
     req<PortalConfigRead>(`${BASE}/v1/portal/config`)
       .then((c: PortalConfigRead) => {
@@ -102,7 +108,7 @@ export function ScreenSettings({ onNavigate }: Props) {
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [isAdmin])
 
   async function handleSaveConfig() {
     setSaving(true)
@@ -189,15 +195,12 @@ export function ScreenSettings({ onNavigate }: Props) {
       setPwdError('Die neuen Passwörter stimmen nicht überein.')
       return
     }
-    if (pwdNew.length < 6) {
-      setPwdError('Das neue Passwort muss mindestens 6 Zeichen haben.')
+    if (pwdNew.length < 8 || !/[A-Za-z]/.test(pwdNew) || !/[0-9]/.test(pwdNew)) {
+      setPwdError('Das neue Passwort muss mindestens 8 Zeichen sowie Buchstaben und Zahlen enthalten.')
       return
     }
     try {
-      await req(`${BASE}/v1/users/me/password`, {
-        method: 'PUT',
-        body: JSON.stringify({ current_password: pwdCurrent, new_password: pwdNew }),
-      })
+      await users.changeOwnPassword(pwdCurrent, pwdNew)
       setPwdSuccess(true)
       setPwdCurrent('')
       setPwdNew('')
@@ -208,16 +211,150 @@ export function ScreenSettings({ onNavigate }: Props) {
     }
   }
 
+  async function handleChangeEmail() {
+    setEmailError(null)
+    setEmailSuccess(false)
+    if (!emailNew.trim()) {
+      setEmailError('Bitte neue E-Mail eingeben.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNew.trim())) {
+      setEmailError('Bitte gültige E-Mail-Adresse eingeben.')
+      return
+    }
+    if (!emailPassword) {
+      setEmailError('Bitte aktuelles Passwort zur Bestätigung eingeben.')
+      return
+    }
+    try {
+      await users.changeOwnEmail(emailNew.trim(), emailPassword)
+      setEmailSuccess(true)
+      setEmailNew('')
+      setEmailPassword('')
+      setTimeout(() => setEmailSuccess(false), 3000)
+    } catch (e) {
+      setEmailError((e as Error).message)
+    }
+  }
+
   return (
     <div className="scroll">
       <div className="ph">
         <div><h1>Einstellungen</h1><div className="sub">System- und Account-Einstellungen</div></div>
       </div>
 
-      {loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
-      {error && <div className="empty" style={{ paddingTop: 40, color: '#f87171' }}>{error}</div>}
+      {isAdmin && loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
 
-      {!loading && !error && (
+      <div style={{ maxWidth: 640, padding: '0 24px' }}>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">E-Mail-Adresse ändern</div>
+          <div className="bd">
+            <div className="field">
+              <div className="lbl">Neue E-Mail</div>
+              <input className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
+            </div>
+            <div className="field">
+              <div className="lbl">Aktuelles Passwort zur Bestätigung</div>
+              <input className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
+            </div>
+            {emailError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{emailError}</div>}
+            {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>E-Mail-Adresse geändert.</div>}
+            <button className="btn pri" onClick={handleChangeEmail}>E-Mail ändern</button>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">Passwort ändern</div>
+          <div className="bd">
+            <div className="field">
+              <div className="lbl">Aktuelles Passwort</div>
+              <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
+            </div>
+            <div className="field">
+              <div className="lbl">Neues Passwort</div>
+              <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
+            </div>
+            <div className="field">
+              <div className="lbl">Neues Passwort wiederholen</div>
+              <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
+            </div>
+            {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
+            {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
+            <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">API-Schlüssel</div>
+          <div className="bd">
+            <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+              API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
+            </p>
+
+            {keyCreated && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
+                <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>✓ Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
+                <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
+                  {keyCreated.key}
+                </code>
+                <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated.key)}>
+                  Kopieren
+                </button>
+              </div>
+            )}
+
+            {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
+
+            {!ownKeysLoading && ownKeys.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
+                    <th style={{ width: 60 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {ownKeys.map(k => (
+                    <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
+                      <td style={{ padding: '4px 8px' }}>{k.name}</td>
+                      <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
+                      <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
+                      <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
+                        {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                        <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="fld"
+                style={{ flex: 1 }}
+                placeholder="Name des neuen Schlüssels"
+                value={newKeyName}
+                onChange={e => setNewKeyName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
+              />
+              <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
+                {keyCreating ? 'Erstelle…' : 'Erstellen'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {isAdmin && error && <div className="empty" style={{ paddingTop: 20, color: '#f87171' }}>{error}</div>}
+
+      </div>
+
+      {isAdmin && !loading && !error && (
         <div style={{ maxWidth: 640, padding: '0 24px' }}>
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="hd">Portal & Institution</div>
@@ -307,93 +444,6 @@ export function ScreenSettings({ onNavigate }: Props) {
                   <button className={`btn${lang === 'de' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('de')}>Deutsch</button>
                   <button className={`btn${lang === 'en' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('en')}>English</button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="hd">Passwort ändern</div>
-            <div className="bd">
-              <div className="field">
-                <div className="lbl">Aktuelles Passwort</div>
-                <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
-              </div>
-              <div className="field">
-                <div className="lbl">Neues Passwort</div>
-                <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
-              </div>
-              <div className="field">
-                <div className="lbl">Neues Passwort wiederholen</div>
-                <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
-              </div>
-              {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
-              {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
-              <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="hd">API-Schlüssel</div>
-            <div className="bd">
-              <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-                API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
-              </p>
-
-              {keyCreated && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
-                  <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>✓ Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
-                  <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
-                    {keyCreated.key}
-                  </code>
-                  <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated.key)}>
-                    Kopieren
-                  </button>
-                </div>
-              )}
-
-              {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
-
-              {!ownKeysLoading && ownKeys.length > 0 && (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
-                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
-                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
-                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
-                      <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
-                      <th style={{ width: 60 }} />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ownKeys.map(k => (
-                      <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
-                        <td style={{ padding: '4px 8px' }}>{k.name}</td>
-                        <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
-                        <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
-                        <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
-                          {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
-                        </td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>
-                          <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  className="fld"
-                  style={{ flex: 1 }}
-                  placeholder="Name des neuen Schlüssels"
-                  value={newKeyName}
-                  onChange={e => setNewKeyName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
-                />
-                <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
-                  {keyCreating ? 'Erstelle…' : 'Erstellen'}
-                </button>
               </div>
             </div>
           </div>

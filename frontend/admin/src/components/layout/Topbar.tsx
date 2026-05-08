@@ -10,15 +10,19 @@ const TYPE_LABELS: Record<string, string> = {
 interface Props {
   crumbs: Array<{ label: string; route?: string }>
   onNavigate?: (route: string, id?: string) => void
+  currentUser?: { email: string; role: string } | null
+  onLogout?: () => void
 }
 
-export function Topbar({ crumbs, onNavigate }: Props) {
+export function Topbar({ crumbs, onNavigate, currentUser, onLogout }: Props) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -36,6 +40,7 @@ export function Topbar({ crumbs, onNavigate }: Props) {
   useEffect(() => {
     function onOutside(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
     }
     document.addEventListener('mousedown', onOutside)
     return () => document.removeEventListener('mousedown', onOutside)
@@ -120,6 +125,46 @@ export function Topbar({ crumbs, onNavigate }: Props) {
       {/* Hilfe und Benachrichtigungen ausgeblendet bis Implementierung (Issue #46) */}
       {/* <button className="ib" title="Hilfe"><Help size={15} /></button> */}
       {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
+      <div ref={userMenuRef} style={{ position: 'relative' }}>
+        <button className="btn gh sm" onClick={() => setUserMenuOpen(v => !v)}>
+          {currentUser?.email || 'Benutzer'} ▾
+        </button>
+        {userMenuOpen && (
+          <div style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            width: 220,
+            background: '#fff',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+            zIndex: 220,
+            padding: 6,
+          }}>
+            <button
+              className="btn gh"
+              style={{ width: '100%', justifyContent: 'flex-start', borderRadius: 6 }}
+              onClick={() => {
+                setUserMenuOpen(false)
+                onNavigate?.('settings')
+              }}
+            >
+              Kontoeinstellungen
+            </button>
+            <button
+              className="btn gh"
+              style={{ width: '100%', justifyContent: 'flex-start', borderRadius: 6, color: '#b91c1c' }}
+              onClick={() => {
+                setUserMenuOpen(false)
+                onLogout?.()
+              }}
+            >
+              Abmelden
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

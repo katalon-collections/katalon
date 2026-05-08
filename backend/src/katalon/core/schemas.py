@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
-
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -147,8 +146,15 @@ class RelationRead(RelationCreate):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
     role: str = "viewer"
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Passwort muss Buchstaben und Zahlen enthalten")
+        return value
 
 
 class UserRead(BaseModel):
@@ -165,12 +171,33 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     role: str | None = None
     is_active: bool | None = None
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Passwort muss Buchstaben und Zahlen enthalten")
+        return value
 
 
 class PasswordChange(BaseModel):
     current_password: str
-    new_password: str
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Passwort muss Buchstaben und Zahlen enthalten")
+        return value
+
+
+class EmailChange(BaseModel):
+    new_email: EmailStr
+    current_password: str
 
 
 # ---------------------------------------------------------------------------
