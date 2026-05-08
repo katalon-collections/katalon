@@ -1,22 +1,51 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from katalon.api.v1 import (
-    auth, audit, authority, dnb_urn_mock, entities, importer, media, objects,
-    occurrences, oai, oai_sets, pages, pids, places, portal, relations, schema_admin, search, theme, users, vocabularies,
+    audit,
+    auth,
+    authority,
+    dnb_urn_mock,
+    entities,
+    importer,
+    media,
+    oai,
+    oai_sets,
+    objects,
+    occurrences,
+    pages,
+    pids,
+    places,
+    portal,
+    record_subtypes,
+    relations,
+    schema_admin,
+    search,
+    theme,
+    users,
+    vocabularies,
 )
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
-from katalon.core.models import AuthoritySource as AuthoritySourceModel, PortalConfig, User, Vocabulary, VocabularyTerm
+from katalon.core.models import (
+    AuthoritySource as AuthoritySourceModel,
+)
+from katalon.core.models import (
+    PortalConfig,
+    RecordSubtype,
+    User,
+    Vocabulary,
+    VocabularyTerm,
+)
 from katalon.database import AsyncSessionLocal
+
 
 async def _ensure_admin() -> None:
     async with AsyncSessionLocal() as db:
@@ -64,6 +93,26 @@ _DEFAULT_AUTHORITY_SOURCES = [
 ]
 
 
+_DEFAULT_RECORD_SUBTYPES = [
+    ("object", "photograph", {"de": "Fotografie", "en": "Photograph"}, 0, True),
+    ("object", "painting", {"de": "Gemälde", "en": "Painting"}, 1, False),
+    ("object", "sculpture", {"de": "Skulptur", "en": "Sculpture"}, 2, False),
+    ("object", "document", {"de": "Dokument", "en": "Document"}, 3, False),
+    ("object", "digital_object", {"de": "Digitales Objekt", "en": "Digital Object"}, 4, False),
+    ("entity", "person", {"de": "Person", "en": "Person"}, 0, True),
+    ("entity", "organization", {"de": "Organisation", "en": "Organization"}, 1, False),
+    ("place", "city", {"de": "Stadt", "en": "City"}, 0, True),
+    ("place", "region", {"de": "Region", "en": "Region"}, 1, False),
+    ("place", "building", {"de": "Gebäude", "en": "Building"}, 2, False),
+    ("place", "site", {"de": "Stätte", "en": "Site"}, 3, False),
+    ("place", "country", {"de": "Land", "en": "Country"}, 4, False),
+    ("occurrence", "work", {"de": "Werk", "en": "Work"}, 0, True),
+    ("occurrence", "event", {"de": "Ereignis", "en": "Event"}, 1, False),
+    ("occurrence", "exhibition", {"de": "Ausstellung", "en": "Exhibition"}, 2, False),
+    ("occurrence", "campaign", {"de": "Kampagne", "en": "Campaign"}, 3, False),
+]
+
+
 async def _ensure_authority_sources() -> None:
     async with AsyncSessionLocal() as db:
         for src_id, label, adapter_class, is_enabled in _DEFAULT_AUTHORITY_SOURCES:
@@ -81,6 +130,28 @@ async def _ensure_authority_sources() -> None:
         await db.commit()
 
 
+async def _ensure_record_subtypes() -> None:
+    async with AsyncSessionLocal() as db:
+        for primary_type, name, label, sort_order, is_default in _DEFAULT_RECORD_SUBTYPES:
+            result = await db.execute(
+                select(RecordSubtype).where(
+                    RecordSubtype.primary_type == primary_type,
+                    RecordSubtype.name == name,
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                db.add(
+                    RecordSubtype(
+                        primary_type=primary_type,
+                        name=name,
+                        label=label,
+                        sort_order=sort_order,
+                        is_default=is_default,
+                    )
+                )
+        await db.commit()
+
+
 async def _ensure_portal_config() -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
@@ -93,6 +164,7 @@ async def _ensure_portal_config() -> None:
 async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
+    await _ensure_record_subtypes()
     await _ensure_portal_config()
     await _ensure_authority_sources()
     try:
@@ -130,6 +202,7 @@ app.include_router(auth.router, prefix="/v1")
 app.include_router(users.router, prefix="/v1")
 app.include_router(objects.router, prefix="/v1")
 app.include_router(schema_admin.router, prefix="/v1")
+app.include_router(record_subtypes.router, prefix="/v1")
 app.include_router(vocabularies.router, prefix="/v1")
 app.include_router(audit.router, prefix="/v1")
 app.include_router(entities.router, prefix="/v1")

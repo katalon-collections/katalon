@@ -1,17 +1,22 @@
 import uuid
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import MediaFile, Object, RecordSnapshot
-from katalon.core.schemas import AuditLogRead, ObjectCreate, ObjectRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import (
+    AuditLogRead,
+    ObjectCreate,
+    ObjectRead,
+    SnapshotCreate,
+    SnapshotRead,
+)
+from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
-from katalon.services import search_service
+from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 
@@ -26,11 +31,14 @@ async def list_objects(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     status: str | None = None,
+    object_type: str | None = None,
     q: str | None = None,
 ) -> dict:
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
+    if object_type:
+        query = query.where(Object.object_type == object_type)
     elif current_user is None:
         query = query.where(Object.status.in_(_PUBLIC_STATUSES))
     if q:
@@ -55,7 +63,9 @@ async def list_objects(
 async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser) -> Object:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
-    errors = await validate_metadata(db, "object", data.metadata_)
+    object_type = normalize_subtype_name(data.object_type, allow_null=True)
+    await ensure_subtype_exists(db, "object", object_type)
+    errors = await validate_metadata(db, "object", data.metadata_, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
 
@@ -63,7 +73,12 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
-    obj = Object(idno=data.idno.strip(), status=data.status, metadata_=data.metadata_)
+    obj = Object(
+        idno=data.idno.strip(),
+        object_type=object_type,
+        status=data.status,
+        metadata_=data.metadata_,
+    )
     db.add(obj)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
@@ -100,12 +115,20 @@ async def update_object(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
-    errors = await validate_metadata(db, "object", data.metadata_)
+    object_type = normalize_subtype_name(data.object_type, allow_null=True)
+    await ensure_subtype_exists(db, "object", object_type)
+    errors = await validate_metadata(db, "object", data.metadata_, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
 
-    old_fields = {"idno": obj.idno, "status": obj.status, "metadata": obj.metadata_}
+    old_fields = {
+        "idno": obj.idno,
+        "object_type": obj.object_type,
+        "status": obj.status,
+        "metadata": obj.metadata_,
+    }
     obj.idno = data.idno.strip()
+    obj.object_type = object_type
     obj.status = data.status
     obj.metadata_ = data.metadata_
 
@@ -115,7 +138,14 @@ async def update_object(
         record_id=obj.id,
         user_id=current_user.id,
         action="update",
-        changed_fields={"old": old_fields, "new": {"status": data.status, "metadata": data.metadata_}},
+        changed_fields={
+            "old": old_fields,
+            "new": {
+                "object_type": object_type,
+                "status": data.status,
+                "metadata": data.metadata_,
+            },
+        },
     )
     try:
         await search_service.index_record("object", obj, db)
@@ -151,7 +181,12 @@ async def create_snapshot(
         record_type="object",
         record_id=obj.id,
         label=data.label,
-        snapshot={"idno": obj.idno, "status": obj.status, "metadata": obj.metadata_},
+        snapshot={
+            "idno": obj.idno,
+            "object_type": obj.object_type,
+            "status": obj.status,
+            "metadata": obj.metadata_,
+        },
         created_by=current_user.id,
     )
     db.add(snap)
@@ -223,6 +258,8 @@ async def restore_snapshot(
         obj.idno = data["idno"]
     if "status" in data:
         obj.status = data["status"]
+    if "object_type" in data:
+        obj.object_type = data["object_type"]
     if "metadata" in data:
         obj.metadata_ = data["metadata"]
     await db.flush()

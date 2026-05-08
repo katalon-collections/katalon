@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Place, RecordSnapshot
-from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
+from katalon.core.models import Place
+from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
+from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
-from katalon.services import search_service
+from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -18,10 +19,13 @@ async def list_places(
     db: DBDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    place_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
 ) -> dict:
     query = select(Place)
+    if place_type:
+        query = query.where(Place.place_type == place_type)
     if status:
         query = query.where(Place.status == status)
     if q:
@@ -36,13 +40,20 @@ async def list_places(
 async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
-    errors = await validate_metadata(db, "place", data.metadata_)
+    place_type = normalize_subtype_name(data.place_type, allow_null=True)
+    await ensure_subtype_exists(db, "place", place_type)
+    errors = await validate_metadata(db, "place", data.metadata_, place_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Place).where(Place.idno == data.idno.strip()))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    place = Place(idno=data.idno.strip(), status=data.status, metadata_=data.metadata_)
+    place = Place(
+        idno=data.idno.strip(),
+        place_type=place_type,
+        status=data.status,
+        metadata_=data.metadata_,
+    )
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
@@ -76,18 +87,26 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     existing = await db.execute(select(Place).where(Place.idno == data.idno.strip(), Place.id != place_id))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    errors = await validate_metadata(db, "place", data.metadata_)
+    place_type = normalize_subtype_name(data.place_type, allow_null=True)
+    await ensure_subtype_exists(db, "place", place_type)
+    errors = await validate_metadata(db, "place", data.metadata_, place_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"idno": place.idno, "status": place.status, "metadata": place.metadata_}
+    old = {
+        "idno": place.idno,
+        "place_type": place.place_type,
+        "status": place.status,
+        "metadata": place.metadata_,
+    }
     place.idno = data.idno.strip()
+    place.place_type = place_type
     place.status = data.status
     place.metadata_ = data.metadata_
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "place_type": place_type, "status": data.status}})
     try:
         await search_service.index_record("place", place)
     except Exception:
