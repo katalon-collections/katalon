@@ -34,6 +34,7 @@ RESET=false
 DEV=false
 DOWN=false
 DOWN_VOLUMES=false
+ENV_CREATED=false
 
 show_help() {
     echo "Usage: $0 [--up] [--demo] [--reset] [--dev] [--down] [--down -v] [--help]"
@@ -194,6 +195,7 @@ else
     if [[ -f .env.example ]]; then
         warn ".env fehlt – wird aus .env.example erstellt."
         cp .env.example .env
+        ENV_CREATED=true
         ok ".env wurde erstellt."
         warn "Bitte öffne .env und passe mindestens folgende Werte an:"
         echo "   • POSTGRES_PASSWORD"
@@ -388,3 +390,9 @@ echo "   • Logs ansehen    → $COMPOSE_CMD logs -f"
 echo "   • Stack stoppen   → $COMPOSE_CMD down"
 echo "   • Stack + Volumes → $COMPOSE_CMD down -v"
 echo
+if [[ "$ENV_CREATED" == true ]]; then
+    info "Instanz-Anpassungen in docker-compose.override.yml pflegen:"
+    echo "   cp docker-compose.override.yml.example docker-compose.override.yml"
+    echo "   # z.B. eigene Ports, Volume-Pfade, zusätzliche ENV-Variablen"
+    echo
+fi

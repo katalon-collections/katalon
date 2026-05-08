@@ -13,7 +13,7 @@ Katalon läuft vollständig in Docker-Containern. Was das für Updates bedeutet,
 
 Das bedeutet: Ein Katalon-Update überschreibt keine deiner Daten und keine deiner Konfigurationen. Was du in der Admin-Oberfläche eingestellt hast — Felder, Vokabulare, Datensätze — bleibt erhalten.
 
-Was du manuell verwalten musst: deine `.env`-Datei und eventuelle Anpassungen an `docker-compose.yml`. Dazu weiter unten mehr.
+Was du manuell verwalten musst: deine `.env`-Datei und ggf. `docker-compose.override.yml` für instanzspezifische Anpassungen. Dazu weiter unten mehr.
 
 ## Standard-Update (keine Breaking Changes)
 
@@ -67,6 +67,8 @@ services:
     ports:
       - "8443:443"
 ```
+
+Ausgangspunkt: `docker-compose.override.yml.example` nach `docker-compose.override.yml` kopieren und dort nur Instanz-spezifisches eintragen.
 
 ## Was bei einem Update erhalten bleibt
 
