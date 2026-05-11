@@ -4,11 +4,16 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Occurrence, RecordSnapshot
-from katalon.core.schemas import AuditLogRead, OccurrenceCreate, OccurrenceRead, SnapshotCreate, SnapshotRead
+from katalon.core.models import Occurrence
+from katalon.core.schemas import (
+    AuditLogRead,
+    OccurrenceCreate,
+    OccurrenceRead,
+)
+from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
-from katalon.services import search_service
+from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
@@ -40,13 +45,15 @@ async def list_occurrences(
 async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
-    errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
+    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
+    await ensure_subtype_exists(db, "occurrence", occurrence_type)
+    errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip()))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    occ = Occurrence(idno=data.idno.strip(), occurrence_type=data.occurrence_type, status=data.status, metadata_=data.metadata_)
+    occ = Occurrence(idno=data.idno.strip(), occurrence_type=occurrence_type, status=data.status, metadata_=data.metadata_)
     db.add(occ)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
@@ -77,16 +84,23 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip(), Occurrence.id != occ_id))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    errors = await validate_metadata(db, "occurrence", data.metadata_, data.occurrence_type or None)
+    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
+    await ensure_subtype_exists(db, "occurrence", occurrence_type)
+    errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"idno": occ.idno, "status": occ.status, "metadata": occ.metadata_}
+    old = {
+        "idno": occ.idno,
+        "occurrence_type": occ.occurrence_type,
+        "status": occ.status,
+        "metadata": occ.metadata_,
+    }
     occ.idno = data.idno.strip()
-    occ.occurrence_type = data.occurrence_type
+    occ.occurrence_type = occurrence_type
     occ.status = data.status
     occ.metadata_ = data.metadata_
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})
     try:
         await search_service.index_record("occurrence", occ)
     except Exception:

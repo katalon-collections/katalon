@@ -2,14 +2,20 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Entity, RecordSnapshot
-from katalon.core.schemas import AuditLogRead, EntityCreate, EntityRead, SnapshotCreate, SnapshotRead
+from katalon.core.schemas import (
+    AuditLogRead,
+    EntityCreate,
+    EntityRead,
+    SnapshotCreate,
+    SnapshotRead,
+)
+from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
-from katalon.services import search_service
+from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
 router = APIRouter(prefix="/entities", tags=["entities"])
 
@@ -41,13 +47,15 @@ async def list_entities(
 async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
-    errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
+    entity_type = normalize_subtype_name(data.entity_type, allow_null=False)
+    await ensure_subtype_exists(db, "entity", entity_type)
+    errors = await validate_metadata(db, "entity", data.metadata_, entity_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip()))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    entity = Entity(idno=data.idno.strip(), entity_type=data.entity_type, status=data.status, metadata_=data.metadata_)
+    entity = Entity(idno=data.idno.strip(), entity_type=entity_type, status=data.status, metadata_=data.metadata_)
     db.add(entity)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
@@ -78,16 +86,23 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip(), Entity.id != entity_id))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    errors = await validate_metadata(db, "entity", data.metadata_, data.entity_type or None)
+    entity_type = normalize_subtype_name(data.entity_type, allow_null=False)
+    await ensure_subtype_exists(db, "entity", entity_type)
+    errors = await validate_metadata(db, "entity", data.metadata_, entity_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    old = {"idno": entity.idno, "status": entity.status, "metadata": entity.metadata_}
+    old = {
+        "idno": entity.idno,
+        "entity_type": entity.entity_type,
+        "status": entity.status,
+        "metadata": entity.metadata_,
+    }
     entity.idno = data.idno.strip()
-    entity.entity_type = data.entity_type
+    entity.entity_type = entity_type
     entity.status = data.status
     entity.metadata_ = data.metadata_
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "status": data.status, "metadata": data.metadata_}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": data.metadata_}})
     try:
         await search_service.index_record("entity", entity)
     except Exception:

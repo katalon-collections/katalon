@@ -11,7 +11,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,6 +36,7 @@ class Object(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    object_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
@@ -73,6 +73,7 @@ class Place(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    place_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     geom: Mapped[str | None] = mapped_column(Geometry("POINT", srid=4326))
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
@@ -126,6 +127,21 @@ class FieldDefinition(Base):
 
     __table_args__ = (
         Index("ix_field_defs_target_type", "target_type"),
+    )
+
+
+class RecordSubtype(Base):
+    __tablename__ = "record_subtypes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    primary_type: Mapped[str] = mapped_column(String(32), index=True)  # object/entity/place/occurrence
+    name: Mapped[str] = mapped_column(String(64))
+    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    __table_args__ = (
+        UniqueConstraint("primary_type", "name", name="uq_record_subtypes_primary_name"),
     )
 
 

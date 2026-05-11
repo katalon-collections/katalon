@@ -37,6 +37,20 @@ class FieldDefinitionRead(FieldDefinitionCreate):
     is_deleted: bool = False
 
 
+class RecordSubtypeCreate(BaseModel):
+    primary_type: str
+    name: str
+    label: dict = {}
+    sort_order: int = 0
+    is_default: bool = False
+
+
+class RecordSubtypeRead(RecordSubtypeCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+
 # ---------------------------------------------------------------------------
 # Vocabularies
 # ---------------------------------------------------------------------------
@@ -78,6 +92,7 @@ class RecordBase(BaseModel):
 
 class ObjectCreate(RecordBase):
     idno: str | None = None
+    object_type: str | None = None
 
 
 class ObjectRead(ObjectCreate):
@@ -99,6 +114,7 @@ class EntityRead(EntityCreate):
 
 class PlaceCreate(RecordBase):
     idno: str | None = None
+    place_type: str | None = None
     lat: float | None = None
     lon: float | None = None
 

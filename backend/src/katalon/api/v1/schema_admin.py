@@ -6,9 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 
-from katalon.core.dependencies import CurrentUser, DBDep, require_role
+from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import FieldDefinition
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
+from katalon.services.subtype_service import ensure_subtype_exists, validate_primary_type
 
 router = APIRouter(prefix="/schema", tags=["schema"])
 
@@ -37,6 +38,9 @@ async def list_fields(
     subtype: str | None = Query(default=None, description="Filter to generic + this subtype"),
     include_deleted: bool = Query(False, description="Include soft-deleted fields"),
 ) -> list[FieldDefinition]:
+    validate_primary_type(target_type)
+    if subtype is not None:
+        await ensure_subtype_exists(db, target_type, subtype)
     q = select(FieldDefinition).where(FieldDefinition.target_type == target_type)
     if subtype:
         q = q.where(
@@ -52,6 +56,8 @@ async def list_fields(
 async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinition:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
+    validate_primary_type(data.target_type)
+    await ensure_subtype_exists(db, data.target_type, data.target_subtype)
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
@@ -65,6 +71,8 @@ async def update_field(
 ) -> FieldDefinition:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
+    validate_primary_type(data.target_type)
+    await ensure_subtype_exists(db, data.target_type, data.target_subtype)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -147,6 +155,7 @@ async def import_schema(
         )
 
     target_type: str = data["target_type"]
+    validate_primary_type(target_type)
     raw_fields: list = data.get("fields", [])
 
     if not isinstance(raw_fields, list):
@@ -186,6 +195,7 @@ async def import_schema(
             sort_order=raw.get("sort_order", idx),
             settings=raw.get("settings", {}),
         )
+        await ensure_subtype_exists(db, target_type, field_data.target_subtype)
 
         if name in existing_map:
             existing = existing_map[name]
