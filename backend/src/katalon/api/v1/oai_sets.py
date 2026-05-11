@@ -20,7 +20,7 @@ async def list_oai_sets(db: DBDep) -> list[OAISet]:
 
 @router.post("", response_model=OAISetRead, status_code=201)
 async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUser) -> OAISet:
-    if current_user.role != "admin":
+    if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets anlegen.")
     existing = await db.execute(select(OAISet).where(OAISet.set_spec == data.set_spec))
     if existing.scalar_one_or_none():
@@ -33,8 +33,13 @@ async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUse
 
 
 @router.put("/{set_id}", response_model=OAISetRead)
-async def update_oai_set(set_id: uuid.UUID, data: OAISetCreate, db: DBDep, current_user: CurrentUser) -> OAISet:
-    if current_user.role != "admin":
+async def update_oai_set(
+    set_id: uuid.UUID,
+    data: OAISetCreate,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> OAISet:
+    if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets bearbeiten.")
     result = await db.execute(select(OAISet).where(OAISet.id == set_id))
     oai_set = result.scalar_one_or_none()
@@ -54,7 +59,7 @@ async def update_oai_set(set_id: uuid.UUID, data: OAISetCreate, db: DBDep, curre
 
 @router.delete("/{set_id}", status_code=204)
 async def delete_oai_set(set_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
-    if current_user.role != "admin":
+    if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets löschen.")
     result = await db.execute(select(OAISet).where(OAISet.id == set_id))
     oai_set = result.scalar_one_or_none()

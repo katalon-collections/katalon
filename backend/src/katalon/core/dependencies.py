@@ -125,6 +125,8 @@ OptionalCurrentUser = Annotated[User | None, Depends(try_get_current_user)]
 
 def require_role(*roles: str):
     async def _check(current_user: CurrentUser) -> User:
+        if current_user.role == "superuser" and "admin" in roles:
+            return current_user
         if current_user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user

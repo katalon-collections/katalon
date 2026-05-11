@@ -350,7 +350,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(256), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(Text)
-    role: Mapped[str] = mapped_column(String(32), default="viewer")  # admin/editor/viewer
+    role: Mapped[str] = mapped_column(String(32), default="viewer")  # superuser/admin/editor/viewer
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
 
     default_admin_email: str = "admin@katalon.dev"
     default_admin_password: str = "admin"
+    katalon_base_url: str = ""
+    first_run_credentials_path: str = "/var/lib/katalon/first-run-credentials.txt"
 
     oai_admin_email: str = "admin@katalon.dev"
     geonames_username: str = "demo"
