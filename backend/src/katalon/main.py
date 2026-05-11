@@ -114,6 +114,9 @@ async def _ensure_admin() -> None:
                 admin_email = settings.default_admin_email
                 admin_password = settings.default_admin_password
                 admin_role = "admin"
+                logger.warning(
+                    "KATALON_BASE_URL is empty; falling back to configured default admin credentials."
+                )
 
             admin = User(
                 email=admin_email,
@@ -128,7 +131,8 @@ async def _ensure_admin() -> None:
             _write_first_run_credentials(first_run_email, first_run_password)
         except OSError:
             logger.exception(
-                "Could not write first-run credentials file: %s",
+                "Could not write first-run credentials file: %s. "
+                "Retrieve credentials from the first-run log block.",
                 settings.first_run_credentials_path,
             )
         _log_first_run_credentials(first_run_email, first_run_password)

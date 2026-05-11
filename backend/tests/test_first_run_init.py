@@ -72,7 +72,15 @@ async def test_ensure_admin_creates_superuser_from_base_url(monkeypatch, tmp_pat
         "fallback-password",
         raising=False,
     )
-    monkeypatch.setattr(main_module.secrets, "token_urlsafe", lambda _n: "A1B2C3D4E5F6G7H8I9J0")
+    monkeypatch.setattr(
+        main_module.secrets,
+        "token_urlsafe",
+        lambda n: (
+            "A1B2C3D4E5F6G7H8I9J0"
+            if n == main_module.FIRST_RUN_PASSWORD_TOKEN_BYTES
+            else (_ for _ in ()).throw(AssertionError("Unexpected token byte length"))
+        ),
+    )
     monkeypatch.setattr(main_module, "hash_password", lambda value: f"hashed::{value}")
 
     await main_module._ensure_admin()

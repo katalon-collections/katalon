@@ -64,7 +64,7 @@ ensure_katalon_base_url() {
     while true; do
         read -rp "Bitte KATALON_BASE_URL eingeben: " current_base_url
         current_base_url=$(echo "$current_base_url" | xargs)
-        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]; then
+        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
             break
         fi
         warn "Ungültige URL. Bitte mit http:// oder https:// beginnen."
