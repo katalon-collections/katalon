@@ -51,6 +51,7 @@ from katalon.core.models import (
 from katalon.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+FIRST_RUN_PASSWORD_TOKEN_BYTES = 15
 
 
 def _derive_admin_email_from_base_url(base_url: str) -> str | None:
@@ -77,6 +78,7 @@ def _write_first_run_credentials(email: str, password: str) -> None:
         ),
         encoding="utf-8",
     )
+    credentials_path.chmod(0o600)
 
 
 def _log_first_run_credentials(email: str, password: str) -> None:
@@ -104,7 +106,7 @@ async def _ensure_admin() -> None:
                     _derive_admin_email_from_base_url(base_url)
                     or settings.default_admin_email
                 )
-                first_run_password = secrets.token_urlsafe(15)
+                first_run_password = secrets.token_urlsafe(FIRST_RUN_PASSWORD_TOKEN_BYTES)
                 admin_email = first_run_email
                 admin_password = first_run_password
                 admin_role = "superuser"

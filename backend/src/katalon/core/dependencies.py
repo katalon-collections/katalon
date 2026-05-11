@@ -125,6 +125,7 @@ OptionalCurrentUser = Annotated[User | None, Depends(try_get_current_user)]
 
 def require_role(*roles: str):
     async def _check(current_user: CurrentUser) -> User:
+        # Superuser inherits all admin-protected permissions.
         if current_user.role == "superuser" and "admin" in roles:
             return current_user
         if current_user.role not in roles:

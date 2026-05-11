@@ -64,7 +64,7 @@ ensure_katalon_base_url() {
     while true; do
         read -rp "Bitte KATALON_BASE_URL eingeben: " current_base_url
         current_base_url=$(echo "$current_base_url" | xargs)
-        if [[ "$current_base_url" =~ ^https?://[^[:space:]]+$ ]]; then
+        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]; then
             break
         fi
         warn "Ungültige URL. Bitte mit http:// oder https:// beginnen."
@@ -88,7 +88,7 @@ show_first_run_credentials() {
 
     for i in $(seq 1 30); do
         local api_logs
-        api_logs=$($COMPOSE_CMD logs api --no-color --tail=250 2>/dev/null || true)
+        api_logs=$($COMPOSE_CMD logs api --no-color --tail=100 2>/dev/null || true)
         if echo "$api_logs" | grep -q "====== KATALON FIRST RUN ======"; then
             echo
             echo "$api_logs" | sed -n '/====== KATALON FIRST RUN ======/,/================================/p'
