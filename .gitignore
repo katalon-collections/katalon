@@ -17,3 +17,4 @@ docker-compose.override.yml
 .claude/
 .env
 .codegraph/
+first-run-credentials.txt

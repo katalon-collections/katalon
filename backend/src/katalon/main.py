@@ -1,4 +1,8 @@
+import logging
+import secrets
 from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,18 +50,97 @@ from katalon.core.models import (
 )
 from katalon.database import AsyncSessionLocal
 
+logger = logging.getLogger(__name__)
+# 15 random bytes via token_urlsafe produce ~20 URL-safe chars (letters, digits, -,_).
+FIRST_RUN_PASSWORD_TOKEN_BYTES = 15
+
+
+def _derive_admin_email_from_base_url(base_url: str) -> str | None:
+    parsed = urlparse(base_url)
+    domain = parsed.hostname
+    if not domain:
+        return None
+    return f"admin@{domain}"
+
+
+def _write_first_run_credentials(email: str, password: str) -> None:
+    credentials_path = Path(settings.first_run_credentials_path)
+    credentials_path.parent.mkdir(parents=True, exist_ok=True)
+    credentials_path.write_text(
+        "\n".join(
+            [
+                "====== KATALON FIRST RUN ======",
+                f"Base URL: {settings.katalon_base_url}",
+                f"Email: {email}",
+                f"Password: {password}",
+                "Please change this password immediately after first login.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    credentials_path.chmod(0o600)
+
+
+def _log_first_run_credentials(email: str, password: str) -> None:
+    logger.warning("====== KATALON FIRST RUN ======")
+    logger.warning("Base URL: %s", settings.katalon_base_url)
+    logger.warning("Email: %s", email)
+    logger.warning("Password: %s", password)
+    logger.warning("Credentials file: %s", settings.first_run_credentials_path)
+    logger.warning("Please change this password immediately after first login.")
+    logger.warning("================================")
+
 
 async def _ensure_admin() -> None:
+    first_run_email: str | None = None
+    first_run_password: str | None = None
+
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).limit(1))
+        result = await db.execute(
+            select(User).where(User.role.in_(("admin", "superuser"))).limit(1)
+        )
         if result.scalar_one_or_none() is None:
+            base_url = settings.katalon_base_url.strip()
+            if base_url:
+                derived_admin_email = _derive_admin_email_from_base_url(base_url)
+                if derived_admin_email is None:
+                    logger.warning(
+                        "Could not derive admin email from KATALON_BASE_URL '%s'; "
+                        "falling back to DEFAULT_ADMIN_EMAIL.",
+                        base_url,
+                    )
+                first_run_email = derived_admin_email or settings.default_admin_email
+                first_run_password = secrets.token_urlsafe(FIRST_RUN_PASSWORD_TOKEN_BYTES)
+                admin_email = first_run_email
+                admin_password = first_run_password
+                admin_role = "superuser"
+            else:
+                admin_email = settings.default_admin_email
+                admin_password = settings.default_admin_password
+                admin_role = "admin"
+                logger.warning(
+                    "KATALON_BASE_URL is empty; falling back to configured default admin credentials."
+                )
+
             admin = User(
-                email=settings.default_admin_email,
-                hashed_password=hash_password(settings.default_admin_password),
-                role="admin",
+                email=admin_email,
+                hashed_password=hash_password(admin_password),
+                role=admin_role,
             )
             db.add(admin)
             await db.commit()
+
+    if first_run_email and first_run_password:
+        try:
+            _write_first_run_credentials(first_run_email, first_run_password)
+        except OSError:
+            logger.exception(
+                "Could not write first-run credentials file: %s. "
+                "Retrieve credentials from the first-run log block.",
+                settings.first_run_credentials_path,
+            )
+        _log_first_run_credentials(first_run_email, first_run_password)
 
 
 _DEFAULT_MEDIA_TYPES = [

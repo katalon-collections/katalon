@@ -4,7 +4,7 @@
 
 Das Schema bestimmt, welche Felder ein Datensatz eines bestimmten Primärtyps hat. Die Verwaltung erfolgt in der Admin-UI unter **Konfiguration → Schemata**. Felder können ohne Datenbankmigrationen angelegt, bearbeitet und gelöscht werden.
 
-Nur Benutzer mit der Rolle `admin` können Felder anlegen, ändern oder löschen.
+Nur Benutzer mit der Rolle `admin` oder `superuser` können Felder anlegen, ändern oder löschen.
 
 ---
 

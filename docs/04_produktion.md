@@ -14,15 +14,14 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] Domainname(n) entschieden und DNS-Einträge gesetzt
 - [ ] URL-Layout gewählt (Subdomain oder Subpfad, → Abschnitt 4)
 - [ ] TLS-Zertifikate ausgestellt
-- [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `DEFAULT_ADMIN_PASSWORD`, `CORS_ORIGINS`
-- [ ] `DEFAULT_ADMIN_PASSWORD` ist kein Standardwert
+- [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `KATALON_BASE_URL`, `CORS_ORIGINS`
 - [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
 - [ ] `docker-compose.prod.yml` VITE-Build-Argumente auf eigene URLs gesetzt
 - [ ] Wikidata-Adapter: `User-Agent` in `backend/src/katalon/integrations/wikidata_adapter.py` auf eigene Instanz-URL und Kontaktadresse aktualisieren (Wikidata-Policy erfordert identifizierbaren User-Agent)
 - [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
 - [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
 - [ ] Nach erstem Start: `alembic upgrade head` ausgeführt
-- [ ] Nach erstem Start: Admin-Passwort geändert
+- [ ] Nach erstem Start: First-Run-`superuser`-Passwort geändert
 
 ## 1. Repository klonen
 
@@ -45,8 +44,10 @@ Mindestens diese Werte anpassen:
 | `POSTGRES_PASSWORD` | Starkes Datenbankpasswort |
 | `DATABASE_URL` | Muss dasselbe Passwort enthalten |
 | `SECRET_KEY` | JWT-Schlüssel — generieren mit `openssl rand -hex 32` |
-| `DEFAULT_ADMIN_EMAIL` | E-Mail des ersten Admin-Accounts |
-| `DEFAULT_ADMIN_PASSWORD` | Passwort des ersten Admin-Accounts |
+| `KATALON_BASE_URL` | Öffentliche Basis-URL der Instanz (z.B. `https://katalon.example.org`) |
+| `FIRST_RUN_CREDENTIALS_PATH` | Pfad im API-Container für die einmalig erzeugte Credentials-Datei (bei Bedarf auf ein persistentes Volume legen) |
+| `DEFAULT_ADMIN_EMAIL` | Fallback-E-Mail für lokale Entwicklung ohne `KATALON_BASE_URL` |
+| `DEFAULT_ADMIN_PASSWORD` | Fallback-Passwort für lokale Entwicklung ohne `KATALON_BASE_URL` |
 | `CORS_ORIGINS` | Komma-separierte Liste erlaubter Frontends |
 | `OAI_ADMIN_EMAIL` | Erscheint im OAI-PMH Identify-Response |
 
@@ -230,8 +231,15 @@ curl -X POST https://deine-domain.de/v1/search/reindex
 
 ## 9. Erster Login
 
+Beim ersten API-Start ohne vorhandenen Admin/Superuser erzeugt Katalon automatisch:
+
+- E-Mail: `admin@<domain-aus-KATALON_BASE_URL>`
+- Passwort: kryptografisch zufällig (einmalig)
+
+Die Zugangsdaten werden im API-Log mit dem Block `====== KATALON FIRST RUN ======` ausgegeben und zusätzlich in `./first-run-credentials.txt` abgelegt (über `install.sh` via `docker cp`).
+
 1. Browser: `https://admin.deine-domain.de`
-2. Login mit `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD`
+2. Login mit den First-Run-Zugangsdaten
 3. Sofort das Passwort ändern (Admin → Benutzer → eigenes Konto)
 
 ## Updates einspielen

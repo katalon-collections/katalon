@@ -49,6 +49,69 @@ show_help() {
     echo "  --help, -h    Diese Hilfe anzeigen"
 }
 
+ensure_katalon_base_url() {
+    local current_base_url
+    current_base_url=$(grep '^KATALON_BASE_URL=' .env 2>/dev/null | cut -d= -f2- | tr -d '"' | xargs || true)
+
+    if [[ -n "$current_base_url" ]]; then
+        ok "KATALON_BASE_URL gesetzt: $current_base_url"
+        return
+    fi
+
+    warn "KATALON_BASE_URL ist in .env nicht gesetzt."
+    warn "Diese URL wird für den ersten Admin-Account benötigt (z.B. https://katalon.example.org)."
+
+    while true; do
+        read -rp "Bitte KATALON_BASE_URL eingeben: " current_base_url
+        current_base_url=$(echo "$current_base_url" | xargs)
+        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]; then
+            break
+        fi
+        warn "Ungültige URL. Bitte mit http:// oder https:// beginnen."
+    done
+
+    if grep -q '^KATALON_BASE_URL=' .env; then
+        sed -i "s|^KATALON_BASE_URL=.*|KATALON_BASE_URL=$current_base_url|" .env
+    else
+        echo "KATALON_BASE_URL=$current_base_url" >> .env
+    fi
+
+    ok "KATALON_BASE_URL wurde in .env gespeichert."
+}
+
+show_first_run_credentials() {
+    if [[ "$API_READY" == false ]]; then
+        return
+    fi
+
+    info "Prüfe API-Logs auf First-Run-Zugangsdaten …"
+
+    for i in $(seq 1 30); do
+        local api_logs
+        api_logs=$($COMPOSE_CMD logs api --no-color --tail=100 2>/dev/null || true)
+        if echo "$api_logs" | grep -q "====== KATALON FIRST RUN ======"; then
+            echo
+            echo "$api_logs" | sed -n '/====== KATALON FIRST RUN ======/,/================================/p'
+            echo
+
+            local api_container
+            api_container=$($COMPOSE_CMD ps -q api | head -n1)
+            if [[ -n "$api_container" ]]; then
+                if docker cp "$api_container:/var/lib/katalon/first-run-credentials.txt" "./first-run-credentials.txt" >/dev/null 2>&1; then
+                    chmod 600 ./first-run-credentials.txt 2>/dev/null || true
+                    ok "First-Run-Credentials wurden nach ./first-run-credentials.txt kopiert."
+                else
+                    warn "Konnte /var/lib/katalon/first-run-credentials.txt nicht per docker cp abrufen."
+                fi
+            fi
+            return
+        fi
+        sleep 2
+    done
+
+    info "Kein First-Run-Block gefunden (vermutlich bereits initialisiert)."
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --up)
@@ -201,7 +264,7 @@ else
         echo "   • POSTGRES_PASSWORD"
         echo "   • DATABASE_URL       (muss zum Passwort passen)"
         echo "   • SECRET_KEY"
-        echo "   • DEFAULT_ADMIN_PASSWORD"
+        echo "   • KATALON_BASE_URL"
         echo
         read -rp "Möchtest du jetzt fortfahren (die Standardwerte aus .env.example werden verwendet)? [j/N] " answer
         if [[ ! "$answer" =~ ^[Jj] ]]; then
@@ -215,6 +278,11 @@ else
 fi
 
 echo
+
+if [[ "$DEV" == false ]]; then
+    ensure_katalon_base_url
+    echo
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DEV-MODUS  –  Nur Infra-Services
@@ -321,6 +389,8 @@ if [[ "$API_READY" == false ]]; then
     warn "   $COMPOSE_CMD logs api -f"
     echo
 fi
+
+show_first_run_credentials
 
 # --- 9. Demo-Daten seeden (optional) ---------------------------------------
 

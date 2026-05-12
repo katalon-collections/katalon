@@ -11,7 +11,7 @@ from katalon.services.audit_service import log_change
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-_VALID_ROLES = {"admin", "editor", "cataloger", "viewer"}
+_VALID_ROLES = {"admin", "superuser", "editor", "cataloger", "viewer"}
 
 
 @router.get("", response_model=list[UserRead], dependencies=[require_role("admin")])

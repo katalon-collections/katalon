@@ -136,7 +136,12 @@ Generisch: alle vier Typen können beliebig miteinander verknüpft werden. `rela
 users (id UUID, email, hashed_password, role, is_active, created_at)
 ```
 
-Rollen: `admin` · `editor` · `cataloger` · `viewer`
+Rollen: `superuser` · `admin` · `editor` · `cataloger` · `viewer`
+
+- `superuser`: Systemweite Rolle mit Bypass für alle `require_role(...)`-Prüfungen.
+- `admin`: Darf alle admin-geschützten Endpoints nutzen (z. B. User-, Schema- und Vokabular-Verwaltung), aber ohne globalen Bypass.
+- `editor`/`cataloger`: Darf Inhalte bearbeiten, wenn Endpoints `require_admin_or_editor()` verwenden.
+- `viewer`: Lesender Zugriff.
 
 ## Auth-Flow
 
@@ -160,7 +165,7 @@ dependencies.py: get_current_user()
 Handler bekommt CurrentUser-Objekt
 ```
 
-Alle geschützten Endpoints verwenden `CurrentUser` als FastAPI-Dependency. Rollenprüfung über `require_role("admin")` oder `require_admin_or_editor()`.
+Alle geschützten Endpoints verwenden `CurrentUser` als FastAPI-Dependency. Rollenprüfung über `require_role("admin")` oder `require_admin_or_editor()`. `superuser` besteht diese Prüfungen immer.
 
 ## Frontend-Struktur
 
