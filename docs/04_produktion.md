@@ -45,7 +45,7 @@ Mindestens diese Werte anpassen:
 | `DATABASE_URL` | Muss dasselbe Passwort enthalten |
 | `SECRET_KEY` | JWT-Schlüssel — generieren mit `openssl rand -hex 32` |
 | `KATALON_BASE_URL` | Öffentliche Basis-URL der Instanz (z.B. `https://katalon.example.org`) |
-| `FIRST_RUN_CREDENTIALS_PATH` | Pfad im API-Container für die einmalig erzeugte Credentials-Datei |
+| `FIRST_RUN_CREDENTIALS_PATH` | Pfad im API-Container für die einmalig erzeugte Credentials-Datei (bei Bedarf auf ein persistentes Volume legen) |
 | `DEFAULT_ADMIN_EMAIL` | Fallback-E-Mail für lokale Entwicklung ohne `KATALON_BASE_URL` |
 | `DEFAULT_ADMIN_PASSWORD` | Fallback-Passwort für lokale Entwicklung ohne `KATALON_BASE_URL` |
 | `CORS_ORIGINS` | Komma-separierte Liste erlaubter Frontends |

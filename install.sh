@@ -64,7 +64,7 @@ ensure_katalon_base_url() {
     while true; do
         read -rp "Bitte KATALON_BASE_URL eingeben: " current_base_url
         current_base_url=$(echo "$current_base_url" | xargs)
-        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+        if [[ "$current_base_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]; then
             break
         fi
         warn "Ungültige URL. Bitte mit http:// oder https:// beginnen."
@@ -98,6 +98,7 @@ show_first_run_credentials() {
             api_container=$($COMPOSE_CMD ps -q api | head -n1)
             if [[ -n "$api_container" ]]; then
                 if docker cp "$api_container:/var/lib/katalon/first-run-credentials.txt" "./first-run-credentials.txt" >/dev/null 2>&1; then
+                    chmod 600 ./first-run-credentials.txt 2>/dev/null || true
                     ok "First-Run-Credentials wurden nach ./first-run-credentials.txt kopiert."
                 else
                     warn "Konnte /var/lib/katalon/first-run-credentials.txt nicht per docker cp abrufen."

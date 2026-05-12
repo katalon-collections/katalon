@@ -51,6 +51,7 @@ from katalon.core.models import (
 from katalon.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+# 15 random bytes via token_urlsafe produce ~20 URL-safe chars (letters, digits, -,_).
 FIRST_RUN_PASSWORD_TOKEN_BYTES = 15
 
 
@@ -102,10 +103,14 @@ async def _ensure_admin() -> None:
         if result.scalar_one_or_none() is None:
             base_url = settings.katalon_base_url.strip()
             if base_url:
-                first_run_email = (
-                    _derive_admin_email_from_base_url(base_url)
-                    or settings.default_admin_email
-                )
+                derived_admin_email = _derive_admin_email_from_base_url(base_url)
+                if derived_admin_email is None:
+                    logger.warning(
+                        "Could not derive admin email from KATALON_BASE_URL '%s'; "
+                        "falling back to DEFAULT_ADMIN_EMAIL.",
+                        base_url,
+                    )
+                first_run_email = derived_admin_email or settings.default_admin_email
                 first_run_password = secrets.token_urlsafe(FIRST_RUN_PASSWORD_TOKEN_BYTES)
                 admin_email = first_run_email
                 admin_password = first_run_password
