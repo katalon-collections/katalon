@@ -21,7 +21,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
 - [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
 - [ ] Nach erstem Start: `alembic upgrade head` ausgeführt
-- [ ] Nach erstem Start: Admin-Passwort geändert
+- [ ] Nach erstem Start: First-Run-`superuser`-Passwort geändert
 
 ## 1. Repository klonen
 
