@@ -11,8 +11,6 @@ const TYPES = [
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
 ]
 
-const SUBTYPE_TYPES = new Set(['entity', 'occurrence'])
-
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
@@ -297,6 +295,7 @@ fields:
 export function ScreenSchema() {
   const [activeType, setActiveType] = useState('object')
   const [activeSubtype, setActiveSubtype] = useState('')
+  const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null)
@@ -306,15 +305,26 @@ export function ScreenSchema() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
 
-  const showSubtype = SUBTYPE_TYPES.has(activeType)
+  const hasSubtypes = subtypesList.length > 0
+
+  useEffect(() => {
+    subtypes.list(activeType)
+      .then(list => {
+        setSubtypesList(list)
+        if (activeSubtype && !list.find(s => s.name === activeSubtype)) {
+          setActiveSubtype('')
+        }
+      })
+      .catch(() => setSubtypesList([]))
+  }, [activeType])
 
   const loadFields = useCallback(() => {
     setLoading(true)
-    schema.list(activeType, (showSubtype && activeSubtype) ? activeSubtype : undefined)
+    schema.list(activeType, activeSubtype || undefined)
       .then(setFields)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [activeType, activeSubtype, showSubtype])
+  }, [activeType, activeSubtype])
 
   useEffect(() => {
     setActiveFieldId(null)
@@ -411,41 +421,60 @@ export function ScreenSchema() {
         <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadFields() }} />
       )}
       <div className="ph">
-        <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ</div></div>
+        <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ und Subtyp</div></div>
         <div className="right">
           <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
           <button className="btn pri" onClick={openNew}><Plus size={13} /> Neues Feld</button>
         </div>
       </div>
 
-      <div className="schema-grid" style={{ flex: 1, minHeight: 0 }}>
-        <div className="schema-list">
-          {TYPES.map(t => (
-            <div key={t.id}>
-              <div
-                className={`item${activeType === t.id ? ' active' : ''}`}
-                onClick={() => { setActiveType(t.id) }}
-              >
-                <div>
-                  <div className="nm">{t.label}</div>
-                  <div className="sub">{t.key}</div>
-                </div>
-                {activeType === t.id && !loading && (
-                  <span className="ct">{fields.length}</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="tabs">
+        {TYPES.map(t => (
+          <button
+            key={t.id}
+            className={`tab${activeType === t.id ? ' active' : ''}`}
+            onClick={() => setActiveType(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        <div className="schema-detail" style={{ overflow: 'auto' }}>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: hasSubtypes ? '220px 1fr' : '1fr', minHeight: 0, overflow: 'hidden' }}>
+        {hasSubtypes && (
+          <div style={{ borderRight: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', minHeight: 0 }}>
+            <div style={{ padding: '14px 12px 6px', fontFamily: "'IBM Plex Mono',monospace", fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-4)', fontWeight: 500 }}>
+              Subtypen
+            </div>
+            <button
+              className={`sb-it${activeSubtype === '' ? ' active' : ''}`}
+              onClick={() => setActiveSubtype('')}
+              style={{ borderRadius: 0, padding: '7px 12px' }}
+            >
+              <span>Alle / Global</span>
+            </button>
+            {subtypesList.map(s => (
+              <button
+                key={s.id}
+                className={`sb-it${activeSubtype === s.name ? ' active' : ''}`}
+                onClick={() => setActiveSubtype(s.name)}
+                style={{ borderRadius: 0, padding: '7px 12px' }}
+              >
+                <span>{s.label.de || s.name}</span>
+                <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ overflowY: 'auto', minHeight: 0 }}>
           {showDetail ? (
             <FieldDetail
               form={form!}
               isNew={isNew}
               saving={saving}
               error={saveError}
-              showSubtype={showSubtype}
+              showSubtype={hasSubtypes}
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}
@@ -453,23 +482,15 @@ export function ScreenSchema() {
             />
           ) : (
             <>
-              {showSubtype && (
-                <div style={{ padding: '14px 24px 0' }}>
-                  <div className="field" style={{ maxWidth: 320 }}>
-                    <div className="lbl">Subtyp-Filter</div>
-                    <input className="fld mono" value={activeSubtype}
-                      onChange={e => setActiveSubtype(e.target.value)}
-                      placeholder="z.B. person — leer = alle anzeigen"
-                    />
-                  </div>
-                </div>
-              )}
               {loading ? (
                 <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>
               ) : (
                 <>
                   <div style={{ margin: '12px 24px 4px', color: 'var(--fg-3)', fontSize: 12 }}>
                     {fields.length} Felder
+                    {activeSubtype && (
+                      <span> für Subtyp <b>{activeSubtype}</b></span>
+                    )}
                   </div>
                   {fields.map(f => (
                     <div key={f.id} className="field-row" onClick={() => openExisting(f)}>
