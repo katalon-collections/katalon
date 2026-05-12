@@ -13,6 +13,7 @@ import { ScreenSettings } from '../screens/ScreenSettings'
 import { ScreenUsers } from '../screens/ScreenUsers'
 import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
+import { ScreenSubtype } from '../screens/ScreenSubtype'
 
 type Crumb = { label: string; route?: string }
 
@@ -25,6 +26,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   'places-form':      [{ label: 'Katalon' }, { label: 'Orte', route: 'places-list' }, { label: 'Bearbeiten' }],
   'occurrences-list': [{ label: 'Katalon' }, { label: 'Occurrences' }],
   'occurrences-form': [{ label: 'Katalon' }, { label: 'Occurrences', route: 'occurrences-list' }, { label: 'Bearbeiten' }],
+  subtypes:           [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Subtypen' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
   pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
@@ -107,6 +109,7 @@ export function AppShell() {
       case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} />
       case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} />
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} />
+      case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />
       case 'vocab':             return <ScreenVocab />
       case 'pages':             return <ScreenPages />

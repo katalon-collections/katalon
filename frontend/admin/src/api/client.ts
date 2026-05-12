@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -303,6 +303,19 @@ export const pids = {
     '/v1/pids/urn/register',
     { method: 'POST', body: JSON.stringify(data) },
   ),
+}
+
+// Record Subtypes
+export const subtypes = {
+  list: (primaryType?: string) => {
+    const qs = primaryType ? `?primary_type=${encodeURIComponent(primaryType)}` : ''
+    return req<RecordSubtype[]>(`/v1/record-subtypes${qs}`)
+  },
+  create: (data: { primary_type: string; name: string; label: Record<string, string>; sort_order?: number; is_default?: boolean }) =>
+    req<RecordSubtype>('/v1/record-subtypes', { method: 'POST', body: JSON.stringify({ sort_order: 0, is_default: false, ...data }) }),
+  update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; sort_order?: number; is_default?: boolean }) =>
+    req<RecordSubtype>(`/v1/record-subtypes/${id}`, { method: 'PUT', body: JSON.stringify({ sort_order: 0, is_default: false, ...data }) }),
+  delete: (id: string) => req<void>(`/v1/record-subtypes/${id}`, { method: 'DELETE' }),
 }
 
 // Audit

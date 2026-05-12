@@ -46,3 +46,4 @@ export const Info     = mk(<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M
 export const Refresh  = mk(<><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></>)
 export const MapPin   = mk(<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>)
 export const Lightning = mk(<><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></>)
+export const ListTree  = mk(<><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></>)

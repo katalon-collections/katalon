@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { schema, vocabularies } from '../../api/client'
+import { schema, subtypes, vocabularies } from '../../api/client'
 import type { SchemaImportResult } from '../../api/client'
-import type { FieldDefinition, Vocabulary } from '../../types'
+import type { FieldDefinition, RecordSubtype, Vocabulary } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
 const TYPES = [
@@ -90,6 +90,12 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
     vocabularies.list().then(setAllVocabs).catch(() => {})
   }, [])
 
+  const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
+  useEffect(() => {
+    if (!showSubtype) return
+    subtypes.list(form.target_type).then(setAvailableSubtypes).catch(() => {})
+  }, [showSubtype, form.target_type])
+
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
       <div className="hd">
@@ -125,8 +131,12 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
         {showSubtype && (
           <div className="field">
             <div className="lbl">Subtyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(leer = gilt für alle Subtypen)</span></div>
-            <input className="fld mono" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)}
-              placeholder="z.B. person, organisation, event, work" disabled={!isNew} />
+            <select className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)} disabled={!isNew}>
+              <option value="">— alle Subtypen —</option>
+              {availableSubtypes.map(s => (
+                <option key={s.id} value={s.name}>{s.label.de || s.name}</option>
+              ))}
+            </select>
           </div>
         )}
         <div className="fg-2">

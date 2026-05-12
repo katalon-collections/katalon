@@ -167,3 +167,12 @@ export interface ApiKeyCreated extends ApiKey {
   /** The full plaintext key – only available immediately after creation */
   key: string
 }
+
+export interface RecordSubtype {
+  id: string
+  primary_type: string
+  name: string
+  label: Record<string, string>
+  sort_order: number
+  is_default: boolean
+}
