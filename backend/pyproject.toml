@@ -38,6 +38,9 @@ dev = [
     "testcontainers[postgres]>=4.4.0",
 ]
 
+[project.scripts]
+katalon-reset-admin = "katalon.management.reset_admin:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
