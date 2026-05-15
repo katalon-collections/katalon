@@ -10,7 +10,7 @@ from katalon.services import importer_service
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
-MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_SIZE = 50 * 1024 * 1024  # 50 MB
 
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
 
@@ -29,11 +29,14 @@ class ImportRequest(MappingRequest):
 async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 10 MB)")
+        raise HTTPException(status_code=413, detail="Datei zu groß (max 50 MB)")
     filename = (file.filename or "").lower()
-    if not (filename.endswith(".csv") or filename.endswith(".tsv")):
-        raise HTTPException(status_code=422, detail="Nur CSV/TSV-Dateien werden unterstützt")
-    headers, rows = importer_service.parse_csv(content)
+    if filename.endswith(".xlsx"):
+        headers, rows = importer_service.parse_excel(content)
+    elif filename.endswith(".csv") or filename.endswith(".tsv"):
+        headers, rows = importer_service.parse_csv(content)
+    else:
+        raise HTTPException(status_code=422, detail="Nur CSV, TSV und Excel (.xlsx) werden unterstützt")
     return {"headers": headers, "row_count": len(rows), "preview": rows[:5], "rows": rows}
 
 

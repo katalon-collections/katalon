@@ -15,6 +15,27 @@ def detect_delimiter(content: str) -> str:
         return ","
 
 
+def parse_excel(content: bytes) -> tuple[list[str], list[dict[str, str]]]:
+    import openpyxl  # lazy import — optional dependency
+
+    wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    header_row = next(rows_iter, None)
+    if not header_row:
+        return [], []
+    headers = [str(c) if c is not None else "" for c in header_row]
+    rows: list[dict[str, str]] = []
+    for row in rows_iter:
+        rows.append({
+            headers[i]: str(v) if v is not None else ""
+            for i, v in enumerate(row)
+            if i < len(headers)
+        })
+    wb.close()
+    return headers, rows
+
+
 def parse_csv(content: bytes) -> tuple[list[str], list[dict[str, str]]]:
     text = content.decode("utf-8-sig", errors="replace")
     delimiter = detect_delimiter(text)

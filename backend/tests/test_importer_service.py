@@ -1,5 +1,37 @@
+import io
+
+import openpyxl
 import pytest
-from katalon.services.importer_service import detect_delimiter, parse_csv, apply_mapping, dry_run
+from katalon.services.importer_service import detect_delimiter, parse_csv, parse_excel, apply_mapping, dry_run
+
+
+def _make_xlsx(headers: list[str], rows: list[list]) -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_parse_excel_basic() -> None:
+    data = _make_xlsx(["title", "creator"], [["Foto 1", "Maier"], ["Foto 2", "Huber"]])
+    headers, rows = parse_excel(data)
+    assert headers == ["title", "creator"]
+    assert len(rows) == 2
+    assert rows[0]["title"] == "Foto 1"
+    assert rows[1]["creator"] == "Huber"
+
+
+def test_parse_excel_empty_sheet() -> None:
+    wb = openpyxl.Workbook()
+    buf = io.BytesIO()
+    wb.save(buf)
+    headers, rows = parse_excel(buf.getvalue())
+    assert headers == []
+    assert rows == []
 
 
 def test_detect_delimiter_comma() -> None:
