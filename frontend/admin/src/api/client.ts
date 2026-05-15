@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -430,4 +430,16 @@ export const apiKeys = {
     req<ApiKeyCreated>(`/v1/users/${userId}/api-keys`, { method: 'POST', body: JSON.stringify({ name, expires_at: expires_at ?? null }) }),
   /** (Admin) Revoke an API key for a specific user */
   revokeForUser: (userId: string, keyId: string) => req<void>(`/v1/users/${userId}/api-keys/${keyId}`, { method: 'DELETE' }),
+}
+
+
+export const bannersApi = {
+  list: () => req<Banner[]>('/v1/banners'),
+  create: (data: Omit<Banner, 'id' | 'created_at' | 'updated_at'>) =>
+    req<Banner>('/v1/banners', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Omit<Banner, 'id' | 'created_at' | 'updated_at'>>) =>
+    req<Banner>(`/v1/banners/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id: string) => req<void>(`/v1/banners/${id}`, { method: 'DELETE' }),
+  activeAdmin: () => req<Banner[]>('/v1/banners/active/admin'),
+  activePortal: () => req<Banner[]>('/v1/banners/active/portal'),
 }

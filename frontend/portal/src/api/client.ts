@@ -150,3 +150,14 @@ export const api = {
     },
   },
 }
+
+export interface BannerItem {
+  id: string
+  message: string
+  color: 'blue' | 'yellow' | 'red' | 'green'
+  expires_at: string | null
+}
+
+export const banners = {
+  activePortal: () => get<BannerItem[]>('/v1/banners/active/portal'),
+}

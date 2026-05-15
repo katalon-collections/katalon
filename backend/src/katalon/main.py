@@ -15,6 +15,7 @@ from katalon.api.v1 import (
     audit,
     auth,
     authority,
+    banners,
     dnb_urn_mock,
     entities,
     importer,
@@ -282,6 +283,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/v1")
+app.include_router(banners.router, prefix="/v1")
 app.include_router(users.router, prefix="/v1")
 app.include_router(objects.router, prefix="/v1")
 app.include_router(schema_admin.router, prefix="/v1")

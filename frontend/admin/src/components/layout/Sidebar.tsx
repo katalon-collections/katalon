@@ -1,5 +1,5 @@
 import { getTokenUser } from '../../api/client'
-import { File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
+import { Bell, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 import { Search } from '../ui/Icons'
 
 type Route = string
@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { id: 'vocab',  label: 'Vokabular',       Icon: Tag,     ct: '4', roles: ['admin'] },
   { id: 'pages',     label: 'Statische Seiten', Icon: File,  roles: ['admin'] },
   { id: 'oai-sets',  label: 'OAI-PMH Sets',    Icon: Globe, roles: ['admin'] },
+  { id: 'banners',   label: 'Banner',           Icon: Bell,  roles: ['admin'] },
   { g: 'Verwaltung', roles: ['admin'] },
   { id: 'users',  label: 'Benutzer',       Icon: Users,   roles: ['admin'] },
   { id: 'settings', label: 'Einstellungen', Icon: Gear, roles: ['admin'] },

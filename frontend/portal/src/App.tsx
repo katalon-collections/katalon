@@ -12,6 +12,7 @@ import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { BannerBar } from './components/BannerBar'
 
 function Header() {
   const navigate = useNavigate()
@@ -72,6 +73,7 @@ function AppInner() {
       <Helmet defaultTitle="Katalon" titleTemplate="%s – Katalon">
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
+      <BannerBar />
       <Header />
       <Routes>
         <Route path="/" element={<HomePage />} />

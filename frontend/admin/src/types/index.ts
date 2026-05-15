@@ -176,3 +176,15 @@ export interface RecordSubtype {
   sort_order: number
   is_default: boolean
 }
+
+export interface Banner {
+  id: string
+  message: string
+  color: 'blue' | 'yellow' | 'red' | 'green'
+  show_admin: boolean
+  show_portal: boolean
+  is_active: boolean
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}

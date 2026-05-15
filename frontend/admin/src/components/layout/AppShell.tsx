@@ -14,6 +14,8 @@ import { ScreenUsers } from '../screens/ScreenUsers'
 import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
+import { ScreenBanners } from '../screens/ScreenBanners'
+import { BannerBar } from '../ui/BannerBar'
 
 type Crumb = { label: string; route?: string }
 
@@ -26,6 +28,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   'places-form':      [{ label: 'Katalon' }, { label: 'Orte', route: 'places-list' }, { label: 'Bearbeiten' }],
   'occurrences-list': [{ label: 'Katalon' }, { label: 'Occurrences' }],
   'occurrences-form': [{ label: 'Katalon' }, { label: 'Occurrences', route: 'occurrences-list' }, { label: 'Bearbeiten' }],
+  banners:            [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Banner' }],
   subtypes:           [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Subtypen' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
@@ -109,6 +112,7 @@ export function AppShell() {
       case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} />
       case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} />
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} />
+      case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />
       case 'vocab':             return <ScreenVocab />
@@ -127,6 +131,7 @@ export function AppShell() {
       <Sidebar route={route} setRoute={(r) => navigate(r)} onLogout={handleLogout} />
       <div className="main">
         <Topbar crumbs={crumbs} onNavigate={(r, id) => navigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
+        <BannerBar surface="admin" />
         {renderScreen()}
       </div>
     </div>

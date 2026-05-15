@@ -378,3 +378,23 @@ class ApiKey(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
+
+
+# ---------------------------------------------------------------------------
+# Maintenance / Info Banners
+# ---------------------------------------------------------------------------
+
+
+class Banner(Base):
+    __tablename__ = "banners"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    message: Mapped[str] = mapped_column(Text)
+    color: Mapped[str] = mapped_column(String(32), default="blue")  # blue/yellow/red/green
+    # which surfaces show this banner
+    show_admin: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_portal: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
