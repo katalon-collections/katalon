@@ -26,7 +26,7 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_JAVA_OPTS=-Xms${ES_HEAP_SIZE:-512m} -Xmx${ES_HEAP_SIZE:-512m}
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -38,7 +38,7 @@ services:
   cantaloupe:
     image: islandora/cantaloupe:main
     volumes:
-      - media_data:/var/lib/cantaloupe/images
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
     environment:
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
     healthcheck:
@@ -64,7 +64,7 @@ services:
       KATALON_BASE_URL: ${KATALON_BASE_URL:-http://localhost}
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
     volumes:
-      - media_data:/var/lib/katalon/media
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
       db:
         condition: service_healthy
@@ -91,7 +91,7 @@ services:
       CANTALOUPE_PUBLIC_URL: http://localhost
       MEDIA_ROOT: /var/lib/katalon/media
     volumes:
-      - media_data:/var/lib/katalon/media
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
       db:
         condition: service_healthy
@@ -153,4 +153,3 @@ services:
 volumes:
   db_data:
   es_data:
-  media_data:
