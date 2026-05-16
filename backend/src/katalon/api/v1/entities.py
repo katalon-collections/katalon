@@ -1,7 +1,10 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
+
+logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Entity, RecordSnapshot
@@ -62,7 +65,7 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser
     try:
         await search_service.index_record("entity", entity)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return entity
 
 
@@ -106,7 +109,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     try:
         await search_service.index_record("entity", entity)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return entity
 
 
@@ -120,7 +123,7 @@ async def delete_entity(entity_id: uuid.UUID, db: DBDep, current_user: CurrentUs
     try:
         await search_service.remove_record(entity.id)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(entity)
 
 

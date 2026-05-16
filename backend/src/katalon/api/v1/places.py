@@ -1,7 +1,10 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
+
+logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Place
@@ -63,7 +66,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
     try:
         await search_service.index_record("place", place)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return place
 
 
@@ -110,7 +113,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     try:
         await search_service.index_record("place", place)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return place
 
 
@@ -124,7 +127,7 @@ async def delete_place(place_id: uuid.UUID, db: DBDep, current_user: CurrentUser
     try:
         await search_service.remove_record(place.id)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(place)
 
 

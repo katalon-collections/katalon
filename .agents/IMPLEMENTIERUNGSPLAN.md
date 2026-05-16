@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-06
+## Stand: 2026-05-16
 
 ---
 
@@ -43,9 +43,9 @@ Schema-Editor, Vokabular-Verwaltung vollständig verdrahtet.
 
 **Noch offen in Phase 6:**
 - Importer-Wizard (ScreenImporter ist Stub – Phase 10)
-- Relationen-Panel im Formular (Placeholder – Phase 6.1)
-- Snapshot-UI im Formular (Placeholder – Phase 7)
-- Benutzer-Verwaltungs-Screen (Placeholder)
+- Relationen-Panel im Formular (Phase 6.1)
+- Snapshot-UI im Formular (Phase 7)
+- Benutzer-Verwaltungs-Screen (Placeholder – nur API-Key-Verwaltung vorhanden, kein User-CRUD)
 
 ### Phase 7 – Elasticsearch + Versionierung ⚠️
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
@@ -65,11 +65,11 @@ Portal-Container liefert Static Files korrekt aus, nginx proxied `/v1/` zum API.
 - OpenGraph/Meta-Tags auf allen Detailseiten (react-helmet-async, #74)
 - IIIF `link:alternate` im `<head>` auf ObjectDetailPage (#75)
 - Relation-Facetten beim Objekt-Browsing (denormalisiert in ES, #83)
+- Relation-Type-Labels aus Vokabular aufgelöst in Admin-UI ✅ (#78 – `ScreenForm.tsx:1309`)
 
 **Noch offen:**
 - IIIF-Viewer (Cantaloupe-Tiles noch nicht End-to-End verdrahtet)
 - „Zurück zur Suche" auf Detailseiten (#77, post-mvp)
-- Relation-Type-Labels aus Vokabular (#78, post-mvp)
 
 ---
 
@@ -77,7 +77,11 @@ Portal-Container liefert Static Files korrekt aus, nginx proxied `/v1/` zum API.
 
 ### Phase 6.1 – Relationen-Panel im Admin-Formular
 Suche über alle Typen, Relationstyp wählen, Metadaten auf der Relation.
-Endpoint `/v1/relations` ist fertig, UI fehlt.
+Endpoint `/v1/relations` ist fertig, UI-Grundgerüst vorhanden (Liste + Hinzufügen-Dialog).
+
+**Offen:**
+- Bearbeitung von Relation-Metadaten (JSONB-Felder auf der Relation selbst)
+- Darstellung der Gegenrichtung (from/to korrekt anzeigen wenn Datensatz `to_id` ist)
 
 ### Phase 8.1 – Facettiertes Browsing + Portal-Konfiguration
 **Ziel:** Sammlungsverantwortliche konfigurieren im Admin, welche Facetten und Felder im Portal sichtbar sind.
@@ -101,7 +105,7 @@ Endpoints: `GET /v1/authorities/`, `/v1/authorities/search`, `/v1/authorities/fe
 
 **Noch offen:**
 - Admin-UI: Autocomplete-Feld bei der Erfassung (authority-Felder im Formular)
-- Admin-UI: Authority-Quelle pro Feld im Schema-Editor konfigurierbar
+- Admin-UI: `authority_source` aus Schema wird in `ScreenForm` nicht an `AuthorityInput` weitergegeben – alle Authority-Suchen laufen aktuell gegen den hardcodierten Fallback (`ScreenForm.tsx` ~1030)
 
 ### Phase 10 – Importer-Wizard
 4-Schritte-Wizard: Upload → Mapping → Dry Run → Import.
@@ -115,25 +119,65 @@ Wiederverwendet Vokabular "media_types" für Typ-Mapping.
 
 ### Phase 11 – OAI-PMH
 Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
-Needs: ListSets, ResumptionToken für große Collections, Tests.
+
+**Offen:**
+- ListSets
+- ResumptionToken für große Collections (Pagination)
+- Spezifische Fehlerbehandlung: Aktuell wird bei jedem Fehler (inkl. ES-Timeout) `noRecordsMatch` zurückgeliefert (`oai.py:134, 176, 203`). Harvester können transiente von permanenten Fehlern nicht unterscheiden.
+- Tests für Token-Roundtrips und Pagination-Edge-Cases
 
 ### Phase 12 – Hardening
-- Rate Limiting (slowapi bereits eingebunden)
+- Rate Limiting: slowapi ist eingebunden, aber **keine einzige Route ist dekoriert** (`main.py`). Öffentliche Endpunkte (`/v1/search`, `/v1/oai`, `/v1/authorities/search`) müssen noch begrenzt werden.
 - Produktions-Secrets (kein `dev-secret-key` in Prod)
 - nginx TLS-Terminierung
 - Perf-Tests (locust)
 - OpenAPI-Dokumentation finalisieren
+- Cantaloupe-Health-Check beim Start (fehlende Konfiguration wird sonst erst beim ersten Upload sichtbar)
+
+---
+
+## Bekannte technische Schulden
+
+Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlichen Release adressiert werden.
+
+### Fehlerbehandlung & Observability
+
+**ES-Fehler werden still verschluckt** – Alle vier CRUD-Module (`objects.py`, `entities.py`, `places.py`, `occurrences.py`) fangen ES-Indexierungs-Fehler mit `except Exception: pass`. Datensätze werden in der DB gespeichert, sind aber nicht durchsuchbar; der User bekommt kein Feedback.
+→ Mindestens per `logger.exception()` loggen; idealerweise `X-Search-Index: failed` Header zurückgeben.
+
+**Kein Logging in API-Modulen** – Nur `pids.py` und `main.py` haben `logging` konfiguriert. Alle anderen API-Module loggen nichts.
+→ `logger = logging.getLogger(__name__)` in alle Module; Fehler, Validierungsmisserfolge und Async-Task-Queuing loggen.
+
+### Datenintegrität
+
+**Naive Datetimes** – `models.py:26` verwendet `datetime.utcnow()` (naive, kein Timezone-Info). Alle OAI-PMH-Timestamps und ES-Datumsfilter bauen darauf auf.
+→ Ersetzen durch `datetime.now(timezone.utc)`.
+
+**Hardcodierte Vokabular-Namen** – Die Strings `"media_types"` und `"relation_types"` tauchen in mehreren Dateien auf (workers, API, Frontend). Bei Umbenennung brechen Features still.
+→ In `config.py` als Konstante extrahieren.
+
+### Test-Lücken
+
+| Feature | Status |
+|---|---|
+| ES-Indexierung + Suche (End-to-End) | ❌ keine Tests |
+| Relationen erstellen/traversieren | ❌ nur Auth-Tests |
+| Snapshot erstellen/wiederherstellen | ❌ keine Tests |
+| Media-Upload-Workflow + IIIF-Manifest | ❌ keine Tests |
+| OAI-PMH ResumptionToken Roundtrip | ❌ keine Tests |
 
 ---
 
 ## Nächste Schritte (Reihenfolge)
 
-1. **Jetzt:** #78 Relation-Type-Labels aus Vokabular im Portal auflösen
-2. Admin-UI: Authority-Autocomplete in ScreenForm (Felder mit `field_type = "authority"`)
-3. Relationen-Panel im Admin-Formular (Phase 6.1)
+1. **Jetzt:** Authority-`source`-Parameter in `ScreenForm` an `AuthorityInput` durchreichen (`ScreenForm.tsx` ~1030)
+2. Admin-UI: Benutzer-Verwaltungs-Screen (User-CRUD, Rollen, Deaktivierung) – `ScreenUsers.tsx` ist aktuell nur API-Key-Verwaltung
+3. Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1 – Relation-Metadaten bearbeiten)
 4. Snapshot-UI im Admin-Formular (Phase 7)
-5. Batch-Medienimport (Phase 10.1)
-6. Cantaloupe Tile-Generierung End-to-End (Issue #13)
+5. ES-Fehler loggen statt verschlucken (technische Schuld – kleiner Aufwand, hoher Nutzen)
+6. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12)
+7. Batch-Medienimport (Phase 10.1)
+8. Cantaloupe Tile-Generierung End-to-End (Issue #13)
 
 ---
 
@@ -157,3 +201,4 @@ Needs: ListSets, ResumptionToken für große Collections, Tests.
 | Celery-Fehler schwer debugbar | Flower-Dashboard, dead-letter Queue, Retry-Limit |
 | ES-Mappings brechen bei Schema-Änderungen | Index-Aliase + Zero-Downtime-Reindex |
 | Cantaloupe-Tile-Generierung nicht verdrahtet | Celery-Task `generate_iiif_tiles` muss noch Cantaloupe-Derivate-API aufrufen |
+| ES-Indexfehler unsichtbar | `except Exception: pass` in 12+ Endpoints ersetzen |

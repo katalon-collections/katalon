@@ -77,7 +77,7 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         is_primary=len(existing) == 0,
     )
     db.add(media)
-    await db.flush()
+    await db.commit()  # commit before Celery dispatch so the worker can find the row
 
     generate_iiif_tiles.delay(str(file_id))
 

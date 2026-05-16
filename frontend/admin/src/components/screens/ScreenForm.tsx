@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
-import { ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
+import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
@@ -547,6 +547,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   useEffect(() => {
     if (savedId && showMedia) loadMedia(savedId)
   }, [savedId, showMedia, loadMedia])
+
+  // Poll until all pending uploads are processed by the Celery worker
+  const hasPendingMedia = mediaFiles.some(f => f.status === 'pending')
+  useEffect(() => {
+    if (!savedId || !showMedia || !hasPendingMedia) return
+    const timer = setInterval(() => {
+      media.list(savedId).then(setMediaFiles).catch(() => {})
+    }, 2500)
+    return () => clearInterval(timer)
+  }, [savedId, showMedia, hasPendingMedia])
 
   useEffect(() => {
     if (savedId) loadSnapshots(savedId)
@@ -1221,7 +1231,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                                 />
                               ) : null}
-                              {f.status !== 'ready' && (
+                              {f.status === 'pending' && (
+                                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <div style={{ width: 18, height: 18, border: '2px solid var(--fg-3)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                  <span style={{ fontSize: 9, color: 'var(--fg-3)' }}>Verarbeitung…</span>
+                                </div>
+                              )}
+                              {f.status === 'error' && (
+                                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <AlertCircle size={18} style={{ color: '#dc2626' }} />
+                                  <span style={{ fontSize: 9, color: '#dc2626' }}>Fehler</span>
+                                </div>
+                              )}
+                              {f.status !== 'ready' && f.status !== 'pending' && f.status !== 'error' && (
                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Image size={20} style={{ color: 'var(--fg-3)' }} />
                                 </div>
@@ -1304,9 +1326,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                       <div style={{ marginBottom: addOpen ? 12 : 0 }}>
                         {rels.map(r => {
                           const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence' }
+                          const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
+                          const relTypeLabel = relTypeTerm ? (relTypeTerm.label.de ?? relTypeTerm.label.en ?? r.relation_type) : r.relation_type
                           return (
                             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
-                              <span style={{ color: 'var(--fg-2)', fontFamily: 'var(--mono)' }}>{r.relation_type}</span>
+                              <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>{relTypeLabel}</span>
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.to_type}: ${r.to_id}`}>
                                 <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[r.to_type] ?? r.to_type}</span>
                                 {relTitles[`${r.to_type}/${r.to_id}`] ?? r.to_id.slice(0, 8) + '…'}

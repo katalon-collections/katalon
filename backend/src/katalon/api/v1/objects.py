@@ -1,8 +1,11 @@
+import logging
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy import func, select
+
+logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import MediaFile, Object, RecordSnapshot
@@ -85,7 +88,7 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return obj
 
 
@@ -150,7 +153,7 @@ async def update_object(
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return obj
 
 
@@ -164,7 +167,7 @@ async def delete_object(object_id: uuid.UUID, db: DBDep, current_user: CurrentUs
     try:
         await search_service.remove_record(obj.id)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(obj)
 
 

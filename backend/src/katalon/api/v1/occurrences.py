@@ -1,7 +1,10 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
+
+logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Occurrence
@@ -60,7 +63,7 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
     try:
         await search_service.index_record("occurrence", occ)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return occ
 
 
@@ -104,7 +107,7 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     try:
         await search_service.index_record("occurrence", occ)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     return occ
 
 
@@ -118,7 +121,7 @@ async def delete_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: CurrentU
     try:
         await search_service.remove_record(occ.id)
     except Exception:
-        pass
+        logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(occ)
 
 
