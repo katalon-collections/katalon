@@ -22,14 +22,29 @@ function MetaRow({ label, value, href }: { label: string; value: string; href?: 
   )
 }
 
-function ViewerFallback({ objectId, media }: { objectId: string; media: MediaFile }) {
+function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles: MediaFile[] }) {
+  if (mediaFiles.length === 1) {
+    return (
+      <img
+        src={`${BASE}/v1/objects/${objectId}/media/${mediaFiles[0].id}/file`}
+        alt=""
+        style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+      />
+    )
+  }
   return (
-    <img
-      src={`${BASE}/v1/objects/${objectId}/media/${media.id}/file`}
-      alt=""
-      style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
-      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-    />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+      {mediaFiles.map(f => (
+        <img
+          key={f.id}
+          src={`${BASE}/v1/objects/${objectId}/media/${f.id}/file`}
+          alt=""
+          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#0f172a' }}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -138,8 +153,8 @@ export function ObjectDetailPage() {
         <div>
           {showViewer ? (
             <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
-          ) : primaryMedia ? (
-            <ViewerFallback objectId={obj.id} media={primaryMedia} />
+          ) : readyMedia.length > 0 ? (
+            <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
           ) : portalConfig.placeholder_image_url ? (
             <img
               src={portalConfig.placeholder_image_url}

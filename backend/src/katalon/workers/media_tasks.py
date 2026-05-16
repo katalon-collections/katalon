@@ -6,20 +6,27 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from katalon.workers.celery_app import celery_app
 
 
+def _worker_session() -> async_sessionmaker[AsyncSession]:
+    from katalon.config import settings
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
 async def _process(media_file_id: uuid.UUID) -> dict:
-    from katalon.database import AsyncSessionLocal
     from katalon.core.models import MediaFile
     from katalon.integrations.cantaloupe import CantaloupeError, build_manifest, fetch_image_info
 
-    async with AsyncSessionLocal() as session:
+    async with _worker_session()() as session:
         result = await session.execute(select(MediaFile).where(MediaFile.id == media_file_id))
         media = result.scalar_one_or_none()
         if not media:
-            return {"status": "error", "detail": "not found"}
+            raise ValueError(f"MediaFile {media_file_id} not found")
 
         filename = Path(media.file_path).name
 
@@ -39,10 +46,9 @@ async def _process(media_file_id: uuid.UUID) -> dict:
 
 
 async def _set_error(media_file_id: uuid.UUID, detail: str) -> None:
-    from katalon.database import AsyncSessionLocal
     from katalon.core.models import MediaFile
 
-    async with AsyncSessionLocal() as session:
+    async with _worker_session()() as session:
         result = await session.execute(select(MediaFile).where(MediaFile.id == media_file_id))
         media = result.scalar_one_or_none()
         if media:
@@ -64,7 +70,6 @@ def generate_iiif_tiles(self, media_file_id: str) -> dict:
 async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict:
     from katalon.config import settings
     from katalon.core.models import MediaFile, Object, Vocabulary, VocabularyTerm
-    from katalon.database import AsyncSessionLocal
     from katalon.services.media_batch_import_service import (
         folder_or_filename_object_id,
         normalize_filename,
@@ -117,7 +122,7 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
     failed = 0
     processed = 0
 
-    async with AsyncSessionLocal() as session:
+    async with _worker_session()() as session:
         vocab_result = await session.execute(select(Vocabulary).where(Vocabulary.name == "media_types"))
         vocab = vocab_result.scalar_one_or_none()
         media_terms: set[str] = set()

@@ -22,7 +22,7 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
-      - media_data:/var/lib/katalon/media
+      - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
     command: uvicorn katalon.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -40,7 +40,7 @@ services:
       MEDIA_ROOT: /var/lib/katalon/media
     volumes:
       - ./backend/src:/app/src
-      - media_data:/var/lib/katalon/media
+      - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
     command: celery -A katalon.workers.celery_app worker --loglevel=info
 
   admin:

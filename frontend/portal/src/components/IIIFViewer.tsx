@@ -22,45 +22,44 @@ export function IIIFViewer({ manifestUrl, onError }: Props) {
     fetch(manifestUrl)
       .then(r => r.ok ? r.json() : Promise.reject(new Error('Manifest nicht verfügbar')))
       .then(manifest => {
-        // Extract IIIF Image API URL from manifest
-        let tileSource: string | undefined
+        const canvases: unknown[] = Array.isArray(manifest.items) ? manifest.items : []
+        if (canvases.length === 0) throw new Error('Kein Canvas im Manifest gefunden')
 
-        if (manifest.items && manifest.items[0]) {
-          const canvas = manifest.items[0]
-          if (canvas.items && canvas.items[0] && canvas.items[0].items) {
-            const annotation = canvas.items[0].items[0]
-            if (annotation.body) {
-              const body = annotation.body
-              if (body.service && body.service[0]) {
-                tileSource = body.service[0].id + '/info.json'
-              } else if (typeof body.id === 'string') {
-                tileSource = body.id.replace(/\/full\/.*$/, '') + '/info.json'
-              }
-            }
+        const tileSources: string[] = []
+        for (const canvas of canvases) {
+          const c = canvas as Record<string, unknown>
+          const pageList = c.items as Record<string, unknown>[] | undefined
+          const annotation = pageList?.[0]?.items as Record<string, unknown>[] | undefined
+          const body = (annotation?.[0] as Record<string, unknown> | undefined)?.body as Record<string, unknown> | undefined
+          if (!body) continue
+          const services = body.service as Record<string, unknown>[] | undefined
+          if (services?.[0]?.id) {
+            tileSources.push(String(services[0].id) + '/info.json')
+          } else if (typeof body.id === 'string') {
+            tileSources.push(body.id.replace(/\/full\/.*$/, '') + '/info.json')
           }
         }
 
-        if (!tileSource) {
-          throw new Error('Kein IIIF Tile Source im Manifest gefunden')
-        }
+        if (tileSources.length === 0) throw new Error('Kein IIIF Tile Source im Manifest gefunden')
 
-        // Check if info.json is reachable
-        return fetch(tileSource, { method: 'HEAD' })
-          .then(r => {
-            if (!r.ok) throw new Error('IIIF Image API nicht erreichbar')
-            return tileSource!
-          })
+        return fetch(tileSources[0], { method: 'HEAD' }).then(r => {
+          if (!r.ok) throw new Error('IIIF Image API nicht erreichbar')
+          return tileSources
+        })
       })
-      .then(tileSource => {
+      .then(tileSources => {
         if (!containerRef.current) return
+        const multiImage = tileSources.length > 1
         viewerRef.current = OpenSeadragon({
           element: containerRef.current,
-          tileSources: tileSource,
+          tileSources,
           prefixUrl: 'https://cdn.jsdelivr.net/npm/openseadragon@6.0/build/openseadragon/images/',
           showNavigationControl: true,
           showZoomControl: true,
           showHomeControl: true,
           showFullPageControl: false,
+          showSequenceControl: multiImage,
+          sequenceMode: multiImage,
           minZoomLevel: 0.1,
           maxZoomLevel: 10,
           defaultZoomLevel: 0,
