@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@samvera/clover-iiif": "^2.9.0",
+    "@samvera/clover-iiif": "^2.19.2",
     "@types/dompurify": "^3.0.5",
     "@types/openseadragon": "^5.0.2",
     "dompurify": "^3.4.2",

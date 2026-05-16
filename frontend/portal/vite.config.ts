@@ -3,9 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  optimizeDeps: {
-    exclude: ['@samvera/clover-iiif'],
-  },
   server: {
     port: 5174,
     proxy: {

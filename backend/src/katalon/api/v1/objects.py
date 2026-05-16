@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
-from katalon.core.models import MediaFile, Object, RecordSnapshot
+from katalon.core.models import FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
     ObjectCreate,
@@ -200,8 +200,8 @@ async def create_snapshot(
 @router.get("/{object_id}/iiif/manifest")
 async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
     from katalon.integrations.cantaloupe import build_object_manifest
+    from katalon.config import settings
 
-    # Only serve manifest for public objects (or require auth for non-public)
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
     if not obj:
@@ -209,21 +209,34 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> di
     if obj.status not in ("public", "published"):
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
-    result = await db.execute(
+    media_result = await db.execute(
         select(MediaFile)
         .where(MediaFile.object_id == object_id, MediaFile.status == "ready")
         .order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
     )
-    media_files = result.scalars().all()
+    media_files = media_result.scalars().all()
     if not media_files:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
-    media_items = [
-        (Path(m.file_path).name, m.iiif_manifest)
-        for m in media_files
-    ]
+    field_result = await db.execute(
+        select(FieldDefinition)
+        .where(FieldDefinition.target_type == "object", FieldDefinition.show_in_detail == True)  # noqa: E712
+        .order_by(FieldDefinition.sort_order)
+    )
+    field_defs = field_result.scalars().all()
+
+    media_items = [(Path(m.file_path).name, m.iiif_manifest) for m in media_files]
     manifest_id = str(request.url)
-    return build_object_manifest(manifest_id, media_items)
+    portal_url = settings.katalon_base_url.rstrip("/")
+    homepage_url = f"{portal_url}/objects/{object_id}" if portal_url else None
+
+    return build_object_manifest(
+        manifest_id,
+        media_items,
+        obj=obj,
+        field_defs=list(field_defs),
+        homepage_url=homepage_url,
+    )
 
 
 @router.get("/{object_id}/snapshots", response_model=list[SnapshotRead])

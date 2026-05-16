@@ -55,7 +55,7 @@ export function ObjectDetailPage() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewerError, setViewerError] = useState(false)
+
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
   const fieldDefs = useFieldDefinitions('object')
@@ -109,7 +109,7 @@ export function ObjectDetailPage() {
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
   const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
-  const showViewer = readyMedia.length > 0 && !viewerError
+  const showViewer = readyMedia.length > 0
 
   const description = String(m.description ?? '')
   const ogImage = primaryMedia ? `${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
@@ -152,7 +152,7 @@ export function ObjectDetailPage() {
       <div className="detail-layout">
         <div>
           {showViewer ? (
-            <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
+            <IIIFViewer manifestUrl={manifestUrl} />
           ) : readyMedia.length > 0 ? (
             <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
           ) : portalConfig.placeholder_image_url ? (
