@@ -128,7 +128,7 @@ def build_object_manifest(
                 if not values:
                     continue
                 label_dict = fd.label if isinstance(fd.label, dict) else {}
-                label = {lang: [lbl] for lang, lbl in label_dict.items()} or {"none": [fd.name]}
+                label = {lang: [lbl] for lang, lbl in label_dict.items() if lbl} or {"none": [fd.name]}
                 metadata_entries.append({"label": label, "value": {"none": values}})
             if metadata_entries:
                 manifest["metadata"] = metadata_entries
