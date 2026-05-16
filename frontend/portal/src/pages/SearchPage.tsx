@@ -17,13 +17,13 @@ export function SearchPage() {
   const [localQ, setLocalQ] = useState(q)
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [facetFields, setFacetFields] = useState<string[]>([])
+  const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
 
   // Load configurable facet fields from portal config
   useEffect(() => {
     api.portal.config()
-      .then(c => setFacetFields(c.facet_fields ?? []))
+      .then(c => setFacetConfig(c.facet_fields ?? {}))
       .catch(() => {})
   }, [])
 
@@ -44,7 +44,11 @@ export function SearchPage() {
       status: statusFilt || undefined,
       page,
       page_size: 20,
-      facets: facetFields.length > 0 ? facetFields.join(',') : undefined,
+      facets: (() => {
+        const fields = typeFilt ? (facetConfig[typeFilt] ?? []) : Object.values(facetConfig).flat()
+        const unique = [...new Set(fields)]
+        return unique.length > 0 ? unique.join(',') : undefined
+      })(),
       rel_entity: relEntity || undefined,
       rel_place: relPlace || undefined,
       rel_occurrence: relOccurrence || undefined,
@@ -80,7 +84,7 @@ export function SearchPage() {
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false))
-  }, [q, typeFilt, statusFilt, page, facetFields.join(','), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
+  }, [q, typeFilt, statusFilt, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -179,7 +183,7 @@ export function SearchPage() {
             active={statusFilt}
             onSelect={v => setFilter('status', v)}
           />
-          {facetFields.map(field => {
+          {(typeFilt ? (facetConfig[typeFilt] ?? []) : [...new Set(Object.values(facetConfig).flat())]).map(field => {
             const buckets = data?.facets?.[`meta_${field}`] ?? []
             return (
               <FacetPanel

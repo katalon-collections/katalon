@@ -1,39 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE, apiKeys, users } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, PortalConfigRead } from '../../types'
+import { req, BASE, apiKeys, users, schema } from '../../api/client'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead } from '../../types'
 
 interface Props {
   onNavigate?: (route: string) => void
   isAdmin: boolean
 }
 
-export function ScreenSettings({ onNavigate, isAdmin }: Props) {
-  const [config, setConfig] = useState<PortalConfigRead | null>(null)
-  const [loading, setLoading] = useState(isAdmin)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [logoUploading, setLogoUploading] = useState(false)
-  const logoInputRef = useRef<HTMLInputElement>(null)
+type Section = 'profil' | 'portal' | 'facetten' | 'suche'
 
-  const [siteTitle, setSiteTitle] = useState('')
-  const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [heroText, setHeroText] = useState('')
-  const [logoUrl, setLogoUrl] = useState('')
-  const [placeholderImageUrl, setPlaceholderImageUrl] = useState('')
-  const [featuredIds, setFeaturedIds] = useState('')
-  const [facetFields, setFacetFields] = useState('')
-  const [accentColor, setAccentColor] = useState('')
-  const [headerBg, setHeaderBg] = useState('')
-  const [headerFg, setHeaderFg] = useState('')
-  const [pageBg, setPageBg] = useState('')
-  const [panelBg, setPanelBg] = useState('')
+const RECORD_TYPES = [
+  { key: 'object',     label: 'Objekte' },
+  { key: 'entity',     label: 'Entitäten' },
+  { key: 'place',      label: 'Orte' },
+  { key: 'occurrence', label: 'Ereignisse' },
+] as const
 
-  const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
+// ---------------------------------------------------------------------------
+// Profil section
+// ---------------------------------------------------------------------------
 
-  const [reindexing, setReindexing] = useState<string | null>(null)
-  const [reindexMsg, setReindexMsg] = useState<string | null>(null)
-
+function SectionProfil() {
   const [pwdCurrent, setPwdCurrent] = useState('')
   const [pwdNew, setPwdNew] = useState('')
   const [pwdConfirm, setPwdConfirm] = useState('')
@@ -43,7 +30,6 @@ export function ScreenSettings({ onNavigate, isAdmin }: Props) {
   const [emailPassword, setEmailPassword] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [emailSuccess, setEmailSuccess] = useState(false)
-
   const [ownKeys, setOwnKeys] = useState<ApiKey[]>([])
   const [ownKeysLoading, setOwnKeysLoading] = useState(true)
   const [newKeyName, setNewKeyName] = useState('')
@@ -54,26 +40,19 @@ export function ScreenSettings({ onNavigate, isAdmin }: Props) {
   useEffect(() => {
     apiKeys.listOwn()
       .then(setOwnKeys)
-      .catch(() => {/* silently ignore */})
+      .catch(() => {})
       .finally(() => setOwnKeysLoading(false))
   }, [])
 
   async function handleCreateOwnKey() {
     if (!newKeyName.trim()) return
-    setKeyCreating(true)
-    setKeyError(null)
-    setKeyCreated(null)
+    setKeyCreating(true); setKeyError(null); setKeyCreated(null)
     try {
       const result = await apiKeys.createOwn(newKeyName.trim())
-      setKeyCreated(result)
-      setNewKeyName('')
-      const updated = await apiKeys.listOwn()
-      setOwnKeys(updated)
-    } catch (e) {
-      setKeyError((e as Error).message)
-    } finally {
-      setKeyCreating(false)
-    }
+      setKeyCreated(result); setNewKeyName('')
+      setOwnKeys(await apiKeys.listOwn())
+    } catch (e) { setKeyError((e as Error).message) }
+    finally { setKeyCreating(false) }
   }
 
   async function handleRevokeOwnKey(keyId: string) {
@@ -81,50 +60,167 @@ export function ScreenSettings({ onNavigate, isAdmin }: Props) {
     try {
       await apiKeys.revokeOwn(keyId)
       setOwnKeys(prev => prev.filter(k => k.id !== keyId))
-    } catch (e) {
-      alert((e as Error).message)
-    }
+    } catch (e) { alert((e as Error).message) }
   }
 
-  useEffect(() => {
-    if (!isAdmin) return
-    setLoading(true)
-    req<PortalConfigRead>(`${BASE}/v1/portal/config`)
-      .then((c: PortalConfigRead) => {
-        setConfig(c)
-        setSiteTitle(c.site_title)
-        setSiteSubtitle(c.site_subtitle)
-        setHeroText(c.hero_text)
-        setLogoUrl(c.logo_url)
-        setPlaceholderImageUrl(c.placeholder_image_url ?? '')
-        setFeaturedIds((c.featured_object_ids ?? []).join('\n'))
-        setFacetFields((c.facet_fields ?? []).join('\n'))
-        setAccentColor(c.accent_color)
-        const ct = c.color_tokens ?? {}
-        setHeaderBg(ct['--header-bg'] ?? '')
-        setHeaderFg(ct['--header-fg'] ?? '')
-        setPageBg(ct['--bg'] ?? '')
-        setPanelBg(ct['--panel'] ?? '')
-      })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [isAdmin])
-
-  async function handleSaveConfig() {
-    setSaving(true)
-    setSaved(false)
-    setError(null)
+  async function handleChangePassword() {
+    setPwdError(null); setPwdSuccess(false)
+    if (pwdNew !== pwdConfirm) { setPwdError('Die neuen Passwörter stimmen nicht überein.'); return }
+    if (pwdNew.length < 8 || !/[A-Za-z]/.test(pwdNew) || !/[0-9]/.test(pwdNew)) {
+      setPwdError('Das neue Passwort muss mindestens 8 Zeichen sowie Buchstaben und Zahlen enthalten.'); return
+    }
     try {
-      await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+      await users.changeOwnPassword(pwdCurrent, pwdNew)
+      setPwdSuccess(true); setPwdCurrent(''); setPwdNew(''); setPwdConfirm('')
+      setTimeout(() => setPwdSuccess(false), 3000)
+    } catch (e) { setPwdError((e as Error).message) }
+  }
+
+  async function handleChangeEmail() {
+    setEmailError(null); setEmailSuccess(false)
+    if (!emailNew.trim()) { setEmailError('Bitte neue E-Mail eingeben.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNew.trim())) { setEmailError('Bitte gültige E-Mail-Adresse eingeben.'); return }
+    if (!emailPassword) { setEmailError('Bitte aktuelles Passwort zur Bestätigung eingeben.'); return }
+    try {
+      await users.changeOwnEmail(emailNew.trim(), emailPassword)
+      setEmailSuccess(true); setEmailNew(''); setEmailPassword('')
+      setTimeout(() => setEmailSuccess(false), 3000)
+    } catch (e) { setEmailError((e as Error).message) }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">E-Mail-Adresse ändern</div>
+        <div className="bd">
+          <div className="field">
+            <div className="lbl">Neue E-Mail</div>
+            <input className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
+          </div>
+          <div className="field">
+            <div className="lbl">Aktuelles Passwort zur Bestätigung</div>
+            <input className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
+          </div>
+          {emailError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{emailError}</div>}
+          {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>E-Mail-Adresse geändert.</div>}
+          <button className="btn pri" onClick={handleChangeEmail}>E-Mail ändern</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Passwort ändern</div>
+        <div className="bd">
+          <div className="field">
+            <div className="lbl">Aktuelles Passwort</div>
+            <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
+          </div>
+          <div className="field">
+            <div className="lbl">Neues Passwort</div>
+            <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
+          </div>
+          <div className="field">
+            <div className="lbl">Neues Passwort wiederholen</div>
+            <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
+          </div>
+          {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
+          {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
+          <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">API-Schlüssel</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+            API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
+          </p>
+          {keyCreated && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
+              <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
+              <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
+                {keyCreated.key}
+              </code>
+              <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated!.key)}>Kopieren</button>
+            </div>
+          )}
+          {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
+          {!ownKeysLoading && ownKeys.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
+                  <th style={{ width: 60 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {ownKeys.map(k => (
+                  <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
+                    <td style={{ padding: '4px 8px' }}>{k.name}</td>
+                    <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                      <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              className="fld" style={{ flex: 1 }} placeholder="Name des neuen Schlüssels"
+              value={newKeyName} onChange={e => setNewKeyName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
+            />
+            <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
+              {keyCreating ? 'Erstelle…' : 'Erstellen'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Portal section
+// ---------------------------------------------------------------------------
+
+function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+
+  const [siteTitle, setSiteTitle] = useState(config.site_title)
+  const [siteSubtitle, setSiteSubtitle] = useState(config.site_subtitle)
+  const [heroText, setHeroText] = useState(config.hero_text)
+  const [logoUrl, setLogoUrl] = useState(config.logo_url)
+  const [placeholderImageUrl, setPlaceholderImageUrl] = useState(config.placeholder_image_url ?? '')
+  const [featuredIds, setFeaturedIds] = useState((config.featured_object_ids ?? []).join('\n'))
+  const [accentColor, setAccentColor] = useState(config.accent_color)
+  const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
+
+  const ct = config.color_tokens ?? {}
+  const [headerBg, setHeaderBg] = useState(ct['--header-bg'] ?? '')
+  const [headerFg, setHeaderFg] = useState(ct['--header-fg'] ?? '')
+  const [pageBg, setPageBg] = useState(ct['--bg'] ?? '')
+  const [panelBg, setPanelBg] = useState(ct['--panel'] ?? '')
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      const c = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
         method: 'PUT',
         body: JSON.stringify({
-          site_title: siteTitle,
-          site_subtitle: siteSubtitle,
-          hero_text: heroText,
-          logo_url: logoUrl,
-          placeholder_image_url: placeholderImageUrl,
+          site_title: siteTitle, site_subtitle: siteSubtitle, hero_text: heroText,
+          logo_url: logoUrl, placeholder_image_url: placeholderImageUrl,
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
-          facet_fields: facetFields.split('\n').map(s => s.trim()).filter(Boolean),
           accent_color: accentColor,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
@@ -132,359 +228,326 @@ export function ScreenSettings({ onNavigate, isAdmin }: Props) {
           ),
         }),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
+      onSaved(c)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
   }
 
   async function handleLogoUpload(file: File) {
-    setLogoUploading(true)
-    setError(null)
+    setLogoUploading(true); setError(null)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
+      const fd = new FormData(); fd.append('file', file)
       const token = localStorage.getItem('katalon_token')
       const res = await fetch(`${BASE}/v1/portal/logo`, {
-        method: 'POST',
-        body: fd,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        method: 'POST', body: fd, headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail ?? `Fehler ${res.status}`)
-      }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? `Fehler ${res.status}`) }
       const c: PortalConfigRead = await res.json()
-      setLogoUrl(c.logo_url)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLogoUploading(false)
-    }
+      setLogoUrl(c.logo_url); onSaved(c)
+    } catch (e) { setError((e as Error).message) }
+    finally { setLogoUploading(false) }
   }
+
+  function handleLangChange(next: string) { setLang(next); localStorage.setItem('katalon_lang', next) }
+
+  const colorFields = [
+    { lbl: 'Akzentfarbe', val: accentColor, set: setAccentColor },
+    { lbl: 'Kopfzeile — Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
+    { lbl: 'Kopfzeile — Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
+    { lbl: 'Seitenhintergrund', val: pageBg, set: setPageBg, ph: '#f4f5f7' },
+    { lbl: 'Panel-/Kartenfarbe', val: panelBg, set: setPanelBg, ph: '#ffffff' },
+  ]
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Institution</div>
+        <div className="bd">
+          <div className="field"><div className="lbl">Institutionsname / Seitentitel</div>
+            <input className="fld" value={siteTitle} onChange={e => setSiteTitle(e.target.value)} /></div>
+          <div className="field"><div className="lbl">Untertitel</div>
+            <input className="fld" value={siteSubtitle} onChange={e => setSiteSubtitle(e.target.value)} /></div>
+          <div className="field"><div className="lbl">Willkommenstext (Hero)</div>
+            <textarea className="fld" rows={3} value={heroText} onChange={e => setHeroText(e.target.value)}
+              style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
+          <div className="field">
+            <div className="lbl">Logo <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
+              <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>{logoUploading ? 'Lädt hoch…' : 'Logo hochladen'}</button>
+              {logoUrl && <button className="btn sm gh" onClick={() => setLogoUrl('')} title="Logo entfernen">✕</button>}
+              <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
+            </div>
+            <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
+          </div>
+          <div className="field">
+            <div className="lbl">Platzhalter-Bild <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(für Objekte ohne Bild)</span></div>
+            <input className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
+            {placeholderImageUrl && <img src={placeholderImageUrl} alt="Platzhalter" style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
+          </div>
+          <div className="field">
+            <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
+            <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2'} />
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Design & Farben</div>
+        <div className="bd">
+          {colorFields.map(({ lbl, val, set, ph }) => (
+            <div className="field" key={lbl}>
+              <div className="lbl">{lbl}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="color" value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
+                  style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
+                <input className="fld mono" value={val} onChange={e => set(e.target.value)} placeholder={ph ?? ''} style={{ flex: 1 }} />
+                {val && <button className="btn sm gh" onClick={() => set('')} title="Zurücksetzen">✕</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Oberfläche</div>
+        <div className="bd">
+          <div className="field"><div className="lbl">Sprache</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={`btn${lang === 'de' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('de')}>Deutsch</button>
+              <button className={`btn${lang === 'en' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('en')}>English</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Facetten section
+// ---------------------------------------------------------------------------
+
+function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
+  const [activeType, setActiveType] = useState<string>('object')
+  const [fieldsByType, setFieldsByType] = useState<Record<string, FieldDefinition[]>>({})
+  const [loadingFields, setLoadingFields] = useState(true)
+  const [facetFields, setFacetFields] = useState<Record<string, string[]>>(
+    () => {
+      const base = config.facet_fields ?? {}
+      return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? []]))
+    }
+  )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoadingFields(true)
+    Promise.all(
+      RECORD_TYPES.map(({ key }) =>
+        schema.list(key).then(fields => [key, fields] as [string, FieldDefinition[]])
+      )
+    ).then(entries => {
+      setFieldsByType(Object.fromEntries(entries))
+    }).catch(e => setError((e as Error).message))
+      .finally(() => setLoadingFields(false))
+  }, [])
+
+  function toggle(type: string, name: string) {
+    setFacetFields(prev => {
+      const cur = prev[type] ?? []
+      return { ...prev, [type]: cur.includes(name) ? cur.filter(f => f !== name) : [...cur, name] }
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      const c = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ facet_fields: facetFields }),
+      })
+      onSaved(c)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  const fields = fieldsByType[activeType] ?? []
+  const selected = facetFields[activeType] ?? []
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+        Wähle pro Datensatztyp die Felder aus, die im Portal als Filteroptionen erscheinen sollen.
+      </p>
+
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border-s)' }}>
+        {RECORD_TYPES.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveType(key)}
+            style={{
+              padding: '7px 14px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer',
+              borderBottom: activeType === key ? '2px solid var(--accent)' : '2px solid transparent',
+              color: activeType === key ? 'var(--accent)' : 'var(--fg-2)',
+              fontWeight: activeType === key ? 600 : 400,
+              marginBottom: -1,
+            }}
+          >
+            {label}
+            {(facetFields[key]?.length ?? 0) > 0 && (
+              <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--accent)', color: '#fff', borderRadius: 10, padding: '1px 5px' }}>
+                {facetFields[key].length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {loadingFields ? (
+        <div className="empty">Lade Felder…</div>
+      ) : fields.length === 0 ? (
+        <div className="empty">Keine Felder für diesen Typ definiert.</div>
+      ) : (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="bd">
+            {fields.map(f => (
+              <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  className="ck"
+                  checked={selected.includes(f.name)}
+                  onChange={() => toggle(activeType, f.name)}
+                />
+                <span style={{ flex: 1 }}>{f.label?.de || f.label?.en || f.name}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Suche section
+// ---------------------------------------------------------------------------
+
+function SectionSuche() {
+  const [reindexing, setReindexing] = useState<string | null>(null)
+  const [reindexMsg, setReindexMsg] = useState<string | null>(null)
 
   async function handleReindex(type?: string) {
     const key = type ?? 'all'
     if (!window.confirm(type ? `Alle ${type}-Datensätze neu indizieren?` : 'Alle Datensätze vollständig neu indizieren?')) return
-    setReindexing(key)
-    setReindexMsg(null)
+    setReindexing(key); setReindexMsg(null)
     try {
       const url = type ? `${BASE}/v1/search/reindex/${type}` : `${BASE}/v1/search/reindex`
       await req(url, { method: 'POST' })
       setReindexMsg('Reindizierung gestartet — läuft im Hintergrund.')
       setTimeout(() => setReindexMsg(null), 5000)
-    } catch (e) {
-      setReindexMsg(`Fehler: ${(e as Error).message}`)
-    } finally {
-      setReindexing(null)
-    }
-  }
-
-  function handleLangChange(next: string) {
-    setLang(next)
-    localStorage.setItem('katalon_lang', next)
-  }
-
-  async function handleChangePassword() {
-    setPwdError(null)
-    setPwdSuccess(false)
-    if (pwdNew !== pwdConfirm) {
-      setPwdError('Die neuen Passwörter stimmen nicht überein.')
-      return
-    }
-    if (pwdNew.length < 8 || !/[A-Za-z]/.test(pwdNew) || !/[0-9]/.test(pwdNew)) {
-      setPwdError('Das neue Passwort muss mindestens 8 Zeichen sowie Buchstaben und Zahlen enthalten.')
-      return
-    }
-    try {
-      await users.changeOwnPassword(pwdCurrent, pwdNew)
-      setPwdSuccess(true)
-      setPwdCurrent('')
-      setPwdNew('')
-      setPwdConfirm('')
-      setTimeout(() => setPwdSuccess(false), 3000)
-    } catch (e) {
-      setPwdError((e as Error).message)
-    }
-  }
-
-  async function handleChangeEmail() {
-    setEmailError(null)
-    setEmailSuccess(false)
-    if (!emailNew.trim()) {
-      setEmailError('Bitte neue E-Mail eingeben.')
-      return
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNew.trim())) {
-      setEmailError('Bitte gültige E-Mail-Adresse eingeben.')
-      return
-    }
-    if (!emailPassword) {
-      setEmailError('Bitte aktuelles Passwort zur Bestätigung eingeben.')
-      return
-    }
-    try {
-      await users.changeOwnEmail(emailNew.trim(), emailPassword)
-      setEmailSuccess(true)
-      setEmailNew('')
-      setEmailPassword('')
-      setTimeout(() => setEmailSuccess(false), 3000)
-    } catch (e) {
-      setEmailError((e as Error).message)
-    }
+    } catch (e) { setReindexMsg(`Fehler: ${(e as Error).message}`) }
+    finally { setReindexing(null) }
   }
 
   return (
-    <div className="scroll">
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="hd">Suche &amp; Indexierung</div>
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+          Nach Schema-Änderungen oder Datenimporten muss der Suchindex manuell aktualisiert werden.
+          Die Reindizierung läuft asynchron im Hintergrund.
+        </p>
+        {reindexMsg && (
+          <div style={{ fontSize: 12, color: reindexMsg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
+            {reindexMsg}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {(['object', 'entity', 'place', 'occurrence'] as const).map(t => (
+            <button key={t} className="btn sm gh" onClick={() => handleReindex(t)} disabled={reindexing !== null}>
+              {reindexing === t ? 'Läuft…' : `${t} reindizieren`}
+            </button>
+          ))}
+          <button className="btn sm pri" onClick={() => handleReindex()} disabled={reindexing !== null} style={{ marginLeft: 8 }}>
+            {reindexing === 'all' ? 'Läuft…' : 'Alles reindizieren'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
+  { id: 'profil',   label: 'Profil' },
+  { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
+  { id: 'facetten', label: 'Facetten', adminOnly: true },
+  { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
+]
+
+export function ScreenSettings({ isAdmin }: Props) {
+  const [section, setSection] = useState<Section>('profil')
+  const [config, setConfig] = useState<PortalConfigRead | null>(null)
+  const [loading, setLoading] = useState(isAdmin)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    req<PortalConfigRead>(`${BASE}/v1/portal/config`)
+      .then(setConfig)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [isAdmin])
+
+  const navItems = NAV.filter(n => !n.adminOnly || isAdmin)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="ph">
-        <div><h1>Einstellungen</h1><div className="sub">System- und Account-Einstellungen</div></div>
+        <div><h1>Einstellungen</h1><div className="sub">Account und Systemkonfiguration</div></div>
       </div>
 
-      {isAdmin && loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
-
-      <div style={{ maxWidth: 640, padding: '0 24px' }}>
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="hd">E-Mail-Adresse ändern</div>
-          <div className="bd">
-            <div className="field">
-              <div className="lbl">Neue E-Mail</div>
-              <input className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
-            </div>
-            <div className="field">
-              <div className="lbl">Aktuelles Passwort zur Bestätigung</div>
-              <input className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
-            </div>
-            {emailError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{emailError}</div>}
-            {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>E-Mail-Adresse geändert.</div>}
-            <button className="btn pri" onClick={handleChangeEmail}>E-Mail ändern</button>
-          </div>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Sidebar nav */}
+        <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border-s)', overflowY: 'auto', paddingTop: 8 }}>
+          {navItems.map(n => (
+            <button key={n.id} className={`panel-it${section === n.id ? ' active' : ''}`} onClick={() => setSection(n.id)}>
+              {n.label}
+            </button>
+          ))}
         </div>
 
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="hd">Passwort ändern</div>
-          <div className="bd">
-            <div className="field">
-              <div className="lbl">Aktuelles Passwort</div>
-              <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
-            </div>
-            <div className="field">
-              <div className="lbl">Neues Passwort</div>
-              <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
-            </div>
-            <div className="field">
-              <div className="lbl">Neues Passwort wiederholen</div>
-              <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
-            </div>
-            {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
-            {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
-            <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
-          </div>
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 680 }}>
+          {loading && <div className="empty">Lade…</div>}
+          {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
+          {!loading && section === 'profil' && <SectionProfil />}
+          {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && section === 'suche' && <SectionSuche />}
         </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="hd">API-Schlüssel</div>
-          <div className="bd">
-            <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-              API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
-            </p>
-
-            {keyCreated && (
-              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
-                <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>✓ Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
-                <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
-                  {keyCreated.key}
-                </code>
-                <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated.key)}>
-                  Kopieren
-                </button>
-              </div>
-            )}
-
-            {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
-
-            {!ownKeysLoading && ownKeys.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
-                    <th style={{ width: 60 }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {ownKeys.map(k => (
-                    <tr key={k.id} style={{ borderBottom: '1px solid var(--border-s)' }}>
-                      <td style={{ padding: '4px 8px' }}>{k.name}</td>
-                      <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
-                      <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
-                      <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
-                        {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
-                      </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>
-                        <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                className="fld"
-                style={{ flex: 1 }}
-                placeholder="Name des neuen Schlüssels"
-                value={newKeyName}
-                onChange={e => setNewKeyName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
-              />
-              <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
-                {keyCreating ? 'Erstelle…' : 'Erstellen'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {isAdmin && error && <div className="empty" style={{ paddingTop: 20, color: '#f87171' }}>{error}</div>}
-
       </div>
-
-      {isAdmin && !loading && !error && (
-        <div style={{ maxWidth: 640, padding: '0 24px' }}>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="hd">Portal & Institution</div>
-            <div className="bd">
-              <div className="field">
-                <div className="lbl">Institutionsname / Seitentitel</div>
-                <input className="fld" value={siteTitle} onChange={e => setSiteTitle(e.target.value)} />
-              </div>
-              <div className="field">
-                <div className="lbl">Untertitel</div>
-                <input className="fld" value={siteSubtitle} onChange={e => setSiteSubtitle(e.target.value)} />
-              </div>
-              <div className="field">
-                <div className="lbl">Willkommenstext (Hero)</div>
-                <textarea className="fld" rows={3} value={heroText} onChange={e => setHeroText(e.target.value)}
-                  style={{ resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-              <div className="field">
-                <div className="lbl">Logo <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {logoUrl && (
-                    <img src={logoUrl} alt="Logo-Vorschau"
-                      style={{ height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />
-                  )}
-                  <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
-                    {logoUploading ? 'Lädt hoch…' : 'Logo hochladen'}
-                  </button>
-                  {logoUrl && (
-                    <button className="btn sm gh" onClick={() => setLogoUrl('')} title="Logo entfernen">✕</button>
-                  )}
-                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
-                </div>
-                <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
-                  placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
-              </div>
-              <div className="field">
-                <div className="lbl">Platzhalter-Bild <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(für Objekte ohne Bild)</span></div>
-                <input className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)}
-                  placeholder="https://..." style={{ fontSize: 12 }} />
-                {placeholderImageUrl && (
-                  <img src={placeholderImageUrl} alt="Platzhalter-Vorschau"
-                    style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />
-                )}
-              </div>
-              <div className="field">
-                <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
-                <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)}
-                  style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2\nuuid-3'} />
-              </div>
-              <div className="field">
-                <div className="lbl">Facetten-Felder <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(ein Feldname pro Zeile — erscheinen als Filter in der Portal-Suche)</span></div>
-                <textarea className="fld mono" rows={4} value={facetFields} onChange={e => setFacetFields(e.target.value)}
-                  style={{ resize: 'vertical', fontSize: 12 }} placeholder={'creator\nmaterial\nlocation'} />
-              </div>
-              {[
-                { lbl: 'Akzentfarbe', val: accentColor, set: setAccentColor },
-                { lbl: 'Kopfzeile — Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
-                { lbl: 'Kopfzeile — Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
-                { lbl: 'Seitenhintergrund', val: pageBg, set: setPageBg, ph: '#f4f5f7' },
-                { lbl: 'Panel-/Kartenfarbe', val: panelBg, set: setPanelBg, ph: '#ffffff' },
-              ].map(({ lbl, val, set, ph }) => (
-                <div className="field" key={lbl}>
-                  <div className="lbl">{lbl}</div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input type="color" value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
-                      style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
-                    <input className="fld mono" value={val} onChange={e => set(e.target.value)}
-                      placeholder={ph ?? ''} style={{ flex: 1 }} />
-                    {val && <button className="btn sm gh" onClick={() => set('')} title="Zurücksetzen">✕</button>}
-                  </div>
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="btn pri" onClick={handleSaveConfig} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
-                {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="hd">Oberfläche</div>
-            <div className="bd">
-              <div className="field">
-                <div className="lbl">Sprache</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className={`btn${lang === 'de' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('de')}>Deutsch</button>
-                  <button className={`btn${lang === 'en' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('en')}>English</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="hd">Suche &amp; Indexierung</div>
-            <div className="bd">
-              <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-                Nach Schema-Änderungen oder Datenimporten muss der Suchindex manuell aktualisiert werden.
-                Die Reindizierung läuft asynchron im Hintergrund.
-              </p>
-              {reindexMsg && (
-                <div style={{ fontSize: 12, color: reindexMsg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
-                  {reindexMsg}
-                </div>
-              )}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {(['object', 'entity', 'place', 'occurrence'] as const).map(t => (
-                  <button
-                    key={t}
-                    className="btn sm gh"
-                    onClick={() => handleReindex(t)}
-                    disabled={reindexing !== null}
-                  >
-                    {reindexing === t ? 'Läuft…' : `${t} reindizieren`}
-                  </button>
-                ))}
-                <button
-                  className="btn sm pri"
-                  onClick={() => handleReindex()}
-                  disabled={reindexing !== null}
-                  style={{ marginLeft: 8 }}
-                >
-                  {reindexing === 'all' ? 'Läuft…' : 'Alles reindizieren'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      )}
     </div>
   )
 }

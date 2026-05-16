@@ -59,7 +59,7 @@ export interface PortalConfig {
   site_subtitle: string
   hero_text: string
   featured_object_ids: string[]
-  facet_fields: string[]
+  facet_fields: Record<string, string[]>
   accent_color: string
   logo_url: string
   placeholder_image_url: string

@@ -7,7 +7,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   site_subtitle: '',
   hero_text: 'Fotografien, Dokumente, Objekte und Personen aus dem Archiv',
   featured_object_ids: [],
-  facet_fields: [],
+  facet_fields: {},
   accent_color: '#1e3a8a',
   logo_url: '',
   placeholder_image_url: '',

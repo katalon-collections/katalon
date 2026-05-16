@@ -33,7 +33,7 @@ _DEFAULTS = {
     "accent_color": "#1e3a8a",
     "logo_url": "",
     "placeholder_image_url": "",
-    "facet_fields": [],
+    "facet_fields": {"object": [], "entity": [], "place": [], "occurrence": []},
     "color_tokens": {},
 }
 
@@ -43,7 +43,7 @@ class PortalConfigRead(BaseModel):
     site_subtitle: str
     hero_text: str
     featured_object_ids: list[str]
-    facet_fields: list[str]
+    facet_fields: dict[str, list[str]]
     accent_color: str
     logo_url: str
     placeholder_image_url: str
@@ -58,7 +58,7 @@ class PortalConfigUpdate(BaseModel):
     site_subtitle: str | None = None
     hero_text: str | None = None
     featured_object_ids: list[str] | None = None
-    facet_fields: list[str] | None = None
+    facet_fields: dict[str, list[str]] | None = None
     accent_color: str | None = None
     logo_url: str | None = None
     placeholder_image_url: str | None = None

@@ -312,7 +312,7 @@ class PortalConfig(Base):
     site_subtitle: Mapped[str] = mapped_column(String(512), default="")
     hero_text: Mapped[str] = mapped_column(Text, default="")
     featured_object_ids: Mapped[list] = mapped_column(JSONB, default=list)
-    facet_fields: Mapped[list] = mapped_column(JSONB, default=list)  # e.g. ["creator", "year"]
+    facet_fields: Mapped[dict] = mapped_column(JSONB, default=dict)  # e.g. {"object": ["creator"], "entity": []}
     accent_color: Mapped[str] = mapped_column(String(32), default="#1e3a8a")
     logo_url: Mapped[str] = mapped_column(String(512), default="")
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="")
