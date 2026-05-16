@@ -7,6 +7,10 @@ import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 
+const PORTAL_PATH: Record<RecordType, string> = {
+  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences',
+}
+
 const TYPE_LABELS: Record<RecordType, string> = {
   object:     'Objekt',
   entity:     'Entität',
@@ -658,7 +662,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
         record_type: recordType,
         record_id: savedId,
         field_name: fieldName,
-        target_url: `${PORTAL_URL}/record/${recordType}/${savedId}`,
+        target_url: `${PORTAL_URL}/${PORTAL_PATH[recordType]}/${savedId}`,
         label: 'URN',
       })
       if (repeatable) {
@@ -870,7 +874,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
           {!isNew && status === 'public' && (
             <a
               className="btn gh"
-              href={`${PORTAL_URL}/record/${recordType}/${recordId}`}
+              href={`${PORTAL_URL}/${PORTAL_PATH[recordType]}/${recordId}`}
               target="_blank"
               rel="noreferrer"
               style={{ textDecoration: 'none' }}
