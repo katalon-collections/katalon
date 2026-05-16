@@ -421,7 +421,7 @@ export function ScreenSchema() {
         <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadFields() }} />
       )}
       <div className="ph">
-        <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ und Subtyp</div></div>
+        <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ/Subtyp</div></div>
         <div className="right">
           <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
           <button className="btn pri" onClick={openNew}><Plus size={13} /> Neues Feld</button>
@@ -446,27 +446,16 @@ export function ScreenSchema() {
             <div style={{ padding: '14px 12px 6px', fontFamily: "'IBM Plex Mono',monospace", fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-4)', fontWeight: 500 }}>
               Subtypen
             </div>
-            {[{ id: '', name: '', label: { de: 'Alle / Global' } }, ...subtypesList].map(s => {
-              const isActive = activeSubtype === s.name
-              return (
-                <button
-                  key={s.id}
-                  className="sb-it"
-                  onClick={() => setActiveSubtype(s.name)}
-                  style={{
-                    borderRadius: 0,
-                    padding: '7px 12px',
-                    background: isActive ? 'var(--accent-muted, rgba(99,102,241,.12))' : undefined,
-                    color: isActive ? 'var(--accent)' : undefined,
-                    fontWeight: isActive ? 600 : undefined,
-                    borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
-                  }}
-                >
-                  <span>{s.label?.de || s.name || 'Alle / Global'}</span>
-                  {s.name && <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>}
-                </button>
-              )
-            })}
+            {[{ id: '', name: '', label: { de: 'Alle / Global' } }, ...subtypesList].map(s => (
+              <button
+                key={s.id}
+                className={`panel-it${activeSubtype === s.name ? ' active' : ''}`}
+                onClick={() => setActiveSubtype(s.name)}
+              >
+                <span>{s.label?.de || s.name || 'Alle / Global'}</span>
+                {s.name && <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>}
+              </button>
+            ))}
           </div>
         )}
 
