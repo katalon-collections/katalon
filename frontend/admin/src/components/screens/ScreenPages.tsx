@@ -85,11 +85,13 @@ export function ScreenPages() {
     }
     try {
       if (isNew) {
-        await staticPages.create({ slug: form.slug.trim(), ...payload })
+        const slug = form.slug.trim()
+        await staticPages.create({ slug, ...payload })
+        setIsNew(false)
+        setActiveSlug(slug)
       } else {
         await staticPages.update(activeSlug!, payload)
       }
-      close()
       load()
     } catch (e) {
       setError((e as Error).message)

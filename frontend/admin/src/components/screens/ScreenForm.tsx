@@ -451,6 +451,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
+  const [saveOk, setSaveOk]   = useState(false)
 
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
@@ -771,7 +772,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
         if (showMedia) loadMedia(created.id)
       } else {
         await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
-        onBack?.()
+        setSaveOk(true)
+        setTimeout(() => setSaveOk(false), 3000)
       }
     } catch (e) {
       setError((e as Error).message)
@@ -896,6 +898,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
       {justCreated && (
         <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
           {label} gespeichert.{showMedia ? ' Bilder können jetzt hochgeladen werden.' : ''}
+        </div>
+      )}
+      {saveOk && (
+        <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
+          Änderungen gespeichert.
         </div>
       )}
 
