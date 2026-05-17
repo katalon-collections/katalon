@@ -198,6 +198,7 @@ class Relation(Base):
     to_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     relation_type: Mapped[str] = mapped_column(String(128))
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    is_schema_derived: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     __table_args__ = (
