@@ -75,15 +75,17 @@ function AppInner() {
       </Helmet>
       <BannerBar />
       <Header />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/objects/:id" element={<ErrorBoundary><ObjectDetailPage /></ErrorBoundary>} />
-        <Route path="/entities/:id" element={<EntityDetailPage />} />
-        <Route path="/places/:id" element={<PlaceDetailPage />} />
-        <Route path="/occurrences/:id" element={<OccurrenceDetailPage />} />
-        <Route path="/page/:slug" element={<StaticPageView />} />
-      </Routes>
+      <main style={{ flex: 1, width: '100%' }}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/objects/:id" element={<ErrorBoundary><ObjectDetailPage /></ErrorBoundary>} />
+          <Route path="/entities/:id" element={<EntityDetailPage />} />
+          <Route path="/places/:id" element={<PlaceDetailPage />} />
+          <Route path="/occurrences/:id" element={<OccurrenceDetailPage />} />
+          <Route path="/page/:slug" element={<StaticPageView />} />
+        </Routes>
+      </main>
       <Footer />
     </>
   )

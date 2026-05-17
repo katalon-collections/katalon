@@ -18,6 +18,11 @@ const options = {
     renderAnnotation: false,
     renderContentSearch: false,
   },
+  openSeadragon: {
+    gestureSettingsMouse: {
+      scrollToZoom: true,
+    },
+  },
 }
 
 export function IIIFViewer({ manifestUrl, onError }: Props) {
