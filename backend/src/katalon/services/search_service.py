@@ -57,12 +57,21 @@ def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | N
     if not title:
         title = getattr(record, "idno", None) or ""
 
+    related_text = " ".join(
+        name
+        for key in ("related_entities", "related_places", "related_occurrences")
+        for name in (rel_data or {}).get(key, [])
+    )
+    search_text = _flatten_text(md, searchable_fields)
+    if related_text:
+        search_text = f"{search_text} {related_text}".strip()
+
     doc: dict[str, Any] = {
         "record_type": record_type,
         "title": title,
         "status": getattr(record, "status", None),
         "metadata": md,
-        "search_text": _flatten_text(md, searchable_fields),
+        "search_text": search_text,
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
     }
