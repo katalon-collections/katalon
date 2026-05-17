@@ -11,8 +11,11 @@ from katalon.integrations.elasticsearch import (
 
 
 def _extract_title(md: dict) -> str:
-    """Extract a display title from metadata, handling both plain strings and repeatable-field lists."""
-    for key in ("title", "name", "display_name", "place_name", "label"):
+    """Extract a display title from metadata, handling both plain strings and repeatable-field lists.
+
+    Checks common title field names in both English and German.
+    """
+    for key in ("title", "titel", "name", "display_name", "place_name", "label", "bezeichnung"):
         val = md.get(key)
         if not val:
             continue
