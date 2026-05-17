@@ -188,3 +188,26 @@ export interface Banner {
   created_at: string
   updated_at: string
 }
+
+/** Return the best available label from a vocabulary term, field, etc.
+ *  Falls back to `fallback` (default: term/name itself) if all labels are empty.
+ */
+export function getLabel(
+  item: { label?: Record<string, string>; term?: string; name?: string } | null | undefined,
+  fallback?: string,
+): string {
+  if (!item) return fallback ?? ''
+  const label = item.label
+  if (label) {
+    const de = label.de?.trim()
+    if (de) return de
+    const en = label.en?.trim()
+    if (en) return en
+    // Try any non-empty language key
+    for (const key of Object.keys(label)) {
+      const v = label[key]?.trim()
+      if (v) return v
+    }
+  }
+  return fallback ?? item.term ?? item.name ?? ''
+}

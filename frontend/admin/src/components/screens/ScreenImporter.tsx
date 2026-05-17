@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { importer, media, schema } from '../../api/client'
 import type { UploadResult, DryRunResult, MediaBatchStatus, TaskStatus } from '../../api/client'
 import type { FieldDefinition } from '../../types'
+import { getLabel } from '../../types'
 import { Upload } from '../ui/Icons'
 
 const RECORD_TYPES = [
@@ -263,7 +264,7 @@ export function ScreenImporter() {
                           <option value="">— ignorieren —</option>
                           {fields.map(f => (
                             <option key={f.id} value={f.name}>
-                              {f.label.de ?? f.name}{f.is_required ? ' *' : ''}
+                              {getLabel(f, f.name)}{f.is_required ? ' *' : ''}
                             </option>
                           ))}
                         </select>

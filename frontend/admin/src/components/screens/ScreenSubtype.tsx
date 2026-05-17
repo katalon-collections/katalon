@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { subtypes } from '../../api/client'
 import type { RecordSubtype } from '../../types'
+import { getLabel } from '../../types'
 import { Edit, Plus, Trash, X } from '../ui/Icons'
 
 const PRIMARY_TYPES = [
@@ -206,8 +207,8 @@ export function ScreenSubtype() {
               {items.map(s => (
                 <tr key={s.id}>
                   <td><span className="mono" style={{ fontSize: 12 }}>{s.name}</span></td>
-                  <td>{s.label.de ?? '—'}</td>
-                  <td>{s.label.en ?? '—'}</td>
+                  <td>{getLabel(s, '—')}</td>
+                  <td>{s.label.en?.trim() || '—'}</td>
                   <td style={{ textAlign: 'center' }}>
                     {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>Standard</span>}
                   </td>

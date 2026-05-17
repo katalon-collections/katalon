@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { schema, subtypes, vocabularies } from '../../api/client'
 import type { SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, RecordSubtype, Vocabulary } from '../../types'
+import { getLabel } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
 const TYPES = [
@@ -525,7 +526,7 @@ export function ScreenSchema() {
                   {fields.map(f => (
                     <div key={f.id} className="field-row" onClick={() => openExisting(f)}>
                       <span className="gp"><Grip size={14} /></span>
-                      <span className="nm">{f.label.de ?? f.name}</span>
+                      <span className="nm">{getLabel(f, f.name)}</span>
                       <span className="key">{f.name}</span>
                       {f.target_subtype && (
                         <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>

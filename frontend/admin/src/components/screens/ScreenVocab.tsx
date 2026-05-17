@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { vocabularies } from '../../api/client'
 import type { Vocabulary, VocabularyTerm } from '../../types'
+import { getLabel } from '../../types'
 import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
 
 export function ScreenVocab() {
@@ -440,7 +441,7 @@ export function ScreenVocab() {
                         ) : (
                           <>
                             <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
-                            <td style={{ maxWidth: 220 }}>{t.label.de ?? '—'}</td>
+                            <td style={{ maxWidth: 220 }}>{getLabel(t, '—')}</td>
                             <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
                             <td className="col-act">
                               <div className="row-actions">

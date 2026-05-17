@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import { getLabel } from '../../types'
 import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -81,7 +82,7 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
   }, [q, vocabId])
 
   function pick(term: VocabularyTerm) {
-    onChange({ id: term.id, label: term.label.de ?? term.label.en ?? term.term })
+    onChange({ id: term.id, label: getLabel(term) })
     setQ(''); setResults([]); setOpen(false)
   }
 
@@ -136,7 +137,7 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
               }}
               className="authority-hit"
             >
-              <div style={{ fontWeight: 500, fontSize: 13 }}>{term.label.de ?? term.label.en ?? term.term}</div>
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{getLabel(term)}</div>
               <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{term.term}</div>
             </button>
           ))}
@@ -220,7 +221,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
   }
 
   function pick(term: VocabularyTerm) {
-    commit(term.label.de ?? term.label.en ?? term.term)
+    commit(getLabel(term))
   }
 
   return (
@@ -262,7 +263,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
               }}
               className="authority-hit"
             >
-              <div style={{ fontWeight: 500, fontSize: 13 }}>{term.label.de ?? term.label.en ?? term.term}</div>
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{getLabel(term)}</div>
               <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{term.term}</div>
             </button>
           ))}
@@ -495,7 +496,7 @@ function RelationInput({
             <select className="fld" style={{ flex: 1 }} value={relType} onChange={e => setRelType(e.target.value)}>
               <option value="">— Relationstyp wählen —</option>
               {relTypeTerms.map(t => (
-                <option key={t.id} value={t.term}>{t.label.de ?? t.label.en ?? t.term}</option>
+                <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
               ))}
             </select>
           ) : (
@@ -638,17 +639,24 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
 
   const loadRelations = useCallback(async (id: string) => {
     try {
-      const loaded = await relationsApi.list({ from_type: recordType, from_id: id })
+      const [fromRels, toRels] = await Promise.all([
+        relationsApi.list({ from_type: recordType, from_id: id }),
+        relationsApi.list({ to_type: recordType, to_id: id }),
+      ])
+      const loaded = [...fromRels, ...toRels]
       setRels(loaded)
       const titleMap: Record<string, string> = {}
       await Promise.all(loaded.map(async r => {
-        const key = `${r.to_type}/${r.to_id}`
+        const isFrom = r.from_id === id
+        const targetType = isFrom ? r.to_type : r.from_type
+        const targetId = isFrom ? r.to_id : r.from_id
+        const key = `${targetType}/${targetId}`
         try {
-          const rec = await (getApi(r.to_type as RecordType).get as (id: string) => Promise<AnyRecord>)(r.to_id)
+          const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
           const m = rec.metadata_ as Record<string, unknown>
-          titleMap[key] = String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? r.to_id)
+          titleMap[key] = String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? targetId)
         } catch {
-          titleMap[key] = r.to_id.slice(0, 8) + '…'
+          titleMap[key] = targetId.slice(0, 8) + '…'
         }
       }))
       setRelTitles(titleMap)
@@ -1127,7 +1135,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   return (
                     <div key={f.id} className="field">
                       <div className="lbl">
-                        {f.label.de ?? f.name}
+                        {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
                         {repeatable && <span className="h">wiederholbar</span>}
                       </div>
@@ -1346,7 +1354,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                               <input className="fld" value={v}
                                 onChange={e => updateRepeat(f.name, i, e.target.value)}
-                                placeholder={f.label.de ?? f.name}
+                                placeholder={getLabel(f, f.name)}
                                 disabled={justCreated} />
                               <button className="btn sm ico gh" onClick={() => removeRepeat(f.name, i)} disabled={justCreated}><X size={12} /></button>
                             </div>
@@ -1359,7 +1367,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                         <textarea className="fld" rows={4}
                           value={(val as string) ?? ''}
                           onChange={e => setField(f.name, e.target.value)}
-                          placeholder={f.label.de ?? f.name}
+                          placeholder={getLabel(f, f.name)}
                           disabled={justCreated} />
                       ) : f.field_type === 'boolean' ? (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1397,7 +1405,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                                 setDateFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
-                            placeholder={f.label.de ?? f.name}
+                            placeholder={getLabel(f, f.name)}
                             disabled={justCreated}
                             style={dateFieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
                           {dateFieldErrors[f.name] && (
@@ -1482,7 +1490,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             >
                               <option value="">— Typ —</option>
                               {mediaTypeTerms.map(t => (
-                                <option key={t.id} value={t.term}>{t.label.de ?? t.term}</option>
+                                <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
                               ))}
                             </select>
                           </div>
@@ -1539,13 +1547,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                         {rels.map(r => {
                           const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence' }
                           const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
-                          const relTypeLabel = relTypeTerm ? (relTypeTerm.label.de ?? relTypeTerm.label.en ?? r.relation_type) : r.relation_type
+                          const relTypeLabel = relTypeTerm ? getLabel(relTypeTerm, r.relation_type) : r.relation_type
+                          const isFrom = r.from_id === savedId
+                          const targetType = isFrom ? r.to_type : r.from_type
+                          const targetId = isFrom ? r.to_id : r.from_id
                           return (
                             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                               <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>{relTypeLabel}</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.to_type}: ${r.to_id}`}>
-                                <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[r.to_type] ?? r.to_type}</span>
-                                {relTitles[`${r.to_type}/${r.to_id}`] ?? r.to_id.slice(0, 8) + '…'}
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
+                                <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
+                                {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
                               </span>
                               <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
                             </div>
@@ -1602,7 +1613,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             <select className="fld" value={addRelType} onChange={e => setAddRelType(e.target.value)}>
                               <option value="">— Typ wählen —</option>
                               {relTypeTerms.map(t => (
-                                <option key={t.id} value={t.term}>{t.label.de ?? t.term}</option>
+                                <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
                               ))}
                             </select>
                           ) : (
