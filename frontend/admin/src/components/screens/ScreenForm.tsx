@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useBlocker } from 'react-router-dom'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
@@ -588,13 +589,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [showAudit, setShowAudit] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
-  const [dateFieldErrors, setDateFieldErrors] = useState<Record<string, string>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [snapLabel, setSnapLabel] = useState('')
   const [snapCreating, setSnapCreating] = useState(false)
   const [snapRestoring, setSnapRestoring] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isDirty, setIsDirty] = useState(false)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [registeringPidField, setRegisteringPidField] = useState<string | null>(null)
@@ -621,6 +623,25 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [addRelType, setAddRelType]       = useState('')
   const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
   const [addSaving, setAddSaving]         = useState(false)
+
+  // Block in-app navigation when form has unsaved changes
+  const blocker = useBlocker(isDirty && !isNew)
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      if (window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker])
+
+  // Warn on browser tab close / reload
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { if (isDirty && !isNew) e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty, isNew])
 
   const loadMedia = useCallback((id: string) => {
     media.list(id).then(setMediaFiles).catch(() => {})
@@ -705,7 +726,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
         setFields(fieldDefs)
       })
       .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); setIsDirty(false) })
 
     if (!isNew && currentId) loadRelations(currentId)
   }, [recordId, recordType, isNew])
@@ -787,32 +808,35 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     } catch (e) { alert((e as Error).message) }
   }
 
-  function setField(name: string, value: unknown) { setValues(v => ({ ...v, [name]: value })) }
+  // All user-triggered value mutations go through this wrapper to mark the form dirty
+  const setValuesDirty: typeof setValues = (fn) => { setValues(fn); setIsDirty(true) }
+
+  function setField(name: string, value: unknown) { setValuesDirty(v => ({ ...v, [name]: value })) }
   function addRepeat(name: string) {
     const cur = (values[name] as string[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, ''] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, ''] }))
   }
   function removeRepeat(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
   }
   function updateRepeat(name: string, idx: number, val: string) {
     const cur = [...((values[name] as string[]) ?? [])]
     cur[idx] = val
-    setValues(v => ({ ...v, [name]: cur }))
+    setValuesDirty(v => ({ ...v, [name]: cur }))
   }
 
   type PidEntry = { value: string; label: string }
   function addPid(name: string) {
     const cur = (values[name] as PidEntry[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, { value: '', label: '' }] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, { value: '', label: '' }] }))
   }
   function removePid(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as PidEntry[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as PidEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
   function updatePid(name: string, idx: number, key: 'value' | 'label', val: string) {
     const cur = [...((values[name] as PidEntry[]) ?? [])]
     cur[idx] = { ...cur[idx], [key]: val }
-    setValues(v => ({ ...v, [name]: cur }))
+    setValuesDirty(v => ({ ...v, [name]: cur }))
   }
 
   async function registerUrn(fieldName: string, repeatable: boolean) {
@@ -840,42 +864,42 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   }
 
   function setAuthority(name: string, val: AuthorityEntry | null) {
-    setValues(v => ({ ...v, [name]: val ?? undefined }))
+    setValuesDirty(v => ({ ...v, [name]: val ?? undefined }))
   }
   function addAuthority(name: string, val: AuthorityEntry) {
     const cur = (values[name] as AuthorityEntry[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, val] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, val] }))
   }
   function removeAuthority(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as AuthorityEntry[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as AuthorityEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
   function setVocab(name: string, val: VocabEntry | null) {
-    setValues(v => ({ ...v, [name]: val ?? undefined }))
+    setValuesDirty(v => ({ ...v, [name]: val ?? undefined }))
   }
   function addFreeVocab(name: string, val: string) {
     if (!val.trim()) return
     const cur = (values[name] as string[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, val.trim()] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, val.trim()] }))
   }
   function removeFreeVocab(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
   function addVocab(name: string, val: VocabEntry) {
     const cur = (values[name] as VocabEntry[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, val] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, val] }))
   }
   function removeVocab(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
   function addRelationEntry(name: string, entry: RelationEntry) {
     const cur = (values[name] as RelationEntry[] | undefined) ?? []
-    setValues(v => ({ ...v, [name]: [...cur, entry] }))
+    setValuesDirty(v => ({ ...v, [name]: [...cur, entry] }))
   }
   function removeRelationEntry(name: string, idx: number) {
-    setValues(v => ({ ...v, [name]: ((v[name] as RelationEntry[]) ?? []).filter((_, i) => i !== idx) }))
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as RelationEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
   function validateFields(): Record<string, string> {
@@ -894,6 +918,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
           const ok = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)
           if (!ok) {
             errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+            break
+          }
+        }
+      }
+      // Number validation
+      if (f.field_type === 'number') {
+        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
+        for (const v of toCheck) {
+          if (!v) continue
+          if (!/^-?\d+(\.\d+)?$/.test(v)) {
+            errors[f.name] = 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
             break
           }
         }
@@ -923,12 +958,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
     setError(null)
     const fieldErrors = validateFields()
     if (Object.keys(fieldErrors).length > 0) {
-      setDateFieldErrors(fieldErrors)
+      setFieldErrors(fieldErrors)
       setSaving(false)
       setError('Bitte korrigieren Sie die markierten Felder.')
       return
     }
-    setDateFieldErrors({})
+    setFieldErrors({})
     try {
       const payload: Record<string, unknown> = { status, metadata_: values }
       if (showIdno)   payload.idno = idno || null
@@ -945,6 +980,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
         if (showMedia) loadMedia(created.id)
       } else {
         await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
+        setIsDirty(false)
         setSaveOk(true)
         setTimeout(() => setSaveOk(false), 3000)
       }
@@ -1031,7 +1067,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border-s)', borderRadius: 6, overflow: 'hidden' }}>
             {STATUSES.map(s => (
-              <button key={s} onClick={() => setStatus(s)}
+              <button key={s} onClick={() => { setStatus(s); setIsDirty(true) }}
                 style={{ border: 0, padding: '5px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
                   background: status === s ? 'var(--accent)' : '#fff',
                   color: status === s ? '#fff' : 'var(--fg-2)',
@@ -1091,13 +1127,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                     <input
                       className="fld mono"
                       value={idno}
-                      onChange={e => setIdno(e.target.value)}
+                      onChange={e => { setIdno(e.target.value); setIsDirty(true) }}
                       placeholder="z.B. FOT.1958.0412"
                       disabled={justCreated}
-                      style={dateFieldErrors['__idno'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                      style={fieldErrors['__idno'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
                     />
-                    {dateFieldErrors['__idno'] && (
-                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors['__idno']}</div>
+                    {fieldErrors['__idno'] && (
+                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__idno']}</div>
                     )}
                   </div>
                 )}
@@ -1105,7 +1141,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                 {subtypeKey && (
                   <div className="field">
                     <div className="lbl">{subtypeKey === 'entity_type' ? 'Entitätstyp' : 'Occurrence-Typ'}</div>
-                    <input className="fld" value={subtype} onChange={e => setSubtype(e.target.value)}
+                    <input className="fld" value={subtype} onChange={e => { setSubtype(e.target.value); setIsDirty(true) }}
                       placeholder={subtypeKey === 'entity_type' ? 'z.B. person, organisation' : 'z.B. event, work'} disabled={justCreated} />
                   </div>
                 )}
@@ -1114,8 +1150,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                   <div className="field">
                     <div className="lbl">Koordinaten</div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <input className="fld mono" value={lat} onChange={e => setLat(e.target.value)} placeholder="Breite (lat)" disabled={justCreated} />
-                      <input className="fld mono" value={lon} onChange={e => setLon(e.target.value)} placeholder="Länge (lon)" disabled={justCreated} />
+                      <input className="fld mono" value={lat} onChange={e => { setLat(e.target.value); setIsDirty(true) }} placeholder="Breite (lat)" disabled={justCreated} />
+                      <input className="fld mono" value={lon} onChange={e => { setLon(e.target.value); setIsDirty(true) }} placeholder="Länge (lon)" disabled={justCreated} />
                     </div>
                   </div>
                 )}
@@ -1353,6 +1389,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                           {(vals ?? []).map((v, i) => (
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                               <input className="fld" value={v}
+                                type={f.field_type === 'number' ? 'number' : 'text'}
+                                step={f.field_type === 'number' ? 'any' : undefined}
                                 onChange={e => updateRepeat(f.name, i, e.target.value)}
                                 placeholder={getLabel(f, f.name)}
                                 disabled={justCreated} />
@@ -1384,15 +1422,34 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             value={(val as string) ?? ''}
                             onChange={e => {
                               setField(f.name, e.target.value)
-                              if (dateFieldErrors[f.name]) {
-                                setDateFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                              if (fieldErrors[f.name]) {
+                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
                             placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
                             disabled={justCreated}
-                            style={dateFieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
-                          {dateFieldErrors[f.name] && (
-                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors[f.name]}</div>
+                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          {fieldErrors[f.name] && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
+                          )}
+                        </>
+                      ) : f.field_type === 'number' ? (
+                        <>
+                          <input className="fld"
+                            type="number"
+                            step="any"
+                            value={(val as string) ?? ''}
+                            onChange={e => {
+                              setField(f.name, e.target.value)
+                              if (fieldErrors[f.name]) {
+                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                              }
+                            }}
+                            placeholder={getLabel(f, f.name)}
+                            disabled={justCreated}
+                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          {fieldErrors[f.name] && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
                           )}
                         </>
                       ) : (
@@ -1401,15 +1458,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             value={(val as string) ?? ''}
                             onChange={e => {
                               setField(f.name, e.target.value)
-                              if (dateFieldErrors[f.name]) {
-                                setDateFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                              if (fieldErrors[f.name]) {
+                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
                             placeholder={getLabel(f, f.name)}
                             disabled={justCreated}
-                            style={dateFieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
-                          {dateFieldErrors[f.name] && (
-                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{dateFieldErrors[f.name]}</div>
+                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          {fieldErrors[f.name] && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
                           )}
                         </>
                       )}
