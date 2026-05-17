@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MMS-Systeme im Vergleich — Katalon, CollectiveAccess, MuseumPlus &amp; Co.</title>
+  <title>MMS-Systeme im Vergleich — Katalon, CollectiveAccess, MuseumPlus, Axiell Collections, fylr, Daphne &amp; Co.</title>
   <style>
     :root {
       --bg: #f8f9fa;
@@ -16,12 +16,18 @@
       --ca-light: #ede9fe;
       --mp: #059669;
       --mp-light: #d1fae5;
+      --axiell: #b45309;
+      --axiell-light: #fef3c7;
+      --fylr: #0891b2;
+      --fylr-light: #cffafe;
+      --daphne: #be185d;
+      --daphne-light: #fce7f3;
       --atom: #dc2626;
       --atom-light: #fee2e2;
       --as: #ea580c;
       --as-light: #ffedd5;
-      --omeka: #0891b2;
-      --omeka-light: #cffafe;
+      --omeka: #0d9488;
+      --omeka-light: #ccfbf1;
     }
     * { box-sizing: border-box; }
     body {
@@ -39,8 +45,8 @@
       text-align: center;
     }
     header h1 { margin: 0 0 0.5rem; font-size: 2rem; }
-    header p { margin: 0; opacity: 0.9; max-width: 600px; margin-inline: auto; }
-    main { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+    header p { margin: 0; opacity: 0.9; max-width: 700px; margin-inline: auto; }
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem 1rem; }
     .intro {
       background: white;
       border-radius: 12px;
@@ -52,7 +58,7 @@
     .intro p { color: var(--muted); margin-bottom: 0; }
 
     /* System cards */
-    .systems { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .systems { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
     .sys-card {
       background: white;
       border-radius: 12px;
@@ -63,6 +69,9 @@
     .sys-card.katalon { border-color: var(--katalon); }
     .sys-card.ca { border-color: var(--ca); }
     .sys-card.mp { border-color: var(--mp); }
+    .sys-card.axiell { border-color: var(--axiell); }
+    .sys-card.fylr { border-color: var(--fylr); }
+    .sys-card.daphne { border-color: var(--daphne); }
     .sys-card.atom { border-color: var(--atom); }
     .sys-card.aspace { border-color: var(--as); }
     .sys-card.omeka { border-color: var(--omeka); }
@@ -75,6 +84,9 @@
     .sys-card.katalon .badge { background: var(--katalon-light); color: var(--katalon); }
     .sys-card.ca .badge { background: var(--ca-light); color: var(--ca); }
     .sys-card.mp .badge { background: var(--mp-light); color: var(--mp); }
+    .sys-card.axiell .badge { background: var(--axiell-light); color: var(--axiell); }
+    .sys-card.fylr .badge { background: var(--fylr-light); color: var(--fylr); }
+    .sys-card.daphne .badge { background: var(--daphne-light); color: var(--daphne); }
     .sys-card.atom .badge { background: var(--atom-light); color: var(--atom); }
     .sys-card.aspace .badge { background: var(--as-light); color: var(--as); }
     .sys-card.omeka .badge { background: var(--omeka-light); color: var(--omeka); }
@@ -96,14 +108,14 @@
       font-size: 1.1rem; border-bottom: 1px solid var(--border);
       background: #fafafa;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
     th {
-      background: #f1f3f5; font-weight: 600; font-size: 0.8rem;
+      background: #f1f3f5; font-weight: 600; font-size: 0.75rem;
       text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted);
       position: sticky; top: 0;
     }
-    td:first-child { font-weight: 500; width: 22%; }
+    td:first-child { font-weight: 500; width: 18%; }
     td { vertical-align: top; }
     tr:hover td { background: #f8f9fa; }
 
@@ -112,18 +124,21 @@
     .partial { color: #d97706; }
     .na { color: #adb5bd; font-style: italic; }
 
-    .sys-col { width: 13%; }
+    .sys-col { width: 9%; text-align: center; }
     .sys-col.kat { background: var(--katalon-light); }
     .sys-col.ca { background: var(--ca-light); }
     .sys-col.mp { background: var(--mp-light); }
-    .sys-col.atom { background: var(--atom-light); }
+    .sys-col.ax { background: var(--axiell-light); }
+    .sys-col.fy { background: var(--fylr-light); }
+    .sys-col.da { background: var(--daphne-light); }
+    .sys-col.at { background: var(--atom-light); }
     .sys-col.as { background: var(--as-light); }
     .sys-col.om { background: var(--omeka-light); }
 
     /* Legend */
     .legend {
-      display: flex; flex-wrap: wrap; gap: 1rem;
-      font-size: 0.85rem; color: var(--muted);
+      display: flex; flex-wrap: wrap; gap: 0.75rem;
+      font-size: 0.8rem; color: var(--muted);
       margin-bottom: 1.5rem; padding: 0 0.5rem;
     }
     .legend span { display: flex; align-items: center; gap: 0.35rem; }
@@ -149,9 +164,9 @@
     }
     footer a { color: var(--katalon); }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1100px) {
       .table-wrap { overflow-x: auto; }
-      table { min-width: 900px; }
+      table { min-width: 1100px; }
     }
   </style>
 </head>
@@ -159,31 +174,46 @@
 
 <header>
   <h1>🗂️ MMS-Systeme im Vergleich</h1>
-  <p>Feature-Vergleich von Katalon, CollectiveAccess, MuseumPlus, AtoM, ArchivesSpace und Omeka S — Stand Mai 2026</p>
+  <p>Feature-Vergleich von 9 Collections Management &amp; Metadata Management Systemen — Stand Mai 2026</p>
 </header>
 
 <main>
 
   <section class="intro">
-    <h2>Was ist ein MMS?</h2>
-    <p>Ein <strong>Metadata Management System (MMS)</strong> — auch Collections Management System (CMS) oder Sammlungsmanagement-System — ist Software zur strukturierten Erfassung, Verwaltung und Bereitstellung von Metadaten für Kulturgüter. Eingesetzt wird sie im GLAM-Sektor (Galleries, Libraries, Archives, Museums) für Objekte, Dokumente, Fotografien, Kunstwerke, Archivalien und mehr. Kernaufgaben: Katalogisierung, Klassifikation, digitale Präsentation, Langzeitarchivierung und interoperabler Datenaustausch.</p>
+    <h2>Was ist ein MMS / CMS?</h2>
+    <p>Ein <strong>Metadata Management System (MMS)</strong> oder <strong>Collections Management System (CMS)</strong> ist Software zur strukturierten Erfassung, Verwaltung und Bereitstellung von Metadaten für Kulturgüter. Eingesetzt im GLAM-Sektor (Galleries, Libraries, Archives, Museums) für Objekte, Dokumente, Fotografien, Kunstwerke, Archivalien und mehr. Kernaufgaben: Katalogisierung, Klassifikation, digitale Präsentation, Langzeitarchivierung und interoperabler Datenaustausch.</p>
   </section>
 
   <section class="systems">
     <div class="sys-card katalon">
       <h3><span class="badge">In Entwicklung</span> Katalon</h3>
-      <div class="meta">Open Source · Python/FastAPI + React · PostgreSQL · 2025–2026</div>
-      <p>Moderner Rewrite von CollectiveAccess-Kernfunktionen. Dynamische Schema-Engine, IIIF, Elasticsearch, Celery. Ziel: Python-Ökosystem, saubere API, einfachere Konfiguration.</p>
+      <div class="meta">Open Source · Python/FastAPI + React · PostgreSQL/PostGIS · 2025–2026</div>
+      <p>Modernes Open-Source-MMS für den GLAM-Sektor. Dynamische Schema-Engine, IIIF, Elasticsearch, Celery, mehrsprachig. Ziel: Python-Ökosystem, saubere API, einfache Konfiguration — Alternative zu bestehenden proprietären und Open-Source-Systemen.</p>
     </div>
     <div class="sys-card ca">
       <h3><span class="badge">Open Source</span> CollectiveAccess</h3>
       <div class="meta">PHP-Monolith · MySQL · seit 2007 · <a href="https://collectiveaccess.org" target="_blank">collectiveaccess.org</a></div>
-      <p>Umfangreiches, bewährtes System mit Providence (Backend) und Pawtucket (Frontend). XML-Profile für Konfiguration. Sehr flexibel, aber steile Lernkurve und schwere Wartbarkeit.</p>
+      <p>Umfangreiches, bewährtes System mit Providence (Backend) und Pawtucket (Frontend). XML-Profile für Konfiguration. Sehr flexibel, aber steile Lernkurve und schwere Wartbarkeit. Version 2.0 mit PHP 8.2+ und GraphQL-API.</p>
     </div>
     <div class="sys-card mp">
       <h3><span class="badge">Kommerziell</span> MuseumPlus</h3>
       <div class="meta">Proprietär · SaaS/On-Prem · PostgreSQL · zetcom AG · <a href="https://www.zetcom.com" target="_blank">zetcom.com</a></div>
       <p>Marktführer mit &gt;900 Kunden (Louvre, Staatliche Museen Berlin). Modular, metadata-driven, REST-API. Leihverkehr, Konservierung, Standortverwaltung. Hohe Kosten, aber umfassend.</p>
+    </div>
+    <div class="sys-card axiell">
+      <h3><span class="badge">Kommerziell</span> Axiell Collections</h3>
+      <div class="meta">Proprietär · SaaS/On-Prem · Axiell · <a href="https://www.axiell.com/solutions/product/axiell-collections/" target="_blank">axiell.com</a></div>
+      <p>Nachfolger von Adlib (30+ Jahre). Web-basiert, &gt;800 UK-Kunden. IIIF, Axiell Move (iOS-Scanner), Axiell Flow (Workflows). Spectrum-konform. Cloud ab £5.500/Jahr.</p>
+    </div>
+    <div class="sys-card fylr">
+      <h3><span class="badge">Kommerziell</span> fylr</h3>
+      <div class="meta">Proprietär · Cloud/SaaS · Picturae · <a href="https://fylr.io" target="_blank">fylr.io</a></div>
+      <p>Moderne Cloud-native Lösung aus den Niederlanden. Fokus auf DAM + CMS-Kombination. Einfache Bedienung, schnelle Implementierung. Geeignet für mittlere Institutionen.</p>
+    </div>
+    <div class="sys-card daphne">
+      <h3><span class="badge">Kommerziell</span> robotron Daphne</h3>
+      <div class="meta">Proprietär · On-Prem/Cloud · Oracle · Robotron · <a href="https://www.robotron-daphne.de" target="_blank">robotron-daphne.de</a></div>
+      <p>Entwickelt mit Staatlichen Kunstsammlungen Dresden. ~35 Museen, ~500 Nutzer. Einfache Erfassung, GND-Integration, Multimedia-Guide. Oracle-Datenbank, LIDO-Export.</p>
     </div>
     <div class="sys-card atom">
       <h3><span class="badge">Open Source</span> AtoM</h3>
@@ -204,10 +234,13 @@
 
   <div class="legend">
     <span><span class="dot" style="background:var(--katalon)"></span> Katalon</span>
-    <span><span class="dot" style="background:var(--ca)"></span> CollectiveAccess</span>
+    <span><span class="dot" style="background:var(--ca)"></span> CA</span>
     <span><span class="dot" style="background:var(--mp)"></span> MuseumPlus</span>
+    <span><span class="dot" style="background:var(--axiell)"></span> Axiell</span>
+    <span><span class="dot" style="background:var(--fylr)"></span> fylr</span>
+    <span><span class="dot" style="background:var(--daphne)"></span> Daphne</span>
     <span><span class="dot" style="background:var(--atom)"></span> AtoM</span>
-    <span><span class="dot" style="background:var(--as)"></span> ArchivesSpace</span>
+    <span><span class="dot" style="background:var(--as)"></span> ASpace</span>
     <span><span class="dot" style="background:var(--omeka)"></span> Omeka S</span>
   </div>
 
@@ -218,21 +251,27 @@
         <tr>
           <th>Feature</th>
           <th class="sys-col kat">Katalon</th>
-          <th class="sys-col ca">CollectiveAccess</th>
-          <th class="sys-col mp">MuseumPlus</th>
-          <th class="sys-col atom">AtoM</th>
-          <th class="sys-col as">ArchivesSpace</th>
-          <th class="sys-col om">Omeka S</th>
+          <th class="sys-col ca">CA</th>
+          <th class="sys-col mp">M+</th>
+          <th class="sys-col ax">Axiell</th>
+          <th class="sys-col fy">fylr</th>
+          <th class="sys-col da">Daphne</th>
+          <th class="sys-col at">AtoM</th>
+          <th class="sys-col as">ASpace</th>
+          <th class="sys-col om">Omeka</th>
         </tr>
       </thead>
       <tbody>
         <!-- Lizenz & Kosten -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Lizenz &amp; Kosten</td></tr>
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Lizenz &amp; Kosten</td></tr>
         <tr>
           <td>Lizenzmodell</td>
           <td>Open Source (GPL)</td>
           <td>Open Source (GPLv3)</td>
-          <td>Proprietär (SaaS/Lizenz)</td>
+          <td>Proprietär</td>
+          <td>Proprietär</td>
+          <td>Proprietär (SaaS)</td>
+          <td>Proprietär</td>
           <td>Open Source (AGPL)</td>
           <td>Open Source (ECL)</td>
           <td>Open Source (GPLv3)</td>
@@ -242,6 +281,9 @@
           <td class="yes">Kostenlos</td>
           <td class="yes">Kostenlos</td>
           <td class="no">Ab ~5.000€/Jahr</td>
+          <td class="no">Ab £5.500/Jahr</td>
+          <td class="no">SaaS-Abonnement</td>
+          <td class="no">Auf Anfrage</td>
           <td class="yes">Kostenlos</td>
           <td class="partial">Kostenlos, Support kostenpflichtig</td>
           <td class="yes">Kostenlos</td>
@@ -251,17 +293,23 @@
           <td>Self-hosted / Docker</td>
           <td>Self-hosted / Whirl-i-Gig</td>
           <td>SaaS oder On-Prem</td>
+          <td>SaaS oder On-Prem</td>
+          <td>Cloud-only</td>
+          <td>On-Prem / Robotron-Cloud</td>
           <td>Self-hosted / Artefactual</td>
           <td>Self-hosted / Hosting-Partner</td>
           <td>Self-hosted / Omeka.net</td>
         </tr>
 
         <!-- Technologie -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Technologie &amp; Architektur</td></tr>
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Technologie &amp; Architektur</td></tr>
         <tr>
           <td>Backend-Sprache</td>
           <td class="yes">Python 3.12+</td>
           <td>PHP 8.2+</td>
+          <td>Java / proprietär</td>
+          <td>.NET / proprietär</td>
+          <td>Node.js / proprietär</td>
           <td>Java / proprietär</td>
           <td>PHP (Symfony)</td>
           <td>Java / Ruby</td>
@@ -272,6 +320,9 @@
           <td>PostgreSQL + PostGIS</td>
           <td>MySQL / MariaDB</td>
           <td>PostgreSQL</td>
+          <td>SQL Server / Oracle</td>
+          <td>PostgreSQL</td>
+          <td>Oracle</td>
           <td>MySQL</td>
           <td>MySQL</td>
           <td>MySQL</td>
@@ -279,25 +330,34 @@
         <tr>
           <td>API</td>
           <td class="yes">REST (OpenAPI)</td>
-          <td class="yes">REST + GraphQL (v2.0)</td>
+          <td class="yes">REST + GraphQL</td>
           <td class="yes">REST</td>
+          <td class="yes">REST / SRU</td>
+          <td class="yes">REST</td>
+          <td class="partial">CSV / LIDO</td>
           <td class="partial">REST (begrenzt)</td>
           <td class="yes">REST</td>
           <td class="yes">REST</td>
         </tr>
         <tr>
-          <td>Frontend-Technologie</td>
-          <td class="yes">React + TypeScript (Vite)</td>
-          <td>PHP-Templates (Pawtucket)</td>
-          <td>HTML5 / JavaScript</td>
+          <td>Frontend</td>
+          <td class="yes">React + TypeScript</td>
           <td>PHP-Templates</td>
-          <td>JavaScript / AngularJS</td>
-          <td>PHP-Templates / Module</td>
+          <td>HTML5 / JS</td>
+          <td>Web / Responsive</td>
+          <td>Modern Web-UI</td>
+          <td>Web / Responsive</td>
+          <td>PHP-Templates</td>
+          <td>JS / AngularJS</td>
+          <td>PHP-Templates</td>
         </tr>
         <tr>
           <td>Moderne Architektur</td>
           <td class="yes">Microservices-ready</td>
           <td class="no">Monolith</td>
+          <td class="partial">Modular</td>
+          <td class="partial">Modular</td>
+          <td class="yes">Cloud-native</td>
           <td class="partial">Modular</td>
           <td class="no">Monolith</td>
           <td class="partial">Modular</td>
@@ -305,12 +365,15 @@
         </tr>
 
         <!-- Datenmodell -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Datenmodell &amp; Metadaten</td></tr>
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Datenmodell &amp; Metadaten</td></tr>
         <tr>
           <td>Dynamische Schemas</td>
           <td class="yes">UI-gesteuert (JSONB)</td>
           <td class="yes">XML-Profile</td>
           <td class="yes">UI-gesteuert</td>
+          <td class="yes">UI-gesteuert</td>
+          <td class="yes">UI-gesteuert</td>
+          <td class="yes">Spezialdatensätze</td>
           <td class="partial">Templates</td>
           <td class="partial">Eingeschränkt</td>
           <td class="partial">Resource Templates</td>
@@ -320,6 +383,9 @@
           <td class="yes">Ja (Pflicht mit Default)</td>
           <td class="yes">Ja (Typen + Listen)</td>
           <td class="yes">Ja (modulspezifisch)</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja (Kategorien)</td>
           <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
           <td class="partial">Item Sets</td>
@@ -332,30 +398,42 @@
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
         </tr>
         <tr>
           <td>Mehrsprachigkeit</td>
-          <td class="partial">UI + Labels (i18n)</td>
+          <td class="yes">Ja (UI + Inhalte)</td>
           <td class="yes">Vollständig</td>
           <td class="yes">Vollständig</td>
+          <td class="yes">Vollständig</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Vollständig</td>
           <td class="partial">UI + Inhalte</td>
           <td class="partial">UI + Inhalte</td>
         </tr>
         <tr>
           <td>Metadaten-Standards</td>
-          <td class="partial">Dublin Core, LIDO (geplant)</td>
+          <td class="yes">DC, LIDO, METS/MODS (Serialisierung)</td>
           <td class="yes">DACS, DC, VRA, CDWA, EAD, LIDO</td>
           <td class="yes">Spectrum, CIDOC, LIDO, EDM, EODEM</td>
+          <td class="yes">Spectrum, ISAD(G), DACS, MARC, FRBR</td>
+          <td class="partial">DC, eigene Schemas</td>
+          <td class="partial">LIDO, Spectrum, CIDOC</td>
           <td class="yes">ISAD(G), DACS, RAD, EAD, DC</td>
           <td class="yes">DACS, EAD, EAC-CPF, MARCXML</td>
           <td class="partial">Dublin Core, MODS</td>
         </tr>
 
-        <!-- Primäre Entitätstypen -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Entitätstypen</td></tr>
+        <!-- Entitätstypen -->
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Entitätstypen</td></tr>
         <tr>
           <td>Objekte / Artefakte</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
@@ -368,6 +446,9 @@
           <td class="yes">Ja (Entities)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja (Authorities)</td>
           <td class="yes">Ja (Agents)</td>
           <td class="no">Nein</td>
@@ -377,6 +458,9 @@
           <td class="yes">Ja (PostGIS)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja (GIS-Modul)</td>
+          <td class="yes">Ja (Karten)</td>
+          <td class="partial">Ja</td>
+          <td class="yes">Ja (Daphne-Maps)</td>
           <td class="partial">Ja</td>
           <td class="no">Nein</td>
           <td class="partial">Via Mapping-Modul</td>
@@ -386,6 +470,9 @@
           <td class="yes">Ja (Occurrences)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Ja</td>
+          <td class="yes">Ja (Werke, Aufführungen)</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
@@ -395,18 +482,24 @@
           <td class="yes">Ja (generisch)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Ja</td>
+          <td class="partial">Ja</td>
           <td class="partial">Begrenzt</td>
           <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
         </tr>
 
-        <!-- Medien & IIIF -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Medien &amp; Digital Assets</td></tr>
+        <!-- Medien -->
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Medien &amp; Digital Assets</td></tr>
         <tr>
           <td>Bilderverwaltung</td>
           <td class="yes">Ja (Upload + IIIF)</td>
           <td class="yes">Ja (Derivate)</td>
           <td class="yes">Ja (DAM-Integration)</td>
+          <td class="yes">Ja (DAM)</td>
+          <td class="yes">Ja (DAM-fokussiert)</td>
+          <td class="yes">Ja (Mediagrabber)</td>
           <td class="yes">Ja</td>
           <td class="partial">Nur Verlinkung</td>
           <td class="yes">Ja</td>
@@ -417,6 +510,9 @@
           <td class="partial">In Entwicklung</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Zoombare Bilder</td>
+          <td class="yes">Ja</td>
           <td class="no">Nein</td>
           <td class="yes">Ja</td>
         </tr>
@@ -424,6 +520,9 @@
           <td>IIIF Presentation API</td>
           <td class="partial">Geplant</td>
           <td class="no">Nein</td>
+          <td class="partial">Begrenzt</td>
+          <td class="partial">Begrenzt</td>
+          <td class="partial">Begrenzt</td>
           <td class="partial">Begrenzt</td>
           <td class="yes">Ja</td>
           <td class="no">Nein</td>
@@ -435,16 +534,22 @@
           <td class="yes">Ja (Player)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="no">Nein</td>
           <td class="yes">Ja</td>
         </tr>
 
         <!-- Suche -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Suche &amp; Discovery</td></tr>
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Suche &amp; Discovery</td></tr>
         <tr>
           <td>Full-Text-Suche</td>
           <td class="yes">Elasticsearch 8.x</td>
           <td class="yes">Elasticsearch / Lucene</td>
+          <td class="yes">Integriert</td>
+          <td class="yes">Integriert</td>
+          <td class="yes">Integriert</td>
           <td class="yes">Integriert</td>
           <td class="yes">Elasticsearch</td>
           <td class="yes">Lucene</td>
@@ -452,7 +557,10 @@
         </tr>
         <tr>
           <td>Facettierung</td>
-          <td class="partial">Geplant</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
@@ -461,21 +569,27 @@
         </tr>
         <tr>
           <td>Public Portal</td>
-          <td class="partial">In Entwicklung</td>
+          <td class="yes">Ja (React)</td>
           <td class="yes">Pawtucket</td>
           <td class="yes">Ja</td>
+          <td class="yes">Axiell Internet Server</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Daphne-Collection</td>
           <td class="yes">Ja</td>
           <td class="yes">PUI</td>
           <td class="yes">Ja (Sites)</td>
         </tr>
 
         <!-- Workflow -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Workflow &amp; Import/Export</td></tr>
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Workflow &amp; Import/Export</td></tr>
         <tr>
           <td>CSV/Excel-Import</td>
-          <td class="partial">Geplant (Phase 10)</td>
+          <td class="yes">Ja (GUI + Dry Run)</td>
           <td class="yes">Ja (Mappings)</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja (CSV)</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">CSV Import-Modul</td>
@@ -487,13 +601,19 @@
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja (Massenänderung)</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="partial">Eingeschränkt</td>
         </tr>
         <tr>
           <td>OAI-PMH</td>
-          <td class="partial">Geplant (Phase 11)</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja (Aufpreis)</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Begrenzt</td>
+          <td class="no">Nein</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
@@ -503,6 +623,9 @@
           <td class="no">Nicht im Scope</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja (Modul)</td>
+          <td class="yes">Ja (Axiell Flow)</td>
+          <td class="partial">Begrenzt</td>
+          <td class="yes">Ja</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
@@ -512,17 +635,23 @@
           <td class="no">Nicht im Scope</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja (Axiell Move)</td>
+          <td class="partial">Begrenzt</td>
+          <td class="yes">Ja</td>
           <td class="no">Nein</td>
           <td class="yes">Ja</td>
           <td class="no">Nein</td>
         </tr>
 
-        <!-- Authority & Integration -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Authority Sources &amp; Integration</td></tr>
+        <!-- Authority -->
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Authority Sources &amp; Integration</td></tr>
         <tr>
           <td>GND-Integration</td>
-          <td class="partial">Geplant (Adapter)</td>
+          <td class="yes">Ja (Plugin-System)</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Begrenzt</td>
           <td class="yes">Ja</td>
           <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
@@ -533,34 +662,46 @@
           <td class="partial">Geplant</td>
           <td class="yes">Ja (AAT, TGN, ULAN)</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Begrenzt</td>
+          <td class="yes">Ja (AAT)</td>
           <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
         </tr>
         <tr>
           <td>Geonames</td>
-          <td class="partial">Geplant</td>
+          <td class="yes">Ja (Plugin-System)</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Begrenzt</td>
           <td class="yes">Ja</td>
           <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
         </tr>
         <tr>
-          <td>Plugin-System für Authorities</td>
+          <td>Plugin-System Authorities</td>
           <td class="yes">Ja (Python ABC)</td>
           <td class="partial">Eingeschränkt</td>
           <td class="partial">Eingeschränkt</td>
+          <td class="partial">Eingeschränkt</td>
+          <td class="no">Nein</td>
+          <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
         </tr>
 
-        <!-- Sicherheit & Audit -->
-        <tr><td colspan="7" style="background:#f1f3f5;font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.03em;">Sicherheit &amp; Governance</td></tr>
+        <!-- Sicherheit -->
+        <tr><td colspan="10" style="background:#f1f3f5;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.03em;">Sicherheit &amp; Governance</td></tr>
         <tr>
           <td>Audit-Log</td>
           <td class="yes">Ja (JSONB)</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="partial">Begrenzt</td>
@@ -572,13 +713,19 @@
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="partial">Begrenzt</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
         </tr>
         <tr>
           <td>Rollenbasierte Rechte</td>
-          <td class="yes">Ja (Admin, Editor, Viewer)</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
+          <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
           <td class="yes">Ja</td>
@@ -590,6 +737,9 @@
           <td class="yes">Ja</td>
           <td class="no">Nein</td>
           <td class="partial">API-Key</td>
+          <td class="partial">API-Key</td>
+          <td class="yes">Ja</td>
+          <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
           <td class="no">Nein</td>
@@ -602,20 +752,20 @@
     <div class="detail-card">
       <h3>🎯 Katalon — Positionierung</h3>
       <ul>
-        <li><strong>Ziel:</strong> Moderner, wartbarer Ersatz für CollectiveAccess</li>
-        <li><strong>USP:</strong> Python-Ökosystem, saubere API, React-Frontend, einfachere Konfiguration</li>
-        <li><strong>Ideal für:</strong> Institutionen, die CollectiveAccess-Features brauchen, aber mit PHP/XML nicht mehr arbeiten wollen</li>
-        <li><strong>Status:</strong> MVP in Entwicklung (Phasen 0–6), noch nicht produktiv einsetzbar</li>
-        <li><strong>Lücke:</strong> Leihverkehr, Standortverwaltung, vollständiger Import/Export noch nicht implementiert</li>
+        <li><strong>Ziel:</strong> Modernes, offenes MMS für Museen, Archive und Sammlungen aller Art</li>
+        <li><strong>USP:</strong> Python-Ökosystem, saubere REST-API, React-Frontend, einfache Konfiguration via UI statt XML</li>
+        <li><strong>Ideal für:</strong> Institutionen, die ein flexibles, modernes MMS suchen — als Alternative zu proprietären Systemen und älteren Open-Source-Lösungen</li>
+        <li><strong>Status:</strong> MVP in Entwicklung, noch nicht produktiv einsetzbar</li>
+        <li><strong>Lücken:</strong> Leihverkehr, Standortverwaltung nicht im Scope</li>
       </ul>
     </div>
     <div class="detail-card">
       <h3>🏛️ CollectiveAccess — Stärken &amp; Schwächen</h3>
       <ul>
-        <li><strong>Stärken:</strong> Umfassendste Feature-Liste, bewährt seit 2007, sehr flexibel</li>
+        <li><strong>Stärken:</strong> Umfangreichste Feature-Liste, bewährt seit 2007, sehr flexibel</li>
         <li><strong>Schwächen:</strong> PHP-Monolith, XML-Konfiguration, steile Lernkurve, schwere Wartbarkeit</li>
         <li><strong>Beste für:</strong> Große Institutionen mit komplexen, heterogenen Sammlungen</li>
-        <li><strong>Migration:</strong> Katalon zielt explizit auf CollectiveAccess-Nutzer ab</li>
+        <li><strong>Migration:</strong> Katalon kann als moderne Alternative dienen</li>
       </ul>
     </div>
     <div class="detail-card">
@@ -625,6 +775,33 @@
         <li><strong>Schwächen:</strong> Hohe Kosten, Vendor Lock-in, geringe Anpassbarkeit ohne Zetcom</li>
         <li><strong>Beste für:</strong> Große Museen mit Budget und Bedarf an Leihverkehr/Konservierung</li>
         <li><strong>Kunden:</strong> Louvre, Staatliche Museen Berlin, Nationalmuseum Stockholm</li>
+      </ul>
+    </div>
+    <div class="detail-card">
+      <h3>📦 Axiell Collections — Adlib-Nachfolger</h3>
+      <ul>
+        <li><strong>Stärken:</strong> 30+ Jahre Erfahrung, &gt;800 UK-Kunden, moderne Web-Oberfläche</li>
+        <li><strong>Add-ons:</strong> Axiell Move (iOS-Scanner), Axiell Flow (Workflows), DAMS</li>
+        <li><strong>Beste für:</strong> Mittlere bis große Museen, die von Adlib migrieren</li>
+        <li><strong>Preis:</strong> Cloud ab £5.500/Jahr, On-Prem ab £10.250</li>
+      </ul>
+    </div>
+    <div class="detail-card">
+      <h3>☁️ fylr — Cloud-native</h3>
+      <ul>
+        <li><strong>Stärken:</strong> Moderne UI, schnelle Implementierung, DAM + CMS Kombination</li>
+        <li><strong>Schwächen:</strong> Relativ neu am Markt, kleinere Community</li>
+        <li><strong>Beste für:</strong> Mittlere Institutionen, die eine cloud-native Lösung suchen</li>
+        <li><strong>Herkunft:</strong> Picturae, Niederlande</li>
+      </ul>
+    </div>
+    <div class="detail-card">
+      <h3>🏰 robotron Daphne — SKD-Partner</h3>
+      <ul>
+        <li><strong>Stärken:</strong> Einfache Erfassung, GND-Integration, Multimedia-Guide, LIDO-Export</li>
+        <li><strong>Schwächen:</strong> Oracle-Abhängigkeit, kleinerer Kundenkreis (~35 Museen)</li>
+        <li><strong>Beste für:</strong> Deutsche Museen, SKD-Netzwerk, Provenienzforschung</li>
+        <li><strong>Kunden:</strong> Staatliche Kunstsammlungen Dresden, Stadtmuseum Dresden</li>
       </ul>
     </div>
     <div class="detail-card">
@@ -648,14 +825,15 @@
     <div class="detail-card">
       <h3>📖 Quellen &amp; Referenzen</h3>
       <ul>
-        <li><a href="https://collectiveaccess.org" target="_blank">collectiveaccess.org</a> — CollectiveAccess Features &amp; Dokumentation</li>
-        <li><a href="https://www.zetcom.com/en/museumplus-en/" target="_blank">zetcom.com</a> — MuseumPlus Produktdatenblatt</li>
-        <li><a href="https://collectionstrust.org.uk/software/museumplus/" target="_blank">collectionstrust.org.uk</a> — MuseumPlus Review (UK)</li>
-        <li><a href="https://www.accesstomemory.org" target="_blank">accesstomemory.org</a> — AtoM Dokumentation</li>
-        <li><a href="https://archivesspace.org/features" target="_blank">archivesspace.org</a> — ArchivesSpace Features</li>
-        <li><a href="https://omeka.org/s/" target="_blank">omeka.org/s</a> — Omeka S Dokumentation</li>
-        <li><a href="https://reviews.americanarchivist.org/2025/02/26/access-to-memory/" target="_blank">American Archivist Review</a> — AtoM Review (2025)</li>
-        <li><a href="https://www.devopsschool.com/blog/top-10-archive-cataloging-software-features-pros-cons-comparison/" target="_blank">devopsschool.com</a> — Top 10 Archive Cataloging Software (2026)</li>
+        <li><a href="https://collectiveaccess.org" target="_blank">collectiveaccess.org</a> — CollectiveAccess</li>
+        <li><a href="https://www.zetcom.com/en/museumplus-en/" target="_blank">zetcom.com</a> — MuseumPlus</li>
+        <li><a href="https://www.axiell.com/solutions/product/axiell-collections/" target="_blank">axiell.com</a> — Axiell Collections</li>
+        <li><a href="https://fylr.io" target="_blank">fylr.io</a> — fylr</li>
+        <li><a href="https://www.robotron-daphne.de" target="_blank">robotron-daphne.de</a> — robotron Daphne</li>
+        <li><a href="https://www.accesstomemory.org" target="_blank">accesstomemory.org</a> — AtoM</li>
+        <li><a href="https://archivesspace.org" target="_blank">archivesspace.org</a> — ArchivesSpace</li>
+        <li><a href="https://omeka.org/s/" target="_blank">omeka.org/s</a> — Omeka S</li>
+        <li><a href="https://collectionstrust.org.uk/software/" target="_blank">collectionstrust.org.uk</a> — Collections Trust Software Directory</li>
       </ul>
     </div>
   </section>
