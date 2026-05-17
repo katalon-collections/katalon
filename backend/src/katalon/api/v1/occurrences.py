@@ -18,7 +18,7 @@ from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
 from katalon.services.schema_service import validate_metadata
-from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
+from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
 
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
@@ -65,7 +65,8 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
         if schema:
             await maybe_advance_counter(db, "occurrence", schema, idno)
 
-    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
+    _has_subtypes = await has_any_subtypes(db, "occurrence")
+    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
     if errors:

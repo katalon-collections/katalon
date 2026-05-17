@@ -14,7 +14,7 @@ from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
 from katalon.services.schema_service import validate_metadata
-from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
+from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -60,7 +60,8 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
         if schema:
             await maybe_advance_counter(db, "place", schema, idno)
 
-    place_type = normalize_subtype_name(data.place_type, allow_null=True)
+    _has_subtypes = await has_any_subtypes(db, "place")
+    place_type = normalize_subtype_name(data.place_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "place", place_type)
     errors = await validate_metadata(db, "place", data.metadata_, place_type)
     if errors:

@@ -20,7 +20,9 @@ const TYPE_LABELS: Record<RecordType, string> = {
 }
 
 const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
+  object:     'object_type',
   entity:     'entity_type',
+  place:      'place_type',
   occurrence: 'occurrence_type',
 }
 
@@ -905,6 +907,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!idno.trim()) {
       errors['__idno'] = 'ID-Nr. ist ein Pflichtfeld.'
     }
+    // subtype is required when subtypes are configured
+    if (subtypeKey && availableSubtypes.length > 0 && !subtype) {
+      errors['__subtype'] = 'Subtyp ist ein Pflichtfeld.'
+    }
     for (const f of fields) {
       const val = values[f.name]
       // Date validation
@@ -1140,13 +1146,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : 'Occurrence-Typ'}</div>
-                    <select className="fld" value={subtype} onChange={e => { setSubtype(e.target.value); setIsDirty(true) }} disabled={justCreated}>
-                      <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : 'Occurrence-Typ'} wählen —</option>
+                    <div className="lbl">{recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'}</div>
+                    <select
+                      className="fld"
+                      value={subtype}
+                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); if (fieldErrors['__subtype']) { setFieldErrors(err => { const n = { ...err }; delete n['__subtype']; return n }) } }}
+                      disabled={justCreated}
+                      style={fieldErrors['__subtype'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                    >
+                      <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
                     </select>
+                    {fieldErrors['__subtype'] && (
+                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__subtype']}</div>
+                    )}
                   </div>
                 )}
 

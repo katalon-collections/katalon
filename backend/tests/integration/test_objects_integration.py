@@ -13,7 +13,8 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
         json={
             "idno": idno,
             "status": "draft",
-            "metadata_": {"title": "Integration object"},
+            "object_type": "objekt",
+            "metadata_": {"label": "Integration object"},
         },
     )
     assert create_response.status_code == 201
@@ -25,7 +26,7 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
 
     get_response = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
     assert get_response.status_code == 200
-    assert get_response.json()["metadata_"]["title"] == "Integration object"
+    assert get_response.json()["metadata_"]["label"] == "Integration object"
 
     update_response = await async_client.put(
         f"/v1/objects/{object_id}",
@@ -33,7 +34,8 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
         json={
             "idno": idno,
             "status": "public",
-            "metadata_": {"title": "Updated integration object"},
+            "object_type": "objekt",
+            "metadata_": {"label": "Updated integration object"},
         },
     )
     assert update_response.status_code == 200

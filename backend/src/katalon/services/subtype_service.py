@@ -61,3 +61,16 @@ async def subtype_has_assigned_records(
         await db.execute(select(func.count()).select_from(model).where(field == subtype_name))
     ).scalar_one()
     return count > 0
+
+
+async def has_any_subtypes(db: AsyncSession, primary_type: str) -> bool:
+    """Return True if at least one subtype is configured for this primary type."""
+    validate_primary_type(primary_type)
+    count = (
+        await db.execute(
+            select(func.count())
+            .select_from(RecordSubtype)
+            .where(RecordSubtype.primary_type == primary_type)
+        )
+    ).scalar_one()
+    return count > 0

@@ -4,6 +4,7 @@ export type RecordType = 'object' | 'entity' | 'place' | 'occurrence'
 export interface KatalonObject {
   id: string
   idno: string | null
+  object_type: string | null
   status: Status
   metadata_: Record<string, unknown>
   created_at: string
@@ -23,6 +24,7 @@ export interface Entity {
 export interface Place {
   id: string
   idno: string | null
+  place_type: string | null
   status: Status
   lat: number | null
   lon: number | null

@@ -25,10 +25,10 @@ type TypeConfig = {
 }
 
 const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
-  object:     { label: 'Objekte',     schemaType: 'object',     primaryLabel: 'Titel',       primaryKey: 'title',    secondaryLabel: 'Urheber:in', secondaryKey: 'creator' },
-  entity:     { label: 'Entitäten',   schemaType: 'entity',     subtypeKey: 'entity_type',   subtypeLabel: 'Typ',    primaryLabel: 'Name',        primaryKey: 'name' },
-  place:      { label: 'Orte',        schemaType: 'place',      primaryLabel: 'Name',        primaryKey: 'name' },
-  occurrence: { label: 'Occurrences', schemaType: 'occurrence', subtypeKey: 'occurrence_type', subtypeLabel: 'Typ',  primaryLabel: 'Titel',       primaryKey: 'title' },
+  object:     { label: 'Objekte',     schemaType: 'object',     subtypeKey: 'object_type',     subtypeLabel: 'Typ', primaryLabel: 'Titel',       primaryKey: 'title',    secondaryLabel: 'Urheber:in', secondaryKey: 'creator' },
+  entity:     { label: 'Entitäten',   schemaType: 'entity',     subtypeKey: 'entity_type',     subtypeLabel: 'Typ', primaryLabel: 'Name',        primaryKey: 'name' },
+  place:      { label: 'Orte',        schemaType: 'place',      subtypeKey: 'place_type',      subtypeLabel: 'Typ', primaryLabel: 'Name',        primaryKey: 'name' },
+  occurrence: { label: 'Occurrences', schemaType: 'occurrence', subtypeKey: 'occurrence_type', subtypeLabel: 'Typ', primaryLabel: 'Titel',       primaryKey: 'title' },
 }
 
 function getApi(recordType: RecordType) {
