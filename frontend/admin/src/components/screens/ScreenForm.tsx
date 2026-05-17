@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useBlocker } from 'react-router-dom'
 import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
@@ -624,17 +623,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
   const [addSaving, setAddSaving]         = useState(false)
 
-  // Block in-app navigation when form has unsaved changes
-  const blocker = useBlocker(isDirty && !isNew)
+  // Intercept in-app navigation (admin uses pushState directly, not React Router)
   useEffect(() => {
-    if (blocker.state === 'blocked') {
+    if (!isDirty || isNew) return
+    const original = window.history.pushState.bind(window.history)
+    window.history.pushState = (...args: Parameters<typeof window.history.pushState>) => {
       if (window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) {
-        blocker.proceed()
-      } else {
-        blocker.reset()
+        setIsDirty(false)
+        original(...args)
       }
     }
-  }, [blocker])
+    return () => { window.history.pushState = original }
+  }, [isDirty, isNew])
 
   // Warn on browser tab close / reload
   useEffect(() => {
