@@ -10,10 +10,16 @@ services:
   elasticsearch:
     ports:
       - "9200:9200"
+    depends_on:
+      db:
+        condition: service_healthy
 
   cantaloupe:
     ports:
       - "8182:8182"
+    depends_on:
+      db:
+        condition: service_healthy
 
   api:
     build:
@@ -26,6 +32,13 @@ services:
     command: uvicorn katalon.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
 
   worker:
     build:
@@ -42,6 +55,13 @@ services:
       - ./backend/src:/app/src
       - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
     command: celery -A katalon.workers.celery_app worker --loglevel=info
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
 
   admin:
     build:
@@ -60,6 +80,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
 
   portal:
     build:
@@ -77,3 +100,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nginx:
+    depends_on:
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
