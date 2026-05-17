@@ -15,6 +15,7 @@ from katalon.core.schemas import (
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
@@ -112,17 +113,39 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
 
 
 @router.delete("/{occ_id}", status_code=204)
-async def delete_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+async def delete_occurrence(
+    occ_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+    force: bool = Query(False),
+) -> None:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+
+    related_count = await count_relations(db, "occurrence", occ_id)
+    if related_count > 0 and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "related_count": related_count,
+            },
+        )
+
+    if related_count > 0:
+        await delete_relations(db, "occurrence", occ_id)
+
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="delete")
     try:
         await search_service.remove_record(occ.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(occ)
+
+    from katalon.workers.cleanup_tasks import cleanup_relation_refs
+    cleanup_relation_refs.delay("occurrence", str(occ_id))
 
 
 @router.get("/{occ_id}/audit-log", response_model=list[AuditLogRead])

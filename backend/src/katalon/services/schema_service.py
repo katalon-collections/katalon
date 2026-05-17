@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +41,50 @@ def _validate_pid_value(value: object, settings: dict, field_name: str) -> str |
     return None
 
 
+def _validate_relation_structure(value: object, field_name: str) -> str | None:
+    """Validate the structure of a single relation entry. Returns error or None."""
+    if not isinstance(value, dict):
+        return f"Feld '{field_name}': Relation muss ein Objekt {{id, label, relation_type}} sein."
+    entry_id = value.get("id")
+    if not entry_id:
+        return f"Feld '{field_name}': Relation-Eintrag muss eine 'id' enthalten."
+    try:
+        uuid.UUID(str(entry_id))
+    except (ValueError, AttributeError):
+        return f"Feld '{field_name}': '{entry_id}' ist keine gültige UUID."
+    if not value.get("label"):
+        return f"Feld '{field_name}': Relation-Eintrag muss ein 'label' enthalten."
+    return None
+
+
+async def _validate_relation_target(
+    value: dict, field_name: str, settings: dict, db: AsyncSession
+) -> str | None:
+    """Check that the referenced UUID exists in the configured target table. Returns error or None."""
+    target_type = settings.get("target_type")
+    if not target_type:
+        return None
+    from katalon.core.models import Entity, Object, Occurrence, Place
+
+    model_map = {
+        "object": Object,
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+    }
+    model = model_map.get(target_type)
+    if model is None:
+        return None
+    try:
+        record_uuid = uuid.UUID(str(value["id"]))
+    except (ValueError, KeyError):
+        return None
+    result = await db.execute(select(model).where(model.id == record_uuid))
+    if result.scalar_one_or_none() is None:
+        return f"Feld '{field_name}': Datensatz '{value['id']}' nicht gefunden in '{target_type}'."
+    return None
+
+
 async def validate_metadata(
     db: AsyncSession, record_type: str, metadata: dict, target_subtype: str | None = None
 ) -> list[str]:
@@ -70,6 +115,24 @@ async def validate_metadata(
                 err = _validate_pid_value(value, field.settings, field.name)
                 if err:
                     errors.append(err)
+            continue
+
+        if field.field_type == "relation":
+            if field.is_repeatable:
+                if not isinstance(value, list):
+                    errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")
+                    continue
+                items = value
+            else:
+                items = [value]
+            for item in items:
+                struct_err = _validate_relation_structure(item, field.name)
+                if struct_err:
+                    errors.append(struct_err)
+                    continue
+                target_err = await _validate_relation_target(item, field.name, field.settings, db)
+                if target_err:
+                    errors.append(target_err)
             continue
 
         if field.is_repeatable:

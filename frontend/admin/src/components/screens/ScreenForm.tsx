@@ -25,6 +25,7 @@ const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
 
 export type AuthorityEntry = { source: string; external_id: string; label: string }
 export type VocabEntry = { id: string; label: string }
+export type RelationEntry = { id: string; label: string; relation_type: string }
 
 function VocabInput({ vocabId, value, onChange, disabled }: {
   vocabId: string
@@ -398,6 +399,158 @@ function AuthorityInput({ source, value, onChange, disabled }: {
   )
 }
 
+function RelationInput({
+  targetType,
+  targetSubtype,
+  relTypeVocabId,
+  onAdd,
+  disabled,
+}: {
+  targetType: string
+  targetSubtype?: string
+  relTypeVocabId?: string
+  onAdd: (entry: RelationEntry) => void
+  disabled?: boolean
+}) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [picked, setPicked] = useState<SearchResult | null>(null)
+  const [relType, setRelType] = useState('')
+  const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
+  const [showDrop, setShowDrop] = useState(false)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!relTypeVocabId) { setRelTypeTerms([]); return }
+    vocabularies.listTerms(relTypeVocabId).then(setRelTypeTerms).catch(() => {})
+  }, [relTypeVocabId])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (inputRef.current?.contains(e.target as Node) || dropRef.current?.contains(e.target as Node)) return
+      setShowDrop(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  useEffect(() => {
+    if (showDrop && inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      const spaceAbove = r.top - 8
+      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+      setDropPos({
+        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+        left: r.left, width: r.width,
+        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+      })
+    }
+  }, [showDrop])
+
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (q.trim().length < 2) { setResults([]); setShowDrop(false); return }
+    timer.current = setTimeout(() => {
+      setSearching(true)
+      searchApi.query(q.trim(), targetType as RecordType, 8)
+        .then(r => {
+          setResults(r.items)
+          setShowDrop(r.items.length > 0)
+        })
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false))
+    }, 300)
+    return () => clearTimeout(timer.current)
+  }, [q, targetType])
+
+  function pickRecord(r: SearchResult) {
+    setPicked(r)
+    setQ('')
+    setResults([])
+    setShowDrop(false)
+    setRelType('')
+  }
+
+  function confirm() {
+    if (!picked || !relType.trim()) return
+    onAdd({ id: picked.id, label: picked.title, relation_type: relType.trim() })
+    setPicked(null)
+    setRelType('')
+  }
+
+  if (picked) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, color: 'var(--fg-2)', flex: 1 }}>{picked.title}</span>
+          <button className="btn sm ico gh" onClick={() => setPicked(null)} title="Auswahl aufheben"><X size={12} /></button>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {relTypeTerms.length > 0 ? (
+            <select className="fld" style={{ flex: 1 }} value={relType} onChange={e => setRelType(e.target.value)}>
+              <option value="">— Relationstyp wählen —</option>
+              {relTypeTerms.map(t => (
+                <option key={t.id} value={t.term}>{t.label.de ?? t.label.en ?? t.term}</option>
+              ))}
+            </select>
+          ) : (
+            <input className="fld" style={{ flex: 1 }} value={relType}
+              onChange={e => setRelType(e.target.value)}
+              placeholder="Relationstyp (z.B. depicts, created_by)"
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirm() } }}
+              autoFocus
+            />
+          )}
+          <button className="btn pri sm" onClick={confirm} disabled={!relType.trim()}>Hinzufügen</button>
+          <button className="btn gh sm" onClick={() => { setPicked(null); setRelType('') }}>Abbrechen</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        className="fld"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
+        disabled={disabled || !targetType}
+      />
+      {searching && (
+        <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
+          Suche…
+        </div>
+      )}
+      {showDrop && results.length > 0 && dropPos && (
+        <div ref={dropRef} style={{
+          position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
+          background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
+        }}>
+          {results.map(r => (
+            <button
+              key={r.id}
+              onMouseDown={e => { e.preventDefault(); pickRecord(r) }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)', background: 'none', cursor: 'pointer' }}
+              className="authority-hit"
+            >
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
+              <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function getApi(recordType: RecordType) {
   switch (recordType) {
     case 'object':     return objects
@@ -707,6 +860,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   }
   function removeVocab(name: string, idx: number) {
     setValues(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
+  }
+
+  function addRelationEntry(name: string, entry: RelationEntry) {
+    const cur = (values[name] as RelationEntry[] | undefined) ?? []
+    setValues(v => ({ ...v, [name]: [...cur, entry] }))
+  }
+  function removeRelationEntry(name: string, idx: number) {
+    setValues(v => ({ ...v, [name]: ((v[name] as RelationEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
   function validateFields(): Record<string, string> {
@@ -1084,6 +1245,46 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
                             onChange={v => setAuthority(f.name, v)}
                             disabled={justCreated}
                           />
+                        )
+                      ) : f.field_type === 'relation' ? (
+                        repeatable ? (
+                          <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+                              {((val as RelationEntry[] | undefined) ?? []).map((entry, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 4, background: 'var(--panel)', border: '1px solid var(--border-s)', fontSize: 13 }}>
+                                  <span style={{ flex: 1 }}>{entry.label}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
+                                  <button className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated}><X size={10} /></button>
+                                </div>
+                              ))}
+                            </div>
+                            <RelationInput
+                              targetType={(f.settings?.target_type as string) ?? ''}
+                              targetSubtype={f.settings?.target_subtype as string | undefined}
+                              relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                              onAdd={entry => addRelationEntry(f.name, entry)}
+                              disabled={justCreated}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {val && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '4px 8px', borderRadius: 4, background: 'var(--panel)', border: '1px solid var(--border-s)', fontSize: 13 }}>
+                                <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
+                                <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{(val as RelationEntry).relation_type}</span>
+                                <button className="btn sm ico gh" onClick={() => setField(f.name, undefined)} disabled={justCreated}><X size={10} /></button>
+                              </div>
+                            )}
+                            {!val && (
+                              <RelationInput
+                                targetType={(f.settings?.target_type as string) ?? ''}
+                                targetSubtype={f.settings?.target_subtype as string | undefined}
+                                relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                                onAdd={entry => setField(f.name, entry)}
+                                disabled={justCreated}
+                              />
+                            )}
+                          </>
                         )
                       ) : f.field_type === 'pid' ? (
                         repeatable ? (

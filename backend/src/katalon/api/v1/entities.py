@@ -17,6 +17,7 @@ from katalon.core.schemas import (
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
@@ -114,17 +115,39 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
 
 
 @router.delete("/{entity_id}", status_code=204)
-async def delete_entity(entity_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+async def delete_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+    force: bool = Query(False),
+) -> None:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+
+    related_count = await count_relations(db, "entity", entity_id)
+    if related_count > 0 and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "related_count": related_count,
+            },
+        )
+
+    if related_count > 0:
+        await delete_relations(db, "entity", entity_id)
+
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="delete")
     try:
         await search_service.remove_record(entity.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(entity)
+
+    from katalon.workers.cleanup_tasks import cleanup_relation_refs
+    cleanup_relation_refs.delay("entity", str(entity_id))
 
 
 @router.post("/{entity_id}/snapshots", response_model=SnapshotRead, status_code=201)

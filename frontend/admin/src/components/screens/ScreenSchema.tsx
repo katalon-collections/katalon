@@ -42,10 +42,13 @@ type FieldFormState = {
   authority_source: string
   show_in_detail: boolean
   vocabulary_id: string
+  relation_target_type: string
+  relation_target_subtype: string
+  relation_type_vocab: string
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, vocabulary_id: '' }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '' }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -63,6 +66,9 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     authority_source: (f.settings?.source as string) ?? 'gnd',
     show_in_detail: f.show_in_detail ?? true,
     vocabulary_id: (f.settings?.vocabulary_id as string) ?? '',
+    relation_target_type: (f.settings?.target_type as string) ?? 'entity',
+    relation_target_subtype: (f.settings?.target_subtype as string) ?? '',
+    relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
   }
 }
 
@@ -184,6 +190,33 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
               {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
+        )}
+        {form.field_type === 'relation' && (
+          <>
+            <div className="fg-2">
+              <div className="field">
+                <div className="lbl">Ziel-Typ <span className="req">*</span></div>
+                <select className="fld" value={form.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
+                  <option value="object">Objekte</option>
+                  <option value="entity">Entitäten</option>
+                  <option value="place">Orte</option>
+                  <option value="occurrence">Occurrences</option>
+                </select>
+              </div>
+              <div className="field">
+                <div className="lbl">Ziel-Subtyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <input className="fld" value={form.relation_target_subtype} onChange={e => set('relation_target_subtype', e.target.value)}
+                  placeholder="z.B. person, organisation" />
+              </div>
+            </div>
+            <div className="field">
+              <div className="lbl">Relationstyp-Vokabular <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — Dropdown in Erfassungsmaske)</span></div>
+              <select className="fld" value={form.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
+                <option value="">— Vokabular wählen —</option>
+                {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+          </>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
@@ -382,6 +415,11 @@ export function ScreenSchema() {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
         ...((form.field_type === 'vocab' || form.field_type === 'vocab_free') && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
+        ...(form.field_type === 'relation' ? {
+          target_type: form.relation_target_type,
+          ...(form.relation_target_subtype.trim() ? { target_subtype: form.relation_target_subtype.trim() } : {}),
+          ...(form.relation_type_vocab ? { relation_type_vocab: form.relation_type_vocab } : {}),
+        } : {}),
       },
     }
     try {

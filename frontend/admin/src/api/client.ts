@@ -29,6 +29,15 @@ export function onUnauthorized(cb: () => void) {
   _onUnauthorized = cb
 }
 
+export class ConflictError extends Error {
+  related_count: number
+  constructor(message: string, related_count: number) {
+    super(message)
+    this.name = 'ConflictError'
+    this.related_count = related_count
+  }
+}
+
 export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
   if (_token) headers['Authorization'] = `Bearer ${_token}`
@@ -38,9 +47,18 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     _onUnauthorized?.()
     throw new Error('Sitzung abgelaufen. Bitte neu anmelden.')
   }
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({ detail: {} }))
+    const d = body.detail ?? {}
+    throw new ConflictError(
+      typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
+      typeof d.related_count === 'number' ? d.related_count : 0,
+    )
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail ?? res.statusText)
+    const msg = typeof err.detail === 'string' ? err.detail : (err.detail ? JSON.stringify(err.detail) : res.statusText)
+    throw new Error(msg)
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -77,7 +95,7 @@ export const objects = {
   audit:  (id: string) => req<AuditEntry[]>(`/v1/objects/${id}/audit-log`),
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => req<void>(`/v1/objects/${id}`, { method: 'DELETE' }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/objects/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/objects/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/objects/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -95,7 +113,7 @@ export const entities = {
   audit:  (id: string) => req<AuditEntry[]>(`/v1/entities/${id}/audit-log`),
   create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => req<void>(`/v1/entities/${id}`, { method: 'DELETE' }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
 }
 
 // Places
@@ -108,7 +126,7 @@ export const places = {
   audit:  (id: string) => req<AuditEntry[]>(`/v1/places/${id}/audit-log`),
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => req<void>(`/v1/places/${id}`, { method: 'DELETE' }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
 }
 
 // Occurrences
@@ -121,7 +139,7 @@ export const occurrences = {
   audit:  (id: string) => req<AuditEntry[]>(`/v1/occurrences/${id}/audit-log`),
   create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => req<void>(`/v1/occurrences/${id}`, { method: 'DELETE' }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
 }
 
 export interface SchemaImportResult {

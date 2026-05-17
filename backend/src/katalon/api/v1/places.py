@@ -11,6 +11,7 @@ from katalon.core.models import Place
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
@@ -118,17 +119,39 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
 
 
 @router.delete("/{place_id}", status_code=204)
-async def delete_place(place_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+async def delete_place(
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+    force: bool = Query(False),
+) -> None:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+
+    related_count = await count_relations(db, "place", place_id)
+    if related_count > 0 and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "related_count": related_count,
+            },
+        )
+
+    if related_count > 0:
+        await delete_relations(db, "place", place_id)
+
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="delete")
     try:
         await search_service.remove_record(place.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     await db.delete(place)
+
+    from katalon.workers.cleanup_tasks import cleanup_relation_refs
+    cleanup_relation_refs.delay("place", str(place_id))
 
 
 @router.get("/{place_id}/audit-log", response_model=list[AuditLogRead])

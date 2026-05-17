@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences } from '../../api/client'
+import { objects, entities, places, occurrences, ConflictError } from '../../api/client'
 import type { AnyRecord, Page, RecordType } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Plus, Search, Trash } from '../ui/Icons'
@@ -99,7 +99,20 @@ export function ScreenList({ recordType, onOpen }: Props) {
       await api.delete(id)
       load()
     } catch (e) {
-      alert((e as Error).message)
+      if (e instanceof ConflictError) {
+        const confirmed = window.confirm(
+          `${e.message}\n\nAlle Verknüpfungen werden beim Löschen entfernt. Fortfahren?`
+        )
+        if (!confirmed) return
+        try {
+          await api.delete(id, true)
+          load()
+        } catch (e2) {
+          alert((e2 as Error).message)
+        }
+      } else {
+        alert((e as Error).message)
+      }
     }
   }
 

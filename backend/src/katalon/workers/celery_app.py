@@ -6,7 +6,12 @@ celery_app = Celery(
     "katalon",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["katalon.workers.media_tasks", "katalon.workers.index_tasks", "katalon.workers.import_tasks"],
+    include=[
+        "katalon.workers.media_tasks",
+        "katalon.workers.index_tasks",
+        "katalon.workers.import_tasks",
+        "katalon.workers.cleanup_tasks",
+    ],
 )
 
 celery_app.conf.task_serializer = "json"

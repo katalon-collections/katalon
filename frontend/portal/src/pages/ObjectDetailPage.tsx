@@ -9,6 +9,7 @@ import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
+import { RelationFieldRow } from '../components/RelationFieldRow'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -191,6 +192,9 @@ export function ObjectDetailPage() {
           {obj.idno && <MetaRow label="Inventar-Nr." value={obj.idno} />}
           {visibleFields.map(f => {
             const rawValue = m[f.name]
+            if (f.field_type === 'relation') {
+              return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
+            }
             const rendered = renderFieldValue(rawValue)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
