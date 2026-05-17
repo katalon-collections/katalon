@@ -24,10 +24,15 @@ def _extract_title(md: dict) -> str:
     return ""
 
 
-def _flatten_text(md: dict) -> str:
-    """Return a single search_text string with all metadata values concatenated."""
+def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
+    """Return a single search_text string with all (or only searchable) metadata values concatenated.
+
+    If searchable_fields is provided, only keys in that set are included.
+    """
     parts: list[str] = []
-    for val in md.values():
+    for key, val in md.items():
+        if searchable_fields is not None and key not in searchable_fields:
+            continue
         if isinstance(val, str):
             parts.append(val)
         elif isinstance(val, list):
@@ -44,7 +49,7 @@ def _clean_metadata(md: dict) -> dict:
     return {k: v for k, v in md.items() if k}
 
 
-def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | None = None) -> dict[str, Any]:
+def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | None = None, searchable_fields: set[str] | None = None) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
 
@@ -57,7 +62,7 @@ def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | N
         "title": title,
         "status": getattr(record, "status", None),
         "metadata": md,
-        "search_text": _flatten_text(md),
+        "search_text": _flatten_text(md, searchable_fields),
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
     }
@@ -107,10 +112,27 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
 
 
 async def index_record(record_type: str, record: Any, db: Any = None) -> None:
+    from sqlalchemy import select
+    from katalon.core.models import FieldDefinition
+
     rel_data: dict[str, list[str]] | None = None
     if db is not None and record_type == "object":
         rel_data = await _load_relation_titles(record_type, record.id, db)
-    doc = _build_doc(record_type, record, rel_data)
+
+    searchable_fields: set[str] | None = None
+    if db is not None:
+        result = await db.execute(
+            select(FieldDefinition.name).where(
+                FieldDefinition.target_type == record_type,
+                FieldDefinition.is_searchable.is_(True),
+                FieldDefinition.is_deleted.is_(False),
+            )
+        )
+        names = result.scalars().all()
+        if names:
+            searchable_fields = set(names)
+
+    doc = _build_doc(record_type, record, rel_data, searchable_fields)
     await index_document(str(record.id), doc)
 
 
