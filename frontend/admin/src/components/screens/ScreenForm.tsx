@@ -566,9 +566,10 @@ interface Props {
   recordId?: string
   onBack?: () => void
   onSaved?: (id: string) => void
+  onDirtyChange?: (dirty: boolean) => void
 }
 
-export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
+export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
@@ -596,6 +597,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [snapRestoring, setSnapRestoring] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
+  useEffect(() => { onDirtyChange?.(isDirty) }, [isDirty])
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [registeringPidField, setRegisteringPidField] = useState<string | null>(null)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { hasToken, onUnauthorized, setToken, getTokenUser } from '../../api/client'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -61,6 +61,7 @@ function Placeholder({ label }: { label: string }) {
 
 export function AppShell() {
   const [loggedIn, setLoggedIn] = useState(hasToken)
+  const isDirtyRef = useRef(false)
 
   const init = hashToState(window.location.hash)
   const [route, setRoute] = useState(init.route)
@@ -88,6 +89,13 @@ export function AppShell() {
     window.history.pushState({ route: r, editId: newId }, '', hash)
   }
 
+  // Used by sidebar/topbar — confirms before leaving a dirty form
+  function safeNavigate(r: string, id?: string | null) {
+    if (isDirtyRef.current && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
+    isDirtyRef.current = false
+    navigate(r, id)
+  }
+
   function handleLogout() {
     setToken(null)
     setLoggedIn(false)
@@ -105,13 +113,13 @@ export function AppShell() {
   function renderScreen() {
     switch (route) {
       case 'list':              return <ScreenList recordType="object"     onOpen={(id) => navigate('form', id)} />
-      case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => navigate('list')} onSaved={(id) => navigate('form', id)} />
+      case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => navigate('list')} onSaved={(id) => navigate('form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'entities-list':     return <ScreenList recordType="entity"     onOpen={(id) => navigate('entities-form', id)} />
-      case 'entities-form':     return <ScreenForm recordType="entity"     recordId={editId ?? undefined} onBack={() => navigate('entities-list')} onSaved={(id) => navigate('entities-form', id)} />
+      case 'entities-form':     return <ScreenForm recordType="entity"     recordId={editId ?? undefined} onBack={() => navigate('entities-list')} onSaved={(id) => navigate('entities-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'places-list':       return <ScreenList recordType="place"      onOpen={(id) => navigate('places-form', id)} />
-      case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} />
+      case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} />
-      case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} />
+      case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />
@@ -121,16 +129,16 @@ export function AppShell() {
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />
-      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => navigate(r)} />
+      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
   }
 
   return (
     <div className="app">
-      <Sidebar route={route} setRoute={(r) => navigate(r)} onLogout={handleLogout} />
+      <Sidebar route={route} setRoute={(r) => safeNavigate(r)} onLogout={handleLogout} />
       <div className="main">
-        <Topbar crumbs={crumbs} onNavigate={(r, id) => navigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
+        <Topbar crumbs={crumbs} onNavigate={(r, id) => safeNavigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
         <BannerBar surface="admin" />
         {renderScreen()}
       </div>

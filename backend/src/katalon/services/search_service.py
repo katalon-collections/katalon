@@ -15,7 +15,7 @@ def _extract_title(md: dict) -> str:
 
     Checks common title field names in both English and German.
     """
-    for key in ("title", "titel", "name", "display_name", "place_name", "label", "bezeichnung"):
+    for key in ("label", "title", "titel", "name", "display_name", "place_name", "bezeichnung"):
         val = md.get(key)
         if not val:
             continue

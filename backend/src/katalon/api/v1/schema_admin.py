@@ -98,6 +98,8 @@ async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
     field = result.scalar_one_or_none()
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
+    if field.name == "label":
+        raise HTTPException(status_code=422, detail="Das Feld 'label' ist ein Systemfeld und kann nicht gelöscht werden.")
     field.is_deleted = True
     target_type = field.target_type
     await db.flush()
