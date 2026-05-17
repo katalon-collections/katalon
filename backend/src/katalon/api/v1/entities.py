@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Entity, RecordSnapshot
+from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
     EntityCreate,
@@ -17,6 +17,7 @@ from katalon.core.schemas import (
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
@@ -49,17 +50,32 @@ async def list_entities(
 
 @router.post("", response_model=EntityRead, status_code=201)
 async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
+    cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
+    cfg = cfg_result.scalar_one_or_none()
+    schema = (cfg.idno_schemas or {}).get("entity") if cfg else None
+    pattern = (cfg.idno_patterns or {}).get("entity") if cfg else None
+
     if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+        if schema:
+            idno = await consume_next_idno(db, "entity", schema)
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        if pattern and not validate_idno_pattern(pattern, idno):
+            raise HTTPException(status_code=422, detail=f"ID-Nr. entspricht nicht dem Muster: {pattern}")
+        if schema:
+            await maybe_advance_counter(db, "entity", schema, idno)
+
     entity_type = normalize_subtype_name(data.entity_type, allow_null=False)
     await ensure_subtype_exists(db, "entity", entity_type)
     errors = await validate_metadata(db, "entity", data.metadata_, entity_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip()))
+    existing = await db.execute(select(Entity).where(Entity.idno == idno))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    entity = Entity(idno=data.idno.strip(), entity_type=entity_type, status=data.status, metadata_=data.metadata_)
+    entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=data.metadata_)
     db.add(entity)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")

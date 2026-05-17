@@ -12,12 +12,14 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from katalon.api.v1 import (
+    admin_config,
     audit,
     auth,
     authority,
     banners,
     dnb_urn_mock,
     entities,
+    idno,
     importer,
     media,
     oai,
@@ -43,6 +45,7 @@ from katalon.core.models import (
     AuthoritySource as AuthoritySourceModel,
 )
 from katalon.core.models import (
+    AdminConfig,
     PortalConfig,
     RecordSubtype,
     User,
@@ -244,12 +247,21 @@ async def _ensure_portal_config() -> None:
             await db.commit()
 
 
+async def _ensure_admin_config() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
+        if result.scalar_one_or_none() is None:
+            db.add(AdminConfig(key="default", idno_schemas={}, idno_patterns={}))
+            await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
     await _ensure_record_subtypes()
     await _ensure_portal_config()
+    await _ensure_admin_config()
     await _ensure_authority_sources()
     try:
         from katalon.integrations.elasticsearch import ensure_index
@@ -282,6 +294,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin_config.router, prefix="/v1")
+app.include_router(idno.router, prefix="/v1")
 app.include_router(auth.router, prefix="/v1")
 app.include_router(banners.router, prefix="/v1")
 app.include_router(users.router, prefix="/v1")

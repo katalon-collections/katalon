@@ -381,6 +381,32 @@ class ApiKey(Base):
 
 
 # ---------------------------------------------------------------------------
+# Admin configuration (singleton row, key="default")
+# ---------------------------------------------------------------------------
+
+
+class AdminConfig(Base):
+    __tablename__ = "admin_config"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True, default="default")
+    idno_schemas: Mapped[dict] = mapped_column(JSONB, default=dict)   # {"object": "ulb_x_{counter:05d}", …}
+    idno_patterns: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"object": "^ulb_x_\\d{5}$", …}
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+# ---------------------------------------------------------------------------
+# IDNO counters (one row per primary type, incremented atomically)
+# ---------------------------------------------------------------------------
+
+
+class IdnoCounter(Base):
+    __tablename__ = "idno_counters"
+
+    record_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    current_value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+# ---------------------------------------------------------------------------
 # Maintenance / Info Banners
 # ---------------------------------------------------------------------------
 

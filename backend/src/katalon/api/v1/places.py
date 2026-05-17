@@ -7,10 +7,11 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Place
+from katalon.core.models import AdminConfig, Place
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
@@ -42,18 +43,33 @@ async def list_places(
 
 @router.post("", response_model=PlaceRead, status_code=201)
 async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
+    cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
+    cfg = cfg_result.scalar_one_or_none()
+    schema = (cfg.idno_schemas or {}).get("place") if cfg else None
+    pattern = (cfg.idno_patterns or {}).get("place") if cfg else None
+
     if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+        if schema:
+            idno = await consume_next_idno(db, "place", schema)
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        if pattern and not validate_idno_pattern(pattern, idno):
+            raise HTTPException(status_code=422, detail=f"ID-Nr. entspricht nicht dem Muster: {pattern}")
+        if schema:
+            await maybe_advance_counter(db, "place", schema, idno)
+
     place_type = normalize_subtype_name(data.place_type, allow_null=True)
     await ensure_subtype_exists(db, "place", place_type)
     errors = await validate_metadata(db, "place", data.metadata_, place_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Place).where(Place.idno == data.idno.strip()))
+    existing = await db.execute(select(Place).where(Place.idno == idno))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     place = Place(
-        idno=data.idno.strip(),
+        idno=idno,
         place_type=place_type,
         status=data.status,
         metadata_=data.metadata_,

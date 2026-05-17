@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import Occurrence
+from katalon.core.models import AdminConfig, Occurrence
 from katalon.core.schemas import (
     AuditLogRead,
     OccurrenceCreate,
@@ -15,6 +15,7 @@ from katalon.core.schemas import (
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
+from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
@@ -47,17 +48,32 @@ async def list_occurrences(
 
 @router.post("", response_model=OccurrenceRead, status_code=201)
 async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
+    cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
+    cfg = cfg_result.scalar_one_or_none()
+    schema = (cfg.idno_schemas or {}).get("occurrence") if cfg else None
+    pattern = (cfg.idno_patterns or {}).get("occurrence") if cfg else None
+
     if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+        if schema:
+            idno = await consume_next_idno(db, "occurrence", schema)
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        if pattern and not validate_idno_pattern(pattern, idno):
+            raise HTTPException(status_code=422, detail=f"ID-Nr. entspricht nicht dem Muster: {pattern}")
+        if schema:
+            await maybe_advance_counter(db, "occurrence", schema, idno)
+
     occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip()))
+    existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    occ = Occurrence(idno=data.idno.strip(), occurrence_type=occurrence_type, status=data.status, metadata_=data.metadata_)
+    occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=data.metadata_)
     db.add(occ)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
