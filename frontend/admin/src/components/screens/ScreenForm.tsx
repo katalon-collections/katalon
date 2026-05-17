@@ -623,19 +623,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
   const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
   const [addSaving, setAddSaving]         = useState(false)
 
-  // Intercept in-app navigation (admin uses pushState directly, not React Router)
-  useEffect(() => {
-    if (!isDirty || isNew) return
-    const original = window.history.pushState.bind(window.history)
-    window.history.pushState = (...args: Parameters<typeof window.history.pushState>) => {
-      if (window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) {
-        setIsDirty(false)
-        original(...args)
-      }
-    }
-    return () => { window.history.pushState = original }
-  }, [isDirty, isNew])
-
   // Warn on browser tab close / reload
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { if (isDirty && !isNew) e.preventDefault() }
@@ -1087,7 +1074,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved }: Props) {
               Im Portal ansehen ↗
             </a>
           )}
-          <button className="btn gh" onClick={onBack} disabled={saving}>
+          <button className="btn gh" onClick={() => {
+            if (isDirty && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
+            onBack?.()
+          }} disabled={saving}>
             {justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
           {!justCreated && (
