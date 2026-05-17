@@ -62,33 +62,6 @@ async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordS
         await _unset_default_for_type(db, subtype.primary_type, keep_id=None)
     db.add(subtype)
     await db.flush()
-
-    # Auto-create label field for this subtype
-    existing_label = await db.execute(
-        select(FieldDefinition).where(
-            FieldDefinition.target_type == data.primary_type,
-            FieldDefinition.target_subtype == name,
-            FieldDefinition.name == "label",
-            FieldDefinition.is_deleted.is_(False),
-        )
-    )
-    if existing_label.scalar_one_or_none() is None:
-        db.add(
-            FieldDefinition(
-                target_type=data.primary_type,
-                target_subtype=name,
-                name="label",
-                label={"de": "Label", "en": "Label"},
-                field_type="text",
-                is_required=True,
-                is_repeatable=False,
-                is_searchable=True,
-                sort_order=0,
-                show_in_detail=True,
-            )
-        )
-        await db.flush()
-
     return subtype
 
 
