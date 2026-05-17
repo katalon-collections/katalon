@@ -62,7 +62,7 @@ services:
       CANTALOUPE_PUBLIC_URL: http://localhost
       SECRET_KEY: change-me-in-production
       MEDIA_ROOT: /var/lib/katalon/media
-      KATALON_BASE_URL: ${KATALON_BASE_URL:-http://localhost}
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
