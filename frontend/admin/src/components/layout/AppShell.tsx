@@ -106,7 +106,7 @@ export function AppShell() {
   }
 
   const currentUser = getTokenUser()
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
 
   const crumbs = CRUMBS[route] ?? [{ label: 'Katalon' }]
 

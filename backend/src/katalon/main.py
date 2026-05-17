@@ -181,26 +181,6 @@ _DEFAULT_AUTHORITY_SOURCES = [
 ]
 
 
-_DEFAULT_RECORD_SUBTYPES = [
-    ("object", "photograph", {"de": "Fotografie", "en": "Photograph"}, 0, True),
-    ("object", "painting", {"de": "Gemälde", "en": "Painting"}, 1, False),
-    ("object", "sculpture", {"de": "Skulptur", "en": "Sculpture"}, 2, False),
-    ("object", "document", {"de": "Dokument", "en": "Document"}, 3, False),
-    ("object", "digital_object", {"de": "Digitales Objekt", "en": "Digital Object"}, 4, False),
-    ("entity", "person", {"de": "Person", "en": "Person"}, 0, True),
-    ("entity", "organization", {"de": "Organisation", "en": "Organization"}, 1, False),
-    ("place", "city", {"de": "Stadt", "en": "City"}, 0, True),
-    ("place", "region", {"de": "Region", "en": "Region"}, 1, False),
-    ("place", "building", {"de": "Gebäude", "en": "Building"}, 2, False),
-    ("place", "site", {"de": "Stätte", "en": "Site"}, 3, False),
-    ("place", "country", {"de": "Land", "en": "Country"}, 4, False),
-    ("occurrence", "work", {"de": "Werk", "en": "Work"}, 0, True),
-    ("occurrence", "event", {"de": "Ereignis", "en": "Event"}, 1, False),
-    ("occurrence", "exhibition", {"de": "Ausstellung", "en": "Exhibition"}, 2, False),
-    ("occurrence", "campaign", {"de": "Kampagne", "en": "Campaign"}, 3, False),
-]
-
-
 async def _ensure_authority_sources() -> None:
     async with AsyncSessionLocal() as db:
         for src_id, label, adapter_class, is_enabled in _DEFAULT_AUTHORITY_SOURCES:
@@ -215,28 +195,6 @@ async def _ensure_authority_sources() -> None:
                     config={},
                     is_enabled=is_enabled,
                 ))
-        await db.commit()
-
-
-async def _ensure_record_subtypes() -> None:
-    async with AsyncSessionLocal() as db:
-        for primary_type, name, label, sort_order, is_default in _DEFAULT_RECORD_SUBTYPES:
-            result = await db.execute(
-                select(RecordSubtype).where(
-                    RecordSubtype.primary_type == primary_type,
-                    RecordSubtype.name == name,
-                )
-            )
-            if result.scalar_one_or_none() is None:
-                db.add(
-                    RecordSubtype(
-                        primary_type=primary_type,
-                        name=name,
-                        label=label,
-                        sort_order=sort_order,
-                        is_default=is_default,
-                    )
-                )
         await db.commit()
 
 
@@ -290,7 +248,8 @@ async def _ensure_label_fields() -> None:
 async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
-    await _ensure_record_subtypes()
+    # Note: record subtypes are no longer auto-created on startup.
+    # Admins create them manually via Configuration > Subtypes.
     await _ensure_portal_config()
     await _ensure_admin_config()
     await _ensure_authority_sources()

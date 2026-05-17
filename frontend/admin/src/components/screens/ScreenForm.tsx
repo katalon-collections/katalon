@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, BASE, PORTAL_URL } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
-import type { AnyRecord, AuditEntry, FieldDefinition, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
 
@@ -609,6 +609,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [dragOver, setDragOver]         = useState(false)
   const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
+  const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
@@ -689,6 +690,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setRels([])
     setRelTitles({})
     setAddOpen(false)
+
+    // Load available subtypes for this record type
+    if (subtypeKey) {
+      subtypes.list(recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
+    } else {
+      setAvailableSubtypes([])
+    }
 
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
 
@@ -1130,11 +1138,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </div>
                 )}
 
-                {subtypeKey && (
+                {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{subtypeKey === 'entity_type' ? 'Entitätstyp' : 'Occurrence-Typ'}</div>
-                    <input className="fld" value={subtype} onChange={e => { setSubtype(e.target.value); setIsDirty(true) }}
-                      placeholder={subtypeKey === 'entity_type' ? 'z.B. person, organisation' : 'z.B. event, work'} disabled={justCreated} />
+                    <div className="lbl">{recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : 'Occurrence-Typ'}</div>
+                    <select className="fld" value={subtype} onChange={e => { setSubtype(e.target.value); setIsDirty(true) }} disabled={justCreated}>
+                      <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : 'Occurrence-Typ'} wählen —</option>
+                      {availableSubtypes.map(s => (
+                        <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
