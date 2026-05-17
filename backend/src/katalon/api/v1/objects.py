@@ -19,7 +19,7 @@ from katalon.core.schemas import (
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
-from katalon.services.relation_service import count_relations, delete_relations
+from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
@@ -101,6 +101,8 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser
     )
     db.add(obj)
     await db.flush()
+    await sync_schema_relations(db, "object", obj.id, data.metadata_)
+    await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
     try:
         await search_service.index_record("object", obj, db)
@@ -151,6 +153,8 @@ async def update_object(
     obj.object_type = object_type
     obj.status = data.status
     obj.metadata_ = data.metadata_
+
+    await sync_schema_relations(db, "object", obj.id, data.metadata_)
 
     await log_change(
         db,

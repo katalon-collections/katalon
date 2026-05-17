@@ -154,6 +154,7 @@ class RelationRead(RelationCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    is_schema_derived: bool = False
     created_at: datetime
 
 

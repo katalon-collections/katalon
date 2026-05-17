@@ -12,7 +12,7 @@ from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
-from katalon.services.relation_service import count_relations, delete_relations
+from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
@@ -79,6 +79,8 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     db.add(place)
     await db.flush()
+    await sync_schema_relations(db, "place", place.id, data.metadata_)
+    await db.flush()
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="create")
     try:
         await search_service.index_record("place", place)
@@ -122,6 +124,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     place.place_type = place_type
     place.status = data.status
     place.metadata_ = data.metadata_
+    await sync_schema_relations(db, "place", place.id, data.metadata_)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
