@@ -46,6 +46,7 @@ from katalon.core.models import (
 )
 from katalon.core.models import (
     AdminConfig,
+    FieldDefinition,
     PortalConfig,
     RecordSubtype,
     User,
@@ -255,6 +256,36 @@ async def _ensure_admin_config() -> None:
             await db.commit()
 
 
+async def _ensure_label_fields() -> None:
+    """Ensure every primary type has a generic 'label' field definition."""
+    async with AsyncSessionLocal() as db:
+        for target_type in ("object", "entity", "place", "occurrence"):
+            result = await db.execute(
+                select(FieldDefinition).where(
+                    FieldDefinition.target_type == target_type,
+                    FieldDefinition.target_subtype.is_(None),
+                    FieldDefinition.name == "label",
+                    FieldDefinition.is_deleted.is_(False),
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                db.add(
+                    FieldDefinition(
+                        target_type=target_type,
+                        target_subtype=None,
+                        name="label",
+                        label={"de": "Label", "en": "Label"},
+                        field_type="text",
+                        is_required=True,
+                        is_repeatable=False,
+                        is_searchable=True,
+                        sort_order=0,
+                        show_in_detail=True,
+                    )
+                )
+        await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _ensure_admin()
@@ -263,6 +294,7 @@ async def lifespan(app: FastAPI):
     await _ensure_portal_config()
     await _ensure_admin_config()
     await _ensure_authority_sources()
+    await _ensure_label_fields()
     try:
         from katalon.integrations.elasticsearch import ensure_index
         await ensure_index()
