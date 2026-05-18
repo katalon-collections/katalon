@@ -172,8 +172,10 @@ def dry_run(
                 "message": f"{empty_idnos} Zeilen haben keine ID-Nummer (leere idno-Spalte)",
             })
 
+    # Collect empty-field stats per mapped field (exclude __idno__)
+    empty_field_counts: dict[str, int] = {}
     for i, rec in enumerate(mapped):
-        row_num = i + 2  # 1-indexed + header row
+        row_num = i + 2
         if not rec and not idnos[i]:
             errors.append({"row": row_num, "message": "Keine Felder gemappt — Zeile wird übersprungen"})
             continue
@@ -181,8 +183,33 @@ def dry_run(
             if fname in mapped_fields and not rec.get(fname):
                 errors.append({"row": row_num, "message": f"Pflichtfeld '{fname}' ist leer"})
 
-        # Type validation
-        if field_defs:
+        # Track empty values for non-required mapped fields
+        for csv_col, field_name in mapping.items():
+            if field_name == "__idno__":
+                continue
+            if field_name in required_fields:
+                continue
+            raw = rows[i].get(csv_col, "").strip()
+            if not raw:
+                empty_field_counts[field_name] = empty_field_counts.get(field_name, 0) + 1
+
+    # Aggregate empty-field warnings: only show if >10% of rows are empty
+    total_rows = len(rows)
+    for fname, count in empty_field_counts.items():
+        pct = count / total_rows * 100
+        if pct > 10:
+            fd = field_defs.get(fname) if field_defs else None
+            label = fd.label.get("de", fname) if fd and fd.label else fname
+            warnings.append({
+                "row": None,
+                "message": f"Feld '{label}' ist in {count} von {total_rows} Zeilen ({pct:.0f}%) leer",
+            })
+
+    # Type validation: collect per-field, show first 3 examples
+    type_issues: dict[str, list[tuple[int, str]]] = {}
+    if field_defs:
+        for i, rec in enumerate(mapped):
+            row_num = i + 2
             for fname, val in rec.items():
                 fd = field_defs.get(fname)
                 if not fd:
@@ -193,26 +220,69 @@ def dry_run(
                 if not raw_val:
                     continue
 
+                issue = None
                 if fd.field_type == "number":
                     try:
                         float(raw_val.replace(",", "."))
                     except ValueError:
-                        warnings.append({
-                            "row": row_num,
-                            "message": f"Feld '{fname}': Wert '{raw_val[:30]}' ist keine gültige Zahl",
-                        })
+                        issue = f"'{raw_val[:30]}' ist keine gültige Zahl"
                 elif fd.field_type == "date":
                     if not _is_iso_date(raw_val):
-                        warnings.append({
-                            "row": row_num,
-                            "message": f"Feld '{fname}': Wert '{raw_val[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD)",
-                        })
+                        issue = f"'{raw_val[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD)"
                 elif fd.field_type == "boolean":
                     if not _is_boolean(raw_val):
-                        warnings.append({
-                            "row": row_num,
-                            "message": f"Feld '{fname}': Wert '{raw_val[:30]}' ist kein gültiger Boolean",
-                        })
+                        issue = f"'{raw_val[:30]}' ist kein gültiger Boolean"
+
+                if issue:
+                    if fname not in type_issues:
+                        type_issues[fname] = []
+                    if len(type_issues[fname]) < 3:
+                        type_issues[fname].append((row_num, issue))
+
+    for fname, issues in type_issues.items():
+        fd = field_defs.get(fname) if field_defs else None
+        label = fd.label.get("de", fname) if fd and fd.label else fname
+        total_issues = sum(
+            1 for i, rec in enumerate(mapped)
+            for fn in rec
+            if fn == fname
+            for csv_col, field_name in mapping.items()
+            if field_name == fname and not rows[i].get(csv_col, "").strip()
+        )
+        # Count actual type mismatches
+        mismatch_count = len(issues)
+        for i, rec in enumerate(mapped):
+            if fname not in rec:
+                continue
+            raw_val = rows[i].get(
+                next((k for k, v in mapping.items() if v == fname), ""), ""
+            ).strip()
+            if not raw_val:
+                continue
+            fd = field_defs.get(fname)
+            if not fd:
+                continue
+            is_bad = False
+            if fd.field_type == "number":
+                try:
+                    float(raw_val.replace(",", "."))
+                except ValueError:
+                    is_bad = True
+            elif fd.field_type == "date":
+                if not _is_iso_date(raw_val):
+                    is_bad = True
+            elif fd.field_type == "boolean":
+                if not _is_boolean(raw_val):
+                    is_bad = True
+            if is_bad:
+                mismatch_count += 1
+
+        if mismatch_count > 0:
+            examples = "; ".join(f"Zeile {r}: {m}" for r, m in issues)
+            warnings.append({
+                "row": None,
+                "message": f"Feld '{label}': {mismatch_count} Typ-Fehler. Beispiele: {examples}",
+            })
 
     return {
         "total": len(rows),

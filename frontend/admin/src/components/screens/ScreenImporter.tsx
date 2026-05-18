@@ -35,6 +35,18 @@ const FIELD_TYPE_OPTIONS = [
 
 const STEPS = ['Upload', 'Mapping', 'Probelauf', 'Import']
 const MEDIA_BATCH_TASK_STORAGE_KEY = 'katalon_media_batch_task_id'
+const IMPORTER_STATE_KEY = 'katalon_importer_state'
+
+interface PersistedImporterState {
+  recordType: string
+  step: number
+  mapping: Record<string, string>
+  idnoStrategy: string
+  upsertStrategy: string
+  uploaded: UploadResult | null
+  dryResult: DryRunResult | null
+  taskId: string | null
+}
 
 function StepBar({ step }: { step: number }) {
   return (
@@ -49,25 +61,46 @@ function StepBar({ step }: { step: number }) {
   )
 }
 
+function loadPersistedState(): PersistedImporterState | null {
+  try {
+    const raw = localStorage.getItem(IMPORTER_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    // Validate basic shape
+    if (typeof parsed.recordType === 'string' && typeof parsed.step === 'number') {
+      return parsed as PersistedImporterState
+    }
+  } catch {
+    // ignore corrupt state
+  }
+  return null
+}
+
+function clearPersistedState() {
+  localStorage.removeItem(IMPORTER_STATE_KEY)
+}
+
 export function ScreenImporter() {
-  const [step, setStep]               = useState(0)
-  const [recordType, setRecordType]   = useState('object')
+  const persisted = loadPersistedState()
+
+  const [step, setStep]               = useState(persisted?.step ?? 0)
+  const [recordType, setRecordType]   = useState(persisted?.recordType ?? 'object')
   const [over, setOver]               = useState(false)
   const [uploading, setUploading]     = useState(false)
   const [uploadErr, setUploadErr]     = useState<string | null>(null)
-  const [uploaded, setUploaded]       = useState<UploadResult | null>(null)
+  const [uploaded, setUploaded]       = useState<UploadResult | null>(persisted?.uploaded ?? null)
   const [fields, setFields]           = useState<FieldDefinition[]>([])
-  const [mapping, setMapping]         = useState<Record<string, string>>({})
-  const [dryResult, setDryResult]     = useState<DryRunResult | null>(null)
+  const [mapping, setMapping]         = useState<Record<string, string>>(persisted?.mapping ?? {})
+  const [dryResult, setDryResult]     = useState<DryRunResult | null>(persisted?.dryResult ?? null)
   const [dryRunning, setDryRunning]   = useState(false)
-  const [taskId, setTaskId]           = useState<string | null>(null)
+  const [taskId, setTaskId]           = useState<string | null>(persisted?.taskId ?? null)
   const [taskStatus, setTaskStatus]   = useState<TaskStatus | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Import options
-  const [idnoStrategy, setIdnoStrategy] = useState('auto')
-  const [upsertStrategy, setUpsertStrategy] = useState('skip')
+  const [idnoStrategy, setIdnoStrategy] = useState(persisted?.idnoStrategy ?? 'auto')
+  const [upsertStrategy, setUpsertStrategy] = useState(persisted?.upsertStrategy ?? 'skip')
 
   // Schema on-the-fly
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
@@ -86,6 +119,21 @@ export function ScreenImporter() {
   const [mediaErr, setMediaErr] = useState<string | null>(null)
   const mediaPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+
+  // Persist state to localStorage whenever it changes
+  useEffect(() => {
+    const state: PersistedImporterState = {
+      recordType,
+      step,
+      mapping,
+      idnoStrategy,
+      upsertStrategy,
+      uploaded,
+      dryResult,
+      taskId,
+    }
+    localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(state))
+  }, [recordType, step, mapping, idnoStrategy, upsertStrategy, uploaded, dryResult, taskId])
 
   // Load field definitions when record type changes
   useEffect(() => {
@@ -200,6 +248,7 @@ export function ScreenImporter() {
     setStep(0); setUploaded(null); setMapping({}); setDryResult(null)
     setTaskId(null); setTaskStatus(null); setUploadErr(null)
     setIdnoStrategy('auto'); setUpsertStrategy('skip')
+    clearPersistedState()
     if (fileRef.current) fileRef.current.value = ''
   }
 
