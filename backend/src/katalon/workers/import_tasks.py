@@ -60,11 +60,14 @@ def import_records_task(
         "occurrence": "occurrence_type",
     }.get(record_type)
 
-    records = apply_mapping(rows, mapping)
+    records, idnos = apply_mapping(rows, mapping)
     created = 0
     updated = 0
     skipped = 0
     errors: list[dict] = []
+
+    # Check if idno is mapped via __idno__
+    has_idno_column = "__idno__" in mapping.values()
 
     async def _import() -> dict[str, Any]:
         nonlocal created, updated, skipped
@@ -76,17 +79,13 @@ def import_records_task(
 
             # Build lookup of existing records by idno for upsert
             existing_by_idno: dict[str, Any] = {}
-            if upsert_strategy != "skip" and idno_strategy != "skip":
-                idnos = []
-                for i, row in enumerate(rows):
-                    rec_meta = records[i]
-                    idno_val = None
-                    if idno_strategy == "column":
-                        idno_val = row.get("idno", "").strip()
-                    if idno_val:
-                        idnos.append(idno_val)
-                if idnos:
-                    result = await session.execute(select(model).where(model.idno.in_(idnos)))
+            if upsert_strategy != "skip":
+                idnos_to_lookup = []
+                for i, row_idno in enumerate(idnos):
+                    if row_idno:
+                        idnos_to_lookup.append(row_idno)
+                if idnos_to_lookup:
+                    result = await session.execute(select(model).where(model.idno.in_(idnos_to_lookup)))
                     for rec in result.scalars().all():
                         if rec.idno:
                             existing_by_idno[rec.idno] = rec
@@ -103,9 +102,10 @@ def import_records_task(
                     pass
 
                 # Determine idno
+                row_idno = idnos[i] if i < len(idnos) else None
                 idno: str | None = None
-                if idno_strategy == "column":
-                    idno = rows[i].get("idno", "").strip() or None
+                if has_idno_column and row_idno:
+                    idno = row_idno
                 elif idno_strategy == "auto" and idno_schema:
                     idno = await consume_next_idno(session, record_type, idno_schema)
 

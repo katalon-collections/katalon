@@ -82,22 +82,33 @@ def apply_mapping(
     rows: list[dict[str, str]],
     mapping: dict[str, str],
     field_defs: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[str | None]]:
     """
     mapping: { csv_column -> field_name }
-    Returns list of metadata dicts ready for record creation.
+    Returns:
+      - list of metadata dicts ready for record creation
+      - list of idno values (one per row, or None)
+
+    Special field name '__idno__' maps to the record's idno column, not metadata.
 
     If field_defs is provided, values are transformed according to field_type:
     - repeatable fields: split on ';' if the raw value contains it
     - number: parse to float/int
     - boolean: normalize to True/False
     """
-    result = []
+    result: list[dict[str, Any]] = []
+    idnos: list[str | None] = []
     for row in rows:
         record: dict[str, Any] = {}
+        row_idno: str | None = None
         for csv_col, field_name in mapping.items():
             raw = row.get(csv_col, "").strip()
             if not raw:
+                continue
+
+            # Special handling for idno
+            if field_name == "__idno__":
+                row_idno = raw
                 continue
 
             fd = field_defs.get(field_name) if field_defs else None
@@ -124,7 +135,8 @@ def apply_mapping(
             else:
                 record[field_name] = [{"value": raw}]
         result.append(record)
-    return result
+        idnos.append(row_idno)
+    return result, idnos
 
 
 def dry_run(
@@ -132,7 +144,7 @@ def dry_run(
     mapping: dict[str, str],
     field_defs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    mapped = apply_mapping(rows, mapping, field_defs)
+    mapped, idnos = apply_mapping(rows, mapping, field_defs)
     mapped_fields = set(mapping.values())
     required_fields = (
         {name for name, fd in field_defs.items() if fd.is_required}
@@ -150,9 +162,19 @@ def dry_run(
             "message": f"Pflichtfelder nicht gemappt: {', '.join(sorted(missing_required))}",
         })
 
+    # Check for idno mapping
+    has_idno_mapping = "__idno__" in mapped_fields
+    if has_idno_mapping:
+        empty_idnos = sum(1 for i, idno in enumerate(idnos) if not idno)
+        if empty_idnos > 0:
+            warnings.append({
+                "row": None,
+                "message": f"{empty_idnos} Zeilen haben keine ID-Nummer (leere idno-Spalte)",
+            })
+
     for i, rec in enumerate(mapped):
         row_num = i + 2  # 1-indexed + header row
-        if not rec:
+        if not rec and not idnos[i]:
             errors.append({"row": row_num, "message": "Keine Felder gemappt — Zeile wird übersprungen"})
             continue
         for fname in required_fields:
@@ -198,6 +220,7 @@ def dry_run(
         "errors": errors,
         "warnings": warnings,
         "preview": mapped[:5],
+        "has_idno_mapping": has_idno_mapping,
     }
 
 

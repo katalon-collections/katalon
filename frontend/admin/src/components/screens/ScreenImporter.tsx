@@ -364,11 +364,16 @@ export function ScreenImporter() {
                             onChange={e => setMapping(m => ({ ...m, [col]: e.target.value }))}
                           >
                             <option value="">— ignorieren —</option>
-                            {fields.map(f => (
-                              <option key={f.id} value={f.name}>
-                                {getLabel(f, f.name)}{f.is_required ? ' *' : ''}
-                              </option>
-                            ))}
+                            <optgroup label="Systemfelder">
+                              <option value="__idno__">ID-Nummer (idno)</option>
+                            </optgroup>
+                            <optgroup label={RECORD_TYPES.find(t => t.id === recordType)?.label ?? 'Felder'}>
+                              {fields.map(f => (
+                                <option key={f.id} value={f.name}>
+                                  {getLabel(f, f.name)}{f.is_required ? ' *' : ''}
+                                </option>
+                              ))}
+                            </optgroup>
                           </select>
                         </td>
                         <td>
