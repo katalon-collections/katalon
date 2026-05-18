@@ -441,7 +441,7 @@ export const importer = {
     req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
-  createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<{ created: number; fields: CreatedField[]; skipped?: string[] }> =>
+  createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<{ created: number; fields: CreatedField[]; restored?: string[] }> =>
     req('/v1/importer/create-fields', { method: 'POST', body: JSON.stringify({ record_type: recordType, fields }) }),
 }
 

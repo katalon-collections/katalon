@@ -126,12 +126,15 @@ async def run_import(body: ImportRequest, current_user: CurrentUser) -> dict:
 
 @router.post("/create-fields", dependencies=[require_role("admin")])
 async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
-    """Create new field definitions on-the-fly for unmapped CSV columns."""
+    """Create new field definitions on-the-fly for unmapped CSV columns.
+
+    If a field was soft-deleted, it will be undeleted and updated.
+    """
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
 
     created_fields: list[FieldDefinitionRead] = []
-    skipped_names: list[str] = []
+    restored_names: list[str] = []
 
     for f in body.fields:
         name = f.get("name", "").strip()
@@ -142,15 +145,31 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
         if not name:
             continue
 
-        # Check if field already exists (including soft-deleted to avoid unique constraint violations)
-        existing = await db.execute(
+        # Check if field already exists (including soft-deleted)
+        existing_result = await db.execute(
             select(FieldDefinition).where(
                 FieldDefinition.target_type == body.record_type,
                 FieldDefinition.name == name,
             )
         )
-        if existing.scalar_one_or_none():
-            skipped_names.append(name)
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            if existing.is_deleted:
+                # Undelete and update the soft-deleted field
+                existing.is_deleted = False
+                existing.field_type = field_type
+                existing.is_repeatable = is_repeatable
+                if label_de:
+                    existing.label = {**existing.label, "de": label_de}
+                if label_en:
+                    existing.label = {**existing.label, "en": label_en}
+                await db.flush()
+                restored_names.append(name)
+                created_fields.append(FieldDefinitionRead.model_validate(existing))
+            else:
+                # Field already exists and is active — skip
+                restored_names.append(name)
             continue
 
         label: dict[str, str] = {}
@@ -173,12 +192,12 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
             await db.flush()
         except IntegrityError:
             await db.rollback()
-            skipped_names.append(name)
+            restored_names.append(name)
             continue
         created_fields.append(FieldDefinitionRead.model_validate(field))
 
     await db.commit()
-    return {"created": len(created_fields), "fields": created_fields, "skipped": skipped_names}
+    return {"created": len(created_fields), "fields": created_fields, "restored": restored_names}
 
 
 @router.get("/task/{task_id}")
