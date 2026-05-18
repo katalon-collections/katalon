@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 logger = logging.getLogger(__name__)
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import AdminConfig, Occurrence
 from katalon.core.schemas import (
     AuditLogRead,
@@ -17,6 +17,7 @@ from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
+from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
 
@@ -88,10 +89,12 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
 
 
 @router.get("/{occ_id}", response_model=OccurrenceRead)
-async def get_occurrence(occ_id: uuid.UUID, db: DBDep) -> Occurrence:
+async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
+        raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    if current_user is None and occ.status not in ("public", "published"):
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
     return occ
 
@@ -130,6 +133,21 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return occ
+
+
+@router.post("/{occ_id}/publish")
+async def publish_occurrence(
+    occ_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> dict:
+    """Publish an occurrence after validating required fields."""
+    ok, errors = await can_publish(db, "occurrence", str(occ_id))
+    if not ok:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+    result = await publish_record(db, "occurrence", str(occ_id), str(current_user.id))
+    await db.commit()
+    return result
 
 
 @router.delete("/{occ_id}", status_code=204)

@@ -43,6 +43,7 @@ interface PersistedImporterState {
   mapping: Record<string, string>
   idnoStrategy: string
   upsertStrategy: string
+  autoPublish: boolean
   uploaded: UploadResult | null
   dryResult: DryRunResult | null
   taskId: string | null
@@ -101,6 +102,7 @@ export function ScreenImporter() {
   // Import options
   const [idnoStrategy, setIdnoStrategy] = useState(persisted?.idnoStrategy ?? 'auto')
   const [upsertStrategy, setUpsertStrategy] = useState(persisted?.upsertStrategy ?? 'skip')
+  const [autoPublish, setAutoPublish] = useState(persisted?.autoPublish ?? false)
 
   // Schema on-the-fly
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
@@ -128,12 +130,13 @@ export function ScreenImporter() {
       mapping,
       idnoStrategy,
       upsertStrategy,
+      autoPublish,
       uploaded,
       dryResult,
       taskId,
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(state))
-  }, [recordType, step, mapping, idnoStrategy, upsertStrategy, uploaded, dryResult, taskId])
+  }, [recordType, step, mapping, idnoStrategy, upsertStrategy, autoPublish, uploaded, dryResult, taskId])
 
   // Load field definitions when record type changes
   useEffect(() => {
@@ -235,6 +238,7 @@ export function ScreenImporter() {
       const { task_id } = await importer.import(recordType, uploaded.rows, mapping, {
         idno_strategy: idnoStrategy,
         upsert_strategy: upsertStrategy,
+        auto_publish: autoPublish,
       })
       setTaskId(task_id)
       setTaskStatus({ state: 'PENDING' })
@@ -247,7 +251,7 @@ export function ScreenImporter() {
   function reset() {
     setStep(0); setUploaded(null); setMapping({}); setDryResult(null)
     setTaskId(null); setTaskStatus(null); setUploadErr(null)
-    setIdnoStrategy('auto'); setUpsertStrategy('skip')
+    setIdnoStrategy('auto'); setUpsertStrategy('skip'); setAutoPublish(false)
     clearPersistedState()
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -545,6 +549,18 @@ export function ScreenImporter() {
                     {UPSERT_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    className="ck"
+                    id="auto-publish"
+                    checked={autoPublish}
+                    onChange={e => setAutoPublish(e.target.checked)}
+                  />
+                  <label htmlFor="auto-publish" style={{ fontSize: 13, cursor: 'pointer' }}>
+                    Datensätze direkt veröffentlichen (nur wenn alle Pflichtfelder befüllt)
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -611,6 +627,16 @@ export function ScreenImporter() {
                     {taskStatus.result.skipped > 0 && (
                       <div style={{ color: 'var(--fg-3)' }}>
                         <b>{taskStatus.result.skipped}</b> Datensätze übersprungen
+                      </div>
+                    )}
+                    {typeof taskStatus.result.published === 'number' && taskStatus.result.published > 0 && (
+                      <div style={{ color: '#1e3a8a' }}>
+                        <b>{taskStatus.result.published}</b> Datensätze veröffentlicht
+                      </div>
+                    )}
+                    {typeof taskStatus.result.publish_failed === 'number' && taskStatus.result.publish_failed > 0 && (
+                      <div style={{ color: '#92400e' }}>
+                        <b>{taskStatus.result.publish_failed}</b> Datensätze konnten nicht veröffentlicht werden (Pflichtfelder fehlen)
                       </div>
                     )}
                     {taskStatus.result.errors.length > 0 && (

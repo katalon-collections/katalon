@@ -96,6 +96,7 @@ export const objects = {
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/objects/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/objects/${id}/publish`, { method: 'POST' }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/objects/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/objects/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -114,6 +115,7 @@ export const entities = {
   create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/entities/${id}/publish`, { method: 'POST' }),
 }
 
 // Places
@@ -127,6 +129,7 @@ export const places = {
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/places/${id}/publish`, { method: 'POST' }),
 }
 
 // Occurrences
@@ -140,6 +143,7 @@ export const occurrences = {
   create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/occurrences/${id}/publish`, { method: 'POST' }),
 }
 
 export interface SchemaImportResult {
@@ -382,7 +386,7 @@ export interface DryRunResult {
 
 export interface TaskStatus {
   state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
-  result?: { created: number; updated: number; skipped: number; errors: { row: number; error: string }[] }
+  result?: { created: number; updated: number; skipped: number; published: number; publish_failed: number; errors: { row: number; error: string }[] }
   error?: string
   meta?: { current: number; total: number; stage: string }
 }
@@ -407,8 +411,8 @@ export const importer = {
   },
   dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<DryRunResult> =>
     req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
-  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>, opts?: { idno_strategy?: string; upsert_strategy?: string }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip' }) }),
+  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string }[]): Promise<{ created: number; fields: CreatedField[] }> =>

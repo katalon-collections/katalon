@@ -25,6 +25,7 @@ class MappingRequest(BaseModel):
 class ImportRequest(MappingRequest):
     idno_strategy: str = "auto"   # "auto" | "column" | "skip"
     upsert_strategy: str = "skip"  # "skip" | "merge" | "replace"
+    auto_publish: bool = False  # if True, publish records that pass validation after import
 
 
 class CreateFieldsRequest(BaseModel):
@@ -82,6 +83,7 @@ async def run_import(body: ImportRequest, current_user: CurrentUser) -> dict:
         body.mapping,
         idno_strategy=body.idno_strategy,
         upsert_strategy=body.upsert_strategy,
+        auto_publish=body.auto_publish,
         user_id=str(current_user.id),
     )
     return {"status": "queued", "task_id": task.id}

@@ -18,6 +18,7 @@ def import_records_task(
     mapping: dict[str, str],
     idno_strategy: str = "auto",  # "auto" | "column" | "skip"
     upsert_strategy: str = "skip",  # "skip" | "merge" | "replace"
+    auto_publish: bool = False,
     user_id: str | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
@@ -30,6 +31,7 @@ def import_records_task(
                        mapped "idno" column, "skip" leaves it null
         upsert_strategy: how to handle existing records by idno — "skip" ignores duplicates,
                          "merge" adds new fields only, "replace" overwrites completely
+        auto_publish: if True, attempt to publish each record after creation
         user_id: optional UUID of the user who triggered the import (for audit log)
     """
     from katalon.services.importer_service import apply_mapping
@@ -39,6 +41,7 @@ def import_records_task(
     from katalon.services.search_service import index_record
     from katalon.services.idno_service import consume_next_idno
     from katalon.services.audit_service import log_change
+    from katalon.services.publish_service import publish_record
     from sqlalchemy import select
     from katalon.core.models import AdminConfig
 
@@ -64,13 +67,15 @@ def import_records_task(
     created = 0
     updated = 0
     skipped = 0
+    published = 0
+    publish_failed = 0
     errors: list[dict] = []
 
     # Check if idno is mapped via __idno__
     has_idno_column = "__idno__" in mapping.values()
 
     async def _import() -> dict[str, Any]:
-        nonlocal created, updated, skipped
+        nonlocal created, updated, skipped, published, publish_failed
         async with AsyncSessionLocal() as session:
             # Load idno schema once
             cfg_result = await session.execute(select(AdminConfig).where(AdminConfig.key == "default"))
@@ -134,6 +139,13 @@ def import_records_task(
                         await index_record(record_type, existing, session)
                     except Exception:
                         pass
+                    # Try auto-publish if requested
+                    if auto_publish:
+                        pub_result = await publish_record(session, record_type, str(existing.id), user_id)
+                        if pub_result["ok"]:
+                            published += 1
+                        else:
+                            publish_failed += 1
                     continue
 
                 # Validate metadata before insert
@@ -176,12 +188,22 @@ def import_records_task(
                 except Exception:
                     pass
 
+                # Try auto-publish if requested
+                if auto_publish:
+                    pub_result = await publish_record(session, record_type, str(rec.id), user_id)
+                    if pub_result["ok"]:
+                        published += 1
+                    else:
+                        publish_failed += 1
+
             await session.commit()
 
         return {
             "created": created,
             "updated": updated,
             "skipped": skipped,
+            "published": published,
+            "publish_failed": publish_failed,
             "errors": errors,
         }
 

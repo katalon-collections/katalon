@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 logger = logging.getLogger(__name__)
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -19,6 +19,7 @@ from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
+from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
 
@@ -90,10 +91,12 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser
 
 
 @router.get("/{entity_id}", response_model=EntityRead)
-async def get_entity(entity_id: uuid.UUID, db: DBDep) -> Entity:
+async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
+        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    if current_user is None and entity.status not in ("public", "published"):
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
     return entity
 
@@ -132,6 +135,21 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return entity
+
+
+@router.post("/{entity_id}/publish")
+async def publish_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> dict:
+    """Publish an entity after validating required fields."""
+    ok, errors = await can_publish(db, "entity", str(entity_id))
+    if not ok:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+    result = await publish_record(db, "entity", str(entity_id), str(current_user.id))
+    await db.commit()
+    return result
 
 
 @router.delete("/{entity_id}", status_code=204)

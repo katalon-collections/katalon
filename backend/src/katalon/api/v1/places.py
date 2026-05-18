@@ -6,13 +6,14 @@ from sqlalchemy import func, select
 
 logger = logging.getLogger(__name__)
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
 from katalon.core.models import AdminConfig, Place
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
 from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
+from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
 
@@ -91,10 +92,12 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
 
 
 @router.get("/{place_id}", response_model=PlaceRead)
-async def get_place(place_id: uuid.UUID, db: DBDep) -> Place:
+async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
+        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    if current_user is None and place.status not in ("public", "published"):
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
     return place
 
@@ -136,6 +139,21 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return place
+
+
+@router.post("/{place_id}/publish")
+async def publish_place(
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> dict:
+    """Publish a place after validating required fields."""
+    ok, errors = await can_publish(db, "place", str(place_id))
+    if not ok:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+    result = await publish_record(db, "place", str(place_id), str(current_user.id))
+    await db.commit()
+    return result
 
 
 @router.delete("/{place_id}", status_code=204)
