@@ -166,7 +166,9 @@ export function SearchPage() {
         </button>
       </form>
       <div style={{ color: 'var(--fg-3)', fontSize: 13, marginBottom: 4 }}>
-        {loading ? 'Suche…' : `${total} Treffer${q ? ` für „${q}"` : ''}`}
+        {loading
+          ? 'Suche…'
+          : `${total} Treffer${q ? ` für „${q}"` : ''}${typeFilt ? ` · ${TYPE_LABELS[typeFilt] ?? typeFilt}` : ' · Alle Typen'}`}
       </div>
 
       <div className="search-layout">

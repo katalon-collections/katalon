@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Link, Route, Routes, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
@@ -14,8 +14,77 @@ import { StaticPageView } from './pages/StaticPageView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
 
+const TYPE_LABELS: Record<string, string> = {
+  object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
+}
+
 function Header() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [q, setQ] = useState('')
+  const [suggestions, setSuggestions] = useState<Array<{ id: string; record_type: string; title: string }>>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // Preserve type scope from current search page
+  const currentType = new URLSearchParams(location.search).get('type') ?? ''
+
+  // Debounced autocomplete
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    setLoadingSuggestions(true)
+    const timer = setTimeout(() => {
+      const qs = new URLSearchParams({ q: q.trim(), page_size: '5' })
+      if (currentType) qs.set('type', currentType)
+      fetch(`${import.meta.env.VITE_API_URL ?? ''}/v1/search?${qs.toString()}`)
+        .then(r => r.json())
+        .then((result: { items: Array<{ id: string; record_type: string; title: string }> }) => {
+          setSuggestions(result.items ?? [])
+          setShowSuggestions(true)
+        })
+        .catch(() => setSuggestions([]))
+        .finally(() => setLoadingSuggestions(false))
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [q, currentType])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  function submit(e?: React.FormEvent) {
+    e?.preventDefault()
+    const term = q.trim()
+    if (!term) return
+    const qs = new URLSearchParams({ q: term })
+    if (currentType) qs.set('type', currentType)
+    navigate(`/search?${qs.toString()}`)
+    setShowSuggestions(false)
+    inputRef.current?.blur()
+  }
+
+  function goToResult(item: { record_type: string; id: string }) {
+    setShowSuggestions(false)
+    const path = item.record_type === 'entity' ? `/entities/${item.id}`
+      : item.record_type === 'place' ? `/places/${item.id}`
+      : item.record_type === 'occurrence' ? `/occurrences/${item.id}`
+      : `/objects/${item.id}`
+    navigate(path)
+  }
+
   return (
     <header className="site-header">
       <Link to="/" className="logo">Katalon</Link>
@@ -26,9 +95,36 @@ function Header() {
         <Link to="/search?q=&type=occurrence">Werke</Link>
       </nav>
       <div className="sp" />
-      <form className="search-bar" onSubmit={e => { e.preventDefault(); const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement).value; if (q) navigate(`/search?q=${encodeURIComponent(q)}`) }}>
-        <input name="q" placeholder="Suchen…" />
-      </form>
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <form className="search-bar" onSubmit={submit}>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onFocus={() => { if (suggestions.length) setShowSuggestions(true) }}
+            placeholder={currentType ? `Suchen in ${TYPE_LABELS[currentType] ?? currentType}…` : 'Suchen…'}
+          />
+        </form>
+        {showSuggestions && (
+          <div className="search-suggestions">
+            {suggestions.length === 0 && loadingSuggestions && (
+              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Suche…</div>
+            )}
+            {suggestions.length === 0 && !loadingSuggestions && (
+              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Keine Ergebnisse</div>
+            )}
+            {suggestions.map(item => (
+              <div key={`${item.record_type}-${item.id}`} className="suggest-item" onClick={() => goToResult(item)}>
+                <span className="suggest-title">{item.title || item.id}</span>
+                <span className="suggest-badge">{TYPE_LABELS[item.record_type] ?? item.record_type}</span>
+              </div>
+            ))}
+            <div className="suggest-footer" onClick={() => submit()}>
+              Alle Ergebnisse anzeigen →
+            </div>
+          </div>
+        )}
+      </div>
     </header>
   )
 }
