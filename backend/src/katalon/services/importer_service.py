@@ -78,13 +78,110 @@ def _guess_field_type(values: list[str]) -> str:
     return "text"
 
 
+def _eval_expression(expression: str, value: str) -> str:
+    """Evaluate a simple template expression with ${value} and filters.
+
+    Supported filters:
+      ${value}           - raw value
+      ${value:upper}     - uppercase
+      ${value:lower}     - lowercase
+      ${value:trim}      - strip whitespace
+      ${value:slice(a,b)}- substring
+      ${value:replace(x,y)} - replace substring
+    """
+    if not expression:
+        return value
+
+    result = expression
+    # Match ${value} or ${value:filter} or ${value:filter(args)}
+    pattern = re.compile(r"\$\{value(?::([^}]+))?\}")
+
+    def _apply_filter(val: str, filt: str | None) -> str:
+        if not filt:
+            return val
+        if filt == "upper":
+            return val.upper()
+        if filt == "lower":
+            return val.lower()
+        if filt == "trim":
+            return val.strip()
+        m = re.match(r"slice\((\d+)(?:,(\d+))?\)", filt)
+        if m:
+            start = int(m.group(1))
+            end = int(m.group(2)) if m.group(2) else None
+            return val[start:end]
+        m = re.match(r"replace\(([^,]+),([^)]+)\)", filt)
+        if m:
+            return val.replace(m.group(1), m.group(2))
+        return val
+
+    for match in pattern.finditer(expression):
+        full = match.group(0)
+        filt = match.group(1)
+        result = result.replace(full, _apply_filter(value, filt), 1)
+
+    return result
+
+
+def apply_transforms(value: str, transforms: list[dict[str, Any]]) -> list[str]:
+    """Apply a chain of transforms to a single cell value.
+
+    Returns a list of values (split may produce multiple).
+    """
+    values: list[str] = [value]
+    for t in transforms:
+        ttype = t.get("type", "")
+        new_values: list[str] = []
+        for v in values:
+            if ttype == "split":
+                delim = t.get("delimiter", ";")
+                filter_empty = t.get("filter_empty", True)
+                parts = [p.strip() for p in v.split(delim) if p.strip() or not filter_empty]
+                new_values.extend(parts)
+            elif ttype == "replace":
+                search = t.get("search", "")
+                replace = t.get("replace", "")
+                case_sensitive = t.get("case_sensitive", True)
+                flags = 0 if case_sensitive else re.IGNORECASE
+                new_values.append(re.sub(re.escape(search), replace, v, flags=flags))
+            elif ttype == "regex_extract":
+                pattern = t.get("pattern", "")
+                group = t.get("group", 0)
+                try:
+                    m = re.search(pattern, v)
+                    new_values.append(m.group(group) if m else v)
+                except re.error:
+                    new_values.append(v)
+            elif ttype == "trim":
+                new_values.append(v.strip())
+            elif ttype == "vocab_map":
+                vocab_map = t.get("vocab_map", {})
+                strict = t.get("strict", False)
+                mapped = vocab_map.get(v.strip())
+                if mapped is not None:
+                    new_values.append(mapped)
+                elif not strict:
+                    new_values.append(v)
+                # if strict and no mapping, drop the value
+            elif ttype == "expression":
+                expr = t.get("expression", "")
+                new_values.append(_eval_expression(expr, v))
+            else:
+                new_values.append(v)
+        filter_empty = t.get("filter_empty", True)
+        values = [v for v in new_values if v.strip() or not filter_empty]
+        if not values:
+            break
+    return values
+
+
 def apply_mapping(
     rows: list[dict[str, str]],
-    mapping: dict[str, str],
+    mapping: dict[str, str] | dict[str, Any],
     field_defs: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str | None]]:
     """
-    mapping: { csv_column -> field_name }
+    mapping: { csv_column -> field_name }  OR  { csv_column -> {"target": field_name, "transforms": [...]} }
     Returns:
       - list of metadata dicts ready for record creation
       - list of idno values (one per row, or None)
@@ -92,16 +189,24 @@ def apply_mapping(
     Special field name '__idno__' maps to the record's idno column, not metadata.
 
     If field_defs is provided, values are transformed according to field_type:
-    - repeatable fields: split on ';' if the raw value contains it
     - number: parse to float/int
     - boolean: normalize to True/False
     """
     result: list[dict[str, Any]] = []
     idnos: list[str | None] = []
+
+    # Normalize mapping to always have target + transforms
+    normalized: dict[str, tuple[str, list[dict[str, Any]]]] = {}
+    for csv_col, val in mapping.items():
+        if isinstance(val, dict):
+            normalized[csv_col] = (val.get("target", ""), val.get("transforms", []))
+        else:
+            normalized[csv_col] = (val, [])
+
     for row in rows:
         record: dict[str, Any] = {}
         row_idno: str | None = None
-        for csv_col, field_name in mapping.items():
+        for csv_col, (field_name, transforms) in normalized.items():
             raw = row.get(csv_col, "").strip()
             if not raw:
                 continue
@@ -115,25 +220,33 @@ def apply_mapping(
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
 
-            # Handle repeatable fields: split on ';' if value contains it
-            if is_repeatable and ";" in raw:
-                parts = [p.strip() for p in raw.split(";") if p.strip()]
+            # Apply transforms pipeline
+            if transforms:
+                parts = apply_transforms(raw, transforms)
+            else:
+                parts = [raw]
+
+            # If result is multiple values AND field is repeatable, wrap as list
+            if is_repeatable:
                 record[field_name] = [{"value": p} for p in parts]
                 continue
+
+            # For non-repeatable fields, store single value (not a list)
+            single = parts[0] if parts else ""
 
             # Type transformations
             if field_type == "number":
                 try:
-                    num = float(raw.replace(",", "."))
-                    record[field_name] = [{"value": int(num) if num == int(num) else num}]
+                    num = float(single.replace(",", "."))
+                    record[field_name] = {"value": int(num) if num == int(num) else num}
                 except ValueError:
-                    record[field_name] = [{"value": raw}]
+                    record[field_name] = {"value": single}
             elif field_type == "boolean":
-                record[field_name] = [{"value": raw.lower() in {"true", "1", "ja", "yes"}}]
+                record[field_name] = {"value": single.lower() in {"true", "1", "ja", "yes"}}
             elif field_type == "date":
-                record[field_name] = [{"value": raw}]
+                record[field_name] = {"value": single}
             else:
-                record[field_name] = [{"value": raw}]
+                record[field_name] = {"value": single}
         result.append(record)
         idnos.append(row_idno)
     return result, idnos
@@ -141,11 +254,19 @@ def apply_mapping(
 
 def dry_run(
     rows: list[dict[str, str]],
-    mapping: dict[str, str],
+    mapping: dict[str, str] | dict[str, Any],
     field_defs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     mapped, idnos = apply_mapping(rows, mapping, field_defs)
-    mapped_fields = set(mapping.values())
+
+    # Extract mapped field names (handle both old and new mapping format)
+    mapped_fields: set[str] = set()
+    for v in mapping.values():
+        if isinstance(v, dict):
+            mapped_fields.add(v.get("target", ""))
+        else:
+            mapped_fields.add(v)
+
     required_fields = (
         {name for name, fd in field_defs.items() if fd.is_required}
         if field_defs
@@ -184,7 +305,8 @@ def dry_run(
                 errors.append({"row": row_num, "message": f"Pflichtfeld '{fname}' ist leer"})
 
         # Track empty values for non-required mapped fields
-        for csv_col, field_name in mapping.items():
+        for csv_col, val in mapping.items():
+            field_name = val.get("target", "") if isinstance(val, dict) else val
             if field_name == "__idno__":
                 continue
             if field_name in required_fields:
@@ -214,9 +336,13 @@ def dry_run(
                 fd = field_defs.get(fname)
                 if not fd:
                     continue
-                raw_val = rows[i].get(
-                    next((k for k, v in mapping.items() if v == fname), ""), ""
-                ).strip()
+                # Find the csv column that maps to this field
+                raw_val = ""
+                for csv_col, v in mapping.items():
+                    mapped_name = v.get("target", "") if isinstance(v, dict) else v
+                    if mapped_name == fname:
+                        raw_val = rows[i].get(csv_col, "").strip()
+                        break
                 if not raw_val:
                     continue
 
@@ -242,21 +368,17 @@ def dry_run(
     for fname, issues in type_issues.items():
         fd = field_defs.get(fname) if field_defs else None
         label = fd.label.get("de", fname) if fd and fd.label else fname
-        total_issues = sum(
-            1 for i, rec in enumerate(mapped)
-            for fn in rec
-            if fn == fname
-            for csv_col, field_name in mapping.items()
-            if field_name == fname and not rows[i].get(csv_col, "").strip()
-        )
         # Count actual type mismatches
         mismatch_count = len(issues)
         for i, rec in enumerate(mapped):
             if fname not in rec:
                 continue
-            raw_val = rows[i].get(
-                next((k for k, v in mapping.items() if v == fname), ""), ""
-            ).strip()
+            raw_val = ""
+            for csv_col, v in mapping.items():
+                mapped_name = v.get("target", "") if isinstance(v, dict) else v
+                if mapped_name == fname:
+                    raw_val = rows[i].get(csv_col, "").strip()
+                    break
             if not raw_val:
                 continue
             fd = field_defs.get(fname)

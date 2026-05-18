@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from typing import Literal, Any
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FieldDefinition
@@ -16,8 +17,34 @@ MAX_SIZE = 10 * 1024 * 1024  # 10 MB (matches frontend limit)
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
 
 
+class TransformConfig(BaseModel):
+    type: Literal["split", "replace", "regex_extract", "trim", "vocab_map", "expression"]
+    # split
+    delimiter: str | None = None
+    filter_empty: bool = True
+    # replace
+    search: str | None = None
+    replace: str | None = None
+    case_sensitive: bool = True
+    # regex_extract
+    pattern: str | None = None
+    group: int = 0
+    # trim
+    trim: bool = True
+    # vocab_map
+    vocab_map: dict[str, str] = Field(default_factory=dict)
+    strict: bool = False
+    # expression
+    expression: str | None = None
+
+
+class MappingEntry(BaseModel):
+    target: str
+    transforms: list[TransformConfig] = Field(default_factory=list)
+
+
 class MappingRequest(BaseModel):
-    mapping: dict[str, str]   # csv_column -> field_name
+    mapping: dict[str, MappingEntry]   # csv_column -> {target, transforms?}
     rows: list[dict[str, str]]
     record_type: str = "object"
 
@@ -30,7 +57,7 @@ class ImportRequest(MappingRequest):
 
 class CreateFieldsRequest(BaseModel):
     record_type: str
-    fields: list[dict[str, str]]  # [{"name": "...", "field_type": "...", "label_de": "...", "label_en": "..."}]
+    fields: list[dict[str, Any]]  # [{"name": "...", "field_type": "...", "label_de": "...", "label_en": "...", "is_repeatable": true/false}]
 
 
 @router.post("/upload")
@@ -69,7 +96,11 @@ async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
         )
     )
     field_defs = {f.name: f for f in result.scalars().all()}
-    return importer_service.dry_run(body.rows, body.mapping, field_defs)
+    # Build normalized mapping for dry_run: {csv_col -> {"target": ..., "transforms": [...]}}
+    norm_mapping: dict[str, dict[str, Any]] = {}
+    for k, v in body.mapping.items():
+        norm_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
+    return importer_service.dry_run(body.rows, norm_mapping, field_defs)
 
 
 @router.post("/import")
@@ -77,10 +108,14 @@ async def run_import(body: ImportRequest, current_user: CurrentUser) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
     from katalon.workers.import_tasks import import_records_task
+    # Serialize mapping for Celery (plain dict)
+    serializable_mapping: dict[str, Any] = {}
+    for k, v in body.mapping.items():
+        serializable_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
     task = import_records_task.delay(
         body.record_type,
         body.rows,
-        body.mapping,
+        serializable_mapping,
         idno_strategy=body.idno_strategy,
         upsert_strategy=body.upsert_strategy,
         auto_publish=body.auto_publish,
@@ -101,6 +136,7 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
         field_type = f.get("field_type", "text").strip()
         label_de = f.get("label_de", "").strip()
         label_en = f.get("label_en", "").strip()
+        is_repeatable = bool(f.get("is_repeatable", False))
         if not name:
             continue
 
@@ -127,7 +163,7 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
             label=label,
             field_type=field_type,
             is_required=False,
-            is_repeatable=False,
+            is_repeatable=is_repeatable,
             sort_order=0,
         )
         db.add(field)

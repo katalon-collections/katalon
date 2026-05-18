@@ -398,6 +398,32 @@ export interface CreatedField {
   label: Record<string, string>
 }
 
+export interface TransformConfig {
+  type: 'split' | 'replace' | 'regex_extract' | 'trim' | 'vocab_map' | 'expression'
+  // split
+  delimiter?: string
+  filter_empty?: boolean
+  // replace
+  search?: string
+  replace?: string
+  case_sensitive?: boolean
+  // regex_extract
+  pattern?: string
+  group?: number
+  // trim
+  trim?: boolean
+  // vocab_map
+  vocab_map?: Record<string, string>
+  strict?: boolean
+  // expression
+  expression?: string
+}
+
+export interface MappingEntry {
+  target: string
+  transforms?: TransformConfig[]
+}
+
 export const importer = {
   upload: async (file: File): Promise<UploadResult> => {
     const formData = new FormData()
@@ -409,13 +435,13 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<DryRunResult> =>
+  dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>): Promise<DryRunResult> =>
     req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
-  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean }): Promise<{ task_id: string; status: string }> =>
+  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean }): Promise<{ task_id: string; status: string }> =>
     req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
-  createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string }[]): Promise<{ created: number; fields: CreatedField[] }> =>
+  createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<{ created: number; fields: CreatedField[] }> =>
     req('/v1/importer/create-fields', { method: 'POST', body: JSON.stringify({ record_type: recordType, fields }) }),
 }
 

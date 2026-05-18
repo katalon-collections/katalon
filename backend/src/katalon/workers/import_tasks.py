@@ -15,7 +15,7 @@ def import_records_task(
     self,
     record_type: str,
     rows: list[dict[str, str]],
-    mapping: dict[str, str],
+    mapping: dict[str, str] | dict[str, Any],
     idno_strategy: str = "auto",  # "auto" | "column" | "skip"
     upsert_strategy: str = "skip",  # "skip" | "merge" | "replace"
     auto_publish: bool = False,
@@ -26,7 +26,7 @@ def import_records_task(
     Args:
         record_type: object | entity | place | occurrence
         rows: list of CSV row dicts
-        mapping: {csv_column -> field_name}
+        mapping: {csv_column -> field_name} or {csv_column -> {"target": field_name, "delimiter": "..."}}
         idno_strategy: how to handle idno — "auto" generates one, "column" reads from
                        mapped "idno" column, "skip" leaves it null
         upsert_strategy: how to handle existing records by idno — "skip" ignores duplicates,
@@ -72,7 +72,14 @@ def import_records_task(
     errors: list[dict] = []
 
     # Check if idno is mapped via __idno__
-    has_idno_column = "__idno__" in mapping.values()
+    # Normalize: mapping may be dict of dicts with "target" key
+    _mapping_targets = []
+    for v in mapping.values():
+        if isinstance(v, dict):
+            _mapping_targets.append(v.get("target", ""))
+        else:
+            _mapping_targets.append(v)
+    has_idno_column = "__idno__" in _mapping_targets
 
     async def _import() -> dict[str, Any]:
         nonlocal created, updated, skipped, published, publish_failed
