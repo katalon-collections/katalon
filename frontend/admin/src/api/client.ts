@@ -369,6 +369,7 @@ export interface UploadResult {
   row_count: number
   preview: Record<string, string>[]
   rows: Record<string, string>[]
+  suggestions: Record<string, string>
 }
 
 export interface DryRunResult {
@@ -381,8 +382,16 @@ export interface DryRunResult {
 
 export interface TaskStatus {
   state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
-  result?: { created: number; errors: { row: number; error: string }[] }
+  result?: { created: number; updated: number; skipped: number; errors: { row: number; error: string }[] }
   error?: string
+  meta?: { current: number; total: number; stage: string }
+}
+
+export interface CreatedField {
+  id: string
+  name: string
+  field_type: string
+  label: Record<string, string>
 }
 
 export const importer = {
@@ -398,10 +407,12 @@ export const importer = {
   },
   dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<DryRunResult> =>
     req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
-  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
+  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, string>, opts?: { idno_strategy?: string; upsert_strategy?: string }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip' }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
+  createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string }[]): Promise<{ created: number; fields: CreatedField[] }> =>
+    req('/v1/importer/create-fields', { method: 'POST', body: JSON.stringify({ record_type: recordType, fields }) }),
 }
 
 // OAI Sets

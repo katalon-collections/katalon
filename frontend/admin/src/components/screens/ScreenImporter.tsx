@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { importer, media, schema } from '../../api/client'
-import type { UploadResult, DryRunResult, MediaBatchStatus, TaskStatus } from '../../api/client'
+import type { UploadResult, DryRunResult, MediaBatchStatus, TaskStatus, CreatedField } from '../../api/client'
 import type { FieldDefinition } from '../../types'
 import { getLabel } from '../../types'
 import { Upload } from '../ui/Icons'
@@ -10,6 +10,27 @@ const RECORD_TYPES = [
   { id: 'entity',     label: 'Entitäten' },
   { id: 'place',      label: 'Orte' },
   { id: 'occurrence', label: 'Occurrences' },
+]
+
+const IDNO_STRATEGIES = [
+  { id: 'auto',   label: 'Automatisch vergeben' },
+  { id: 'column', label: 'Aus Spalte "idno" lesen' },
+  { id: 'skip',   label: 'Keine ID-Nr. vergeben' },
+]
+
+const UPSERT_STRATEGIES = [
+  { id: 'skip',    label: 'Bestehende überspringen (nur neue anlegen)' },
+  { id: 'merge',   label: 'Zusammenführen (neue Felder hinzufügen)' },
+  { id: 'replace', label: 'Ersetzen (komplett überschreiben)' },
+]
+
+const FIELD_TYPE_OPTIONS = [
+  { id: 'text',     label: 'Text' },
+  { id: 'number',   label: 'Zahl' },
+  { id: 'date',     label: 'Datum' },
+  { id: 'boolean',  label: 'Boolean' },
+  { id: 'vocab',    label: 'Vokabular' },
+  { id: 'relation', label: 'Relation' },
 ]
 
 const STEPS = ['Upload', 'Mapping', 'Probelauf', 'Import']
@@ -43,6 +64,19 @@ export function ScreenImporter() {
   const [taskStatus, setTaskStatus]   = useState<TaskStatus | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Import options
+  const [idnoStrategy, setIdnoStrategy] = useState('auto')
+  const [upsertStrategy, setUpsertStrategy] = useState('skip')
+
+  // Schema on-the-fly
+  const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
+  const [newFieldType, setNewFieldType] = useState('text')
+  const [newFieldLabelDe, setNewFieldLabelDe] = useState('')
+  const [newFieldLabelEn, setNewFieldLabelEn] = useState('')
+  const [creatingField, setCreatingField] = useState(false)
+
+  // Media batch import
   const [mediaArchive, setMediaArchive] = useState<File | null>(null)
   const [mediaMapping, setMediaMapping] = useState<File | null>(null)
   const [mediaFolderFiles, setMediaFolderFiles] = useState<File[]>([])
@@ -117,7 +151,7 @@ export function ScreenImporter() {
     try {
       const result = await importer.upload(file)
       setUploaded(result)
-      // Auto-map by name match
+      // Auto-map by name match (only if field exists)
       const autoMap: Record<string, string> = {}
       for (const col of result.headers) {
         const norm = col.toLowerCase().replace(/[\s\-]/g, '_')
@@ -150,7 +184,10 @@ export function ScreenImporter() {
   async function handleImport() {
     if (!uploaded) return
     try {
-      const { task_id } = await importer.import(recordType, uploaded.rows, mapping)
+      const { task_id } = await importer.import(recordType, uploaded.rows, mapping, {
+        idno_strategy: idnoStrategy,
+        upsert_strategy: upsertStrategy,
+      })
       setTaskId(task_id)
       setTaskStatus({ state: 'PENDING' })
       setStep(3)
@@ -162,7 +199,41 @@ export function ScreenImporter() {
   function reset() {
     setStep(0); setUploaded(null); setMapping({}); setDryResult(null)
     setTaskId(null); setTaskStatus(null); setUploadErr(null)
+    setIdnoStrategy('auto'); setUpsertStrategy('skip')
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function createNewField(csvColumn: string) {
+    if (!uploaded) return
+    const suggestion = uploaded.suggestions?.[csvColumn] ?? 'text'
+    setNewFieldType(suggestion)
+    setNewFieldLabelDe(csvColumn)
+    setNewFieldLabelEn(csvColumn)
+    setNewFieldModal(csvColumn)
+  }
+
+  async function confirmCreateField() {
+    if (!newFieldModal || !uploaded) return
+    const name = newFieldModal.toLowerCase().replace(/[\s\-]/g, '_')
+    setCreatingField(true)
+    try {
+      const result = await importer.createFields(recordType, [{
+        name,
+        field_type: newFieldType,
+        label_de: newFieldLabelDe || newFieldModal,
+        label_en: newFieldLabelEn || newFieldModal,
+      }])
+      if (result.created > 0 && result.fields[0]) {
+        const newField = result.fields[0]
+        setFields(prev => [...prev, newField as unknown as FieldDefinition])
+        setMapping(m => ({ ...m, [newFieldModal]: newField.name }))
+      }
+      setNewFieldModal(null)
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setCreatingField(false)
+    }
   }
 
   async function startMediaBatchImport() {
@@ -184,11 +255,12 @@ export function ScreenImporter() {
   }
 
   const mappedCount = Object.values(mapping).filter(Boolean).length
+  const ignoredCount = uploaded ? uploaded.headers.length - mappedCount : 0
 
   return (
     <div className="scroll">
       <div className="ph">
-        <div><h1>Importer</h1><div className="sub">CSV in Katalon übernehmen</div></div>
+        <div><h1>Importer</h1><div className="sub">CSV / Excel in Katalon übernehmen</div></div>
         <div className="right">
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Typ:</span>
@@ -214,21 +286,47 @@ export function ScreenImporter() {
               className={`dz${over ? ' over' : ''}`}
               onDragOver={e => { e.preventDefault(); setOver(true) }}
               onDragLeave={() => setOver(false)}
-              onDrop={e => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+              onDrop={e => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f) }}
               onClick={() => fileRef.current?.click()}
             >
               <div className="ic"><Upload size={40} /></div>
               {uploading
                 ? <div style={{ fontWeight: 600 }}>Lade…</div>
                 : <>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>CSV hier ablegen oder klicken</div>
-                    <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>UTF-8, Komma- oder Semikolon-getrennt, max. 10 MB</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Datei hier ablegen oder klicken</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>CSV, TSV oder Excel (.xlsx), UTF-8, max. 10 MB</div>
                   </>
               }
-              <input ref={fileRef} type="file" accept=".csv,.tsv" style={{ display: 'none' }}
+              <input ref={fileRef} type="file" accept=".csv,.tsv,.xlsx" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
             </div>
             {uploadErr && <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>{uploadErr}</div>}
+
+            {uploaded && (
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="hd">Vorschau · {uploaded.row_count} Zeilen · {uploaded.headers.length} Spalten</div>
+                <div className="bd" style={{ overflow: 'auto' }}>
+                  <table className="tbl" style={{ fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {uploaded.headers.map(h => <th key={h}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploaded.preview.map((row, i) => (
+                        <tr key={i}>
+                          {uploaded.headers.map(h => (
+                            <td key={h} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {row[h] ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -236,7 +334,7 @@ export function ScreenImporter() {
         {step === 1 && uploaded && (
           <>
             <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--fg-2)' }}>
-              <b>{uploaded.row_count}</b> Zeilen geladen · {mappedCount} von {uploaded.headers.length} Spalten gemappt
+              <b>{uploaded.row_count}</b> Zeilen geladen · <b style={{ color: '#166534' }}>{mappedCount}</b> gemappt · <b style={{ color: 'var(--fg-3)' }}>{ignoredCount}</b> ignoriert
             </div>
             <div className="tw">
               <table className="tbl">
@@ -244,36 +342,84 @@ export function ScreenImporter() {
                   <tr>
                     <th>CSV-Spalte</th>
                     <th>Beispielwert</th>
-                    <th>→ Katalon-Feld ({RECORD_TYPES.find(t => t.id === recordType)?.label})</th>
+                    <th>→ Katalon-Feld</th>
+                    <th style={{ width: 120 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {uploaded.headers.map(col => (
-                    <tr key={col}>
-                      <td className="mono" style={{ maxWidth: 160 }}>{col}</td>
-                      <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>
-                        {uploaded.preview[0]?.[col] ?? '—'}
-                      </td>
-                      <td>
-                        <select
-                          className="fld"
-                          style={{ height: 28, fontSize: 12 }}
-                          value={mapping[col] ?? ''}
-                          onChange={e => setMapping(m => ({ ...m, [col]: e.target.value }))}
-                        >
-                          <option value="">— ignorieren —</option>
-                          {fields.map(f => (
-                            <option key={f.id} value={f.name}>
-                              {getLabel(f, f.name)}{f.is_required ? ' *' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {uploaded.headers.map(col => {
+                    const mapped = mapping[col] ?? ''
+                    const isIgnored = !mapped
+                    return (
+                      <tr key={col}>
+                        <td className="mono" style={{ maxWidth: 160 }}>{col}</td>
+                        <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>
+                          {uploaded.preview[0]?.[col] ?? '—'}
+                        </td>
+                        <td>
+                          <select
+                            className="fld"
+                            style={{ height: 28, fontSize: 12 }}
+                            value={mapped}
+                            onChange={e => setMapping(m => ({ ...m, [col]: e.target.value }))}
+                          >
+                            <option value="">— ignorieren —</option>
+                            {fields.map(f => (
+                              <option key={f.id} value={f.name}>
+                                {getLabel(f, f.name)}{f.is_required ? ' *' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          {isIgnored && (
+                            <button className="btn sm gh" onClick={() => createNewField(col)}>
+                              + Feld
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
+
+            {/* New field modal */}
+            {newFieldModal && (
+              <div style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 200,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }} onClick={e => { if (e.target === e.currentTarget) setNewFieldModal(null) }}>
+                <div style={{ background: 'var(--panel)', borderRadius: 10, padding: 24, width: 400, maxWidth: '90vw' }}>
+                  <h3 style={{ margin: '0 0 16px' }}>Neues Feld erstellen</h3>
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
+                    Spalte: <span className="mono">{newFieldModal}</span>
+                  </div>
+                  <div className="field">
+                    <label className="lbl">Feldtyp</label>
+                    <select className="fld" value={newFieldType} onChange={e => setNewFieldType(e.target.value)}>
+                      {FIELD_TYPE_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label className="lbl">Label (Deutsch)</label>
+                    <input className="fld" value={newFieldLabelDe} onChange={e => setNewFieldLabelDe(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label className="lbl">Label (Englisch)</label>
+                    <input className="fld" value={newFieldLabelEn} onChange={e => setNewFieldLabelEn(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button className="btn gh" onClick={() => setNewFieldModal(null)}>Abbrechen</button>
+                    <button className="btn pri" onClick={confirmCreateField} disabled={creatingField}>
+                      {creatingField ? 'Erstelle…' : 'Feld erstellen'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
               <button className="btn" onClick={reset}>Zurück</button>
               <button className="btn pri" onClick={handleDryRun} disabled={dryRunning || mappedCount === 0}>
@@ -286,7 +432,7 @@ export function ScreenImporter() {
         {/* Step 2: Dry run */}
         {step === 2 && dryResult && (
           <>
-            <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
               <div style={{ fontWeight: 600 }}>{dryResult.total} Zeilen gesamt</div>
               <div style={{ fontWeight: 600, color: '#166534' }}>{dryResult.valid} gültig</div>
               {dryResult.errors.length > 0 && (
@@ -301,7 +447,7 @@ export function ScreenImporter() {
               <div style={{ marginBottom: 12 }}>
                 {dryResult.warnings.map((w, i) => (
                   <div key={i} style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
-                    {w.message}
+                    {w.row ? `Zeile ${w.row}: ` : ''}{w.message}
                   </div>
                 ))}
               </div>
@@ -325,9 +471,28 @@ export function ScreenImporter() {
 
             {dryResult.errors.length === 0 && (
               <div style={{ fontSize: 13, color: '#166534', marginBottom: 12 }}>
-                Keine Fehler. {dryResult.valid} Datensätze können als Entwurf importiert werden.
+                Keine Fehler. {dryResult.valid} Datensätze können importiert werden.
               </div>
             )}
+
+            {/* Import options */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="hd">Import-Optionen</div>
+              <div className="bd" style={{ display: 'grid', gap: 12 }}>
+                <div>
+                  <label className="lbl">ID-Nummer</label>
+                  <select className="fld" value={idnoStrategy} onChange={e => setIdnoStrategy(e.target.value)}>
+                    {IDNO_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="lbl">Bestehende Datensätze (gleiche ID-Nr.)</label>
+                  <select className="fld" value={upsertStrategy} onChange={e => setUpsertStrategy(e.target.value)}>
+                    {UPSERT_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" onClick={() => setStep(1)}>Zurück</button>
@@ -340,12 +505,37 @@ export function ScreenImporter() {
 
         {/* Step 3: Import / Result */}
         {step === 3 && (
-          <div style={{ maxWidth: 480 }}>
-            {(!taskStatus || taskStatus.state === 'PENDING' || taskStatus.state === 'STARTED') && (
+          <div style={{ maxWidth: 520 }}>
+            {(!taskStatus || taskStatus.state === 'PENDING') && (
+              <div className="card">
+                <div className="hd">Import wird gestartet…</div>
+                <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                  Der Import wird in die Warteschlange gestellt.
+                </div>
+              </div>
+            )}
+
+            {taskStatus?.state === 'STARTED' && (
               <div className="card">
                 <div className="hd">Import läuft…</div>
                 <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
-                  Der Import läuft im Hintergrund. Bitte warten.
+                  {taskStatus.meta ? (
+                    <>
+                      <div style={{ marginBottom: 8 }}>
+                        Zeile {taskStatus.meta.current} von {taskStatus.meta.total}
+                      </div>
+                      <div style={{ background: 'var(--border-soft)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${Math.round((taskStatus.meta.current / taskStatus.meta.total) * 100)}%`,
+                          background: 'var(--accent)',
+                          height: '100%',
+                          transition: 'width .3s',
+                        }} />
+                      </div>
+                    </>
+                  ) : (
+                    'Der Import läuft im Hintergrund. Bitte warten.'
+                  )}
                   <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-3)' }}>Task: {taskId}</div>
                 </div>
               </div>
@@ -357,8 +547,18 @@ export function ScreenImporter() {
                 <div className="bd">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
                     <div style={{ color: '#166534' }}>
-                      <b>{taskStatus.result.created}</b> Datensätze als Entwurf angelegt
+                      <b>{taskStatus.result.created}</b> Datensätze angelegt
                     </div>
+                    {taskStatus.result.updated > 0 && (
+                      <div style={{ color: '#1e3a8a' }}>
+                        <b>{taskStatus.result.updated}</b> Datensätze aktualisiert
+                      </div>
+                    )}
+                    {taskStatus.result.skipped > 0 && (
+                      <div style={{ color: 'var(--fg-3)' }}>
+                        <b>{taskStatus.result.skipped}</b> Datensätze übersprungen
+                      </div>
+                    )}
                     {taskStatus.result.errors.length > 0 && (
                       <div style={{ color: '#b91c1c' }}>
                         <b>{taskStatus.result.errors.length}</b> Fehler beim Import
@@ -389,6 +589,7 @@ export function ScreenImporter() {
           </div>
         )}
 
+        {/* Batch media import section */}
         <div style={{ marginTop: 32 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Batch-Medienimport</h2>
           <div className="sub" style={{ marginTop: 4 }}>
