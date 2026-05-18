@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
   { id: 'entities-list',   label: 'Entitäten',      Icon: User,      routes: ['entities-list', 'entities-form'] },
   { id: 'places-list',     label: 'Orte',           Icon: MapPin,    routes: ['places-list', 'places-form'] },
   { id: 'occurrences-list', label: 'Occurrences',   Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
-  { id: 'import',          label: 'Importer',       Icon: Upload,    ct: '2 aktiv' },
+  { id: 'import',          label: 'Importer',       Icon: Upload },
   { id: 'audit',           label: 'Audit-Log',      Icon: History },
   { g: 'Konfiguration', roles: ['admin', 'superuser'] },
   { id: 'subtypes', label: 'Subtypen',       Icon: ListTree, roles: ['admin', 'superuser'] },
