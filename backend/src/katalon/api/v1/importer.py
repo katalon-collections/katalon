@@ -131,6 +131,8 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
 
     created_fields: list[FieldDefinitionRead] = []
+    skipped_names: list[str] = []
+
     for f in body.fields:
         name = f.get("name", "").strip()
         field_type = f.get("field_type", "text").strip()
@@ -140,15 +142,15 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
         if not name:
             continue
 
-        # Check if field already exists
+        # Check if field already exists (including soft-deleted to avoid unique constraint violations)
         existing = await db.execute(
             select(FieldDefinition).where(
                 FieldDefinition.target_type == body.record_type,
                 FieldDefinition.name == name,
-                FieldDefinition.is_deleted.is_(False),
             )
         )
         if existing.scalar_one_or_none():
+            skipped_names.append(name)
             continue
 
         label: dict[str, str] = {}
@@ -167,11 +169,16 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
             sort_order=0,
         )
         db.add(field)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            skipped_names.append(name)
+            continue
         created_fields.append(FieldDefinitionRead.model_validate(field))
 
     await db.commit()
-    return {"created": len(created_fields), "fields": created_fields}
+    return {"created": len(created_fields), "fields": created_fields, "skipped": skipped_names}
 
 
 @router.get("/task/{task_id}")

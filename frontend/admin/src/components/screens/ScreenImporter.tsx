@@ -302,6 +302,14 @@ export function ScreenImporter() {
         const newField = result.fields[0]
         setFields(prev => [...prev, newField as unknown as FieldDefinition])
         setMapping(m => ({ ...m, [newFieldModal]: { target: newField.name } }))
+      } else if (result.skipped && result.skipped.length > 0) {
+        // Field already exists — refresh field list and map to existing
+        const freshFields = await schema.list(recordType)
+        setFields(freshFields)
+        const existing = freshFields.find(f => f.name === name)
+        if (existing) {
+          setMapping(m => ({ ...m, [newFieldModal]: { target: existing.name } }))
+        }
       }
       setNewFieldModal(null)
     } catch (e) {
