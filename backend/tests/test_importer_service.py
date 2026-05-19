@@ -105,8 +105,12 @@ def test_apply_transforms_vocab_map() -> None:
 
 def test_apply_transforms_expression() -> None:
     from katalon.services.importer_service import apply_transforms
-    result = apply_transforms("hello", [{"type": "expression", "expression": "${value:upper}"}])
+    # Jinja2 syntax
+    result = apply_transforms("hello", [{"type": "expression", "expression": "{{ value | upper }}"}])
     assert result == ["HELLO"]
+    # Backward compat: bare ${value} still works
+    result2 = apply_transforms("world", [{"type": "expression", "expression": "prefix_${value}_suffix"}])
+    assert result2 == ["prefix_world_suffix"]
 
 
 def test_apply_transforms_pipeline() -> None:

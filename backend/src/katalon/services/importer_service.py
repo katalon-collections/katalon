@@ -5,6 +5,10 @@ import io
 import re
 from typing import Any
 
+from jinja2.sandbox import SandboxedEnvironment
+
+_JINJA_ENV = SandboxedEnvironment()
+
 
 def detect_delimiter(content: str) -> str:
     sample = content[:4096]
@@ -79,48 +83,25 @@ def _guess_field_type(values: list[str]) -> str:
 
 
 def _eval_expression(expression: str, value: str) -> str:
-    """Evaluate a simple template expression with ${value} and filters.
+    """Evaluate a Jinja2 template expression with `value` as context variable.
 
-    Supported filters:
-      ${value}           - raw value
-      ${value:upper}     - uppercase
-      ${value:lower}     - lowercase
-      ${value:trim}      - strip whitespace
-      ${value:slice(a,b)}- substring
-      ${value:replace(x,y)} - replace substring
+    Examples:
+      {{ value }}                  -> raw value
+      {{ value | upper }}          -> uppercase
+      {{ value | trim }}           -> strip whitespace
+      {{ value | replace('a','b')}} -> replace substring
+      PREFIX_{{ value }}_SUFFIX    -> wrap with literal text
+
+    Legacy ${value} syntax is converted automatically for backwards compatibility.
     """
     if not expression:
         return value
-
-    result = expression
-    # Match ${value} or ${value:filter} or ${value:filter(args)}
-    pattern = re.compile(r"\$\{value(?::([^}]+))?\}")
-
-    def _apply_filter(val: str, filt: str | None) -> str:
-        if not filt:
-            return val
-        if filt == "upper":
-            return val.upper()
-        if filt == "lower":
-            return val.lower()
-        if filt == "trim":
-            return val.strip()
-        m = re.match(r"slice\((\d+)(?:,(\d+))?\)", filt)
-        if m:
-            start = int(m.group(1))
-            end = int(m.group(2)) if m.group(2) else None
-            return val[start:end]
-        m = re.match(r"replace\(([^,]+),([^)]+)\)", filt)
-        if m:
-            return val.replace(m.group(1), m.group(2))
-        return val
-
-    for match in pattern.finditer(expression):
-        full = match.group(0)
-        filt = match.group(1)
-        result = result.replace(full, _apply_filter(value, filt), 1)
-
-    return result
+    # Backward compat: convert old ${value} markers to {{ value }}
+    compat = re.sub(r"\$\{value(?::[^}]+)?\}", "{{ value }}", expression)
+    try:
+        return _JINJA_ENV.from_string(compat).render(value=value)
+    except Exception:
+        return value
 
 
 def apply_transforms(value: str, transforms: list[dict[str, Any]]) -> list[str]:
@@ -252,6 +233,68 @@ def apply_mapping(
     return result, idnos
 
 
+def _validate_types(
+    rows: list[dict[str, str]],
+    mapping: dict[str, str] | dict[str, Any],
+    field_defs: dict[str, Any],
+) -> list[dict]:
+    """Check field type constraints for all rows. Returns warning dicts (one per failing field).
+
+    Collects up to 3 example failures per field for the warning message, but counts
+    all mismatches for the total so the number is accurate.
+    """
+    # Build reverse mapping: field_name -> csv_col (first match wins)
+    field_to_col: dict[str, str] = {}
+    for csv_col, v in mapping.items():
+        fname = v.get("target", "") if isinstance(v, dict) else v
+        if fname and fname != "__idno__" and fname not in field_to_col:
+            field_to_col[fname] = csv_col
+
+    examples: dict[str, list[tuple[int, str]]] = {}
+    counts: dict[str, int] = {}
+
+    for i, row in enumerate(rows):
+        row_num = i + 2
+        for fname, csv_col in field_to_col.items():
+            fd = field_defs.get(fname)
+            if not fd:
+                continue
+            raw = row.get(csv_col, "").strip()
+            if not raw:
+                continue
+
+            issue: str | None = None
+            if fd.field_type == "number":
+                try:
+                    float(raw.replace(",", "."))
+                except ValueError:
+                    issue = f"'{raw[:30]}' ist keine gültige Zahl"
+            elif fd.field_type == "date":
+                if not _is_iso_date(raw):
+                    issue = f"'{raw[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD)"
+            elif fd.field_type == "boolean":
+                if not _is_boolean(raw):
+                    issue = f"'{raw[:30]}' ist kein gültiger Boolean"
+
+            if issue:
+                counts[fname] = counts.get(fname, 0) + 1
+                if fname not in examples:
+                    examples[fname] = []
+                if len(examples[fname]) < 3:
+                    examples[fname].append((row_num, issue))
+
+    warnings: list[dict] = []
+    for fname, ex in examples.items():
+        fd = field_defs.get(fname)
+        label = fd.label.get("de", fname) if fd and fd.label else fname
+        sample = "; ".join(f"Zeile {r}: {m}" for r, m in ex)
+        warnings.append({
+            "row": None,
+            "message": f"Feld '{label}': {counts[fname]} Typ-Fehler. Beispiele: {sample}",
+        })
+    return warnings
+
+
 def dry_run(
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
@@ -327,84 +370,8 @@ def dry_run(
                 "message": f"Feld '{label}' ist in {count} von {total_rows} Zeilen ({pct:.0f}%) leer",
             })
 
-    # Type validation: collect per-field, show first 3 examples
-    type_issues: dict[str, list[tuple[int, str]]] = {}
     if field_defs:
-        for i, rec in enumerate(mapped):
-            row_num = i + 2
-            for fname, val in rec.items():
-                fd = field_defs.get(fname)
-                if not fd:
-                    continue
-                # Find the csv column that maps to this field
-                raw_val = ""
-                for csv_col, v in mapping.items():
-                    mapped_name = v.get("target", "") if isinstance(v, dict) else v
-                    if mapped_name == fname:
-                        raw_val = rows[i].get(csv_col, "").strip()
-                        break
-                if not raw_val:
-                    continue
-
-                issue = None
-                if fd.field_type == "number":
-                    try:
-                        float(raw_val.replace(",", "."))
-                    except ValueError:
-                        issue = f"'{raw_val[:30]}' ist keine gültige Zahl"
-                elif fd.field_type == "date":
-                    if not _is_iso_date(raw_val):
-                        issue = f"'{raw_val[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD)"
-                elif fd.field_type == "boolean":
-                    if not _is_boolean(raw_val):
-                        issue = f"'{raw_val[:30]}' ist kein gültiger Boolean"
-
-                if issue:
-                    if fname not in type_issues:
-                        type_issues[fname] = []
-                    if len(type_issues[fname]) < 3:
-                        type_issues[fname].append((row_num, issue))
-
-    for fname, issues in type_issues.items():
-        fd = field_defs.get(fname) if field_defs else None
-        label = fd.label.get("de", fname) if fd and fd.label else fname
-        # Count actual type mismatches
-        mismatch_count = len(issues)
-        for i, rec in enumerate(mapped):
-            if fname not in rec:
-                continue
-            raw_val = ""
-            for csv_col, v in mapping.items():
-                mapped_name = v.get("target", "") if isinstance(v, dict) else v
-                if mapped_name == fname:
-                    raw_val = rows[i].get(csv_col, "").strip()
-                    break
-            if not raw_val:
-                continue
-            fd = field_defs.get(fname)
-            if not fd:
-                continue
-            is_bad = False
-            if fd.field_type == "number":
-                try:
-                    float(raw_val.replace(",", "."))
-                except ValueError:
-                    is_bad = True
-            elif fd.field_type == "date":
-                if not _is_iso_date(raw_val):
-                    is_bad = True
-            elif fd.field_type == "boolean":
-                if not _is_boolean(raw_val):
-                    is_bad = True
-            if is_bad:
-                mismatch_count += 1
-
-        if mismatch_count > 0:
-            examples = "; ".join(f"Zeile {r}: {m}" for r, m in issues)
-            warnings.append({
-                "row": None,
-                "message": f"Feld '{label}': {mismatch_count} Typ-Fehler. Beispiele: {examples}",
-            })
+        warnings.extend(_validate_types(rows, mapping, field_defs))
 
     return {
         "total": len(rows),
