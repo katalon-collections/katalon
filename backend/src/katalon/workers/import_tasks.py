@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import Any
 
 from katalon.workers.celery_app import celery_app
-
-
-def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
 
 
 @celery_app.task(name="katalon.import_records", bind=True)
@@ -34,16 +31,16 @@ def import_records_task(
         auto_publish: if True, attempt to publish each record after creation
         user_id: optional UUID of the user who triggered the import (for audit log)
     """
-    from katalon.services.importer_service import apply_mapping
+    from sqlalchemy import select
+
+    from katalon.core.models import AdminConfig, Entity, FieldDefinition, Object, Occurrence, Place
     from katalon.database import AsyncSessionLocal
-    from katalon.core.models import Object, Entity, Place, Occurrence, AuditLog
+    from katalon.services.audit_service import log_change
+    from katalon.services.idno_service import consume_next_idno
+    from katalon.services.importer_service import apply_mapping
+    from katalon.services.publish_service import publish_record
     from katalon.services.schema_service import validate_metadata
     from katalon.services.search_service import index_record
-    from katalon.services.idno_service import consume_next_idno
-    from katalon.services.audit_service import log_change
-    from katalon.services.publish_service import publish_record
-    from sqlalchemy import select
-    from katalon.core.models import AdminConfig
 
     model_map = {
         "object": Object,
@@ -63,16 +60,7 @@ def import_records_task(
         "occurrence": "occurrence_type",
     }.get(record_type)
 
-    records, idnos = apply_mapping(rows, mapping)
-    created = 0
-    updated = 0
-    skipped = 0
-    published = 0
-    publish_failed = 0
-    errors: list[dict] = []
-
     # Check if idno is mapped via __idno__
-    # Normalize: mapping may be dict of dicts with "target" key
     _mapping_targets = []
     for v in mapping.values():
         if isinstance(v, dict):
@@ -81,9 +69,30 @@ def import_records_task(
             _mapping_targets.append(v)
     has_idno_column = "__idno__" in _mapping_targets
 
+    created = 0
+    updated = 0
+    skipped = 0
+    published = 0
+    publish_failed = 0
+    index_failed = 0
+    errors: list[dict] = []
+    warnings: list[dict] = []
+
     async def _import() -> dict[str, Any]:
-        nonlocal created, updated, skipped, published, publish_failed
+        nonlocal created, updated, skipped, published, publish_failed, index_failed
+
         async with AsyncSessionLocal() as session:
+            # Load field_defs once for type conversion in apply_mapping
+            fd_result = await session.execute(
+                select(FieldDefinition).where(
+                    FieldDefinition.target_type == record_type,
+                    FieldDefinition.is_deleted.is_(False),
+                )
+            )
+            field_defs = {f.name: f for f in fd_result.scalars().all()}
+
+            records, idnos = apply_mapping(rows, mapping, field_defs)
+
             # Load idno schema once
             cfg_result = await session.execute(select(AdminConfig).where(AdminConfig.key == "default"))
             cfg = cfg_result.scalar_one_or_none()
@@ -92,10 +101,7 @@ def import_records_task(
             # Build lookup of existing records by idno for upsert
             existing_by_idno: dict[str, Any] = {}
             if upsert_strategy != "skip":
-                idnos_to_lookup = []
-                for i, row_idno in enumerate(idnos):
-                    if row_idno:
-                        idnos_to_lookup.append(row_idno)
+                idnos_to_lookup = [row_idno for row_idno in idnos if row_idno]
                 if idnos_to_lookup:
                     result = await session.execute(select(model).where(model.idno.in_(idnos_to_lookup)))
                     for rec in result.scalars().all():
@@ -103,15 +109,14 @@ def import_records_task(
                             existing_by_idno[rec.idno] = rec
 
             total = len(records)
+            user_uuid = uuid.UUID(user_id) if user_id else None
+
             for i, metadata in enumerate(records):
                 row_num = i + 1
-                try:
-                    self.update_state(
-                        state="STARTED",
-                        meta={"current": i + 1, "total": total, "stage": "importing"},
-                    )
-                except Exception:
-                    pass
+                self.update_state(
+                    state="STARTED",
+                    meta={"current": i + 1, "total": total, "stage": "importing"},
+                )
 
                 # Determine idno
                 row_idno = idnos[i] if i < len(idnos) else None
@@ -128,7 +133,6 @@ def import_records_task(
                         skipped += 1
                         continue
                     elif upsert_strategy == "merge":
-                        # Merge metadata: add new keys, keep existing ones
                         old_meta = existing.metadata_ or {}
                         merged = {**old_meta}
                         for k, v in metadata.items():
@@ -141,12 +145,13 @@ def import_records_task(
                         if subtype_field:
                             setattr(existing, subtype_field, None)
                         updated += 1
-                    # Index updated record
+
                     try:
                         await index_record(record_type, existing, session)
-                    except Exception:
-                        pass
-                    # Try auto-publish if requested
+                    except Exception as e:
+                        index_failed += 1
+                        warnings.append({"row": row_num, "warning": f"ES-Indexierung fehlgeschlagen: {e}"})
+
                     if auto_publish:
                         pub_result = await publish_record(session, record_type, str(existing.id), user_id)
                         if pub_result["ok"]:
@@ -176,26 +181,24 @@ def import_records_task(
                 await session.flush()
                 created += 1
 
-                # Audit log per record (fire-and-forget within same session)
                 try:
                     await log_change(
                         session,
                         record_type=record_type,
                         record_id=rec.id,
-                        user_id=__import__("uuid").UUID(user_id) if user_id else None,
+                        user_id=user_uuid,
                         action="create",
                         changed_fields={"source": "import", "row": row_num},
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    warnings.append({"row": row_num, "warning": f"Audit-Log fehlgeschlagen: {e}"})
 
-                # Index in Elasticsearch
                 try:
                     await index_record(record_type, rec, session)
-                except Exception:
-                    pass
+                except Exception as e:
+                    index_failed += 1
+                    warnings.append({"row": row_num, "warning": f"ES-Indexierung fehlgeschlagen: {e}"})
 
-                # Try auto-publish if requested
                 if auto_publish:
                     pub_result = await publish_record(session, record_type, str(rec.id), user_id)
                     if pub_result["ok"]:
@@ -211,7 +214,9 @@ def import_records_task(
             "skipped": skipped,
             "published": published,
             "publish_failed": publish_failed,
+            "index_failed": index_failed,
             "errors": errors,
+            "warnings": warnings,
         }
 
-    return _run(_import())
+    return asyncio.run(_import())
