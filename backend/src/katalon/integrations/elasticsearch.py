@@ -6,14 +6,9 @@ from elasticsearch import AsyncElasticsearch, NotFoundError
 
 from katalon.config import settings
 
-_client: AsyncElasticsearch | None = None
-
-
 def get_es() -> AsyncElasticsearch:
-    global _client
-    if _client is None:
-        _client = AsyncElasticsearch(settings.elasticsearch_url)
-    return _client
+    """Create a fresh ES client. Not cached – must be used within a single event loop."""
+    return AsyncElasticsearch(settings.elasticsearch_url)
 
 
 INDEX_SETTINGS: dict[str, Any] = {

@@ -7,11 +7,8 @@ from katalon.workers.celery_app import celery_app
 
 
 def _run(coro: Any) -> Any:
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run a coroutine in a fresh event loop."""
+    return asyncio.run(coro)
 
 
 @celery_app.task(name="katalon.index_record")
