@@ -171,27 +171,24 @@ def apply_mapping(
             else:
                 parts = [raw]
 
-            # If result is multiple values AND field is repeatable, wrap as list
+            # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
-                record[field_name] = [{"value": p} for p in parts]
+                record[field_name] = parts
                 continue
 
-            # For non-repeatable fields, store single value (not a list)
+            # For non-repeatable fields, store single plain value (form reads string/number/bool)
             single = parts[0] if parts else ""
 
-            # Type transformations
             if field_type == "number":
                 try:
                     num = float(single.replace(",", "."))
-                    record[field_name] = {"value": int(num) if num == int(num) else num}
+                    record[field_name] = int(num) if num == int(num) else num
                 except ValueError:
-                    record[field_name] = {"value": single}
+                    record[field_name] = single
             elif field_type == "boolean":
-                record[field_name] = {"value": single.lower() in {"true", "1", "ja", "yes"}}
-            elif field_type == "date":
-                record[field_name] = {"value": single}
+                record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
             else:
-                record[field_name] = {"value": single}
+                record[field_name] = single
         result.append(record)
         idnos.append(row_idno)
     return result, idnos

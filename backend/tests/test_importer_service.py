@@ -60,9 +60,9 @@ def test_apply_mapping() -> None:
     rows = [{"title": "Foto 1", "creator": "Maier"}]
     mapping = {"title": "title", "creator": "photographer"}
     records, idnos = apply_mapping(rows, mapping)
-    # Without field_defs, fields are treated as non-repeatable -> single dict
-    assert records[0]["title"] == {"value": "Foto 1"}
-    assert records[0]["photographer"] == {"value": "Maier"}
+    # Without field_defs, fields are treated as non-repeatable -> plain string
+    assert records[0]["title"] == "Foto 1"
+    assert records[0]["photographer"] == "Maier"
     assert idnos[0] is None
 
 
@@ -75,14 +75,14 @@ def test_apply_mapping_with_split_transform_repeatable() -> None:
         field_type = "text"
         is_repeatable = True
     records, idnos = apply_mapping(rows, mapping, {"languages": MockField()})
-    assert records[0]["languages"] == [{"value": "Deutsch"}, {"value": "Englisch"}, {"value": "Französisch"}]
+    assert records[0]["languages"] == ["Deutsch", "Englisch", "Französisch"]
 
 
 def test_apply_mapping_with_dict_target() -> None:
     rows = [{"title": "Foto 1"}]
     mapping = {"title": {"target": "title"}}
     records, idnos = apply_mapping(rows, mapping)
-    assert records[0]["title"] == {"value": "Foto 1"}
+    assert records[0]["title"] == "Foto 1"
 
 
 def test_apply_transforms_replace() -> None:

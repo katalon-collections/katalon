@@ -7,9 +7,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
-from katalon.core.models import FieldDefinition
+from katalon.core.models import FieldDefinition, RecordSubtype
 from katalon.core.schemas import FieldDefinitionRead
 from katalon.services import importer_service
+from katalon.services.importer import parse_file
+from katalon.services.schema_service import validate_metadata
+from katalon.services.subtype_service import has_any_subtypes
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
@@ -48,12 +51,14 @@ class MappingRequest(BaseModel):
     mapping: dict[str, MappingEntry]   # csv_column -> {target, transforms?}
     rows: list[dict[str, str]]
     record_type: str = "object"
+    subtype: str | None = None
 
 
 class ImportRequest(MappingRequest):
     idno_strategy: str = "auto"   # "auto" | "column" | "skip"
     upsert_strategy: str = "skip"  # "skip" | "merge" | "replace"
     auto_publish: bool = False  # if True, publish records that pass validation after import
+    fields_to_create: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class CreateFieldsRequest(BaseModel):
@@ -66,12 +71,10 @@ async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
         raise HTTPException(status_code=413, detail="Datei zu groß (max 10 MB)")
-    filename = (file.filename or "").lower()
-    if filename.endswith(".xlsx"):
-        headers, rows = importer_service.parse_excel(content)
-    elif filename.endswith(".csv") or filename.endswith(".tsv"):
-        headers, rows = importer_service.parse_csv(content)
-    else:
+    filename = file.filename or ""
+    try:
+        headers, rows, _ = parse_file(filename, content)
+    except (ValueError, NotImplementedError):
         raise HTTPException(status_code=422, detail="Nur CSV, TSV und Excel (.xlsx) werden unterstützt")
 
     # Suggest field types for each column
@@ -90,6 +93,18 @@ async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
 async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
+
+    # Validate subtype if provided
+    if body.subtype:
+        subtype_result = await db.execute(
+            select(RecordSubtype).where(
+                RecordSubtype.primary_type == body.record_type,
+                RecordSubtype.name == body.subtype,
+            )
+        )
+        if subtype_result.scalar_one_or_none() is None:
+            raise HTTPException(status_code=422, detail=f"Ungültiger Subtyp: {body.subtype}")
+
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.target_type == body.record_type,
@@ -97,11 +112,36 @@ async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
         )
     )
     field_defs = {f.name: f for f in result.scalars().all()}
+
     # Build normalized mapping for dry_run: {csv_col -> {"target": ..., "transforms": [...]}}
     norm_mapping: dict[str, dict[str, Any]] = {}
     for k, v in body.mapping.items():
         norm_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
-    return importer_service.dry_run(body.rows, norm_mapping, field_defs)
+
+    dry_result = importer_service.dry_run(body.rows, norm_mapping, field_defs)
+
+    # Warn if type has subtypes but none was provided
+    if not body.subtype and await has_any_subtypes(db, body.record_type):
+        dry_result["warnings"].insert(0, {
+            "row": None,
+            "message": "Dieser Typ hat Subtypen — bitte einen Subtyp auswählen.",
+        })
+
+    # Run full schema validation per row (catches pid/relation/regex/required errors)
+    mapped_records = dry_result.get("preview", [])
+    # Validate all rows, not just the preview
+    from katalon.services.importer_service import apply_mapping
+    all_records, _ = apply_mapping(body.rows, norm_mapping, field_defs)
+    for i, metadata in enumerate(all_records):
+        row_num = i + 2
+        val_errors = await validate_metadata(db, body.record_type, metadata, body.subtype)
+        for err in val_errors:
+            dry_result["errors"].append({"row": row_num, "message": err})
+
+    # Recompute valid count after full validation
+    dry_result["valid"] = dry_result["total"] - len(dry_result["errors"])
+
+    return dry_result
 
 
 @router.post("/import")
@@ -121,6 +161,8 @@ async def run_import(body: ImportRequest, current_user: CurrentUser) -> dict:
         upsert_strategy=body.upsert_strategy,
         auto_publish=body.auto_publish,
         user_id=str(current_user.id),
+        subtype=body.subtype,
+        fields_to_create=body.fields_to_create,
     )
     return {"status": "queued", "task_id": task.id}
 

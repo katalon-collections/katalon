@@ -17,6 +17,8 @@ def import_records_task(
     upsert_strategy: str = "skip",  # "skip" | "merge" | "replace"
     auto_publish: bool = False,
     user_id: str | None = None,
+    subtype: str | None = None,
+    fields_to_create: list[dict] | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
 
@@ -32,15 +34,22 @@ def import_records_task(
         user_id: optional UUID of the user who triggered the import (for audit log)
     """
     from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
 
+    from katalon.config import settings
     from katalon.core.models import AdminConfig, Entity, FieldDefinition, Object, Occurrence, Place
-    from katalon.database import AsyncSessionLocal
     from katalon.services.audit_service import log_change
     from katalon.services.idno_service import consume_next_idno
     from katalon.services.importer_service import apply_mapping
     from katalon.services.publish_service import publish_record
     from katalon.services.schema_service import validate_metadata
     from katalon.services.search_service import index_record
+    from katalon.services.subtype_service import ensure_subtype_exists
+
+    # NullPool avoids binding connections to a previous event loop across Celery task invocations
+    _engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    AsyncSessionLocal = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
     model_map = {
         "object": Object,
@@ -77,11 +86,49 @@ def import_records_task(
     index_failed = 0
     errors: list[dict] = []
     warnings: list[dict] = []
+    publish_fail_reasons: list[str] = []  # first few unique reasons
 
     async def _import() -> dict[str, Any]:
-        nonlocal created, updated, skipped, published, publish_failed, index_failed
+        nonlocal created, updated, skipped, published, publish_failed, index_failed, publish_fail_reasons
 
         async with AsyncSessionLocal() as session:
+            # Validate subtype before processing any rows
+            await ensure_subtype_exists(session, record_type, subtype)
+
+            # Create field definitions requested alongside this import
+            if fields_to_create:
+                for f in fields_to_create:
+                    name = (f.get("name") or "").strip()
+                    if not name:
+                        continue
+                    existing_fd = (await session.execute(
+                        select(FieldDefinition).where(
+                            FieldDefinition.target_type == record_type,
+                            FieldDefinition.name == name,
+                        )
+                    )).scalar_one_or_none()
+                    if existing_fd:
+                        if existing_fd.is_deleted:
+                            existing_fd.is_deleted = False
+                            existing_fd.field_type = f.get("field_type", "text")
+                            existing_fd.is_repeatable = bool(f.get("is_repeatable", False))
+                        continue
+                    label: dict[str, str] = {}
+                    if f.get("label_de"):
+                        label["de"] = f["label_de"].strip()
+                    if f.get("label_en"):
+                        label["en"] = f["label_en"].strip()
+                    session.add(FieldDefinition(
+                        target_type=record_type,
+                        name=name,
+                        label=label,
+                        field_type=f.get("field_type", "text"),
+                        is_required=False,
+                        is_repeatable=bool(f.get("is_repeatable", False)),
+                        sort_order=0,
+                    ))
+                await session.flush()
+
             # Load field_defs once for type conversion in apply_mapping
             fd_result = await session.execute(
                 select(FieldDefinition).where(
@@ -143,7 +190,7 @@ def import_records_task(
                     elif upsert_strategy == "replace":
                         existing.metadata_ = metadata
                         if subtype_field:
-                            setattr(existing, subtype_field, None)
+                            setattr(existing, subtype_field, subtype)
                         updated += 1
 
                     try:
@@ -158,10 +205,13 @@ def import_records_task(
                             published += 1
                         else:
                             publish_failed += 1
+                            for reason in (pub_result.get("errors") or []):
+                                if reason not in publish_fail_reasons and len(publish_fail_reasons) < 5:
+                                    publish_fail_reasons.append(reason)
                     continue
 
                 # Validate metadata before insert
-                val_errors = await validate_metadata(session, record_type, metadata)
+                val_errors = await validate_metadata(session, record_type, metadata, subtype)
                 if val_errors:
                     errors.append({"row": row_num, "error": "; ".join(val_errors)})
                     continue
@@ -174,7 +224,7 @@ def import_records_task(
                 if idno:
                     kwargs["idno"] = idno
                 if subtype_field:
-                    kwargs[subtype_field] = None
+                    kwargs[subtype_field] = subtype
 
                 rec = model(**kwargs)
                 session.add(rec)
@@ -205,6 +255,9 @@ def import_records_task(
                         published += 1
                     else:
                         publish_failed += 1
+                        for reason in (pub_result.get("errors") or []):
+                            if reason not in publish_fail_reasons and len(publish_fail_reasons) < 5:
+                                publish_fail_reasons.append(reason)
 
             await session.commit()
 
@@ -214,9 +267,13 @@ def import_records_task(
             "skipped": skipped,
             "published": published,
             "publish_failed": publish_failed,
+            "publish_fail_reasons": publish_fail_reasons,
             "index_failed": index_failed,
             "errors": errors,
             "warnings": warnings,
         }
 
-    return asyncio.run(_import())
+    try:
+        return asyncio.run(_import())
+    finally:
+        asyncio.run(_engine.dispose())

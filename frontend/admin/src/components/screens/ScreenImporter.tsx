@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { importer, media, schema } from '../../api/client'
-import type { UploadResult, DryRunResult, MediaBatchStatus, TaskStatus, CreatedField, MappingEntry } from '../../api/client'
-import type { FieldDefinition } from '../../types'
+import { importer, media, schema, subtypes as subtypesApi } from '../../api/client'
+import type { UploadResult, DryRunResult, MediaBatchStatus, TaskStatus, MappingEntry } from '../../api/client'
+import type { FieldDefinition, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { Upload } from '../ui/Icons'
 import { TransformModal } from '../importer/TransformModal'
+
+interface PendingField {
+  csvColumn: string
+  name: string
+  field_type: string
+  label_de: string
+  label_en: string
+  is_repeatable: boolean
+}
 
 const RECORD_TYPES = [
   { id: 'object',     label: 'Objekte' },
@@ -45,14 +54,17 @@ const IMPORTER_STATE_KEY = 'katalon_importer_state'
 
 interface PersistedImporterState {
   recordType: string
+  subtype: string | null
   step: number
   mapping: Record<string, MappingEntry>
   idnoStrategy: string
+  idnoColumn: string | null
   upsertStrategy: string
   autoPublish: boolean
   uploaded: UploadResult | null
   dryResult: DryRunResult | null
   taskId: string | null
+  pendingFields: PendingField[]
 }
 
 function StepBar({ step }: { step: number }) {
@@ -94,6 +106,9 @@ function loadPersistedState(): PersistedImporterState | null {
       if (parsed.mapping) {
         parsed.mapping = migrateOldMapping(parsed.mapping)
       }
+      if (!parsed.pendingFields) parsed.pendingFields = []
+      if (!('subtype' in parsed)) parsed.subtype = null
+      if (!('idnoColumn' in parsed)) parsed.idnoColumn = null
       return parsed as PersistedImporterState
     }
   } catch {
@@ -114,11 +129,14 @@ export function ScreenImporter() {
   // --- Metadata import state ---
   const [step, setStep] = useState(persisted?.step ?? 0)
   const [recordType, setRecordType] = useState(persisted?.recordType ?? 'object')
+  const [subtype, setSubtype] = useState<string | null>(persisted?.subtype ?? null)
+  const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const [over, setOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState<string | null>(null)
   const [uploaded, setUploaded] = useState<UploadResult | null>(persisted?.uploaded ?? null)
   const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [pendingFields, setPendingFields] = useState<PendingField[]>(persisted?.pendingFields ?? [])
   const [mapping, setMapping] = useState<Record<string, MappingEntry>>(persisted?.mapping ?? {})
   const [dryResult, setDryResult] = useState<DryRunResult | null>(persisted?.dryResult ?? null)
   const [dryRunning, setDryRunning] = useState(false)
@@ -128,6 +146,7 @@ export function ScreenImporter() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [idnoStrategy, setIdnoStrategy] = useState(persisted?.idnoStrategy ?? 'auto')
+  const [idnoColumn, setIdnoColumn] = useState<string | null>(persisted?.idnoColumn ?? null)
   const [upsertStrategy, setUpsertStrategy] = useState(persisted?.upsertStrategy ?? 'skip')
   const [autoPublish, setAutoPublish] = useState(persisted?.autoPublish ?? false)
 
@@ -136,7 +155,6 @@ export function ScreenImporter() {
   const [newFieldLabelDe, setNewFieldLabelDe] = useState('')
   const [newFieldLabelEn, setNewFieldLabelEn] = useState('')
   const [newFieldRepeatable, setNewFieldRepeatable] = useState(false)
-  const [creatingField, setCreatingField] = useState(false)
 
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
 
@@ -154,15 +172,32 @@ export function ScreenImporter() {
   // Persist state
   useEffect(() => {
     const state: PersistedImporterState = {
-      recordType, step, mapping, idnoStrategy, upsertStrategy, autoPublish,
-      uploaded, dryResult, taskId,
+      recordType, subtype, step, mapping, idnoStrategy, idnoColumn, upsertStrategy, autoPublish,
+      uploaded, dryResult, taskId, pendingFields,
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(state))
-  }, [recordType, step, mapping, idnoStrategy, upsertStrategy, autoPublish, uploaded, dryResult, taskId])
+  }, [recordType, subtype, step, mapping, idnoStrategy, idnoColumn, upsertStrategy, autoPublish, uploaded, dryResult, taskId, pendingFields])
 
   useEffect(() => {
-    schema.list(recordType).then(setFields).catch(() => setFields([]))
-  }, [recordType])
+    schema.list(recordType, subtype ?? undefined).then(fs => {
+      // Keep any pending (virtual) fields that were added in this session
+      setFields(fs.concat(pendingFields.map(p => ({
+        id: `__pending__${p.name}`,
+        target_type: recordType,
+        name: p.name,
+        label: { de: p.label_de, en: p.label_en },
+        field_type: p.field_type as FieldDefinition['field_type'],
+        is_required: false,
+        is_repeatable: p.is_repeatable,
+        sort_order: 9999,
+        settings: {},
+        target_subtype: null,
+        show_in_detail: false,
+        is_searchable: false,
+      }))))
+    }).catch(() => setFields([]))
+    subtypesApi.list(recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
+  }, [recordType, subtype]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!taskId) return
@@ -241,7 +276,7 @@ export function ScreenImporter() {
     if (!uploaded) return
     setDryRunning(true)
     try {
-      const result = await importer.dryRun(recordType, uploaded.rows, mapping)
+      const result = await importer.dryRun(recordType, uploaded.rows, mapping, subtype)
       setDryResult(result)
       setStep(2)
     } catch (e) {
@@ -258,6 +293,14 @@ export function ScreenImporter() {
         idno_strategy: idnoStrategy,
         upsert_strategy: upsertStrategy,
         auto_publish: autoPublish,
+        subtype,
+        fields_to_create: pendingFields.map(f => ({
+          name: f.name,
+          field_type: f.field_type,
+          label_de: f.label_de,
+          label_en: f.label_en,
+          is_repeatable: f.is_repeatable,
+        })),
       })
       setTaskId(task_id)
       setTaskStatus({ state: 'PENDING' })
@@ -267,10 +310,36 @@ export function ScreenImporter() {
     }
   }
 
+  function removeIdnoFromMapping(m: Record<string, MappingEntry>): Record<string, MappingEntry> {
+    const next = { ...m }
+    for (const [k, v] of Object.entries(next)) {
+      if (v.target === '__idno__') delete next[k]
+    }
+    return next
+  }
+
+  function handleIdnoStrategyChange(strategy: string) {
+    setIdnoStrategy(strategy)
+    if (strategy !== 'column') {
+      setIdnoColumn(null)
+      setMapping(prev => removeIdnoFromMapping(prev))
+    }
+  }
+
+  function handleIdnoColumnChange(col: string) {
+    setIdnoColumn(col)
+    setMapping(prev => {
+      const next = removeIdnoFromMapping(prev)
+      if (col) next[col] = { target: '__idno__' }
+      return next
+    })
+  }
+
   function reset() {
     setStep(0); setUploaded(null); setMapping({}); setDryResult(null)
     setTaskId(null); setTaskStatus(null); setUploadErr(null)
     setIdnoStrategy('auto'); setUpsertStrategy('skip'); setAutoPublish(false)
+    setSubtype(null); setPendingFields([]); setIdnoColumn(null)
     clearPersistedState()
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -287,38 +356,47 @@ export function ScreenImporter() {
     setNewFieldModal(csvColumn)
   }
 
-  async function confirmCreateField() {
-    if (!newFieldModal || !uploaded) return
+  function confirmCreateField() {
+    if (!newFieldModal) return
     const name = newFieldModal.toLowerCase().replace(/[\s\-]/g, '_')
-    setCreatingField(true)
-    try {
-      const result = await importer.createFields(recordType, [{
-        name, field_type: newFieldType,
-        label_de: newFieldLabelDe || newFieldModal,
-        label_en: newFieldLabelEn || newFieldModal,
-        is_repeatable: newFieldRepeatable,
-      }])
-      if (result.created > 0 && result.fields[0]) {
-        const newField = result.fields[0]
-        setFields(prev => [...prev, newField as unknown as FieldDefinition])
-        setMapping(m => ({ ...m, [newFieldModal]: { target: newField.name } }))
-      } else if (result.restored && result.restored.length > 0) {
-        // Field was restored (undeleted) or already exists — refresh field list and map to existing
-        const freshFields = await schema.list(recordType)
-        setFields(freshFields)
-        const existing = freshFields.find(f => f.name === name)
-        if (existing) {
-          setMapping(m => ({ ...m, [newFieldModal]: { target: existing.name } }))
-        } else {
-          alert(`Feld '${name}' existiert bereits, konnte aber nicht im Schema gefunden werden.`)
-        }
-      }
+
+    // Check if field already exists (saved or already pending)
+    const existingField = fields.find(f => f.name === name)
+    if (existingField) {
+      setMapping(m => ({ ...m, [newFieldModal]: { target: existingField.name } }))
       setNewFieldModal(null)
-    } catch (e) {
-      alert((e as Error).message)
-    } finally {
-      setCreatingField(false)
+      return
     }
+
+    const pending: PendingField = {
+      csvColumn: newFieldModal,
+      name,
+      field_type: newFieldType,
+      label_de: newFieldLabelDe || newFieldModal,
+      label_en: newFieldLabelEn || newFieldModal,
+      is_repeatable: newFieldRepeatable,
+    }
+
+    // Add virtual field to the fields list so it appears in the dropdown
+    const virtualField: FieldDefinition = {
+      id: `__pending__${name}`,
+      target_type: recordType,
+      name,
+      label: { de: pending.label_de, en: pending.label_en },
+      field_type: newFieldType as FieldDefinition['field_type'],
+      is_required: false,
+      is_repeatable: newFieldRepeatable,
+      sort_order: 9999,
+      settings: {},
+      target_subtype: null,
+      show_in_detail: false,
+      is_searchable: false,
+    }
+
+    setPendingFields(prev => [...prev.filter(f => f.name !== name), pending])
+    setFields(prev => [...prev.filter(f => f.name !== name), virtualField])
+    setMapping(m => ({ ...m, [newFieldModal]: { target: name } }))
+    setNewFieldModal(null)
   }
 
   async function startMediaBatchImport() {
@@ -339,8 +417,11 @@ export function ScreenImporter() {
     }
   }
 
-  const mappedCount = Object.values(mapping).filter(m => m.target).length
-  const ignoredCount = uploaded ? uploaded.headers.length - mappedCount : 0
+  const mappedCount = Object.values(mapping).filter(m => m.target && m.target !== '__idno__').length
+  const ignoredCount = uploaded ? uploaded.headers.length - mappedCount - (idnoStrategy === 'column' && idnoColumn ? 1 : 0) : 0
+  const mappedTargets = new Set(Object.values(mapping).map(m => m.target).filter(Boolean))
+  const missingRequired = fields.filter(f => f.is_required && !mappedTargets.has(f.name))
+  const idnoMissing = idnoStrategy === 'column' && !idnoColumn
 
   return (
     <div className="scroll">
@@ -368,7 +449,7 @@ export function ScreenImporter() {
       {activeTab === 'metadata' && (
         <div style={{ padding: '24px' }}>
           {/* Record type selector */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: availableSubtypes.length > 0 ? 8 : 16 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Typ:</span>
             {RECORD_TYPES.map(t => (
               <button
@@ -378,6 +459,24 @@ export function ScreenImporter() {
               >{t.label}</button>
             ))}
           </div>
+
+          {/* Subtype selector (only shown if subtypes exist for this type) */}
+          {availableSubtypes.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Subtyp:</span>
+              <select
+                className="fld"
+                style={{ height: 28, fontSize: 12, width: 220 }}
+                value={subtype ?? ''}
+                onChange={e => setSubtype(e.target.value || null)}
+              >
+                <option value="">— kein Subtyp —</option>
+                {availableSubtypes.map(s => (
+                  <option key={s.id} value={s.name}>{s.label?.de ?? s.label?.en ?? s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <StepBar step={step} />
 
@@ -434,6 +533,54 @@ export function ScreenImporter() {
             {/* Step 1: Mapping */}
             {step === 1 && uploaded && (
               <>
+                {/* ID-Nummer strategy — must be decided before proceeding */}
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <div className="hd">ID-Nummer</div>
+                  <div className="bd" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      {[
+                        { id: 'column', label: 'Aus Spalte zuweisen' },
+                        { id: 'auto',   label: 'Automatisch nach Schema vergeben' },
+                      ].map(opt => (
+                        <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="idno-strategy"
+                            value={opt.id}
+                            checked={idnoStrategy === opt.id}
+                            onChange={() => handleIdnoStrategyChange(opt.id)}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                    {idnoStrategy === 'column' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>Spalte:</span>
+                        <select
+                          className="fld"
+                          style={{ height: 28, fontSize: 12, width: 220 }}
+                          value={idnoColumn ?? ''}
+                          onChange={e => handleIdnoColumnChange(e.target.value)}
+                        >
+                          <option value="">— Spalte wählen —</option>
+                          {uploaded.headers.map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        {!idnoColumn && (
+                          <span style={{ fontSize: 12, color: '#b91c1c' }}>Pflichtfeld</span>
+                        )}
+                      </div>
+                    )}
+                    {idnoStrategy === 'auto' && (
+                      <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                        IDs werden automatisch nach dem konfigurierten Schema vergeben.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--fg-2)' }}>
                   <b>{uploaded.row_count}</b> Zeilen geladen · <b style={{ color: '#166534' }}>{mappedCount}</b> gemappt · <b style={{ color: 'var(--fg-3)' }}>{ignoredCount}</b> ignoriert
                 </div>
@@ -482,17 +629,15 @@ export function ScreenImporter() {
                                 }}
                               >
                                 <option value="">— ignorieren —</option>
-                                <optgroup label="Systemfelder">
-                                  <option value="__idno__">ID-Nummer (idno)</option>
-                                </optgroup>
                                 <optgroup label={RECORD_TYPES.find(t => t.id === recordType)?.label ?? 'Felder'}>
                                   {fields.map(f => {
                                     const isMappedByOther = Object.entries(mapping).some(
                                       ([otherCol, otherEntry]) => otherCol !== col && otherEntry.target === f.name
                                     )
+                                    const isPending = pendingFields.some(p => p.name === f.name)
                                     return (
                                       <option key={f.id} value={f.name} disabled={isMappedByOther}>
-                                        {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isMappedByOther ? ' (bereits zugewiesen)' : ''}
+                                        {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isPending ? ' (neu)' : ''}{isMappedByOther ? ' (bereits zugewiesen)' : ''}
                                       </option>
                                     )
                                   })}
@@ -583,17 +728,24 @@ export function ScreenImporter() {
                       </label>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                         <button className="btn gh" onClick={() => setNewFieldModal(null)}>Abbrechen</button>
-                        <button className="btn pri" onClick={confirmCreateField} disabled={creatingField}>
-                          {creatingField ? 'Erstelle…' : 'Feld erstellen'}
+                        <button className="btn pri" onClick={confirmCreateField}>
+                          Feld erstellen
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                {(missingRequired.length > 0 || idnoMissing) && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 4, padding: '6px 10px' }}>
+                    {idnoMissing && <div>ID-Nummer: Bitte eine Spalte auswählen oder "Automatisch" wählen.</div>}
+                    {missingRequired.length > 0 && <div>Pflichtfelder noch nicht gemappt: {missingRequired.map(f => getLabel(f, f.name)).join(', ')}</div>}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                   <button className="btn" onClick={reset}>Zurück</button>
-                  <button className="btn pri" onClick={handleDryRun} disabled={dryRunning || mappedCount === 0}>
+                  <button className="btn pri" onClick={handleDryRun} disabled={dryRunning || mappedCount === 0 || missingRequired.length > 0 || idnoMissing}>
                     {dryRunning ? 'Prüfe…' : 'Weiter → Probelauf'}
                   </button>
                 </div>
@@ -651,22 +803,23 @@ export function ScreenImporter() {
                   <div className="hd">Import-Optionen</div>
                   <div className="bd" style={{ display: 'grid', gap: 12 }}>
                     <div>
-                      <label className="lbl">ID-Nummer</label>
-                      <select className="fld" value={idnoStrategy} onChange={e => setIdnoStrategy(e.target.value)}>
-                        {IDNO_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
                       <label className="lbl">Bestehende Datensätze (gleiche ID-Nr.)</label>
                       <select className="fld" value={upsertStrategy} onChange={e => setUpsertStrategy(e.target.value)}>
                         {UPSERT_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" className="ck" id="auto-publish" checked={autoPublish} onChange={e => setAutoPublish(e.target.checked)} />
-                      <label htmlFor="auto-publish" style={{ fontSize: 13, cursor: 'pointer' }}>
-                        Datensätze direkt veröffentlichen (nur wenn alle Pflichtfelder befüllt)
-                      </label>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="checkbox" className="ck" id="auto-publish" checked={autoPublish} onChange={e => setAutoPublish(e.target.checked)} />
+                        <label htmlFor="auto-publish" style={{ fontSize: 13, cursor: 'pointer' }}>
+                          Datensätze direkt veröffentlichen (nur wenn alle Pflichtfelder befüllt)
+                        </label>
+                      </div>
+                      {autoPublish && idnoStrategy === 'skip' && (
+                        <div style={{ marginTop: 6, fontSize: 12, color: '#b91c1c' }}>
+                          Datensätze ohne ID-Nummer können nicht veröffentlicht werden. Bitte eine andere ID-Strategie wählen.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -731,7 +884,14 @@ export function ScreenImporter() {
                         )}
                         {typeof taskStatus.result.publish_failed === 'number' && taskStatus.result.publish_failed > 0 && (
                           <div style={{ color: '#92400e' }}>
-                            <b>{taskStatus.result.publish_failed}</b> Datensätze konnten nicht veröffentlicht werden (Pflichtfelder fehlen)
+                            <b>{taskStatus.result.publish_failed}</b> Datensätze konnten nicht veröffentlicht werden
+                            {(taskStatus.result.publish_fail_reasons ?? []).length > 0 && (
+                              <ul style={{ margin: '4px 0 0 16px', fontSize: 12 }}>
+                                {(taskStatus.result.publish_fail_reasons ?? []).map((r: string, i: number) => (
+                                  <li key={i}>{r}</li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         )}
                         {taskStatus.result.errors.length > 0 && (

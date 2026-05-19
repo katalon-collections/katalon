@@ -18,7 +18,8 @@
       "Bash(codegraph sync *)",
       "Bash(chmod 644 .codegraph/codegraph.db)",
       "Bash(chmod 666 .codegraph/codegraph.db)",
-      "Bash(codegraph index *)"
+      "Bash(codegraph index *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

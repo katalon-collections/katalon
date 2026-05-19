@@ -386,7 +386,7 @@ export interface DryRunResult {
 
 export interface TaskStatus {
   state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
-  result?: { created: number; updated: number; skipped: number; published: number; publish_failed: number; errors: { row: number; error: string }[] }
+  result?: { created: number; updated: number; skipped: number; published: number; publish_failed: number; publish_fail_reasons?: string[]; errors: { row: number; error: string }[] }
   error?: string
   meta?: { current: number; total: number; stage: string }
 }
@@ -435,10 +435,10 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping }) }),
-  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false }) }),
+  dryRun: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>, subtype?: string | null): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, subtype: subtype ?? null }) }),
+  import: (recordType: string, rows: Record<string, string>[], mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[] }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, rows, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [] }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<{ created: number; fields: CreatedField[]; restored?: string[] }> =>
