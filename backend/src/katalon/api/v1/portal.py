@@ -77,7 +77,21 @@ async def _get_or_create(db: DBDep) -> PortalConfig:
 
 @router.get("/config", response_model=PortalConfigRead)
 async def get_portal_config(db: DBDep) -> PortalConfig:
-    return await _get_or_create(db)
+    from katalon.core.models import FieldDefinition
+
+    config = await _get_or_create(db)
+    # Build facet_fields dynamically from field_definitions.is_facet
+    facet_result = await db.execute(
+        select(FieldDefinition.target_type, FieldDefinition.name).where(
+            FieldDefinition.is_facet.is_(True),
+            FieldDefinition.is_deleted.is_(False),
+        )
+    )
+    facet_fields: dict[str, list[str]] = {"object": [], "entity": [], "place": [], "occurrence": []}
+    for row in facet_result.all():
+        facet_fields.setdefault(row.target_type, []).append(row.name)
+    config.facet_fields = facet_fields
+    return config
 
 
 @router.put("/config", response_model=PortalConfigRead)

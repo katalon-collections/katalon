@@ -57,6 +57,7 @@ def _normalize_for_index(val: Any) -> Any:
 
     Repeatable fields are stored as [{value: "..."}] in the DB.
     For ES we flatten them to a list of strings so the mapping stays consistent.
+    Numbers are also converted to strings for keyword facet fields.
     """
     if isinstance(val, list) and val:
         result: list[str] = []
@@ -72,6 +73,8 @@ def _normalize_for_index(val: Any) -> Any:
         return result if len(result) > 1 else (result[0] if result else "")
     if isinstance(val, dict):
         return {k: _normalize_for_index(v) for k, v in val.items()}
+    if isinstance(val, (int, float)):
+        return str(val)
     return val
 
 
