@@ -5,6 +5,7 @@
 Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galleries, Libraries, Archives, Museums). Es ist ein moderner Python/React-Rewrite der Kernfunktionalitäten von **CollectiveAccess** (PHP-Monolith mit XML-Konfiguration).
 
 **Kernproblem von CollectiveAccess, das gelöst wird:**
+
 - Monolithisches PHP, schwer wartbar
 - XML-Konfiguration mit hoher Einstiegshürde
 - Keine saubere API für moderne Frontends
@@ -15,38 +16,38 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 - `KONZEPT.md` – vollständiges Konzeptdokument mit Datenmodell
 - `.agents/IMPLEMENTIERUNGSPLAN.md` – detaillierter Phasenplan
 - `.agents/DEV.md` – Entwickler-Setup und Workflows
-- `design-prompts/01_discovery_portal.md` – Design-Prompt Public-Portal
-- `design-prompts/02_admin_ui.md` – Design-Prompt Admin-UI
+- `docs/` – technische Dokumentation (Architektur, Datenmodell, OAI, Produktion, Upgrading …)
+- `e2e/` – Playwright-E2E-Tests
 
 ## Fixierte Architekturentscheidungen
 
-| Entscheidung | Festgelegt |
-|---|---|
-| Name | **Katalon** (kein PyAccess – verwerfen) |
-| Backend | Python 3.12+ / FastAPI |
-| Datenbank | PostgreSQL 16 + PostGIS + JSONB |
-| Suche | Elasticsearch 8.x |
-| Bildserver | Cantaloupe (IIIF Image API 3) |
-| Task Queue | Celery + Redis |
-| Frontend | React + TypeScript (Vite) – zwei separate Apps |
-| Deployment | Docker Compose |
-| IIIF im MVP | Ja |
+| Entscheidung     | Festgelegt                                                 |
+|------------------|------------------------------------------------------------|
+| Name             | **Katalon** (kein PyAccess – verwerfen)                    |
+| Backend          | Python 3.12+ / FastAPI                                     |
+| Datenbank        | PostgreSQL 16 + PostGIS + JSONB                            |
+| Suche            | Elasticsearch 8.x                                          |
+| Bildserver       | Cantaloupe (IIIF Image API 3)                              |
+| Task Queue       | Celery + Redis                                             |
+| Frontend         | React + TypeScript (Vite) – zwei separate Apps             |
+| Deployment       | Docker Compose                                             |
+| IIIF im MVP      | Ja                                                         |
 | Vier Primärtypen | Vier getrennte Tabellen (nicht generische records-Tabelle) |
 
 ## Vier Primärtypen (alle mit frei konfigurierbaren Metadaten)
 
-| Typ | DB-Tabelle | Beschreibung |
-|---|---|---|
-| Object | `objects` | Artefakte: Fotos, Dokumente, Gemälde |
-| Entity | `entities` | Personen, Organisationen |
-| Place | `places` | Geografische Orte (PostGIS) |
-| Occurrence | `occurrences` | Werke (FRBR), Ereignisse, Konzepte |
+| Typ        | DB-Tabelle    | Beschreibung                         |
+|------------|---------------|--------------------------------------|
+| Object     | `objects`     | Artefakte: Fotos, Dokumente, Gemälde |
+| Entity     | `entities`    | Personen, Organisationen             |
+| Place      | `places`      | Geografische Orte (PostGIS)          |
+| Occurrence | `occurrences` | Werke (FRBR), Ereignisse, Konzepte   |
 
 **Alle vier Typen** haben dynamisch konfigurierbare Metadaten via `field_definitions`.
 
-## Monorepo-Struktur (geplant)
+## Monorepo-Struktur
 
-```
+```text
 katalon/
 ├── backend/
 │   ├── src/katalon/
@@ -57,7 +58,8 @@ katalon/
 │   │   ├── api/v1/        # Alle Endpoints
 │   │   ├── services/      # Business-Logik
 │   │   ├── workers/       # Celery tasks
-│   │   └── integrations/  # ES, Cantaloupe, Authority-Adapter
+│   │   ├── integrations/  # ES, Cantaloupe, Authority-Adapter
+│   │   └── management/    # CLI-Verwaltungsbefehle
 │   ├── tests/
 │   ├── migrations/        # Alembic
 │   └── pyproject.toml
@@ -65,6 +67,8 @@ katalon/
 │   ├── admin/             # Eingabeoberfläche (auth-geschützt)
 │   └── portal/            # Public-Portal (Suche, IIIF)
 ├── docker/
+├── docs/                  # Technische Dokumentation
+├── e2e/                   # Playwright-E2E-Tests
 ├── docker-compose.yml
 └── CLAUDE.md              # diese Datei
 ```
@@ -72,6 +76,7 @@ katalon/
 ## Schlüsselentscheidungen Datenmodell
 
 ### Schema-Engine (gilt für alle 4 Typen)
+
 ```sql
 field_definitions (
     id UUID, target_type VARCHAR,  -- object/entity/place/occurrence
@@ -83,6 +88,7 @@ field_definitions (
 ```
 
 ### Wiederholbare Felder (JSONB-Arrays)
+
 ```json
 {
   "title": [{"value": "Straße in Marrakesch", "lang": "de"}],
@@ -91,6 +97,7 @@ field_definitions (
 ```
 
 ### Relationen (generisch, mit Metadaten auf der Relation)
+
 ```sql
 relations (
     id UUID, from_type VARCHAR, from_id UUID,
@@ -98,41 +105,46 @@ relations (
     relation_type VARCHAR, metadata JSONB
 )
 ```
+
 Alle 4 Typen können beliebig miteinander verknüpft werden.
 
 ### Audit Log (Pflicht)
+
 ```sql
 audit_log (record_type, record_id, user_id, action, changed_fields JSONB, created_at)
 ```
 
 ### Versionierung (Snapshots)
+
 ```sql
 record_snapshots (record_type, record_id, label, snapshot JSONB, created_by, created_at)
 ```
 
 ### Authority-Plugin-System
+
 Abstrakte Python-Klasse `AuthoritySource(ABC)` mit `search()` und `fetch()`.
 Adapter werden in DB registriert. Erste Adapter: GND, Geonames.
+
 ```sql
 authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 ```
 
 ## Phasenplan (MVP = Phasen 0–6)
 
-| Phase | Meilenstein |
-|---|---|
-| 0–1 | Infra (Docker Compose, alle Services) + Core-DB (ORM, Alembic) |
-| 2 | Schema-Engine (field_definitions, repeatable, Vokabulare) |
-| 3 | CRUD alle 4 Typen + generische Relationen mit Metadaten |
-| 4 | Auth (FastAPI-Users, JWT, Rollen) + Audit Log |
-| 5 | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API |
-| 6 | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett |
-| 7 | Elasticsearch + Versionierung (Snapshots) |
-| 8 | Public-Portal (React: Suche, Facetten, IIIF-Viewer) |
-| 9 | Authority-Plugin-System + Adapter GND/Geonames |
-| 10 | Smart Importer (Excel/CSV ETL, Dry Run) |
-| 11 | OAI-PMH |
-| 12 | Hardening |
+| Phase | Status | Meilenstein                                                    |
+|-------|--------|----------------------------------------------------------------|
+| 0–1   | ✅     | Infra (Docker Compose, alle Services) + Core-DB (ORM, Alembic) |
+| 2     | ✅     | Schema-Engine (field_definitions, repeatable, Vokabulare)      |
+| 3     | ✅     | CRUD alle 4 Typen + generische Relationen mit Metadaten        |
+| 4     | ✅     | Auth (FastAPI-Users, JWT, Rollen) + Audit Log                  |
+| 5     | ⚠️     | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
+| 6     | ✅     | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett          |
+| 7     | ⚠️     | Elasticsearch + Versionierung (Snapshots)                      |
+| 8     | ✅     | Public-Portal (React: Suche, Facetten, IIIF-Viewer)            |
+| 9     | ✅     | Authority-Plugin-System + Adapter GND/Geonames                 |
+| 10    | ⚠️     | Smart Importer (Excel/CSV ETL, Dry Run)                        |
+| 11    | ⚠️     | OAI-PMH                                                        |
+| 12    | 🔲     | Hardening                                                      |
 
 ## Nicht im Scope
 
@@ -144,6 +156,18 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 ## User-Profil
 
 Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen zu diesen Technologien nötig. Er kennt CollectiveAccess-Konzepte (dynamische Schemata, Vokabulare, Entitätsrelationen).
+
+## Code Navigation
+
+A CodeGraph MCP server is available with a pre-indexed knowledge graph of this codebase.
+Prefer these tools over grep/find for code exploration:
+
+- `codegraph_context` — get structured context for a task (use this first)
+- `codegraph_search` — find symbols by name
+- `codegraph_callers` / `codegraph_callees` — trace call relationships
+- `codegraph_impact` — blast radius before changing something
+
+Always use CodeGraph before falling back to grep or sequential file reads.
 
 ## Nächster logischer Schritt
 
