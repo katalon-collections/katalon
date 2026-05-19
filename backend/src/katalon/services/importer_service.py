@@ -117,6 +117,9 @@ def apply_transforms(value: str, transforms: list[dict[str, Any]]) -> list[str]:
             if ttype == "split":
                 delim = t.get("delimiter", ";")
                 filter_empty = t.get("filter_empty", True)
+                if not delim:
+                    new_values.append(v)
+                    continue
                 parts = [p.strip() for p in v.split(delim) if p.strip() or not filter_empty]
                 new_values.extend(parts)
             elif ttype == "replace":

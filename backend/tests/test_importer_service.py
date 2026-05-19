@@ -122,6 +122,40 @@ def test_apply_transforms_pipeline() -> None:
     assert result == ["a", "b", "c"]
 
 
+def test_apply_transforms_vocab_map_strict_drops_unknown() -> None:
+    """vocab_map with strict=True drops values not in the map."""
+    from katalon.services.importer_service import apply_transforms
+    result = apply_transforms("XX", [{"type": "vocab_map", "vocab_map": {"DE": "Deutsch"}, "strict": True}])
+    assert result == []
+
+
+def test_apply_transforms_vocab_map_strict_passes_known() -> None:
+    from katalon.services.importer_service import apply_transforms
+    result = apply_transforms("DE", [{"type": "vocab_map", "vocab_map": {"DE": "Deutsch"}, "strict": True}])
+    assert result == ["Deutsch"]
+
+
+def test_apply_transforms_regex_extract_invalid_pattern() -> None:
+    """Invalid regex pattern falls back to original value instead of crashing."""
+    from katalon.services.importer_service import apply_transforms
+    result = apply_transforms("hello", [{"type": "regex_extract", "pattern": "[invalid("}])
+    assert result == ["hello"]
+
+
+def test_apply_transforms_expression_multiple_placeholders() -> None:
+    """Jinja2 expression with value referenced multiple times."""
+    from katalon.services.importer_service import apply_transforms
+    result = apply_transforms("hi", [{"type": "expression", "expression": "{{ value }}-{{ value | upper }}"}])
+    assert result == ["hi-HI"]
+
+
+def test_apply_transforms_split_empty_delimiter_returns_original() -> None:
+    """Empty delimiter is a no-op — returns the original value unchanged."""
+    from katalon.services.importer_service import apply_transforms
+    result = apply_transforms("a;b;c", [{"type": "split", "delimiter": ""}])
+    assert result == ["a;b;c"]
+
+
 def test_dry_run_no_errors() -> None:
     rows = [{"title": "Foto 1"}]
     mapping = {"title": "title"}
