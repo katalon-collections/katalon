@@ -193,6 +193,7 @@ export function ScreenImporter() {
         settings: {},
         target_subtype: null,
         show_in_detail: false,
+        show_in_list: false,
         is_searchable: false,
       }))))
     }).catch(() => setFields([]))
@@ -390,6 +391,7 @@ export function ScreenImporter() {
       settings: {},
       target_subtype: null,
       show_in_detail: false,
+      show_in_list: false,
       is_searchable: false,
     }
 

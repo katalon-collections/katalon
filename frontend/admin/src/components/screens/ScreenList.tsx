@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, ConflictError } from '../../api/client'
-import type { AnyRecord, Page, RecordType } from '../../types'
+import { objects, entities, places, occurrences, schema, ConflictError } from '../../api/client'
+import type { AnyRecord, FieldDefinition, Page, RecordType } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Plus, Search, Trash } from '../ui/Icons'
 
@@ -13,22 +13,18 @@ const TABS = [
 
 const PAGE_SIZE = 50
 
-type TypeConfig = {
-  label: string
-  schemaType: string
-  subtypeKey?: string
-  subtypeLabel?: string
-  primaryLabel: string
-  primaryKey: string
-  secondaryLabel?: string
-  secondaryKey?: string
+const TYPE_LABELS: Record<RecordType, string> = {
+  object: 'Objekte',
+  entity: 'Entitäten',
+  place: 'Orte',
+  occurrence: 'Occurrences',
 }
 
-const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
-  object:     { label: 'Objekte',     schemaType: 'object',     subtypeKey: 'object_type',     subtypeLabel: 'Typ', primaryLabel: 'Titel',       primaryKey: 'title',    secondaryLabel: 'Urheber:in', secondaryKey: 'creator' },
-  entity:     { label: 'Entitäten',   schemaType: 'entity',     subtypeKey: 'entity_type',     subtypeLabel: 'Typ', primaryLabel: 'Name',        primaryKey: 'name' },
-  place:      { label: 'Orte',        schemaType: 'place',      subtypeKey: 'place_type',      subtypeLabel: 'Typ', primaryLabel: 'Name',        primaryKey: 'name' },
-  occurrence: { label: 'Occurrences', schemaType: 'occurrence', subtypeKey: 'occurrence_type', subtypeLabel: 'Typ', primaryLabel: 'Titel',       primaryKey: 'title' },
+const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
+  object: 'object_type',
+  entity: 'entity_type',
+  place: 'place_type',
+  occurrence: 'occurrence_type',
 }
 
 function getApi(recordType: RecordType) {
@@ -40,14 +36,31 @@ function getApi(recordType: RecordType) {
   }
 }
 
+/** Extract a display value from metadata for a field name.
+ *  Handles both plain strings and repeatable-field lists. */
+function getFieldValue(metadata: Record<string, unknown>, fieldName: string): string {
+  const val = metadata[fieldName]
+  if (val == null) return ''
+  if (typeof val === 'string') return val
+  if (Array.isArray(val) && val.length > 0) {
+    const first = val[0]
+    if (typeof first === 'string') return first
+    if (first && typeof first === 'object' && 'value' in first) {
+      return String((first as { value?: unknown }).value ?? '')
+    }
+    return String(first ?? '')
+  }
+  return String(val)
+}
+
 interface Props {
   recordType: RecordType
   onOpen?: (id: string) => void
 }
 
 export function ScreenList({ recordType, onOpen }: Props) {
-  const cfg = TYPE_CONFIG[recordType]
   const api = getApi(recordType)
+  const subtypeKey = SUBTYPE_KEYS[recordType]
 
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
@@ -58,6 +71,19 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const [sel, setSel] = useState<Set<string>>(new Set())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [debouncedQ, setDebouncedQ] = useState('')
+  const [listFields, setListFields] = useState<FieldDefinition[]>([])
+
+  // Load field definitions with show_in_list for this type
+  useEffect(() => {
+    schema.list(recordType)
+      .then(fields => {
+        const visible = fields
+          .filter(f => f.show_in_list)
+          .sort((a, b) => a.sort_order - b.sort_order)
+        setListFields(visible)
+      })
+      .catch(() => setListFields([]))
+  }, [recordType])
 
   useEffect(() => {
     setTab('all')
@@ -94,7 +120,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   function handleSearch(v: string) { setQ(v); setPage(1) }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(`${cfg.label.slice(0, -1)} wirklich löschen?`)) return
+    if (!window.confirm(`${TYPE_LABELS[recordType].slice(0, -1)} wirklich löschen?`)) return
     try {
       await api.delete(id)
       load()
@@ -131,16 +157,27 @@ export function ScreenList({ recordType, onOpen }: Props) {
     return new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
+  // Build column configuration dynamically
+  // Always: Checkbox, ID-Nr., [Subtype], [listFields...], Status, Geändert, Actions
   const showIdno = true
-  const showSubtype = Boolean(cfg.subtypeKey)
-  const showSecondary = Boolean(cfg.secondaryKey)
-  const colCount = 5 + (showIdno ? 1 : 0) + (showSubtype ? 1 : 0) + (showSecondary ? 1 : 0)
+  const showSubtype = Boolean(subtypeKey)
+  const hasListFields = listFields.length > 0
+
+  // Primary label field: first list field, or fallback to label
+  const primaryField = listFields[0]
+  const primaryLabel = primaryField?.label?.de || primaryField?.label?.en || primaryField?.name || 'Titel'
+  const primaryKey = primaryField?.name || 'label'
+
+  // Additional list fields (after primary)
+  const extraFields = listFields.slice(1)
+
+  const colCount = 4 + (showIdno ? 1 : 0) + (showSubtype ? 1 : 0) + extraFields.length
 
   return (
     <div className="scroll">
       <div className="ph">
         <div>
-          <h1>{cfg.label}</h1>
+          <h1>{TYPE_LABELS[recordType]}</h1>
           <div className="sub">{data.total.toLocaleString('de')} Datensätze</div>
         </div>
         <div className="right">
@@ -187,12 +224,13 @@ export function ScreenList({ recordType, onOpen }: Props) {
               <th className="col-ck">
                 <input type="checkbox" className={`ck${someSel && !allSel ? ' ind' : ''}`} checked={allSel} onChange={toggleAll} />
               </th>
-              {showIdno    && <th>ID-Nr.</th>}
-              {showSubtype && <th>{cfg.subtypeLabel}</th>}
-              <th>{cfg.primaryLabel}</th>
+              {showIdno && <th>ID-Nr.</th>}
+              {showSubtype && <th>Typ</th>}
+              <th>{primaryLabel}</th>
+              {extraFields.map(f => (
+                <th key={f.name}>{f.label?.de || f.label?.en || f.name}</th>
+              ))}
               <th>Status</th>
-              {showSecondary && <th>{cfg.secondaryLabel}</th>}
-              {recordType === 'object' && <th>Jahr</th>}
               <th>Geändert</th>
               <th className="col-act" />
             </tr>
@@ -206,18 +244,19 @@ export function ScreenList({ recordType, onOpen }: Props) {
             )}
             {!loading && items.map(rec => {
               const m = rec.metadata_ as Record<string, unknown>
-              const subtypeVal = cfg.subtypeKey ? String((rec as unknown as Record<string, unknown>)[cfg.subtypeKey] ?? '') : ''
-              const primaryVal = String(m[cfg.primaryKey] ?? '')
-              const secondaryVal = cfg.secondaryKey ? String(m[cfg.secondaryKey] ?? '') : ''
+              const subtypeVal = subtypeKey ? String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? '') : ''
               return (
                 <tr key={rec.id} className={sel.has(rec.id) ? 'sel' : ''}>
                   <td className="col-ck"><input type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} /></td>
-                  {showIdno    && <td className="mono" style={{ maxWidth: 140 }}>{(rec as { idno?: string | null }).idno}</td>}
+                  {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{(rec as { idno?: string | null }).idno}</td>}
                   {showSubtype && <td style={{ maxWidth: 120, color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
-                  <td style={{ maxWidth: 280 }}><span className="tt">{primaryVal}</span></td>
+                  <td style={{ maxWidth: 280 }}><span className="tt">{getFieldValue(m, primaryKey)}</span></td>
+                  {extraFields.map(f => (
+                    <td key={f.name} style={{ maxWidth: 140, color: 'var(--fg-2)' }}>
+                      {getFieldValue(m, f.name)}
+                    </td>
+                  ))}
                   <td style={{ maxWidth: 100 }}><StatusBadge status={rec.status} /></td>
-                  {showSecondary && <td style={{ maxWidth: 140, color: 'var(--fg-2)' }}>{secondaryVal}</td>}
-                  {recordType === 'object' && <td style={{ maxWidth: 80, color: 'var(--fg-3)' }} className="mono">{String(m.year ?? '')}</td>}
                   <td style={{ maxWidth: 120, color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">

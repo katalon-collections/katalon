@@ -7,7 +7,11 @@ from katalon.workers.celery_app import celery_app
 
 
 def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 @celery_app.task(name="katalon.index_record")
@@ -71,7 +75,6 @@ def reindex_all_task() -> None:
 
     async def _reindex() -> None:
         from sqlalchemy import select
-
 
         await ensure_index()
         async with AsyncSessionLocal() as session:

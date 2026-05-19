@@ -52,6 +52,29 @@ def _clean_metadata(md: dict) -> dict:
     return {k: v for k, v in md.items() if k}
 
 
+def _normalize_for_index(val: Any) -> Any:
+    """Normalize metadata values for ES indexing.
+
+    Repeatable fields are stored as [{value: "..."}] in the DB.
+    For ES we flatten them to a list of strings so the mapping stays consistent.
+    """
+    if isinstance(val, list) and val:
+        result: list[str] = []
+        for item in val:
+            if isinstance(item, dict):
+                v = item.get("value")
+                if v is not None:
+                    result.append(str(v))
+            elif isinstance(item, str):
+                result.append(item)
+            else:
+                result.append(str(item))
+        return result if len(result) > 1 else (result[0] if result else "")
+    if isinstance(val, dict):
+        return {k: _normalize_for_index(v) for k, v in val.items()}
+    return val
+
+
 def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | None = None, searchable_fields: set[str] | None = None) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
@@ -69,11 +92,14 @@ def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | N
     if related_text:
         search_text = f"{search_text} {related_text}".strip()
 
+    # Normalize metadata for ES: flatten repeatable fields to strings
+    indexed_metadata = {k: _normalize_for_index(v) for k, v in md.items()}
+
     doc: dict[str, Any] = {
         "record_type": record_type,
         "title": title,
         "status": getattr(record, "status", None),
-        "metadata": md,
+        "metadata": indexed_metadata,
         "search_text": search_text,
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,

@@ -57,6 +57,7 @@ export interface FieldDefinition {
   sort_order: number
   settings: Record<string, unknown>
   show_in_detail: boolean
+  show_in_list: boolean
   is_searchable: boolean
 }
 

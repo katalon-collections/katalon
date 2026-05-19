@@ -124,6 +124,7 @@ class FieldDefinition(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (

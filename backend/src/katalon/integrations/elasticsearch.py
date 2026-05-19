@@ -33,7 +33,7 @@ INDEX_SETTINGS: dict[str, Any] = {
             "record_type":         {"type": "keyword"},
             "title":               {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
             "status":              {"type": "keyword"},
-            "metadata":            {"type": "object", "dynamic": True},
+            "metadata":            {"type": "object", "enabled": False},
             "search_text":         {"type": "text", "analyzer": "katalon_default"},
             "created_at":          {"type": "date"},
             "updated_at":          {"type": "date"},

@@ -29,6 +29,7 @@ class FieldDefinitionCreate(BaseModel):
     sort_order: int = 0
     settings: dict = {}
     show_in_detail: bool = True
+    show_in_list: bool = True
 
 
 class FieldDefinitionRead(FieldDefinitionCreate):

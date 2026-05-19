@@ -261,6 +261,14 @@ def import_records_task(
 
             await session.commit()
 
+        # Trigger bulk reindex for this type so all records are consistently indexed
+        if created > 0 or updated > 0:
+            try:
+                from katalon.workers.index_tasks import bulk_reindex_type_task
+                bulk_reindex_type_task.delay(record_type)
+            except Exception:
+                pass  # Celery may not be available
+
         return {
             "created": created,
             "updated": updated,
@@ -273,7 +281,9 @@ def import_records_task(
             "warnings": warnings,
         }
 
+    loop = asyncio.new_event_loop()
     try:
-        return asyncio.run(_import())
+        return loop.run_until_complete(_import())
     finally:
-        asyncio.run(_engine.dispose())
+        loop.run_until_complete(_engine.dispose())
+        loop.close()
