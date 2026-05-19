@@ -75,7 +75,13 @@ def _normalize_for_index(val: Any) -> Any:
     return val
 
 
-def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | None = None, searchable_fields: set[str] | None = None) -> dict[str, Any]:
+def _build_doc(
+    record_type: str,
+    record: Any,
+    rel_data: dict[str, list[str]] | None = None,
+    searchable_fields: set[str] | None = None,
+    facet_fields: set[str] | None = None,
+) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
 
@@ -104,6 +110,17 @@ def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | N
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
     }
+
+    # Build facet_* fields for fields marked as is_facet
+    if facet_fields:
+        for field_name in facet_fields:
+            val = md.get(field_name)
+            if val is None:
+                continue
+            normalized = _normalize_for_index(val)
+            if normalized:
+                doc[f"facet_{field_name}"] = normalized
+
     if rel_data:
         doc.update(rel_data)
     return doc
@@ -160,19 +177,19 @@ async def index_record(record_type: str, record: Any, db: Any = None) -> None:
         rel_data = await _load_relation_titles(record_type, record.id, db)
 
     searchable_fields: set[str] | None = None
+    facet_fields: set[str] | None = None
     if db is not None:
         result = await db.execute(
-            select(FieldDefinition.name).where(
+            select(FieldDefinition.name, FieldDefinition.is_searchable, FieldDefinition.is_facet).where(
                 FieldDefinition.target_type == record_type,
-                FieldDefinition.is_searchable.is_(True),
                 FieldDefinition.is_deleted.is_(False),
             )
         )
-        names = result.scalars().all()
-        if names:
-            searchable_fields = set(names)
+        rows = result.all()
+        searchable_fields = {r.name for r in rows if r.is_searchable}
+        facet_fields = {r.name for r in rows if r.is_facet}
 
-    doc = _build_doc(record_type, record, rel_data, searchable_fields)
+    doc = _build_doc(record_type, record, rel_data, searchable_fields, facet_fields)
     await index_document(str(record.id), doc)
 
 

@@ -194,6 +194,7 @@ export function ScreenImporter() {
         target_subtype: null,
         show_in_detail: false,
         show_in_list: false,
+        is_facet: false,
         is_searchable: false,
       }))))
     }).catch(() => setFields([]))
@@ -392,6 +393,7 @@ export function ScreenImporter() {
       target_subtype: null,
       show_in_detail: false,
       show_in_list: false,
+      is_facet: false,
       is_searchable: false,
     }
 

@@ -81,10 +81,13 @@ async def update_field(
     field = result.scalar_one_or_none()
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
+    old_is_facet = field.is_facet
     for k, v in data.model_dump().items():
         setattr(field, k, v)
     await db.flush()
-    _enqueue_reindex(field.target_type)
+    # Reindex if facet-relevant properties changed
+    if field.is_facet != old_is_facet:
+        _enqueue_reindex(field.target_type)
     return field
 
 

@@ -43,6 +43,7 @@ type FieldFormState = {
   authority_source: string
   show_in_detail: boolean
   show_in_list: boolean
+  is_facet: boolean
   is_searchable: boolean
   vocabulary_id: string
   relation_target_type: string
@@ -51,7 +52,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '' }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '' }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -69,6 +70,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     authority_source: (f.settings?.source as string) ?? 'gnd',
     show_in_detail: f.show_in_detail ?? true,
     show_in_list: f.show_in_list ?? true,
+    is_facet: f.is_facet ?? false,
     is_searchable: f.is_searchable ?? true,
     vocabulary_id: (f.settings?.vocabulary_id as string) ?? '',
     relation_target_type: (f.settings?.target_type as string) ?? 'entity',
@@ -169,6 +171,10 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
               <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
@@ -425,6 +431,7 @@ export function ScreenSchema() {
       sort_order: form.sort_order,
       show_in_detail: form.show_in_detail,
       show_in_list: form.show_in_list ?? true,
+      is_facet: form.is_facet ?? false,
       is_searchable: form.is_searchable,
       settings: {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),

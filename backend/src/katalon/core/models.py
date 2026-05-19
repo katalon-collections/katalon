@@ -125,6 +125,7 @@ class FieldDefinition(Base):
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_facet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (

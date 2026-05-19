@@ -30,6 +30,7 @@ class FieldDefinitionCreate(BaseModel):
     settings: dict = {}
     show_in_detail: bool = True
     show_in_list: bool = True
+    is_facet: bool = False
 
 
 class FieldDefinitionRead(FieldDefinitionCreate):

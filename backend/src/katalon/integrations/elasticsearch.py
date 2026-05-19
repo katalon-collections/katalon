@@ -29,6 +29,15 @@ INDEX_SETTINGS: dict[str, Any] = {
         }
     },
     "mappings": {
+        "dynamic_templates": [
+            {
+                "facet_fields": {
+                    "match_pattern": "regex",
+                    "match": "^facet_.*",
+                    "mapping": {"type": "keyword"},
+                }
+            }
+        ],
         "properties": {
             "record_type":         {"type": "keyword"},
             "title":               {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
@@ -131,7 +140,7 @@ async def search_documents(
     if status:
         filters.append({"term": {"status": status}})
     for field, value in (extra_filters or {}).items():
-        filters.append({"term": {f"metadata.{field}.keyword": value}})
+        filters.append({"term": {f"facet_{field}": value}})
     for field, value in (rel_filters or {}).items():
         filters.append({"term": {field: value}})
 
@@ -145,7 +154,7 @@ async def search_documents(
         "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
     }
     for field in facet_fields or []:
-        aggs[f"meta_{field}"] = {"terms": {"field": f"metadata.{field}.keyword", "size": 20}}
+        aggs[f"meta_{field}"] = {"terms": {"field": f"facet_{field}", "size": 20}}
 
     result = await es.search(
         index=INDEX_NAME,
