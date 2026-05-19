@@ -3,12 +3,12 @@ from __future__ import annotations
 import importlib
 
 from katalon.integrations.authority import AuthorityHit, AuthoritySource
-from katalon.integrations.gnd_adapter import GNDAdapter
 from katalon.integrations.geonames_adapter import GeonamesAdapter
+from katalon.integrations.gnd_adapter import GNDAdapter
+from katalon.integrations.iconclass_adapter import ICONCLASSAdapter
+from katalon.integrations.tgn_adapter import TGNAdapter
 from katalon.integrations.viaf_adapter import VIAFAdapter
 from katalon.integrations.wikidata_adapter import WikidataAdapter
-from katalon.integrations.tgn_adapter import TGNAdapter
-from katalon.integrations.iconclass_adapter import ICONCLASSAdapter
 
 # Built-in adapters always available (can be overridden by DB config)
 _BUILTIN: dict[str, AuthoritySource] = {
@@ -31,8 +31,9 @@ async def _load_registry() -> dict[str, AuthoritySource]:
         return _cache
     try:
         from sqlalchemy import select
-        from katalon.database import AsyncSessionLocal
+
         from katalon.core.models import AuthoritySource as AuthoritySourceModel
+        from katalon.database import AsyncSessionLocal
 
         async with AsyncSessionLocal() as session:
             result = await session.execute(

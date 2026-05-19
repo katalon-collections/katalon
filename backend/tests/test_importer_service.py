@@ -1,8 +1,14 @@
 import io
 
 import openpyxl
-import pytest
-from katalon.services.importer_service import detect_delimiter, parse_csv, parse_excel, apply_mapping, dry_run
+
+from katalon.services.importer_service import (
+    apply_mapping,
+    detect_delimiter,
+    dry_run,
+    parse_csv,
+    parse_excel,
+)
 
 
 def _make_xlsx(headers: list[str], rows: list[list]) -> bytes:

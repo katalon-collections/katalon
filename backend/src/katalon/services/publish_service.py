@@ -5,11 +5,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import Object, Entity, Place, Occurrence
+from katalon.core.models import Entity, Object, Occurrence, Place
+from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services.search_service import index_record
-from katalon.services.audit_service import log_change
-
 
 MODEL_MAP: dict[str, type] = {
     "object": Object,

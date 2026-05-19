@@ -1,10 +1,11 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from katalon.integrations.gnd_adapter import GNDAdapter
+import pytest
+
 from katalon.integrations.geonames_adapter import GeonamesAdapter
-from katalon.integrations.tgn_adapter import TGNAdapter
+from katalon.integrations.gnd_adapter import GNDAdapter
 from katalon.integrations.iconclass_adapter import ICONCLASSAdapter
+from katalon.integrations.tgn_adapter import TGNAdapter
 from katalon.integrations.viaf_adapter import VIAFAdapter
 from katalon.integrations.wikidata_adapter import WikidataAdapter
 

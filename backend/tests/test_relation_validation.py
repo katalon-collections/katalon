@@ -1,14 +1,14 @@
 """Unit tests for relation field type validation in schema_service."""
 import uuid
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from katalon.services.schema_service import (
     _validate_relation_structure,
     _validate_relation_target,
     validate_metadata,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -1,10 +1,10 @@
-import uuid
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from httpx import ASGITransport, AsyncClient
 
-from katalon.main import app
 from katalon.database import get_db
+from katalon.main import app
 
 
 def _make_session(pages: list | None = None) -> AsyncMock:

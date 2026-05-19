@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from katalon.config import settings
+
 from .authority import AuthorityHit, AuthoritySource
 
 GEONAMES_SEARCH = "http://api.geonames.org/searchJSON"

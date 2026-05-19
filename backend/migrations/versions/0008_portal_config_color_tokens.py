@@ -4,8 +4,8 @@ Revision ID: 0008
 Revises: 56b592d317dd
 Create Date: 2026-05-04
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "0008"

@@ -18,11 +18,23 @@ from katalon.core.schemas import (
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
-from katalon.services.idno_service import consume_next_idno, maybe_advance_counter, validate_idno_pattern
-from katalon.services.relation_service import count_relations, delete_relations, sync_schema_relations
+from katalon.services.idno_service import (
+    consume_next_idno,
+    maybe_advance_counter,
+    validate_idno_pattern,
+)
 from katalon.services.publish_service import can_publish, publish_record
+from katalon.services.relation_service import (
+    count_relations,
+    delete_relations,
+    sync_schema_relations,
+)
 from katalon.services.schema_service import validate_metadata
-from katalon.services.subtype_service import ensure_subtype_exists, has_any_subtypes, normalize_subtype_name
+from katalon.services.subtype_service import (
+    ensure_subtype_exists,
+    has_any_subtypes,
+    normalize_subtype_name,
+)
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 
@@ -259,8 +271,8 @@ async def create_snapshot(
 
 @router.get("/{object_id}/iiif/manifest")
 async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
-    from katalon.integrations.cantaloupe import build_object_manifest
     from katalon.config import settings
+    from katalon.integrations.cantaloupe import build_object_manifest
 
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()

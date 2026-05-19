@@ -1,6 +1,7 @@
 import uuid
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from katalon.services.relation_service import count_relations, delete_relations
 

@@ -24,7 +24,7 @@ async def _es_search_for_oai(
     identifier: str | None = None,
 ) -> dict[str, Any]:
     """Run an Elasticsearch query for OAI-PMH harvesting."""
-    from katalon.integrations.elasticsearch import get_es, INDEX_NAME
+    from katalon.integrations.elasticsearch import INDEX_NAME, get_es
 
     es = get_es()
     filters: list[dict] = []

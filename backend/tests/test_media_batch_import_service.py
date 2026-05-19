@@ -6,9 +6,9 @@ from katalon.services.media_batch_import_service import (
 
 def test_parse_mapping_csv_accepts_alias_columns() -> None:
     content = (
-        "Dateiname;Objekt_ID;Medientyp\n"
-        "foto1.jpg;550e8400-e29b-41d4-a716-446655440000;detail\n"
-    ).encode("utf-8")
+        b"Dateiname;Objekt_ID;Medientyp\n"
+        b"foto1.jpg;550e8400-e29b-41d4-a716-446655440000;detail\n"
+    )
     rows, errors = parse_mapping_csv(content)
     assert errors == []
     assert len(rows) == 1
@@ -18,7 +18,7 @@ def test_parse_mapping_csv_accepts_alias_columns() -> None:
 
 
 def test_parse_mapping_csv_requires_filename_and_object_id() -> None:
-    rows, errors = parse_mapping_csv("foo,bar\nx,y\n".encode("utf-8"))
+    rows, errors = parse_mapping_csv(b"foo,bar\nx,y\n")
     assert rows == []
     assert errors
     assert "filename" in str(errors[0]["message"])

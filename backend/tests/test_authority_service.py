@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock
 
-from katalon.services import authority_service
+import pytest
+
 from katalon.integrations.authority import AuthorityHit
+from katalon.services import authority_service
 
 
 def _hit(**kwargs) -> AuthorityHit:

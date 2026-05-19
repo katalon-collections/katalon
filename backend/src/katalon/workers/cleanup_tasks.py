@@ -15,8 +15,9 @@ async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:
 
     Factored out of the Celery task for testability.
     """
-    from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place
     from sqlalchemy import select
+
+    from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place
 
     MODEL_MAP: dict[str, Any] = {
         "object": Object,

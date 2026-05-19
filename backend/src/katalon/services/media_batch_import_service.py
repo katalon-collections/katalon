@@ -7,7 +7,6 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-
 _UUID_PREFIX_RE = re.compile(
     r"^(?P<id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:[_\-\s\.].*)?$"
 )

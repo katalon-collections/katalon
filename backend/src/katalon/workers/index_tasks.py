@@ -27,11 +27,12 @@ def remove_record_task(record_id: str) -> None:
 @celery_app.task(name="katalon.bulk_reindex_type")
 def bulk_reindex_type_task(target_type: str) -> dict:
     """Reindex all records of a single type (e.g. after schema changes)."""
-    from katalon.database import AsyncSessionLocal
-    from katalon.core.models import Object, Entity, Place, Occurrence
-    from katalon.services.search_service import _build_doc
-    from katalon.integrations.elasticsearch import reindex_type
     from sqlalchemy import select
+
+    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.database import AsyncSessionLocal
+    from katalon.integrations.elasticsearch import reindex_type
+    from katalon.services.search_service import _build_doc
 
     _MODEL_MAP: dict = {
         "object": Object,
@@ -63,14 +64,14 @@ def bulk_reindex_type_task(target_type: str) -> dict:
 @celery_app.task(name="katalon.reindex_all")
 def reindex_all_task() -> None:
     """Full reindex – reads all records from DB and pushes to ES."""
+    from katalon.core.models import Entity, Object, Occurrence, Place
     from katalon.database import AsyncSessionLocal
-    from katalon.core.models import Object, Entity, Place, Occurrence
     from katalon.integrations.elasticsearch import ensure_index
-    from katalon.services.search_service import _build_doc, index_record as _index
+    from katalon.services.search_service import index_record as _index
 
     async def _reindex() -> None:
         from sqlalchemy import select
-        from katalon.services.search_service import _load_relation_titles
+
 
         await ensure_index()
         async with AsyncSessionLocal() as session:

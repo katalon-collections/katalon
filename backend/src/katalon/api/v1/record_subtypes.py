@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import FieldDefinition, RecordSubtype
+from katalon.core.models import RecordSubtype
 from katalon.core.schemas import RecordSubtypeCreate, RecordSubtypeRead
 from katalon.services.subtype_service import (
     normalize_subtype_name,

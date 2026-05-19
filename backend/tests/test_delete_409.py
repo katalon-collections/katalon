@@ -4,7 +4,6 @@ from httpx import ASGITransport, AsyncClient
 
 from katalon.main import app
 
-
 # ---------------------------------------------------------------------------
 # Auth-required tests (no DB needed — rejected before handler logic runs)
 # ---------------------------------------------------------------------------

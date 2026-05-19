@@ -1,10 +1,10 @@
 """Unit tests for the cleanup_relation_refs Celery task internals."""
 import uuid
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from katalon.workers.cleanup_tasks import _do_cleanup
+import pytest
 
+from katalon.workers.cleanup_tasks import _do_cleanup
 
 # ---------------------------------------------------------------------------
 # Helpers

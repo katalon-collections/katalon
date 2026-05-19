@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -22,6 +21,7 @@ def test_main_is_callable() -> None:
 
 def test_password_token_length() -> None:
     import secrets
+
     from katalon.management.reset_admin import PASSWORD_TOKEN_BYTES
 
     pw = secrets.token_urlsafe(PASSWORD_TOKEN_BYTES)
@@ -30,6 +30,7 @@ def test_password_token_length() -> None:
 
 def test_reset_exits_when_no_admins(monkeypatch: object, capsys: object) -> None:
     import asyncio
+
     from katalon.management.reset_admin import _reset
 
     async def _fake_reset_inner() -> None:

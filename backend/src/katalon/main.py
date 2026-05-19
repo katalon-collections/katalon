@@ -42,9 +42,6 @@ from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
 from katalon.core.models import (
-    AuthoritySource as AuthoritySourceModel,
-)
-from katalon.core.models import (
     AdminConfig,
     FieldDefinition,
     PortalConfig,
@@ -52,6 +49,9 @@ from katalon.core.models import (
     User,
     Vocabulary,
     VocabularyTerm,
+)
+from katalon.core.models import (
+    AuthoritySource as AuthoritySourceModel,
 )
 from katalon.database import AsyncSessionLocal
 

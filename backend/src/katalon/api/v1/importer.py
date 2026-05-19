@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile
+from typing import Any, Literal
+
+from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from typing import Literal, Any
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FieldDefinition
+from katalon.core.schemas import FieldDefinitionRead
 from katalon.services import importer_service
-from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
@@ -203,6 +204,7 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
 @router.get("/task/{task_id}")
 async def task_status(task_id: str, _: CurrentUser) -> dict:
     from celery.result import AsyncResult
+
     from katalon.workers.celery_app import celery_app
     result = AsyncResult(task_id, app=celery_app)
     state = result.state

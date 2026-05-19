@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
@@ -47,7 +47,7 @@ def _root() -> ET.Element:
         "xmlns:xsi": XSI_NS,
         "xsi:schemaLocation": SCHEMA_LOC,
     })
-    ET.SubElement(el, "responseDate").text = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ET.SubElement(el, "responseDate").text = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return el
 
 
@@ -59,7 +59,7 @@ def _error(el: ET.Element, code: str, message: str) -> str:
 
 def _datestamp(ts: str | None) -> str:
     if not ts:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return ts[:19].replace(" ", "T") + "Z"
 
 

@@ -1,6 +1,7 @@
 """Unit tests for idno_service – pure logic, no DB required."""
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from katalon.services.idno_service import (
     format_idno,
@@ -8,7 +9,6 @@ from katalon.services.idno_service import (
     peek_next_idno,
     validate_idno_pattern,
 )
-
 
 # ---------------------------------------------------------------------------
 # format_idno

@@ -85,8 +85,9 @@ def _build_doc(record_type: str, record: Any, rel_data: dict[str, list[str]] | N
 
 async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> dict[str, list[str]]:
     """Return names of related entities/places/occurrences for denormalisation in ES."""
-    from sqlalchemy import or_, and_, select
-    from katalon.core.models import Relation, Entity, Place, Occurrence
+    from sqlalchemy import and_, or_, select
+
+    from katalon.core.models import Entity, Occurrence, Place, Relation
 
     TYPE_MAP: dict[str, tuple[str, Any]] = {
         "entity":     ("related_entities", Entity),
@@ -125,6 +126,7 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
 
 async def index_record(record_type: str, record: Any, db: Any = None) -> None:
     from sqlalchemy import select
+
     from katalon.core.models import FieldDefinition
 
     rel_data: dict[str, list[str]] | None = None

@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from katalon.api.v1.banners import BannerCreate, BannerUpdate, VALID_COLORS
+from katalon.api.v1.banners import VALID_COLORS, BannerCreate, BannerUpdate
 
 
 def test_banner_create_defaults() -> None:
