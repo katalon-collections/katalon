@@ -125,15 +125,22 @@ def apply_mapping(
     mapping: dict[str, str] | dict[str, Any],
     field_defs: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str | None]]:
-    """
-    mapping: { csv_column -> field_name }  OR  { csv_column -> {"target": field_name, "transforms": [...]} }
+    """Apply a source→field mapping to a list of source records.
+
+    mapping: { selector -> field_name }
+             OR { selector -> {"target": field_name, "transforms": [...]} }
+
+    The selector is the dict key used to look up the value in each source record.
+    For CSV/Excel that is the column header; for XML it is the Clark-notation tag
+    path produced by XmlFormat.parse_flat().
+
     Returns:
       - list of metadata dicts ready for record creation
       - list of idno values (one per row, or None)
 
     Special field name '__idno__' maps to the record's idno column, not metadata.
 
-    If field_defs is provided, values are transformed according to field_type:
+    If field_defs is provided, values are coerced according to field_type:
     - number: parse to float/int
     - boolean: normalize to True/False
     """
@@ -142,17 +149,17 @@ def apply_mapping(
 
     # Normalize mapping to always have target + transforms
     normalized: dict[str, tuple[str, list[dict[str, Any]]]] = {}
-    for csv_col, val in mapping.items():
+    for selector, val in mapping.items():
         if isinstance(val, dict):
-            normalized[csv_col] = (val.get("target", ""), val.get("transforms", []))
+            normalized[selector] = (val.get("target", ""), val.get("transforms", []))
         else:
-            normalized[csv_col] = (val, [])
+            normalized[selector] = (val, [])
 
     for row in rows:
         record: dict[str, Any] = {}
         row_idno: str | None = None
-        for csv_col, (field_name, transforms) in normalized.items():
-            raw = row.get(csv_col, "").strip()
+        for selector, (field_name, transforms) in normalized.items():
+            raw = row.get(selector, "").strip()
             if not raw:
                 continue
 
@@ -204,23 +211,23 @@ def _validate_types(
     Collects up to 3 example failures per field for the warning message, but counts
     all mismatches for the total so the number is accurate.
     """
-    # Build reverse mapping: field_name -> csv_col (first match wins)
-    field_to_col: dict[str, str] = {}
-    for csv_col, v in mapping.items():
+    # Build reverse mapping: field_name -> selector (first match wins)
+    field_to_selector: dict[str, str] = {}
+    for selector, v in mapping.items():
         fname = v.get("target", "") if isinstance(v, dict) else v
-        if fname and fname != "__idno__" and fname not in field_to_col:
-            field_to_col[fname] = csv_col
+        if fname and fname != "__idno__" and fname not in field_to_selector:
+            field_to_selector[fname] = selector
 
     examples: dict[str, list[tuple[int, str]]] = {}
     counts: dict[str, int] = {}
 
     for i, row in enumerate(rows):
         row_num = i + 2
-        for fname, csv_col in field_to_col.items():
+        for fname, selector in field_to_selector.items():
             fd = field_defs.get(fname)
             if not fd:
                 continue
-            raw = row.get(csv_col, "").strip()
+            raw = row.get(selector, "").strip()
             if not raw:
                 continue
 
@@ -309,13 +316,13 @@ def dry_run(
                 errors.append({"row": row_num, "message": f"Pflichtfeld '{fname}' ist leer"})
 
         # Track empty values for non-required mapped fields
-        for csv_col, val in mapping.items():
+        for selector, val in mapping.items():
             field_name = val.get("target", "") if isinstance(val, dict) else val
             if field_name == "__idno__":
                 continue
             if field_name in required_fields:
                 continue
-            raw = rows[i].get(csv_col, "").strip()
+            raw = rows[i].get(selector, "").strip()
             if not raw:
                 empty_field_counts[field_name] = empty_field_counts.get(field_name, 0) + 1
 

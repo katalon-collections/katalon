@@ -52,7 +52,8 @@ class MappingEntry(BaseModel):
 
 
 class MappingRequest(BaseModel):
-    mapping: dict[str, MappingEntry]   # csv_column -> {target, transforms?}
+    mapping: dict[str, MappingEntry]   # selector -> {target, transforms?}
+    # selector = CSV/Excel column header OR Clark-notation XPath for XML
     rows: list[dict[str, str]]
     record_type: str = "object"
     subtype: str | None = None
