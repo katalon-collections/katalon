@@ -1,4 +1,4 @@
-import type { UploadResult, DryRunResult, TaskStatus, MappingEntry } from '../../../api/client'
+import type { UploadResult, DryRunResult, TaskStatus, MappingEntry, XmlElementLevel, XmlSelector } from '../../../api/client'
 
 export interface PendingField {
   csvColumn: string
@@ -19,6 +19,12 @@ export interface ImporterState {
   uploading: boolean
   uploadErr: string | null
   uploaded: UploadResult | null
+  // XML-specific upload state (step 0.5 between Upload and Mapping)
+  sourceType: 'csv' | 'excel' | 'xml' | null
+  xmlUploadId: string | null
+  xmlElementLevels: XmlElementLevel[] | null
+  xmlSelectorsLoading: boolean
+  xmlSelectors: XmlSelector[] | null
   // Mapping
   mapping: Record<string, MappingEntry>
   idnoStrategy: string
@@ -41,6 +47,10 @@ export type ImporterAction =
   | { type: 'UPLOAD_STARTED' }
   | { type: 'UPLOADED'; payload: UploadResult }
   | { type: 'UPLOAD_ERROR'; payload: string }
+  // XML two-step upload
+  | { type: 'XML_UPLOAD_DONE'; payload: { uploadId: string; elementLevels: XmlElementLevel[] } }
+  | { type: 'XML_SELECTORS_LOADING' }
+  | { type: 'XML_RECORD_XPATH_SET'; payload: { uploaded: UploadResult; selectors: XmlSelector[] } }
   | { type: 'MAPPING_CHANGED'; payload: Record<string, MappingEntry> }
   | { type: 'IDNO_STRATEGY_CHANGED'; payload: { strategy: string; column: string | null } }
   | { type: 'OPTIONS_CHANGED'; payload: Partial<Pick<ImporterState, 'upsertStrategy' | 'autoPublish'>> }
@@ -84,6 +94,9 @@ export const FIELD_TYPE_OPTIONS = [
   { id: 'relation', label: 'Relation' },
 ] as const
 
+// Steps 0=Upload, 1=Mapping (CSV/Excel) or XmlRecordSelector (XML), 2=Mapping (XML only), 3=DryRun, 4=Import
+// For CSV/Excel the wizard has 4 steps; XML adds one extra step between Upload and Mapping
 export const STEPS = ['Upload', 'Mapping', 'Probelauf', 'Import'] as const
+export const STEPS_XML = ['Upload', 'Element', 'Mapping', 'Probelauf', 'Import'] as const
 
 export const IMPORTER_STATE_KEY = 'katalon_importer_state'

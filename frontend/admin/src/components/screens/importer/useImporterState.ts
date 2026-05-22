@@ -1,6 +1,6 @@
-import { useEffect, useReducer, useRef } from 'react'
+import React, { useEffect, useReducer, useRef } from 'react'
 import { importer, schema, subtypes as subtypesApi } from '../../../api/client'
-import type { MappingEntry, UploadResult } from '../../../api/client'
+import type { MappingEntry, UploadResult, XmlElementLevel, XmlSelector } from '../../../api/client'
 import type { FieldDefinition, RecordSubtype } from '../../../types'
 import {
   IMPORTER_STATE_KEY,
@@ -50,22 +50,27 @@ function loadPersistedState(): PersistedImporterState | null {
 
 function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
   return {
-    step:          persisted?.step          ?? 0,
-    recordType:    persisted?.recordType    ?? 'object',
-    subtype:       persisted?.subtype       ?? null,
-    uploading:     false,
-    uploadErr:     null,
-    uploaded:      persisted?.uploaded      ?? null,
-    mapping:       persisted?.mapping       ?? {},
-    idnoStrategy:  persisted?.idnoStrategy  ?? 'auto',
-    idnoColumn:    persisted?.idnoColumn    ?? null,
+    step:           persisted?.step          ?? 0,
+    recordType:     persisted?.recordType    ?? 'object',
+    subtype:        persisted?.subtype       ?? null,
+    uploading:      false,
+    uploadErr:      null,
+    uploaded:       persisted?.uploaded      ?? null,
+    sourceType:     null,
+    xmlUploadId:    null,
+    xmlElementLevels: null,
+    xmlSelectorsLoading: false,
+    xmlSelectors:   null,
+    mapping:        persisted?.mapping       ?? {},
+    idnoStrategy:   persisted?.idnoStrategy  ?? 'auto',
+    idnoColumn:     persisted?.idnoColumn    ?? null,
     upsertStrategy: persisted?.upsertStrategy ?? 'skip',
-    autoPublish:   persisted?.autoPublish   ?? false,
-    pendingFields: persisted?.pendingFields ?? [],
-    dryResult:     persisted?.dryResult     ?? null,
-    dryRunning:    false,
-    taskId:        persisted?.taskId        ?? null,
-    taskStatus:    null,
+    autoPublish:    persisted?.autoPublish   ?? false,
+    pendingFields:  persisted?.pendingFields ?? [],
+    dryResult:      persisted?.dryResult     ?? null,
+    dryRunning:     false,
+    taskId:         persisted?.taskId        ?? null,
+    taskStatus:     null,
   }
 }
 
@@ -82,8 +87,7 @@ function removeIdnoFromMapping(m: Record<string, MappingEntry>): Record<string, 
 function importerReducer(state: ImporterState, action: ImporterAction): ImporterState {
   switch (action.type) {
     case 'SET_RECORD_TYPE':
-      return buildInitialState(null) // full reset on type change
-        && { ...buildInitialState(null), recordType: action.payload }
+      return { ...buildInitialState(null), recordType: action.payload }
 
     case 'SET_SUBTYPE':
       return { ...state, subtype: action.payload }
@@ -91,15 +95,33 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
     case 'UPLOAD_STARTED':
       return { ...state, uploading: true, uploadErr: null }
 
-    case 'UPLOADED': {
-      const result = action.payload
-      const autoMap: Record<string, MappingEntry> = {}
-      // Auto-map obvious column names (will be refined by step components)
-      return { ...state, uploading: false, uploaded: result, mapping: autoMap, step: 1, uploadErr: null }
-    }
+    case 'UPLOADED':
+      return { ...state, uploading: false, uploaded: action.payload, sourceType: action.payload.source_type ?? 'csv', mapping: {}, step: 1, uploadErr: null }
 
     case 'UPLOAD_ERROR':
       return { ...state, uploading: false, uploadErr: action.payload }
+
+    case 'XML_UPLOAD_DONE':
+      return {
+        ...state, uploading: false, uploadErr: null,
+        sourceType: 'xml',
+        xmlUploadId: action.payload.uploadId,
+        xmlElementLevels: action.payload.elementLevels,
+        step: 1, // XmlRecordSelector step
+      }
+
+    case 'XML_SELECTORS_LOADING':
+      return { ...state, xmlSelectorsLoading: true }
+
+    case 'XML_RECORD_XPATH_SET':
+      return {
+        ...state,
+        xmlSelectorsLoading: false,
+        xmlSelectors: action.payload.selectors,
+        uploaded: action.payload.uploaded,
+        mapping: {},
+        step: 2, // Mapping step for XML
+      }
 
     case 'MAPPING_CHANGED':
       return { ...state, mapping: action.payload }
@@ -124,10 +146,10 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       return { ...state, dryRunning: true }
 
     case 'DRY_RUN_OK':
-      return { ...state, dryRunning: false, dryResult: action.payload, step: 2 }
+      return { ...state, dryRunning: false, dryResult: action.payload, step: state.sourceType === 'xml' ? 3 : 2 }
 
     case 'IMPORT_STARTED':
-      return { ...state, taskId: action.payload, taskStatus: { state: 'PENDING' }, step: 3 }
+      return { ...state, taskId: action.payload, taskStatus: { state: 'PENDING' }, step: state.sourceType === 'xml' ? 4 : 3 }
 
     case 'TASK_STATUS_UPDATED':
       return { ...state, taskStatus: action.payload }
@@ -143,14 +165,6 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
   }
 }
 
-// Workaround: SET_RECORD_TYPE resets all state then sets the type
-function patchedReducer(state: ImporterState, action: ImporterAction): ImporterState {
-  if (action.type === 'SET_RECORD_TYPE') {
-    return { ...buildInitialState(null), recordType: action.payload }
-  }
-  return importerReducer(state, action)
-}
-
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export interface ImporterStateAndHandlers {
@@ -158,26 +172,25 @@ export interface ImporterStateAndHandlers {
   dispatch: React.Dispatch<ImporterAction>
   fields: FieldDefinition[]
   availableSubtypes: RecordSubtype[]
-  // Derived
   mappedCount: number
   ignoredCount: number
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
-  // Async handlers
   handleFile: (file: File) => Promise<void>
+  handleXmlRecordXpath: (clarkTag: string) => Promise<void>
   handleDryRun: () => Promise<void>
   handleImport: () => Promise<void>
 }
 
 export function useImporterState(): ImporterStateAndHandlers {
   const persisted = loadPersistedState()
-  const [state, dispatch] = useReducer(patchedReducer, persisted, buildInitialState)
+  const [state, dispatch] = useReducer(importerReducer, persisted, buildInitialState)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [fields, setFields] = React.useState<FieldDefinition[]>([])
   const [availableSubtypes, setAvailableSubtypes] = React.useState<RecordSubtype[]>([])
 
-  // Persist to localStorage
+  // Persist to localStorage (skip transient fields)
   useEffect(() => {
     const toSave: PersistedImporterState = {
       step: state.step, recordType: state.recordType, subtype: state.subtype,
@@ -193,48 +206,33 @@ export function useImporterState(): ImporterStateAndHandlers {
     state.dryResult, state.taskId, state.pendingFields,
   ])
 
-  // Load fields + subtypes when recordType or subtype changes
+  // Load fields + subtypes
   useEffect(() => {
     schema.list(state.recordType, state.subtype ?? undefined).then(fs => {
-      setFields(fs.concat(state.pendingFields.map((p): FieldDefinition => ({
-        id: `__pending__${p.name}`,
-        target_type: state.recordType,
-        name: p.name,
+      const virtuals = state.pendingFields.map((p): FieldDefinition => ({
+        id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
         label: { de: p.label_de, en: p.label_en },
         field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false,
-        is_repeatable: p.is_repeatable,
-        sort_order: 9999,
-        settings: {},
-        target_subtype: null,
-        show_in_detail: false,
-        show_in_list: false,
-        is_facet: false,
-        is_searchable: false,
-      }))))
+        is_required: false, is_repeatable: p.is_repeatable, sort_order: 9999,
+        settings: {}, target_subtype: null,
+        show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
+      }))
+      setFields(fs.concat(virtuals))
     }).catch(() => setFields([]))
     subtypesApi.list(state.recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
   }, [state.recordType, state.subtype]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-merge pending fields into fields list when pendingFields changes
+  // Re-merge pending fields when they change
   useEffect(() => {
     setFields(prev => {
       const base = prev.filter(f => !f.id.startsWith('__pending__'))
       return base.concat(state.pendingFields.map((p): FieldDefinition => ({
-        id: `__pending__${p.name}`,
-        target_type: state.recordType,
-        name: p.name,
+        id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
         label: { de: p.label_de, en: p.label_en },
         field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false,
-        is_repeatable: p.is_repeatable,
-        sort_order: 9999,
-        settings: {},
-        target_subtype: null,
-        show_in_detail: false,
-        show_in_list: false,
-        is_facet: false,
-        is_searchable: false,
+        is_required: false, is_repeatable: p.is_repeatable, sort_order: 9999,
+        settings: {}, target_subtype: null,
+        show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
       })))
     })
   }, [state.pendingFields, state.recordType])
@@ -246,9 +244,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       try {
         const s = await importer.taskStatus(state.taskId!)
         dispatch({ type: 'TASK_STATUS_UPDATED', payload: s })
-        if (s.state === 'SUCCESS' || s.state === 'FAILURE') {
-          clearInterval(pollRef.current!)
-        }
+        if (s.state === 'SUCCESS' || s.state === 'FAILURE') clearInterval(pollRef.current!)
       } catch {
         clearInterval(pollRef.current!)
       }
@@ -258,31 +254,66 @@ export function useImporterState(): ImporterStateAndHandlers {
 
   // Derived
   const mappedCount = Object.values(state.mapping).filter(m => m.target && m.target !== '__idno__').length
-  const ignoredCount = state.uploaded
-    ? state.uploaded.headers.length - mappedCount - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
+  const uploaded = state.uploaded
+  const ignoredCount = uploaded
+    ? uploaded.headers.length - mappedCount - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
     : 0
   const mappedTargets = new Set(Object.values(state.mapping).map(m => m.target).filter(Boolean))
   const missingRequired = fields.filter(f => f.is_required && !mappedTargets.has(f.name))
   const idnoMissing = state.idnoStrategy === 'column' && !state.idnoColumn
 
-  // Async handlers
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   async function handleFile(file: File) {
     dispatch({ type: 'UPLOAD_STARTED' })
     try {
-      const result = await importer.upload(file) as UploadResult
-      // Auto-map obvious columns
-      const currentFields = fields
+      const raw = await importer.upload(file)
+      const result = raw as UploadResult & { upload_id?: string; element_levels?: XmlElementLevel[] }
+
+      if (result.source_type === 'xml' && result.upload_id) {
+        dispatch({
+          type: 'XML_UPLOAD_DONE',
+          payload: { uploadId: result.upload_id, elementLevels: result.element_levels ?? [] },
+        })
+        return
+      }
+
+      // CSV/Excel: auto-map obvious column names
       const autoMap: Record<string, MappingEntry> = {}
       for (const col of (result.headers ?? [])) {
         const norm = col.toLowerCase().replace(/[\s\-]/g, '_')
-        const match = currentFields.find(f => f.name === norm || f.label.de?.toLowerCase() === col.toLowerCase())
+        const match = fields.find(f => f.name === norm || f.label.de?.toLowerCase() === col.toLowerCase())
         if (match) autoMap[col] = { target: match.name }
       }
-      dispatch({ type: 'UPLOADED', payload: { ...result, } })
-      // Override auto-map with actual computed one
+      dispatch({ type: 'UPLOADED', payload: result })
       dispatch({ type: 'MAPPING_CHANGED', payload: autoMap })
     } catch (e) {
       dispatch({ type: 'UPLOAD_ERROR', payload: (e as Error).message })
+    }
+  }
+
+  async function handleXmlRecordXpath(clarkTag: string) {
+    if (!state.xmlUploadId) return
+    dispatch({ type: 'XML_SELECTORS_LOADING' })
+    try {
+      const result = await importer.xmlSelectors(state.xmlUploadId, clarkTag)
+      dispatch({
+        type: 'XML_RECORD_XPATH_SET',
+        payload: {
+          uploaded: {
+            source_type: 'xml',
+            headers: result.headers,
+            row_count: result.row_count,
+            preview: result.preview,
+            rows: result.rows,
+            suggestions: result.suggestions,
+          },
+          selectors: result.selectors,
+        },
+      })
+    } catch (e) {
+      alert((e as Error).message)
+      dispatch({ type: 'XML_SELECTORS_LOADING' }) // clear loading state via reducer fallthrough
     }
   }
 
@@ -293,7 +324,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       const result = await importer.dryRun(state.recordType, state.uploaded.rows, state.mapping, state.subtype)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
-      dispatch({ type: 'OPTIONS_CHANGED', payload: {} }) // clear dryRunning
+      dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
       alert((e as Error).message)
     }
   }
@@ -320,9 +351,6 @@ export function useImporterState(): ImporterStateAndHandlers {
   return {
     state, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
-    handleFile, handleDryRun, handleImport,
+    handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
   }
 }
-
-// React needs to be in scope for JSX in this file
-import React from 'react'

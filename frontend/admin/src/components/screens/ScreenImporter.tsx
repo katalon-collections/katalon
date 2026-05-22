@@ -1,22 +1,24 @@
+import { useState } from 'react'
 import type { FieldDefinition } from '../../types'
-import { RECORD_TYPES, STEPS } from './importer/types'
+import { RECORD_TYPES, STEPS, STEPS_XML } from './importer/types'
 import { useImporterState } from './importer/useImporterState'
 import { StepDryRun } from './importer/StepDryRun'
 import { StepMapping } from './importer/StepMapping'
 import { StepMedia } from './importer/StepMedia'
 import { StepResult } from './importer/StepResult'
 import { StepUpload } from './importer/StepUpload'
-import { useState } from 'react'
+import { StepXmlRecordSelector } from './importer/StepXmlRecordSelector'
 
 const IMPORTER_TABS = [
   { id: 'metadata', label: 'Metadaten' },
   { id: 'media',    label: 'Medien' },
 ]
 
-function StepBar({ step }: { step: number }) {
+function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
+  const steps = isXml ? STEPS_XML : STEPS
   return (
     <div className="steps">
-      {STEPS.map((s, i) => (
+      {steps.map((s, i) => (
         <div key={s} className={`step${i === step ? ' active' : i < step ? ' done' : ''}`}>
           <div className="num">{i < step ? '✓' : i + 1}</div>
           {s}
@@ -32,12 +34,19 @@ export function ScreenImporter() {
   const {
     state, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
-    handleFile, handleDryRun, handleImport,
+    handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
   } = useImporterState()
 
-  function reset() {
-    dispatch({ type: 'RESET' })
-  }
+  const isXml = state.sourceType === 'xml'
+
+  // Step numbers differ between XML (5 steps) and CSV/Excel (4 steps)
+  // XML:     0=Upload  1=Element  2=Mapping  3=DryRun  4=Import
+  // CSV/Excel: 0=Upload  1=Mapping  2=DryRun  3=Import
+  const mappingStep   = isXml ? 2 : 1
+  const dryRunStep    = isXml ? 3 : 2
+  const resultStep    = isXml ? 4 : 3
+
+  function reset() { dispatch({ type: 'RESET' }) }
 
   return (
     <div className="scroll">
@@ -93,9 +102,10 @@ export function ScreenImporter() {
             </div>
           )}
 
-          <StepBar step={state.step} />
+          <StepBar step={state.step} isXml={isXml} />
 
           <div style={{ marginTop: 24 }}>
+            {/* Step 0: Upload (all formats) */}
             {state.step === 0 && (
               <StepUpload
                 uploaded={state.uploaded}
@@ -105,7 +115,17 @@ export function ScreenImporter() {
               />
             )}
 
-            {state.step === 1 && state.uploaded && (
+            {/* Step 1 (XML only): Record element selector */}
+            {state.step === 1 && isXml && state.xmlElementLevels && (
+              <StepXmlRecordSelector
+                elementLevels={state.xmlElementLevels}
+                loading={state.xmlSelectorsLoading}
+                onSelect={handleXmlRecordXpath}
+              />
+            )}
+
+            {/* Mapping step */}
+            {state.step === mappingStep && state.uploaded && (
               <StepMapping
                 uploaded={state.uploaded}
                 fields={fields}
@@ -118,7 +138,7 @@ export function ScreenImporter() {
                   dispatch({ type: 'IDNO_STRATEGY_CHANGED', payload: { strategy, column } })
                 }
                 pendingFields={state.pendingFields}
-                onPendingFieldsChange={(pending, _withVirtual) =>
+                onPendingFieldsChange={(pending) =>
                   dispatch({ type: 'PENDING_FIELDS_CHANGED', payload: pending })
                 }
                 missingRequired={missingRequired}
@@ -127,11 +147,13 @@ export function ScreenImporter() {
                 ignoredCount={ignoredCount}
                 dryRunning={state.dryRunning}
                 onDryRun={handleDryRun}
-                onBack={reset}
+                onBack={() => dispatch({ type: 'STEP_SET', payload: isXml ? 1 : 0 })}
+                xmlSelectors={isXml ? (state.xmlSelectors ?? undefined) : undefined}
               />
             )}
 
-            {state.step === 2 && state.dryResult && (
+            {/* Dry run step */}
+            {state.step === dryRunStep && state.dryResult && (
               <StepDryRun
                 dryResult={state.dryResult}
                 upsertStrategy={state.upsertStrategy}
@@ -140,15 +162,16 @@ export function ScreenImporter() {
                 onAutoPublishChange={v => dispatch({ type: 'OPTIONS_CHANGED', payload: { autoPublish: v } })}
                 idnoStrategy={state.idnoStrategy}
                 onImport={handleImport}
-                onBack={() => dispatch({ type: 'STEP_SET', payload: 1 })}
+                onBack={() => dispatch({ type: 'STEP_SET', payload: mappingStep })}
               />
             )}
 
-            {state.step === 3 && (
+            {/* Result step */}
+            {state.step === resultStep && (
               <StepResult
                 taskStatus={state.taskStatus}
                 taskId={state.taskId}
-                onBack={() => dispatch({ type: 'STEP_SET', payload: 1 })}
+                onBack={() => dispatch({ type: 'STEP_SET', payload: mappingStep })}
                 onReset={reset}
               />
             )}

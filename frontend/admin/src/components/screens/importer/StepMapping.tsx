@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MappingEntry, UploadResult } from '../../../api/client'
+import type { MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
 import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
@@ -15,7 +15,7 @@ interface Props {
   idnoColumn: string | null
   onIdnoStrategyChange: (strategy: string, column: string | null) => void
   pendingFields: PendingField[]
-  onPendingFieldsChange: (fields: PendingField[], fieldsWithVirtual: FieldDefinition[]) => void
+  onPendingFieldsChange: (fields: PendingField[]) => void
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
   mappedCount: number
@@ -23,14 +23,17 @@ interface Props {
   dryRunning: boolean
   onDryRun: () => void
   onBack: () => void
+  /** XML only: structured selector list with human-readable labels */
+  xmlSelectors?: XmlSelector[]
 }
+
 
 export function StepMapping({
   uploaded, fields, mapping, onMappingChange, recordType,
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
   pendingFields, onPendingFieldsChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
-  dryRunning, onDryRun, onBack,
+  dryRunning, onDryRun, onBack, xmlSelectors,
 }: Props) {
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
@@ -64,21 +67,16 @@ export function StepMapping({
       label_en: newFieldLabelEn || newFieldModal,
       is_repeatable: newFieldRepeatable,
     }
-    const virtualField: FieldDefinition = {
-      id: `__pending__${name}`,
-      target_type: recordType, name,
-      label: { de: pending.label_de, en: pending.label_en },
-      field_type: newFieldType as FieldDefinition['field_type'],
-      is_required: false, is_repeatable: newFieldRepeatable, sort_order: 9999,
-      settings: {}, target_subtype: null,
-      show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
-    }
     const newPending = [...pendingFields.filter(f => f.name !== name), pending]
-    const newFields = [...fields.filter(f => f.name !== name), virtualField]
-    onPendingFieldsChange(newPending, newFields)
+    onPendingFieldsChange(newPending)
     onMappingChange({ ...mapping, [newFieldModal]: { target: name } })
     setNewFieldModal(null)
   }
+
+  // Build path→label lookup for XML selector labels
+  const xmlLabelMap = xmlSelectors
+    ? Object.fromEntries(xmlSelectors.map(s => [s.path, s.label]))
+    : null
 
   return (
     <>
@@ -134,7 +132,7 @@ export function StepMapping({
         <table className="tbl">
           <thead>
             <tr>
-              <th>Quell-Spalte</th>
+              <th>{xmlLabelMap ? 'XPath-Selector' : 'Quell-Spalte'}</th>
               <th>Beispielwert</th>
               <th>→ Katalon-Feld</th>
               <th style={{ width: 140 }} />
@@ -145,9 +143,12 @@ export function StepMapping({
               const mapped = mapping[col]?.target ?? ''
               const transformCount = mapping[col]?.transforms?.length ?? 0
               const isIgnored = !mapped
+              const displayLabel = xmlLabelMap ? (xmlLabelMap[col] ?? col) : col
               return (
                 <tr key={col}>
-                  <td className="mono" style={{ maxWidth: 160 }}>{col}</td>
+                  <td className="mono" style={{ maxWidth: 200 }} title={xmlLabelMap ? col : undefined}>
+                    {displayLabel}
+                  </td>
                   <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>
                     {uploaded.preview[0]?.[col] ?? '—'}
                   </td>
