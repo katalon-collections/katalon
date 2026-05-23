@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
@@ -23,7 +23,7 @@ def _uuid() -> uuid.UUID:
 
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 # ---------------------------------------------------------------------------

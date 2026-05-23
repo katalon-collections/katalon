@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 import bcrypt as _bcrypt
@@ -49,9 +49,9 @@ async def get_current_user(
         if matched is None:
             raise credentials_exception
         if matched.expires_at is not None:
-            if datetime.utcnow() > matched.expires_at:
+            if datetime.now(UTC).replace(tzinfo=None) > matched.expires_at:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API-Schlüssel abgelaufen")
-        matched.last_used_at = datetime.utcnow()
+        matched.last_used_at = datetime.now(UTC).replace(tzinfo=None)
         user_result = await db.execute(select(User).where(User.id == matched.user_id))
         user = user_result.scalar_one_or_none()
         if user is None or not user.is_active:
@@ -95,9 +95,9 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
         )
         for candidate in result.scalars().all():
             if _bcrypt.checkpw(api_key.encode(), candidate.hashed_key.encode()):
-                if candidate.expires_at and datetime.utcnow() > candidate.expires_at:
+                if candidate.expires_at and datetime.now(UTC).replace(tzinfo=None) > candidate.expires_at:
                     return None
-                candidate.last_used_at = datetime.utcnow()
+                candidate.last_used_at = datetime.now(UTC).replace(tzinfo=None)
                 user_result = await db.execute(select(User).where(User.id == candidate.user_id))
                 user = user_result.scalar_one_or_none()
                 return user if user and user.is_active else None

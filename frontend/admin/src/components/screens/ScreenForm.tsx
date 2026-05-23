@@ -1519,7 +1519,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {mediaFiles.map(f => (
                           <div key={f.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)', background: 'var(--bg-s)' }}>
                             <a href={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1', overflow: 'hidden' }}>
-                              {f.status === 'ready' ? (
+                              {f.status !== 'error' ? (
                                 <img
                                   src={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`}
                                   alt={f.filename}
@@ -1527,12 +1527,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                                 />
                               ) : null}
-                              {f.status === 'pending' && (
-                                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                                  <div style={{ width: 18, height: 18, border: '2px solid var(--fg-3)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                                  <span style={{ fontSize: 9, color: 'var(--fg-3)' }}>Verarbeitung…</span>
-                                </div>
-                              )}
                               {f.status === 'error' && (
                                 <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                                   <AlertCircle size={18} style={{ color: '#dc2626' }} />

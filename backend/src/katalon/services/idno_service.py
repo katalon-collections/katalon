@@ -4,7 +4,7 @@ IDNO schema service: format generation, atomic counter management, pattern valid
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ _PLACEHOLDER_RE = re.compile(r"\{counter(?::([^}]+))?\}|\{year\}|\{type\}")
 def format_idno(schema: str, counter: int, record_type: str, year: int | None = None) -> str:
     """Render a schema string with the given counter and current year."""
     if year is None:
-        year = datetime.utcnow().year
+        year = datetime.now(UTC).year
     abbrev = _TYPE_ABBREV.get(record_type, record_type[:3])
 
     def _replace(m: re.Match) -> str:  # type: ignore[type-arg]

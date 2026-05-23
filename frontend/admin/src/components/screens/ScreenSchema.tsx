@@ -91,7 +91,17 @@ interface FieldDetailProps {
   onClose: () => void
 }
 
+function toSlug(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose }: FieldDetailProps) {
+  const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
+
   function set<K extends keyof FieldFormState>(key: K, value: FieldFormState[K]) {
     onChange({ ...form, [key]: value })
   }
@@ -120,7 +130,14 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
         <div className="fg-2">
           <div className="field">
             <div className="lbl">Label DE</div>
-            <input className="fld" value={form.label_de} onChange={e => set('label_de', e.target.value)} />
+            <input className="fld" value={form.label_de} onChange={e => {
+              const newLabel = e.target.value
+              if (isNew && !nameManuallyEdited) {
+                onChange({ ...form, label_de: newLabel, name: toSlug(newLabel) })
+              } else {
+                set('label_de', newLabel)
+              }
+            }} />
           </div>
           <div className="field">
             <div className="lbl">Label EN</div>
@@ -130,7 +147,10 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
         <div className="fg-2">
           <div className="field">
             <div className="lbl">Interner Name</div>
-            <input className="fld mono" value={form.name} onChange={e => set('name', e.target.value)} disabled={!isNew} />
+            <input className="fld mono" value={form.name} onChange={e => {
+              setNameManuallyEdited(true)
+              set('name', e.target.value)
+            }} disabled={!isNew} />
           </div>
           <div className="field">
             <div className="lbl">Feldtyp</div>

@@ -139,6 +139,35 @@ Beispiele für Felder:
 
 ---
 
+### `vocab_free` – Vokabularfeld mit Freitext
+
+Texteingabe mit optionalem Vokabular als Autocomplete-Quelle. Im Gegensatz zu `vocab` ist der eingegebene Wert nicht an einen Term im Vokabular gebunden — der User kann beliebige Texte eintragen oder einen Vorschlag aus der Autocomplete-Liste wählen.
+
+**UX-Unterschied zu `vocab`:**
+
+| | `vocab` | `vocab_free` |
+|---|---|---|
+| Eingabe | Strikter Picker, nur Vokabular-Terms wählbar | Freitextfeld mit optionalen Vorschlägen |
+| Gespeichertes Format | `{"id": "uuid", "label": "Begriff"}` | `"Begriff"` (plain string) |
+| Referenz-Integrität | Term-ID bleibt verknüpft | Kein referenzieller Bezug |
+
+**Settings:**
+
+| Schlüssel | Typ | Beschreibung |
+|---|---|---|
+| `vocabulary_id` | UUID | Optional. Vokabular, dessen Terms als Autocomplete-Vorschläge angezeigt werden. Ohne Angabe: reines Freitextfeld ohne Vorschläge. |
+
+Beispiel:
+```json
+{"vocabulary_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"}
+```
+
+Beispiele für Felder:
+- Technik / Herstellungsverfahren (viele Freitextvarianten, Vokabular als Hilfe)
+- Schlagwort (freie Eingabe, aber Kontrolle über bekannte Begriffe)
+
+---
+
 ### `relation` – Verknüpfung zu einem anderen Datensatz
 
 Verknüpft den Datensatz mit einem anderen Datensatz (Object, Entity, Place oder Occurrence). Die Relation wird in der `relations`-Tabelle gespeichert.

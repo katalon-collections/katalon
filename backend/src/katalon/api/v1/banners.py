@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -49,7 +49,7 @@ class BannerRead(BaseModel):
 
 def _active_filter(q: object, *, surface: str) -> object:
     """Return banners that are active, not expired, and visible on `surface`."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     from sqlalchemy import or_
 
     q = q.where(Banner.is_active.is_(True))
