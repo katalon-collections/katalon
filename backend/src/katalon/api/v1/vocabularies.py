@@ -79,7 +79,6 @@ async def list_terms(
         select(VocabularyTerm)
         .where(VocabularyTerm.vocabulary_id == vocab_id)
         .order_by(VocabularyTerm.term)
-        .limit(20)
     )
     if q and q.strip():
         pattern = f"%{q.strip()}%"

@@ -34,6 +34,28 @@ def test_parse_csv_terms_requires_term() -> None:
     assert "term" in errors[0]["message"]
 
 
+def test_parse_csv_terms_trims_whitespace_in_headers_and_values() -> None:
+    """CSV with spaces after commas and trailing spaces in headers/values."""
+    content = (
+        "639-1 ,639-2/T ,639-2/B ,Language name ,Native name \n"
+        "aa ,aar ,aar ,Afar ,Afaraf \n"
+        "ab ,abk ,abk ,Abkhaz ,\"аҧсуа бызшәа, аҧсшәа \" \n"
+    ).encode()
+    mapping = {
+        "639-2/T": "term",
+        "Language name": "label:de",
+    }
+
+    terms, errors = parse_csv_terms(content, mapping)
+
+    assert errors == []
+    assert len(terms) == 2
+    assert terms[0].term == "aar"
+    assert terms[0].label == {"de": "Afar"}
+    assert terms[1].term == "abk"
+    assert terms[1].label == {"de": "Abkhaz"}
+
+
 def test_parse_json_terms_nested_hierarchy() -> None:
     content = b"""
     [

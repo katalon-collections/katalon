@@ -85,7 +85,7 @@ def parse_csv_terms(
     errors: list[dict[str, Any]] = []
 
     for i, row in enumerate(reader, start=2):
-        row_values = {k: _norm(v) for k, v in row.items() if k}
+        row_values = {_norm(k): _norm(v) for k, v in row.items() if k}
         term = ""
         parent_term = None
         external_id = None

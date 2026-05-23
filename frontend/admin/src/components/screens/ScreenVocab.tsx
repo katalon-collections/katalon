@@ -46,8 +46,8 @@ export function ScreenVocab() {
 
   const CSV_TARGETS = [
     { value: '', label: 'Ignorieren' },
-    { value: 'term', label: 'Term' },
-    { value: 'parent_term', label: 'Parent-Term' },
+    { value: 'term', label: 'ID' },
+    { value: 'parent_term', label: 'Parent-ID' },
     { value: 'external_id', label: 'Externe ID' },
     { value: 'label:de', label: 'Label (de)' },
     { value: 'label:en', label: 'Label (en)' },
@@ -204,7 +204,7 @@ export function ScreenVocab() {
   async function runVocabularyImport(dryRun: boolean) {
     if (!activeVocab || !importFile) return
     if (isCsvImport && !hasTermMapping) {
-      setImportFeedback("Bitte mindestens eine Spalte auf 'Term' mappen.")
+      setImportFeedback("Bitte mindestens eine Spalte auf 'ID' mappen.")
       return
     }
     setImportBusy(true)
@@ -393,7 +393,7 @@ export function ScreenVocab() {
                   <div className="bd">
                     <div className="fg-2">
                       <div className="field">
-                        <div className="lbl">Term (intern)</div>
+                        <div className="lbl">ID (intern)</div>
                         <input className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
                       </div>
                       <div className="field">
@@ -413,7 +413,7 @@ export function ScreenVocab() {
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>Term</th>
+                      <th>ID</th>
                       <th>Label DE</th>
                       <th>Übergeordnet</th>
                       <th className="col-act" />
