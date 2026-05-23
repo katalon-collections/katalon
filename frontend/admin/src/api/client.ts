@@ -369,7 +369,41 @@ export const staticPages = {
 
 // Importer
 export interface UploadResult {
+  source_type?: 'csv' | 'excel' | 'xml'
   headers: string[]
+  row_count: number
+  preview: Record<string, string>[]
+  rows: Record<string, string>[]
+  suggestions: Record<string, string>
+}
+
+export interface XmlElementTag {
+  clark_tag: string
+  label: string
+}
+
+export interface XmlElementLevel {
+  depth: number
+  tags: XmlElementTag[]
+}
+
+export interface XmlSelector {
+  path: string
+  label: string
+  sample: string
+  kind: string
+}
+
+export interface XmlUploadResult {
+  source_type: 'xml'
+  upload_id: string
+  element_levels: XmlElementLevel[]
+}
+
+export interface XmlSelectorsResult {
+  source_type: 'xml'
+  headers: string[]
+  selectors: XmlSelector[]
   row_count: number
   preview: Record<string, string>[]
   rows: Record<string, string>[]
@@ -443,6 +477,18 @@ export const importer = {
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   createFields: (recordType: string, fields: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<{ created: number; fields: CreatedField[]; restored?: string[] }> =>
     req('/v1/importer/create-fields', { method: 'POST', body: JSON.stringify({ record_type: recordType, fields }) }),
+  xmlUpload: async (file: File): Promise<XmlUploadResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    if (_token) headers['Authorization'] = `Bearer ${_token}`
+    const res = await fetch(`${BASE}/v1/importer/upload`, { method: 'POST', body: formData, headers })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
+    if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
+    return res.json()
+  },
+  xmlSelectors: (uploadId: string, recordXpath: string): Promise<XmlSelectorsResult> =>
+    req<XmlSelectorsResult>('/v1/importer/xml-selectors', { method: 'POST', body: JSON.stringify({ upload_id: uploadId, record_xpath: recordXpath }) }),
 }
 
 // OAI Sets

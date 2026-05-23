@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -11,12 +12,15 @@ from katalon.core.models import FieldDefinition, RecordSubtype
 from katalon.core.schemas import FieldDefinitionRead
 from katalon.services import importer_service
 from katalon.services.importer import parse_file
+from katalon.services.importer.formats.xml_format import XmlFormat
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import has_any_subtypes
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
-MAX_SIZE = 10 * 1024 * 1024  # 10 MB (matches frontend limit)
+MAX_SIZE = 500 * 1024 * 1024  # 500 MB
+
+_XML_UPLOAD_TTL = 3600  # seconds
 
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
 
@@ -48,7 +52,8 @@ class MappingEntry(BaseModel):
 
 
 class MappingRequest(BaseModel):
-    mapping: dict[str, MappingEntry]   # csv_column -> {target, transforms?}
+    mapping: dict[str, MappingEntry]   # selector -> {target, transforms?}
+    # selector = CSV/Excel column header OR Clark-notation XPath for XML
     rows: list[dict[str, str]]
     record_type: str = "object"
     subtype: str | None = None
@@ -66,22 +71,78 @@ class CreateFieldsRequest(BaseModel):
     fields: list[dict[str, Any]]  # [{"name": "...", "field_type": "...", "label_de": "...", "label_en": "...", "is_repeatable": true/false}]
 
 
+class XmlSelectorsRequest(BaseModel):
+    upload_id: str
+    record_xpath: str  # Clark-notation tag e.g. "{http://...}mods" or "*"
+
+
+def _get_redis():
+    import redis as redis_lib
+    from katalon.config import settings
+    return redis_lib.from_url(settings.redis_url, decode_responses=False)
+
+
 @router.post("/upload")
 async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 10 MB)")
+        raise HTTPException(status_code=413, detail="Datei zu groß (max 500 MB)")
     filename = file.filename or ""
+
+    # XML gets a two-step flow: upload returns element levels, user picks record element
+    xml_fmt = XmlFormat()
+    if xml_fmt.sniff(content, filename):
+        try:
+            element_levels = xml_fmt.list_element_levels(content)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"XML konnte nicht geparst werden: {exc}") from exc
+        upload_id = str(uuid.uuid4())
+        r = _get_redis()
+        r.setex(f"xml_upload:{upload_id}", _XML_UPLOAD_TTL, content)
+        return {
+            "source_type": "xml",
+            "upload_id": upload_id,
+            "element_levels": element_levels,
+        }
+
     try:
         headers, rows, _ = parse_file(filename, content)
     except (ValueError, NotImplementedError):
-        raise HTTPException(status_code=422, detail="Nur CSV, TSV und Excel (.xlsx) werden unterstützt")
+        raise HTTPException(status_code=422, detail="Nur CSV, TSV, Excel (.xlsx) und XML werden unterstützt")
 
-    # Suggest field types for each column
     suggestions = importer_service.suggest_field_types(headers, rows)
-
+    source_type = "excel" if filename.lower().endswith((".xlsx", ".xls")) else "csv"
     return {
+        "source_type": source_type,
         "headers": headers,
+        "row_count": len(rows),
+        "preview": rows[:5],
+        "rows": rows,
+        "suggestions": suggestions,
+    }
+
+
+@router.post("/xml-selectors")
+async def xml_selectors(body: XmlSelectorsRequest, _: CurrentUser) -> dict:
+    """Resolve selectors and rows for XML after the user has chosen the record element."""
+    r = _get_redis()
+    content = r.get(f"xml_upload:{body.upload_id}")
+    if content is None:
+        raise HTTPException(status_code=404, detail="Upload nicht gefunden oder abgelaufen (max 1 Stunde)")
+
+    xml_fmt = XmlFormat()
+    try:
+        selectors = xml_fmt.list_selectors(content, record_xpath=body.record_xpath)
+        rows = list(xml_fmt.parse_flat(content, record_xpath=body.record_xpath))
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"XML konnte nicht verarbeitet werden: {exc}") from exc
+
+    headers = [s.path for s in selectors]
+    suggestions = importer_service.suggest_field_types(headers, rows)
+    return {
+        "source_type": "xml",
+        "headers": headers,
+        "selectors": [{"path": s.path, "label": s.label, "sample": s.sample, "kind": s.kind} for s in selectors],
         "row_count": len(rows),
         "preview": rows[:5],
         "rows": rows,
