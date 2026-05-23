@@ -65,7 +65,7 @@ async def _es_search_for_oai(
     query = {"bool": {"must": must, "filter": filters}}
     body = {
         "query": query,
-        "sort": [{"updated_at": "asc"}, {"_id": "asc"}],
+        "sort": [{"updated_at": "asc"}, {"_doc": "asc"}],
         "from": offset,
         "size": PAGE_SIZE,
     }
