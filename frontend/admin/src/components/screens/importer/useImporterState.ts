@@ -6,9 +6,12 @@ import {
   IMPORTER_STATE_KEY,
   type ImporterAction,
   type ImporterState,
+  type ImportProfile,
   type PendingField,
   type PersistedImporterState,
+  type ProfileApplyResult,
 } from './types'
+import { applyProfile, buildProfile, downloadProfile } from './profileUtils'
 
 // ── Persistence helpers ───────────────────────────────────────────────────────
 
@@ -157,6 +160,11 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
     case 'STEP_SET':
       return { ...state, step: action.payload }
 
+    case 'PROFILE_APPLIED': {
+      const { mapping, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
+      return { ...state, mapping, pendingFields, upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
+    }
+
     case 'RESET':
       return buildInitialState(null)
 
@@ -176,10 +184,13 @@ export interface ImporterStateAndHandlers {
   ignoredCount: number
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
+  profileWarnings: ProfileApplyResult | null
   handleFile: (file: File) => Promise<void>
   handleXmlRecordXpath: (clarkTag: string) => Promise<void>
   handleDryRun: () => Promise<void>
   handleImport: () => Promise<void>
+  handleProfileLoaded: (profile: ImportProfile) => Promise<void>
+  handleProfileExport: () => Promise<void>
 }
 
 export function useImporterState(): ImporterStateAndHandlers {
@@ -189,6 +200,7 @@ export function useImporterState(): ImporterStateAndHandlers {
 
   const [fields, setFields] = React.useState<FieldDefinition[]>([])
   const [availableSubtypes, setAvailableSubtypes] = React.useState<RecordSubtype[]>([])
+  const [profileWarnings, setProfileWarnings] = React.useState<ProfileApplyResult | null>(null)
 
   // Persist to localStorage (skip transient fields)
   useEffect(() => {
@@ -348,9 +360,41 @@ export function useImporterState(): ImporterStateAndHandlers {
     }
   }
 
+  async function handleProfileLoaded(profile: ImportProfile) {
+    const fieldDefs = await schema.list(state.recordType, state.subtype ?? undefined).catch(() => [] as FieldDefinition[])
+    const existingFieldNames = new Set(fieldDefs.filter(f => !f.id.startsWith('__pending__')).map(f => f.name))
+    const availableSelectors = state.sourceType === 'xml' && state.xmlSelectors
+      ? state.xmlSelectors.map(s => s.path)
+      : (state.uploaded?.headers ?? [])
+    const result = applyProfile(profile, availableSelectors, existingFieldNames)
+    setProfileWarnings(result)
+    dispatch({
+      type: 'PROFILE_APPLIED',
+      payload: {
+        mapping: result.appliedMapping,
+        pendingFields: result.newPendingFields,
+        upsertStrategy: profile.upsertStrategy,
+        autoPublish: profile.autoPublish,
+        idnoStrategy: profile.idnoStrategy,
+      },
+    })
+  }
+
+  async function handleProfileExport() {
+    const fieldDefs = await schema.list(state.recordType, state.subtype ?? undefined).catch(() => [] as FieldDefinition[])
+    const profile = buildProfile(
+      state.mapping,
+      { record_type: state.recordType, idnoStrategy: state.idnoStrategy, upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish },
+      fieldDefs,
+    )
+    downloadProfile(profile)
+  }
+
   return {
     state, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
+    profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
+    handleProfileLoaded, handleProfileExport,
   }
 }

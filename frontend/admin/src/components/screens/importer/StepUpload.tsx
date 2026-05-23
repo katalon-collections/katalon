@@ -1,17 +1,39 @@
 import { useRef, useState } from 'react'
 import type { UploadResult } from '../../../api/client'
 import { Upload } from '../../ui/Icons'
+import type { ImportProfile } from './types'
 
 interface Props {
   uploaded: UploadResult | null
   uploading: boolean
   uploadErr: string | null
   onFile: (file: File) => void
+  onProfileLoaded?: (profile: ImportProfile) => void
 }
 
-export function StepUpload({ uploaded, uploading, uploadErr, onFile }: Props) {
+export function StepUpload({ uploaded, uploading, uploadErr, onFile, onProfileLoaded }: Props) {
   const [over, setOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const profileRef = useRef<HTMLInputElement>(null)
+  const [profileErr, setProfileErr] = useState<string | null>(null)
+
+  function handleProfileFile(file: File) {
+    setProfileErr(null)
+    const reader = new FileReader()
+    reader.onload = e => {
+      try {
+        const parsed = JSON.parse(e.target?.result as string)
+        if (parsed.version !== 1 || typeof parsed.mapping !== 'object') {
+          setProfileErr('Ungültiges Profilformat (version 1 erwartet).')
+          return
+        }
+        onProfileLoaded?.(parsed as ImportProfile)
+      } catch {
+        setProfileErr('Datei konnte nicht gelesen werden.')
+      }
+    }
+    reader.readAsText(file)
+  }
 
   return (
     <>
@@ -40,6 +62,23 @@ export function StepUpload({ uploaded, uploading, uploadErr, onFile }: Props) {
       </div>
 
       {uploadErr && <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>{uploadErr}</div>}
+
+      {uploaded && onProfileLoaded && (
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            className="btn sm gh"
+            onClick={() => profileRef.current?.click()}
+          >Import-Profil laden</button>
+          <input
+            ref={profileRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleProfileFile(f); e.target.value = '' }}
+          />
+          {profileErr && <span style={{ fontSize: 12, color: '#dc2626' }}>{profileErr}</span>}
+        </div>
+      )}
 
       {uploaded && (
         <div className="card" style={{ marginTop: 16 }}>

@@ -34,7 +34,9 @@ export function ScreenImporter() {
   const {
     state, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
+    profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
+    handleProfileLoaded, handleProfileExport,
   } = useImporterState()
 
   const isXml = state.sourceType === 'xml'
@@ -112,6 +114,7 @@ export function ScreenImporter() {
                 uploading={state.uploading}
                 uploadErr={state.uploadErr}
                 onFile={handleFile}
+                onProfileLoaded={handleProfileLoaded}
               />
             )}
 
@@ -148,6 +151,8 @@ export function ScreenImporter() {
                 dryRunning={state.dryRunning}
                 onDryRun={handleDryRun}
                 onBack={() => dispatch({ type: 'STEP_SET', payload: isXml ? 1 : 0 })}
+                onProfileExport={handleProfileExport}
+                profileWarnings={profileWarnings}
                 xmlSelectors={isXml ? (state.xmlSelectors ?? undefined) : undefined}
               />
             )}

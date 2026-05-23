@@ -3,7 +3,7 @@ import type { MappingEntry, UploadResult, XmlSelector } from '../../../api/clien
 import type { FieldDefinition } from '../../../types'
 import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
-import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField } from './types'
+import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult } from './types'
 
 interface Props {
   uploaded: UploadResult
@@ -23,6 +23,8 @@ interface Props {
   dryRunning: boolean
   onDryRun: () => void
   onBack: () => void
+  onProfileExport?: () => void
+  profileWarnings?: ProfileApplyResult | null
   /** XML only: structured selector list with human-readable labels */
   xmlSelectors?: XmlSelector[]
 }
@@ -33,9 +35,10 @@ export function StepMapping({
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
   pendingFields, onPendingFieldsChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
-  dryRunning, onDryRun, onBack, xmlSelectors,
+  dryRunning, onDryRun, onBack, onProfileExport, profileWarnings, xmlSelectors,
 }: Props) {
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
+  const [warningsExpanded, setWarningsExpanded] = useState(false)
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
   const [newFieldType, setNewFieldType] = useState('text')
   const [newFieldLabelDe, setNewFieldLabelDe] = useState('')
@@ -80,6 +83,38 @@ export function StepMapping({
 
   return (
     <>
+      {/* Profile import warnings banner */}
+      {profileWarnings && (profileWarnings.missedSelectors.length > 0 || profileWarnings.missingFieldNames.length > 0 || profileWarnings.appliedMapping) && (
+        <div style={{ marginBottom: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, padding: '10px 14px', fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ color: '#166534' }}>✓ {Object.keys(profileWarnings.appliedMapping).length} Zuweisungen übernommen</span>
+              {profileWarnings.missingFieldNames.length > 0 && (
+                <span style={{ color: '#92400e' }}>⚠ {profileWarnings.missingFieldNames.length} Felder werden bei Import neu angelegt</span>
+              )}
+              {profileWarnings.missedSelectors.length > 0 && (
+                <span style={{ color: '#991b1b' }}>✗ {profileWarnings.missedSelectors.length} Selektoren nicht in Datei gefunden</span>
+              )}
+            </div>
+            {(profileWarnings.missingFieldNames.length > 0 || profileWarnings.missedSelectors.length > 0) && (
+              <button className="btn sm gh" onClick={() => setWarningsExpanded(v => !v)} style={{ flexShrink: 0, marginLeft: 12 }}>
+                {warningsExpanded ? 'Weniger' : 'Details'}
+              </button>
+            )}
+          </div>
+          {warningsExpanded && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {profileWarnings.missingFieldNames.length > 0 && (
+                <div><span style={{ color: '#92400e' }}>Neue Felder:</span> {profileWarnings.missingFieldNames.join(', ')}</div>
+              )}
+              {profileWarnings.missedSelectors.length > 0 && (
+                <div><span style={{ color: '#991b1b' }}>Fehlende Selektoren:</span> {profileWarnings.missedSelectors.join(', ')}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ID-Nummer strategy */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="hd">ID-Nummer</div>
@@ -268,11 +303,16 @@ export function StepMapping({
         </div>
       )}
 
-      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
         <button className="btn" onClick={onBack}>Zurück</button>
         <button className="btn pri" onClick={onDryRun} disabled={dryRunning || mappedCount === 0 || missingRequired.length > 0 || idnoMissing}>
           {dryRunning ? 'Prüfe…' : 'Weiter → Probelauf'}
         </button>
+        {onProfileExport && Object.keys(mapping).length > 0 && (
+          <button className="btn gh" onClick={onProfileExport} style={{ marginLeft: 'auto' }}>
+            Profil exportieren
+          </button>
+        )}
       </div>
     </>
   )

@@ -1,5 +1,29 @@
 import type { UploadResult, DryRunResult, TaskStatus, MappingEntry, XmlElementLevel, XmlSelector } from '../../../api/client'
 
+export interface ImportProfile {
+  version: 1
+  record_type: string
+  idnoStrategy: string
+  upsertStrategy: string
+  autoPublish: boolean
+  mapping: Record<string, MappingEntry>
+  field_definitions: Record<string, {
+    name: string
+    field_type: string
+    label: Record<string, string>
+    is_required: boolean
+    is_repeatable: boolean
+    settings: Record<string, unknown>
+  }>
+}
+
+export interface ProfileApplyResult {
+  appliedMapping: Record<string, MappingEntry>
+  newPendingFields: PendingField[]
+  missedSelectors: string[]
+  missingFieldNames: string[]
+}
+
 export interface PendingField {
   csvColumn: string
   name: string
@@ -60,6 +84,13 @@ export type ImporterAction =
   | { type: 'IMPORT_STARTED'; payload: string }
   | { type: 'TASK_STATUS_UPDATED'; payload: TaskStatus }
   | { type: 'STEP_SET'; payload: number }
+  | { type: 'PROFILE_APPLIED'; payload: {
+      mapping: Record<string, MappingEntry>
+      pendingFields: PendingField[]
+      upsertStrategy: string
+      autoPublish: boolean
+      idnoStrategy: string
+    }}
   | { type: 'RESET' }
 
 // ── localStorage ───────────────────────────────────────────────────────────────
