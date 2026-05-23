@@ -7,11 +7,12 @@ interface Props {
   uploaded: UploadResult | null
   uploading: boolean
   uploadErr: string | null
+  needsReupload?: boolean
   onFile: (file: File) => void
   onProfileLoaded?: (profile: ImportProfile) => void
 }
 
-export function StepUpload({ uploaded, uploading, uploadErr, onFile, onProfileLoaded }: Props) {
+export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFile, onProfileLoaded }: Props) {
   const [over, setOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const profileRef = useRef<HTMLInputElement>(null)
@@ -37,6 +38,14 @@ export function StepUpload({ uploaded, uploading, uploadErr, onFile, onProfileLo
 
   return (
     <>
+      {needsReupload && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px', background: '#fefce8',
+          border: '1px solid #fde047', borderRadius: 8, fontSize: 13, color: '#854d0e',
+        }}>
+          Mapping und Optionen wurden wiederhergestellt. Bitte Datei erneut hochladen, um fortzufahren.
+        </div>
+      )}
       <div
         className={`dz${over ? ' over' : ''}`}
         onDragOver={e => { e.preventDefault(); setOver(true) }}

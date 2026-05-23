@@ -3,7 +3,7 @@ import type { TransformConfig, MappingEntry } from '../../api/client'
 
 interface TransformModalProps {
   csvColumn: string
-  sampleValue: string
+  sampleValues: string[]
   mappingEntry: MappingEntry
   onSave: (entry: MappingEntry) => void
   onClose: () => void
@@ -103,13 +103,14 @@ function applyTransformsLocal(value: string, transforms: TransformConfig[]): str
   return values
 }
 
-export function TransformModal({ csvColumn, sampleValue, mappingEntry, onSave, onClose }: TransformModalProps) {
+export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, onClose }: TransformModalProps) {
   const [transforms, setTransforms] = useState<TransformConfig[]>(mappingEntry.transforms ?? [])
   const [addingType, setAddingType] = useState<TransformConfig['type'] | ''>('')
 
-  const preview = useMemo(() => {
-    return applyTransformsLocal(sampleValue || 'Beispielwert', transforms)
-  }, [sampleValue, transforms])
+  const effectiveSamples = sampleValues.length > 0 ? sampleValues.slice(0, 3) : ['Beispielwert']
+  const previews = useMemo(() => {
+    return effectiveSamples.map(v => applyTransformsLocal(v, transforms))
+  }, [effectiveSamples.join('|'), transforms]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addTransform(type: TransformConfig['type']) {
     const base: TransformConfig = { type }
@@ -300,13 +301,25 @@ export function TransformModal({ csvColumn, sampleValue, mappingEntry, onSave, o
           background: 'var(--bg)', border: '1px solid var(--border-soft)', borderRadius: 8,
           padding: 12, marginBottom: 16, fontSize: 12,
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Vorschau</div>
-          <div style={{ color: 'var(--fg-3)', marginBottom: 4 }}>
-            Eingabe: <span className="mono">"{sampleValue || '—'}"</span>
-          </div>
-          <div style={{ color: '#166534' }}>
-            → {preview.length === 0 ? '(leer)' : preview.map(p => `"${p}"`).join(', ')}
-          </div>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Vorschau</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', color: 'var(--fg-3)', fontWeight: 500, paddingBottom: 4, width: '50%' }}>Vorher</th>
+                <th style={{ textAlign: 'left', color: 'var(--fg-3)', fontWeight: 500, paddingBottom: 4 }}>Nachher</th>
+              </tr>
+            </thead>
+            <tbody>
+              {effectiveSamples.map((raw, i) => (
+                <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-soft)' : undefined }}>
+                  <td style={{ padding: '3px 8px 3px 0', color: 'var(--fg-2)', fontFamily: 'monospace' }}>"{raw}"</td>
+                  <td style={{ padding: '3px 0', color: '#166534', fontFamily: 'monospace' }}>
+                    {previews[i].length === 0 ? '(leer)' : previews[i].map(p => `"${p}"`).join(', ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

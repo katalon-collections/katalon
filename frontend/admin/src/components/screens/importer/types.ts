@@ -63,6 +63,8 @@ export interface ImporterState {
   // Import
   taskId: string | null
   taskStatus: TaskStatus | null
+  // Restore hint: rows were stripped from localStorage, user must re-upload
+  needsReupload: boolean
 }
 
 export type ImporterAction =

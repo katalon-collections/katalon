@@ -52,8 +52,10 @@ function loadPersistedState(): PersistedImporterState | null {
 // ── Initial state ─────────────────────────────────────────────────────────────
 
 function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
+  const hasRows = (persisted?.uploaded?.rows?.length ?? 0) > 0
+  const needsReupload = !!persisted?.uploaded && !hasRows && (persisted?.step ?? 0) > 0
   return {
-    step:           persisted?.step          ?? 0,
+    step:           needsReupload ? 0 : (persisted?.step ?? 0),
     recordType:     persisted?.recordType    ?? 'object',
     subtype:        persisted?.subtype       ?? null,
     uploading:      false,
@@ -74,6 +76,7 @@ function buildInitialState(persisted: PersistedImporterState | null): ImporterSt
     dryRunning:     false,
     taskId:         persisted?.taskId        ?? null,
     taskStatus:     null,
+    needsReupload,
   }
 }
 
@@ -99,7 +102,7 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       return { ...state, uploading: true, uploadErr: null }
 
     case 'UPLOADED':
-      return { ...state, uploading: false, uploaded: action.payload, sourceType: action.payload.source_type ?? 'csv', mapping: {}, step: 1, uploadErr: null }
+      return { ...state, uploading: false, uploaded: action.payload, sourceType: action.payload.source_type ?? 'csv', mapping: {}, step: 1, uploadErr: null, needsReupload: false }
 
     case 'UPLOAD_ERROR':
       return { ...state, uploading: false, uploadErr: action.payload }
@@ -177,6 +180,7 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
 
 export interface ImporterStateAndHandlers {
   state: ImporterState
+  needsReupload: boolean
   dispatch: React.Dispatch<ImporterAction>
   fields: FieldDefinition[]
   availableSubtypes: RecordSubtype[]
@@ -202,13 +206,14 @@ export function useImporterState(): ImporterStateAndHandlers {
   const [availableSubtypes, setAvailableSubtypes] = React.useState<RecordSubtype[]>([])
   const [profileWarnings, setProfileWarnings] = React.useState<ProfileApplyResult | null>(null)
 
-  // Persist to localStorage (skip transient fields)
+  // Persist to localStorage — rows are NOT saved (too large); on restore, user must re-upload
   useEffect(() => {
     const toSave: PersistedImporterState = {
       step: state.step, recordType: state.recordType, subtype: state.subtype,
       mapping: state.mapping, idnoStrategy: state.idnoStrategy, idnoColumn: state.idnoColumn,
       upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish,
-      uploaded: state.uploaded, dryResult: state.dryResult, taskId: state.taskId,
+      uploaded: state.uploaded ? { ...state.uploaded, rows: [] } : null,
+      dryResult: state.dryResult, taskId: state.taskId,
       pendingFields: state.pendingFields,
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(toSave))
@@ -391,7 +396,7 @@ export function useImporterState(): ImporterStateAndHandlers {
   }
 
   return {
-    state, dispatch, fields, availableSubtypes,
+    state, needsReupload: state.needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, handleImport,

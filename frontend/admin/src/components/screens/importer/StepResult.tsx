@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { TaskStatus } from '../../../api/client'
 
 interface Props {
@@ -7,7 +8,31 @@ interface Props {
   onReset: () => void
 }
 
+function formatEta(seconds: number): string {
+  if (seconds < 60) return `${seconds} Sek.`
+  return `${Math.ceil(seconds / 60)} Min.`
+}
+
 export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
+  const historyRef = useRef<{ t: number; n: number }[]>([])
+  const [eta, setEta] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (taskStatus?.state !== 'STARTED' || !taskStatus.meta) return
+    const now = Date.now()
+    const cur = taskStatus.meta.current
+    historyRef.current = [
+      ...historyRef.current.filter(p => now - p.t < 10_000),
+      { t: now, n: cur },
+    ]
+    if (historyRef.current.length >= 2) {
+      const oldest = historyRef.current[0]
+      const newest = historyRef.current[historyRef.current.length - 1]
+      const rate = (newest.n - oldest.n) / ((newest.t - oldest.t) / 1000)
+      if (rate > 0) setEta(Math.ceil((taskStatus.meta.total - newest.n) / rate))
+    }
+  }, [taskStatus?.state, taskStatus?.meta?.current]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div style={{ maxWidth: 520 }}>
       {(!taskStatus || taskStatus.state === 'PENDING') && (
@@ -25,7 +50,10 @@ export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
           <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
             {taskStatus.meta ? (
               <>
-                <div style={{ marginBottom: 8 }}>Zeile {taskStatus.meta.current} von {taskStatus.meta.total}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                  <span>Zeile {taskStatus.meta.current} von {taskStatus.meta.total}</span>
+                  {eta !== null && <span style={{ color: 'var(--fg-3)' }}>noch ca. {formatEta(eta)}</span>}
+                </div>
                 <div style={{ background: 'var(--border-soft)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                   <div style={{
                     width: `${Math.round((taskStatus.meta.current / taskStatus.meta.total) * 100)}%`,

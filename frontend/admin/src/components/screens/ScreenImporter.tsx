@@ -32,7 +32,7 @@ export function ScreenImporter() {
   const [activeTab, setActiveTab] = useState<'metadata' | 'media'>('metadata')
 
   const {
-    state, dispatch, fields, availableSubtypes,
+    state, needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
@@ -113,6 +113,7 @@ export function ScreenImporter() {
                 uploaded={state.uploaded}
                 uploading={state.uploading}
                 uploadErr={state.uploadErr}
+                needsReupload={needsReupload}
                 onFile={handleFile}
                 onProfileLoaded={handleProfileLoaded}
               />

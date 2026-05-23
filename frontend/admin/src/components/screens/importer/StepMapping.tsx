@@ -252,7 +252,7 @@ export function StepMapping({
       {transformModalCol && (
         <TransformModal
           csvColumn={transformModalCol}
-          sampleValue={uploaded.preview[0]?.[transformModalCol] ?? ''}
+          sampleValues={uploaded.preview.slice(0, 3).map(row => row[transformModalCol] ?? '').filter(v => v !== '')}
           mappingEntry={mapping[transformModalCol] ?? { target: '' }}
           onSave={entry => { onMappingChange({ ...mapping, [transformModalCol]: entry }); setTransformModalCol(null) }}
           onClose={() => setTransformModalCol(null)}
