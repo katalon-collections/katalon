@@ -27,6 +27,33 @@ def _extract_title(md: dict) -> str:
     return ""
 
 
+def _extract_display_value(val: Any) -> str | None:
+    """Extract a human-readable string from a single metadata item.
+
+    Handles repeatable plain fields {"value": "..."}, vocab {"id": ..., "label": "..."},
+    and authority {"id": "Q762", "label": "Name"} field formats.
+    """
+    if isinstance(val, dict):
+        return str(val["label"]) if "label" in val else (str(val["value"]) if "value" in val else None)
+    if val is not None:
+        return str(val)
+    return None
+
+
+def _extract_facet_value(val: Any) -> str | list[str] | None:
+    """Extract keyword-safe facet value(s) from a metadata field value.
+
+    Returns a string or list of strings suitable for ES keyword faceting.
+    """
+    if isinstance(val, list):
+        results = [_extract_display_value(item) for item in val]
+        flat = [r for r in results if r]
+        if not flat:
+            return None
+        return flat if len(flat) > 1 else flat[0]
+    return _extract_display_value(val)
+
+
 def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
     """Return a single search_text string with all (or only searchable) metadata values concatenated.
 
@@ -40,10 +67,9 @@ def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
             parts.append(val)
         elif isinstance(val, list):
             for item in val:
-                if isinstance(item, dict):
-                    parts.append(item.get("value", ""))
-                elif isinstance(item, str):
-                    parts.append(item)
+                parts.append(_extract_display_value(item) or "")
+        elif isinstance(val, dict):
+            parts.append(_extract_display_value(val) or "")
     return " ".join(p for p in parts if p)
 
 
@@ -120,9 +146,9 @@ def _build_doc(
             val = md.get(field_name)
             if val is None:
                 continue
-            normalized = _normalize_for_index(val)
-            if normalized:
-                doc[f"facet_{field_name}"] = normalized
+            label = _extract_facet_value(val)
+            if label:
+                doc[f"facet_{field_name}"] = label
 
     if rel_data:
         doc.update(rel_data)
