@@ -119,6 +119,7 @@ input, select, textarea { font-family: inherit; }
 .pagination { display: flex; gap: 4px; justify-content: center; margin-top: 32px; }
 .page-btn { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; background: var(--panel, #fff); cursor: pointer; font-size: 13px; }
 .page-btn.active { background: var(--accent, #1e3a8a); color: #fff; border-color: var(--accent, #1e3a8a); }
+.page-ellipsis { width: 34px; height: 34px; display: grid; place-items: center; font-size: 13px; color: var(--fg-3, #9ca3af); }
 
 /* Clover IIIF overrides */
 .clover-viewer-media-search { display: none !important; }

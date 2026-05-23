@@ -252,9 +252,23 @@ export function SearchPage() {
 
       {totalPages > 1 && (
         <div className="pagination">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-            <button key={n} className={`page-btn${n === page ? ' active' : ''}`} onClick={() => setPage(n)}>{n}</button>
-          ))}
+          {(() => {
+            const pages: (number | '...')[] = []
+            const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
+            for (let i = 1; i <= Math.min(2, totalPages); i++) add(i)
+            for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) add(i)
+            for (let i = Math.max(1, totalPages - 1); i <= totalPages; i++) add(i)
+            const withEllipsis: (number | '...')[] = []
+            pages.sort((a, b) => (a as number) - (b as number)).forEach((n, i) => {
+              if (i > 0 && (n as number) - (pages[i - 1] as number) > 1) withEllipsis.push('...')
+              withEllipsis.push(n)
+            })
+            return withEllipsis.map((n, i) =>
+              n === '...'
+                ? <span key={`e${i}`} className="page-ellipsis">…</span>
+                : <button key={n} className={`page-btn${n === page ? ' active' : ''}`} onClick={() => setPage(n as number)}>{n}</button>
+            )
+          })()}
         </div>
       )}
     </div>
