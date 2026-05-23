@@ -38,7 +38,16 @@ def import_records_task(
     from sqlalchemy.pool import NullPool
 
     from katalon.config import settings
-    from katalon.core.models import AdminConfig, Entity, FieldDefinition, Object, Occurrence, Place
+    from katalon.core.models import (
+        AdminConfig,
+        Entity,
+        FieldDefinition,
+        Object,
+        Occurrence,
+        Place,
+        Vocabulary,
+        VocabularyTerm,
+    )
     from katalon.services.audit_service import log_change
     from katalon.services.idno_service import consume_next_idno
     from katalon.services.importer_service import apply_mapping
@@ -87,6 +96,85 @@ def import_records_task(
     errors: list[dict] = []
     warnings: list[dict] = []
     publish_fail_reasons: list[str] = []  # first few unique reasons
+
+    async def _resolve_vocab_terms(
+        session: AsyncSession,
+        field_defs: dict[str, Any],
+        records: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Replace plain string values in vocab fields with {id, label} dicts.
+
+        Looks up existing terms case-insensitively, creates missing ones, and
+        caches per-vocabulary to avoid redundant DB queries.
+        """
+        # Find all vocab fields that have a vocabulary_id configured
+        vocab_fields: dict[str, uuid.UUID] = {}
+        for fname, fd in field_defs.items():
+            if fd.field_type == "vocab":
+                vid = (fd.settings or {}).get("vocabulary_id")
+                if vid:
+                    try:
+                        vocab_fields[fname] = uuid.UUID(str(vid))
+                    except ValueError:
+                        pass
+
+        if not vocab_fields:
+            return records
+
+        # Per-vocabulary term cache: vocab_id -> {lower_term -> {id, label}}
+        term_cache: dict[uuid.UUID, dict[str, dict]] = {}
+
+        async def get_term(vocab_id: uuid.UUID, term_str: str) -> dict | None:
+            if vocab_id not in term_cache:
+                res = await session.execute(
+                    select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id)
+                )
+                term_cache[vocab_id] = {
+                    t.term.strip().lower(): {"id": str(t.id), "label": t.term}
+                    for t in res.scalars().all()
+                }
+            key = term_str.strip().lower()
+            if key in term_cache[vocab_id]:
+                return term_cache[vocab_id][key]
+            # Term does not exist — check the vocabulary exists before creating
+            vocab_res = await session.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
+            if vocab_res.scalar_one_or_none() is None:
+                return None
+            new_term = VocabularyTerm(
+                vocabulary_id=vocab_id,
+                term=term_str.strip(),
+                label={"de": term_str.strip()},
+            )
+            session.add(new_term)
+            await session.flush()
+            entry = {"id": str(new_term.id), "label": new_term.term}
+            term_cache[vocab_id][key] = entry
+            return entry
+
+        for record in records:
+            for fname, vocab_id in vocab_fields.items():
+                val = record.get(fname)
+                if val is None:
+                    continue
+                if isinstance(val, list):
+                    resolved = []
+                    for item in val:
+                        if isinstance(item, str) and item.strip():
+                            entry = await get_term(vocab_id, item)
+                            if entry:
+                                resolved.append(entry)
+                    if resolved:
+                        record[fname] = resolved
+                    else:
+                        record.pop(fname, None)
+                elif isinstance(val, str) and val.strip():
+                    entry = await get_term(vocab_id, val)
+                    if entry:
+                        record[fname] = entry
+                    else:
+                        record.pop(fname, None)
+
+        return records
 
     async def _import() -> dict[str, Any]:
         nonlocal created, updated, skipped, published, publish_failed, index_failed, publish_fail_reasons
@@ -139,6 +227,9 @@ def import_records_task(
             field_defs = {f.name: f for f in fd_result.scalars().all()}
 
             records, idnos = apply_mapping(rows, mapping, field_defs)
+
+            # Resolve vocab field values: string → {id, label} by looking up/creating terms
+            records = await _resolve_vocab_terms(session, field_defs, records)
 
             # Load idno schema once
             cfg_result = await session.execute(select(AdminConfig).where(AdminConfig.key == "default"))

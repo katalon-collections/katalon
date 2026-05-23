@@ -55,6 +55,19 @@ export function StepDryRun({
         </div>
       )}
 
+      {dryResult.vocab_warnings && dryResult.vocab_warnings.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {dryResult.vocab_warnings.map((w, i) => (
+            <div key={i} style={{ fontSize: 12, background: w.high_cardinality ? '#fff7ed' : '#f0fdf4', border: `1px solid ${w.high_cardinality ? '#fed7aa' : '#bbf7d0'}`, borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
+              {w.high_cardinality
+                ? `⚠ Feld „${w.label}": ${w.unique_count} verschiedene Werte, davon ${w.new_count} neu. Soll diese Spalte wirklich als Vokabular verwendet werden?`
+                : `Feld „${w.label}": ${w.new_count} neue Vokabular-Terms werden angelegt (${w.unique_count} eindeutige Werte).`
+              }
+            </div>
+          ))}
+        </div>
+      )}
+
       {dryResult.errors.length === 0 && (
         <div style={{ fontSize: 13, color: '#166534', marginBottom: 12 }}>
           Keine Fehler. {dryResult.valid} Datensätze können importiert werden.

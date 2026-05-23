@@ -416,6 +416,7 @@ export interface DryRunResult {
   errors: { row: number | null; message: string }[]
   warnings: { row: number | null; message: string }[]
   preview: Record<string, unknown>[]
+  vocab_warnings?: { field: string; label: string; unique_count: number; new_count: number; high_cardinality: boolean }[]
 }
 
 export interface TaskStatus {

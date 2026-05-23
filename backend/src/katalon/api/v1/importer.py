@@ -78,6 +78,7 @@ class XmlSelectorsRequest(BaseModel):
 
 def _get_redis():
     import redis as redis_lib
+
     from katalon.config import settings
     return redis_lib.from_url(settings.redis_url, decode_responses=False)
 
@@ -189,8 +190,6 @@ async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
         })
 
     # Run full schema validation per row (catches pid/relation/regex/required errors)
-    mapped_records = dry_result.get("preview", [])
-    # Validate all rows, not just the preview
     from katalon.services.importer_service import apply_mapping
     all_records, _ = apply_mapping(body.rows, norm_mapping, field_defs)
     for i, metadata in enumerate(all_records):
@@ -201,6 +200,36 @@ async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
 
     # Recompute valid count after full validation
     dry_result["valid"] = dry_result["total"] - len(dry_result["errors"])
+
+    # Resolve vocab_stats against DB: count existing vs. new terms per vocab field
+    vocab_warnings = []
+    vocab_stats: dict[str, list[str]] = dry_result.pop("vocab_stats", {})
+    for field_name, unique_values in vocab_stats.items():
+        fd = field_defs.get(field_name)
+        if not fd:
+            continue
+        vocab_id = (fd.settings or {}).get("vocabulary_id")
+        if not vocab_id:
+            continue
+        from katalon.core.models import VocabularyTerm
+        existing_terms_result = await db.execute(
+            select(VocabularyTerm.term).where(
+                VocabularyTerm.vocabulary_id == uuid.UUID(str(vocab_id)),
+                VocabularyTerm.term.in_(unique_values),
+            )
+        )
+        existing_set = {row[0] for row in existing_terms_result.all()}
+        new_count = len([v for v in unique_values if v not in existing_set])
+        label = (fd.label or {}).get("de") or field_name
+        vocab_warnings.append({
+            "field": field_name,
+            "label": label,
+            "unique_count": len(unique_values),
+            "new_count": new_count,
+            "high_cardinality": new_count > 100,
+        })
+
+    dry_result["vocab_warnings"] = vocab_warnings
 
     return dry_result
 

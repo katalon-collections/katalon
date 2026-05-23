@@ -5,8 +5,8 @@ from typing import Any
 
 from jinja2.sandbox import SandboxedEnvironment
 
-from katalon.services.importer import parse_csv, parse_excel
-from katalon.services.importer.formats.csv_format import _detect_delimiter as detect_delimiter
+from katalon.services.importer import parse_csv, parse_excel  # noqa: F401
+from katalon.services.importer.formats.csv_format import _detect_delimiter as detect_delimiter  # noqa: F401
 
 _JINJA_ENV = SandboxedEnvironment()
 
@@ -263,6 +263,37 @@ def _validate_types(
     return warnings
 
 
+def _collect_vocab_values(
+    rows: list[dict[str, str]],
+    mapping: dict[str, str] | dict[str, Any],
+    field_defs: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Return unique raw values (after splits) per vocab-typed mapped field."""
+    result: dict[str, list[str]] = {}
+    for selector, val in mapping.items():
+        if isinstance(val, dict):
+            field_name = val.get("target", "")
+            transforms = val.get("transforms", [])
+        else:
+            field_name, transforms = val, []
+        if not field_name or field_name == "__idno__":
+            continue
+        fd = field_defs.get(field_name)
+        if not fd or fd.field_type not in ("vocab",):
+            continue
+        seen: set[str] = set()
+        for row in rows:
+            raw = row.get(selector, "").strip()
+            if not raw:
+                continue
+            parts = apply_transforms(raw, transforms) if transforms else [raw]
+            for p in parts:
+                if p:
+                    seen.add(p)
+        result[field_name] = sorted(seen)
+    return result
+
+
 def dry_run(
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
@@ -341,6 +372,10 @@ def dry_run(
     if field_defs:
         warnings.extend(_validate_types(rows, mapping, field_defs))
 
+    vocab_stats: dict[str, list[str]] = {}
+    if field_defs:
+        vocab_stats = _collect_vocab_values(rows, mapping, field_defs)
+
     return {
         "total": len(rows),
         "valid": len(rows) - len(errors),
@@ -348,6 +383,7 @@ def dry_run(
         "warnings": warnings,
         "preview": mapped[:5],
         "has_idno_mapping": has_idno_mapping,
+        "vocab_stats": vocab_stats,
     }
 
 
