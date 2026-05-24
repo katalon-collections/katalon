@@ -75,7 +75,7 @@ Endpoints: `GET /v1/authorities/`, `/v1/authorities/search`, `/v1/authorities/fe
 41 Unit-Tests (Adapter + Service-Layer) vollständig grün.
 
 **Noch offen:**
-- Admin-UI: `authority_source` aus Schema wird in `ScreenForm` nicht an `AuthorityInput` weitergegeben – alle Authority-Suchen laufen aktuell gegen den hardcodierten Fallback (`ScreenForm.tsx` ~1030)
+- (keine – Authority-Source ist bereits an `AuthorityInput` durchgereicht)
 
 ### Phase 10 – Importer-Wizard ✅ (mit kleinen Lücken)
 Vollständiger 4-Schritte-Wizard: Upload → Mapping → Dry Run → Import.
@@ -179,13 +179,11 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ## Nächste Schritte (Reihenfolge)
 
-1. **Jetzt:** Authority-`source`-Parameter in `ScreenForm` an `AuthorityInput` durchreichen (`ScreenForm.tsx` ~1030)
-2. Admin-UI: Benutzer-Verwaltungs-Screen (User-CRUD, Rollen, Deaktivierung) – Issue #144
-3. Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1 – Relation-Metadaten bearbeiten)
-4. Snapshot-UI im Admin-Formular (Phase 7)
-5. ES-Fehler loggen statt verschlucken (technische Schuld – kleiner Aufwand, hoher Nutzen)
-6. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12)
-7. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
+1. **Jetzt:** Admin-UI: Benutzer-Verwaltungs-Screen (User-CRUD, Rollen, Deaktivierung) – Issue #144
+2. Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1 – Relation-Metadaten bearbeiten)
+3. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
+4. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219
+5. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
 
 ---
 
