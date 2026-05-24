@@ -155,8 +155,7 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ### Fehlerbehandlung & Observability
 
-**ES-Fehler werden still verschluckt** – Alle vier CRUD-Module (`objects.py`, `entities.py`, `places.py`, `occurrences.py`) fangen ES-Indexierungs-Fehler mit `except Exception: pass`. Datensätze werden in der DB gespeichert, sind aber nicht durchsuchbar; der User bekommt kein Feedback.
-→ Mindestens per `logger.exception()` loggen; idealerweise `X-Search-Index: failed` Header zurückgeben.
+**ES-Fehler werden geloggt ✅** – Alle vier CRUD-Module (`objects.py`, `entities.py`, `places.py`, `occurrences.py`) loggen ES-Indexierungs-Fehler mit `logger.warning("ES index/remove failed", exc_info=True)`.
 
 **Kein Logging in API-Modulen** – Nur `pids.py` und `main.py` haben `logging` konfiguriert. Alle anderen API-Module loggen nichts.
 → `logger = logging.getLogger(__name__)` in alle Module; Fehler, Validierungsmisserfolge und Async-Task-Queuing loggen.
@@ -210,4 +209,4 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 | Celery-Fehler schwer debugbar | Flower-Dashboard, dead-letter Queue, Retry-Limit |
 | ES-Mappings brechen bei Schema-Änderungen | Index-Aliase + Zero-Downtime-Reindex |
 | Cantaloupe-Tile-Generierung verdrahtet ✅ | Celery-Task `generate_iiif_tiles` ruft Cantaloupes `info.json` auf; Tests vorhanden |
-| ES-Indexfehler unsichtbar | `except Exception: pass` in 12+ Endpoints ersetzen |
+| ES-Indexfehler geloggt ✅ | `logger.warning()` in allen 4 CRUD-Modulen; `X-Search-Index: failed` Header optional |
