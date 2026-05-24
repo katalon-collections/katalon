@@ -7,7 +7,7 @@ from katalon.workers.celery_app import celery_app
 
 
 def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:

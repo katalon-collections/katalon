@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-23
+## Stand: 2026-05-24
 
 ---
 
@@ -27,14 +27,12 @@ JWT-Auth (jose), Rollen (admin/editor/viewer), bcrypt (direkt, ohne passlib).
 Default-Admin-User wird beim ersten Start angelegt (`admin@katalon.dev / admin`).
 Audit Log bei jedem Create/Update/Delete.
 
-### Phase 5 – Media ✅ / IIIF ⚠️
+### Phase 5 – Media ✅ / IIIF ✅
 Upload (Single-File), Celery-Task, Speicherung. IIIF-Manifest-Endpoint vorhanden.
 `media_type`-Feld pro Datei; konfigurierbare Typen via Vokabular "media_types" (Vorderseite, Rückseite, Detail …).
-Cantaloupe-Integration für Tile-Generierung noch nicht verdrahtet (Endpoint antwortet, produziert aber keine echten IIIF-Tiles).
+Cantaloupe-Integration für Tile-Generierung ist verdrahtet: Celery-Task `generate_iiif_tiles` ruft Cantaloupes `info.json` auf und speichert das IIIF-Manifest in der DB.
 Thumbnail-Vorschau im Admin erscheint sofort nach Upload (über `/file`-Endpoint, unabhängig von IIIF-Status).
-
-**Noch offen in Phase 5:**
-- Batch-Medienimport (ZIP oder Ordner mit CSV-Mapping → Phase 10.1)
+Batch-Medienimport (ZIP + CSV/TSV-Mapping) ist im Importer-Wizard als `StepMedia.tsx` implementiert.
 
 ### Phase 6 – Admin-UI ✅ (mit Lücken)
 Alle 4 Typen: Listen-Screen + Formular (dynamisch aus Schema, wiederholbare Felder, Status-Selector).
@@ -68,9 +66,7 @@ Windowed Pagination mit Ellipsis in Suchergebnissen.
 - IIIF `link:alternate` im `<head>` auf ObjectDetailPage (#75)
 - Relation-Facetten beim Objekt-Browsing (denormalisiert in ES, #83)
 - Relation-Type-Labels aus Vokabular aufgelöst in Admin-UI ✅ (#78)
-
-**Noch offen:**
-- IIIF-Viewer (Cantaloupe-Tiles noch nicht End-to-End verdrahtet)
+- IIIF-Viewer mit Clover IIIF und Cantaloupe-Tiles End-to-End verdrahtet ✅
 
 ### Phase 9 – Authority-Plugin-System ✅
 6 Adapter implementiert: GND (lobid.org), Geonames, VIAF, Wikidata, Getty TGN (SPARQL), ICONCLASS.
@@ -97,10 +93,11 @@ localStorage-Persistenz: Mapping + Options bleiben erhalten, Rows werden nicht g
 - Diff-Preview bei Upsert (#202)
 - Streaming-Upload für Dateien > 10 MB (#204)
 
-### Phase 10.1 – Batch-Medienimport
+### Phase 10.1 – Batch-Medienimport ✅
 ZIP-Archiv mit Bildern + CSV/JSON-Mapping-Datei (Dateiname → Objekt-ID + media_type).
 Celery-Task für asynchrone Verarbeitung, Fortschritts-Anzeige im Admin.
 Wiederverwendet Vokabular "media_types" für Typ-Mapping.
+UI im Importer-Wizard (`StepMedia.tsx`) vorhanden.
 
 ### Phase 11 – OAI-PMH ⚠️
 Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
@@ -176,7 +173,7 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 | ES-Indexierung + Suche (End-to-End) | ❌ keine Tests |
 | Relationen erstellen/traversieren | ❌ nur Auth-Tests |
 | Snapshot erstellen/wiederherstellen | ❌ keine Tests |
-| Media-Upload-Workflow + IIIF-Manifest | ❌ keine Tests |
+| Media-Upload-Workflow + IIIF-Manifest | ✅ 19 Unit-Tests (Cantaloupe, Tasks, API) |
 | OAI-PMH ResumptionToken Roundtrip | ❌ keine Tests |
 
 ---
@@ -190,8 +187,6 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 5. ES-Fehler loggen statt verschlucken (technische Schuld – kleiner Aufwand, hoher Nutzen)
 6. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12)
 7. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
-8. Batch-Medienimport (Phase 10.1)
-9. Cantaloupe Tile-Generierung End-to-End (Issue #13)
 
 ---
 
@@ -214,5 +209,5 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 | JSONB-Queries langsam | GIN-Index auf `metadata` |
 | Celery-Fehler schwer debugbar | Flower-Dashboard, dead-letter Queue, Retry-Limit |
 | ES-Mappings brechen bei Schema-Änderungen | Index-Aliase + Zero-Downtime-Reindex |
-| Cantaloupe-Tile-Generierung nicht verdrahtet | Celery-Task `generate_iiif_tiles` muss noch Cantaloupe-Derivate-API aufrufen |
+| Cantaloupe-Tile-Generierung verdrahtet ✅ | Celery-Task `generate_iiif_tiles` ruft Cantaloupes `info.json` auf; Tests vorhanden |
 | ES-Indexfehler unsichtbar | `except Exception: pass` in 12+ Endpoints ersetzen |

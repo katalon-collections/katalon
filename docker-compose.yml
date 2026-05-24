@@ -41,7 +41,9 @@ services:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
     environment:
       - CANTALOUPE_SOURCE_STATIC=FilesystemSource
+      - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
+      - CANTALOUPE_BASE_URI=http://localhost/iiif
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3" ]
       interval: 10s
