@@ -100,6 +100,10 @@ async def update_user(
     if data.role is not None:
         if data.role not in _VALID_ROLES:
             raise HTTPException(status_code=422, detail=f"Ungültige Rolle. Erlaubt: {_VALID_ROLES}")
+        if user_id == current_user.id and user.role == "admin" and data.role != "admin":
+            raise HTTPException(
+                status_code=400, detail="Eigene Admin-Rolle kann nicht entzogen werden"
+            )
         user.role = data.role
         changed_fields["role"] = data.role
     if data.email is not None:
@@ -112,6 +116,10 @@ async def update_user(
         user.email = data.email
         changed_fields["email"] = {"old": old_email, "new": data.email}
     if data.is_active is not None:
+        if user_id == current_user.id and not data.is_active:
+            raise HTTPException(
+                status_code=400, detail="Eigenes Konto kann nicht deaktiviert werden"
+            )
         user.is_active = data.is_active
         changed_fields["is_active"] = data.is_active
     if data.password is not None:

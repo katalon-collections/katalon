@@ -43,7 +43,7 @@ Vokabular-Verwaltung vollständig verdrahtet.
 **Noch offen in Phase 6:**
 - Relationen-Panel im Formular (Phase 6.1)
 - Snapshot-UI im Formular (Phase 7)
-- Benutzer-Verwaltungs-Screen (Placeholder – nur API-Key-Verwaltung vorhanden, kein User-CRUD)
+- ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
 ### Phase 7 – Elasticsearch + Versionierung ⚠️
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
@@ -179,7 +179,7 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ## Nächste Schritte (Reihenfolge)
 
-1. **Jetzt:** Admin-UI: Benutzer-Verwaltungs-Screen (User-CRUD, Rollen, Deaktivierung) – Issue #144
+1. ~~Admin-UI: Benutzer-Verwaltungs-Screen~~ ✅ – Issue #144
 2. Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1 – Relation-Metadaten bearbeiten)
 3. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
 4. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219

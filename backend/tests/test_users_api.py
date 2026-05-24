@@ -111,3 +111,69 @@ async def test_admin_update_user_email_password_writes_audit_log(override_deps) 
     assert audit_entries[0].user_id == admin_user.id
     assert audit_entries[0].changed_fields["password"] == "updated"
     assert audit_entries[0].changed_fields["email"]["new"] == "updated@example.org"
+
+
+@pytest.mark.asyncio
+async def test_admin_can_change_user_role(override_deps) -> None:
+    session, _ = override_deps
+    target_user = User(
+        id=uuid.uuid4(),
+        email="cataloger@example.org",
+        hashed_password=hash_password("Initial123"),
+        role="cataloger",
+        is_active=True,
+        created_at=datetime.now(),
+    )
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(target_user),
+    ])
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put(f"/v1/users/{target_user.id}", json={"role": "editor"})
+
+    assert response.status_code == 200
+    assert target_user.role == "editor"
+
+
+@pytest.mark.asyncio
+async def test_self_deactivation_blocked(override_deps) -> None:
+    session, user = override_deps
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(user),
+    ])
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put(f"/v1/users/{user.id}", json={"is_active": False})
+
+    assert response.status_code == 400
+    assert "deaktiviert" in response.json()["detail"]
+    assert user.is_active is True
+
+
+@pytest.mark.asyncio
+async def test_self_demotion_blocked(override_deps) -> None:
+    session, user = override_deps
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(user),
+    ])
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put(f"/v1/users/{user.id}", json={"role": "editor"})
+
+    assert response.status_code == 400
+    assert "Admin-Rolle" in response.json()["detail"]
+    assert user.role == "admin"
+
+
+@pytest.mark.asyncio
+async def test_self_delete_blocked(override_deps) -> None:
+    session, user = override_deps
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(user),
+    ])
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete(f"/v1/users/{user.id}")
+
+    assert response.status_code == 400
+    assert "gelöscht" in response.json()["detail"]

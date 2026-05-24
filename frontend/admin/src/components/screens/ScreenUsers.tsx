@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { apiKeys, users as usersApi } from '../../api/client'
+import { apiKeys, getTokenUser, users as usersApi } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
 
 const ROLES: Record<string, string> = {
@@ -132,6 +132,8 @@ function ApiKeysPanel({ userId }: { userId: string }) {
 }
 
 export function ScreenUsers() {
+  const currentUser = getTokenUser()
+
   const [userList, setUserList] = useState<UserRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -148,6 +150,9 @@ export function ScreenUsers() {
   const [draftEmail, setDraftEmail] = useState<Record<string, string>>({})
   const [draftPassword, setDraftPassword] = useState<Record<string, string>>({})
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [draftRole, setDraftRole] = useState<Record<string, string>>({})
+  const [roleSaving, setRoleSaving] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadUsers()
@@ -183,6 +188,10 @@ export function ScreenUsers() {
   }
 
   async function handleToggleActive(user: UserRead) {
+    if (user.email === currentUser?.email) {
+      alert('Eigenes Konto kann nicht deaktiviert werden.')
+      return
+    }
     try {
       await usersApi.update(user.id, { is_active: !user.is_active })
       loadUsers()
@@ -192,12 +201,38 @@ export function ScreenUsers() {
   }
 
   async function handleDelete(user: UserRead) {
+    if (user.email === currentUser?.email) {
+      alert('Eigenes Konto kann nicht gelöscht werden.')
+      return
+    }
     if (!window.confirm(`Benutzer ${user.email} wirklich löschen?`)) return
     try {
       await usersApi.remove(user.id)
       loadUsers()
     } catch (e) {
       alert((e as Error).message)
+    }
+  }
+
+  async function handleRoleChange(user: UserRead) {
+    const nextRole = draftRole[user.id]
+    if (!nextRole || nextRole === user.role) return
+    if (user.email === currentUser?.email) {
+      alert('Eigene Rolle kann nicht geändert werden.')
+      return
+    }
+    setRoleSaving(prev => new Set(prev).add(user.id))
+    try {
+      await usersApi.update(user.id, { role: nextRole })
+      loadUsers()
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setRoleSaving(prev => {
+        const next = new Set(prev)
+        next.delete(user.id)
+        return next
+      })
     }
   }
 
@@ -299,16 +334,44 @@ export function ScreenUsers() {
                 <th>E-Mail</th>
                 <th>Rolle</th>
                 <th>Status</th>
+                <th>Erstellt</th>
                 <th>API-Schlüssel</th>
                  <th className="col-act" />
                </tr>
             </thead>
             <tbody>
-               {userList.map(u => (
+               {userList.map(u => {
+                const isSelf = u.email === currentUser?.email
+                const roleChanged = (draftRole[u.id] ?? u.role) !== u.role
+                return (
                 <>
                   <tr key={u.id}>
                     <td>{u.email}</td>
-                    <td>{ROLES[u.role] ?? u.role}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select
+                          className="fld"
+                          style={{ fontSize: 12, padding: '2px 6px', minWidth: 130 }}
+                          value={draftRole[u.id] ?? u.role}
+                          disabled={isSelf}
+                          onChange={e => setDraftRole(prev => ({ ...prev, [u.id]: e.target.value }))}
+                        >
+                          {Object.entries(ROLES).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                        {roleChanged && !isSelf && (
+                          <button
+                            className="btn sm pri"
+                            style={{ fontSize: 11, padding: '2px 8px' }}
+                            disabled={roleSaving.has(u.id)}
+                            onClick={() => handleRoleChange(u)}
+                          >
+                            {roleSaving.has(u.id) ? '…' : 'Speichern'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <span style={{
                         fontSize: 11,
@@ -320,6 +383,9 @@ export function ScreenUsers() {
                       }}>
                         {u.is_active ? 'Aktiv' : 'Inaktiv'}
                       </span>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                      {new Date(u.created_at).toLocaleDateString('de-DE')}
                     </td>
                     <td>
                       <button
@@ -333,28 +399,32 @@ export function ScreenUsers() {
                     </td>
                     <td className="col-act">
                       <div className="row-actions">
-                         <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
-                           {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
-                         </button>
+                         {!isSelf && (
+                           <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
+                             {u.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                           </button>
+                         )}
                          <button className="btn sm gh" onClick={() => toggleCredentials(u)}>
                            {expandedCredentials.has(u.id) ? 'Schließen' : 'Zugangsdaten'}
                          </button>
-                         <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
-                           🗑
-                         </button>
+                         {!isSelf && (
+                           <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title="Löschen">
+                             🗑
+                           </button>
+                         )}
                       </div>
                     </td>
                   </tr>
                    {expandedKeys.has(u.id) && (
                      <tr key={`${u.id}-keys`}>
-                       <td colSpan={5} style={{ padding: '0 8px 12px' }}>
+                       <td colSpan={6} style={{ padding: '0 8px 12px' }}>
                          <ApiKeysPanel userId={u.id} />
                        </td>
                      </tr>
                    )}
                    {expandedCredentials.has(u.id) && (
                      <tr key={`${u.id}-credentials`}>
-                       <td colSpan={5} style={{ padding: '0 8px 12px' }}>
+                       <td colSpan={6} style={{ padding: '0 8px 12px' }}>
                          <div style={{ background: 'var(--bg-s, #f9fafb)', border: '1px solid var(--border-s)', borderRadius: 6, padding: '12px 16px', marginTop: 4 }}>
                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zugangsdaten ändern</div>
                            <div className="field">
@@ -375,9 +445,10 @@ export function ScreenUsers() {
                      </tr>
                    )}
                  </>
-               ))}
+                )
+               })}
                {userList.length === 0 && (
-                <tr><td colSpan={5} className="empty">Keine Benutzer gefunden.</td></tr>
+                <tr><td colSpan={6} className="empty">Keine Benutzer gefunden.</td></tr>
               )}
             </tbody>
           </table>
