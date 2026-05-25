@@ -7,6 +7,7 @@ test('admin can upload an image to an object', async ({ page }) => {
   await loginAsAdmin(page)
   await page.getByRole('button', { name: 'Neu anlegen' }).click()
   await page.getByPlaceholder('z.B. FOT.1958.0412').fill(idno)
+  await page.getByPlaceholder('Label').fill('E2E Test Object')
   await page.getByRole('button', { name: 'Speichern' }).click()
 
   const pngBytes = Uint8Array.from([

@@ -8,6 +8,7 @@ test('admin can create object from UI', async ({ page }) => {
   await page.getByRole('button', { name: 'Neu anlegen' }).click()
 
   await page.getByPlaceholder('z.B. FOT.1958.0412').fill(idno)
+  await page.getByPlaceholder('Label').fill('E2E Test Object')
   await page.getByRole('button', { name: 'Speichern' }).click()
 
   // After save the app navigates to the edit view — wait for the idno to appear
