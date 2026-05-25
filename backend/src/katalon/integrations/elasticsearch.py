@@ -100,7 +100,7 @@ async def reindex_type(target_type: str, records: list[tuple[str, dict[str, Any]
 
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
     es = get_es()
-    await es.index(index=INDEX_NAME, id=doc_id, body=body)
+    await es.index(index=INDEX_NAME, id=doc_id, body=body, refresh=True)
 
 
 async def delete_document(doc_id: str) -> None:
