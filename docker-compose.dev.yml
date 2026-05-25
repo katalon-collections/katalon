@@ -21,7 +21,7 @@ services:
       - CANTALOUPE_SOURCE_STATIC=FilesystemSource
       - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
-      - CANTALOUPE_BASE_URI=http://localhost:8182
+      - CANTALOUPE_BASE_URI=http://localhost
     depends_on:
       db:
         condition: service_healthy
@@ -50,12 +50,7 @@ services:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend.dev
     environment:
-      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
-      REDIS_URL: redis://redis:6379/0
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      CANTALOUPE_URL: http://cantaloupe:8182
       SECRET_KEY: change-me-in-production
-      MEDIA_ROOT: /var/lib/katalon/media
     volumes:
       - ./backend/src:/app/src
       - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
@@ -78,7 +73,8 @@ services:
     ports:
       - "4000:5173"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=
+      - API_PROXY_TARGET=http://api:8000
       - VITE_PORTAL_URL=http://localhost:4001
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
@@ -99,7 +95,8 @@ services:
     ports:
       - "4001:5174"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=
+      - API_PROXY_TARGET=http://api:8000
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5174/ > /dev/null 2>&1 || exit 1"]
       interval: 10s
