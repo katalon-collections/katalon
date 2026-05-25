@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import Relation
-from katalon.core.schemas import RelationCreate, RelationRead
+from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 
@@ -39,6 +39,22 @@ async def create_relation(data: RelationCreate, db: DBDep, current_user: Current
         relation_type=data.relation_type, metadata_=data.metadata_,
     )
     db.add(rel)
+    await db.flush()
+    return rel
+
+
+@router.put("/{relation_id}", response_model=RelationRead)
+async def update_relation(
+    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user: CurrentUser
+) -> Relation:
+    result = await db.execute(select(Relation).where(Relation.id == relation_id))
+    rel = result.scalar_one_or_none()
+    if not rel:
+        raise HTTPException(status_code=404, detail="Relation nicht gefunden")
+    if data.relation_type is not None:
+        rel.relation_type = data.relation_type
+    if data.metadata_ is not None:
+        rel.metadata_ = data.metadata_
     await db.flush()
     return rel
 

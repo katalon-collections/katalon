@@ -291,6 +291,8 @@ export const relations = {
   },
   create: (data: { from_type: string; from_id: string; to_type: string; to_id: string; relation_type: string; metadata_?: Record<string, unknown> }) =>
     req<Relation>('/v1/relations', { method: 'POST', body: JSON.stringify({ metadata_: {}, ...data }) }),
+  update: (id: string, data: { relation_type?: string; metadata_?: Record<string, unknown> }) =>
+    req<Relation>(`/v1/relations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/relations/${id}`, { method: 'DELETE' }),
 }
 

@@ -3,7 +3,7 @@ import { objects, entities, places, occurrences, schema, media, vocabularies, re
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image } from '../ui/Icons'
+import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit } from '../ui/Icons'
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
@@ -628,6 +628,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
   const [addSaving, setAddSaving]         = useState(false)
 
+  const [editRel, setEditRel]             = useState<Relation | null>(null)
+  const [editRelType, setEditRelType]     = useState('')
+  const [editMeta, setEditMeta]           = useState<{ key: string; value: string }[]>([])
+  const [editSaving, setEditSaving]       = useState(false)
+
   // Warn on browser tab close / reload
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { if (isDirty && !isNew) e.preventDefault() }
@@ -805,6 +810,31 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       await relationsApi.delete(id)
       setRels(prev => prev.filter(r => r.id !== id))
     } catch (e) { alert((e as Error).message) }
+  }
+
+  function openEditRelation(r: Relation) {
+    setEditRel(r)
+    setEditRelType(r.relation_type)
+    const meta = r.metadata_ ?? {}
+    setEditMeta(Object.entries(meta).map(([key, value]) => ({ key, value: String(value ?? '') })))
+  }
+
+  async function handleUpdateRelation() {
+    if (!editRel || !editRelType.trim()) return
+    setEditSaving(true)
+    try {
+      const metadata_: Record<string, unknown> = {}
+      editMeta.forEach(({ key, value }) => { if (key.trim()) metadata_[key.trim()] = value })
+      const updated = await relationsApi.update(editRel.id, {
+        relation_type: editRelType.trim(),
+        metadata_,
+      })
+      setRels(prev => prev.map(r => r.id === updated.id ? updated : r))
+      setEditRel(null)
+      setEditRelType('')
+      setEditMeta([])
+    } catch (e) { alert((e as Error).message) }
+    finally { setEditSaving(false) }
   }
 
   // All user-triggered value mutations go through this wrapper to mark the form dirty
@@ -1697,13 +1727,65 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           const targetType = isFrom ? r.to_type : r.from_type
                           const targetId = isFrom ? r.to_id : r.from_id
                           return (
-                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
-                              <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>{relTypeLabel}</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
-                                <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
-                                {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
-                              </span>
-                              <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+                            <div key={r.id}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                                <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
+                                  {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
+                                  {relTypeLabel}
+                                </span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
+                                  <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
+                                  {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
+                                </span>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button className="btn sm ico gh dn" onClick={() => openEditRelation(r)} title="Bearbeiten"><Edit size={11} /></button>
+                                  <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+                                </div>
+                              </div>
+                              {editRel?.id === r.id && (
+                                <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                                  <div className="field" style={{ marginBottom: 8 }}>
+                                    <div className="lbl">Relationstyp</div>
+                                    {relTypeTerms.length > 0 ? (
+                                      <select className="fld" value={editRelType} onChange={e => setEditRelType(e.target.value)}>
+                                        <option value="">— Typ wählen —</option>
+                                        {relTypeTerms.map(t => (
+                                          <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input className="fld mono" value={editRelType} onChange={e => setEditRelType(e.target.value)} />
+                                    )}
+                                  </div>
+                                  <div className="field" style={{ marginBottom: 8 }}>
+                                    <div className="lbl">Metadaten</div>
+                                    {editMeta.map((entry, idx) => (
+                                      <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                        <input className="fld mono" style={{ flex: 1 }} placeholder="Key" value={entry.key} onChange={e => {
+                                          const next = [...editMeta]
+                                          next[idx] = { ...entry, key: e.target.value }
+                                          setEditMeta(next)
+                                        }} />
+                                        <input className="fld" style={{ flex: 1.5 }} placeholder="Value" value={entry.value} onChange={e => {
+                                          const next = [...editMeta]
+                                          next[idx] = { ...entry, value: e.target.value }
+                                          setEditMeta(next)
+                                        }} />
+                                        <button className="btn sm ico gh" onClick={() => setEditMeta(prev => prev.filter((_, i) => i !== idx))}><X size={12} /></button>
+                                      </div>
+                                    ))}
+                                    <button className="btn sm gh" onClick={() => setEditMeta(prev => [...prev, { key: '', value: '' }])}><Plus size={11} /> Eintrag</button>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button className="btn pri sm" onClick={handleUpdateRelation} disabled={!editRelType.trim() || editSaving}>
+                                      {editSaving ? 'Speichert…' : 'Speichern'}
+                                    </button>
+                                    <button className="btn gh sm" onClick={() => { setEditRel(null); setEditRelType(''); setEditMeta([]) }}>
+                                      Abbrechen
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}

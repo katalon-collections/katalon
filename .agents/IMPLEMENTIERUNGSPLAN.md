@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-24
+## Stand: 2026-05-25
 
 ---
 
@@ -17,6 +17,11 @@ Alembic-Migrationen laufen.
 ### Phase 2 – Schema-Engine ✅
 `field_definitions`-Tabelle, `schema_service.validate_metadata()`, CRUD-Endpoints.
 Vokabulare mit hierarchischen Terms vollständig.
+
+### Phase 2.1 – Containerfelder (verschachtelte Metadatengruppen) ✅ – Issue #220
+`field_type = "group"` mit `parent_id` (self-referential FK, CASCADE DELETE).
+Sub-Felder inline im Schema-Editor verwaltbar; wiederholbare Gruppen im Formular mit nested Inputs.
+ES-Indexierung als `nested`-Typ. Rekursive Validierung in `schema_service.validate_metadata()`.
 
 ### Phase 3 – CRUD alle 4 Typen ✅
 REST-Endpoints für Objects, Entities, Places, Occurrences, Relationen.
@@ -141,29 +146,6 @@ Dateien (neu):
 - `backend/src/katalon/api/v1/portal_config.py`
 - `frontend/admin/src/components/screens/ScreenPortalConfig.tsx`
 - `frontend/portal/src/hooks/usePortalConfig.ts`
-
-### Phase 2.1 – Containerfelder (verschachtelte Metadatengruppen) – Issue #220
-
-Neuer `field_type = "group"`: mehrere semantisch zusammengehörige Sub-Felder als wiederholbare Einheit.
-
-**Architekturentscheidungen:**
-- Sub-Felder als eigene Zeilen in `field_definitions` mit `parent_id UUID` (FK auf sich selbst, CASCADE DELETE)
-- Datenspeicherung: JSONB-Array von Objekten, wie bei allen wiederholbaren Feldern
-- ES-Mapping: `nested`-Typ für korrekte Kombinations-Queries
-- Schema-Editor UX: Sub-Felder inline im Drawer des Containerfelds
-
-**Zu implementieren:**
-- DB-Migration: `ALTER TABLE field_definitions ADD COLUMN parent_id UUID REFERENCES field_definitions(id) ON DELETE CASCADE`
-- `schema_service.py`: `validate_metadata()` erkennt `field_type == "group"`, iteriert Instanzen, prüft Pflichtfelder und `validation.regex` pro Sub-Feld
-- Schema-Editor (Admin): Containerfeld anlegen → Sub-Felder inline hinzufügen/sortieren/löschen
-- Formular (Admin): Gruppenabschnitt mit „+ Eintrag hinzufügen"; Sub-Felder rendern passende Input-Komponenten (`VocabSelect`, `TextInput`, `BooleanToggle` …)
-- ES-Indexierung: Sub-Felder als `nested`-Objekte indexieren
-- Suchergebnisse/Portal: Containerfelder korrekt darstellen
-
-**Nicht im Scope (MVP):**
-- Rekursion (Gruppen in Gruppen)
-- Relation-Felder als Sub-Felder
-- OAI-Export der Sub-Felder
 
 ---
 

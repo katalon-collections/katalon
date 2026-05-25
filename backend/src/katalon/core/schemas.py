@@ -157,6 +157,11 @@ class RelationCreate(BaseModel):
     metadata_: dict = {}
 
 
+class RelationUpdate(BaseModel):
+    relation_type: str | None = None
+    metadata_: dict | None = None
+
+
 class RelationRead(RelationCreate):
     model_config = ConfigDict(from_attributes=True)
 
