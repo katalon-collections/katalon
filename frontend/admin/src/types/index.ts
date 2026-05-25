@@ -51,7 +51,7 @@ export interface FieldDefinition {
   target_subtype: string | null
   name: string
   label: Record<string, string>
-  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'authority'
+  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'authority' | 'group'
   is_required: boolean
   is_repeatable: boolean
   sort_order: number
@@ -60,6 +60,8 @@ export interface FieldDefinition {
   show_in_list: boolean
   is_facet: boolean
   is_searchable: boolean
+  parent_id?: string | null
+  children?: FieldDefinition[]
 }
 
 export interface Vocabulary {

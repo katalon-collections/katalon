@@ -12,12 +12,28 @@ const TYPES = [
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
 ]
 
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
   boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
   relation: 'Relation', geo: 'Geodaten', pid: 'PID',
-  authority: 'Normdaten (Authority)',
+  authority: 'Normdaten (Authority)', group: 'Containerfeld (Gruppe)',
+}
+
+// Field types allowed as sub-fields of a group (no recursion)
+const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free'] as const
+type SubFieldType = typeof SUB_FIELD_TYPES[number]
+
+type SubFieldFormState = {
+  id?: string
+  name: string
+  label_de: string
+  label_en: string
+  field_type: SubFieldType
+  is_required: boolean
+  sort_order: number
+  validation_regex: string
+  vocabulary_id: string
 }
 
 const AUTHORITY_SOURCES = [
@@ -49,6 +65,8 @@ type FieldFormState = {
   relation_target_type: string
   relation_target_subtype: string
   relation_type_vocab: string
+  // sub-fields of this group field (populated when editing an existing group field)
+  subFields?: FieldDefinition[]
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
@@ -76,11 +94,13 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     relation_target_type: (f.settings?.target_type as string) ?? 'entity',
     relation_target_subtype: (f.settings?.target_subtype as string) ?? '',
     relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
+    subFields: f.children ?? [],
   }
 }
 
 interface FieldDetailProps {
   form: FieldFormState
+  fieldId: string | null   // null when creating a new field
   isNew: boolean
   saving: boolean
   error: string | null
@@ -89,6 +109,7 @@ interface FieldDetailProps {
   onSave: () => void
   onDelete: () => void
   onClose: () => void
+  onSubFieldChange: () => void  // reload field list after sub-field create/delete
 }
 
 function toSlug(label: string): string {
@@ -99,8 +120,93 @@ function toSlug(label: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
-function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose }: FieldDetailProps) {
+function emptySubFieldForm(sortOrder: number): SubFieldFormState {
+  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '' }
+}
+
+function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
+
+  // Sub-field editing state (only relevant when form.field_type === 'group')
+  const [subFieldEditing, setSubFieldEditing] = useState<'new' | string | null>(null)
+  const [subFieldForm, setSubFieldForm] = useState<SubFieldFormState | null>(null)
+  const [subFieldSaving, setSubFieldSaving] = useState(false)
+  const [subFieldError, setSubFieldError] = useState<string | null>(null)
+  const [subNameManual, setSubNameManual] = useState(false)
+
+  function openNewSubField() {
+    setSubFieldEditing('new')
+    setSubFieldForm(emptySubFieldForm((form.subFields?.length ?? 0)))
+    setSubFieldError(null)
+    setSubNameManual(false)
+  }
+
+  function openEditSubField(sf: FieldDefinition) {
+    setSubFieldEditing(sf.id)
+    setSubFieldForm({
+      id: sf.id,
+      name: sf.name,
+      label_de: sf.label.de ?? '',
+      label_en: sf.label.en ?? '',
+      field_type: sf.field_type as SubFieldType,
+      is_required: sf.is_required,
+      sort_order: sf.sort_order,
+      validation_regex: (sf.settings?.validation_regex as string) ?? '',
+      vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
+    })
+    setSubFieldError(null)
+    setSubNameManual(true)
+  }
+
+  async function handleSubFieldSave() {
+    if (!subFieldForm || !fieldId) return
+    if (!subFieldForm.name.trim()) { setSubFieldError('Interner Name darf nicht leer sein.'); return }
+    setSubFieldSaving(true)
+    setSubFieldError(null)
+    const data = {
+      target_type: form.target_type,
+      target_subtype: form.target_subtype || null,
+      name: subFieldForm.name,
+      label: { de: subFieldForm.label_de, en: subFieldForm.label_en },
+      field_type: subFieldForm.field_type,
+      is_required: subFieldForm.is_required,
+      is_repeatable: false,
+      sort_order: subFieldForm.sort_order,
+      show_in_detail: true,
+      show_in_list: true,
+      is_facet: false,
+      is_searchable: true,
+      settings: {
+        ...(subFieldForm.validation_regex.trim() ? { validation_regex: subFieldForm.validation_regex.trim() } : {}),
+        ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
+      },
+      parent_id: fieldId,
+    }
+    try {
+      if (subFieldEditing === 'new') {
+        await schema.create(data)
+      } else {
+        await schema.update(subFieldEditing!, { ...data, parent_id: fieldId })
+      }
+      setSubFieldEditing(null)
+      setSubFieldForm(null)
+      onSubFieldChange()
+    } catch (e) {
+      setSubFieldError((e as Error).message)
+    } finally {
+      setSubFieldSaving(false)
+    }
+  }
+
+  async function handleSubFieldDelete(sfId: string) {
+    if (!window.confirm('Sub-Feld wirklich löschen?')) return
+    try {
+      await schema.delete(sfId)
+      onSubFieldChange()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
 
   function set<K extends keyof FieldFormState>(key: K, value: FieldFormState[K]) {
     onChange({ ...form, [key]: value })
@@ -265,6 +371,152 @@ function FieldDetail({ form, isNew, saving, error, showSubtype, onChange, onSave
             <button className="btn dn" onClick={onDelete} disabled={saving}>Feld löschen</button>
           )}
         </div>
+
+        {/* Sub-field management — only for saved group fields */}
+        {form.field_type === 'group' && !isNew && fieldId && (
+          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Sub-Felder</span>
+              <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--fg-3)' }}>
+                {form.subFields?.length ?? 0} definiert
+              </span>
+              <div style={{ flex: 1 }} />
+              {subFieldEditing === null && (
+                <button className="btn sm gh" onClick={openNewSubField}>
+                  <Plus size={12} /> Sub-Feld
+                </button>
+              )}
+            </div>
+
+            {/* Existing sub-fields */}
+            {(form.subFields ?? []).map(sf => (
+              <div key={sf.id} style={{ fontSize: 13 }}>
+                {subFieldEditing === sf.id ? (
+                  <SubFieldFormPanel
+                    sf={subFieldForm!}
+                    allVocabs={allVocabs}
+                    nameManual={subNameManual}
+                    saving={subFieldSaving}
+                    error={subFieldError}
+                    onChange={setSubFieldForm}
+                    onNameManual={() => setSubNameManual(true)}
+                    onSave={handleSubFieldSave}
+                    onCancel={() => { setSubFieldEditing(null); setSubFieldForm(null) }}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)' }}>
+                    <span style={{ flex: 1, fontWeight: 500 }}>{sf.label.de || sf.name}</span>
+                    <span className="key" style={{ fontSize: 11 }}>{sf.name}</span>
+                    <span className="typ">{FIELD_TYPE_LABELS[sf.field_type] ?? sf.field_type}</span>
+                    {sf.is_required && <span className="req-mark">Pflicht</span>}
+                    <button className="btn sm ico gh" onClick={() => openEditSubField(sf)}><Edit size={12} /></button>
+                    <button className="btn sm ico gh dn" onClick={() => handleSubFieldDelete(sf.id)}><Trash size={12} /></button>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* New sub-field form */}
+            {subFieldEditing === 'new' && (
+              <div style={{ marginTop: 8 }}>
+                <SubFieldFormPanel
+                  sf={subFieldForm!}
+                  allVocabs={allVocabs}
+                  nameManual={subNameManual}
+                  saving={subFieldSaving}
+                  error={subFieldError}
+                  onChange={setSubFieldForm}
+                  onNameManual={() => setSubNameManual(true)}
+                  onSave={handleSubFieldSave}
+                  onCancel={() => { setSubFieldEditing(null); setSubFieldForm(null) }}
+                />
+              </div>
+            )}
+
+            {(form.subFields?.length ?? 0) === 0 && subFieldEditing === null && (
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', paddingBottom: 4 }}>
+                Noch keine Sub-Felder. Klicke „Sub-Feld" um das erste anzulegen.
+              </div>
+            )}
+          </div>
+        )}
+        {form.field_type === 'group' && isNew && (
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--accent-50)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
+            Containerfeld zuerst speichern, dann Sub-Felder anlegen.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface SubFieldFormPanelProps {
+  sf: SubFieldFormState
+  allVocabs: Vocabulary[]
+  nameManual: boolean
+  saving: boolean
+  error: string | null
+  onChange: (sf: SubFieldFormState) => void
+  onNameManual: () => void
+  onSave: () => void
+  onCancel: () => void
+}
+
+function SubFieldFormPanel({ sf, allVocabs, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
+  function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, background: 'var(--panel)' }}>
+      {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
+      <div className="fg-2">
+        <div className="field">
+          <div className="lbl">Label DE</div>
+          <input className="fld" value={sf.label_de} onChange={e => {
+            const v = e.target.value
+            if (!nameManual) onChange({ ...sf, label_de: v, name: toSlug(v) })
+            else set('label_de', v)
+          }} />
+        </div>
+        <div className="field">
+          <div className="lbl">Label EN</div>
+          <input className="fld" value={sf.label_en} onChange={e => set('label_en', e.target.value)} />
+        </div>
+      </div>
+      <div className="fg-2">
+        <div className="field">
+          <div className="lbl">Interner Name</div>
+          <input className="fld mono" value={sf.name} onChange={e => { onNameManual(); set('name', e.target.value) }} disabled={Boolean(sf.id)} />
+        </div>
+        <div className="field">
+          <div className="lbl">Feldtyp</div>
+          <select className="fld" value={sf.field_type} onChange={e => set('field_type', e.target.value as SubFieldType)}>
+            {SUB_FIELD_TYPES.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 8 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <input type="checkbox" className="ck" checked={sf.is_required} onChange={e => set('is_required', e.target.checked)} />
+          Pflichtfeld
+        </label>
+      </div>
+      {sf.field_type === 'text' && (
+        <div className="field">
+          <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+          <input className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder="^https?://.+" />
+        </div>
+      )}
+      {(sf.field_type === 'vocab' || sf.field_type === 'vocab_free') && (
+        <div className="field">
+          <div className="lbl">Vokabular</div>
+          <select className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
+            <option value="">— Vokabular wählen —</option>
+            {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button className="btn pri sm" onClick={onSave} disabled={saving}>{saving ? '…' : 'Speichern'}</button>
+        <button className="btn gh sm" onClick={onCancel}>Abbrechen</button>
       </div>
     </div>
   )
@@ -393,10 +645,19 @@ export function ScreenSchema() {
   const loadFields = useCallback(() => {
     setLoading(true)
     schema.list(activeType, activeSubtype || undefined)
-      .then(setFields)
+      .then(loaded => {
+        setFields(loaded)
+        // Sync sub-fields into open group field form
+        setForm(prev => {
+          if (!prev || prev.field_type !== 'group') return prev
+          const current = loaded.find(f => f.id === activeFieldId)
+          if (current) return { ...prev, subFields: current.children ?? [] }
+          return prev
+        })
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [activeType, activeSubtype])
+  }, [activeType, activeSubtype, activeFieldId])
 
   useEffect(() => {
     setActiveFieldId(null)
@@ -466,12 +727,28 @@ export function ScreenSchema() {
     }
     try {
       if (isNew) {
-        await schema.create(data)
+        const created = await schema.create(data)
+        closeDetail()
+        loadFields()
+        // Immediately open the new group field so user can add sub-fields
+        if (data.field_type === 'group') {
+          setTimeout(() => {
+            setIsNew(false)
+            setActiveFieldId(created.id)
+            setForm({ ...fieldToForm(created as FieldDefinition), subFields: [] })
+          }, 100)
+          return
+        }
       } else {
         await schema.update(activeFieldId!, data)
+        loadFields()
+        // Keep group field open with updated form but preserve subFields
+        if (data.field_type === 'group') {
+          setForm(prev => prev ? { ...prev, ...data as Partial<FieldFormState> } : prev)
+          return
+        }
+        closeDetail()
       }
-      closeDetail()
-      loadFields()
     } catch (e) {
       setSaveError((e as Error).message)
     } finally {
@@ -543,6 +820,7 @@ export function ScreenSchema() {
           {showDetail ? (
             <FieldDetail
               form={form!}
+              fieldId={activeFieldId}
               isNew={isNew}
               saving={saving}
               error={saveError}
@@ -551,6 +829,7 @@ export function ScreenSchema() {
               onSave={handleSave}
               onDelete={handleDelete}
               onClose={closeDetail}
+              onSubFieldChange={loadFields}
             />
           ) : (
             <>
@@ -573,6 +852,7 @@ export function ScreenSchema() {
                         <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
                       )}
                       <span className="typ">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</span>
+                      {f.field_type === 'group' && <span className="typ" style={{ background: 'var(--fg-5)', color: 'var(--fg-3)' }}>{f.children?.length ?? 0} Sub-Felder</span>}
                       {f.is_required && <span className="req-mark">Pflicht</span>}
                       {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}
                       <div className="actions" onClick={e => e.stopPropagation()}>

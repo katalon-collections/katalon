@@ -142,6 +142,31 @@ Dateien (neu):
 - `frontend/admin/src/components/screens/ScreenPortalConfig.tsx`
 - `frontend/portal/src/hooks/usePortalConfig.ts`
 
+### Phase 2.1 – Containerfelder (verschachtelte Metadatengruppen) – Issue #220
+
+Neuer `field_type = "group"`: mehrere semantisch zusammengehörige Sub-Felder als wiederholbare Einheit.
+
+**Architekturentscheidungen:**
+- Sub-Felder als eigene Zeilen in `field_definitions` mit `parent_id UUID` (FK auf sich selbst, CASCADE DELETE)
+- Datenspeicherung: JSONB-Array von Objekten, wie bei allen wiederholbaren Feldern
+- ES-Mapping: `nested`-Typ für korrekte Kombinations-Queries
+- Schema-Editor UX: Sub-Felder inline im Drawer des Containerfelds
+
+**Zu implementieren:**
+- DB-Migration: `ALTER TABLE field_definitions ADD COLUMN parent_id UUID REFERENCES field_definitions(id) ON DELETE CASCADE`
+- `schema_service.py`: `validate_metadata()` erkennt `field_type == "group"`, iteriert Instanzen, prüft Pflichtfelder und `validation.regex` pro Sub-Feld
+- Schema-Editor (Admin): Containerfeld anlegen → Sub-Felder inline hinzufügen/sortieren/löschen
+- Formular (Admin): Gruppenabschnitt mit „+ Eintrag hinzufügen"; Sub-Felder rendern passende Input-Komponenten (`VocabSelect`, `TextInput`, `BooleanToggle` …)
+- ES-Indexierung: Sub-Felder als `nested`-Objekte indexieren
+- Suchergebnisse/Portal: Containerfelder korrekt darstellen
+
+**Nicht im Scope (MVP):**
+- Rekursion (Gruppen in Gruppen)
+- Relation-Felder als Sub-Felder
+- OAI-Export der Sub-Felder
+
+---
+
 ### Phase 13 – Inherited Fields (ES-Denormalisierung) – Issue #213
 Felder verlinkter Records werden beim ES-Indexieren eingebettet, damit sie bei verknüpften Objekten suchbar und facettierbar sind (z.B. Erscheinungsjahr eines verknüpften Werks).
 Kaskaden-Reindex bei Änderungen am verlinkten Record, max. 1 Ebene tief.

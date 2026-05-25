@@ -31,6 +31,7 @@ class FieldDefinitionCreate(BaseModel):
     show_in_detail: bool = True
     show_in_list: bool = True
     is_facet: bool = False
+    parent_id: uuid.UUID | None = None
 
 
 class FieldDefinitionRead(FieldDefinitionCreate):
@@ -38,6 +39,10 @@ class FieldDefinitionRead(FieldDefinitionCreate):
 
     id: uuid.UUID
     is_deleted: bool = False
+    children: list["FieldDefinitionRead"] = []
+
+
+FieldDefinitionRead.model_rebuild()
 
 
 class RecordSubtypeCreate(BaseModel):

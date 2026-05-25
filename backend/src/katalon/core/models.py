@@ -117,7 +117,7 @@ class FieldDefinition(Base):
     target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)  # e.g. person, organisation
     name: Mapped[str] = mapped_column(String(128))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
-    field_type: Mapped[str] = mapped_column(String(32))  # text/date/number/geo/vocab/relation/boolean
+    field_type: Mapped[str] = mapped_column(String(32))  # text/date/number/geo/vocab/relation/boolean/group
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
     is_repeatable: Mapped[bool] = mapped_column(Boolean, default=False)
     is_searchable: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
@@ -127,6 +127,23 @@ class FieldDefinition(Base):
     show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_facet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # NULL for top-level fields; set for sub-fields of a group field
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("field_definitions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    children: Mapped[list["FieldDefinition"]] = relationship(
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        order_by="FieldDefinition.sort_order",
+    )
+    parent: Mapped["FieldDefinition | None"] = relationship(
+        back_populates="children",
+        remote_side="FieldDefinition.id",
+    )
 
     __table_args__ = (
         Index("ix_field_defs_target_type", "target_type"),

@@ -6,6 +6,7 @@ from elasticsearch import AsyncElasticsearch, NotFoundError
 
 from katalon.config import settings
 
+
 def get_es() -> AsyncElasticsearch:
     """Create a fresh ES client. Not cached – must be used within a single event loop."""
     return AsyncElasticsearch(settings.elasticsearch_url)
@@ -31,7 +32,15 @@ INDEX_SETTINGS: dict[str, Any] = {
                     "match": "^facet_.*",
                     "mapping": {"type": "keyword"},
                 }
-            }
+            },
+            {
+                # group field instances are indexed as nested objects under grp_{fieldname}
+                "group_fields": {
+                    "match_pattern": "regex",
+                    "match": "^grp_.*",
+                    "mapping": {"type": "nested"},
+                }
+            },
         ],
         "properties": {
             "record_type":         {"type": "keyword"},

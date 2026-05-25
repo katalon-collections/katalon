@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections import defaultdict
 
 import yaml
 from fastapi import APIRouter, HTTPException, Query, UploadFile
@@ -31,17 +32,48 @@ class ImportResult(BaseModel):
     fields: list[FieldDefinitionRead]
 
 
+async def _embed_children(
+    db: DBDep, target_type: str, top_fields: list[FieldDefinition]
+) -> list[FieldDefinitionRead]:
+    """Load sub-fields for all group fields and embed them as children."""
+    group_ids = [f.id for f in top_fields if f.field_type == "group"]
+    children_map: dict[uuid.UUID, list[FieldDefinition]] = defaultdict(list)
+    if group_ids:
+        sub_result = await db.execute(
+            select(FieldDefinition).where(
+                FieldDefinition.target_type == target_type,
+                FieldDefinition.parent_id.in_(group_ids),
+                FieldDefinition.is_deleted.is_(False),
+            ).order_by(FieldDefinition.sort_order)
+        )
+        for sf in sub_result.scalars().all():
+            children_map[sf.parent_id].append(sf)
+
+    out: list[FieldDefinitionRead] = []
+    for f in top_fields:
+        fd = FieldDefinitionRead.model_validate(f)
+        if f.field_type == "group":
+            fd.children = [
+                FieldDefinitionRead.model_validate(c) for c in children_map.get(f.id, [])
+            ]
+        out.append(fd)
+    return out
+
+
 @router.get("/{target_type}", response_model=list[FieldDefinitionRead])
 async def list_fields(
     target_type: str,
     db: DBDep,
     subtype: str | None = Query(default=None, description="Filter to generic + this subtype"),
     include_deleted: bool = Query(False, description="Include soft-deleted fields"),
-) -> list[FieldDefinition]:
+) -> list[FieldDefinitionRead]:
     validate_primary_type(target_type)
     if subtype is not None:
         await ensure_subtype_exists(db, target_type, subtype)
-    q = select(FieldDefinition).where(FieldDefinition.target_type == target_type)
+    q = select(FieldDefinition).where(
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.parent_id.is_(None),  # top-level only; sub-fields embedded via children
+    )
     if subtype:
         q = q.where(
             or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == subtype)
@@ -49,30 +81,61 @@ async def list_fields(
     if not include_deleted:
         q = q.where(FieldDefinition.is_deleted.is_(False))
     result = await db.execute(q.order_by(FieldDefinition.sort_order))
-    return list(result.scalars().all())
+    top_fields = list(result.scalars().all())
+    return await _embed_children(db, target_type, top_fields)
+
+
+async def _validate_parent(db: DBDep, parent_id: uuid.UUID, field_type: str) -> None:
+    """Validate parent_id: parent must exist, be a group field, and sub-fields cannot be groups."""
+    if field_type == "group":
+        raise HTTPException(
+            status_code=422,
+            detail="Verschachtelte Containerfelder (Gruppe in Gruppe) sind nicht erlaubt.",
+        )
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.id == parent_id,
+            FieldDefinition.is_deleted.is_(False),
+        )
+    )
+    parent = result.scalar_one_or_none()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Übergeordnetes Feld nicht gefunden.")
+    if parent.field_type != "group":
+        raise HTTPException(
+            status_code=422,
+            detail="Sub-Felder können nur unter einem Containerfeld (Gruppe) angelegt werden.",
+        )
 
 
 @router.post("", response_model=FieldDefinitionRead, status_code=201, dependencies=[require_role("admin")])
-async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinition:
+async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     validate_primary_type(data.target_type)
-    await ensure_subtype_exists(db, data.target_type, data.target_subtype)
+    if data.parent_id:
+        await _validate_parent(db, data.parent_id, data.field_type)
+    else:
+        await ensure_subtype_exists(db, data.target_type, data.target_subtype)
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
     _enqueue_reindex(data.target_type)
-    return field
+    fd = FieldDefinitionRead.model_validate(field)
+    return fd
 
 
 @router.put("/{field_id}", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
 async def update_field(
     field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep
-) -> FieldDefinition:
+) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     validate_primary_type(data.target_type)
-    await ensure_subtype_exists(db, data.target_type, data.target_subtype)
+    if data.parent_id:
+        await _validate_parent(db, data.parent_id, data.field_type)
+    else:
+        await ensure_subtype_exists(db, data.target_type, data.target_subtype)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -85,10 +148,10 @@ async def update_field(
     for k, v in data.model_dump().items():
         setattr(field, k, v)
     await db.flush()
-    # Reindex if facet-relevant properties changed
     if field.is_facet != old_is_facet:
         _enqueue_reindex(field.target_type)
-    return field
+    fd = FieldDefinitionRead.model_validate(field)
+    return fd
 
 
 @router.delete("/{field_id}", status_code=204, dependencies=[require_role("admin")])

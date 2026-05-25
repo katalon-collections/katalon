@@ -12,15 +12,30 @@ from katalon.core.models import FieldDefinition
 async def get_field_definitions(
     db: AsyncSession, target_type: str, target_subtype: str | None = None
 ) -> list[FieldDefinition]:
+    """Return top-level field definitions (parent_id IS NULL) for a given type."""
     q = select(FieldDefinition).where(
         FieldDefinition.target_type == target_type,
         FieldDefinition.is_deleted.is_(False),
+        FieldDefinition.parent_id.is_(None),
     )
     if target_subtype:
         q = q.where(
             or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == target_subtype)
         )
     result = await db.execute(q.order_by(FieldDefinition.sort_order))
+    return list(result.scalars().all())
+
+
+async def get_sub_field_definitions(
+    db: AsyncSession, parent_id: uuid.UUID
+) -> list[FieldDefinition]:
+    """Return sub-field definitions for a group field."""
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.parent_id == parent_id,
+            FieldDefinition.is_deleted.is_(False),
+        ).order_by(FieldDefinition.sort_order)
+    )
     return list(result.scalars().all())
 
 
@@ -100,6 +115,36 @@ async def validate_metadata(
             continue
 
         if value is None:
+            continue
+
+        if field.field_type == "group":
+            if not isinstance(value, list):
+                errors.append(f"Feld '{field.name}': Containerfeld muss eine Liste sein.")
+                continue
+            sub_fields = await get_sub_field_definitions(db, field.id)
+            for idx, instance in enumerate(value):
+                if not isinstance(instance, dict):
+                    errors.append(
+                        f"Feld '{field.name}' (Eintrag {idx + 1}): Eintrag muss ein Objekt sein."
+                    )
+                    continue
+                for sf in sub_fields:
+                    sv = instance.get(sf.name)
+                    if sf.is_required and (sv is None or sv == ""):
+                        errors.append(
+                            f"Feld '{field.name}.{sf.name}' (Eintrag {idx + 1}): Pflichtfeld."
+                        )
+                    if sv is not None and sf.field_type == "text":
+                        regex = sf.settings.get("validation_regex")
+                        if regex and isinstance(sv, str):
+                            try:
+                                if not re.fullmatch(regex, sv):
+                                    errors.append(
+                                        f"Feld '{field.name}.{sf.name}' (Eintrag {idx + 1}): "
+                                        "entspricht nicht dem erwarteten Format."
+                                    )
+                            except re.error:
+                                pass
             continue
 
         if field.field_type == "pid":

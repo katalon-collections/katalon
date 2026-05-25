@@ -893,6 +893,56 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
+  type GroupInstance = Record<string, unknown>
+  function addGroupInstance(name: string) {
+    const cur = (values[name] as GroupInstance[] | undefined) ?? []
+    setValuesDirty(v => ({ ...v, [name]: [...cur, {}] }))
+  }
+  function removeGroupInstance(name: string, idx: number) {
+    setValuesDirty(v => ({ ...v, [name]: ((v[name] as GroupInstance[]) ?? []).filter((_, i) => i !== idx) }))
+  }
+  function updateGroupSubField(name: string, idx: number, subName: string, val: unknown) {
+    const cur = [...((values[name] as GroupInstance[]) ?? [])]
+    cur[idx] = { ...cur[idx], [subName]: val }
+    setValuesDirty(v => ({ ...v, [name]: cur }))
+  }
+
+  function renderSubFieldInput(sf: FieldDefinition, val: unknown, onChange: (v: unknown) => void, disabled: boolean) {
+    switch (sf.field_type) {
+      case 'boolean':
+        return (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" className="ck" checked={Boolean(val)} onChange={e => onChange(e.target.checked)} disabled={disabled} />
+            <span style={{ fontSize: 13 }}>{sf.label.de || sf.name}</span>
+          </label>
+        )
+      case 'number':
+        return <input className="fld" type="number" step="any" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
+      case 'date':
+        return <input className="fld" type="text" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder="YYYY, YYYY-MM oder YYYY-MM-DD" />
+      case 'vocab':
+        return (
+          <VocabInput
+            vocabId={(sf.settings?.vocabulary_id as string) ?? ''}
+            value={(val as VocabEntry | undefined) ?? null}
+            onChange={v => onChange(v ?? undefined)}
+            disabled={disabled}
+          />
+        )
+      case 'vocab_free':
+        return (
+          <VocabFreeInput
+            vocabId={(sf.settings?.vocabulary_id as string) ?? ''}
+            value={(val as string) ?? ''}
+            onChange={v => onChange(v)}
+            disabled={disabled}
+          />
+        )
+      default:
+        return <input className="fld" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
+    }
+  }
+
   function addRelationEntry(name: string, entry: RelationEntry) {
     const cur = (values[name] as RelationEntry[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, entry] }))
@@ -1349,6 +1399,31 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             )}
                           </>
                         )
+                      ) : f.field_type === 'group' ? (
+                        <div>
+                          {((val as Record<string, unknown>[] | undefined) ?? []).map((instance, i) => (
+                            <div key={i} style={{ border: '1px solid var(--border-s)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, position: 'relative', background: 'var(--panel)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                                <button className="btn sm ico gh dn" onClick={() => removeGroupInstance(f.name, i)} disabled={justCreated}><X size={12} /></button>
+                              </div>
+                              {(f.children ?? []).map(sf => (
+                                <div key={sf.id} className="field">
+                                  <div className="lbl">
+                                    {getLabel(sf, sf.name)}
+                                    {sf.is_required && <span className="req">*</span>}
+                                  </div>
+                                  {renderSubFieldInput(sf, instance[sf.name], v => updateGroupSubField(f.name, i, sf.name, v), justCreated)}
+                                </div>
+                              ))}
+                              {(f.children ?? []).length === 0 && (
+                                <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Sub-Felder definiert.</div>
+                              )}
+                            </div>
+                          ))}
+                          <button className="btn sm gh" onClick={() => addGroupInstance(f.name)} disabled={justCreated}>
+                            <Plus size={12} /> Eintrag hinzufügen
+                          </button>
+                        </div>
                       ) : f.field_type === 'pid' ? (
                         repeatable ? (
                           <>

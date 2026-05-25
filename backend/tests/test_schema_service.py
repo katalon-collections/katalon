@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -5,19 +6,33 @@ import pytest
 from katalon.services.schema_service import validate_metadata
 
 
-def make_field(name: str, *, is_required: bool = False, is_repeatable: bool = False) -> MagicMock:
+def make_field(name: str, *, is_required: bool = False, is_repeatable: bool = False, field_type: str = "text") -> MagicMock:
     f = MagicMock()
     f.name = name
     f.is_required = is_required
     f.is_repeatable = is_repeatable
+    f.field_type = field_type
+    f.settings = {}
+    f.id = uuid.uuid4()
     return f
 
 
-def mock_db(*fields: MagicMock) -> AsyncMock:
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = list(fields)
+def make_group_field(name: str, sub_fields: list[MagicMock], *, is_required: bool = False) -> MagicMock:
+    f = make_field(name, is_required=is_required, field_type="group")
+    f.is_repeatable = True
+    return f, sub_fields
+
+
+def mock_db(*top_fields: MagicMock, sub_fields: list[MagicMock] | None = None) -> AsyncMock:
+    """Mock DB that returns top_fields for the first execute call and sub_fields for subsequent calls."""
+    top_result = MagicMock()
+    top_result.scalars.return_value.all.return_value = list(top_fields)
+
+    sub_result = MagicMock()
+    sub_result.scalars.return_value.all.return_value = list(sub_fields or [])
+
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=result)
+    db.execute = AsyncMock(side_effect=[top_result, sub_result] + [sub_result] * 10)
     return db
 
 
@@ -107,4 +122,70 @@ async def test_valid_complex_metadata() -> None:
         "title": "Bahnhofstraße bei Nacht",
         "tags": ["zürich", "nacht", "strasse"],
     })
+    assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# Group / container field tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_group_field_not_a_list_is_error() -> None:
+    group = make_field("foerderung", field_type="group")
+    db = mock_db(group, sub_fields=[])
+    errors = await validate_metadata(db, "object", {"foerderung": "not-a-list"})
+    assert len(errors) == 1
+    assert "Liste" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_group_field_required_empty_list() -> None:
+    group = make_field("foerderung", field_type="group", is_required=True)
+    db = mock_db(group, sub_fields=[])
+    errors = await validate_metadata(db, "object", {"foerderung": []})
+    assert len(errors) == 1
+    assert "foerderung" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_group_field_required_sub_field_missing() -> None:
+    group = make_field("foerderung", field_type="group")
+    nummer = make_field("nummer", is_required=True)
+    db = mock_db(group, sub_fields=[nummer])
+    errors = await validate_metadata(db, "object", {"foerderung": [{"nummer": ""}]})
+    assert len(errors) == 1
+    assert "foerderung.nummer" in errors[0]
+    assert "Eintrag 1" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_group_field_valid_instances() -> None:
+    group = make_field("foerderung", field_type="group")
+    nummer = make_field("nummer", is_required=True)
+    db = mock_db(group, sub_fields=[nummer])
+    errors = await validate_metadata(db, "object", {
+        "foerderung": [
+            {"nummer": "FU-2023-001"},
+            {"nummer": "FU-2024-042"},
+        ]
+    })
+    assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_group_field_sub_field_regex_violation() -> None:
+    group = make_field("foerderung", field_type="group")
+    url = make_field("url")
+    url.settings = {"validation_regex": r"^https?://.+"}
+    db = mock_db(group, sub_fields=[url])
+    errors = await validate_metadata(db, "object", {"foerderung": [{"url": "not-a-url"}]})
+    assert len(errors) == 1
+    assert "foerderung.url" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_group_field_optional_absent() -> None:
+    group = make_field("foerderung", field_type="group")
+    db = mock_db(group, sub_fields=[])
+    errors = await validate_metadata(db, "object", {})
     assert errors == []

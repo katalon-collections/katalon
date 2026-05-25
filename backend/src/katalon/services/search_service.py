@@ -54,10 +54,19 @@ def _extract_facet_value(val: Any) -> str | list[str] | None:
     return _extract_display_value(val)
 
 
+_KNOWN_ENTRY_KEYS = {"label", "value", "id", "source", "external_id"}
+
+
+def _is_group_instance(d: dict) -> bool:
+    """Return True if a dict looks like a group field instance (not a vocab/authority/pid entry)."""
+    return not bool(_KNOWN_ENTRY_KEYS & d.keys())
+
+
 def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
     """Return a single search_text string with all (or only searchable) metadata values concatenated.
 
     If searchable_fields is provided, only keys in that set are included.
+    Group field instances (arrays of sub-field dicts) are recursively flattened.
     """
     parts: list[str] = []
     for key, val in md.items():
@@ -67,7 +76,12 @@ def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
             parts.append(val)
         elif isinstance(val, list):
             for item in val:
-                parts.append(_extract_display_value(item) or "")
+                if isinstance(item, dict) and _is_group_instance(item):
+                    # Group instance: extract all sub-field values
+                    for sv in item.values():
+                        parts.append(_extract_display_value(sv) or "")
+                else:
+                    parts.append(_extract_display_value(item) or "")
         elif isinstance(val, dict):
             parts.append(_extract_display_value(val) or "")
     return " ".join(p for p in parts if p)
@@ -110,6 +124,7 @@ def _build_doc(
     rel_data: dict[str, list[str]] | None = None,
     searchable_fields: set[str] | None = None,
     facet_fields: set[str] | None = None,
+    group_fields: set[str] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
@@ -149,6 +164,13 @@ def _build_doc(
             label = _extract_facet_value(val)
             if label:
                 doc[f"facet_{field_name}"] = label
+
+    # Index group field instances as nested ES objects under grp_* keys
+    if group_fields:
+        for field_name in group_fields:
+            val = md.get(field_name)
+            if isinstance(val, list) and val:
+                doc[f"grp_{field_name}"] = val
 
     if rel_data:
         doc.update(rel_data)
@@ -207,18 +229,26 @@ async def index_record(record_type: str, record: Any, db: Any = None) -> None:
 
     searchable_fields: set[str] | None = None
     facet_fields: set[str] | None = None
+    group_fields: set[str] | None = None
     if db is not None:
         result = await db.execute(
-            select(FieldDefinition.name, FieldDefinition.is_searchable, FieldDefinition.is_facet).where(
+            select(
+                FieldDefinition.name,
+                FieldDefinition.is_searchable,
+                FieldDefinition.is_facet,
+                FieldDefinition.field_type,
+            ).where(
                 FieldDefinition.target_type == record_type,
                 FieldDefinition.is_deleted.is_(False),
+                FieldDefinition.parent_id.is_(None),
             )
         )
         rows = result.all()
         searchable_fields = {r.name for r in rows if r.is_searchable}
         facet_fields = {r.name for r in rows if r.is_facet}
+        group_fields = {r.name for r in rows if r.field_type == "group"}
 
-    doc = _build_doc(record_type, record, rel_data, searchable_fields, facet_fields)
+    doc = _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields)
     await index_document(str(record.id), doc)
 
 
