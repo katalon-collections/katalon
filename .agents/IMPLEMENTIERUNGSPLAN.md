@@ -46,7 +46,7 @@ Schema-Editor: interner Feldname wird automatisch aus Label DE als Slug befüllt
 Vokabular-Verwaltung vollständig verdrahtet.
 
 **Noch offen in Phase 6:**
-- Relationen-Panel im Formular (Phase 6.1)
+- ~~Relationen-Panel im Formular (Phase 6.1)~~ ✅ – Relation-Metadaten bearbeiten, Gegenrichtung anzeigen
 - Snapshot-UI im Formular (Phase 7)
 - ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
@@ -125,13 +125,14 @@ Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
 
 ## Offene Phasen (geplant, nicht begonnen)
 
-### Phase 6.1 – Relationen-Panel im Admin-Formular
+### Phase 6.1 – Relationen-Panel im Admin-Formular ✅
 Suche über alle Typen, Relationstyp wählen, Metadaten auf der Relation.
-Endpoint `/v1/relations` ist fertig, UI-Grundgerüst vorhanden (Liste + Hinzufügen-Dialog).
 
-**Offen:**
-- Bearbeitung von Relation-Metadaten (JSONB-Felder auf der Relation selbst)
-- Darstellung der Gegenrichtung (from/to korrekt anzeigen wenn Datensatz `to_id` ist)
+**Erledigt:**
+- `PUT /v1/relations/{id}` endpoint für Bearbeitung von `relation_type` und `metadata_`
+- Inline-Bearbeitungspanel pro Relation im Admin-Formular
+- Key-Value-Editor für Relation-Metadaten (JSONB)
+- Visueller Gegenrichtung-Indikator (`←`) für eingehende Relationen
 
 ### Phase 8.1 – Facettiertes Browsing + Portal-Konfiguration
 **Ziel:** Sammlungsverantwortliche konfigurieren im Admin, welche Facetten und Felder im Portal sichtbar sind.
@@ -187,7 +188,7 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 ## Nächste Schritte (Reihenfolge)
 
 1. ~~Admin-UI: Benutzer-Verwaltungs-Screen~~ ✅ – Issue #144
-2. Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1 – Relation-Metadaten bearbeiten)
+2. ~~Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1)~~ ✅
 3. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
 4. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219
 5. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145

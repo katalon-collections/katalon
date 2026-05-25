@@ -1,6 +1,6 @@
 # Katalon – Fortschrittsplan
 
-> Letzte Aktualisierung: 2026-05-06
+> Letzte Aktualisierung: 2026-05-25
 
 ## Implementierungsstatus
 
@@ -27,6 +27,9 @@
 | Feature                                        | PR    | Beschreibung                                                                          |
 |------------------------------------------------|-------|---------------------------------------------------------------------------------------|
 | Statische Seiten (Admin)                       | #80   | ScreenPages, CRUD `/v1/pages`                                                         |
+| Containerfelder (nested metadata groups)       | #220  | `field_type = "group"`, `parent_id` FK, nested ES mapping (Closes #220)               |
+| Benutzer-Verwaltungs-Screen                    | #144  | User-CRUD: Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, API-Keys (Closes #144) |
+| Relationen-Panel im Admin-Formular             | —     | Inline-Edit für Relation-Metadaten, Gegenrichtung-Indikator                           |
 | Facetten-Konfiguration (Portal-Settings)       | —     | `facet_fields` in PortalConfig                                                        |
 | Portal-Farbkonfiguration                       | #82   | `color_tokens` JSONB, Migration 0008, Color-Picker in Settings                        |
 | Logo-Upload                                    | #82   | `POST /v1/portal/logo`, `GET /v1/portal/logo/file`, Upload-UI                         |
@@ -44,8 +47,10 @@
 
 ### Priorität 1 — Offene Core-Issues
 
-- [#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen → **in Arbeit**
-- Admin-UI Authority-Autocomplete (Felder mit `field_type = "authority"` in ScreenForm)
+- ~~[#78](https://github.com/karkraeg/Katalon/issues/78) Relation-Type-Labels aus Vokabular auflösen~~ ✅
+- ~~Admin-UI Authority-Autocomplete~~ ✅
+- Snapshot-UI im Admin-Formular (Phase 7, Issue #217)
+- Rate-Limiting auf öffentlichen Endpunkten (Phase 12, Issue #219)
 
 ### Priorität 2 — Deployment-Nacharbeit
 
@@ -53,8 +58,10 @@
 
 ### Priorität 3 — Langfristig
 
-- Batch-Medienimport (ZIP + CSV-Mapping, Issue #18)
-- IIIF-Viewer-Integration End-to-End (Issue #13)
+- ~~Batch-Medienimport (ZIP + CSV-Mapping, Issue #18)~~ ✅
+- ~~IIIF-Viewer-Integration End-to-End (Issue #13)~~ ✅
+- OAI-PMH ResumptionToken + Fehlerbehandlung (Issue #145)
+- `system_fields` statt `__idno__` im Importer (Issue #194)
 - Fehler- und Ladezustände in UI-Screens verbessern
 
 ---

@@ -2,7 +2,8 @@
 
 **Ziel:** Den bestehenden CSV/Excel-Importer um einen vollständigen XML-Import mit GUI erweitern (XPath-basiertes Mapping, lxml-Parsing, baumförmige Selector-Ansicht im Wizard).
 
-**Stand bei Planerstellung:** 2026-05-22  
+**Stand bei Planerstellung:** 2026-05-22
+**Letzte Aktualisierung:** 2026-05-25  
 **Entscheidungen (2026-05-22):** Generisches XML (kein Format-Lock), Record-Granularität per User-Klick wählbar (neuer Wizard-Schritt), Upload-Limit massiv hochsetzen.
 
 ---
