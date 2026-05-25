@@ -59,6 +59,7 @@ export function ObjectDetailPage() {
 
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
+  const [viewerError, setViewerError] = useState(false)
   const fieldDefs = useFieldDefinitions('object')
   const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
@@ -109,8 +110,8 @@ export function ObjectDetailPage() {
   const readyMedia = mediaFiles.filter(f => f.status === 'ready')
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
-  const manifestUrl = `${BASE}/v1/objects/${obj.id}/iiif/manifest`
-  const showViewer = readyMedia.length > 0
+  const manifestUrl = `${window.location.origin}/v1/objects/${obj.id}/iiif/manifest`
+  const showViewer = readyMedia.length > 0 && !viewerError
 
   const description = String(m.description ?? '')
   const ogImage = primaryMedia ? `${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
@@ -153,7 +154,7 @@ export function ObjectDetailPage() {
       <div className="detail-layout">
         <div>
           {showViewer ? (
-            <IIIFViewer manifestUrl={manifestUrl} />
+            <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
           ) : readyMedia.length > 0 ? (
             <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
           ) : portalConfig.placeholder_image_url ? (

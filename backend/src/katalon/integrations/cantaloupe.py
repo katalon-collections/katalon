@@ -60,6 +60,8 @@ def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest
                         "body": {
                             "id": f"{img_base}/full/max/0/default.jpg",
                             "type": "Image",
+                            "format": "image/jpeg",
+                            **({"width": width, "height": height} if width and height else {}),
                             "service": [
                                 {
                                     "id": img_base,
