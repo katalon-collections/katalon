@@ -114,7 +114,8 @@ Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
 - Tests für Token-Roundtrips und Pagination-Edge-Cases
 
 ### Phase 12 – Hardening
-- Rate Limiting: slowapi ist eingebunden, aber **keine einzige Route ist dekoriert** (`main.py`). Öffentliche Endpunkte (`/v1/search`, `/v1/oai`, `/v1/authorities/search`) müssen noch begrenzt werden.
+- Rate Limiting: slowapi ist eingebunden, aber **keine einzige Route ist dekoriert** (`main.py`). Öffentliche Endpunkte (`/v1/search`, `/v1/oai`, `/v1/authorities/search`) müssen noch begrenzt werden — Issue #219.
+- Verwaiste Relationen: Beim Löschen eines Records bleiben Relationseinträge in `relations` stehen — Issue #149.
 - Produktions-Secrets (kein `dev-secret-key` in Prod)
 - nginx TLS-Terminierung
 - Perf-Tests (locust)
@@ -187,11 +188,22 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ## Nächste Schritte (Reihenfolge)
 
-1. ~~Admin-UI: Benutzer-Verwaltungs-Screen~~ ✅ – Issue #144
-2. ~~Relationen-Panel im Admin-Formular vervollständigen (Phase 6.1)~~ ✅
-3. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
-4. Rate-Limiting-Dekoratoren auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219
-5. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
+### Beta-Blocker (öffentlicher Beta)
+
+1. Rate-Limiting auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219
+2. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
+3. Verwaiste Relationen bei Record-Löschung aufräumen (Phase 12) – Issue #149
+4. Production Hardening: Secrets, TLS-Check (Phase 12) – Issue #20
+
+### Wichtig vor oder kurz nach Beta-Start
+
+5. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
+6. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
+
+### Nachrangig (Post-Beta)
+
+7. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
+8. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
 
 ---
 
