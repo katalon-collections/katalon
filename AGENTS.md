@@ -133,17 +133,17 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 
 | Phase | Status | Meilenstein                                                    |
 |-------|--------|----------------------------------------------------------------|
-| 0–1   | ✅     | Infra (Docker Compose, alle Services) + Core-DB (ORM, Alembic) |
-| 2     | ✅     | Schema-Engine (field_definitions, repeatable, Vokabulare)      |
-| 3     | ✅     | CRUD alle 4 Typen + generische Relationen mit Metadaten        |
-| 4     | ✅     | Auth (FastAPI-Users, JWT, Rollen) + Audit Log                  |
-| 5     | ⚠️     | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
-| 6     | ✅     | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett          |
-| 7     | ⚠️     | Elasticsearch + Versionierung (Snapshots)                      |
-| 8     | ✅     | Public-Portal (React: Suche, Facetten, IIIF-Viewer)            |
-| 9     | ✅     | Authority-Plugin-System + Adapter GND/Geonames                 |
-| 10    | ⚠️     | Smart Importer (Excel/CSV ETL, Dry Run)                        |
-| 11    | ⚠️     | OAI-PMH                                                        |
+| 0–1   | ✅      | Infra (Docker Compose, alle Services) + Core-DB (ORM, Alembic) |
+| 2     | ✅      | Schema-Engine (field_definitions, repeatable, Vokabulare)      |
+| 3     | ✅      | CRUD alle 4 Typen + generische Relationen mit Metadaten        |
+| 4     | ✅      | Auth (FastAPI-Users, JWT, Rollen) + Audit Log                  |
+| 5     | ⚠️      | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
+| 6     | ✅      | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett          |
+| 7     | ⚠️      | Elasticsearch + Versionierung (Snapshots)                      |
+| 8     | ✅      | Public-Portal (React: Suche, Facetten, IIIF-Viewer)            |
+| 9     | ✅      | Authority-Plugin-System + Adapter GND/Geonames                 |
+| 10    | ⚠️      | Smart Importer (Excel/CSV ETL, Dry Run)                        |
+| 11    | ⚠️      | OAI-PMH                                                        |
 | 12    | 🔲     | Hardening                                                      |
 
 ## Nicht im Scope
@@ -156,6 +156,10 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 ## User-Profil
 
 Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen zu diesen Technologien nötig. Er kennt CollectiveAccess-Konzepte (dynamische Schemata, Vokabulare, Entitätsrelationen).
+
+## Debugging
+
+- Wenn ich Fehler berichte, schau immer in die Logs der entsorechenden Container statt Annahmen zu treffen.
 
 ## Code Navigation
 

@@ -47,6 +47,8 @@ show_help() {
     echo "  --down        Stack herunterfahren"
     echo "  --down -v     Stack herunterfahren und Docker-Volumes löschen"
     echo "  --help, -h    Diese Hilfe anzeigen"
+    echo ""
+    echo "Für gezielte Build- und Cleanup-Befehle: make help"
 }
 
 ensure_katalon_base_url() {
@@ -177,11 +179,11 @@ if [[ "$DOWN" == true ]]; then
 
     if [[ "$DOWN_VOLUMES" == true ]]; then
         warn "Stack wird heruntergefahren und Volumes werden gelöscht …"
-        $COMPOSE_CMD down -v --remove-orphans
+        COMPOSE="$COMPOSE_CMD" make down-volumes
         ok "Stack und Volumes wurden entfernt."
     else
         info "Fahre Stack herunter …"
-        $COMPOSE_CMD down --remove-orphans
+        COMPOSE="$COMPOSE_CMD" make down
         ok "Stack wurde heruntergefahren."
     fi
     exit 0
@@ -217,7 +219,19 @@ else
     exit 1
 fi
 
-# --- 3. Optional: uv prüfen (nur für Local-Dev relevant) -------------------
+# --- 3. Make prüfen --------------------------------------------------------
+
+if command -v make &>/dev/null; then
+    MAKE_VERSION=$(make --version 2>/dev/null | head -n1 | awk '{print $3}')
+    ok "make gefunden: $MAKE_VERSION"
+else
+    err "make ist nicht installiert."
+    err "   → macOS: xcode-select --install"
+    err "   → Linux: sudo apt-get install build-essential"
+    exit 1
+fi
+
+# --- 4. Optional: uv prüfen (nur für Local-Dev relevant) -------------------
 
 if command -v uv &>/dev/null; then
     UV_VERSION=$(uv --version 2>/dev/null | awk '{print $2}')
@@ -245,7 +259,7 @@ if [[ "$RESET" == true ]]; then
     fi
 
     info "Fahre Stack herunter und entferne Volumes …"
-    $COMPOSE_CMD down -v --remove-orphans
+    COMPOSE="$COMPOSE_CMD" make down-volumes
     ok "Volumes und Container wurden entfernt."
     echo
 fi
@@ -292,7 +306,7 @@ if [[ "$DEV" == true ]]; then
     info "Starte Infra-Services für Local Development …"
     echo
 
-    $COMPOSE_CMD up -d db redis elasticsearch cantaloupe
+    COMPOSE="$COMPOSE_CMD" make up-dev
 
     ok "Infra-Services laufen."
     echo
@@ -349,8 +363,8 @@ if [[ "$DEV" == true ]]; then
     echo "   • API Health      → http://localhost:8000/health"
     echo
     info "Infra-Services stoppen:"
-    echo "   $COMPOSE_CMD down"
-    echo "   $COMPOSE_CMD down -v   # inkl. Datenbank zurücksetzen"
+    echo "   make down"
+    echo "   make down-volumes   # inkl. Datenbank zurücksetzen"
     echo
     exit 0
 fi
@@ -364,7 +378,7 @@ fi
 info "Baue und starte den Katalon-Stack …"
 echo
 
-$COMPOSE_CMD up -d --build
+COMPOSE="$COMPOSE_CMD" make up
 
 echo
 ok "Stack wurde gestartet."
@@ -456,9 +470,11 @@ if [[ "$DEMO" == true ]]; then
     echo
 fi
 info "Hilfreiche Befehle:"
-echo "   • Logs ansehen    → $COMPOSE_CMD logs -f"
-echo "   • Stack stoppen   → $COMPOSE_CMD down"
-echo "   • Stack + Volumes → $COMPOSE_CMD down -v"
+echo "   • Logs ansehen       → $COMPOSE_CMD logs -f"
+echo "   • Stack stoppen      → make down"
+echo "   • Stack + Volumes    → make down-volumes"
+echo "   • Alte Images löschen → make clean"
+echo "   • Alle Targets       → make help"
 echo
 if [[ "$ENV_CREATED" == true ]]; then
     info "Instanz-Anpassungen in docker-compose.override.yml pflegen:"

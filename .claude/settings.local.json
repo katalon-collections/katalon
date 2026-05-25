@@ -19,7 +19,13 @@
       "Bash(chmod 644 .codegraph/codegraph.db)",
       "Bash(chmod 666 .codegraph/codegraph.db)",
       "Bash(codegraph index *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(ruff check *)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(npx eslint *)",
+      "Bash(make help *)",
+      "Bash(bash -n /Users/karl/Coding/Katalon/install.sh)",
+      "Bash(make *)"
     ]
   }
 }

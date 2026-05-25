@@ -1,6 +1,8 @@
 # Katalon
 
-Open-Source Metadata Management System (MMS) für den GLAM-Sektor — Galerien, Bibliotheken, Archive, Museen.
+>This project is 100% AI-generated. Every line of code, every architectural decision's implementation, and every commit was written by AI. The human developer serves solely as the decision-maker and product manager — defining what to build, not how to build it.
+
+Turn-key Open-Source Metadata Management System (MMS) für den GLAM-Sektor — Galerien, Bibliotheken, Archive, Museen.
 
 Katalon ist ein moderner Python/React-Rewrite der Kernfunktionalitäten von [CollectiveAccess](https://collectiveaccess.org). Es vereint die bewährte Flexibilität dynamischer Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
 
@@ -19,6 +21,14 @@ Katalon überführt diese Flexibilität in eine moderne Stack:
 - **Volltextsuche**
 - **Facettierte Suche über alle Bestände**
 - **Theme-System** — Public-Portal per Drop-in-Bundle anpassbar, kein Rebuild nötig
+
+Unique Selling Points:
+
+- Extrem konfortabler Datenimport (WYSIWYG Mapping inkl. Transformationen)
+- Skalierbare Architektur
+- Exporter GUI (Eigenes Datenmodell auf Schema mappen)
+- KI-assistierte Felder
+- Extrem einfache Installtion dank Docker Compose
 
 ---
 
@@ -116,27 +126,27 @@ Ein Theme-Bundle besteht aus `theme.json` (CSS-Tokens, Fonts, Logo) + optionalem
 
 ## API
 
-OpenAPI-Dokumentation: `http://localhost:8000/docs`
+OpenAPI-Dokumentation: `http://localhost:8000/api/docs`
 
 Wichtige Endpunkte:
 
-| Methode        | Pfad                              | Beschreibung                           |
-|----------------|-----------------------------------|----------------------------------------|
-| POST           | `/v1/auth/token`                  | JWT-Login                              |
-| GET            | `/v1/objects`                     | Objekte auflisten (Pagination, Filter) |
-| POST           | `/v1/objects`                     | Neues Objekt anlegen                   |
-| GET/PUT/DELETE | `/v1/objects/{id}`                | Objekt lesen/aktualisieren/löschen     |
-| GET            | `/v1/schema/{target_type}`        | Felddefinitionen abrufen               |
-| GET/POST       | `/v1/schema/import`               | Schema aus YAML/JSON importieren       |
-| GET            | `/v1/vocabularies`                | Vokabulare auflisten                   |
-| POST           | `/v1/vocabularies/{id}/import`    | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
-| GET            | `/v1/search`                      | Volltext- und Facettensuche            |
-| POST           | `/v1/pids/urn/register`           | URN via DNB-API registrieren (PID-Feld) |
-| GET            | `/v1/authorities/search`          | Normdaten-Suche                        |
-| GET            | `/v1/oai`                         | OAI-PMH Endpoint                       |
-| GET            | `/v1/portal/config`               | Portal-Konfiguration                   |
-| POST           | `/v1/portal/logo`                 | Logo hochladen                         |
-| GET            | `/v1/audit`                       | Audit-Log abrufen                      |
+| Methode        | Pfad                           | Beschreibung                                               |
+|----------------|--------------------------------|------------------------------------------------------------|
+| POST           | `/v1/auth/token`               | JWT-Login                                                  |
+| GET            | `/v1/objects`                  | Objekte auflisten (Pagination, Filter)                     |
+| POST           | `/v1/objects`                  | Neues Objekt anlegen                                       |
+| GET/PUT/DELETE | `/v1/objects/{id}`             | Objekt lesen/aktualisieren/löschen                         |
+| GET            | `/v1/schema/{target_type}`     | Felddefinitionen abrufen                                   |
+| GET/POST       | `/v1/schema/import`            | Schema aus YAML/JSON importieren                           |
+| GET            | `/v1/vocabularies`             | Vokabulare auflisten                                       |
+| POST           | `/v1/vocabularies/{id}/import` | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
+| GET            | `/v1/search`                   | Volltext- und Facettensuche                                |
+| POST           | `/v1/pids/urn/register`        | URN via DNB-API registrieren (PID-Feld)                    |
+| GET            | `/v1/authorities/search`       | Normdaten-Suche                                            |
+| GET            | `/v1/oai`                      | OAI-PMH Endpoint                                           |
+| GET            | `/v1/portal/config`            | Portal-Konfiguration                                       |
+| POST           | `/v1/portal/logo`              | Logo hochladen                                             |
+| GET            | `/v1/audit`                    | Audit-Log abrufen                                          |
 
 ### DNB-URN (PID)
 
@@ -234,7 +244,6 @@ Unterstützt flache Listen oder verschachtelte `children`:
 ## Entwicklung
 
 Für lokale Entwicklung ohne Docker siehe [`.agents/DEV.md`](.agents/DEV.md).
-
 
 ---
 
