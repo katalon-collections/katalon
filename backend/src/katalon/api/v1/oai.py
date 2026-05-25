@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from katalon.config import settings
 from katalon.core.dependencies import DBDep
+from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
 from katalon.services import oaipmh_service
 
@@ -74,6 +75,7 @@ async def _es_search_for_oai(
 
 
 @router.get("")
+@limiter.limit("100/minute")
 async def oai_endpoint(request: Request, db: DBDep) -> Response:
     params = dict(request.query_params)
     verb = params.get("verb", "")

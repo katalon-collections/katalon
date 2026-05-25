@@ -6,9 +6,8 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from katalon.api.v1 import (
@@ -41,6 +40,7 @@ from katalon.api.v1 import (
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
+from katalon.core.limiter import limiter
 from katalon.core.models import (
     AdminConfig,
     FieldDefinition,
@@ -290,8 +290,6 @@ async def lifespan(app: FastAPI):
         pass  # ES may not be available in all environments
     yield
 
-
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(
     lifespan=lifespan,

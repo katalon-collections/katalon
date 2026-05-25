@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.limiter import limiter
 from katalon.core.models import AuthoritySource as AuthoritySourceModel
 from katalon.services import authority_service
 
@@ -41,7 +42,9 @@ async def list_sources(db: DBDep, _: CurrentUser) -> list[SourceOut]:
 
 
 @router.get("/search", response_model=list[HitOut])
+@limiter.limit("60/minute")
 async def search(
+    request: Request,
     source: Annotated[str, Query(description="Adapter ID, e.g. gnd or geonames")],
     q: Annotated[str, Query(description="Search query")],
     _: CurrentUser,
@@ -54,7 +57,9 @@ async def search(
 
 
 @router.get("/fetch", response_model=HitOut)
+@limiter.limit("60/minute")
 async def fetch(
+    request: Request,
     source: Annotated[str, Query()],
     id: Annotated[str, Query(description="External ID to fetch")],
     _: CurrentUser,

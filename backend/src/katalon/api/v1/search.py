@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
 from katalon.core.dependencies import OptionalCurrentUser, require_role
+from katalon.core.limiter import limiter
 from katalon.services import search_service
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -33,6 +34,7 @@ class SearchResponse(BaseModel):
 
 
 @router.get("", response_model=SearchResponse)
+@limiter.limit("100/minute")
 async def search(
     request: Request,
     current_user: OptionalCurrentUser,
