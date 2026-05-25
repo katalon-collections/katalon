@@ -629,6 +629,9 @@ export function ScreenSchema() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
 
+  const activeFieldIdRef = useRef<string | null>(null)
+  activeFieldIdRef.current = activeFieldId
+
   const hasSubtypes = subtypesList.length > 0
 
   useEffect(() => {
@@ -650,14 +653,14 @@ export function ScreenSchema() {
         // Sync sub-fields into open group field form
         setForm(prev => {
           if (!prev || prev.field_type !== 'group') return prev
-          const current = loaded.find(f => f.id === activeFieldId)
+          const current = loaded.find(f => f.id === activeFieldIdRef.current)
           if (current) return { ...prev, subFields: current.children ?? [] }
           return prev
         })
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [activeType, activeSubtype, activeFieldId])
+  }, [activeType, activeSubtype])
 
   useEffect(() => {
     setActiveFieldId(null)

@@ -5,12 +5,20 @@ from collections import defaultdict
 import yaml
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import or_, select
 
 from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import FieldDefinition
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services.subtype_service import ensure_subtype_exists, validate_primary_type
+
+
+def _fd_read(f: FieldDefinition, children: list[FieldDefinitionRead] | None = None) -> FieldDefinitionRead:
+    """Validate a FieldDefinition ORM object into FieldDefinitionRead without triggering lazy loads."""
+    cols = {attr.key: getattr(f, attr.key) for attr in sa_inspect(type(f)).mapper.column_attrs}
+    cols["children"] = children or []
+    return FieldDefinitionRead.model_validate(cols)
 
 router = APIRouter(prefix="/schema", tags=["schema"])
 
@@ -51,12 +59,8 @@ async def _embed_children(
 
     out: list[FieldDefinitionRead] = []
     for f in top_fields:
-        fd = FieldDefinitionRead.model_validate(f)
-        if f.field_type == "group":
-            fd.children = [
-                FieldDefinitionRead.model_validate(c) for c in children_map.get(f.id, [])
-            ]
-        out.append(fd)
+        children = [_fd_read(c) for c in children_map.get(f.id, [])] if f.field_type == "group" else []
+        out.append(_fd_read(f, children))
     return out
 
 
@@ -121,8 +125,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     db.add(field)
     await db.flush()
     _enqueue_reindex(data.target_type)
-    fd = FieldDefinitionRead.model_validate(field)
-    return fd
+    return _fd_read(field)
 
 
 @router.put("/{field_id}", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
@@ -150,8 +153,7 @@ async def update_field(
     await db.flush()
     if field.is_facet != old_is_facet:
         _enqueue_reindex(field.target_type)
-    fd = FieldDefinitionRead.model_validate(field)
-    return fd
+    return _fd_read(field)
 
 
 @router.delete("/{field_id}", status_code=204, dependencies=[require_role("admin")])
@@ -173,7 +175,7 @@ async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
 
 
 @router.post("/{field_id}/restore", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
-async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinition:
+async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(True)
@@ -186,7 +188,7 @@ async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinition:
     target_type = field.target_type
     await db.flush()
     _enqueue_reindex(target_type)
-    return field
+    return _fd_read(field)
 
 
 @router.post("/import", response_model=ImportResult, status_code=200, dependencies=[require_role("admin")])
@@ -294,5 +296,5 @@ async def import_schema(
         updated=updated,
         skipped=skipped,
         errors=errors,
-        fields=[FieldDefinitionRead.model_validate(f) for f in result_fields],
+        fields=[_fd_read(f) for f in result_fields],
     )
