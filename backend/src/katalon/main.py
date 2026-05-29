@@ -274,8 +274,29 @@ async def _ensure_record_subtypes() -> None:
         await db.commit()
 
 
+_DEFAULT_SECRETS = {
+    "dev-secret-key-change-in-production",
+    "change-me-in-production",
+}
+
+_DEFAULT_PASSWORDS = {"admin", "password", "katalon"}
+
+
+def _check_production_secrets() -> None:
+    if settings.debug:
+        return
+    errors = []
+    if settings.secret_key in _DEFAULT_SECRETS or len(settings.secret_key) < 32:
+        errors.append("SECRET_KEY is insecure — set a strong random value (>= 32 chars) via environment variable")
+    if settings.default_admin_password in _DEFAULT_PASSWORDS:
+        errors.append("DEFAULT_ADMIN_PASSWORD is set to a well-known default — change it before going live")
+    if errors:
+        raise RuntimeError("Refusing to start in production mode:\n" + "\n".join(f"  - {e}" for e in errors))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _check_production_secrets()
     await _ensure_admin()
     await _ensure_media_types_vocab()
     await _ensure_record_subtypes()
