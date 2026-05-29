@@ -116,6 +116,11 @@ export const entities = {
   update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/entities/${id}/publish`, { method: 'POST' }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/entities/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/entities/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string) => req<Entity>(`/v1/entities/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+  },
 }
 
 // Places
@@ -130,6 +135,11 @@ export const places = {
   update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/places/${id}/publish`, { method: 'POST' }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/places/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/places/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string) => req<Place>(`/v1/places/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+  },
 }
 
 // Occurrences
@@ -144,6 +154,11 @@ export const occurrences = {
   update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/occurrences/${id}/publish`, { method: 'POST' }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/occurrences/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/occurrences/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string) => req<Occurrence>(`/v1/occurrences/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+  },
 }
 
 export interface SchemaImportResult {

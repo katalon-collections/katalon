@@ -7,8 +7,8 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
-from katalon.core.models import AdminConfig, Place
-from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead
+from katalon.core.models import AdminConfig, Place, RecordSnapshot
+from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
@@ -202,6 +202,67 @@ async def delete_place(
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     cleanup_relation_refs.delay("place", str(place_id))
+
+
+@router.post("/{place_id}/snapshots", response_model=SnapshotRead, status_code=201)
+async def create_snapshot(
+    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser
+) -> RecordSnapshot:
+    result = await db.execute(select(Place).where(Place.id == place_id))
+    place = result.scalar_one_or_none()
+    if not place:
+        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    snap = RecordSnapshot(
+        record_type="place",
+        record_id=place.id,
+        label=data.label,
+        snapshot={"place_type": place.place_type, "status": place.status, "metadata": place.metadata_},
+        created_by=current_user.id,
+    )
+    db.add(snap)
+    await db.flush()
+    return snap
+
+
+@router.get("/{place_id}/snapshots", response_model=list[SnapshotRead])
+async def list_snapshots(place_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
+    result = await db.execute(
+        select(RecordSnapshot)
+        .where(RecordSnapshot.record_type == "place", RecordSnapshot.record_id == place_id)
+        .order_by(RecordSnapshot.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/{place_id}/snapshots/{snapshot_id}/restore", response_model=PlaceRead)
+async def restore_snapshot(
+    place_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+) -> Place:
+    snap_result = await db.execute(
+        select(RecordSnapshot).where(
+            RecordSnapshot.id == snapshot_id,
+            RecordSnapshot.record_type == "place",
+            RecordSnapshot.record_id == place_id,
+        )
+    )
+    snap = snap_result.scalar_one_or_none()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot nicht gefunden")
+
+    place_result = await db.execute(select(Place).where(Place.id == place_id))
+    place = place_result.scalar_one_or_none()
+    if not place:
+        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+
+    data = snap.snapshot
+    if "place_type" in data:
+        place.place_type = data["place_type"]
+    if "status" in data:
+        place.status = data["status"]
+    if "metadata" in data:
+        place.metadata_ = data["metadata"]
+    await db.flush()
+    return place
 
 
 @router.get("/{place_id}/audit-log", response_model=list[AuditLogRead])

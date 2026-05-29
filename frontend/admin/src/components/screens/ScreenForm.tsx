@@ -645,10 +645,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }, [])
 
   const loadSnapshots = useCallback((id: string) => {
-    if (recordType === 'object') {
-      objects.snapshots.list(id).then(setSnapshots).catch(() => {})
-    }
-  }, [recordType])
+    api.snapshots.list(id).then(setSnapshots).catch(() => {})
+  }, [api])
 
   const loadAudit = useCallback((id: string) => {
     setAuditLoading(true)
@@ -1868,7 +1866,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </div>
               )}
 
-              {!isNew && recordType === 'object' && savedId && (
+              {!isNew && savedId && (
                 <div className="card">
                   <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowSnapshots(s => !s)}>
                     <span>Versionen ({snapshots.length})</span>
@@ -1891,7 +1889,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             if (!snapLabel.trim() || !savedId) return
                             setSnapCreating(true)
                             try {
-                              const snap = await objects.snapshots.create(savedId, snapLabel.trim())
+                              const snap = await api.snapshots.create(savedId, snapLabel.trim())
                               setSnapshots(s => [snap, ...s])
                               setSnapLabel('')
                             } finally {
@@ -1918,7 +1916,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               if (!savedId || !window.confirm(`Version „${snap.label}" wiederherstellen?`)) return
                               setSnapRestoring(snap.id)
                               try {
-                                const restored = await objects.snapshots.restore(savedId, snap.id)
+                                const restored = await api.snapshots.restore(savedId, snap.id)
                                 setStatus(restored.status as Status)
                                 setIdno(restored.idno ?? '')
                                 setValues(restored.metadata_ as Record<string, unknown>)

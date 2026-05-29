@@ -214,6 +214,47 @@ async def create_snapshot(entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep,
     return snap
 
 
+@router.get("/{entity_id}/snapshots", response_model=list[SnapshotRead])
+async def list_snapshots(entity_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
+    result = await db.execute(
+        select(RecordSnapshot)
+        .where(RecordSnapshot.record_type == "entity", RecordSnapshot.record_id == entity_id)
+        .order_by(RecordSnapshot.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/{entity_id}/snapshots/{snapshot_id}/restore", response_model=EntityRead)
+async def restore_snapshot(
+    entity_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+) -> Entity:
+    snap_result = await db.execute(
+        select(RecordSnapshot).where(
+            RecordSnapshot.id == snapshot_id,
+            RecordSnapshot.record_type == "entity",
+            RecordSnapshot.record_id == entity_id,
+        )
+    )
+    snap = snap_result.scalar_one_or_none()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot nicht gefunden")
+
+    entity_result = await db.execute(select(Entity).where(Entity.id == entity_id))
+    entity = entity_result.scalar_one_or_none()
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+
+    data = snap.snapshot
+    if "entity_type" in data:
+        entity.entity_type = data["entity_type"]
+    if "status" in data:
+        entity.status = data["status"]
+    if "metadata" in data:
+        entity.metadata_ = data["metadata"]
+    await db.flush()
+    return entity
+
+
 @router.get("/{entity_id}/audit-log", response_model=list[AuditLogRead])
 async def list_entity_audit_log(entity_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log

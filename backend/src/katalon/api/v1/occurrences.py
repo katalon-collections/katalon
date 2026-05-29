@@ -7,11 +7,13 @@ from sqlalchemy import func, select
 logger = logging.getLogger(__name__)
 
 from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
-from katalon.core.models import AdminConfig, Occurrence
+from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
     OccurrenceCreate,
     OccurrenceRead,
+    SnapshotCreate,
+    SnapshotRead,
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
@@ -196,6 +198,67 @@ async def delete_occurrence(
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     cleanup_relation_refs.delay("occurrence", str(occ_id))
+
+
+@router.post("/{occ_id}/snapshots", response_model=SnapshotRead, status_code=201)
+async def create_snapshot(
+    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser
+) -> RecordSnapshot:
+    result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
+    occ = result.scalar_one_or_none()
+    if not occ:
+        raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    snap = RecordSnapshot(
+        record_type="occurrence",
+        record_id=occ.id,
+        label=data.label,
+        snapshot={"occurrence_type": occ.occurrence_type, "status": occ.status, "metadata": occ.metadata_},
+        created_by=current_user.id,
+    )
+    db.add(snap)
+    await db.flush()
+    return snap
+
+
+@router.get("/{occ_id}/snapshots", response_model=list[SnapshotRead])
+async def list_snapshots(occ_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
+    result = await db.execute(
+        select(RecordSnapshot)
+        .where(RecordSnapshot.record_type == "occurrence", RecordSnapshot.record_id == occ_id)
+        .order_by(RecordSnapshot.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/{occ_id}/snapshots/{snapshot_id}/restore", response_model=OccurrenceRead)
+async def restore_snapshot(
+    occ_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+) -> Occurrence:
+    snap_result = await db.execute(
+        select(RecordSnapshot).where(
+            RecordSnapshot.id == snapshot_id,
+            RecordSnapshot.record_type == "occurrence",
+            RecordSnapshot.record_id == occ_id,
+        )
+    )
+    snap = snap_result.scalar_one_or_none()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot nicht gefunden")
+
+    occ_result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
+    occ = occ_result.scalar_one_or_none()
+    if not occ:
+        raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+
+    data = snap.snapshot
+    if "occurrence_type" in data:
+        occ.occurrence_type = data["occurrence_type"]
+    if "status" in data:
+        occ.status = data["status"]
+    if "metadata" in data:
+        occ.metadata_ = data["metadata"]
+    await db.flush()
+    return occ
 
 
 @router.get("/{occ_id}/audit-log", response_model=list[AuditLogRead])
