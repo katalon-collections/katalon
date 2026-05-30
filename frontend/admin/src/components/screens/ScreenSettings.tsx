@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE, apiKeys, users, schema } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, adminConfig } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead } from '../../types'
 
 interface Props {
@@ -7,7 +7,7 @@ interface Props {
   isAdmin: boolean
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche'
+type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -496,6 +496,96 @@ function SectionSuche() {
 }
 
 // ---------------------------------------------------------------------------
+// ID-Schemas section
+// ---------------------------------------------------------------------------
+
+function SectionIdnoSchemas() {
+  const [schemas, setSchemas] = useState<Record<string, string>>({})
+  const [patterns, setPatterns] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    adminConfig.get()
+      .then(cfg => {
+        setSchemas(cfg.idno_schemas ?? {})
+        setPatterns(cfg.idno_patterns ?? {})
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      await adminConfig.update({ idno_schemas: schemas, idno_patterns: patterns })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  function setSchema(type: string, value: string) {
+    setSchemas(prev => ({ ...prev, [type]: value }))
+  }
+
+  function setPattern(type: string, value: string) {
+    setPatterns(prev => ({ ...prev, [type]: value }))
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+        Pro Primärtyp kann ein ID-Schema mit Platzhaltern definiert werden.
+        Beim Anlegen eines neuen Datensatzes wird die nächste ID automatisch vorgeschlagen.
+      </p>
+
+      {RECORD_TYPES.map(({ key, label }) => (
+        <div className="card" key={key} style={{ marginBottom: 16 }}>
+          <div className="hd">{label}</div>
+          <div className="bd">
+            <div className="field">
+              <div className="lbl">Schema <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+              <input
+                className="fld mono"
+                value={schemas[key] ?? ''}
+                onChange={e => setSchema(key, e.target.value)}
+                placeholder="z.B. ulb_x_{counter:05d}"
+              />
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+                Platzhalter: {'{counter}'} — laufende Nummer | {'{counter:05d}'} — mit Nullen aufgefüllt | {'{year}'} — aktuelles Jahr | {'{type}'} — Typ-Kürzel (obj/ent/pla/occ)
+              </div>
+            </div>
+            <div className="field">
+              <div className="lbl">Validierungs-Muster (Regex) <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+              <input
+                className="fld mono"
+                value={patterns[key] ?? ''}
+                onChange={e => setPattern(key, e.target.value)}
+                placeholder="z.B. ^ulb_x_\\d{5}$"
+              />
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+                Wenn gesetzt, werden manuell eingegebene IDs gegen dieses Muster geprüft.
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -503,6 +593,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
+  { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
 ]
 
@@ -545,6 +636,7 @@ export function ScreenSettings({ isAdmin }: Props) {
           {!loading && section === 'profil' && <SectionProfil />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, BASE, PORTAL_URL } from '../../api/client'
+import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
@@ -732,6 +732,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
     if (!isNew && currentId) loadRelations(currentId)
   }, [recordId, recordType, isNew])
+
+  useEffect(() => {
+    if (!isNew) return
+    idnoApi.next(recordType)
+      .then(r => { if (r.next) setIdno(r.next) })
+      .catch(() => {})
+  }, [isNew, recordType])
 
   useEffect(() => {
     if (savedId && showMedia) loadMedia(savedId)

@@ -566,3 +566,18 @@ export const bannersApi = {
   activeAdmin: () => req<Banner[]>('/v1/banners/active/admin'),
   activePortal: () => req<Banner[]>('/v1/banners/active/portal'),
 }
+
+export interface AdminConfigRead {
+  idno_schemas: Record<string, string>
+  idno_patterns: Record<string, string>
+}
+
+export const adminConfig = {
+  get: () => req<AdminConfigRead>('/v1/admin/config'),
+  update: (data: Partial<AdminConfigRead>) =>
+    req<AdminConfigRead>('/v1/admin/config', { method: 'PUT', body: JSON.stringify(data) }),
+}
+
+export const idno = {
+  next: (type: string) => req<{ next: string | null }>(`/v1/idno/next?type=${encodeURIComponent(type)}`),
+}
