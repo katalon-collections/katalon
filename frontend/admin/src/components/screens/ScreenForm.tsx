@@ -979,6 +979,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as RelationEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
 
+  function isEmptyValue(val: unknown): boolean {
+    return val === null || val === undefined || val === '' ||
+      (Array.isArray(val) && val.length === 0) ||
+      (typeof val === 'object' && val !== null && Object.keys(val).length === 0)
+  }
+
   function validateFields(): Record<string, string> {
     const errors: Record<string, string> = {}
     // idno is required for all record types
@@ -991,39 +997,104 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }
     for (const f of fields) {
       const val = values[f.name]
-      // Date validation
+
+      // Required field check (all types)
+      if (f.is_required && isEmptyValue(val)) {
+        errors[f.name] = `Feld '${getLabel(f, f.name)}' ist ein Pflichtfeld.`
+        continue
+      }
+
+      if (val === undefined || val === null || val === '') continue
+
+      // Group field validation
+      if (f.field_type === 'group') {
+        const instances = (val as Record<string, unknown>[] | undefined) ?? []
+        if (f.is_required && instances.length === 0) {
+          errors[f.name] = `Feld '${getLabel(f, f.name)}' muss mindestens einen Eintrag haben.`
+          continue
+        }
+        for (let idx = 0; idx < instances.length; idx++) {
+          const instance = instances[idx]
+          for (const sf of (f.children ?? [])) {
+            const sv = instance[sf.name]
+            if (sf.is_required && isEmptyValue(sv)) {
+              errors[`${f.name}.${sf.name}:${idx}`] =
+                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}) ist ein Pflichtfeld.`
+            }
+            if (sv !== undefined && sv !== null && sv !== '' &&
+                sf.field_type === 'text' && sf.settings?.validation_regex) {
+              const regex = sf.settings.validation_regex as string
+              try {
+                if (!new RegExp(regex).test(String(sv))) {
+                  errors[`${f.name}.${sf.name}:${idx}`] =
+                    `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): Eingabe entspricht nicht dem erwarteten Format.`
+                }
+              } catch {
+                // invalid regex on backend, ignore
+              }
+            }
+          }
+        }
+        continue
+      }
+
+      // Repeatable fields: must be a non-empty list when required
+      if (f.is_repeatable) {
+        const arr = Array.isArray(val) ? val : []
+        if (f.is_required && arr.length === 0) {
+          errors[f.name] = `Feld '${getLabel(f, f.name)}' muss mindestens einen Wert haben.`
+          continue
+        }
+        // Validate each item
+        for (let i = 0; i < arr.length; i++) {
+          const item = arr[i]
+          if (f.field_type === 'date' && typeof item === 'string' && item) {
+            if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(item)) {
+              errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+              break
+            }
+          }
+          if (f.field_type === 'number' && typeof item === 'string' && item) {
+            if (!/^-?\d+(\.\d+)?$/.test(item)) {
+              errors[f.name] = 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
+              break
+            }
+          }
+          if (f.field_type === 'text' && f.settings?.validation_regex && typeof item === 'string' && item) {
+            const regex = f.settings.validation_regex as string
+            try {
+              if (!new RegExp(regex).test(item)) {
+                errors[f.name] = 'Eingabe entspricht nicht dem erwarteten Format.'
+                break
+              }
+            } catch {
+              // invalid regex on backend, ignore
+            }
+          }
+        }
+        continue
+      }
+
+      // Non-repeatable field validation
       if (f.field_type === 'date') {
-        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
-        for (const v of toCheck) {
-          if (!v) continue
-          const ok = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)
-          if (!ok) {
-            errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
-            break
-          }
+        const v = val as string
+        if (v && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)) {
+          errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
         }
       }
-      // Number validation
       if (f.field_type === 'number') {
-        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
-        for (const v of toCheck) {
-          if (!v) continue
-          if (!/^-?\d+(\.\d+)?$/.test(v)) {
-            errors[f.name] = 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
-            break
-          }
+        const v = val as string
+        if (v && !/^-?\d+(\.\d+)?$/.test(v)) {
+          errors[f.name] = 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
         }
       }
-      // Regex validation
       if (f.field_type === 'text' && f.settings?.validation_regex) {
         const regex = f.settings.validation_regex as string
-        const toCheck: string[] = f.is_repeatable ? ((val as string[] | undefined) ?? []) : [val as string | undefined ?? '']
-        for (const v of toCheck) {
-          if (!v) continue
+        const v = val as string
+        if (v) {
           try {
             if (!new RegExp(regex).test(v)) {
               errors[f.name] = 'Eingabe entspricht nicht dem erwarteten Format.'
-              break
             }
           } catch {
             // invalid regex on backend, ignore
@@ -1032,6 +1103,53 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       }
     }
     return errors
+  }
+
+  function validateSingleField(field: FieldDefinition): string | null {
+    const val = values[field.name]
+    if (field.is_required && isEmptyValue(val)) {
+      return `Feld '${getLabel(field, field.name)}' ist ein Pflichtfeld.`
+    }
+    if (val === undefined || val === null || val === '') return null
+    if (field.field_type === 'date') {
+      const v = val as string
+      if (v && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)) {
+        return 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+      }
+    }
+    if (field.field_type === 'number') {
+      const v = val as string
+      if (v && !/^-?\d+(\.\d+)?$/.test(v)) {
+        return 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
+      }
+    }
+    if (field.field_type === 'text' && field.settings?.validation_regex) {
+      const regex = field.settings.validation_regex as string
+      const v = val as string
+      if (v) {
+        try {
+          if (!new RegExp(regex).test(v)) {
+            return 'Eingabe entspricht nicht dem erwarteten Format.'
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return null
+  }
+
+  function handleFieldBlur(field: FieldDefinition) {
+    const err = validateSingleField(field)
+    setFieldErrors(prev => {
+      const next = { ...prev }
+      if (err) {
+        next[field.name] = err
+      } else {
+        delete next[field.name]
+      }
+      return next
+    })
   }
 
   async function handleSave() {
@@ -1175,7 +1293,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             {justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
           {!justCreated && (
-            <button className="btn pri" onClick={handleSave} disabled={saving}>
+            <button className="btn pri" onClick={handleSave} disabled={saving || Object.keys(fieldErrors).length > 0}>
               {saving ? 'Speichert…' : 'Speichern'}
             </button>
           )}
@@ -1212,6 +1330,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       className="fld mono"
                       value={idno}
                       onChange={e => { setIdno(e.target.value); setIsDirty(true) }}
+                      onBlur={() => {
+                        if (!idno.trim()) {
+                          setFieldErrors(err => ({ ...err, __idno: 'ID-Nr. ist ein Pflichtfeld.' }))
+                        } else {
+                          setFieldErrors(err => { const n = { ...err }; delete n.__idno; return n })
+                        }
+                      }}
                       placeholder="z.B. FOT.1958.0412"
                       disabled={justCreated}
                       style={fieldErrors['__idno'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
@@ -1548,6 +1673,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
+                            onBlur={() => handleFieldBlur(f)}
                             placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
                             disabled={justCreated}
                             style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
@@ -1567,6 +1693,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
+                            onBlur={() => handleFieldBlur(f)}
                             placeholder={getLabel(f, f.name)}
                             disabled={justCreated}
                             style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
@@ -1584,6 +1711,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
                               }
                             }}
+                            onBlur={() => handleFieldBlur(f)}
                             placeholder={getLabel(f, f.name)}
                             disabled={justCreated}
                             style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
