@@ -52,3 +52,82 @@ def test_get_record_contains_dc_title() -> None:
 def test_list_records_empty_returns_noRecordsMatch() -> None:
     xml = oaipmh_service.list_records([], 0, 0, None, None, None, "oai_dc", "http://test/oai")
     assert "noRecordsMatch" in xml
+
+
+def test_token_roundtrip() -> None:
+    token = oaipmh_service.encode_token(
+        offset=100,
+        set_spec="object",
+        from_="2024-01-01",
+        until="2024-12-31",
+        prefix="oai_dc",
+    )
+    decoded = oaipmh_service.decode_token(token)
+    assert decoded["offset"] == 100
+    assert decoded["set_spec"] == "object"
+    assert decoded["from_"] == "2024-01-01"
+    assert decoded["until"] == "2024-12-31"
+    assert decoded["prefix"] == "oai_dc"
+
+
+def test_token_roundtrip_none_values() -> None:
+    token = oaipmh_service.encode_token(
+        offset=0,
+        set_spec=None,
+        from_=None,
+        until=None,
+        prefix="oai_dc",
+    )
+    decoded = oaipmh_service.decode_token(token)
+    assert decoded["offset"] == 0
+    assert decoded["set_spec"] is None
+    assert decoded["from_"] is None
+    assert decoded["until"] is None
+    assert decoded["prefix"] == "oai_dc"
+
+
+def test_list_records_with_resumption_token() -> None:
+    hit = _mock_hit()
+    xml = oaipmh_service.list_records(
+        [hit], total=200, offset=0, set_spec=None,
+        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+    )
+    assert "resumptionToken" in xml
+    assert 'completeListSize="200"' in xml
+    assert 'cursor="0"' in xml
+    # Token text should be present (next offset = 1)
+    root = ET.fromstring(xml.split("\n", 1)[-1] if xml.startswith("<?") else xml)
+    rt = root.find(".//{http://www.openarchives.org/OAI/2.0/}resumptionToken")
+    assert rt is not None
+    assert rt.text is not None
+    decoded = oaipmh_service.decode_token(rt.text)
+    assert decoded["offset"] == 1
+
+
+def test_list_records_last_page_empty_token() -> None:
+    hit = _mock_hit()
+    xml = oaipmh_service.list_records(
+        [hit], total=1, offset=0, set_spec=None,
+        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+    )
+    # Last page: resumptionToken element present but empty (no text)
+    assert "resumptionToken" in xml
+    root = ET.fromstring(xml.split("\n", 1)[-1] if xml.startswith("<?") else xml)
+    rt = root.find(".//{http://www.openarchives.org/OAI/2.0/}resumptionToken")
+    assert rt is not None
+    assert rt.text is None or rt.text == ""
+
+
+def test_list_identifiers_with_resumption_token() -> None:
+    hit = _mock_hit()
+    xml = oaipmh_service.list_identifiers(
+        [hit], total=200, offset=0, set_spec=None,
+        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+    )
+    assert "resumptionToken" in xml
+    root = ET.fromstring(xml.split("\n", 1)[-1] if xml.startswith("<?") else xml)
+    rt = root.find(".//{http://www.openarchives.org/OAI/2.0/}resumptionToken")
+    assert rt is not None
+    assert rt.text is not None
+    decoded = oaipmh_service.decode_token(rt.text)
+    assert decoded["offset"] == 1

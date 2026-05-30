@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-25
+## Stand: 2026-05-29
 
 ---
 
@@ -52,11 +52,10 @@ Vokabular-Verwaltung vollständig verdrahtet.
 
 ### Phase 7 – Elasticsearch + Versionierung ⚠️
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
-Snapshot-Endpoints im Backend vorhanden.
 ES-Facetten für vocab- und authority-Felder funktionieren korrekt (Label wird extrahiert, nicht das Raw-Objekt).
+Snapshot-UI im Admin-Formular für alle 4 Typen vollständig ✅ (Issue #217, 2026-05-29).
 
 **Noch offen:**
-- Snapshot-UI in Admin-Formular (Knopf + Versionsliste)
 - Re-Index-Task via Celery (Massenreindex bei Schema-Änderungen) – Issue #214
 
 ### Phase 8 – Public-Portal ✅ (mit laufenden Verbesserungen)
@@ -113,11 +112,26 @@ Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
 - Spezifische Fehlerbehandlung: Aktuell wird bei jedem Fehler (inkl. ES-Timeout) `noRecordsMatch` zurückgeliefert (`oai.py:134, 176, 203`). Harvester können transiente von permanenten Fehlern nicht unterscheiden.
 - Tests für Token-Roundtrips und Pagination-Edge-Cases
 
-### Phase 12 – Hardening
-- Rate Limiting: slowapi ist eingebunden, aber **keine einzige Route ist dekoriert** (`main.py`). Öffentliche Endpunkte (`/v1/search`, `/v1/oai`, `/v1/authorities/search`) müssen noch begrenzt werden — Issue #219.
-- Verwaiste Relationen: Beim Löschen eines Records bleiben Relationseinträge in `relations` stehen — Issue #149.
-- Produktions-Secrets (kein `dev-secret-key` in Prod)
-- nginx TLS-Terminierung
+### Phase 11.1 – Dublin-Core-Feldmapping für OAI-PMH – Issue #225 🔲
+**MVP-Pflicht:** Institutionen müssen konfigurieren können, welche ihrer `field_definitions`-Felder auf Dublin-Core-Elemente (dc:title, dc:creator, dc:date, …) gemappt werden.
+
+Aktuell hat der OAI-Endpoint ein hartkodiertes DC-Mapping. Das muss konfigurierbar werden.
+
+**Offene Designfragen (vor Implementierung klären):**
+- Mapping-Granularität: pro `field_definition` → DC-Element? Oder pro Record-Typ?
+- Speicherort: neue `dc_mappings`-Tabelle, oder `dc_element`-Spalte in `field_definitions`?
+- Werttransformation: Direktdurchleitung, oder Template/Ausdruck (z.B. erstes Element aus wiederholbarem Feld)?
+- Fallback für Pflichtfelder: woher kommt `dc:identifier`? (idno? festes Feld? Record-UUID?)
+- Scope: nur Objects (für OAI) oder alle 4 Typen?
+- UI-Platzierung: im Schema-Editor pro Feld, oder eigener "OAI/Dublin Core"-Screen?
+
+**Wahrscheinlichster Ansatz:** `dc_element`-Spalte (nullable) in `field_definitions` + DC-Element-Selektor im Schema-Editor.
+
+### Phase 12 – Hardening ⚠️
+- Rate Limiting ✅ – `/v1/search`, `/v1/oai` auf 100/min; `/v1/authorities/search`, `/v1/authorities/fetch` auf 60/min (Issue #219, geschlossen).
+- Verwaiste Relationen ✅ – `delete_relations()` + `cleanup_relation_refs` Celery-Task auf allen 4 Typen (Issue #149, geschlossen).
+- Produktions-Secrets ✅ – Startup-Guard in `main.py` verweigert Start wenn `SECRET_KEY` Default/zu kurz oder `DEFAULT_ADMIN_PASSWORD` ein bekanntes Default ist (Issue #20, geschlossen).
+- nginx TLS-Terminierung (Infra, deployment-spezifisch)
 - Perf-Tests (locust)
 - OpenAPI-Dokumentation finalisieren
 - Cantaloupe-Health-Check beim Start (fehlende Konfiguration wird sonst erst beim ersten Upload sichtbar)
@@ -188,22 +202,23 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ## Nächste Schritte (Reihenfolge)
 
-### Beta-Blocker (öffentlicher Beta)
+### Beta-Blocker – alle erledigt ✅
 
-1. Rate-Limiting auf `/v1/search`, `/v1/oai`, `/v1/authorities/search` (Phase 12) – Issue #219
-2. Snapshot-UI im Admin-Formular (Phase 7) – Issue #217
-3. Verwaiste Relationen bei Record-Löschung aufräumen (Phase 12) – Issue #149
-4. Production Hardening: Secrets, TLS-Check (Phase 12) – Issue #20
+~~1. Rate-Limiting~~ ✅ Issue #219
+~~2. Snapshot-UI~~ ✅ Issue #217
+~~3. Verwaiste Relationen~~ ✅ Issue #149
+~~4. Production Hardening: Secrets~~ ✅ Issue #20
 
-### Wichtig vor oder kurz nach Beta-Start
+### MVP-Pflicht (vor oder gleichzeitig mit Beta)
 
-5. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
-6. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
+1. **Dublin-Core-Feldmapping UI** – Konzept + Implementierung (Phase 11.1) – Issue #225
+2. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
+3. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
 
 ### Nachrangig (Post-Beta)
 
-7. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
-8. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
+4. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
+5. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
 
 ---
 

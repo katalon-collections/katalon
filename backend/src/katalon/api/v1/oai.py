@@ -115,7 +115,10 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
         else:
             if prefix != "oai_dc":
                 root = oaipmh_service._root()
-                xml = oaipmh_service._error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
+                msg = f"Unsupported prefix: {prefix}"
+                xml = oaipmh_service._error(
+                    root, "cannotDisseminateFormat", msg
+                )
                 return Response(content=xml, media_type="application/xml")
             offset = 0
             set_spec = params.get("set")
@@ -124,23 +127,24 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
         set_def: OAISet | None = None
         if set_spec:
-            res = await db.execute(select(OAISet).where(OAISet.set_spec == set_spec))
+            res = await db.execute(
+                select(OAISet).where(OAISet.set_spec == set_spec)
+            )
             set_def = res.scalar_one_or_none()
             if not set_def:
                 root = oaipmh_service._root()
-                xml = oaipmh_service._error(root, "noSetHierarchy", f"Unknown set: {set_spec}")
+                xml = oaipmh_service._error(
+                    root, "noSetHierarchy", f"Unknown set: {set_spec}"
+                )
                 return Response(content=xml, media_type="application/xml")
 
-        try:
-            es_result = await _es_search_for_oai(set_def, from_, until, offset)
-        except Exception:
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "noRecordsMatch", "Search index unavailable.")
-            return Response(content=xml, media_type="application/xml")
+        es_result = await _es_search_for_oai(set_def, from_, until, offset)
 
         hits = es_result.get("hits", {}).get("hits", [])
         total = es_result.get("hits", {}).get("total", {}).get("value", 0)
-        xml = oaipmh_service.list_records(hits, total, offset, set_spec, from_, until, prefix, base_url)
+        xml = oaipmh_service.list_records(
+            hits, total, offset, set_spec, from_, until, prefix, base_url
+        )
 
     # --- ListIdentifiers ---
     elif verb == "ListIdentifiers":
@@ -157,7 +161,10 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
         else:
             if prefix != "oai_dc":
                 root = oaipmh_service._root()
-                xml = oaipmh_service._error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
+                msg = f"Unsupported prefix: {prefix}"
+                xml = oaipmh_service._error(
+                    root, "cannotDisseminateFormat", msg
+                )
                 return Response(content=xml, media_type="application/xml")
             offset = 0
             set_spec = params.get("set")
@@ -166,31 +173,43 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
         set_def = None
         if set_spec:
-            res = await db.execute(select(OAISet).where(OAISet.set_spec == set_spec))
+            res = await db.execute(
+                select(OAISet).where(OAISet.set_spec == set_spec)
+            )
             set_def = res.scalar_one_or_none()
             if not set_def:
                 root = oaipmh_service._root()
-                xml = oaipmh_service._error(root, "noSetHierarchy", f"Unknown set: {set_spec}")
+                xml = oaipmh_service._error(
+                    root, "noSetHierarchy", f"Unknown set: {set_spec}"
+                )
                 return Response(content=xml, media_type="application/xml")
 
-        try:
-            es_result = await _es_search_for_oai(set_def, from_, until, offset)
-        except Exception:
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "noRecordsMatch", "Search index unavailable.")
-            return Response(content=xml, media_type="application/xml")
+        es_result = await _es_search_for_oai(set_def, from_, until, offset)
 
         hits = es_result.get("hits", {}).get("hits", [])
         total = es_result.get("hits", {}).get("total", {}).get("value", 0)
-        xml = oaipmh_service.list_identifiers(hits, total, offset, set_spec, from_, until, prefix, base_url)
+        xml = oaipmh_service.list_identifiers(
+            hits, total, offset, set_spec, from_, until, prefix, base_url
+        )
 
     # --- GetRecord ---
     elif verb == "GetRecord":
+        if params.get("resumptionToken"):
+            root = oaipmh_service._root()
+            xml = oaipmh_service._error(
+                root, "badResumptionToken",
+                "GetRecord does not support resumptionToken."
+            )
+            return Response(content=xml, media_type="application/xml")
+
         identifier = params.get("identifier", "")
         prefix = params.get("metadataPrefix", "oai_dc")
         if prefix != "oai_dc":
             root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
+            msg = f"Unsupported prefix: {prefix}"
+            xml = oaipmh_service._error(
+                root, "cannotDisseminateFormat", msg
+            )
             return Response(content=xml, media_type="application/xml")
 
         parts = identifier.split(":")
@@ -200,12 +219,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             return Response(content=xml, media_type="application/xml")
 
         record_id = parts[3]
-        try:
-            es_result = await _es_search_for_oai(None, None, None, 0, identifier=record_id)
-        except Exception:
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "idDoesNotExist", "Search index unavailable.")
-            return Response(content=xml, media_type="application/xml")
+        es_result = await _es_search_for_oai(None, None, None, 0, identifier=record_id)
 
         hits = es_result.get("hits", {}).get("hits", [])
         if not hits:
