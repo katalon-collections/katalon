@@ -43,6 +43,22 @@ cd Katalon
 
 **Voraussetzungen:** Docker + Docker Compose v2
 
+### Erster Login
+
+Beim ersten Start generiert Katalon automatisch ein sicheres Admin-Passwort. `install.sh` zeigt die Zugangsdaten direkt nach dem Start an und kopiert sie nach `./first-run-credentials.txt`.
+
+Wer den Stack ohne `install.sh` startet (z. B. `docker compose up -d`), findet die Zugangsdaten:
+
+```bash
+# im API-Container
+docker compose exec api cat /var/lib/katalon/first-run-credentials.txt
+
+# oder in den Logs (einmalig beim ersten Start)
+docker compose logs api | grep -A5 "KATALON FIRST RUN"
+```
+
+> **Ohne gesetztes `KATALON_BASE_URL`** (z. B. lokale Entwicklung) wird statt eines generierten Passworts der Wert `DEFAULT_ADMIN_PASSWORD` aus der `.env` verwendet (Standard: `admin`).
+
 ---
 
 ## Architektur

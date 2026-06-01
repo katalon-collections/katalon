@@ -66,9 +66,19 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // Auth
 export const auth = {
-  login: (email: string, password: string) => {
+  login: async (email: string, password: string): Promise<Token> => {
     const body = new URLSearchParams({ username: email, password })
-    return req<Token>('/v1/auth/token', { method: 'POST', body: body.toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+    const res = await fetch(`${BASE}/v1/auth/token`, {
+      method: 'POST',
+      body: body.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+    if (res.status === 401) throw new Error('Falsche E-Mail oder Passwort.')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(typeof err.detail === 'string' ? err.detail : res.statusText)
+    }
+    return res.json()
   },
 }
 
