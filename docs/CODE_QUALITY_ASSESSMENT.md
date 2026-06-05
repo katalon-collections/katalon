@@ -1,8 +1,10 @@
 # Katalon – Code Quality Assessment
 
-Date: 2026-06-05
+Date: 2026-06-05 (updated after remediation commit `d5f326f`)
 Scope: `backend/src` (77 files, ~9.7k LOC Python) + `frontend/{admin,portal}` (60 TS/TSX files)
-Tools: `ruff 0.x`, manual review, pattern grep, codegraph index. Read-only — no code changed.
+Tools: `ruff 0.x`, manual review, pattern grep, codegraph index.
+
+**Remediation status:** C1, H1, M1 fixed in `d5f326f`. M2–M4 and all Low items still open.
 
 ---
 
@@ -13,22 +15,27 @@ service/api/integration separation, parameterized SQL throughout, bcrypt for bot
 passwords and API keys). Frontend is unusually clean: zero `any`, zero `console.log`,
 and the single `dangerouslySetInnerHTML` is wrapped in DOMPurify.
 
-But there is **one critical, unauthenticated privilege-escalation vector** and **one
-guaranteed runtime crash bug**, plus lint hygiene that contradicts the documented
-pre-commit policy. Priorities below.
+The original review found **one critical, unauthenticated privilege-escalation
+vector** and **one guaranteed runtime crash bug**, plus lint hygiene that contradicts
+the documented pre-commit policy. The two top items and one Medium have since been
+fixed; the rest remain.
 
-| Severity | Count | Headline |
-|----------|-------|----------|
-| Critical | 1 | Unauthenticated `/auth/register` accepts arbitrary `role` |
-| High | 1 | `IntegrityError` undefined → `NameError` at runtime |
-| Medium | 4 | Mock router in prod, role not validated, ES/DB drift, broad `except: pass` |
-| Low | 3 | 214 ruff violations, JWT claims, CORS config drift |
+| Severity | Status | Headline |
+|----------|--------|----------|
+| Critical | ✅ fixed `d5f326f` | Unauthenticated `/auth/register` accepts arbitrary `role` |
+| High | ✅ fixed `d5f326f` | `IntegrityError` undefined → `NameError` at runtime |
+| Medium | ✅ fixed `d5f326f` | M1 — mock URN router mounted in production |
+| Medium | ⬜ open | M2 role not validated, M3 ES/DB drift, M4 broad `except: pass` |
+| Low | ⬜ open | 214 ruff violations, JWT claims, CORS config drift |
 
 ---
 
 ## Critical
 
-### C1 — Unauthenticated admin/superuser self-registration
+### C1 — Unauthenticated admin/superuser self-registration — ✅ FIXED (`d5f326f`)
+Resolved by deleting the route. Real user creation already lives on the admin-guarded,
+role-validated `/v1/users` endpoint. Original finding below.
+
 `backend/src/katalon/api/v1/auth.py:39`
 
 ```python
@@ -59,7 +66,9 @@ be dead/legacy but is mounted (`main.py:338`).
 
 ## High
 
-### H1 — `IntegrityError` undefined name (runtime crash)
+### H1 — `IntegrityError` undefined name (runtime crash) — ✅ FIXED (`d5f326f`)
+Resolved: added `from sqlalchemy.exc import IntegrityError`. Original finding below.
+
 `backend/src/katalon/api/v1/importer.py:326` — ruff `F821`
 
 ```python
@@ -81,7 +90,9 @@ matters.
 
 ## Medium
 
-### M1 — Mock URN router mounted unconditionally in production
+### M1 — Mock URN router mounted unconditionally in production — ✅ FIXED (`d5f326f`)
+Resolved: inclusion now gated behind `if settings.debug:` in `main.py`. Original finding below.
+
 `backend/src/katalon/main.py:362` → `api/v1/dnb_urn_mock.py`
 
 The in-memory DNB-URN **mock** registrar is included on every startup regardless of
@@ -175,10 +186,11 @@ explicit (acceptable, but document it).
 
 ## Suggested order of work
 
-1. **C1** — guard/delete `/auth/register`, add role enum. (security, minutes)
-2. **H1** — import `IntegrityError`. (one line)
-3. **M1** — gate `dnb_urn_mock` behind `debug`. (one line)
-4. **L1** — `ruff --fix`, fix E402 logger placement, re-enable the pre-commit hook + CI.
-5. **M3/M4** — move ES indexing to Celery + add logging to silent excepts (folds into
+1. ~~**C1** — guard/delete `/auth/register`~~ ✅ done `d5f326f` (route deleted).
+2. ~~**H1** — import `IntegrityError`~~ ✅ done `d5f326f`.
+3. ~~**M1** — gate `dnb_urn_mock` behind `debug`~~ ✅ done `d5f326f`.
+4. **M2** — replace free-string `role` with a `Literal`/`Enum` on the `/v1/users` path.
+5. **L1** — `ruff --fix`, fix E402 logger placement, re-enable the pre-commit hook + CI.
+6. **M3/M4** — move ES indexing to Celery + add logging to silent excepts (folds into
    Issues #213/#214 already on the roadmap).
-6. **L2/L3** — JWT claims + CORS pruning during Phase 12 hardening.
+7. **L2/L3** — JWT claims + CORS pruning during Phase 12 hardening.
