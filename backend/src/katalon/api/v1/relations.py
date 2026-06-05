@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import Relation
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
 
@@ -32,7 +32,7 @@ async def list_relations(
 
 
 @router.post("", response_model=RelationRead, status_code=201)
-async def create_relation(data: RelationCreate, db: DBDep, current_user: CurrentUser) -> Relation:
+async def create_relation(data: RelationCreate, db: DBDep, current_user=require_admin_or_editor()) -> Relation:
     rel = Relation(
         from_type=data.from_type, from_id=data.from_id,
         to_type=data.to_type, to_id=data.to_id,
@@ -45,7 +45,7 @@ async def create_relation(data: RelationCreate, db: DBDep, current_user: Current
 
 @router.put("/{relation_id}", response_model=RelationRead)
 async def update_relation(
-    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user: CurrentUser
+    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user=require_admin_or_editor()
 ) -> Relation:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()
@@ -60,7 +60,7 @@ async def update_relation(
 
 
 @router.delete("/{relation_id}", status_code=204)
-async def delete_relation(relation_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+async def delete_relation(relation_id: uuid.UUID, db: DBDep, current_user=require_admin_or_editor()) -> None:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()
     if not rel:

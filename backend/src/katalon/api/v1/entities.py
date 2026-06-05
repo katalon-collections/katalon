@@ -4,9 +4,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
-logger = logging.getLogger(__name__)
-
-from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -15,6 +13,7 @@ from katalon.core.schemas import (
     SnapshotCreate,
     SnapshotRead,
 )
+from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
@@ -35,12 +34,15 @@ from katalon.services.subtype_service import (
     normalize_subtype_name,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
 @router.get("", response_model=dict)
 async def list_entities(
     db: DBDep,
+    current_user: OptionalCurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     entity_type: str | None = None,
@@ -52,6 +54,7 @@ async def list_entities(
         query = query.where(Entity.entity_type == entity_type)
     if status:
         query = query.where(Entity.status == status)
+    query = apply_public_visibility(query, Entity, current_user)
     if q:
         query = query.where(Entity.search_vector.match(q))
 
@@ -62,7 +65,7 @@ async def list_entities(
 
 
 @router.post("", response_model=EntityRead, status_code=201)
-async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
+async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("entity") if cfg else None
@@ -108,13 +111,12 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    if current_user is None and entity.status not in ("public", "published"):
-        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    ensure_publicly_visible(entity, current_user, "Entität nicht gefunden")
     return entity
 
 
 @router.put("/{entity_id}", response_model=EntityRead)
-async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, current_user: CurrentUser) -> Entity:
+async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -153,7 +155,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
 async def publish_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
 ) -> dict:
     """Publish an entity after validating required fields."""
     ok, errors = await can_publish(db, "entity", str(entity_id))
@@ -168,7 +170,7 @@ async def publish_entity(
 async def delete_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -201,7 +203,9 @@ async def delete_entity(
 
 
 @router.post("/{entity_id}/snapshots", response_model=SnapshotRead, status_code=201)
-async def create_snapshot(entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser) -> RecordSnapshot:
+async def create_snapshot(
+    entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
+) -> RecordSnapshot:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
@@ -226,7 +230,7 @@ async def list_snapshots(entity_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
 
 @router.post("/{entity_id}/snapshots/{snapshot_id}/restore", response_model=EntityRead)
 async def restore_snapshot(
-    entity_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+    entity_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Entity:
     snap_result = await db.execute(
         select(RecordSnapshot).where(

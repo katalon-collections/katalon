@@ -4,11 +4,10 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
-logger = logging.getLogger(__name__)
-
-from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
+from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
@@ -29,12 +28,15 @@ from katalon.services.subtype_service import (
     normalize_subtype_name,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/places", tags=["places"])
 
 
 @router.get("", response_model=dict)
 async def list_places(
     db: DBDep,
+    current_user: OptionalCurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     place_type: str | None = None,
@@ -46,6 +48,7 @@ async def list_places(
         query = query.where(Place.place_type == place_type)
     if status:
         query = query.where(Place.status == status)
+    query = apply_public_visibility(query, Place, current_user)
     if q:
         query = query.where(Place.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
@@ -55,7 +58,7 @@ async def list_places(
 
 
 @router.post("", response_model=PlaceRead, status_code=201)
-async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
+async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("place") if cfg else None
@@ -109,13 +112,12 @@ async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurren
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
-    if current_user is None and place.status not in ("public", "published"):
-        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    ensure_publicly_visible(place, current_user, "Ort nicht gefunden")
     return place
 
 
 @router.put("/{place_id}", response_model=PlaceRead)
-async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, current_user: CurrentUser) -> Place:
+async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -157,7 +159,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
 async def publish_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
 ) -> dict:
     """Publish a place after validating required fields."""
     ok, errors = await can_publish(db, "place", str(place_id))
@@ -172,7 +174,7 @@ async def publish_place(
 async def delete_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -206,7 +208,7 @@ async def delete_place(
 
 @router.post("/{place_id}/snapshots", response_model=SnapshotRead, status_code=201)
 async def create_snapshot(
-    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser
+    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
@@ -236,7 +238,7 @@ async def list_snapshots(place_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]
 
 @router.post("/{place_id}/snapshots/{snapshot_id}/restore", response_model=PlaceRead)
 async def restore_snapshot(
-    place_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+    place_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Place:
     snap_result = await db.execute(
         select(RecordSnapshot).where(

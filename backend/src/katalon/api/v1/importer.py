@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from katalon.core.dependencies import CurrentUser, DBDep, require_role
+from katalon.core.dependencies import DBDep, require_admin_or_editor, require_role
 from katalon.core.models import FieldDefinition, RecordSubtype
 from katalon.core.schemas import FieldDefinitionRead
 from katalon.services import importer_service
@@ -19,7 +19,8 @@ from katalon.services.subtype_service import has_any_subtypes
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
-MAX_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_SIZE = 100 * 1024 * 1024  # 100 MB
+MAX_IMPORT_ROWS = 10_000
 
 _XML_UPLOAD_TTL = 3600  # seconds
 
@@ -85,10 +86,10 @@ def _get_redis():
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
+async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 500 MB)")
+        raise HTTPException(status_code=413, detail="Datei zu groß (max 100 MB)")
     filename = file.filename or ""
 
     # XML gets a two-step flow: upload returns element levels, user picks record element
@@ -111,6 +112,8 @@ async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
         headers, rows, _ = parse_file(filename, content)
     except (ValueError, NotImplementedError):
         raise HTTPException(status_code=422, detail="Nur CSV, TSV, Excel (.xlsx) und XML werden unterstützt")
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise HTTPException(status_code=413, detail=f"Zu viele Zeilen für Browser-Import (max {MAX_IMPORT_ROWS})")
 
     suggestions = importer_service.suggest_field_types(headers, rows)
     source_type = "excel" if filename.lower().endswith((".xlsx", ".xls")) else "csv"
@@ -125,7 +128,7 @@ async def upload_file(file: UploadFile, _: CurrentUser) -> dict:
 
 
 @router.post("/xml-selectors")
-async def xml_selectors(body: XmlSelectorsRequest, _: CurrentUser) -> dict:
+async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) -> dict:
     """Resolve selectors and rows for XML after the user has chosen the record element."""
     r = _get_redis()
     content = r.get(f"xml_upload:{body.upload_id}")
@@ -138,6 +141,8 @@ async def xml_selectors(body: XmlSelectorsRequest, _: CurrentUser) -> dict:
         rows = list(xml_fmt.parse_flat(content, record_xpath=body.record_xpath))
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"XML konnte nicht verarbeitet werden: {exc}") from exc
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise HTTPException(status_code=413, detail=f"Zu viele Zeilen für Browser-Import (max {MAX_IMPORT_ROWS})")
 
     headers = [s.path for s in selectors]
     suggestions = importer_service.suggest_field_types(headers, rows)
@@ -153,7 +158,7 @@ async def xml_selectors(body: XmlSelectorsRequest, _: CurrentUser) -> dict:
 
 
 @router.post("/dry-run")
-async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
+async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
 
@@ -236,7 +241,7 @@ async def dry_run(body: MappingRequest, db: DBDep, _: CurrentUser) -> dict:
 
 
 @router.post("/import")
-async def run_import(body: ImportRequest, current_user: CurrentUser) -> dict:
+async def run_import(body: ImportRequest, current_user=require_admin_or_editor()) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
     from katalon.workers.import_tasks import import_records_task
@@ -335,7 +340,7 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
 
 
 @router.get("/task/{task_id}")
-async def task_status(task_id: str, _: CurrentUser) -> dict:
+async def task_status(task_id: str, _=require_admin_or_editor()) -> dict:
     from celery.result import AsyncResult
 
     from katalon.workers.celery_app import celery_app

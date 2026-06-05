@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import DBDep, require_admin
 from katalon.core.models import StaticPage
 
 _SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -57,7 +57,7 @@ async def list_pages(db: DBDep) -> list[StaticPage]:
 
 
 @router.get("/admin", response_model=list[PageRead])
-async def list_all_pages(db: DBDep, _: CurrentUser) -> list[StaticPage]:
+async def list_all_pages(db: DBDep, _=require_admin()) -> list[StaticPage]:
     result = await db.execute(select(StaticPage).order_by(StaticPage.sort_order))
     return list(result.scalars().all())
 
@@ -74,7 +74,7 @@ async def get_page(slug: str, db: DBDep) -> StaticPage:
 
 
 @router.post("", response_model=PageRead, status_code=201)
-async def create_page(data: PageCreate, db: DBDep, _: CurrentUser) -> StaticPage:
+async def create_page(data: PageCreate, db: DBDep, _=require_admin()) -> StaticPage:
     existing = await db.execute(select(StaticPage).where(StaticPage.slug == data.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail=f"Slug '{data.slug}' bereits vergeben")
@@ -85,7 +85,7 @@ async def create_page(data: PageCreate, db: DBDep, _: CurrentUser) -> StaticPage
 
 
 @router.put("/{slug}", response_model=PageRead)
-async def update_page(slug: str, data: PageUpdate, db: DBDep, _: CurrentUser) -> StaticPage:
+async def update_page(slug: str, data: PageUpdate, db: DBDep, _=require_admin()) -> StaticPage:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:
@@ -103,7 +103,7 @@ async def update_page(slug: str, data: PageUpdate, db: DBDep, _: CurrentUser) ->
 
 
 @router.delete("/{slug}", status_code=204)
-async def delete_page(slug: str, db: DBDep, _: CurrentUser) -> None:
+async def delete_page(slug: str, db: DBDep, _=require_admin()) -> None:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:

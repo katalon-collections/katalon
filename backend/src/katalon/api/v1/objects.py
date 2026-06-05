@@ -5,9 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy import func, select
 
-logger = logging.getLogger(__name__)
-
-from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -16,6 +14,7 @@ from katalon.core.schemas import (
     SnapshotCreate,
     SnapshotRead,
 )
+from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
@@ -36,10 +35,9 @@ from katalon.services.subtype_service import (
     normalize_subtype_name,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/objects", tags=["objects"])
-
-
-_PUBLIC_STATUSES = ("public", "published")
 
 
 @router.get("", response_model=dict)
@@ -55,10 +53,9 @@ async def list_objects(
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
+    query = apply_public_visibility(query, Object, current_user)
     if object_type:
         query = query.where(Object.object_type == object_type)
-    elif current_user is None:
-        query = query.where(Object.status.in_(_PUBLIC_STATUSES))
     if q:
         query = query.where(Object.search_vector.match(q))
 
@@ -78,7 +75,7 @@ async def list_objects(
 
 
 @router.post("", response_model=ObjectRead, status_code=201)
-async def create_object(data: ObjectCreate, db: DBDep, current_user: CurrentUser) -> Object:
+async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admin_or_editor()) -> Object:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("object") if cfg else None
@@ -131,14 +128,13 @@ async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    if current_user is None and obj.status not in _PUBLIC_STATUSES:
-        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
     return obj
 
 
 @router.put("/{object_id}", response_model=ObjectRead)
 async def update_object(
-    object_id: uuid.UUID, data: ObjectCreate, db: DBDep, current_user: CurrentUser
+    object_id: uuid.UUID, data: ObjectCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> Object:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
@@ -196,7 +192,7 @@ async def update_object(
 async def publish_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
 ) -> dict:
     """Publish an object after validating required fields."""
     ok, errors = await can_publish(db, "object", str(object_id))
@@ -211,7 +207,7 @@ async def publish_object(
 async def delete_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Object).where(Object.id == object_id))
@@ -245,7 +241,7 @@ async def delete_object(
 
 @router.post("/{object_id}/snapshots", response_model=SnapshotRead, status_code=201)
 async def create_snapshot(
-    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser
+    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
@@ -323,7 +319,7 @@ async def list_snapshots(object_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
 
 @router.post("/{object_id}/snapshots/{snapshot_id}/restore", response_model=ObjectRead)
 async def restore_snapshot(
-    object_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+    object_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Object:
     snap_result = await db.execute(
         select(RecordSnapshot).where(

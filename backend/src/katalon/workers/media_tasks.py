@@ -1,5 +1,4 @@
 import asyncio
-import mimetypes
 import shutil
 import uuid
 from pathlib import Path
@@ -69,6 +68,7 @@ def generate_iiif_tiles(self, media_file_id: str) -> dict:
 
 async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict:
     from katalon.config import settings
+    from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
     from katalon.core.models import MediaFile, Object, Vocabulary, VocabularyTerm
     from katalon.services.media_batch_import_service import (
         folder_or_filename_object_id,
@@ -173,19 +173,28 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 })
                 continue
 
-            mime, _ = mimetypes.guess_type(file_path.name)
-            if mime not in {"image/jpeg", "image/png", "image/tiff", "image/webp"}:
+            file_id = uuid.uuid4()
+            suffix = file_path.suffix or ".bin"
+            dest_path = media_root / f"{file_id}{suffix}"
+            shutil.copy2(file_path, dest_path)
+            try:
+                mime = verified_image_mime(dest_path)
+            except Exception:
+                dest_path.unlink(missing_ok=True)
                 failed += 1
                 report["errors"].append({
                     "row": None,
                     "message": f"Nicht unterstützter Dateityp für Datei {rel_name}",
                 })
                 continue
-
-            file_id = uuid.uuid4()
-            suffix = file_path.suffix or ".bin"
-            dest_path = media_root / f"{file_id}{suffix}"
-            shutil.copy2(file_path, dest_path)
+            if mime not in ALLOWED_IMAGE_MIME:
+                dest_path.unlink(missing_ok=True)
+                failed += 1
+                report["errors"].append({
+                    "row": None,
+                    "message": f"Nicht unterstützter Dateityp für Datei {rel_name}",
+                })
+                continue
 
             existing = (
                 await session.execute(select(MediaFile.id).where(MediaFile.object_id == object_id))

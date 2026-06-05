@@ -47,6 +47,22 @@ def _tag_path_to_label(path: str, nsmap: dict) -> str:
 class XmlFormat(SourceFormat):
     """Generic XML import handler using lxml."""
 
+    max_depth = 64
+
+    def _parse_root(self, content: bytes) -> etree._Element:
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            no_network=True,
+            load_dtd=False,
+            huge_tree=False,
+            recover=False,
+        )
+        root = etree.fromstring(content, parser=parser)
+        for elem in root.iter():
+            if sum(1 for _ in elem.iterancestors()) > self.max_depth:
+                raise ValueError(f"XML ist zu tief verschachtelt (max {self.max_depth} Ebenen)")
+        return root
+
     def sniff(self, content: bytes, filename: str) -> bool:
         if filename.lower().endswith(".xml"):
             return True
@@ -63,7 +79,7 @@ class XmlFormat(SourceFormat):
         Used by the frontend to let the user choose which element = one record.
         Returns list of {depth, tags: [{label, clark_tag}]}.
         """
-        root = etree.fromstring(content)
+        root = self._parse_root(content)
         nsmap = root.nsmap
         levels: dict[int, dict[str, str]] = {}  # depth -> {clark_tag: label}
         for elem in root.iter():
@@ -98,7 +114,7 @@ class XmlFormat(SourceFormat):
         record_xpath: Clark-notation tag like "{http://...}mods", or "*" for
         direct root children.
         """
-        root = etree.fromstring(content)
+        root = self._parse_root(content)
         nsmap = root.nsmap
         if record_xpath == "*":
             elements = list(root)
@@ -118,7 +134,7 @@ class XmlFormat(SourceFormat):
 
     def list_selectors(self, content: bytes, record_xpath: str = "*", sample_size: int = 50) -> list[Selector]:  # type: ignore[override]
         """List all distinct tag paths across the first sample_size records."""
-        root = etree.fromstring(content)
+        root = self._parse_root(content)
         nsmap = root.nsmap
 
         if record_xpath == "*":

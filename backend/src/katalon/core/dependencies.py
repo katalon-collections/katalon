@@ -122,11 +122,27 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
 
 OptionalCurrentUser = Annotated[User | None, Depends(try_get_current_user)]
 
+ROLE_CAPABILITIES: dict[str, set[str]] = {
+    "viewer": set(),
+    "cataloger": {"manage_content"},
+    "editor": {"manage_content"},
+    "admin": {"manage_content", "manage_config", "manage_users"},
+    "superuser": {"manage_content", "manage_config", "manage_users"},
+}
+
+
+def has_capability(user: User, capability: str) -> bool:
+    return capability in ROLE_CAPABILITIES.get(user.role, set())
+
 
 def require_role(*roles: str):
     async def _check(current_user: CurrentUser) -> User:
         # Superuser bypasses role checks.
         if current_user.role == "superuser":
+            return current_user
+        if current_user.role == "admin" and any(role in {"editor", "cataloger"} for role in roles):
+            return current_user
+        if current_user.role == "editor" and "cataloger" in roles:
             return current_user
         if current_user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
@@ -134,10 +150,18 @@ def require_role(*roles: str):
     return Depends(_check)
 
 
+def require_capability(capability: str):
+    async def _check(current_user: CurrentUser) -> User:
+        if not has_capability(current_user, capability):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return current_user
+    return Depends(_check)
+
+
 def require_admin_or_editor():
     """Allow admin, editor, and cataloger for content operations."""
-    return require_role("admin", "editor", "cataloger")
+    return require_capability("manage_content")
 
 
 def require_admin():
-    return require_role("admin")
+    return require_capability("manage_config")

@@ -113,6 +113,7 @@ async def test_upload_media_object_not_found_returns_404(override_auth) -> None:
 @pytest.mark.asyncio
 async def test_list_media_returns_files() -> None:
     obj_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="published", metadata_={})
     media = MediaFile(
         id=uuid.uuid4(),
         object_id=obj_id,
@@ -126,7 +127,10 @@ async def test_list_media_returns_files() -> None:
     )
 
     session = AsyncMock()
-    session.execute = AsyncMock(return_value=_mock_scalars_result([media]))
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(obj),
+        _mock_scalars_result([media]),
+    ])
 
     async def override_db():
         yield session
@@ -154,9 +158,13 @@ async def test_list_media_returns_files() -> None:
 async def test_serve_media_file_not_found_returns_404() -> None:
     obj_id = uuid.uuid4()
     media_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="published", metadata_={})
 
     session = AsyncMock()
-    session.execute = AsyncMock(return_value=_mock_result(None))
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(obj),
+        _mock_result(None),
+    ])
 
     async def override_db():
         yield session

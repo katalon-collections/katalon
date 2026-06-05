@@ -12,15 +12,17 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.config import settings
-from katalon.core.dependencies import CurrentUser, DBDep, require_admin_or_editor
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
 from katalon.core.models import MediaFile, Object
+from katalon.core.visibility import ensure_publicly_visible
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
 router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
 batch_router = APIRouter(prefix="/media", tags=["media"])
 
-ALLOWED_MIME = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
+ALLOWED_MIME = ALLOWED_IMAGE_MIME
 
 
 def _serialize(f: MediaFile) -> dict:
@@ -36,13 +38,18 @@ def _serialize(f: MediaFile) -> dict:
 
 
 @router.get("", response_model=list[dict])
-async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict]:
+async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict]:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
     result = await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))
     return [_serialize(f) for f in result.scalars().all()]
 
 
 @router.post("", status_code=201)
-async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user: CurrentUser) -> dict:
+async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user=require_admin_or_editor()) -> dict:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     if not obj_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
@@ -66,12 +73,14 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
                 raise HTTPException(status_code=413, detail="Datei zu groß")
             await out.write(chunk)
 
+    actual_mime = verified_image_mime(dest_path)
+
     existing = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
     media = MediaFile(
         id=file_id,
         object_id=object_id,
         filename=file.filename or dest_path.name,
-        mime_type=file.content_type,
+        mime_type=actual_mime,
         file_path=str(dest_path),
         status="pending",
         is_primary=len(existing) == 0,
@@ -91,7 +100,7 @@ class MediaPatch(BaseModel):
 
 @router.patch("/{media_id}", response_model=dict)
 async def patch_media(
-    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user: CurrentUser
+    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user=require_admin_or_editor()
 ) -> dict:
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
@@ -113,7 +122,14 @@ async def patch_media(
 
 
 @router.get("/{media_id}/file")
-async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> FileResponse:
+async def serve_media_file(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> FileResponse:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
     if not media or not Path(media.file_path).exists():
@@ -122,7 +138,7 @@ async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep)
 
 
 @router.delete("/{media_id}", status_code=204)
-async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user=require_admin_or_editor()) -> None:
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
     if not media:

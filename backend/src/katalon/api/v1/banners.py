@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
+from katalon.core.dependencies import DBDep, require_admin
 from katalon.core.models import Banner
 
 router = APIRouter(prefix="/banners", tags=["banners"])
@@ -90,13 +90,13 @@ async def active_portal_banners(db: DBDep) -> list[Banner]:
 
 
 @router.get("", response_model=list[BannerRead])
-async def list_banners(db: DBDep, _: CurrentUser) -> list[Banner]:
+async def list_banners(db: DBDep, _=require_admin()) -> list[Banner]:
     result = await db.execute(select(Banner).order_by(Banner.created_at.desc()))
     return list(result.scalars().all())
 
 
 @router.post("", response_model=BannerRead, status_code=201)
-async def create_banner(body: BannerCreate, db: DBDep, _: CurrentUser) -> Banner:
+async def create_banner(body: BannerCreate, db: DBDep, _=require_admin()) -> Banner:
     if body.color not in VALID_COLORS:
         raise HTTPException(status_code=422, detail=f"Ungültige Farbe. Erlaubt: {', '.join(VALID_COLORS)}")
     banner = Banner(**body.model_dump())
@@ -107,7 +107,7 @@ async def create_banner(body: BannerCreate, db: DBDep, _: CurrentUser) -> Banner
 
 
 @router.put("/{banner_id}", response_model=BannerRead)
-async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _: CurrentUser) -> Banner:
+async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _=require_admin()) -> Banner:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()
     if not banner:
@@ -122,7 +122,7 @@ async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _: 
 
 
 @router.delete("/{banner_id}", status_code=204)
-async def delete_banner(banner_id: uuid.UUID, db: DBDep, _: CurrentUser) -> None:
+async def delete_banner(banner_id: uuid.UUID, db: DBDep, _=require_admin()) -> None:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()
     if not banner:

@@ -4,9 +4,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
-logger = logging.getLogger(__name__)
-
-from katalon.core.dependencies import CurrentUser, DBDep, OptionalCurrentUser
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -15,6 +13,7 @@ from katalon.core.schemas import (
     SnapshotCreate,
     SnapshotRead,
 )
+from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
@@ -35,12 +34,15 @@ from katalon.services.subtype_service import (
     normalize_subtype_name,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
 
 @router.get("", response_model=dict)
 async def list_occurrences(
     db: DBDep,
+    current_user: OptionalCurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     occurrence_type: str | None = None,
@@ -52,6 +54,7 @@ async def list_occurrences(
         query = query.where(Occurrence.occurrence_type == occurrence_type)
     if status:
         query = query.where(Occurrence.status == status)
+    query = apply_public_visibility(query, Occurrence, current_user)
     if q:
         query = query.where(Occurrence.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
@@ -62,7 +65,7 @@ async def list_occurrences(
 
 
 @router.post("", response_model=OccurrenceRead, status_code=201)
-async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
+async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Occurrence:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("occurrence") if cfg else None
@@ -108,13 +111,14 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCur
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
-    if current_user is None and occ.status not in ("public", "published"):
-        raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    ensure_publicly_visible(occ, current_user, "Occurrence nicht gefunden")
     return occ
 
 
 @router.put("/{occ_id}", response_model=OccurrenceRead)
-async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep, current_user: CurrentUser) -> Occurrence:
+async def update_occurrence(
+    occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()
+) -> Occurrence:
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -153,7 +157,7 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
 async def publish_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
 ) -> dict:
     """Publish an occurrence after validating required fields."""
     ok, errors = await can_publish(db, "occurrence", str(occ_id))
@@ -168,7 +172,7 @@ async def publish_occurrence(
 async def delete_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user: CurrentUser,
+    current_user=require_admin_or_editor(),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -202,7 +206,7 @@ async def delete_occurrence(
 
 @router.post("/{occ_id}/snapshots", response_model=SnapshotRead, status_code=201)
 async def create_snapshot(
-    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: CurrentUser
+    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
@@ -232,7 +236,7 @@ async def list_snapshots(occ_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
 
 @router.post("/{occ_id}/snapshots/{snapshot_id}/restore", response_model=OccurrenceRead)
 async def restore_snapshot(
-    occ_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _: CurrentUser
+    occ_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Occurrence:
     snap_result = await db.execute(
         select(RecordSnapshot).where(
