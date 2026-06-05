@@ -348,7 +348,9 @@ async def get_current_user(
 
 ## 4. Neues OAI-PMH-Metadatenformat hinzufügen
 
-→ Vollständige Anleitung in [05_oai_serialisierungen.md](./05_oai_serialisierungen.md)
+Die Export-Mappings selbst werden im Schema-Editor gepflegt. OAI-PMH ist nur der erste Consumer.
+
+→ Vollständige Anleitung in [10_export_mappings.md](./10_export_mappings.md) und [05_oai_serialisierungen.md](./05_oai_serialisierungen.md)
 
 ---
 
@@ -363,6 +365,6 @@ async def get_current_user(
 | SSO (OIDC/SAML) | `api/v1/auth.py` + `core/dependencies.py` |
 | SSO via LDAP | `api/v1/auth.py` (nur Login-Schritt) |
 | SSO via Reverse Proxy | nginx-Config + `core/dependencies.py` |
-| Neues OAI-Format | `services/oaipmh_service.py` + `api/v1/oai.py` |
+| Neues OAI-Format | `services/oaipmh_service.py` + `api/v1/oai.py` + `services/metadata_mapping_service.py` |
 | Neues Feld für alle Records | `migrations/` (Alembic) + `core/models.py` + `core/schemas.py` |
 | Neue Admin-Seite | `components/screens/Screen<Name>.tsx` + `layout/AppShell.tsx` + `layout/Sidebar.tsx` |

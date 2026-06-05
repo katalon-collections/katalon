@@ -105,7 +105,7 @@ Integrierte Adapter für GND, GeoNames, VIAF, Wikidata, Getty TGN und ICONCLASS.
 
 ### OAI-PMH
 
-Standardschnittstelle für Metadaten-Harvesting mit Dublin-Core-Mapping.
+Standardschnittstelle für Metadaten-Harvesting mit generischer Export-Mapping-Schicht. OAI-PMH nutzt aktuell `oai_dc`, spaeter koennen weitere Formate wie LIDO oder METS/MODS an dieselbe Infrastruktur angeschlossen werden.
 
 ### Theming
 
@@ -217,6 +217,7 @@ Unterstützt flache Listen oder verschachtelte `children`:
 
 - **Objekte / Entitäten / Orte / Occurrences** — Tabellenansicht + dynamisches Erfassungsformular
 - **Schemata** — Feldkonfiguration pro Typ, YAML/JSON-Import
+- **Metadaten-Export** — Felddefinitionen auf Exportformate mappen
 - **Vokabular** — Kontrollierte Listen verwalten
 - **Importer** — CSV/Excel-Import-Wizard mit Dry-Run
 - **Statische Seiten** — Portal-Inhaltsseiten

@@ -64,6 +64,18 @@ export interface FieldDefinition {
   children?: FieldDefinition[]
 }
 
+export interface MetadataMapping {
+  id: string
+  field_definition_id: string
+  format_key: string
+  target_path: string
+  settings: Record<string, unknown>
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Vocabulary {
   id: string
   name: string

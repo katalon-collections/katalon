@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { schema, subtypes, vocabularies } from '../../api/client'
+import { metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
 import type { SchemaImportResult } from '../../api/client'
-import type { FieldDefinition, RecordSubtype, Vocabulary } from '../../types'
+import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
@@ -44,6 +44,32 @@ const AUTHORITY_SOURCES = [
   { id: 'tgn',       label: 'Getty TGN' },
   { id: 'iconclass', label: 'ICONCLASS' },
 ]
+
+const EXPORT_FORMATS = [
+  { id: 'oai_dc', label: 'OAI DC', enabled: true },
+  { id: 'lido', label: 'LIDO', enabled: false },
+  { id: 'metsmods', label: 'METS/MODS', enabled: false },
+] as const
+
+const OAI_DC_ELEMENTS = [
+  { value: 'dc:title', label: 'dc:title' },
+  { value: 'dc:creator', label: 'dc:creator' },
+  { value: 'dc:subject', label: 'dc:subject' },
+  { value: 'dc:description', label: 'dc:description' },
+  { value: 'dc:publisher', label: 'dc:publisher' },
+  { value: 'dc:contributor', label: 'dc:contributor' },
+  { value: 'dc:date', label: 'dc:date' },
+  { value: 'dc:type', label: 'dc:type' },
+  { value: 'dc:format', label: 'dc:format' },
+  { value: 'dc:identifier', label: 'dc:identifier' },
+  { value: 'dc:source', label: 'dc:source' },
+  { value: 'dc:language', label: 'dc:language' },
+  { value: 'dc:relation', label: 'dc:relation' },
+  { value: 'dc:coverage', label: 'dc:coverage' },
+  { value: 'dc:rights', label: 'dc:rights' },
+]
+
+const MAPPABLE_FIELD_TYPES = new Set(['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority'])
 
 type FieldFormState = {
   target_type: string
@@ -122,6 +148,99 @@ function toSlug(label: string): string {
 
 function emptySubFieldForm(sortOrder: number): SubFieldFormState {
   return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '' }
+}
+
+function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
+  const [activeFormat, setActiveFormat] = useState<(typeof EXPORT_FORMATS)[number]['id']>('oai_dc')
+  const [mappings, setMappings] = useState<MetadataMapping[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isMappable = MAPPABLE_FIELD_TYPES.has(fieldType)
+  const selected = mappings.find(m => m.format_key === activeFormat)?.target_path ?? ''
+
+  const loadMappings = useCallback(() => {
+    if (!fieldId) {
+      setMappings([])
+      return
+    }
+    setLoading(true)
+    metadataMappings.list({ field_definition_id: fieldId })
+      .then(setMappings)
+      .catch(e => setError((e as Error).message))
+      .finally(() => setLoading(false))
+  }, [fieldId])
+
+  useEffect(() => {
+    loadMappings()
+  }, [loadMappings])
+
+  async function setOaiDcTarget(targetPath: string) {
+    if (!fieldId) return
+    setSaving(true)
+    setError(null)
+    try {
+      await metadataMappings.setFieldFormat(fieldId, 'oai_dc', {
+        target_path: targetPath || null,
+      })
+      await metadataMappings.list({ field_definition_id: fieldId }).then(setMappings)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span style={{ fontWeight: 600, fontSize: 13 }}>Metadaten-Export</span>
+        {loading && <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>Lädt…</span>}
+        {saving && <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>Speichert…</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        {EXPORT_FORMATS.map(format => (
+          <button
+            key={format.id}
+            type="button"
+            className={`btn sm ${activeFormat === format.id ? 'pri' : 'gh'}`}
+            onClick={() => setActiveFormat(format.id)}
+          >
+            {format.label}
+          </button>
+        ))}
+      </div>
+      {activeFormat === 'oai_dc' ? (
+        <div className="field">
+          <div className="lbl">Dublin Core Element</div>
+          <select
+            className="fld"
+            value={selected}
+            disabled={isNew || !fieldId || !isMappable || saving}
+            onChange={e => setOaiDcTarget(e.target.value)}
+          >
+            <option value="">— kein Mapping —</option>
+            {OAI_DC_ELEMENTS.map(el => <option key={el.value} value={el.value}>{el.label}</option>)}
+          </select>
+          {fieldType === 'group' && (
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+              Containerfelder werden nicht direkt exportiert.
+            </div>
+          )}
+          {isNew && (
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+              Feld zuerst speichern.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', color: 'var(--fg-3)', fontSize: 12 }}>
+          {EXPORT_FORMATS.find(f => f.id === activeFormat)?.label} ist vorbereitet.
+        </div>
+      )}
+      {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 8 }}>{error}</div>}
+    </div>
+  )
 }
 
 function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
@@ -363,6 +482,7 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
             </div>
           </>
         )}
+        <ExportMappingPanel fieldId={fieldId} fieldType={form.field_type} isNew={isNew} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
             {saving ? 'Speichert…' : 'Speichern'}

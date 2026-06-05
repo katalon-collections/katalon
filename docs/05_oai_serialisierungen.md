@@ -1,13 +1,14 @@
-# OAI-PMH: Neue Metadatenformate hinzufügen
+# OAI-PMH: Export-Mappings und Metadatenformate
 
 ## Architektur: wie das aktuell funktioniert
 
-Der OAI-PMH-Stack besteht aus zwei Dateien:
+Der OAI-PMH-Stack besteht aus drei Schichten:
 
 | Datei | Verantwortung |
 |---|---|
 | `backend/src/katalon/api/v1/oai.py` | HTTP-Handler, verb-Dispatch, ES-Query |
 | `backend/src/katalon/services/oaipmh_service.py` | XML-Serialisierung (DC-Mapping, verb-Responses) |
+| `backend/src/katalon/services/metadata_mapping_service.py` | Formatneutrale Export-Mappings aus der DB lesen |
 
 Ein Treffer aus Elasticsearch hat diese Struktur (vereinfacht):
 
@@ -27,11 +28,13 @@ Ein Treffer aus Elasticsearch hat diese Struktur (vereinfacht):
 }
 ```
 
-Das aktuelle Format `oai_dc` ist in `_hit_to_oai_record()` implementiert.
+ Das aktuelle Format `oai_dc` nutzt die generische Export-Mapping-Schicht aus `metadata_mappings`. Wenn Mappings fuer einen Record-Typ vorhanden sind, werden sie exportiert. Ohne Mappings bleibt ein konservativer Fallback aktiv.
+
+Die generische Architektur ist in [10_export_mappings.md](./10_export_mappings.md) beschrieben.
 
 ## Neue Serialisierung hinzufügen — Schritt für Schritt
 
-### Schritt 1: Mapping-Funktion in `oaipmh_service.py`
+### Schritt 1: Serializer in `oaipmh_service.py`
 
 Füge eine neue Funktion analog zu `_hit_to_oai_record()` hinzu:
 
@@ -63,9 +66,9 @@ def _hit_to_mods(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
     return oai_rec
 ```
 
-### Schritt 2: Format-Registry einführen
+### Schritt 2: Format registrieren
 
-Ersetze die hartkodierte Prüfung `if prefix != "oai_dc"` durch eine Registry am Anfang von `oaipmh_service.py`:
+Wenn ein neues Format angeboten werden soll, muss es in `ListMetadataFormats` erscheinen und im Handler akzeptiert werden. Die aktuelle Implementierung prueft den Prefix noch direkt im Handler. Fuer neue Formate empfiehlt sich, die Prefix-Validierung und die Serializer-Auswahl zusammenzufassen.
 
 ```python
 # Typ: MetadataPrefix → Callable(hit, set_spec) → ET.Element
@@ -118,15 +121,7 @@ def list_metadata_formats(base_url: str) -> str:
 
 ### Schritt 4: Prefix-Validierung in `oai.py` vereinheitlichen
 
-Aktuell steckt `prefix != "oai_dc"` dreimal im Handler (ListRecords, ListIdentifiers, GetRecord). Nach der Registry-Einführung ersetzt ein einziger Import-Check alle drei:
-
-```python
-from katalon.services.oaipmh_service import RECORD_SERIALIZERS
-
-if prefix not in RECORD_SERIALIZERS:
-    xml = oaipmh_service._error(root, "cannotDisseminateFormat", ...)
-    return Response(...)
-```
+Wenn mehr als ein Format aktiv ist, sollte die Prefix-Validierung zentral erfolgen. Das verhindert, dass `ListRecords`, `ListIdentifiers` und `GetRecord` auseinanderlaufen.
 
 ---
 
@@ -181,15 +176,15 @@ Für eine Europeana-Einspielung wäre Variante 2 der Mindeststandard.
 
 ## Könnte die Admin-Oberfläche das steuern?
 
-**Was sinnvoll wäre:** Aktivieren/Deaktivieren einzelner Formate je Installation. Beispiel: eine Instanz liefert nur `oai_dc`, eine andere zusätzlich `lido`.
+**Was bereits sinnvoll umgesetzt ist:** Das Mapping selbst wird pro Feld im Schema-Editor konfiguriert, nicht im OAI-Handler.
 
-**Was nicht sinnvoll wäre:** Das Mapping selbst konfigurieren — das ist Python-Code, nicht konfigurierbare Daten.
+**Was spaeter ergaenzt werden kann:** Aktivieren/Deaktivieren einzelner Formate je Installation. Beispiel: eine Instanz liefert nur `oai_dc`, eine andere zusaetzlich `lido`.
 
-**Empfohlene Umsetzung (wenn gewünscht):**
-- Neue Tabelle `oai_metadata_formats (prefix VARCHAR PK, is_enabled BOOLEAN)` mit Seed-Daten für alle verfügbaren Formate
+**Mogliche naechste Ausbaustufe:**
+- Neue Tabelle `oai_metadata_formats (prefix VARCHAR PK, is_enabled BOOLEAN)` mit Seed-Daten fuer alle verfuegbaren Formate
 - `list_metadata_formats` liest nur aktivierte Formate aus der DB
-- `cannotDisseminateFormat`-Check prüft zusätzlich gegen aktivierte Formate
-- Admin-UI: einfache Toggle-Liste in den OAI-Einstellungen
+- `cannotDisseminateFormat`-Check prueft zusaetzlich gegen aktivierte Formate
+- Admin-UI: Toggle-Liste in den OAI-Einstellungen
 
 Das ist ~0,5 Tage Backend + ~0,5 Tage Frontend, setzt aber die Registry-Umstrukturierung (Schritte 1–4 oben) voraus.
 

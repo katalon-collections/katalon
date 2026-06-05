@@ -21,6 +21,7 @@ from katalon.api.v1 import (
     idno,
     importer,
     media,
+    metadata_mappings,
     oai,
     oai_sets,
     objects,
@@ -356,6 +357,7 @@ app.include_router(search.router, prefix="/v1")
 app.include_router(authority.router, prefix="/v1")
 app.include_router(pids.router, prefix="/v1")
 app.include_router(importer.router, prefix="/v1")
+app.include_router(metadata_mappings.router, prefix="/v1")
 app.include_router(oai.router, prefix="/v1")
 app.include_router(oai_sets.router, prefix="/v1")
 app.include_router(api_keys_router, prefix="/v1")

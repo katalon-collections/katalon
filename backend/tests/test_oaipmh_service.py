@@ -49,6 +49,50 @@ def test_get_record_contains_dc_title() -> None:
     assert "Test Foto" in xml
 
 
+def test_get_record_uses_configured_dc_mapping() -> None:
+    hit = _mock_hit()
+    hit["_source"]["metadata"] = {
+        "title": [{"value": "Gemappter Titel", "lang": "de"}],
+        "photographer": [{"value": "Ada Lovelace"}],
+    }
+    mapping_index = {
+        "object": {
+            "title": ["dc:title"],
+            "photographer": ["dc:creator"],
+        }
+    }
+
+    xml = oaipmh_service.get_record(
+        hit,
+        "http://test/oai",
+        "oai:katalon:object:550e8400",
+        "oai_dc",
+        mapping_index,
+    )
+
+    assert "<dc:title>Gemappter Titel</dc:title>" in xml
+    assert "<dc:creator>Ada Lovelace</dc:creator>" in xml
+    identifier = "oai:katalon:object:550e8400-e29b-41d4-a716-446655440000"
+    assert f"<dc:identifier>{identifier}</dc:identifier>" in xml
+
+
+def test_get_record_repeatable_mapping_emits_multiple_dc_elements() -> None:
+    hit = _mock_hit()
+    hit["_source"]["metadata"] = {"keywords": ["Fotografie", "Marrakesch"]}
+    mapping_index = {"object": {"keywords": ["dc:subject"]}}
+
+    xml = oaipmh_service.get_record(
+        hit,
+        "http://test/oai",
+        "oai:katalon:object:550e8400",
+        "oai_dc",
+        mapping_index,
+    )
+
+    assert "<dc:subject>Fotografie</dc:subject>" in xml
+    assert "<dc:subject>Marrakesch</dc:subject>" in xml
+
+
 def test_list_records_empty_returns_noRecordsMatch() -> None:
     xml = oaipmh_service.list_records([], 0, 0, None, None, None, "oai_dc", "http://test/oai")
     assert "noRecordsMatch" in xml

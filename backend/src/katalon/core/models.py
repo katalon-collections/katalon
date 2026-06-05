@@ -144,9 +144,43 @@ class FieldDefinition(Base):
         back_populates="children",
         remote_side="FieldDefinition.id",
     )
+    metadata_mappings: Mapped[list["MetadataMapping"]] = relationship(
+        back_populates="field_definition",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_field_defs_target_type", "target_type"),
+    )
+
+
+class MetadataMapping(Base):
+    __tablename__ = "metadata_mappings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    field_definition_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("field_definitions.id", ondelete="CASCADE"),
+        index=True,
+    )
+    format_key: Mapped[str] = mapped_column(String(64), index=True)
+    target_path: Mapped[str] = mapped_column(String(256))
+    settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    field_definition: Mapped[FieldDefinition] = relationship(back_populates="metadata_mappings")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "field_definition_id",
+            "format_key",
+            "target_path",
+            name="uq_metadata_mappings_field_format_target",
+        ),
+        Index("ix_metadata_mappings_format_enabled", "format_key", "is_enabled"),
     )
 
 

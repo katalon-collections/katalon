@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, MetadataMapping, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -191,6 +191,23 @@ export const schema = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
+}
+
+export const metadataMappings = {
+  list: (params?: { format_key?: string; field_definition_id?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v).map(([k, v]) => [k, String(v)])).toString()
+    return req<MetadataMapping[]>(`/v1/metadata-mappings${qs ? `?${qs}` : ''}`)
+  },
+  setFieldFormat: (fieldId: string, formatKey: string, data: { target_path: string | null; settings?: Record<string, unknown>; sort_order?: number; is_enabled?: boolean }) =>
+    req<MetadataMapping | null>(`/v1/metadata-mappings/field/${fieldId}/${encodeURIComponent(formatKey)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        target_path: data.target_path,
+        settings: data.settings ?? {},
+        sort_order: data.sort_order ?? 0,
+        is_enabled: data.is_enabled ?? true,
+      }),
+    }),
 }
 
 // Vocabularies

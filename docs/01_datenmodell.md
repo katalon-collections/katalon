@@ -104,6 +104,30 @@ field_definitions (
 )
 ```
 
+### Export-Mappings
+
+Felder koennen zusaetzlich auf Exportformate gemappt werden. Diese Zuordnung ist getrennt vom Schema und wird in einer eigenen Tabelle gespeichert.
+
+```sql
+metadata_mappings (
+    id UUID,
+    field_definition_id UUID,
+    format_key VARCHAR,   -- z. B. oai_dc, spaeter lido oder metsmods
+    target_path VARCHAR,   -- z. B. dc:title
+    settings JSONB,
+    sort_order INT,
+    is_enabled BOOLEAN
+)
+```
+
+Eigenschaften:
+
+- Ein Feld kann mehrere Export-Mappings haben.
+- Ein Format kann mehrere Zielpfade erhalten.
+- Das Schema selbst bleibt davon unberuehrt.
+
+OAI-PMH nutzt diese Schicht aktuell zuerst. LIDO und METS/MODS sind als spaetere Consumer vorgesehen.
+
 ### Feldtypen
 
 | Feldtyp | Beschreibung | Beispiel |

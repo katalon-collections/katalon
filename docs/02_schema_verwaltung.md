@@ -19,6 +19,8 @@ Nach dem Speichern ist das Feld sofort in allen Erfassungsformularen sichtbar. B
 
 Das Löschen eines Feldes ist ein Soft-Delete: Das Feld wird als `is_deleted` markiert und aus der UI ausgeblendet, die gespeicherten Feldwerte in bestehenden Datensätzen bleiben in der Datenbank erhalten.
 
+Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann ein Feld auf Exportformate wie `oai_dc` gemappt werden. Die Tabs fuer `LIDO` und `METS/MODS` sind bereits angelegt, aber noch Stub-UI.
+
 ---
 
 ## Eigenschaften einer Felddefinition

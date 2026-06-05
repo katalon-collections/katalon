@@ -63,6 +63,7 @@ services:
       # Change to your domain for production (e.g. https://example.com).
       CANTALOUPE_PUBLIC_URL: http://localhost
       SECRET_KEY: change-me-in-production
+      DEBUG: "true"
       MEDIA_ROOT: /var/lib/katalon/media
       KATALON_BASE_URL: ${KATALON_BASE_URL:-}
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}

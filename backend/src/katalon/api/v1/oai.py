@@ -11,6 +11,7 @@ from katalon.core.dependencies import DBDep
 from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
 from katalon.services import oaipmh_service
+from katalon.services.metadata_mapping_service import OAI_DC_FORMAT, get_mapping_index
 
 router = APIRouter(prefix="/oai", tags=["oai-pmh"])
 
@@ -142,8 +143,9 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
         hits = es_result.get("hits", {}).get("hits", [])
         total = es_result.get("hits", {}).get("total", {}).get("value", 0)
+        mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
         xml = oaipmh_service.list_records(
-            hits, total, offset, set_spec, from_, until, prefix, base_url
+            hits, total, offset, set_spec, from_, until, prefix, base_url, mapping_index
         )
 
     # --- ListIdentifiers ---
@@ -226,7 +228,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             root = oaipmh_service._root()
             xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
         else:
-            xml = oaipmh_service.get_record(hits[0], base_url, identifier, prefix)
+            mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
+            xml = oaipmh_service.get_record(hits[0], base_url, identifier, prefix, mapping_index)
 
     else:
         xml = oaipmh_service.bad_verb(verb, base_url)

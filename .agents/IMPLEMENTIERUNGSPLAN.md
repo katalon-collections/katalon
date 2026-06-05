@@ -104,7 +104,7 @@ Wiederverwendet Vokabular "media_types" für Typ-Mapping.
 UI im Importer-Wizard (`StepMedia.tsx`) vorhanden.
 
 ### Phase 11 – OAI-PMH ⚠️
-Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
+Endpoint `/v1/oai` vorhanden. OAI-PMH nutzt die generische Export-Mapping-Schicht.
 
 **Offen:**
 - ListSets
@@ -112,20 +112,13 @@ Endpoint `/v1/oai` vorhanden. Dublin-Core-Mapping für Objects.
 - Spezifische Fehlerbehandlung: Aktuell wird bei jedem Fehler (inkl. ES-Timeout) `noRecordsMatch` zurückgeliefert (`oai.py:134, 176, 203`). Harvester können transiente von permanenten Fehlern nicht unterscheiden.
 - Tests für Token-Roundtrips und Pagination-Edge-Cases
 
-### Phase 11.1 – Dublin-Core-Feldmapping für OAI-PMH – Issue #225 🔲
-**MVP-Pflicht:** Institutionen müssen konfigurieren können, welche ihrer `field_definitions`-Felder auf Dublin-Core-Elemente (dc:title, dc:creator, dc:date, …) gemappt werden.
+### Phase 11.1 – Export-Mapping für OAI-PMH ✅ – Issue #225
+**Umsetzung:** Generische `metadata_mappings`-Tabelle + `/v1/metadata-mappings` API + Export-Abschnitt im Schema-Editor.
 
-Aktuell hat der OAI-Endpoint ein hartkodiertes DC-Mapping. Das muss konfigurierbar werden.
-
-**Offene Designfragen (vor Implementierung klären):**
-- Mapping-Granularität: pro `field_definition` → DC-Element? Oder pro Record-Typ?
-- Speicherort: neue `dc_mappings`-Tabelle, oder `dc_element`-Spalte in `field_definitions`?
-- Werttransformation: Direktdurchleitung, oder Template/Ausdruck (z.B. erstes Element aus wiederholbarem Feld)?
-- Fallback für Pflichtfelder: woher kommt `dc:identifier`? (idno? festes Feld? Record-UUID?)
-- Scope: nur Objects (für OAI) oder alle 4 Typen?
-- UI-Platzierung: im Schema-Editor pro Feld, oder eigener "OAI/Dublin Core"-Screen?
-
-**Wahrscheinlichster Ansatz:** `dc_element`-Spalte (nullable) in `field_definitions` + DC-Element-Selektor im Schema-Editor.
+**Aktueller Stand:**
+- `oai_dc` nutzt die Mappings als ersten Consumer
+- LIDO und METS/MODS sind im UI als Stubs vorbereitet
+- Das Mapping bleibt formatneutral und kann spaeter von weiteren Exportern wiederverwendet werden
 
 ### Phase 12 – Hardening ⚠️
 - Rate Limiting ✅ – `/v1/search`, `/v1/oai` auf 100/min; `/v1/authorities/search`, `/v1/authorities/fetch` auf 60/min (Issue #219, geschlossen).
@@ -211,14 +204,13 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ### MVP-Pflicht (vor oder gleichzeitig mit Beta)
 
-1. **Dublin-Core-Feldmapping UI** – Konzept + Implementierung (Phase 11.1) – Issue #225
-2. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
-3. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
+1. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
+2. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
 
 ### Nachrangig (Post-Beta)
 
-4. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
-5. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
+3. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
+4. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
 
 ---
 

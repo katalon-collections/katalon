@@ -75,6 +75,7 @@ backend/src/katalon/
 │   ├── search.py        # Elasticsearch-Suche
 │   ├── oai.py           # OAI-PMH (verb-Dispatch)
 │   ├── oai_sets.py      # OAI-Sets CRUD
+│   ├── metadata_mappings.py # Export-Mapping CRUD
 │   ├── authority.py     # Normdaten-Suche/Fetch
 │   ├── users.py         # Benutzerverwaltung
 │   ├── portal.py        # PortalConfig (Theme, Farben, Logo)
@@ -84,6 +85,7 @@ backend/src/katalon/
 │   └── media.py         # Medien-Upload, IIIF-Manifest
 ├── services/            # Business-Logik (von Handlern aufgerufen)
 │   ├── search_service.py    # ES-Indexierung, Reindex
+│   ├── metadata_mapping_service.py # Formatneutrale Export-Mappings
 │   ├── oaipmh_service.py    # OAI-XML-Serialisierung
 │   ├── authority_service.py # Adapter-Registry
 │   └── importer_service.py  # CSV-ETL
@@ -121,6 +123,15 @@ field_definitions (id, target_type, name, label JSONB, field_type, is_required,
 ```
 
 Definiert, welche Felder `metadata_` für jeden Typ enthält. Das Admin-UI liest diese Definitionen und rendert entsprechende Formularfelder.
+
+Zusatz fuer Exporte:
+
+```
+metadata_mappings (id, field_definition_id, format_key, target_path,
+                   settings JSONB, sort_order, is_enabled)
+```
+
+Damit kann ein Feld auf mehrere Exportformate gemappt werden, ohne das Schema selbst zu veraendern. OAI-PMH ist der erste Consumer dieser Schicht.
 
 ### Relationen
 

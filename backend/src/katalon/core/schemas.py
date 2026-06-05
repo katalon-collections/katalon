@@ -45,6 +45,30 @@ class FieldDefinitionRead(FieldDefinitionCreate):
 FieldDefinitionRead.model_rebuild()
 
 
+class MetadataMappingCreate(BaseModel):
+    field_definition_id: uuid.UUID
+    format_key: str
+    target_path: str
+    settings: dict = {}
+    sort_order: int = 0
+    is_enabled: bool = True
+
+
+class MetadataMappingRead(MetadataMappingCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class MetadataMappingUpsert(BaseModel):
+    target_path: str | None = None
+    settings: dict = {}
+    sort_order: int = 0
+    is_enabled: bool = True
+
+
 class RecordSubtypeCreate(BaseModel):
     primary_type: str
     name: str

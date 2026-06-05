@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
 
+from katalon.services.metadata_mapping_service import MappingIndex, extract_values
+
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 DC_NS = "http://purl.org/dc/elements/1.1/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
@@ -67,11 +69,33 @@ def _datestamp(ts: str | None) -> str:
 # Dublin Core mapping from ES hit
 # ---------------------------------------------------------------------------
 
-def _hit_to_oai_record(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
+def _append_dc_value(dc: ET.Element, target_path: str, value: str) -> None:
+    if not target_path.startswith("dc:") or not value:
+        return
+    ET.SubElement(dc, target_path).text = value
+
+
+def _append_mapped_dc_values(
+    dc: ET.Element,
+    src: dict[str, Any],
+    mappings: dict[str, list[str]],
+) -> None:
+    for field_name, target_paths in mappings.items():
+        for value in extract_values(src, field_name):
+            for target_path in target_paths:
+                _append_dc_value(dc, target_path, value)
+
+
+def _hit_to_oai_record(
+    hit: dict[str, Any],
+    set_spec: str | None,
+    mapping_index: MappingIndex | None = None,
+) -> ET.Element:
     src = hit["_source"]
     record_id = hit["_id"]
     record_type = src.get("record_type", "")
     md: dict = src.get("metadata", {})
+    record_mappings = (mapping_index or {}).get(record_type, {})
 
     oai_rec = ET.Element("record")
     header = ET.SubElement(oai_rec, "header")
@@ -91,51 +115,58 @@ def _hit_to_oai_record(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
         ),
     })
 
-    title = src.get("title") or record_id
-    ET.SubElement(dc, "dc:title").text = str(title)
+    if record_mappings:
+        _append_mapped_dc_values(dc, src, record_mappings)
+    else:
+        title = src.get("title") or record_id
+        ET.SubElement(dc, "dc:title").text = str(title)
 
-    for creator_key in ("creator", "photographer", "author", "artist", "illustrator"):
-        if val := md.get(creator_key):
-            if isinstance(val, list):
-                for item in val:
-                    text = item.get("value", "") if isinstance(item, dict) else str(item)
-                    if text:
-                        ET.SubElement(dc, "dc:creator").text = text
-            else:
-                ET.SubElement(dc, "dc:creator").text = str(val)
-            break
+        for creator_key in ("creator", "photographer", "author", "artist", "illustrator"):
+            if val := md.get(creator_key):
+                if isinstance(val, list):
+                    for item in val:
+                        text = item.get("value", "") if isinstance(item, dict) else str(item)
+                        if text:
+                            ET.SubElement(dc, "dc:creator").text = text
+                else:
+                    ET.SubElement(dc, "dc:creator").text = str(val)
+                break
 
-    if desc := md.get("description"):
-        text = str(desc)
-        if isinstance(desc, list):
-            text = desc[0].get("value", "") if isinstance(desc[0], dict) else str(desc[0])
-        ET.SubElement(dc, "dc:description").text = text
+        if desc := md.get("description"):
+            text = str(desc)
+            if isinstance(desc, list):
+                text = desc[0].get("value", "") if isinstance(desc[0], dict) else str(desc[0])
+            ET.SubElement(dc, "dc:description").text = text
 
-    keywords = md.get("keywords", [])
-    if isinstance(keywords, list):
-        for kw in keywords:
-            if kw:
-                ET.SubElement(dc, "dc:subject").text = str(kw)
-    elif keywords:
-        ET.SubElement(dc, "dc:subject").text = str(keywords)
+        keywords = md.get("keywords", [])
+        if isinstance(keywords, list):
+            for kw in keywords:
+                if kw:
+                    ET.SubElement(dc, "dc:subject").text = str(kw)
+        elif keywords:
+            ET.SubElement(dc, "dc:subject").text = str(keywords)
 
-    date_val = (src.get("created_at") or "")[:10]
-    if date_val:
-        ET.SubElement(dc, "dc:date").text = date_val
+        date_val = (src.get("created_at") or "")[:10]
+        if date_val:
+            ET.SubElement(dc, "dc:date").text = date_val
 
-    ET.SubElement(dc, "dc:type").text = record_type
+    if not record_mappings or "dc:type" not in {
+        target_path for targets in record_mappings.values() for target_path in targets
+    }:
+        ET.SubElement(dc, "dc:type").text = record_type
     ET.SubElement(dc, "dc:identifier").text = f"oai:katalon:{record_type}:{record_id}"
 
     if idno := src.get("idno") or md.get("idno"):
         ET.SubElement(dc, "dc:identifier").text = str(idno)
 
-    if lang := md.get("language"):
+    if not record_mappings and (lang := md.get("language")):
         ET.SubElement(dc, "dc:language").text = str(lang)
 
-    for rights_key in ("rights", "license", "licence"):
-        if val := md.get(rights_key):
-            ET.SubElement(dc, "dc:rights").text = str(val)
-            break
+    if not record_mappings:
+        for rights_key in ("rights", "license", "licence"):
+            if val := md.get(rights_key):
+                ET.SubElement(dc, "dc:rights").text = str(val)
+                break
 
     return oai_rec
 
@@ -207,6 +238,7 @@ def list_records(
     until: str | None,
     prefix: str,
     base_url: str,
+    mapping_index: MappingIndex | None = None,
 ) -> str:
     root = _root()
     req_attrs: dict[str, str] = {"verb": "ListRecords", "metadataPrefix": prefix}
@@ -224,7 +256,7 @@ def list_records(
 
     lr = ET.SubElement(root, "ListRecords")
     for hit in hits:
-        lr.append(_hit_to_oai_record(hit, set_spec))
+        lr.append(_hit_to_oai_record(hit, set_spec, mapping_index))
 
     next_offset = offset + len(hits)
     if next_offset < total:
@@ -276,13 +308,19 @@ def list_identifiers(
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
-def get_record(hit: dict[str, Any], base_url: str, identifier: str, prefix: str) -> str:
+def get_record(
+    hit: dict[str, Any],
+    base_url: str,
+    identifier: str,
+    prefix: str,
+    mapping_index: MappingIndex | None = None,
+) -> str:
     root = _root()
     req = ET.SubElement(root, "request", verb="GetRecord", metadataPrefix=prefix,
                         identifier=identifier)
     req.text = base_url
     gr = ET.SubElement(root, "GetRecord")
-    gr.append(_hit_to_oai_record(hit, None))
+    gr.append(_hit_to_oai_record(hit, None, mapping_index))
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
