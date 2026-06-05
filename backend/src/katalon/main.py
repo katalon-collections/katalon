@@ -359,7 +359,11 @@ app.include_router(importer.router, prefix="/v1")
 app.include_router(oai.router, prefix="/v1")
 app.include_router(oai_sets.router, prefix="/v1")
 app.include_router(api_keys_router, prefix="/v1")
-app.include_router(dnb_urn_mock.router, prefix="/v1")
+
+# Mock URN registrar is a test/dev fixture only — never expose its writable
+# in-memory endpoints in production.
+if settings.debug:
+    app.include_router(dnb_urn_mock.router, prefix="/v1")
 
 
 @app.get("/health", tags=["system"])

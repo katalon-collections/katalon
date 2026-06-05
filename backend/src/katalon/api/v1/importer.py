@@ -6,6 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FieldDefinition, RecordSubtype

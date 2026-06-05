@@ -1,7 +1,13 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from katalon.api.v1 import dnb_urn_mock
 from katalon.main import app
+
+# The mock URN registrar is only mounted when settings.debug is True (it must
+# never be exposed in production). Ensure it is available for these tests.
+if not any(getattr(r, "path", "").startswith("/v1/dnb-urn-mock") for r in app.routes):
+    app.include_router(dnb_urn_mock.router, prefix="/v1")
 
 
 @pytest.mark.asyncio
