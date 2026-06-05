@@ -97,7 +97,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: CurrentUser) 
     await db.flush()
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="create")
     try:
-        await search_service.index_record("place", place)
+        await search_service.index_record("place", place, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return place
@@ -147,7 +147,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "place_type": place_type, "status": data.status}})
     try:
-        await search_service.index_record("place", place)
+        await search_service.index_record("place", place, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return place

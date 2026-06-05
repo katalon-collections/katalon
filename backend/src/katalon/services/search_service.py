@@ -121,6 +121,7 @@ def _build_doc(
     searchable_fields: set[str] | None = None,
     facet_fields: set[str] | None = None,
     group_fields: set[str] | None = None,
+    linked_data: dict[str, list[dict]] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
@@ -170,7 +171,58 @@ def _build_doc(
 
     if rel_data:
         doc.update(rel_data)
+    if linked_data:
+        doc.update(linked_data)
     return doc
+
+
+async def _load_linked_data(
+    record_type: str,
+    record_id: UUID,
+    db: Any,
+    inherited_config: dict[str, list[str]],
+) -> dict[str, list[dict]]:
+    """Load inherited fields from linked records for ES denormalization.
+
+    inherited_config maps target_type -> list of field names to embed.
+    Returns {"linked_occurrences": [{id, relation_type, inherited: {...}}, ...], ...}.
+    """
+    from sqlalchemy import and_, select
+
+    from katalon.core.models import Entity, Object, Occurrence, Place, Relation
+
+    _MODEL_MAP: dict[str, Any] = {
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+    }
+    result: dict[str, list[dict]] = {}
+
+    stmt = select(Relation).where(
+        and_(Relation.from_type == record_type, Relation.from_id == record_id)
+    )
+    relations = (await db.execute(stmt)).scalars().all()
+
+    for rel in relations:
+        fields = inherited_config.get(rel.to_type)
+        if not fields:
+            continue
+        model = _MODEL_MAP.get(rel.to_type)
+        if not model:
+            continue
+        linked_rec = await db.get(model, rel.to_id)
+        if not linked_rec:
+            continue
+        md = linked_rec.metadata_ or {}
+        inherited = {f: md[f] for f in fields if f in md}
+        if not inherited:
+            continue
+        key = f"linked_{rel.to_type}s"
+        result.setdefault(key, []).append({
+            "id": str(rel.to_id),
+            "relation_type": rel.relation_type,
+            "inherited": inherited,
+        })
+
+    return result
 
 
 async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> dict[str, list[str]]:
@@ -221,12 +273,13 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     from katalon.core.models import FieldDefinition
 
     rel_data: dict[str, list[str]] | None = None
-    if db is not None and record_type == "object":
+    if db is not None:
         rel_data = await _load_relation_titles(record_type, record.id, db)
 
     searchable_fields: set[str] | None = None
     facet_fields: set[str] | None = None
     group_fields: set[str] | None = None
+    inherited_config: dict[str, list[str]] = {}
     if db is not None:
         result = await db.execute(
             select(
@@ -234,6 +287,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
                 FieldDefinition.is_searchable,
                 FieldDefinition.is_facet,
                 FieldDefinition.field_type,
+                FieldDefinition.settings,
             ).where(
                 FieldDefinition.target_type == record_type,
                 FieldDefinition.is_deleted.is_(False),
@@ -244,8 +298,20 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
         searchable_fields = {r.name for r in rows if r.is_searchable}
         facet_fields = {r.name for r in rows if r.is_facet}
         group_fields = {r.name for r in rows if r.field_type == "group"}
+        for r in rows:
+            if r.field_type == "relation":
+                s = r.settings or {}
+                ifields = s.get("inherited_fields") or []
+                target = s.get("relation_target_type", "")
+                if ifields and target:
+                    existing = inherited_config.get(target, [])
+                    inherited_config[target] = list(set(existing + ifields))
 
-    return _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields)
+    linked_data: dict[str, list[dict]] = {}
+    if inherited_config and db is not None:
+        linked_data = await _load_linked_data(record_type, record.id, db, inherited_config)
+
+    return _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields, linked_data)
 
 
 async def index_record(record_type: str, record: Any, db: Any = None) -> None:

@@ -96,7 +96,7 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: CurrentUser
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
     try:
-        await search_service.index_record("entity", entity)
+        await search_service.index_record("entity", entity, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return entity
@@ -143,7 +143,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": data.metadata_}})
     try:
-        await search_service.index_record("entity", entity)
+        await search_service.index_record("entity", entity, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return entity

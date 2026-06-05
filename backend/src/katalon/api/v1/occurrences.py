@@ -96,7 +96,7 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Cur
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
     try:
-        await search_service.index_record("occurrence", occ)
+        await search_service.index_record("occurrence", occ, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return occ
@@ -143,7 +143,7 @@ async def update_occurrence(occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})
     try:
-        await search_service.index_record("occurrence", occ)
+        await search_service.index_record("occurrence", occ, db)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
     return occ

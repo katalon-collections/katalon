@@ -63,6 +63,7 @@ def index_record_task(self, record_type: str, record_id: str, doc: dict) -> None
 
     try:
         _run(index_document(record_id, {"record_type": record_type, **doc}))
+        cascade_reindex_task.delay(record_type, record_id)
     except Exception as exc:
         logger.error("index_record failed %s/%s (attempt %d): %s", record_type, record_id, self.request.retries + 1, exc)
         try:
@@ -84,6 +85,50 @@ def remove_record_task(self, record_id: str) -> None:
             raise self.retry(exc=exc, countdown=10 * (2 ** self.request.retries))
         except self.MaxRetriesExceededError:
             logger.error("remove_record permanently failed %s after %d retries", record_id, self.max_retries)
+
+
+@celery_app.task(name="katalon.cascade_reindex")
+def cascade_reindex_task(record_type: str, record_id: str) -> dict:
+    """Reindex all records linking TO the given record (1-level cascade).
+
+    Triggered after index_record_task succeeds. Propagates inherited field
+    changes to records that embed data from this record. Max depth: 1.
+    """
+    from sqlalchemy import and_, select
+
+    from katalon.core.models import Entity, Object, Occurrence, Place, Relation
+    from katalon.integrations.elasticsearch import index_document
+    from katalon.services.search_service import build_index_doc
+
+    _MODEL_MAP: dict = {
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+    }
+
+    AsyncSessionLocal, engine = _make_session()
+
+    async def _do() -> dict:
+        async with AsyncSessionLocal() as session:
+            stmt = select(Relation).where(
+                and_(Relation.to_type == record_type, Relation.to_id == record_id)
+            )
+            relations = (await session.execute(stmt)).scalars().all()
+            count = 0
+            for rel in relations:
+                model = _MODEL_MAP.get(rel.from_type)
+                if not model:
+                    continue
+                rec = await session.get(model, rel.from_id)
+                if not rec:
+                    continue
+                doc = await build_index_doc(rel.from_type, rec, session)
+                await index_document(str(rec.id), {"record_type": rel.from_type, **doc})
+                count += 1
+        return {"cascaded": count, "source": f"{record_type}/{record_id}"}
+
+    try:
+        return _run(_do())
+    finally:
+        _run(engine.dispose())
 
 
 @celery_app.task(name="katalon.bulk_reindex_type")
