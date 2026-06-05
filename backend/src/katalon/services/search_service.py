@@ -3,11 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from katalon.integrations.elasticsearch import (
-    delete_document,
-    index_document,
-    search_documents,
-)
+from katalon.integrations.elasticsearch import search_documents
 
 
 def _extract_title(md: dict) -> str:
@@ -218,7 +214,8 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
     return related
 
 
-async def index_record(record_type: str, record: Any, db: Any = None) -> None:
+async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict[str, Any]:
+    """Build the ES document for a record without writing to ES."""
     from sqlalchemy import select
 
     from katalon.core.models import FieldDefinition
@@ -248,12 +245,21 @@ async def index_record(record_type: str, record: Any, db: Any = None) -> None:
         facet_fields = {r.name for r in rows if r.is_facet}
         group_fields = {r.name for r in rows if r.field_type == "group"}
 
-    doc = _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields)
-    await index_document(str(record.id), doc)
+    return _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields)
+
+
+async def index_record(record_type: str, record: Any, db: Any = None) -> None:
+    """Build ES document and dispatch Celery task for indexed write with retry."""
+    from katalon.workers.index_tasks import index_record_task
+
+    doc = await build_index_doc(record_type, record, db)
+    index_record_task.delay(record_type, str(record.id), doc)
 
 
 async def remove_record(record_id: UUID) -> None:
-    await delete_document(str(record_id))
+    from katalon.workers.index_tasks import remove_record_task
+
+    remove_record_task.delay(str(record_id))
 
 
 async def search(
