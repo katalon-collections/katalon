@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from elasticsearch import ConnectionError, ConnectionTimeout, TransportError
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -12,6 +14,8 @@ from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
 from katalon.services import oaipmh_service
 from katalon.services.metadata_mapping_service import OAI_DC_FORMAT, get_mapping_index
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/oai", tags=["oai-pmh"])
 
@@ -82,156 +86,167 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
     verb = params.get("verb", "")
     base_url = str(request.url).split("?")[0]
 
-    # --- Identify ---
-    if verb == "Identify":
-        config_res = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
-        config = config_res.scalar_one_or_none()
-        repo_name = config.site_title if config else "Katalon"
-        admin_email = getattr(settings, "oai_admin_email", settings.default_admin_email)
-        earliest = "2024-01-01T00:00:00Z"
-        xml = oaipmh_service.identify(base_url, repo_name, admin_email, earliest)
+    try:
+        # --- Identify ---
+        if verb == "Identify":
+            config_res = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+            config = config_res.scalar_one_or_none()
+            repo_name = config.site_title if config else "Katalon"
+            admin_email = getattr(settings, "oai_admin_email", settings.default_admin_email)
+            earliest = "2024-01-01T00:00:00Z"
+            xml = oaipmh_service.identify(base_url, repo_name, admin_email, earliest)
 
-    # --- ListMetadataFormats ---
-    elif verb == "ListMetadataFormats":
-        xml = oaipmh_service.list_metadata_formats(base_url)
+        # --- ListMetadataFormats ---
+        elif verb == "ListMetadataFormats":
+            xml = oaipmh_service.list_metadata_formats(base_url)
 
-    # --- ListSets ---
-    elif verb == "ListSets":
-        result = await db.execute(select(OAISet).order_by(OAISet.set_spec))
-        sets = list(result.scalars().all())
-        xml = oaipmh_service.list_sets(sets, base_url)
+        # --- ListSets ---
+        elif verb == "ListSets":
+            result = await db.execute(select(OAISet).order_by(OAISet.set_spec))
+            sets = list(result.scalars().all())
+            xml = oaipmh_service.list_sets(sets, base_url)
 
-    # --- ListRecords ---
-    elif verb == "ListRecords":
-        prefix = params.get("metadataPrefix", "oai_dc")
+        # --- ListRecords ---
+        elif verb == "ListRecords":
+            prefix = params.get("metadataPrefix", "oai_dc")
 
-        token_str = params.get("resumptionToken")
-        if token_str:
-            token = oaipmh_service.decode_token(token_str)
-            offset = token["offset"]
-            set_spec = token["set_spec"]
-            from_ = token["from_"]
-            until = token["until"]
-            prefix = token["prefix"]
-        else:
-            if prefix != "oai_dc":
-                root = oaipmh_service._root()
-                msg = f"Unsupported prefix: {prefix}"
-                xml = oaipmh_service._error(
-                    root, "cannotDisseminateFormat", msg
+            token_str = params.get("resumptionToken")
+            if token_str:
+                token = oaipmh_service.decode_token(token_str)
+                offset = token["offset"]
+                set_spec = token["set_spec"]
+                from_ = token["from_"]
+                until = token["until"]
+                prefix = token["prefix"]
+            else:
+                if prefix != "oai_dc":
+                    root = oaipmh_service._root()
+                    msg = f"Unsupported prefix: {prefix}"
+                    xml = oaipmh_service._error(
+                        root, "cannotDisseminateFormat", msg
+                    )
+                    return Response(content=xml, media_type="application/xml")
+                offset = 0
+                set_spec = params.get("set")
+                from_ = params.get("from")
+                until = params.get("until")
+
+            set_def: OAISet | None = None
+            if set_spec:
+                res = await db.execute(
+                    select(OAISet).where(OAISet.set_spec == set_spec)
                 )
-                return Response(content=xml, media_type="application/xml")
-            offset = 0
-            set_spec = params.get("set")
-            from_ = params.get("from")
-            until = params.get("until")
+                set_def = res.scalar_one_or_none()
+                if not set_def:
+                    root = oaipmh_service._root()
+                    xml = oaipmh_service._error(
+                        root, "noSetHierarchy", f"Unknown set: {set_spec}"
+                    )
+                    return Response(content=xml, media_type="application/xml")
 
-        set_def: OAISet | None = None
-        if set_spec:
-            res = await db.execute(
-                select(OAISet).where(OAISet.set_spec == set_spec)
-            )
-            set_def = res.scalar_one_or_none()
-            if not set_def:
-                root = oaipmh_service._root()
-                xml = oaipmh_service._error(
-                    root, "noSetHierarchy", f"Unknown set: {set_spec}"
-                )
-                return Response(content=xml, media_type="application/xml")
+            es_result = await _es_search_for_oai(set_def, from_, until, offset)
 
-        es_result = await _es_search_for_oai(set_def, from_, until, offset)
-
-        hits = es_result.get("hits", {}).get("hits", [])
-        total = es_result.get("hits", {}).get("total", {}).get("value", 0)
-        mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
-        xml = oaipmh_service.list_records(
-            hits, total, offset, set_spec, from_, until, prefix, base_url, mapping_index
-        )
-
-    # --- ListIdentifiers ---
-    elif verb == "ListIdentifiers":
-        prefix = params.get("metadataPrefix", "oai_dc")
-
-        token_str = params.get("resumptionToken")
-        if token_str:
-            token = oaipmh_service.decode_token(token_str)
-            offset = token["offset"]
-            set_spec = token["set_spec"]
-            from_ = token["from_"]
-            until = token["until"]
-            prefix = token["prefix"]
-        else:
-            if prefix != "oai_dc":
-                root = oaipmh_service._root()
-                msg = f"Unsupported prefix: {prefix}"
-                xml = oaipmh_service._error(
-                    root, "cannotDisseminateFormat", msg
-                )
-                return Response(content=xml, media_type="application/xml")
-            offset = 0
-            set_spec = params.get("set")
-            from_ = params.get("from")
-            until = params.get("until")
-
-        set_def = None
-        if set_spec:
-            res = await db.execute(
-                select(OAISet).where(OAISet.set_spec == set_spec)
-            )
-            set_def = res.scalar_one_or_none()
-            if not set_def:
-                root = oaipmh_service._root()
-                xml = oaipmh_service._error(
-                    root, "noSetHierarchy", f"Unknown set: {set_spec}"
-                )
-                return Response(content=xml, media_type="application/xml")
-
-        es_result = await _es_search_for_oai(set_def, from_, until, offset)
-
-        hits = es_result.get("hits", {}).get("hits", [])
-        total = es_result.get("hits", {}).get("total", {}).get("value", 0)
-        xml = oaipmh_service.list_identifiers(
-            hits, total, offset, set_spec, from_, until, prefix, base_url
-        )
-
-    # --- GetRecord ---
-    elif verb == "GetRecord":
-        if params.get("resumptionToken"):
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(
-                root, "badResumptionToken",
-                "GetRecord does not support resumptionToken."
-            )
-            return Response(content=xml, media_type="application/xml")
-
-        identifier = params.get("identifier", "")
-        prefix = params.get("metadataPrefix", "oai_dc")
-        if prefix != "oai_dc":
-            root = oaipmh_service._root()
-            msg = f"Unsupported prefix: {prefix}"
-            xml = oaipmh_service._error(
-                root, "cannotDisseminateFormat", msg
-            )
-            return Response(content=xml, media_type="application/xml")
-
-        parts = identifier.split(":")
-        if len(parts) < 4:
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "idDoesNotExist", "Malformed identifier.")
-            return Response(content=xml, media_type="application/xml")
-
-        record_id = parts[3]
-        es_result = await _es_search_for_oai(None, None, None, 0, identifier=record_id)
-
-        hits = es_result.get("hits", {}).get("hits", [])
-        if not hits:
-            root = oaipmh_service._root()
-            xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
-        else:
+            hits = es_result.get("hits", {}).get("hits", [])
+            total = es_result.get("hits", {}).get("total", {}).get("value", 0)
             mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
-            xml = oaipmh_service.get_record(hits[0], base_url, identifier, prefix, mapping_index)
+            xml = oaipmh_service.list_records(
+                hits, total, offset, set_spec, from_, until, prefix, base_url, mapping_index
+            )
 
-    else:
-        xml = oaipmh_service.bad_verb(verb, base_url)
+        # --- ListIdentifiers ---
+        elif verb == "ListIdentifiers":
+            prefix = params.get("metadataPrefix", "oai_dc")
+
+            token_str = params.get("resumptionToken")
+            if token_str:
+                token = oaipmh_service.decode_token(token_str)
+                offset = token["offset"]
+                set_spec = token["set_spec"]
+                from_ = token["from_"]
+                until = token["until"]
+                prefix = token["prefix"]
+            else:
+                if prefix != "oai_dc":
+                    root = oaipmh_service._root()
+                    msg = f"Unsupported prefix: {prefix}"
+                    xml = oaipmh_service._error(
+                        root, "cannotDisseminateFormat", msg
+                    )
+                    return Response(content=xml, media_type="application/xml")
+                offset = 0
+                set_spec = params.get("set")
+                from_ = params.get("from")
+                until = params.get("until")
+
+            set_def = None
+            if set_spec:
+                res = await db.execute(
+                    select(OAISet).where(OAISet.set_spec == set_spec)
+                )
+                set_def = res.scalar_one_or_none()
+                if not set_def:
+                    root = oaipmh_service._root()
+                    xml = oaipmh_service._error(
+                        root, "noSetHierarchy", f"Unknown set: {set_spec}"
+                    )
+                    return Response(content=xml, media_type="application/xml")
+
+            es_result = await _es_search_for_oai(set_def, from_, until, offset)
+
+            hits = es_result.get("hits", {}).get("hits", [])
+            total = es_result.get("hits", {}).get("total", {}).get("value", 0)
+            xml = oaipmh_service.list_identifiers(
+                hits, total, offset, set_spec, from_, until, prefix, base_url
+            )
+
+        # --- GetRecord ---
+        elif verb == "GetRecord":
+            if params.get("resumptionToken"):
+                root = oaipmh_service._root()
+                xml = oaipmh_service._error(
+                    root, "badResumptionToken",
+                    "GetRecord does not support resumptionToken."
+                )
+                return Response(content=xml, media_type="application/xml")
+
+            identifier = params.get("identifier", "")
+            prefix = params.get("metadataPrefix", "oai_dc")
+            if prefix != "oai_dc":
+                root = oaipmh_service._root()
+                msg = f"Unsupported prefix: {prefix}"
+                xml = oaipmh_service._error(
+                    root, "cannotDisseminateFormat", msg
+                )
+                return Response(content=xml, media_type="application/xml")
+
+            parts = identifier.split(":")
+            if len(parts) < 4:
+                root = oaipmh_service._root()
+                xml = oaipmh_service._error(root, "idDoesNotExist", "Malformed identifier.")
+                return Response(content=xml, media_type="application/xml")
+
+            record_id = parts[3]
+            es_result = await _es_search_for_oai(None, None, None, 0, identifier=record_id)
+
+            hits = es_result.get("hits", {}).get("hits", [])
+            if not hits:
+                root = oaipmh_service._root()
+                xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
+            else:
+                mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
+                xml = oaipmh_service.get_record(
+                    hits[0], base_url, identifier, prefix, mapping_index
+                )
+
+        else:
+            xml = oaipmh_service.bad_verb(verb, base_url)
+
+    except (ConnectionError, ConnectionTimeout, TransportError) as exc:
+        logger.error("OAI-PMH request failed due to ES error: %s", exc)
+        return Response(
+            content="Search backend temporarily unavailable. Please retry later.",
+            status_code=503,
+            headers={"Retry-After": "60"},
+        )
 
     return Response(content=xml, media_type="application/xml")
