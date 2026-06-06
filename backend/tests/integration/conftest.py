@@ -45,8 +45,9 @@ def migrated_database(postgres_url: str) -> str:
 
 
 @pytest.fixture
-def app(migrated_database: str):
+async def app(migrated_database: str):
     os.environ["DATABASE_URL"] = migrated_database
+    os.environ["DEBUG"] = "true"
 
     import katalon.config as config_module
     import katalon.database as database_module
@@ -56,7 +57,12 @@ def app(migrated_database: str):
     importlib.reload(database_module)
     importlib.reload(main_module)
 
-    return main_module.app
+    yield main_module.app
+
+    # Each reload swaps in a fresh engine bound to this test's event loop.
+    # Dispose it so its pooled asyncpg connections don't leak into the next
+    # test's (different) loop — that causes "attached to a different loop".
+    await database_module.engine.dispose()
 
 
 @pytest.fixture

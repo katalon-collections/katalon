@@ -72,6 +72,7 @@ async def test_delete_object_returns_409_when_relations_exist() -> None:
     record_id = uuid.uuid4()
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
+    mock_user.role = "admin"
 
     # The handler calls db.execute() multiple times:
     # 1. select(Object).where(...) → find the record
@@ -122,6 +123,7 @@ async def test_delete_entity_returns_409_when_relations_exist() -> None:
     record_id = uuid.uuid4()
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
+    mock_user.role = "admin"
 
     entity_mock = MagicMock()
     entity_mock.id = record_id
@@ -165,6 +167,7 @@ async def test_delete_object_409_detail_message_contains_count() -> None:
     record_id = uuid.uuid4()
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
+    mock_user.role = "admin"
 
     obj_mock = MagicMock()
     obj_mock.id = record_id
