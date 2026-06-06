@@ -25,7 +25,15 @@
       "Bash(npx eslint *)",
       "Bash(make help *)",
       "Bash(bash -n /Users/karl/Coding/Katalon/install.sh)",
-      "Bash(make *)"
+      "Bash(make *)",
+      "Bash(uvx ruff *)",
+      "Bash(python -m pytest tests/ -x -q)",
+      "Bash(sed -n '24,40p' /Users/karl/Coding/Katalon/backend/src/katalon/services/relation_service.py)",
+      "Bash(sed -n '75,110p' /Users/karl/Coding/Katalon/backend/src/katalon/workers/cleanup_tasks.py)",
+      "Bash(ls -d */frontend)",
+      "Bash(ls frontend *)",
+      "Bash(find . -maxdepth 2 -name \"package.json\" -not -path \"*/node_modules/*\")",
+      "Bash(awk -F: '{print $1}')"
     ]
   }
 }

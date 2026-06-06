@@ -127,7 +127,7 @@ Endpoint `/v1/oai` vorhanden. OAI-PMH nutzt die generische Export-Mapping-Schich
 - nginx TLS-Terminierung (Infra, deployment-spezifisch)
 - Perf-Tests (locust)
 - OpenAPI-Dokumentation finalisieren
-- Cantaloupe-Health-Check beim Start (fehlende Konfiguration wird sonst erst beim ersten Upload sichtbar)
+- Cantaloupe-Health-Check beim Start ✅ – `_check_cantaloupe_health()` in `main.py` pingt `/iiif/3` beim Lifespan-Start, loggt Warning bei Fehlern
 
 ---
 

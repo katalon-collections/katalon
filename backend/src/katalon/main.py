@@ -296,6 +296,32 @@ def _check_production_secrets() -> None:
         raise RuntimeError("Refusing to start in production mode:\n" + "\n".join(f"  - {e}" for e in errors))
 
 
+async def _check_cantaloupe_health() -> None:
+    """Ping Cantaloupe at startup so misconfiguration surfaces in logs, not on first upload."""
+    import httpx
+
+    url = f"{settings.cantaloupe_url}/iiif/3"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code >= 400:
+                logger.warning(
+                    "Cantaloupe health check at %s returned HTTP %d — "
+                    "IIIF tile generation will fail",
+                    url,
+                    resp.status_code,
+                )
+            else:
+                logger.info("Cantaloupe reachable at %s", settings.cantaloupe_url)
+    except Exception as exc:
+        logger.warning(
+            "Cantaloupe unreachable at %s (%s) — "
+            "IIIF tile generation will fail until this is fixed",
+            url,
+            exc,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _check_production_secrets()
@@ -306,6 +332,7 @@ async def lifespan(app: FastAPI):
     await _ensure_admin_config()
     await _ensure_authority_sources()
     await _ensure_label_fields()
+    await _check_cantaloupe_health()
     try:
         from katalon.integrations.elasticsearch import ensure_index
         await ensure_index()
