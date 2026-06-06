@@ -48,7 +48,9 @@ def _log_index_failure(record_type: str, record_id: str, error: str) -> None:
     try:
         _run(_write())
     except Exception:
-        logger.exception("Failed to write index_failed audit entry for %s/%s", record_type, record_id)
+        logger.exception(
+            "Failed to write index_failed audit entry for %s/%s", record_type, record_id
+        )
     finally:
         _run(engine.dispose())
 
@@ -65,11 +67,17 @@ def index_record_task(self, record_type: str, record_id: str, doc: dict) -> None
         _run(index_document(record_id, {"record_type": record_type, **doc}))
         cascade_reindex_task.delay(record_type, record_id)
     except Exception as exc:
-        logger.error("index_record failed %s/%s (attempt %d): %s", record_type, record_id, self.request.retries + 1, exc)
+        logger.error(
+            "index_record failed %s/%s (attempt %d): %s",
+            record_type, record_id, self.request.retries + 1, exc,
+        )
         try:
             raise self.retry(exc=exc, countdown=10 * (2 ** self.request.retries))
         except self.MaxRetriesExceededError:
-            logger.error("index_record permanently failed %s/%s after %d retries", record_type, record_id, self.max_retries)
+            logger.error(
+                "index_record permanently failed %s/%s after %d retries",
+                record_type, record_id, self.max_retries,
+            )
             _log_index_failure(record_type, record_id, str(exc))
 
 
@@ -80,11 +88,16 @@ def remove_record_task(self, record_id: str) -> None:
     try:
         _run(delete_document(record_id))
     except Exception as exc:
-        logger.error("remove_record failed %s (attempt %d): %s", record_id, self.request.retries + 1, exc)
+        logger.error(
+            "remove_record failed %s (attempt %d): %s",
+            record_id, self.request.retries + 1, exc,
+        )
         try:
             raise self.retry(exc=exc, countdown=10 * (2 ** self.request.retries))
         except self.MaxRetriesExceededError:
-            logger.error("remove_record permanently failed %s after %d retries", record_id, self.max_retries)
+            logger.error(
+                "remove_record permanently failed %s after %d retries", record_id, self.max_retries
+            )
 
 
 @celery_app.task(name="katalon.cascade_reindex")
@@ -173,7 +186,8 @@ def bulk_reindex_type_task(target_type: str) -> dict:
                 rel_data = None
                 if target_type == "object":
                     rel_data = await _load_relation_titles(target_type, rec.id, session)
-                records.append((str(rec.id), _build_doc(target_type, rec, rel_data, facet_fields=facet_fields)))
+                doc = _build_doc(target_type, rec, rel_data, facet_fields=facet_fields)
+                records.append((str(rec.id), doc))
         count = await reindex_type(target_type, records)
         return {"status": "ok", "indexed": count, "target_type": target_type}
 
