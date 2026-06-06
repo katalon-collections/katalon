@@ -102,6 +102,24 @@ services:
       redis:
         condition: service_healthy
 
+  beat:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.worker
+    command: ["celery", "-A", "katalon.workers.celery_app", "beat", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
+      REDIS_URL: redis://redis:6379/0
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      CANTALOUPE_URL: http://cantaloupe:8182
+      CANTALOUPE_PUBLIC_URL: http://localhost
+      MEDIA_ROOT: /var/lib/katalon/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   admin:
     build:
       context: .

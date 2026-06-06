@@ -20,6 +20,7 @@ from katalon.api.v1 import (
     entities,
     idno,
     importer,
+    index_health,
     media,
     metadata_mappings,
     oai,
@@ -335,6 +336,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_config.router, prefix="/v1")
+app.include_router(index_health.router, prefix="/v1")
 app.include_router(idno.router, prefix="/v1")
 app.include_router(auth.router, prefix="/v1")
 app.include_router(banners.router, prefix="/v1")

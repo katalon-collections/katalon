@@ -183,6 +183,102 @@ def bulk_reindex_type_task(target_type: str) -> dict:
         _run(engine.dispose())
 
 
+@celery_app.task(name="katalon.reconciliation_job")
+def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
+    """Layer 3 safety net (#214): compare DB vs. ES counts and self-heal.
+
+    mode="count": fast DB-vs-ES count comparison; if the delta exceeds the
+    configured threshold, falls through to an ID-diff for that type.
+    mode="id_diff": always determines concrete missing IDs and reindexes them.
+
+    `force=True` (manual trigger) bypasses the `reconciliation_enabled` toggle —
+    that toggle only governs the scheduled background runs.
+    """
+    from sqlalchemy import func, select
+
+    from katalon.core.models import AdminConfig, Entity, Object, Occurrence, Place
+    from katalon.integrations.elasticsearch import count_by_type, list_ids_by_type
+
+    _MODEL_MAP: dict = {
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+    }
+
+    AsyncSessionLocal, engine = _make_session()
+
+    async def _do() -> dict:
+        async with AsyncSessionLocal() as session:
+            cfg_stmt = select(AdminConfig).where(AdminConfig.key == "default")
+            config = (await session.execute(cfg_stmt)).scalar_one_or_none()
+            if config and not config.reconciliation_enabled and not force:
+                return {"status": "skipped", "reason": "reconciliation_disabled"}
+            threshold = config.reconciliation_threshold if config else 5
+            id_diff_enabled = config.reconciliation_id_diff_enabled if config else True
+
+            report: dict[str, dict] = {}
+            for record_type, model in _MODEL_MAP.items():
+                count_stmt = select(func.count()).select_from(model)
+                db_count = (await session.execute(count_stmt)).scalar_one()
+                es_count = await count_by_type(record_type)
+                delta = db_count - es_count
+                entry = {"db": db_count, "es": es_count, "delta": delta, "reindexed": 0}
+
+                run_id_diff = id_diff_enabled and (mode == "id_diff" or abs(delta) > threshold)
+                if run_id_diff:
+                    db_ids = set(str(r[0]) for r in (await session.execute(select(model.id))).all())
+                    es_ids = await list_ids_by_type(record_type)
+                    missing = db_ids - es_ids
+                    stale = es_ids - db_ids
+                    for record_id in missing:
+                        index_record_dispatch_task.delay(record_type, record_id)
+                    for stale_id in stale:
+                        remove_record_task.delay(stale_id)
+                    entry["reindexed"] = len(missing)
+                    entry["removed"] = len(stale)
+                    entry["mode"] = "id_diff"
+                else:
+                    entry["mode"] = "count"
+                report[record_type] = entry
+        return report
+
+    try:
+        return _run(_do())
+    finally:
+        _run(engine.dispose())
+
+
+@celery_app.task(name="katalon.index_record_dispatch")
+def index_record_dispatch_task(record_type: str, record_id: str) -> None:
+    """Build index doc for one record and dispatch indexing (used by reconciliation)."""
+    import uuid as _uuid_mod
+
+    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.services.search_service import build_index_doc
+
+    _MODEL_MAP: dict = {
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+    }
+    model = _MODEL_MAP.get(record_type)
+    if model is None:
+        return
+
+    AsyncSessionLocal, engine = _make_session()
+
+    async def _do() -> dict | None:
+        async with AsyncSessionLocal() as session:
+            rec = await session.get(model, _uuid_mod.UUID(record_id))
+            if not rec:
+                return None
+            return await build_index_doc(record_type, rec, session)
+
+    try:
+        doc = _run(_do())
+    finally:
+        _run(engine.dispose())
+
+    if doc is not None:
+        index_record_task.delay(record_type, record_id, doc)
+
+
 @celery_app.task(name="katalon.reindex_all")
 def reindex_all_task() -> None:
     """Full reindex – reads all records from DB and pushes to ES directly."""

@@ -103,6 +103,39 @@ async def index_document(doc_id: str, body: dict[str, Any]) -> None:
     await es.index(index=INDEX_NAME, id=doc_id, body=body, refresh=True)
 
 
+async def count_by_type(record_type: str) -> int:
+    es = get_es()
+    query = {"query": {"term": {"record_type": record_type}}}
+    try:
+        resp = await es.count(index=INDEX_NAME, body=query)
+    except NotFoundError:
+        return 0
+    return int(resp["count"])
+
+
+async def list_ids_by_type(record_type: str, *, batch_size: int = 1000) -> set[str]:
+    """Return all document IDs for a record type via scroll/PIT-free pagination."""
+    es = get_es()
+    ids: set[str] = set()
+    query = {"query": {"term": {"record_type": record_type}}, "_source": False, "size": batch_size}
+    try:
+        resp = await es.search(index=INDEX_NAME, body=query, scroll="2m")
+    except NotFoundError:
+        return ids
+    scroll_id = resp.get("_scroll_id")
+    hits = resp["hits"]["hits"]
+    try:
+        while hits:
+            ids.update(hit["_id"] for hit in hits)
+            resp = await es.scroll(scroll_id=scroll_id, scroll="2m")
+            scroll_id = resp.get("_scroll_id")
+            hits = resp["hits"]["hits"]
+    finally:
+        if scroll_id:
+            await es.clear_scroll(scroll_id=scroll_id)
+    return ids
+
+
 async def delete_document(doc_id: str) -> None:
     es = get_es()
     try:

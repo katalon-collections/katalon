@@ -11,6 +11,9 @@ router = APIRouter(prefix="/admin/config", tags=["admin"])
 class AdminConfigRead(BaseModel):
     idno_schemas: dict[str, str]
     idno_patterns: dict[str, str]
+    reconciliation_enabled: bool
+    reconciliation_threshold: int
+    reconciliation_id_diff_enabled: bool
 
     class Config:
         from_attributes = True
@@ -19,6 +22,9 @@ class AdminConfigRead(BaseModel):
 class AdminConfigUpdate(BaseModel):
     idno_schemas: dict[str, str] | None = None
     idno_patterns: dict[str, str] | None = None
+    reconciliation_enabled: bool | None = None
+    reconciliation_threshold: int | None = None
+    reconciliation_id_diff_enabled: bool | None = None
 
 
 async def _get_or_create(db: DBDep) -> AdminConfig:
@@ -45,5 +51,11 @@ async def update_admin_config(
         config.idno_schemas = data.idno_schemas
     if data.idno_patterns is not None:
         config.idno_patterns = data.idno_patterns
+    if data.reconciliation_enabled is not None:
+        config.reconciliation_enabled = data.reconciliation_enabled
+    if data.reconciliation_threshold is not None:
+        config.reconciliation_threshold = data.reconciliation_threshold
+    if data.reconciliation_id_diff_enabled is not None:
+        config.reconciliation_id_diff_enabled = data.reconciliation_id_diff_enabled
     await db.flush()
     return config

@@ -446,6 +446,9 @@ class AdminConfig(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True, default="default")
     idno_schemas: Mapped[dict] = mapped_column(JSONB, default=dict)   # {"object": "ulb_x_{counter:05d}", …}
     idno_patterns: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"object": "^ulb_x_\\d{5}$", …}
+    reconciliation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    reconciliation_threshold: Mapped[int] = mapped_column(Integer, default=5)
+    reconciliation_id_diff_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

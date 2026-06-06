@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { req, BASE, apiKeys, users, schema, adminConfig } from '../../api/client'
+import type { AdminConfigRead } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead } from '../../types'
 
 interface Props {
@@ -450,6 +451,154 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 // Suche section
 // ---------------------------------------------------------------------------
 
+type IndexHealthEntry = { db: number; es: number; delta: number }
+type IndexHealth = { types: Record<string, IndexHealthEntry> }
+
+function IndexHealthWidget() {
+  const [health, setHealth] = useState<IndexHealth | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [running, setRunning] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [cfg, setCfg] = useState<Pick<AdminConfigRead, 'reconciliation_enabled' | 'reconciliation_threshold' | 'reconciliation_id_diff_enabled'> | null>(null)
+  const [cfgSaving, setCfgSaving] = useState(false)
+
+  async function load() {
+    setLoading(true); setError(null)
+    try {
+      const data = await req<IndexHealth>(`${BASE}/v1/admin/index-health`)
+      setHealth(data)
+    } catch (e) { setError((e as Error).message) }
+    finally { setLoading(false) }
+  }
+
+  async function loadCfg() {
+    try {
+      const c = await adminConfig.get()
+      setCfg({
+        reconciliation_enabled: c.reconciliation_enabled,
+        reconciliation_threshold: c.reconciliation_threshold,
+        reconciliation_id_diff_enabled: c.reconciliation_id_diff_enabled,
+      })
+    } catch { /* ignore — widget still shows counts without config controls */ }
+  }
+
+  useEffect(() => { load(); loadCfg() }, [])
+
+  async function saveCfg(patch: Partial<AdminConfigRead>) {
+    if (!cfg) return
+    const next = { ...cfg, ...patch }
+    setCfg(next)
+    setCfgSaving(true)
+    try {
+      await adminConfig.update(patch)
+    } catch (e) { setMsg(`Fehler beim Speichern: ${(e as Error).message}`) }
+    finally { setCfgSaving(false) }
+  }
+
+  async function handleReconcile(mode: 'count' | 'id_diff') {
+    setRunning(mode); setMsg(null)
+    try {
+      await req(`${BASE}/v1/admin/index-health/reconcile?mode=${mode}`, { method: 'POST' })
+      setMsg('Abgleich gestartet — läuft im Hintergrund. Aktualisieren Sie die Seite in Kürze, um das Ergebnis zu sehen.')
+      setTimeout(() => setMsg(null), 8000)
+    } catch (e) { setMsg(`Fehler: ${(e as Error).message}`) }
+    finally { setRunning(null) }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="hd">Index-Status</div>
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+          Vergleich der Datensatzanzahl zwischen Datenbank und Suchindex (#214). Abweichungen werden
+          täglich automatisch geprüft und ab dem konfigurierten Schwellenwert nachindiziert.
+        </p>
+        {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 10 }}>{error}</div>}
+        {msg && (
+          <div style={{ fontSize: 12, color: msg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
+            {msg}
+          </div>
+        )}
+        {loading && <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>Lädt…</p>}
+        {!loading && health && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '4px 8px' }}>Typ</th>
+                <th style={{ padding: '4px 8px', textAlign: 'right' }}>DB</th>
+                <th style={{ padding: '4px 8px', textAlign: 'right' }}>ES</th>
+                <th style={{ padding: '4px 8px', textAlign: 'right' }}>Abweichung</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RECORD_TYPES.map(({ key, label }) => {
+                const entry = health.types[key]
+                if (!entry) return null
+                const ok = entry.delta === 0
+                return (
+                  <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '4px 8px' }}>{label}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.db}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.es}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', color: ok ? '#166534' : '#dc2626' }}>
+                      {ok ? '✓ OK' : `⚠ ${entry.delta > 0 ? '+' : ''}${entry.delta}`}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginBottom: cfg ? 16 : 0 }}>
+          <button className="btn sm gh" onClick={load} disabled={loading}>Aktualisieren</button>
+          <button className="btn sm gh" onClick={() => handleReconcile('count')} disabled={running !== null}>
+            {running === 'count' ? 'Läuft…' : 'Zählung prüfen'}
+          </button>
+          <button className="btn sm pri" onClick={() => handleReconcile('id_diff')} disabled={running !== null}>
+            {running === 'id_diff' ? 'Läuft…' : 'ID-Diff ausführen'}
+          </button>
+        </div>
+        {cfg && (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <div className="lbl" style={{ marginBottom: 8 }}>Automatischer Abgleich (Celery Beat)</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
+              <input
+                type="checkbox"
+                checked={cfg.reconciliation_enabled}
+                disabled={cfgSaving}
+                onChange={e => saveCfg({ reconciliation_enabled: e.target.checked })}
+              />
+              Tägliche Zählungs-Prüfung aktiv (3 Uhr)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
+              <input
+                type="checkbox"
+                checked={cfg.reconciliation_id_diff_enabled}
+                disabled={cfgSaving}
+                onChange={e => saveCfg({ reconciliation_id_diff_enabled: e.target.checked })}
+              />
+              Wöchentlicher ID-Diff aktiv (sonntags, 4 Uhr)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              Schwellenwert für automatischen ID-Diff (Abweichung)
+              <input
+                type="number"
+                min={0}
+                className="fld mono"
+                style={{ width: 80 }}
+                value={cfg.reconciliation_threshold}
+                disabled={cfgSaving}
+                onChange={e => saveCfg({ reconciliation_threshold: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SectionSuche() {
   const [reindexing, setReindexing] = useState<string | null>(null)
   const [reindexMsg, setReindexMsg] = useState<string | null>(null)
@@ -468,6 +617,8 @@ function SectionSuche() {
   }
 
   return (
+    <>
+    <IndexHealthWidget />
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="hd">Suche &amp; Indexierung</div>
       <div className="bd">
@@ -492,6 +643,7 @@ function SectionSuche() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 

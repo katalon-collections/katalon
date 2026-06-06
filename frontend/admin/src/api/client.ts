@@ -587,6 +587,9 @@ export const bannersApi = {
 export interface AdminConfigRead {
   idno_schemas: Record<string, string>
   idno_patterns: Record<string, string>
+  reconciliation_enabled: boolean
+  reconciliation_threshold: number
+  reconciliation_id_diff_enabled: boolean
 }
 
 export const adminConfig = {
