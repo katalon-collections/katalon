@@ -75,11 +75,20 @@ def _detect_delimiter(text: str) -> str:
         return ","
 
 
+def _decode_csv(content: bytes) -> str:
+    for enc in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return content.decode(enc, errors="strict")
+        except (UnicodeDecodeError, ValueError):
+            continue
+    return content.decode("utf-8-sig", errors="replace")
+
+
 def parse_csv_terms(
     content: bytes,
     mapping: dict[str, str],
 ) -> tuple[list[ImportTerm], list[dict[str, Any]]]:
-    text = content.decode("utf-8-sig", errors="replace")
+    text = _decode_csv(content)
     reader = csv.DictReader(io.StringIO(text), delimiter=_detect_delimiter(text))
     terms: dict[str, ImportTerm] = {}
     errors: list[dict[str, Any]] = []
@@ -127,7 +136,7 @@ def parse_csv_terms(
 
 def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, Any]]]:
     try:
-        payload = json.loads(content.decode("utf-8-sig", errors="replace"))
+        payload = json.loads(_decode_csv(content))
     except json.JSONDecodeError as exc:
         return [], [{"row": None, "message": f"Ungültiges JSON: {exc.msg}"}]
 

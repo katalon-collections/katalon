@@ -36,11 +36,14 @@ async def _es_search_for_oai(
     filters: list[dict] = []
 
     if identifier:
-        # GetRecord: fetch by exact ES _id
+        # GetRecord: fetch by exact ES _id, then enforce public status
         result = await es.get(index=INDEX_NAME, id=identifier, ignore=[404])
-        if result.get("found"):
+        if result.get("found") and result.get("_source", {}).get("status") == "public":
             return {"hits": {"hits": [result], "total": {"value": 1}}, "aggregations": {}}
         return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
+
+    # Always restrict OAI-PMH to public records
+    filters.append({"term": {"status": "public"}})
 
     if set_def:
         if set_def.filter_record_type:
