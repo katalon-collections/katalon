@@ -4,7 +4,12 @@ import type { Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
 
-export function ScreenVocab() {
+interface ScreenVocabProps {
+  initialVocab?: string | null
+  onVocabSelect?: (name: string) => void
+}
+
+export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [terms, setTerms] = useState<VocabularyTerm[]>([])
   const [activeVocab, setActiveVocab] = useState<string | null>(null)
@@ -106,12 +111,13 @@ export function ScreenVocab() {
       .then(data => {
         setVocabs(data)
         if (data.length > 0 && !activeVocab) {
-          setActiveVocab(data[0].id)
+          const target = initialVocab ? data.find(v => v.name === initialVocab) : null
+          setActiveVocab(target ? target.id : data[0].id)
         }
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [activeVocab])
+  }, [activeVocab, initialVocab])
 
   useEffect(() => { loadVocabs() }, [])
 
@@ -133,6 +139,7 @@ export function ScreenVocab() {
       const v = await vocabularies.create({ name: newVocabName.trim(), is_hierarchical: newVocabHierarchical })
       setVocabs(prev => [...prev, v])
       setActiveVocab(v.id)
+      onVocabSelect?.(v.name)
       setNewVocabName('')
       setNewVocabHierarchical(false)
       setShowNewVocab(false)
@@ -274,7 +281,7 @@ export function ScreenVocab() {
         <div className="vocab-tree">
           {vocabs.map(v => (
             <div key={v.id}>
-              <div className={`tree-it${activeVocab === v.id ? ' active' : ''}`} onClick={() => setActiveVocab(v.id)}>
+              <div className={`tree-it${activeVocab === v.id ? ' active' : ''}`} onClick={() => { setActiveVocab(v.id); onVocabSelect?.(v.name) }}>
                 <span className="caret">
                   {v.is_hierarchical ? <ChevD size={12} /> : null}
                 </span>

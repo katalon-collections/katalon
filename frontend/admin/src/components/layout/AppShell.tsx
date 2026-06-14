@@ -123,7 +123,7 @@ export function AppShell() {
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />
-      case 'vocab':             return <ScreenVocab />
+      case 'vocab':             return <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} />
       case 'pages':             return <ScreenPages />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return <ScreenImporter />
