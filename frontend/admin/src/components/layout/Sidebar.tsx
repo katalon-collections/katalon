@@ -1,3 +1,4 @@
+import pkg from '../../../package.json'
 import { getTokenUser } from '../../api/client'
 import { Bell, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 import { Search } from '../ui/Icons'
@@ -74,6 +75,8 @@ export function Sidebar({ route, setRoute, onLogout }: Props) {
           )
         })}
       </nav>
+
+      <div className="sb-ver">v{pkg.version}</div>
 
       <div className="sb-foot">
         <div className="sb-av">{initials}</div>
