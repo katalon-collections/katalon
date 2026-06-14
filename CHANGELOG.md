@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-14
+
+### Fixed
+- Login error now shows "Falsche E-Mail oder Passwort." instead of "Sitzung abgelaufen"
+
+### Added
+- README: first-run credentials documented
+
 ## [0.1.1] - 2026-06-14
 
 ### Added
