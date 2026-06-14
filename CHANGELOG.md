@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-14
+
+### Added
+- Semantic versioning rule in AGENTS.md — patch bump on every commit
+- Version number displayed in admin sidebar (bottom left)
+
+### Fixed
+- List view: `[object Object]` for vocab-strict and relation fields in table columns
+- List view: action column (Edit/Delete) sticky-right, always visible on wide tables
+
 ## [0.1.0] - 2026-06-14
 
 Initial release for internal testing.

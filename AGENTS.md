@@ -173,6 +173,22 @@ Prefer these tools over grep/find for code exploration:
 
 Always use CodeGraph before falling back to grep or sequential file reads.
 
+## Versionierung
+
+Katalon verwendet Semantic Versioning (`MAJOR.MINOR.PATCH`).
+
+**Regel: Mit jedem Commit die Patch-Version hochziehen** (`0.1.0` → `0.1.1` → `0.1.2` …).
+
+Dazu bei jedem Commit:
+1. `backend/pyproject.toml` — `version = "x.y.z"`
+2. `frontend/admin/package.json` — `"version": "x.y.z"`
+3. `frontend/portal/package.json` — `"version": "x.y.z"`
+4. `CHANGELOG.md` — neuen Eintrag unter `[Unreleased]` oder neuen `[x.y.z]`-Block
+5. Nach dem Commit: `git tag vx.y.z && git push origin vx.y.z`
+
+**Minor-Bump** (`0.1.x` → `0.2.0`): neue Features oder abgeschlossene Phase → kurz informieren, Karl entscheidet.
+**Major-Bump** (`0.x.y` → `1.0.0`): erster öffentlicher Release → explizite Absprache.
+
 ## Nächster logischer Schritt
 
 Siehe `.agents/IMPLEMENTIERUNGSPLAN.md` für aktuelle Prioritäten.
