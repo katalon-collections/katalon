@@ -159,7 +159,16 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 ## Debugging
 
-- Wenn ich Fehler berichte, schau immer in die Logs der entsorechenden Container statt Annahmen zu treffen.
+- Wenn ich Fehler berichte, schau immer in die Logs der entsprechenden Container statt Annahmen zu treffen.
+
+## Datensicherheit – ABSOLUTE VERBOTE
+
+**NIEMALS die Datenbank-Volumes löschen, neu erstellen oder `docker compose down -v` ausführen ohne explizite Bestätigung von Karl.** Das gilt auch dann, wenn es als schnelle Lösung erscheint (z. B. bei Passwort-Konflikten, Schema-Problemen oder Container-Fehlern). Datenverlust ist irreversibel.
+
+Stattdessen bei DB-Problemen:
+1. Logs lesen, Root Cause verstehen
+2. Karl informieren und Optionen vorlegen
+3. Erst nach ausdrücklicher Freigabe handeln
 
 ## Code Navigation
 

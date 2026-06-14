@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-14
+
+### Fixed
+- docker-compose.yml: alle Credentials und Konfigurationswerte nutzen jetzt `${VAR}`-Substitution aus `.env` (kein Hardcoding mehr)
+- DB-Healthcheck referenziert jetzt `${POSTGRES_USER}` statt hartem Wert
+
+### Added
+- AGENTS.md: Regel "Datensicherheit – ABSOLUTE VERBOTE" — DB-Volumes niemals ohne explizite Bestätigung löschen
+
 ## [0.1.2] - 2026-06-14
 
 ### Fixed

@@ -2,13 +2,13 @@ services:
   db:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: katalon
-      POSTGRES_PASSWORD: katalon
-      POSTGRES_DB: katalon
+      POSTGRES_USER: ${POSTGRES_USER:-katalon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-katalon}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U katalon" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-katalon}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -55,18 +55,21 @@ services:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
-      REDIS_URL: redis://redis:6379/0
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      CANTALOUPE_URL: http://cantaloupe:8182
-      # Public URL used in IIIF manifests — must be reachable from browsers.
-      # Change to your domain for production (e.g. https://example.com).
-      CANTALOUPE_PUBLIC_URL: http://localhost
-      SECRET_KEY: change-me-in-production
-      DEBUG: "true"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG:-false}
       MEDIA_ROOT: /var/lib/katalon/media
       KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
+      OAI_ADMIN_EMAIL: ${OAI_ADMIN_EMAIL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
@@ -88,12 +91,13 @@ services:
       context: ./backend
       dockerfile: ../docker/Dockerfile.worker
     environment:
-      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
-      REDIS_URL: redis://redis:6379/0
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      CANTALOUPE_URL: http://cantaloupe:8182
-      CANTALOUPE_PUBLIC_URL: http://localhost
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       MEDIA_ROOT: /var/lib/katalon/media
+      SECRET_KEY: ${SECRET_KEY}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
@@ -108,12 +112,13 @@ services:
       dockerfile: ../docker/Dockerfile.worker
     command: ["celery", "-A", "katalon.workers.celery_app", "beat", "--loglevel=info"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://katalon:katalon@db:5432/katalon
-      REDIS_URL: redis://redis:6379/0
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      CANTALOUPE_URL: http://cantaloupe:8182
-      CANTALOUPE_PUBLIC_URL: http://localhost
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       MEDIA_ROOT: /var/lib/katalon/media
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy

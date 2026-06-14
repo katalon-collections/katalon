@@ -33,7 +33,10 @@
       "Bash(ls -d */frontend)",
       "Bash(ls frontend *)",
       "Bash(find . -maxdepth 2 -name \"package.json\" -not -path \"*/node_modules/*\")",
-      "Bash(awk -F: '{print $1}')"
+      "Bash(awk -F: '{print $1}')",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)"
     ]
   }
 }
