@@ -143,7 +143,7 @@ textarea.fld { height: auto; padding: 8px 10px; line-height: 1.5; resize: vertic
 .search .ic { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--fg-4); pointer-events: none; }
 
 /* Table */
-.tw { margin: 14px 24px 24px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tw { margin: 14px 24px 24px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
 .tw.flush { margin: 0; border: 0; border-radius: 0; }
 table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .tbl th { text-align: left; font-weight: 500; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-3); padding: 0 12px; height: 34px; background: var(--panel-2); border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0; z-index: 1; user-select: none; }
@@ -153,7 +153,9 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .tbl tbody tr.sel td { background: var(--accent-50); }
 .tbl .col-ck { width: 34px; padding-right: 0; }
 .tbl .col-thumb { width: 46px; padding-right: 0; }
-.tbl .col-act { width: 60px; text-align: right; overflow: visible; }
+.tbl .col-act { width: 60px; text-align: right; overflow: visible; position: sticky; right: 0; background: var(--panel); z-index: 2; }
+.tbl tbody tr:hover .col-act { background: var(--panel-2); }
+.tbl tbody tr.sel .col-act { background: var(--accent-50); }
 .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-2); }
 .tbl .mono { font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-2); }
 .tbl .tt { font-weight: 500; color: var(--fg); }

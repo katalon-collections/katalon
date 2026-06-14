@@ -45,10 +45,11 @@ function getFieldValue(metadata: Record<string, unknown>, fieldName: string): st
   if (Array.isArray(val) && val.length > 0) {
     const first = val[0]
     if (typeof first === 'string') return first
-    if (first && typeof first === 'object' && 'value' in first) {
-      return String((first as { value?: unknown }).value ?? '')
+    if (first && typeof first === 'object') {
+      if ('value' in first) return String((first as { value?: unknown }).value ?? '')
+      if ('label' in first) return String((first as { label?: unknown }).label ?? '')
     }
-    return String(first ?? '')
+    return ''
   }
   return String(val)
 }
