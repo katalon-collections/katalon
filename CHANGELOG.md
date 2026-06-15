@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-06-15
+
+### Fixed
+- Admin ScreenForm: Pflichtfeld-Fehler bei `vocab`, `vocab_free`, `authority`, `relation`, `group`, `pid` und `richtext`-Feldern wurden nicht visuell angezeigt — Fehlermeldung erscheint jetzt einheitlich unter allen Feldtypen
+- Admin ScreenForm: `console.log` bei Validierungsfehlern hinzugefügt für einfacheres Debugging
+
 ## [0.1.10] - 2026-06-15
 
 ### Fixed

@@ -1164,6 +1164,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setError(null)
     const fieldErrors = validateFields()
     if (Object.keys(fieldErrors).length > 0) {
+      console.log('[Katalon] Validierungsfehler beim Speichern:', fieldErrors)
       setFieldErrors(fieldErrors)
       setSaving(false)
       setError('Bitte korrigieren Sie die markierten Felder.')
@@ -1655,12 +1656,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <Plus size={12} /> Weiteren Wert
                           </button>
                         </>
-                      ) : f.field_type === 'richtext' ? (
-                        <textarea className="fld" rows={4}
-                          value={(val as string) ?? ''}
-                          onChange={e => setField(f.name, e.target.value)}
-                          placeholder={getLabel(f, f.name)}
-                          disabled={justCreated} />
                       ) : f.field_type === 'boolean' ? (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <input type="checkbox" className="ck"
@@ -1670,62 +1665,57 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
                       ) : f.field_type === 'date' ? (
-                        <>
-                          <input className="fld"
-                            type="text"
-                            value={(val as string) ?? ''}
-                            onChange={e => {
-                              setField(f.name, e.target.value)
-                              if (fieldErrors[f.name]) {
-                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                              }
-                            }}
-                            onBlur={() => handleFieldBlur(f)}
-                            placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
-                            disabled={justCreated}
-                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
-                          {fieldErrors[f.name] && (
-                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
-                          )}
-                        </>
+                        <input className="fld"
+                          type="text"
+                          value={(val as string) ?? ''}
+                          onChange={e => {
+                            setField(f.name, e.target.value)
+                            if (fieldErrors[f.name]) {
+                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                            }
+                          }}
+                          onBlur={() => handleFieldBlur(f)}
+                          placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
+                          disabled={justCreated}
+                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
                       ) : f.field_type === 'number' ? (
-                        <>
-                          <input className="fld"
-                            type="number"
-                            step="any"
-                            value={(val as string) ?? ''}
-                            onChange={e => {
-                              setField(f.name, e.target.value)
-                              if (fieldErrors[f.name]) {
-                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                              }
-                            }}
-                            onBlur={() => handleFieldBlur(f)}
-                            placeholder={getLabel(f, f.name)}
-                            disabled={justCreated}
-                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
-                          {fieldErrors[f.name] && (
-                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
-                          )}
-                        </>
+                        <input className="fld"
+                          type="number"
+                          step="any"
+                          value={(val as string) ?? ''}
+                          onChange={e => {
+                            setField(f.name, e.target.value)
+                            if (fieldErrors[f.name]) {
+                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                            }
+                          }}
+                          onBlur={() => handleFieldBlur(f)}
+                          placeholder={getLabel(f, f.name)}
+                          disabled={justCreated}
+                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                      ) : f.field_type === 'richtext' ? (
+                        <textarea className="fld" rows={4}
+                          value={(val as string) ?? ''}
+                          onChange={e => setField(f.name, e.target.value)}
+                          placeholder={getLabel(f, f.name)}
+                          disabled={justCreated}
+                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
                       ) : (
-                        <>
-                          <input className="fld"
-                            value={(val as string) ?? ''}
-                            onChange={e => {
-                              setField(f.name, e.target.value)
-                              if (fieldErrors[f.name]) {
-                                setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                              }
-                            }}
-                            onBlur={() => handleFieldBlur(f)}
-                            placeholder={getLabel(f, f.name)}
-                            disabled={justCreated}
-                            style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
-                          {fieldErrors[f.name] && (
-                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
-                          )}
-                        </>
+                        <input className="fld"
+                          value={(val as string) ?? ''}
+                          onChange={e => {
+                            setField(f.name, e.target.value)
+                            if (fieldErrors[f.name]) {
+                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
+                            }
+                          }}
+                          onBlur={() => handleFieldBlur(f)}
+                          placeholder={getLabel(f, f.name)}
+                          disabled={justCreated}
+                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                      )}
+                      {fieldErrors[f.name] && (
+                        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
                       )}
                     </div>
                   )
