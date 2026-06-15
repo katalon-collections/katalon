@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { req, getTokenUser } from '../../api/client'
 import { Help, X } from '../ui/Icons'
 
@@ -25,13 +25,6 @@ export function FeedbackButton() {
   const [error, setError] = useState<string | null>(null)
   const user = getTokenUser()
 
-  const context = useMemo(() => ({
-    url: window.location.href,
-    user: user?.email || 'unbekannt',
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-    time: new Date().toLocaleString('de-DE'),
-  }), [open])
-
   if (!feedbackEnabled) return null
 
   async function send() {
@@ -43,10 +36,10 @@ export function FeedbackButton() {
         method: 'POST',
         body: JSON.stringify({
           message: message.trim(),
-          url: context.url,
-          user: context.user,
-          viewport: context.viewport,
-          time: context.time,
+          url: window.location.href,
+          user: user?.email || 'unbekannt',
+          viewport: `${window.innerWidth}x${window.innerHeight}`,
+          time: new Date().toLocaleString('de-DE'),
         }),
       })
       setSent(true)
