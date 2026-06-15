@@ -132,7 +132,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.admin
       args:
-        VITE_ADMIN_FEEDBACK_EMAIL: ${VITE_ADMIN_FEEDBACK_EMAIL:-}
+        VITE_ADMIN_FEEDBACK_ENABLED: ${VITE_ADMIN_FEEDBACK_ENABLED:-}
     ports:
       - "3000:80"
     healthcheck:
@@ -153,7 +153,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.portal
       args:
-        VITE_PORTAL_FEEDBACK_EMAIL: ${VITE_PORTAL_FEEDBACK_EMAIL:-}
+        VITE_PORTAL_FEEDBACK_ENABLED: ${VITE_PORTAL_FEEDBACK_ENABLED:-}
     ports:
       - "3001:80"
     healthcheck:

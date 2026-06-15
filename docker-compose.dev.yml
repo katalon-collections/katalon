@@ -76,7 +76,7 @@ services:
       - VITE_API_URL=
       - API_PROXY_TARGET=http://api:8000
       - VITE_PORTAL_URL=http://localhost:4001
-      - VITE_ADMIN_FEEDBACK_EMAIL=${VITE_ADMIN_FEEDBACK_EMAIL:-}
+      - VITE_ADMIN_FEEDBACK_ENABLED=${VITE_ADMIN_FEEDBACK_ENABLED:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
       interval: 10s

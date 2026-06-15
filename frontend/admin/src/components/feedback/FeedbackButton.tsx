@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { req, getTokenUser } from '../../api/client'
 import { Help, X } from '../ui/Icons'
 
-const feedbackEnabled = Boolean(import.meta.env.VITE_ADMIN_FEEDBACK_EMAIL?.trim())
+const feedbackEnabled = Boolean(import.meta.env.VITE_ADMIN_FEEDBACK_ENABLED?.trim())
 
 const panel = {
   position: 'fixed',

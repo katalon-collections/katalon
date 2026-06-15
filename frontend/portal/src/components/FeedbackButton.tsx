@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const feedbackEnabled = Boolean(import.meta.env.VITE_PORTAL_FEEDBACK_EMAIL?.trim())
+const feedbackEnabled = Boolean(import.meta.env.VITE_PORTAL_FEEDBACK_ENABLED?.trim())
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
