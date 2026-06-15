@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-06-15
+
+### Fixed
+- IIIF: `CANTALOUPE_BASE_URI` nutzt jetzt `${CANTALOUPE_PUBLIC_URL}` statt hartkodiertem `http://localhost/iiif` — verhindert falsche `http://`-URLs und doppelten `/iiif/iiif/`-Pfad in `info.json` hinter Reverse Proxy
+- IIIF: Manifest-`id` und Canvas-IDs verwenden jetzt `katalon_base_url` statt `str(request.url)`, sodass auch hinter TLS-terminierenden Proxies `https://`-URLs erzeugt werden
+- Nginx: `X-Forwarded-Proto`-Header wird jetzt an das Backend weitergeleitet (für `/v1/` und `/api/`)
+
 ## [0.1.14] - 2026-06-15
 
 ### Changed

@@ -294,8 +294,8 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> di
     field_defs = field_result.scalars().all()
 
     media_items = [(Path(m.file_path).name, m.iiif_manifest) for m in media_files]
-    manifest_id = str(request.url)
     portal_url = settings.katalon_base_url.rstrip("/")
+    manifest_id = f"{portal_url}{request.url.path}" if portal_url else str(request.url)
     homepage_url = f"{portal_url}/objects/{object_id}" if portal_url else None
 
     return build_object_manifest(
