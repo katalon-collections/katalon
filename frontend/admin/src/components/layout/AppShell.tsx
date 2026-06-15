@@ -16,6 +16,7 @@ import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { BannerBar } from '../ui/BannerBar'
+import { FeedbackButton } from '../feedback/FeedbackButton'
 
 type Crumb = { label: string; route?: string }
 
@@ -142,6 +143,7 @@ export function AppShell() {
         <BannerBar surface="admin" />
         {renderScreen()}
       </div>
+      <FeedbackButton />
     </div>
   )
 }
