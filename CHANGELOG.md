@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-06-15
+
+### Fixed
+- Admin: Beziehungen-Tab zeigt jetzt den echten Datensatz-Namen (z. B. "Electronic Arts") statt dem Fallback `idno` — Entitätsnamen aus `metadata.label` werden korrekt erkannt (spiegelt Backend-Logik `_extract_title`)
+
+### Added
+- Admin: Datensatz-Titel im Beziehungen-Tab ist jetzt anklickbar und navigiert direkt ins Bearbeitungsformular des verknüpften Eintrags
+
 ## [0.1.15] - 2026-06-15
 
 ### Fixed

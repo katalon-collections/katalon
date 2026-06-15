@@ -5,6 +5,20 @@ import type { AnyRecord, AuditEntry, FieldDefinition, RecordSubtype, RecordType,
 import { getLabel } from '../../types'
 import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit } from '../ui/Icons'
 
+function extractTitle(m: Record<string, unknown>, fallback: string): string {
+  for (const key of ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']) {
+    const val = m[key]
+    if (!val) continue
+    if (typeof val === 'string') return val
+    if (Array.isArray(val) && val.length > 0) {
+      const first = val[0]
+      if (typeof first === 'string') return first
+      if (first && typeof first === 'object') return String((first as Record<string, unknown>).value ?? (first as Record<string, unknown>).label ?? '') || fallback
+    }
+  }
+  return fallback
+}
+
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 
@@ -17,6 +31,17 @@ const TYPE_LABELS: Record<RecordType, string> = {
   entity:     'Entität',
   place:      'Ort',
   occurrence: 'Occurrence',
+}
+
+const TYPE_ROUTES: Record<string, string> = {
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form',
+}
+
+function navigateToRecord(type: string, id: string) {
+  const route = TYPE_ROUTES[type]
+  if (!route) return
+  window.history.pushState({ route, editId: id }, '', `#${route}/${id}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
@@ -670,7 +695,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         try {
           const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
           const m = rec.metadata_ as Record<string, unknown>
-          titleMap[key] = String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? targetId)
+          titleMap[key] = extractTitle(m, (rec as { idno?: string | null }).idno ?? targetId.slice(0, 8) + '…')
         } catch {
           titleMap[key] = targetId.slice(0, 8) + '…'
         }
@@ -722,7 +747,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             setLat(p.lat != null ? String(p.lat) : '')
             setLon(p.lon != null ? String(p.lon) : '')
           }
-          setTitle(String(m.title ?? m.name ?? (rec as { idno?: string | null }).idno ?? rec.id))
+          setTitle(extractTitle(m, (rec as { idno?: string | null }).idno ?? rec.id))
         }
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
@@ -1863,7 +1888,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 </span>
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
                                   <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
-                                  {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
+                                  <a
+                                    href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`}
+                                    onClick={e => { e.preventDefault(); navigateToRecord(targetType, targetId) }}
+                                    style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
+                                    onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                                    onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+                                  >
+                                    {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
+                                  </a>
                                 </span>
                                 <div style={{ display: 'flex', gap: 4 }}>
                                   <button className="btn sm ico gh dn" onClick={() => openEditRelation(r)} title="Bearbeiten"><Edit size={11} /></button>
