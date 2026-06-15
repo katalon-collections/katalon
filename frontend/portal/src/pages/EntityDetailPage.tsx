@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { marked } from 'marked'
 import { api, fetchRecordTitle, type EntitySummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
@@ -80,7 +81,13 @@ export function EntityDetailPage() {
   const typeLabel = ENTITY_TYPE_LABELS[entity.entity_type] ?? entity.entity_type
   const description = String(m.description ?? '')
 
-  const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
+  const allVisibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
+  const bodyFields = allVisibleFields.filter(f => {
+    if (f.field_type === 'relation' || f.field_type === 'authority' || f.field_type === 'pid') return false
+    const rendered = renderFieldValue(m[f.name])
+    return rendered !== null && rendered.length > 100
+  })
+  const sidebarFields = allVisibleFields.filter(f => !bodyFields.includes(f))
 
   return (
     <div className="container page">
@@ -115,10 +122,29 @@ export function EntityDetailPage() {
       <div className="detail-layout">
         <div>
           {m.description != null && (
-            <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}>
-              {String(m.description)}
-            </div>
+            <div
+              className="prose"
+              style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}
+              dangerouslySetInnerHTML={{ __html: marked.parse(String(m.description)) as string }}
+            />
           )}
+
+          {bodyFields.map(f => {
+            const rendered = renderFieldValue(m[f.name])
+            if (!rendered) return null
+            return (
+              <div key={f.name} style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
+                  {f.label?.de ?? f.label?.en ?? f.name}
+                </div>
+                <div
+                  className="prose"
+                  style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}
+                  dangerouslySetInnerHTML={{ __html: marked.parse(rendered) as string }}
+                />
+              </div>
+            )
+          })}
 
           {linkedObjects.length > 0 && (
             <section style={{ marginTop: 8 }}>
@@ -156,7 +182,7 @@ export function EntityDetailPage() {
         </div>
 
         <aside className="detail-meta">
-          {visibleFields.map(f => {
+          {sidebarFields.map(f => {
             const rawValue = m[f.name]
             if (f.field_type === 'relation') {
               return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />

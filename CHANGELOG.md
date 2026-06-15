@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-06-15
+
+### Fixed
+- Portal: Entitäts-Links aus `RelationsList` nutzten `/entitys/` (Tippfehler) statt `/entities/` — Entitäts-Detailseiten waren nicht erreichbar
+- Portal: Lange Textfelder (z. B. Beschreibung) aus `field_definitions` werden nun in der Hauptspalte mit Markdown-Rendering dargestellt statt als Rohtext in der schmalen Sidebar (gilt für Occurrence- und Entity-Detailseiten)
+
 ## [0.1.16] - 2026-06-15
 
 ### Fixed

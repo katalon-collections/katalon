@@ -8,8 +8,15 @@ const TYPE_LABELS: Record<string, string> = {
   occurrence: 'Werk/Ereignis',
 }
 
+const TYPE_PATHS: Record<string, string> = {
+  object: 'objects',
+  entity: 'entities',
+  place: 'places',
+  occurrence: 'occurrences',
+}
+
 function typePath(type: string, id: string): string {
-  return `/${type}s/${id}`
+  return `/${TYPE_PATHS[type] ?? `${type}s`}/${id}`
 }
 
 interface Props {
