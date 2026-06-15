@@ -13,6 +13,7 @@ import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
+import { FeedbackButton } from './components/FeedbackButton'
 
 const TYPE_LABELS: Record<string, string> = {
   object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
@@ -183,6 +184,7 @@ function AppInner() {
         </Routes>
       </main>
       <Footer />
+      <FeedbackButton />
     </>
   )
 }

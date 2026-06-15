@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-06-15
+
+### Added
+- Portal: Feedback-Button (identisch zum Admin) — sendet über den neuen öffentlichen `/v1/feedback/public`-Endpoint (keine Auth erforderlich), aktivierbar via `VITE_PORTAL_FEEDBACK_EMAIL`
+- Backend: neuer POST `/v1/feedback/public`-Endpoint ohne Authentifizierung für Portal-Nutzer
+
 ## [0.1.12] - 2026-06-15
 
 ### Changed

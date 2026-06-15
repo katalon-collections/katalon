@@ -152,6 +152,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.portal
+      args:
+        VITE_PORTAL_FEEDBACK_EMAIL: ${VITE_PORTAL_FEEDBACK_EMAIL:-}
     ports:
       - "3001:80"
     healthcheck:

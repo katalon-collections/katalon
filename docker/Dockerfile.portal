@@ -1,5 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_PORTAL_FEEDBACK_EMAIL=
+ENV VITE_PORTAL_FEEDBACK_EMAIL=$VITE_PORTAL_FEEDBACK_EMAIL
 COPY frontend/portal/package*.json ./
 RUN npm install
 COPY frontend/portal /app

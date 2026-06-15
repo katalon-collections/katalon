@@ -16,8 +16,7 @@ class FeedbackPayload(BaseModel):
     time: str
 
 
-@router.post("", status_code=204)
-async def send_feedback(payload: FeedbackPayload, current_user: CurrentUser) -> None:
+async def _deliver(payload: FeedbackPayload) -> None:
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         raise HTTPException(status_code=503, detail="Feedback not configured")
 
@@ -38,3 +37,13 @@ async def send_feedback(payload: FeedbackPayload, current_user: CurrentUser) -> 
         )
     if r.status_code != 200:
         raise HTTPException(status_code=502, detail="Telegram delivery failed")
+
+
+@router.post("", status_code=204)
+async def send_feedback(payload: FeedbackPayload, current_user: CurrentUser) -> None:
+    await _deliver(payload)
+
+
+@router.post("/public", status_code=204)
+async def send_feedback_public(payload: FeedbackPayload) -> None:
+    await _deliver(payload)
