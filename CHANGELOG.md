@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-06-15
+
+### Fixed
+- Portal: „Zugehörige Objekte" auf Occurrence-, Entity- und Place-Detailseiten zeigt jetzt Vorschaubilder (Primary Media wird per `media`-API geladen)
+
 ## [0.1.17] - 2026-06-15
 
 ### Fixed

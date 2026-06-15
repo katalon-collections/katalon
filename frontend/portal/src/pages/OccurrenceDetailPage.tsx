@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { marked } from 'marked'
-import { api, fetchRecordTitle, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
+import { api, BASE, fetchRecordTitle, type MediaFile, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
@@ -32,6 +32,7 @@ export function OccurrenceDetailPage() {
   const [occurrence, setOccurrence] = useState<OccurrenceSummary | null>(null)
   const [relations, setRelations] = useState<Relation[]>([])
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +54,20 @@ export function OccurrenceDetailPage() {
           .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
           .slice(0, 12)
         const objs = await Promise.all(objIds.map(oid => api.objects.get(oid).catch(() => null)))
-        setLinkedObjects(objs.filter((o): o is ObjectSummary => o !== null))
+        const validObjs = objs.filter((o): o is ObjectSummary => o !== null)
+        setLinkedObjects(validObjs)
+
+        const thumbMap: Record<string, string> = {}
+        await Promise.all(validObjs.map(obj =>
+          api.objects.media(obj.id)
+            .then((media: MediaFile[]) => {
+              const ready = media.filter(mf => mf.status === 'ready')
+              const primary = ready.find(mf => mf.is_primary) ?? ready[0]
+              if (primary) thumbMap[obj.id] = `${BASE}/v1/objects/${obj.id}/media/${primary.id}/file`
+            })
+            .catch(() => {})
+        ))
+        setThumbnails(thumbMap)
 
         const nonObjRels = rels.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
         const pairs = nonObjRels.map(rel => {
@@ -157,7 +171,9 @@ export function OccurrenceDetailPage() {
                   const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
                   return (
                     <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
-                      <div className="thumb" />
+                      <div className="thumb">
+                        {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
+                      </div>
                       <div className="info">
                         <div className="title">{otitle}</div>
                         {rel && (
