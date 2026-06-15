@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-15
+
+### Added
+- Feedback-Endpoint `POST /v1/feedback`: sendet Feedback per Telegram-Bot (auth-geschützt, konfigurierbar via `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`)
+- `docker-compose.traefik.yml`: Traefik-Integration als separates Overlay-File
+
+### Changed
+- Admin-Feedbackknopf: von `mailto:`-Link auf direkten API-Call umgestellt — sendet Nachricht inkl. URL, User, Viewport und Zeitpunkt
+- `docker-compose.yml`: Telegram-Env-Vars ergänzt
+
 ## [0.1.8] - 2026-06-15
 
 ### Fixed

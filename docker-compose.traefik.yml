@@ -1,0 +1,22 @@
+# Traefik integration — use alongside docker-compose.yml + docker-compose.prod.yml
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.traefik.yml up -d
+
+services:
+  nginx:
+    ports: !reset []
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.katalon.rule=Host(`katalon.kraegelin.dev`)"
+      - "traefik.http.routers.katalon.entrypoints=websecure"
+      - "traefik.http.routers.katalon.tls=true"
+      - "traefik.http.routers.katalon.tls.certresolver=letsencrypt"
+      - "traefik.http.services.katalon.loadbalancer.server.port=80"
+    networks:
+      - traefik-public
+      - default
+
+networks:
+  traefik-public:
+    external: true

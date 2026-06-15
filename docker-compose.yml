@@ -70,6 +70,8 @@ services:
       OAI_ADMIN_EMAIL: ${OAI_ADMIN_EMAIL:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:

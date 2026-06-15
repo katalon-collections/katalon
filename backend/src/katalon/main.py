@@ -18,6 +18,7 @@ from katalon.api.v1 import (
     banners,
     dnb_urn_mock,
     entities,
+    feedback,
     idno,
     importer,
     index_health,
@@ -389,6 +390,7 @@ app.include_router(importer.router, prefix="/v1")
 app.include_router(metadata_mappings.router, prefix="/v1")
 app.include_router(oai.router, prefix="/v1")
 app.include_router(oai_sets.router, prefix="/v1")
+app.include_router(feedback.router, prefix="/v1")
 app.include_router(api_keys_router, prefix="/v1")
 
 # Mock URN registrar is a test/dev fixture only — never expose its writable

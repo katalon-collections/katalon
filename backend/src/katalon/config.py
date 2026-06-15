@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     debug: bool = False
     cors_origins: list[str] = [
         "http://localhost:3000",

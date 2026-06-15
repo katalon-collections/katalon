@@ -1,8 +1,8 @@
-import { FormEvent, useMemo, useState } from 'react'
-import { getTokenUser } from '../../api/client'
+import { useMemo, useState } from 'react'
+import { req, getTokenUser } from '../../api/client'
 import { Help, X } from '../ui/Icons'
 
-const feedbackEmail = import.meta.env.VITE_ADMIN_FEEDBACK_EMAIL?.trim()
+const feedbackEnabled = Boolean(import.meta.env.VITE_ADMIN_FEEDBACK_EMAIL?.trim())
 
 const panel = {
   position: 'fixed',
@@ -20,40 +20,54 @@ const panel = {
 export function FeedbackButton() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const user = getTokenUser()
 
   const context = useMemo(() => ({
     url: window.location.href,
     user: user?.email || 'unbekannt',
     viewport: `${window.innerWidth}x${window.innerHeight}`,
-    userAgent: navigator.userAgent,
-    time: new Date().toISOString(),
+    time: new Date().toLocaleString('de-DE'),
   }), [open])
 
-  if (!feedbackEmail) return null
+  if (!feedbackEnabled) return null
 
-  function send(e: FormEvent) {
-    e.preventDefault()
-    const body = [
-      message.trim(),
-      '',
-      '--- Kontext ---',
-      `URL: ${context.url}`,
-      `Benutzer: ${context.user}`,
-      `Viewport: ${context.viewport}`,
-      `User-Agent: ${context.userAgent}`,
-      `Zeitpunkt: ${context.time}`,
-    ].join('\n')
-
-    window.location.href = `mailto:${feedbackEmail}?subject=${encodeURIComponent('Katalon Admin Feedback')}&body=${encodeURIComponent(body)}`
-    setOpen(false)
-    setMessage('')
+  async function send() {
+    if (!message.trim()) return
+    setSending(true)
+    setError(null)
+    try {
+      await req('/v1/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: message.trim(),
+          url: context.url,
+          user: context.user,
+          viewport: context.viewport,
+          time: context.time,
+        }),
+      })
+      setSent(true)
+      setMessage('')
+      setTimeout(() => { setOpen(false); setSent(false) }, 2000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Fehler beim Senden')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
     <>
       {open && (
-        <form style={panel} onSubmit={send}>
+        <div style={panel}>
+          {sent ? (
+            <div style={{ textAlign: 'center', padding: '18px 0', fontSize: 13 }}>
+              ✓ Feedback gesendet. Danke!
+            </div>
+          ) : (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <strong style={{ fontSize: 13 }}>Feedback senden</strong>
             <button
@@ -72,17 +86,27 @@ export function FeedbackButton() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Was ist dir aufgefallen?"
-            required
             autoFocus
           />
+          {error && (
+            <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 6 }}>{error}</div>
+          )}
           <div style={{ color: 'var(--fg-3)', fontSize: 11.5, marginTop: 8 }}>
-            URL, Browser und Fenstergröße werden in die E-Mail übernommen.
+            URL, Browser und Fenstergröße werden mitgeschickt.
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
             <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
-            <button type="submit" className="btn pri">E-Mail öffnen</button>
+            <button
+              type="button"
+              className="btn pri"
+              disabled={!message.trim() || sending}
+              onClick={send}
+            >
+              {sending ? 'Senden…' : 'Senden'}
+            </button>
           </div>
-        </form>
+          </>)}
+        </div>
       )}
       <button
         type="button"
