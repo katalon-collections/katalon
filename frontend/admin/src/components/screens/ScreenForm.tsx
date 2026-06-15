@@ -1311,6 +1311,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       {error && (
         <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '8px 24px', fontSize: 13, color: '#b91c1c', flexShrink: 0 }}>
           {error}
+          {Object.keys(fieldErrors).length > 0 && (
+            <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.6 }}>
+              {Object.values(fieldErrors).map((msg, i) => <li key={i}>{msg}</li>)}
+            </ul>
+          )}
         </div>
       )}
 
