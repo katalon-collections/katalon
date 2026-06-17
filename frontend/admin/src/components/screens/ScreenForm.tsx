@@ -765,6 +765,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       .catch(() => {})
   }, [isNew, recordType])
 
+  // Reload field definitions when subtype changes on new forms (values preserved in state)
+  useEffect(() => {
+    if (!isNew || !subtypeKey || !subtype) return
+    schema.list(recordType, subtype).then(setFields).catch(() => {})
+  }, [isNew, subtype, recordType, subtypeKey])
+
   useEffect(() => {
     if (savedId && showMedia) loadMedia(savedId)
   }, [savedId, showMedia, loadMedia])

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-06-17
+
+### Fixed
+- Admin: Subtyp-Wechsel im Neues-Formular lädt jetzt korrekte Felder nach — Felder anderer Subtypes werden ausgeblendet, eingegebene Werte bleiben im State erhalten
+
 ## [0.1.19] - 2026-06-17
 
 ### Fixed
