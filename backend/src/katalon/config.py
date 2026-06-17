@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     first_run_credentials_path: str = "/var/lib/katalon/first-run-credentials.txt"
 
     oai_admin_email: str = "admin@katalon.dev"
+    es_index_name: str = "katalon_records"
+
     geonames_username: str = "demo"
 
     dnb_urn_enabled: bool = False

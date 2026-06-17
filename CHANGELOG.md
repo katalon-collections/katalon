@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-06-17
+
+### Changed
+- Elasticsearch index name is now configurable via `ES_INDEX_NAME` env var (default: `katalon_records`)
+
 ## [0.1.20] - 2026-06-17
 
 ### Fixed

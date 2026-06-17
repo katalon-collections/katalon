@@ -57,7 +57,7 @@ INDEX_SETTINGS: dict[str, Any] = {
     },
 }
 
-INDEX_NAME = "katalon_records"
+INDEX_NAME = settings.es_index_name
 ALIAS_NAME = "katalon"  # stable alias used by all queries
 
 
