@@ -1,12 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { Relation } from '../api/client'
 
-const TYPE_LABELS: Record<string, string> = {
-  object: 'Objekt',
-  entity: 'Person/Organisation',
-  place: 'Ort',
-  occurrence: 'Werk/Ereignis',
-}
 
 const TYPE_PATHS: Record<string, string> = {
   object: 'objects',
@@ -43,7 +37,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {} 
           const targetType = isFrom ? r.to_type : r.from_type
           const targetId = isFrom ? r.to_id : r.from_id
           const titleKey = `${targetType}/${targetId}`
-          const targetLabel = titles[titleKey] ?? (TYPE_LABELS[targetType] ?? targetType)
+          const targetLabel = titles[titleKey] ?? `[${targetId.slice(0, 8)}…]`
           const path = typePath(targetType, targetId)
 
           return (

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-06-17
+
+### Fixed
+- Portal: Verknüpfungen zeigen bei nicht-aufgelöstem Titel jetzt `[ID…]` statt irreführendem Typ-Label "Werk/Ereignis"
+
 ## [0.1.18] - 2026-06-15
 
 ### Fixed
