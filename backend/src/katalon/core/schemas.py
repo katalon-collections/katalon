@@ -102,6 +102,7 @@ class VocabularyTermCreate(BaseModel):
     vocabulary_id: uuid.UUID
     term: str
     label: dict = {}
+    inverse_label: dict = {}
     parent_id: uuid.UUID | None = None
 
 

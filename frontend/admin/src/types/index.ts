@@ -87,6 +87,7 @@ export interface VocabularyTerm {
   vocabulary_id: string
   term: string
   label: Record<string, string>
+  inverse_label: Record<string, string>
   parent_id: string | null
 }
 

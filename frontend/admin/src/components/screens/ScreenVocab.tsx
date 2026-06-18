@@ -27,12 +27,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [showNewTerm, setShowNewTerm] = useState(false)
   const [newTermTerm, setNewTermTerm] = useState('')
   const [newTermLabelDe, setNewTermLabelDe] = useState('')
+  const [newTermInverseLabelDe, setNewTermInverseLabelDe] = useState('')
   const [savingTerm, setSavingTerm] = useState(false)
 
   // edit term inline
   const [editTermId, setEditTermId] = useState<string | null>(null)
   const [editTermTerm, setEditTermTerm] = useState('')
   const [editTermLabelDe, setEditTermLabelDe] = useState('')
+  const [editTermInverseLabelDe, setEditTermInverseLabelDe] = useState('')
   const [savingEditTerm, setSavingEditTerm] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
@@ -56,6 +58,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     { value: 'external_id', label: 'Externe ID' },
     { value: 'label:de', label: 'Label (de)' },
     { value: 'label:en', label: 'Label (en)' },
+    { value: 'inverse_label:de', label: 'Gegenrichtung (de)' },
+    { value: 'inverse_label:en', label: 'Gegenrichtung (en)' },
   ]
 
   function detectDelimiter(line: string): string {
@@ -158,10 +162,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         vocabulary_id: activeVocab,
         term: newTermTerm.trim(),
         label: { de: newTermLabelDe.trim() },
+        inverse_label: newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
         parent_id: null,
       })
       setNewTermTerm('')
       setNewTermLabelDe('')
+      setNewTermInverseLabelDe('')
       setShowNewTerm(false)
       loadTerms()
     } catch (e) {
@@ -175,6 +181,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermId(t.id)
     setEditTermTerm(t.term)
     setEditTermLabelDe(t.label.de ?? '')
+    setEditTermInverseLabelDe(t.inverse_label?.de ?? '')
   }
 
   async function saveEditTerm(t: VocabularyTerm) {
@@ -184,6 +191,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         vocabulary_id: activeVocab!,
         term: editTermTerm.trim(),
         label: { de: editTermLabelDe.trim() },
+        inverse_label: editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
         parent_id: t.parent_id,
       })
       setEditTermId(null)
@@ -405,7 +413,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       </div>
                       <div className="field">
                         <div className="lbl">Label DE</div>
-                        <input className="fld" value={newTermLabelDe} onChange={e => setNewTermLabelDe(e.target.value)} placeholder="Anzeigetext" />
+                        <input className="fld" value={newTermLabelDe} onChange={e => setNewTermLabelDe(e.target.value)} placeholder="Anzeigetext (Hinrichtung)" />
+                      </div>
+                      <div className="field">
+                        <div className="lbl">Gegenrichtung DE</div>
+                        <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -422,6 +434,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     <tr>
                       <th>ID</th>
                       <th>Label DE</th>
+                      <th>Gegenrichtung DE</th>
                       <th>Übergeordnet</th>
                       <th className="col-act" />
                     </tr>
@@ -437,6 +450,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <>
                             <td><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ maxWidth: 160 }} /></td>
                             <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
+                            <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>
                             <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>
                             <td className="col-act">
                               <div className="row-actions">
@@ -449,6 +463,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <>
                             <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
                             <td style={{ maxWidth: 220 }}>{getLabel(t, '—')}</td>
+                            <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>
                             <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
                             <td className="col-act">
                               <div className="row-actions">

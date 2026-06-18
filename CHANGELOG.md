@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-06-18
+
+### Added
+- Relationstypen unterstützen jetzt ein `inverse_label` (Gegenrichtungslabel): In der Detailansicht wird das Label richtungsabhängig angezeigt – wenn die aktuelle Seite das *Ziel* einer Relation ist, erscheint das Gegenrichtungslabel statt des Hinrichtungslabels
+- Admin Vokabular-Editor: neues Feld „Gegenrichtung DE" bei Term anlegen/bearbeiten sowie neue CSV-Import-Targets `inverse_label:de` / `inverse_label:en`
+- DB-Migration `a1b2c3d4e5f6`: Spalte `inverse_label JSONB` in `vocabulary_terms`
+
 ## [0.1.21] - 2026-06-17
 
 ### Changed

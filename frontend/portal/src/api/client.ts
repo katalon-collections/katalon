@@ -76,7 +76,7 @@ export interface SearchResponse {
 }
 
 export interface VocabSummary { id: string; name: string; is_hierarchical: boolean }
-export interface VocabTerm { id: string; term: string; label: Record<string, string>; parent_id: string | null }
+export interface VocabTerm { id: string; term: string; label: Record<string, string>; inverse_label: Record<string, string>; parent_id: string | null }
 
 const TYPE_ENDPOINT: Record<string, string> = {
   object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences',

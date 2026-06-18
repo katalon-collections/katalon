@@ -19,6 +19,7 @@ DEFAULT_LABEL_LANGUAGE = "de"
 class ImportTerm:
     term: str
     label: dict[str, str]
+    inverse_label: dict[str, str]
     parent_term: str | None
     external_id: str | None
     row: int | None
@@ -58,6 +59,8 @@ def _merge_term(
         target[item.term] = item
         return
     existing.label.update(item.label)
+    if item.inverse_label:
+        existing.inverse_label.update(item.inverse_label)
     if item.external_id:
         existing.external_id = item.external_id
     if item.parent_term and not existing.parent_term:
@@ -99,6 +102,7 @@ def parse_csv_terms(
         parent_term = None
         external_id = None
         label: dict[str, str] = {}
+        inverse_label: dict[str, str] = {}
 
         for source_col, target_field in mapping.items():
             source_val = row_values.get(source_col, "")
@@ -114,6 +118,10 @@ def parse_csv_terms(
                 lang = target_field.split(":", 1)[1].strip()
                 if lang:
                     label[lang] = source_val
+            elif target_field.startswith("inverse_label:"):
+                lang = target_field.split(":", 1)[1].strip()
+                if lang:
+                    inverse_label[lang] = source_val
 
         if not term:
             errors.append({"row": i, "message": "Pflichtfeld 'term' fehlt oder ist leer"})
@@ -124,6 +132,7 @@ def parse_csv_terms(
             ImportTerm(
                 term=term,
                 label=label,
+                inverse_label=inverse_label,
                 parent_term=parent_term,
                 external_id=external_id,
                 row=i,
@@ -171,11 +180,18 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
 
         this_parent = _norm(str(node.get("parent_term", ""))) or parent_term
         external_id = _norm(str(node.get("external_id", ""))) or None
+        raw_inverse = node.get("inverse_label", {})
+        inverse_label: dict[str, str] = {}
+        if isinstance(raw_inverse, dict):
+            inverse_label = {str(k): _norm(str(v)) for k, v in raw_inverse.items() if _norm(str(v))}
+        elif isinstance(raw_inverse, str) and _norm(raw_inverse):
+            inverse_label = {DEFAULT_LABEL_LANGUAGE: _norm(raw_inverse)}
         _merge_term(
             terms,
             ImportTerm(
                 term=term,
                 label=label,
+                inverse_label=inverse_label,
                 parent_term=this_parent,
                 external_id=external_id,
                 row=None,
@@ -259,11 +275,14 @@ async def import_vocabulary_terms(
                 vocabulary_id=vocab_id,
                 term=item.term,
                 label={},
+                inverse_label={},
                 parent_id=None,
             )
             db.add(term_model)
         if item.label:
             term_model.label = item.label
+        if item.inverse_label:
+            term_model.inverse_label = item.inverse_label
         touched[item.term] = term_model
     await db.flush()
 

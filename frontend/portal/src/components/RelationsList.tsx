@@ -16,7 +16,7 @@ function typePath(type: string, id: string): string {
 interface Props {
   relations: Relation[]
   currentId: string
-  resolveLabel: (code: string) => string
+  resolveLabel: (code: string, isFrom: boolean) => string
   /** Optional: pre-loaded titles keyed by "<type>/<id>" */
   titles?: Record<string, string>
 }
@@ -50,7 +50,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {} 
                 textTransform: 'uppercase',
                 letterSpacing: '.04em',
               }}>
-                {resolveLabel(r.relation_type)}
+                {resolveLabel(r.relation_type, isFrom)}
               </span>
               <a
                 href="#"
