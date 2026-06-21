@@ -133,6 +133,26 @@ Endpoint `/v1/oai` vorhanden. OAI-PMH nutzt die generische Export-Mapping-Schich
 
 ## Offene Phasen (geplant, nicht begonnen)
 
+### Phase 14 – Procedure-Typ (Leihverkehr, Erwerbung, Restaurierung) 🔲 – Issue #238
+
+5. Primärtyp für transaktionale/prozessuale Vorgänge. Semantisch getrennt von Occurrence (FRBR).
+
+**Datenmodell:**
+- Neue Tabelle `procedures` mit `procedure_type` (loan_out/loan_in/acquisition/conservation/object_entry/deaccession), `status` (draft/active/completed/cancelled), `start_date`, `end_date`, `due_date`, `reference_number`, `metadata_` JSONB
+- `collection_status VARCHAR` auf `objects` (ersetzt kein Boolean): `active` | `pending` | `on_loan_in` | `deaccessioned` | `returned` — nicht user-konfigurierbar, load-bearing im Code
+- Relationen über bestehende `relations`-Tabelle; pro-Objekt-Notiz via `relations.metadata->>'note'`
+
+**Wichtige Design-Entscheidungen:**
+- Filter im Admin via PostgreSQL (kein ES-Denormalisierungsbedarf)
+- Semi-automatische `collection_status`-Updates: Dialog beim Abschließen einer Procedure
+- Loan Renewal: `due_date` updaten (kein `parent_procedure_id`), History via Audit Log
+- Dokument-Referenzen: Freitext-Feld in `metadata_`, kein Datei-Upload
+- Validierung: kein zweiter aktiver `loan_out` pro Objekt (Service-Layer, kein DB-Constraint)
+
+**Zurückgestellt auf Post-MVP:** Per-Objekt strukturierte Felder (Issue #239), Status-Transition-Guards, Auto-Referenznummern, Datei-Attachments.
+
+---
+
 ### Phase 6.1 – Relationen-Panel im Admin-Formular ✅
 Suche über alle Typen, Relationstyp wählen, Metadaten auf der Relation.
 
@@ -211,6 +231,7 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 3. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
 4. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
+5. Phase 14 – Procedure-Typ: Leihverkehr, Erwerbung, Restaurierung – Issue #238
 
 ---
 
