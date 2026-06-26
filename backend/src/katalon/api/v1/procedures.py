@@ -52,7 +52,7 @@ async def _validate_procedure(
         raise HTTPException(status_code=422, detail="Ungültiger Vorgangstyp.")
     if data.status not in PROCEDURE_STATUSES:
         raise HTTPException(status_code=422, detail="Ungültiger Vorgangsstatus.")
-    errors = await validate_metadata(db, "procedure", data.metadata_)
+    errors = await validate_metadata(db, "procedure", data.metadata_, data.procedure_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if data.procedure_type == "loan_out" and data.status == "active" and procedure_id:

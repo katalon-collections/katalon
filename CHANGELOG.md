@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-26
+
+### Added
+- Objektformular hat eigenes Panel „Vorgänge" für feste Objekt-Vorgang-Verknüpfungen
+
+### Fixed
+- Vorgangsschemata laden mit eingebauten Vorgangstypen wie `conservation`
+
 ## [0.2.4] - 2026-06-26
 
 ### Added

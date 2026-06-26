@@ -695,6 +695,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [editRelType, setEditRelType]     = useState('')
   const [editMeta, setEditMeta]           = useState<{ key: string; value: string }[]>([])
   const [editSaving, setEditSaving]       = useState(false)
+  const [addProcedureOpen, setAddProcedureOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
 
   // Warn on browser tab close / reload
@@ -771,6 +772,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setRelTitles({})
     setObjectStatuses({})
     setAddOpen(false)
+    setAddProcedureOpen(false)
     setCompletionDialog(null)
 
     // Load available subtypes for this record type
@@ -876,7 +878,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }, [])
 
   useEffect(() => {
-    const searchOpen = addOpen || (showProcedureFields && addTargetType === 'object')
+    const searchOpen =
+      addOpen ||
+      (showProcedureFields && addTargetType === 'object') ||
+      (showCollectionStatus && addProcedureOpen && addTargetType === 'procedure')
     if (!searchOpen || addSearchQ.trim().length < 2) { setAddResults([]); return }
     setAddSearching(true)
     const timer = setTimeout(() => {
@@ -886,7 +891,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         .finally(() => setAddSearching(false))
     }, 300)
     return () => clearTimeout(timer)
-  }, [addSearchQ, addTargetType, addOpen, showProcedureFields])
+  }, [addSearchQ, addTargetType, addOpen, showProcedureFields, showCollectionStatus, addProcedureOpen])
 
   async function handleAddRelation() {
     if (!addSelected || !addRelType.trim() || !savedId) return
@@ -920,6 +925,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       }).catch(() => {})
       setAddSearchQ('')
       setAddResults([])
+    } catch (e) { alert((e as Error).message) }
+    finally { setAddSaving(false) }
+  }
+
+  async function handleAddProcedureRelation() {
+    if (!addSelected || !savedId) return
+    setAddSaving(true)
+    try {
+      const created = await relationsApi.create({
+        from_type: recordType, from_id: savedId,
+        to_type: 'procedure', to_id: addSelected.id,
+        relation_type: 'concerns',
+      })
+      setRels(prev => [...prev, created])
+      setRelTitles(prev => ({ ...prev, [`procedure/${created.to_id}`]: addSelected.title }))
+      setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([])
     } catch (e) { alert((e as Error).message) }
     finally { setAddSaving(false) }
   }
@@ -1432,7 +1453,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const justCreated  = isNew && hasSavedId
   const showTwoCol   = showMedia || !isNew
   const objectRels = showProcedureFields ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'object') : []
-  const otherRels = showProcedureFields ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'object') : rels
+  const procedureRels = showCollectionStatus ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'procedure') : []
+  const otherRels = showProcedureFields
+    ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'object')
+    : showCollectionStatus
+      ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'procedure')
+      : rels
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
   const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
 
@@ -2066,6 +2092,102 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </div>
               )}
 
+              {showCollectionStatus && !isNew && (
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div className="hd">
+                    <span>Vorgänge</span>
+                    {procedureRels.length > 0 && <span className="sub">{procedureRels.length}</span>}
+                    <div className="grow" />
+                    {!addProcedureOpen && hasSavedId && (
+                      <button
+                        className="btn sm gh"
+                        onClick={() => {
+                          setAddTargetType('procedure')
+                          setAddProcedureOpen(true)
+                          setAddOpen(false)
+                          setAddSearchQ('')
+                          setAddSelected(null)
+                          setAddResults([])
+                        }}
+                      >
+                        <Plus size={12} /> Hinzufügen
+                      </button>
+                    )}
+                  </div>
+                  <div className="bd">
+                    {procedureRels.length > 0 ? (
+                      <div style={{ marginBottom: addProcedureOpen ? 12 : 0 }}>
+                        {procedureRels.map(r => {
+                          const targetId = r.from_id === savedId ? r.to_id : r.from_id
+                          return (
+                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                              <a
+                                href={`#procedures-form/${targetId}`}
+                                onClick={e => { e.preventDefault(); navigateToRecord('procedure', targetId) }}
+                                style={{ color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={targetId}
+                              >
+                                {relTitles[`procedure/${targetId}`] ?? targetId.slice(0, 8) + '…'}
+                              </a>
+                              <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="empty" style={{ padding: addProcedureOpen ? '0 0 12px' : '8px 0' }}>Noch keine Vorgänge verknüpft.</div>
+                    )}
+                    {addProcedureOpen && (
+                      <div style={{ borderTop: procedureRels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: procedureRels.length > 0 ? 12 : 0 }}>
+                        <div className="field" style={{ marginBottom: 8 }}>
+                          <div className="lbl">Vorgang suchen</div>
+                          {addSelected ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, flex: 1 }}>{addSelected.title}</span>
+                              <button className="btn sm ico gh" onClick={() => { setAddSelected(null); setAddSearchQ('') }}><X size={12} /></button>
+                            </div>
+                          ) : (
+                            <>
+                              <input
+                                className="fld"
+                                value={addTargetType === 'procedure' ? addSearchQ : ''}
+                                onFocus={() => setAddTargetType('procedure')}
+                                onChange={e => { setAddTargetType('procedure'); setAddSearchQ(e.target.value) }}
+                                placeholder="Suchbegriff (mind. 2 Zeichen)…"
+                                autoFocus
+                              />
+                              {addTargetType === 'procedure' && addSearching && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Suche…</div>}
+                              {addTargetType === 'procedure' && addResults.length > 0 && !addSearching && (
+                                <div style={{ border: '1px solid var(--border-s)', borderRadius: 4, marginTop: 4, maxHeight: 140, overflowY: 'auto' }}>
+                                  {addResults.map(r => (
+                                    <div key={r.id} onClick={() => { setAddSelected(r); setAddSearchQ('') }}
+                                      style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border-s)' }}
+                                      className="hover-row">
+                                      {r.title}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {addTargetType === 'procedure' && addSearchQ.trim().length >= 2 && addResults.length === 0 && !addSearching && (
+                                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Keine Ergebnisse.</div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn pri sm" onClick={handleAddProcedureRelation} disabled={!addSelected || addSaving}>
+                            {addSaving ? 'Speichert…' : 'Speichern'}
+                          </button>
+                          <button className="btn gh sm" onClick={() => { setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([]) }}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {showProcedureFields && !isNew && (
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div className="hd">
@@ -2127,7 +2249,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}
                     <div className="grow" />
                     {!addOpen && hasSavedId && (
-                      <button className="btn sm gh" onClick={() => { if (showProcedureFields) setAddTargetType('entity'); setAddOpen(true) }}><Plus size={12} /> Hinzufügen</button>
+                      <button className="btn sm gh" onClick={() => { if (showProcedureFields) setAddTargetType('entity'); setAddProcedureOpen(false); setAddOpen(true) }}><Plus size={12} /> Hinzufügen</button>
                     )}
                   </div>
                   <div className="bd">

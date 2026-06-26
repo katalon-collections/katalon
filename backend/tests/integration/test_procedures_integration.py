@@ -108,3 +108,44 @@ async def test_procedure_crud_and_active_loan_out_guard(async_client, auth_heade
     )
     assert update_response.status_code == 200
     assert update_response.json()["status"] == "completed"
+
+
+async def test_procedure_validation_uses_procedure_type_schema(async_client, auth_headers) -> None:
+    field_name = f"restoration_note_{uuid.uuid4().hex[:8]}"
+    field_response = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "procedure",
+            "target_subtype": "conservation",
+            "name": field_name,
+            "label": {"de": "Restaurierungsnotiz"},
+            "field_type": "text",
+            "is_required": True,
+            "is_repeatable": False,
+        },
+    )
+    assert field_response.status_code == 201, field_response.text
+
+    missing_response = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+            "procedure_type": "conservation",
+            "metadata_": {"label": "Restaurierung"},
+        },
+    )
+    assert missing_response.status_code == 422
+    assert field_name in str(missing_response.json()["detail"])
+
+    ok_response = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+            "procedure_type": "conservation",
+            "metadata_": {"label": "Restaurierung", field_name: "gereinigt"},
+        },
+    )
+    assert ok_response.status_code == 201, ok_response.text

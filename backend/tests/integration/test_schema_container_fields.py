@@ -15,6 +15,13 @@ async def test_list_schema_returns_200(async_client: AsyncClient, auth_headers: 
 
 
 @pytest.mark.asyncio
+async def test_list_procedure_schema_accepts_builtin_subtype(async_client: AsyncClient, auth_headers: dict) -> None:
+    r = await async_client.get("/v1/schema/procedure?subtype=conservation", headers=auth_headers)
+    assert r.status_code == 200, r.text
+    assert any(f["name"] == "label" for f in r.json())
+
+
+@pytest.mark.asyncio
 async def test_create_group_field_no_500(async_client: AsyncClient, auth_headers: dict) -> None:
     r = await async_client.post(
         "/v1/schema",
