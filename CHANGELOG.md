@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-26
+
+### Added
+- Admin-Objektformular zeigt und speichert `collection_status` als Systemfeld
+
+### Changed
+- Öffentliche Objektlisten und Objektdetails zeigen anonym nur noch Objekte mit aktivem Sammlungsstatus
+
 ## [0.2.0] - 2026-06-26
 
 ### Added

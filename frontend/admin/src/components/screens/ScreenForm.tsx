@@ -39,6 +39,14 @@ const PROCEDURE_COMPLETION_STATUS: Record<string, string | null> = {
   deaccession: 'deaccessioned',
   conservation: null,
 }
+const COLLECTION_STATUSES = [
+  { id: 'active', label: 'Aktiv' },
+  { id: 'pending', label: 'In Bearbeitung' },
+  { id: 'on_loan_out', label: 'Ausgeliehen' },
+  { id: 'on_loan_in', label: 'Leihgabe' },
+  { id: 'deaccessioned', label: 'Deakzessioniert' },
+  { id: 'returned', label: 'Zurückgegeben' },
+]
 
 const PORTAL_PATH: Record<RecordType, string> = {
   object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', procedure: 'procedures',
@@ -627,6 +635,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showMedia = recordType === 'object'
   const showGeo   = recordType === 'place'
   const showProcedureFields = recordType === 'procedure'
+  const showCollectionStatus = recordType === 'object'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [idno, setIdno]       = useState('')
@@ -635,6 +644,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [lon, setLon]         = useState('')
   const [status, setStatus]   = useState<Status | ProcedureStatus>('draft')
   const [loadedStatus, setLoadedStatus] = useState<Status | ProcedureStatus>('draft')
+  const [collectionStatus, setCollectionStatus] = useState('active')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -747,6 +757,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setReferenceNumber('')
     setStatus('draft')
     setLoadedStatus('draft')
+    setCollectionStatus('active')
     setValues({})
     setMediaFiles([])
     setRels([])
@@ -779,6 +790,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             const p = rec as { lat?: number | null; lon?: number | null }
             setLat(p.lat != null ? String(p.lat) : '')
             setLon(p.lon != null ? String(p.lon) : '')
+          }
+          if (showCollectionStatus) {
+            setCollectionStatus((rec as { collection_status?: string | null }).collection_status ?? 'active')
           }
           if (showProcedureFields) {
             const p = rec as { start_date?: string | null; end_date?: string | null; due_date?: string | null; reference_number?: string | null }
@@ -1250,6 +1264,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       }
       if (showIdno)   payload.idno = idno || null
       if (subtypeKey) payload[subtypeKey] = subtype
+      if (showCollectionStatus) payload.collection_status = collectionStatus
       if (showGeo) {
         payload.lat = lat ? parseFloat(lat) : null
         payload.lon = lon ? parseFloat(lon) : null
@@ -1501,6 +1516,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     {fieldErrors['__subtype'] && (
                       <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__subtype']}</div>
                     )}
+                  </div>
+                )}
+
+                {showCollectionStatus && (
+                  <div className="field">
+                    <div className="lbl">Sammlungsstatus</div>
+                    <select
+                      className="fld"
+                      value={collectionStatus}
+                      onChange={e => { setCollectionStatus(e.target.value); setIsDirty(true) }}
+                      disabled={justCreated}
+                    >
+                      {COLLECTION_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                    </select>
                   </div>
                 )}
 
