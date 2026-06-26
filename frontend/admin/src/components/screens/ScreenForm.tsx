@@ -1290,14 +1290,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             return targetType === 'object'
           }).length
           const suggested = PROCEDURE_COMPLETION_STATUS[subtype] ?? null
-          let collectionStatus: string | null = null
-          if (objectCount > 0 && suggested) {
-            const answer = window.prompt(
-              `${objectCount} verknüpfte Objekt(e): Sammlungsstatus setzen? Leer lassen = nicht ändern.`,
-              suggested,
-            )
-            collectionStatus = answer?.trim() || null
-          }
+          const collectionStatus = objectCount > 0 && suggested && window.confirm(
+            `${objectCount} verknüpfte Objekt(e): Sammlungsstatus auf "${suggested}" setzen?`,
+          ) ? suggested : null
           await procedures.complete(recordId!, collectionStatus)
           setStatus('completed')
           setLoadedStatus('completed')

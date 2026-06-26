@@ -97,6 +97,8 @@ async def list_procedures(
     page_size: int = Query(50, ge=1, le=200),
     procedure_type: str | None = None,
     status: str | None = None,
+    due_before: date | None = None,
+    reference_number: str | None = None,
     q: str | None = None,
 ) -> dict:
     query = select(Procedure)
@@ -104,6 +106,10 @@ async def list_procedures(
         query = query.where(Procedure.procedure_type == procedure_type)
     if status:
         query = query.where(Procedure.status == status)
+    if due_before:
+        query = query.where(Procedure.due_date <= due_before)
+    if reference_number:
+        query = query.where(Procedure.reference_number.ilike(f"%{reference_number}%"))
     if q:
         query = query.where(Procedure.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()

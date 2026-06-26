@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-26
+
+### Added
+- Admin-Vorgangsliste filtert nach Vorgangstyp, Fälligkeit bis und Referenznummer
+- Elasticsearch-Index enthält `collection_status` für Objekte
+
+### Changed
+- Anonyme Suche blendet nicht aktive Objekte aus, ohne andere Record-Typen zu verstecken
+- Vorgang-Abschluss nutzt Bestätigungsdialog statt freier Prompt-Eingabe für vorgeschlagenen Sammlungsstatus
+
 ## [0.2.1] - 2026-06-26
 
 ### Added

@@ -173,7 +173,7 @@ export const occurrences = {
 
 // Procedures
 export const procedures = {
-  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Procedure>>(`/v1/procedures${qs ? `?${qs}` : ''}`)
   },

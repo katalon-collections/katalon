@@ -151,6 +151,8 @@ def _build_doc(
         "created_at": record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         "updated_at": record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
     }
+    if record_type == "object":
+        doc["collection_status"] = getattr(record, "collection_status", "active") or "active"
 
     # Build facet_* fields for fields marked as is_facet
     if facet_fields:
@@ -337,6 +339,7 @@ async def search(
     extra_filters: dict[str, str] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
+    active_objects_only: bool = False,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -344,6 +347,7 @@ async def search(
         extra_filters=extra_filters,
         facet_fields=facet_fields,
         rel_filters=rel_filters,
+        active_objects_only=active_objects_only,
     )
 
     hits = raw.get("hits", {})

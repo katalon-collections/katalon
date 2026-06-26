@@ -17,6 +17,14 @@ const PROCEDURE_TABS = [
   { id: 'completed', label: 'Abgeschlossen' },
   { id: 'cancelled', label: 'Abgebrochen' },
 ]
+const PROCEDURE_TYPES = [
+  { id: 'loan_out', label: 'Ausleihe ausgehend' },
+  { id: 'loan_in', label: 'Ausleihe eingehend' },
+  { id: 'acquisition', label: 'Erwerbung' },
+  { id: 'conservation', label: 'Restaurierung' },
+  { id: 'object_entry', label: 'Objekteingang' },
+  { id: 'deaccession', label: 'Deakzession' },
+]
 
 const PAGE_SIZE = 50
 
@@ -80,6 +88,9 @@ export function ScreenList({ recordType, onOpen }: Props) {
 
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
+  const [procedureType, setProcedureType] = useState('')
+  const [dueBefore, setDueBefore] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
   const [page, setPage] = useState(1)
   const [data, setData] = useState<Page<AnyRecord>>({ total: 0, page: 1, page_size: PAGE_SIZE, items: [] })
   const [loading, setLoading] = useState(true)
@@ -104,6 +115,9 @@ export function ScreenList({ recordType, onOpen }: Props) {
   useEffect(() => {
     setTab('all')
     setQ('')
+    setProcedureType('')
+    setDueBefore('')
+    setReferenceNumber('')
     setPage(1)
     setDebouncedQ('')
     setSel(new Set())
@@ -124,11 +138,16 @@ export function ScreenList({ recordType, onOpen }: Props) {
       status: tab === 'all' ? undefined : tab,
     }
     if (debouncedQ) params.q = debouncedQ
+    if (recordType === 'procedure') {
+      if (procedureType) params.procedure_type = procedureType
+      if (dueBefore) params.due_before = dueBefore
+      if (referenceNumber) params.reference_number = referenceNumber
+    }
     ;(api.list as (p: typeof params) => Promise<Page<AnyRecord>>)(params)
       .then(d => { setData(d); setSel(new Set()) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [page, tab, debouncedQ, api, recordType])
+  }, [page, tab, debouncedQ, procedureType, dueBefore, referenceNumber, api, recordType])
 
   useEffect(() => { load() }, [load])
 
@@ -222,6 +241,16 @@ export function ScreenList({ recordType, onOpen }: Props) {
             onChange={e => handleSearch(e.target.value)}
           />
         </div>
+        {recordType === 'procedure' && (
+          <>
+            <select className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>
+              <option value="">Alle Vorgangstypen</option>
+              {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+            <input className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
+            <input className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
+          </>
+        )}
       </div>
 
       {someSel && (
