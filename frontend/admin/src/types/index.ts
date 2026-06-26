@@ -1,10 +1,12 @@
 export type Status = 'draft' | 'internal' | 'public'
-export type RecordType = 'object' | 'entity' | 'place' | 'occurrence'
+export type ProcedureStatus = 'draft' | 'active' | 'completed' | 'cancelled'
+export type RecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
 
 export interface KatalonObject {
   id: string
   idno: string | null
   object_type: string | null
+  collection_status?: string
   status: Status
   metadata_: Record<string, unknown>
   created_at: string
@@ -43,7 +45,21 @@ export interface Occurrence {
   updated_at: string
 }
 
-export type AnyRecord = KatalonObject | Entity | Place | Occurrence
+export interface Procedure {
+  id: string
+  idno: string | null
+  procedure_type: string
+  status: ProcedureStatus
+  start_date: string | null
+  end_date: string | null
+  due_date: string | null
+  reference_number: string | null
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type AnyRecord = KatalonObject | Entity | Place | Occurrence | Procedure
 
 export interface FieldDefinition {
   id: string

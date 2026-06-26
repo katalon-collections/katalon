@@ -6,7 +6,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import FieldDefinition, Relation
+from katalon.core.models import FieldDefinition, Procedure, Relation
 
 
 async def count_relations(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> int:
@@ -30,6 +30,74 @@ async def delete_relations(db: AsyncSession, record_type: str, record_id: uuid.U
             )
         )
     )
+
+
+def procedure_object_pair(
+    from_type: str,
+    from_id: uuid.UUID,
+    to_type: str,
+    to_id: uuid.UUID,
+) -> tuple[uuid.UUID, uuid.UUID] | None:
+    if from_type == "procedure" and to_type == "object":
+        return from_id, to_id
+    if from_type == "object" and to_type == "procedure":
+        return to_id, from_id
+    return None
+
+
+async def get_active_loan_out_for_object(
+    db: AsyncSession,
+    object_id: uuid.UUID,
+    exclude_procedure_id: uuid.UUID | None = None,
+) -> Procedure | None:
+    stmt = (
+        select(Procedure)
+        .join(
+            Relation,
+            or_(
+                and_(
+                    Relation.from_type == "procedure",
+                    Relation.from_id == Procedure.id,
+                    Relation.to_type == "object",
+                    Relation.to_id == object_id,
+                ),
+                and_(
+                    Relation.to_type == "procedure",
+                    Relation.to_id == Procedure.id,
+                    Relation.from_type == "object",
+                    Relation.from_id == object_id,
+                ),
+            ),
+        )
+        .where(Procedure.procedure_type == "loan_out", Procedure.status == "active")
+        .limit(1)
+    )
+    if exclude_procedure_id:
+        stmt = stmt.where(Procedure.id != exclude_procedure_id)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def procedure_object_ids(db: AsyncSession, procedure_id: uuid.UUID) -> list[uuid.UUID]:
+    result = await db.execute(
+        select(Relation).where(
+            or_(
+                and_(
+                    Relation.from_type == "procedure",
+                    Relation.from_id == procedure_id,
+                    Relation.to_type == "object",
+                ),
+                and_(
+                    Relation.to_type == "procedure",
+                    Relation.to_id == procedure_id,
+                    Relation.from_type == "object",
+                ),
+            )
+        )
+    )
+    ids: list[uuid.UUID] = []
+    for rel in result.scalars().all():
+        ids.append(rel.to_id if rel.from_type == "procedure" else rel.from_id)
+    return ids
 
 
 async def sync_schema_relations(

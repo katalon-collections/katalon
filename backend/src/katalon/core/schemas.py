@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -126,6 +126,7 @@ class RecordBase(BaseModel):
 class ObjectCreate(RecordBase):
     idno: str | None = None
     object_type: str | None = None
+    collection_status: str = "active"
 
 
 class ObjectRead(ObjectCreate):
@@ -167,6 +168,29 @@ class OccurrenceRead(OccurrenceCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+class ProcedureCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    idno: str | None = None
+    procedure_type: str
+    status: str = "draft"
+    start_date: date | None = None
+    end_date: date | None = None
+    due_date: date | None = None
+    reference_number: str | None = None
+    metadata_: dict = {}
+
+
+class ProcedureRead(ProcedureCreate):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProcedureComplete(BaseModel):
+    collection_status: str | None = None
 
 
 # ---------------------------------------------------------------------------

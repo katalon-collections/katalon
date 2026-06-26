@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, ConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, ConflictError } from '../../api/client'
 import type { AnyRecord, FieldDefinition, Page, RecordType } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Plus, Search, Trash } from '../ui/Icons'
@@ -10,6 +10,13 @@ const TABS = [
   { id: 'internal', label: 'Intern' },
   { id: 'public',   label: 'Öffentlich' },
 ]
+const PROCEDURE_TABS = [
+  { id: 'all',       label: 'Alle' },
+  { id: 'draft',     label: 'Entwurf' },
+  { id: 'active',    label: 'Aktiv' },
+  { id: 'completed', label: 'Abgeschlossen' },
+  { id: 'cancelled', label: 'Abgebrochen' },
+]
 
 const PAGE_SIZE = 50
 
@@ -18,6 +25,7 @@ const TYPE_LABELS: Record<RecordType, string> = {
   entity: 'Entitäten',
   place: 'Orte',
   occurrence: 'Occurrences',
+  procedure: 'Vorgänge',
 }
 
 const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
@@ -25,6 +33,7 @@ const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
   entity: 'entity_type',
   place: 'place_type',
   occurrence: 'occurrence_type',
+  procedure: 'procedure_type',
 }
 
 function getApi(recordType: RecordType) {
@@ -33,6 +42,7 @@ function getApi(recordType: RecordType) {
     case 'entity':     return entities
     case 'place':      return places
     case 'occurrence': return occurrences
+    case 'procedure':  return procedures
   }
 }
 
@@ -149,6 +159,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }
 
   const items = data.items
+  const tabs = recordType === 'procedure' ? PROCEDURE_TABS : TABS
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const allSel = items.length > 0 && items.every(o => sel.has(o.id))
   const someSel = items.some(o => sel.has(o.id))
@@ -194,7 +205,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       </div>
 
       <div className="tabs">
-        {TABS.map(t => (
+            {tabs.map(t => (
           <button key={t.id} className={`tab${tab === t.id ? ' active' : ''}`} onClick={() => handleTabChange(t.id)}>
             {t.label}
             {t.id === 'all' && <span className="ct">{data.total}</span>}

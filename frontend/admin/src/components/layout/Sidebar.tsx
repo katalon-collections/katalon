@@ -21,6 +21,7 @@ const NAV: NavItem[] = [
   { id: 'entities-list',   label: 'Entitäten',      Icon: User,      routes: ['entities-list', 'entities-form'] },
   { id: 'places-list',     label: 'Orte',           Icon: MapPin,    routes: ['places-list', 'places-form'] },
   { id: 'occurrences-list', label: 'Occurrences',   Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
+  { id: 'procedures-list', label: 'Vorgänge',       Icon: ListTree,  routes: ['procedures-list', 'procedures-form'] },
   { id: 'import',          label: 'Importer',       Icon: Upload },
   { id: 'audit',           label: 'Audit-Log',      Icon: History },
   { g: 'Konfiguration', roles: ['admin', 'superuser'] },

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep
-from katalon.core.models import AuditLog, Entity, Object, Occurrence, Place, User
+from katalon.core.models import AuditLog, Entity, Object, Occurrence, Place, Procedure, User
 from katalon.core.schemas import AuditLogRead
 
 router = APIRouter(prefix="/audit", tags=["audit"])
@@ -37,6 +37,11 @@ async def _resolve_record_labels(db, logs: list[AuditLog]) -> dict[uuid.UUID, st
         result = await db.execute(select(Occurrence.id, Occurrence.metadata_).where(Occurrence.id.in_(by_type["occurrence"])))
         for id_, md in result.all():
             labels[id_] = (md.get("title") if md else None) or str(id_)[:8]
+
+    if "procedure" in by_type:
+        result = await db.execute(select(Procedure.id, Procedure.idno, Procedure.reference_number).where(Procedure.id.in_(by_type["procedure"])))
+        for id_, idno, reference_number in result.all():
+            labels[id_] = idno or reference_number or str(id_)[:8]
 
     return labels
 

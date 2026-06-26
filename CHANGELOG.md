@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-26
+
+### Added
+- Procedure/Vorgänge als fünfter interner Record-Typ mit CRUD-API, Migration, Admin-Liste/Formular, Audit Log, Snapshots und Schema-Feldern
+- `collection_status` auf Objekten als Systemfeld für Sammlungsstatus
+- Validierung gegen zweite aktive ausgehende Leihgabe (`loan_out`) für dasselbe Objekt
+- Abschluss-Workflow für Vorgänge kann verknüpfte Objekt-Sammlungsstatus in einer Transaktion setzen
+- Konzeptpapier `docs/konzept-vorgaenge.md`
+
+### Changed
+- Ruff ignoriert historische Zeilenlängen (`E501`); echte `E/W/F/I/UP`-Regeln laufen backendweit grün
+
 ## [0.1.22] - 2026-06-18
 
 ### Added

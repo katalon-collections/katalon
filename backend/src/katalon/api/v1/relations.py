@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_admin_or_editor
-from katalon.core.models import Relation
+from katalon.core.models import Procedure, Relation
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
+from katalon.services.relation_service import get_active_loan_out_for_object, procedure_object_pair
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 
@@ -32,7 +33,28 @@ async def list_relations(
 
 
 @router.post("", response_model=RelationRead, status_code=201)
-async def create_relation(data: RelationCreate, db: DBDep, current_user=require_admin_or_editor()) -> Relation:
+async def create_relation(
+    data: RelationCreate,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+) -> Relation:
+    pair = procedure_object_pair(data.from_type, data.from_id, data.to_type, data.to_id)
+    if pair:
+        procedure_id, object_id = pair
+        procedure = (
+            await db.execute(select(Procedure).where(Procedure.id == procedure_id))
+        ).scalar_one_or_none()
+        if procedure and procedure.procedure_type == "loan_out" and procedure.status == "active":
+            existing = await get_active_loan_out_for_object(
+                db,
+                object_id,
+                exclude_procedure_id=procedure_id,
+            )
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Objekt ist bereits in einem aktiven Ausleihvorgang.",
+                )
     rel = Relation(
         from_type=data.from_type, from_id=data.from_id,
         to_type=data.to_type, to_id=data.to_id,
@@ -60,7 +82,11 @@ async def update_relation(
 
 
 @router.delete("/{relation_id}", status_code=204)
-async def delete_relation(relation_id: uuid.UUID, db: DBDep, current_user=require_admin_or_editor()) -> None:
+async def delete_relation(
+    relation_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+) -> None:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()
     if not rel:

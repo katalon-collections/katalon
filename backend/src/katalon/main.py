@@ -32,6 +32,7 @@ from katalon.api.v1 import (
     pids,
     places,
     portal,
+    procedures,
     record_subtypes,
     relations,
     schema_admin,
@@ -220,7 +221,7 @@ async def _ensure_admin_config() -> None:
 async def _ensure_label_fields() -> None:
     """Ensure every primary type has a generic 'label' field definition."""
     async with AsyncSessionLocal() as db:
-        for target_type in ("object", "entity", "place", "occurrence"):
+        for target_type in ("object", "entity", "place", "occurrence", "procedure"):
             result = await db.execute(
                 select(FieldDefinition).where(
                     FieldDefinition.target_type == target_type,
@@ -377,6 +378,7 @@ app.include_router(audit.router, prefix="/v1")
 app.include_router(entities.router, prefix="/v1")
 app.include_router(places.router, prefix="/v1")
 app.include_router(occurrences.router, prefix="/v1")
+app.include_router(procedures.router, prefix="/v1")
 app.include_router(relations.router, prefix="/v1")
 app.include_router(media.router, prefix="/v1")
 app.include_router(media.batch_router, prefix="/v1")

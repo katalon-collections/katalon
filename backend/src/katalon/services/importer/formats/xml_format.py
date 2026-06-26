@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Iterator
+from collections.abc import Iterator
 
 from lxml import etree
 
@@ -115,7 +115,6 @@ class XmlFormat(SourceFormat):
         direct root children.
         """
         root = self._parse_root(content)
-        nsmap = root.nsmap
         if record_xpath == "*":
             elements = list(root)
         else:

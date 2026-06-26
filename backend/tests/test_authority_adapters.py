@@ -415,7 +415,6 @@ async def test_iconclass_fetch_not_found_returns_none() -> None:
 async def test_iconclass_search_fetches_details_for_first_five() -> None:
     adapter = ICONCLASSAdapter()
     search_data = {"result": ["71A1", "71A2", "71A3"]}
-    detail_hit = AsyncMock(return_value=_http({"txt": {"de": ["Detail"]}, "kw": {}, "p": []}))
 
     from katalon.integrations.authority import AuthorityHit
     fake_detail = AuthorityHit(source="iconclass", external_id="71A1", label="Detail", description="")

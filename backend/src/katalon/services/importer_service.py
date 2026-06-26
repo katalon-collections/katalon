@@ -6,7 +6,9 @@ from typing import Any
 from jinja2.sandbox import SandboxedEnvironment
 
 from katalon.services.importer import parse_csv, parse_excel  # noqa: F401
-from katalon.services.importer.formats.csv_format import _detect_delimiter as detect_delimiter  # noqa: F401
+from katalon.services.importer.formats.csv_format import (
+    _detect_delimiter as detect_delimiter,  # noqa: F401
+)
 
 _JINJA_ENV = SandboxedEnvironment()
 

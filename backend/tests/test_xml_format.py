@@ -1,5 +1,4 @@
 """Tests for XmlFormat: sniff, list_element_levels, parse, list_selectors."""
-import pytest
 from katalon.services.importer.formats.xml_format import XmlFormat
 
 fmt = XmlFormat()

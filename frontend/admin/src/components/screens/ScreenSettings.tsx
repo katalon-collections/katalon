@@ -15,6 +15,7 @@ const RECORD_TYPES = [
   { key: 'entity',     label: 'Entitäten' },
   { key: 'place',      label: 'Orte' },
   { key: 'occurrence', label: 'Ereignisse' },
+  { key: 'procedure',  label: 'Vorgänge' },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -709,7 +710,7 @@ function SectionIdnoSchemas() {
                 placeholder="z.B. ulb_x_{counter:05d}"
               />
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                Platzhalter: {'{counter}'} — laufende Nummer | {'{counter:05d}'} — mit Nullen aufgefüllt | {'{year}'} — aktuelles Jahr | {'{type}'} — Typ-Kürzel (obj/ent/pla/occ)
+                Platzhalter: {'{counter}'} — laufende Nummer | {'{counter:05d}'} — mit Nullen aufgefüllt | {'{year}'} — aktuelles Jahr | {'{type}'} — Typ-Kürzel (obj/ent/pla/occ/pro)
               </div>
             </div>
             <div className="field">

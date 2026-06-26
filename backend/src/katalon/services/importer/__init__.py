@@ -1,6 +1,6 @@
 """Import service module with backwards-compatible wrapper functions."""
 
-from .formats import SourceFormat, SourceRecord, Selector, get_format_for
+from .formats import Selector, SourceFormat, SourceRecord, get_format_for
 from .formats.csv_format import CsvFormat
 from .formats.excel_format import ExcelFormat
 

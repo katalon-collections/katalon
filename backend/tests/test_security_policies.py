@@ -77,6 +77,11 @@ async def test_anonymous_lists_keep_public_visibility_with_explicit_status(
             "/v1/occurrences",
             {"idno": "OCC-1", "occurrence_type": "event", "metadata": {}},
         ),
+        (
+            "post",
+            "/v1/procedures",
+            {"idno": "PRO-1", "procedure_type": "loan_out", "metadata": {}},
+        ),
         ("post", "/v1/relations", {
             "from_type": "object",
             "from_id": str(uuid.uuid4()),

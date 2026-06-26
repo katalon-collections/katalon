@@ -1,9 +1,10 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -37,6 +38,7 @@ class Object(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     object_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    collection_status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
@@ -104,6 +106,27 @@ class Occurrence(Base):
     )
 
 
+class Procedure(Base):
+    __tablename__ = "procedures"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    procedure_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    reference_number: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    __table_args__ = (
+        Index("ix_procedures_metadata_gin", "metadata", postgresql_using="gin"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Schema / field definitions
 # ---------------------------------------------------------------------------
@@ -113,11 +136,14 @@ class FieldDefinition(Base):
     __tablename__ = "field_definitions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    target_type: Mapped[str] = mapped_column(String(32), index=True)  # object/entity/place/occurrence
-    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)  # e.g. person, organisation
+    # object/entity/place/occurrence/procedure
+    target_type: Mapped[str] = mapped_column(String(32), index=True)
+    # e.g. person, organisation
+    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(128))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
-    field_type: Mapped[str] = mapped_column(String(32))  # text/date/number/geo/vocab/relation/boolean/group
+    # text/date/number/geo/vocab/relation/boolean/group
+    field_type: Mapped[str] = mapped_column(String(32))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
     is_repeatable: Mapped[bool] = mapped_column(Boolean, default=False)
     is_searchable: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
@@ -188,7 +214,8 @@ class RecordSubtype(Base):
     __tablename__ = "record_subtypes"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    primary_type: Mapped[str] = mapped_column(String(32), index=True)  # object/entity/place/occurrence
+    # object/entity/place/occurrence
+    primary_type: Mapped[str] = mapped_column(String(32), index=True)
     name: Mapped[str] = mapped_column(String(64))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -368,7 +395,8 @@ class PortalConfig(Base):
     site_subtitle: Mapped[str] = mapped_column(String(512), default="")
     hero_text: Mapped[str] = mapped_column(Text, default="")
     featured_object_ids: Mapped[list] = mapped_column(JSONB, default=list)
-    facet_fields: Mapped[dict] = mapped_column(JSONB, default=dict)  # e.g. {"object": ["creator"], "entity": []}
+    # e.g. {"object": ["creator"], "entity": []}
+    facet_fields: Mapped[dict] = mapped_column(JSONB, default=dict)
     accent_color: Mapped[str] = mapped_column(String(32), default="#1e3a8a")
     logo_url: Mapped[str] = mapped_column(String(512), default="")
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="")
@@ -410,7 +438,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
-    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    api_keys: Mapped[list["ApiKey"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -426,7 +457,8 @@ class ApiKey(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(256))
-    key_prefix: Mapped[str] = mapped_column(String(16), index=True)  # first chars for display/lookup
+    # first chars for display/lookup
+    key_prefix: Mapped[str] = mapped_column(String(16), index=True)
     hashed_key: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -445,8 +477,10 @@ class AdminConfig(Base):
     __tablename__ = "admin_config"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True, default="default")
-    idno_schemas: Mapped[dict] = mapped_column(JSONB, default=dict)   # {"object": "ulb_x_{counter:05d}", …}
-    idno_patterns: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"object": "^ulb_x_\\d{5}$", …}
+    # {"object": "ulb_x_{counter:05d}", ...}
+    idno_schemas: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # {"object": "^ulb_x_\\d{5}$", ...}
+    idno_patterns: Mapped[dict] = mapped_column(JSONB, default=dict)
     reconciliation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     reconciliation_threshold: Mapped[int] = mapped_column(Integer, default=5)
     reconciliation_id_diff_enabled: Mapped[bool] = mapped_column(Boolean, default=True)

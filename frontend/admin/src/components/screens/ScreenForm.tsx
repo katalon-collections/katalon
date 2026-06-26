@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
-import type { AnyRecord, AuditEntry, FieldDefinition, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit } from '../ui/Icons'
 
@@ -21,9 +21,27 @@ function extractTitle(m: Record<string, unknown>, fallback: string): string {
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
+const PROCEDURE_STATUSES: ProcedureStatus[] = ['draft', 'active', 'completed', 'cancelled']
+const PROCEDURE_STATUS_LABELS: Record<ProcedureStatus, string> = { draft: 'Entwurf', active: 'Aktiv', completed: 'Abgeschlossen', cancelled: 'Abgebrochen' }
+const PROCEDURE_TYPES = [
+  { id: 'loan_out', label: 'Ausleihe ausgehend' },
+  { id: 'loan_in', label: 'Ausleihe eingehend' },
+  { id: 'acquisition', label: 'Erwerbung' },
+  { id: 'conservation', label: 'Restaurierung' },
+  { id: 'object_entry', label: 'Objekteingang' },
+  { id: 'deaccession', label: 'Deakzession' },
+]
+const PROCEDURE_COMPLETION_STATUS: Record<string, string | null> = {
+  loan_out: 'active',
+  loan_in: 'returned',
+  acquisition: 'active',
+  object_entry: 'active',
+  deaccession: 'deaccessioned',
+  conservation: null,
+}
 
 const PORTAL_PATH: Record<RecordType, string> = {
-  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences',
+  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', procedure: 'procedures',
 }
 
 const TYPE_LABELS: Record<RecordType, string> = {
@@ -31,10 +49,11 @@ const TYPE_LABELS: Record<RecordType, string> = {
   entity:     'Entität',
   place:      'Ort',
   occurrence: 'Occurrence',
+  procedure:  'Vorgang',
 }
 
 const TYPE_ROUTES: Record<string, string> = {
-  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form',
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
 }
 
 function navigateToRecord(type: string, id: string) {
@@ -49,6 +68,7 @@ const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
   entity:     'entity_type',
   place:      'place_type',
   occurrence: 'occurrence_type',
+  procedure:  'procedure_type',
 }
 
 export type AuthorityEntry = { source: string; external_id: string; label: string }
@@ -585,6 +605,7 @@ function getApi(recordType: RecordType) {
     case 'entity':     return entities
     case 'place':      return places
     case 'occurrence': return occurrences
+    case 'procedure':  return procedures
   }
 }
 
@@ -605,13 +626,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showIdno  = true
   const showMedia = recordType === 'object'
   const showGeo   = recordType === 'place'
+  const showProcedureFields = recordType === 'procedure'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [idno, setIdno]       = useState('')
   const [subtype, setSubtype] = useState('')
   const [lat, setLat]         = useState('')
   const [lon, setLon]         = useState('')
-  const [status, setStatus]   = useState<Status>('draft')
+  const [status, setStatus]   = useState<Status | ProcedureStatus>('draft')
+  const [loadedStatus, setLoadedStatus] = useState<Status | ProcedureStatus>('draft')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
   const [values, setValues]   = useState<Record<string, unknown>>({})
   const [showAudit, setShowAudit] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
@@ -714,7 +741,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setSubtype('')
     setLat('')
     setLon('')
+    setStartDate('')
+    setEndDate('')
+    setDueDate('')
+    setReferenceNumber('')
     setStatus('draft')
+    setLoadedStatus('draft')
     setValues({})
     setMediaFiles([])
     setRels([])
@@ -735,6 +767,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         let recSubtype: string | undefined
         if (rec) {
           setStatus(rec.status as Status)
+          setLoadedStatus(rec.status as Status)
           setValues(rec.metadata_)
           const m = rec.metadata_ as Record<string, unknown>
           if (showIdno)  setIdno((rec as { idno?: string | null }).idno ?? '')
@@ -746,6 +779,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             const p = rec as { lat?: number | null; lon?: number | null }
             setLat(p.lat != null ? String(p.lat) : '')
             setLon(p.lon != null ? String(p.lon) : '')
+          }
+          if (showProcedureFields) {
+            const p = rec as { start_date?: string | null; end_date?: string | null; due_date?: string | null; reference_number?: string | null }
+            setStartDate(p.start_date ?? '')
+            setEndDate(p.end_date ?? '')
+            setDueDate(p.due_date ?? '')
+            setReferenceNumber(p.reference_number ?? '')
           }
           setTitle(extractTitle(m, (rec as { idno?: string | null }).idno ?? rec.id))
         }
@@ -1030,7 +1070,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       errors['__idno'] = 'ID-Nr. ist ein Pflichtfeld.'
     }
     // subtype is required when subtypes are configured
-    if (subtypeKey && availableSubtypes.length > 0 && !subtype) {
+    if (subtypeKey && (availableSubtypes.length > 0 || showProcedureFields) && !subtype) {
       errors['__subtype'] = 'Subtyp ist ein Pflichtfeld.'
     }
     for (const f of fields) {
@@ -1203,21 +1243,52 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }
     setFieldErrors({})
     try {
-      const payload: Record<string, unknown> = { status, metadata_: values }
+      const completingProcedure = showProcedureFields && !isNew && loadedStatus !== 'completed' && status === 'completed'
+      const payload: Record<string, unknown> = {
+        status: completingProcedure ? loadedStatus : status,
+        metadata_: values,
+      }
       if (showIdno)   payload.idno = idno || null
       if (subtypeKey) payload[subtypeKey] = subtype
       if (showGeo) {
         payload.lat = lat ? parseFloat(lat) : null
         payload.lon = lon ? parseFloat(lon) : null
       }
+      if (showProcedureFields) {
+        payload.start_date = startDate || null
+        payload.end_date = endDate || null
+        payload.due_date = dueDate || null
+        payload.reference_number = referenceNumber || null
+      }
 
       if (isNew) {
         const created = await (api.create as (d: typeof payload) => Promise<AnyRecord>)(payload)
         setSavedId(created.id)
+        setLoadedStatus(created.status as Status)
         onSaved?.(created.id)
         if (showMedia) loadMedia(created.id)
       } else {
         await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
+        if (completingProcedure) {
+          const objectCount = rels.filter(r => {
+            const targetType = r.from_id === recordId ? r.to_type : r.from_type
+            return targetType === 'object'
+          }).length
+          const suggested = PROCEDURE_COMPLETION_STATUS[subtype] ?? null
+          let collectionStatus: string | null = null
+          if (objectCount > 0 && suggested) {
+            const answer = window.prompt(
+              `${objectCount} verknüpfte Objekt(e): Sammlungsstatus setzen? Leer lassen = nicht ändern.`,
+              suggested,
+            )
+            collectionStatus = answer?.trim() || null
+          }
+          await procedures.complete(recordId!, collectionStatus)
+          setStatus('completed')
+          setLoadedStatus('completed')
+        } else {
+          setLoadedStatus(status)
+        }
         setIsDirty(false)
         setSaveOk(true)
         setTimeout(() => setSaveOk(false), 3000)
@@ -1297,6 +1368,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const hasSavedId   = Boolean(savedId)
   const justCreated  = isNew && hasSavedId
   const showTwoCol   = showMedia || !isNew
+  const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
+  const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1304,17 +1377,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border-s)', borderRadius: 6, overflow: 'hidden' }}>
-            {STATUSES.map(s => (
+            {statusOptions.map(s => (
               <button key={s} onClick={() => { setStatus(s); setIsDirty(true) }}
                 style={{ border: 0, padding: '5px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
                   background: status === s ? 'var(--accent)' : '#fff',
                   color: status === s ? '#fff' : 'var(--fg-2)',
                   borderLeft: s !== 'draft' ? '1px solid var(--border-s)' : undefined }}>
-                {STATUS_LABELS[s]}
+                {statusLabels[s]}
               </button>
             ))}
           </div>
-          {!isNew && status === 'public' && (
+          {!isNew && recordType !== 'procedure' && status === 'public' && (
             <a
               className="btn gh"
               href={`${PORTAL_URL}/${PORTAL_PATH[recordType]}/${recordId}`}
@@ -1391,7 +1464,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </div>
                 )}
 
-                {subtypeKey && availableSubtypes.length > 0 && (
+                {showProcedureFields && (
+                  <div className="field">
+                    <div className="lbl">Vorgangstyp</div>
+                    <select
+                      className="fld"
+                      value={subtype}
+                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); if (fieldErrors['__subtype']) { setFieldErrors(err => { const n = { ...err }; delete n['__subtype']; return n }) } }}
+                      disabled={justCreated}
+                      style={fieldErrors['__subtype'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                    >
+                      <option value="">— Vorgangstyp wählen —</option>
+                      {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                    {fieldErrors['__subtype'] && (
+                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__subtype']}</div>
+                    )}
+                  </div>
+                )}
+
+                {subtypeKey && !showProcedureFields && availableSubtypes.length > 0 && (
                   <div className="field">
                     <div className="lbl">{recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'}</div>
                     <select
@@ -1420,6 +1512,23 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <input className="fld mono" value={lon} onChange={e => { setLon(e.target.value); setIsDirty(true) }} placeholder="Länge (lon)" disabled={justCreated} />
                     </div>
                   </div>
+                )}
+
+                {showProcedureFields && (
+                  <>
+                    <div className="field">
+                      <div className="lbl">Referenznummer</div>
+                      <input className="fld mono" value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setIsDirty(true) }} disabled={justCreated} />
+                    </div>
+                    <div className="field">
+                      <div className="lbl">Daten</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                        <input className="fld mono" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Startdatum" />
+                        <input className="fld mono" type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Fälligkeitsdatum" />
+                        <input className="fld mono" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Enddatum" />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {fields.map(f => {
@@ -1879,7 +1988,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     {rels.length > 0 && (
                       <div style={{ marginBottom: addOpen ? 12 : 0 }}>
                         {rels.map(r => {
-                          const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence' }
+                          const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
                           const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
                           const relTypeLabel = relTypeTerm ? getLabel(relTypeTerm, r.relation_type) : r.relation_type
                           const isFrom = r.from_id === savedId

@@ -14,6 +14,7 @@ _TYPE_ABBREV: dict[str, str] = {
     "entity": "ent",
     "place": "pla",
     "occurrence": "occ",
+    "procedure": "pro",
 }
 
 # Matches {counter}, {counter:05d}, {year}, {type}

@@ -1,5 +1,5 @@
 import io
-from typing import Iterator
+from collections.abc import Iterator
 
 from .base import Selector, SourceFormat, SourceRecord
 
