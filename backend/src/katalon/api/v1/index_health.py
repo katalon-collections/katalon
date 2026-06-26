@@ -5,13 +5,13 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import Entity, Object, Occurrence, Place
+from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
 from katalon.integrations.elasticsearch import count_by_type
 
 router = APIRouter(prefix="/admin/index-health", tags=["admin"])
 
 _MODEL_MAP: dict = {
-    "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+    "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
 }
 
 

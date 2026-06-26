@@ -90,7 +90,7 @@ async def trigger_reindex() -> dict[str, str]:
 
 @router.post("/reindex/{target_type}", dependencies=[require_role("admin")])
 async def trigger_reindex_type(target_type: str) -> dict[str, str]:
-    valid = {"object", "entity", "place", "occurrence"}
+    valid = {"object", "entity", "place", "occurrence", "procedure"}
     if target_type not in valid:
         from fastapi import HTTPException
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ. Erlaubt: {', '.join(sorted(valid))}")

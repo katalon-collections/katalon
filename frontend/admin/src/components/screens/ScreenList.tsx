@@ -36,6 +36,14 @@ const TYPE_LABELS: Record<RecordType, string> = {
   procedure: 'Vorgänge',
 }
 
+const TYPE_SINGULAR_LABELS: Record<RecordType, string> = {
+  object: 'Objekt',
+  entity: 'Entität',
+  place: 'Ort',
+  occurrence: 'Occurrence',
+  procedure: 'Vorgang',
+}
+
 const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
   object: 'object_type',
   entity: 'entity_type',
@@ -160,7 +168,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(`${TYPE_LABELS[recordType].slice(0, -1)} wirklich löschen?`)) return
+    if (!window.confirm(`${TYPE_SINGULAR_LABELS[recordType]} wirklich löschen?`)) return
     try {
       await api.delete(id)
       load()

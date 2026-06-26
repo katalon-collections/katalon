@@ -109,12 +109,12 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict:
     """
     from sqlalchemy import and_, select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place, Relation
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, Relation
     from katalon.integrations.elasticsearch import index_document
     from katalon.services.search_service import build_index_doc
 
     _MODEL_MAP: dict = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -149,7 +149,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
     """Reindex all records of a single type (e.g. after schema changes)."""
     from sqlalchemy import select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import _build_doc
 
@@ -158,6 +158,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
         "entity": Entity,
         "place": Place,
         "occurrence": Occurrence,
+        "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -210,11 +211,11 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
     """
     from sqlalchemy import func, select
 
-    from katalon.core.models import AdminConfig, Entity, Object, Occurrence, Place
+    from katalon.core.models import AdminConfig, Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import count_by_type, list_ids_by_type
 
     _MODEL_MAP: dict = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -265,11 +266,11 @@ def index_record_dispatch_task(record_type: str, record_id: str) -> None:
     """Build index doc for one record and dispatch indexing (used by reconciliation)."""
     import uuid as _uuid_mod
 
-    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.services.search_service import build_index_doc
 
     _MODEL_MAP: dict = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
     model = _MODEL_MAP.get(record_type)
     if model is None:
@@ -298,7 +299,7 @@ def reindex_all_task() -> None:
     """Full reindex – reads all records from DB and pushes to ES directly."""
     from sqlalchemy import select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import ensure_index, index_document
     from katalon.services.search_service import build_index_doc
 
@@ -312,6 +313,7 @@ def reindex_all_task() -> None:
                 (Entity, "entity"),
                 (Place, "place"),
                 (Occurrence, "occurrence"),
+                (Procedure, "procedure"),
             ]:
                 result = await session.execute(select(model))
                 for rec in result.scalars().all():

@@ -191,10 +191,10 @@ async def _load_linked_data(
     """
     from sqlalchemy import and_, select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place, Relation
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, Relation
 
     _MODEL_MAP: dict[str, Any] = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence,
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
     result: dict[str, list[dict]] = {}
 

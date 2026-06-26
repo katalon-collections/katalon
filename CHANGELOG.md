@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-26
+
+### Changed
+- Implementierungsplan aktualisiert Phase 14/Vorgänge und robuste ES-Indexierung als erledigt.
+- Robuste ES-Indexierung, Reindex, Health und Reconciliation berücksichtigen jetzt auch Vorgänge.
+
+### Fixed
+- Admin-Formular zeigt „Neuer Vorgang" und weitere neue Datensatz-Titel grammatikalisch korrekt.
+- Admin-Löschdialog nutzt echte Singular-Labels statt abgeschnittener Pluralformen.
+- Vorgang-Abschluss reindiziert geänderte Objekte, damit `collection_status` in Elasticsearch aktuell bleibt.
+
 ## [0.2.5] - 2026-06-26
 
 ### Added

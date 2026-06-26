@@ -60,6 +60,14 @@ const TYPE_LABELS: Record<RecordType, string> = {
   procedure:  'Vorgang',
 }
 
+const NEW_TYPE_LABELS: Record<RecordType, string> = {
+  object:     'Neues Objekt',
+  entity:     'Neue Entität',
+  place:      'Neuer Ort',
+  occurrence: 'Neue Occurrence',
+  procedure:  'Neuer Vorgang',
+}
+
 const TYPE_ROUTES: Record<string, string> = {
   object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
 }
@@ -665,7 +673,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [registeringPidField, setRegisteringPidField] = useState<string | null>(null)
-  const [title, setTitle]     = useState(isNew ? `Neues ${label}` : '…')
+  const [title, setTitle]     = useState(isNew ? NEW_TYPE_LABELS[recordType] : '…')
 
   const [mediaFiles, setMediaFiles]     = useState<MediaFile[]>([])
   const [uploading, setUploading]       = useState(false)
@@ -753,7 +761,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   useEffect(() => {
     setLoading(true)
-    setTitle(isNew ? `Neues ${label}` : '…')
+    setTitle(isNew ? NEW_TYPE_LABELS[recordType] : '…')
     setSavedId(currentId)
     setIdno('')
     setSubtype('')

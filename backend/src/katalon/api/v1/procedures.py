@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import date
 
@@ -14,6 +15,7 @@ from katalon.core.schemas import (
     SnapshotCreate,
     SnapshotRead,
 )
+from katalon.services import search_service
 from katalon.services.audit_service import log_change
 from katalon.services.idno_service import (
     consume_next_idno,
@@ -30,6 +32,7 @@ from katalon.services.relation_service import (
 from katalon.services.schema_service import validate_metadata
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
+logger = logging.getLogger(__name__)
 
 PROCEDURE_TYPES = {
     "loan_out",
@@ -159,6 +162,10 @@ async def create_procedure(
         user_id=current_user.id,
         action="create",
     )
+    try:
+        await search_service.index_record("procedure", proc, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return proc
 
 
@@ -200,6 +207,10 @@ async def complete_procedure(
                         "new": {"collection_status": data.collection_status},
                     },
                 )
+                try:
+                    await search_service.index_record("object", obj, db)
+                except Exception:
+                    logger.warning("ES index/remove failed", exc_info=True)
 
     await log_change(
         db,
@@ -217,6 +228,10 @@ async def complete_procedure(
         },
     )
     await db.flush()
+    try:
+        await search_service.index_record("procedure", proc, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return proc
 
 
@@ -283,6 +298,10 @@ async def update_procedure(
             "new": ProcedureRead.model_validate(proc).model_dump(mode="json"),
         },
     )
+    try:
+        await search_service.index_record("procedure", proc, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return proc
 
 
@@ -320,6 +339,10 @@ async def delete_procedure(
         action="delete",
     )
     await db.delete(proc)
+    try:
+        await search_service.remove_record(procedure_id)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     cleanup_relation_refs.delay("procedure", str(procedure_id))

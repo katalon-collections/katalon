@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-05-29
+## Stand: 2026-06-26
 
 ---
 
@@ -47,16 +47,17 @@ Vokabular-Verwaltung vollständig verdrahtet.
 
 **Noch offen in Phase 6:**
 - ~~Relationen-Panel im Formular (Phase 6.1)~~ ✅ – Relation-Metadaten bearbeiten, Gegenrichtung anzeigen
-- Snapshot-UI im Formular (Phase 7)
+- ~~Snapshot-UI im Formular (Phase 7)~~ ✅ – Snapshots anzeigen, erstellen und wiederherstellen
 - ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
 ### Phase 7 – Elasticsearch + Versionierung ⚠️
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
 ES-Facetten für vocab- und authority-Felder funktionieren korrekt (Label wird extrahiert, nicht das Raw-Objekt).
 Snapshot-UI im Admin-Formular für alle 4 Typen vollständig ✅ (Issue #217, 2026-05-29).
+Robuste ES-Indexierung via Celery-Retry, manueller Reindex, Index-Health und Reconciliation-Job vollständig ✅ (Issue #214, 2026-06-26).
 
 **Noch offen:**
-- Re-Index-Task via Celery (Massenreindex bei Schema-Änderungen) – Issue #214
+- (keine bekannten Phase-7-Pflichtpunkte)
 
 ### Phase 8 – Public-Portal ✅ (mit laufenden Verbesserungen)
 Homepage, Suchergebnisse, alle 4 Detailseiten, Theme-System.
@@ -129,38 +130,28 @@ Endpoint `/v1/oai` vorhanden. OAI-PMH nutzt die generische Export-Mapping-Schich
 - OpenAPI-Dokumentation finalisieren
 - Cantaloupe-Health-Check beim Start ✅ – `_check_cantaloupe_health()` in `main.py` pingt `/iiif/3` beim Lifespan-Start, loggt Warning bei Fehlern
 
----
+### Phase 14 – Procedure-Typ (Leihverkehr, Erwerbung, Restaurierung) ✅ – Issue #238
 
-## Offene Phasen (geplant, nicht begonnen)
-
-### Phase 14 – Procedure-Typ (Leihverkehr, Erwerbung, Restaurierung) 🔲 – Issue #238
+**Umsetzung:** Gemerged in `main` via `feat/procedures` (Tags `v0.2.0`–`v0.2.5`, Merge `6dd01d6`).
 
 5. Primärtyp für transaktionale/prozessuale Vorgänge. Semantisch getrennt von Occurrence (FRBR).
 
-**Datenmodell:**
-- Neue Tabelle `procedures` mit `procedure_type` (loan_out/loan_in/acquisition/conservation/object_entry/deaccession), `status` (draft/active/completed/cancelled), `start_date`, `end_date`, `due_date`, `reference_number`, `metadata_` JSONB
-- `collection_status VARCHAR` auf `objects` (ersetzt kein Boolean): `active` | `pending` | `on_loan_in` | `deaccessioned` | `returned` — nicht user-konfigurierbar, load-bearing im Code
-- Relationen über bestehende `relations`-Tabelle; pro-Objekt-Notiz via `relations.metadata->>'note'`
+**Erledigt:**
+- Tabelle `procedures` mit `procedure_type`, `status`, Datumsfeldern, `reference_number`, `metadata_` und Snapshots/Audit-Log
+- `collection_status` auf Objekten mit Public-Search-Guard via Elasticsearch/Visibility-Layer
+- CRUD-API `/v1/procedures`, Completion-Endpoint `/v1/procedures/{id}/complete`, Filter für Typ, Status, Fälligkeit, Referenznummer und Suche
+- Schema-Engine akzeptiert `procedure` plus eingebaute Vorgangstypen als `target_subtype`
+- Relationen zwischen Vorgängen und Objekten über bestehende `relations`-Tabelle; Objekt-Panel im Vorgangsformular und Vorgangs-Panel im Objektformular
+- Validierung gegen zweite aktive `loan_out`-Leihgabe pro Objekt im Service/API-Layer
+- Admin-UI: Vorgangsliste, Vorgangsformular, Vorgangstypen, Abschlussdialog, Objektstatus-Vorschlag, Schnellfilter für überfällige aktive Vorgänge
+- Dokumentation in `docs/konzept-vorgaenge.md` und Produktionshinweis zum Reindex in `docs/04_produktion.md`
+- Tests: `backend/tests/integration/test_procedures_integration.py`, `backend/tests/integration/test_schema_container_fields.py`, `backend/tests/test_search_visibility.py`
 
-**Wichtige Design-Entscheidungen:**
-- Filter im Admin via PostgreSQL (kein ES-Denormalisierungsbedarf)
-- Semi-automatische `collection_status`-Updates: Dialog beim Abschließen einer Procedure
-- Loan Renewal: `due_date` updaten (kein `parent_procedure_id`), History via Audit Log
-- Dokument-Referenzen: Freitext-Feld in `metadata_`, kein Datei-Upload
-- Validierung: kein zweiter aktiver `loan_out` pro Objekt (Service-Layer, kein DB-Constraint)
-
-**Zurückgestellt auf Post-MVP:** Per-Objekt strukturierte Felder (Issue #239), Status-Transition-Guards, Auto-Referenznummern, Datei-Attachments.
+**Zurückgestellt auf Post-MVP:** Per-Objekt strukturierte Zusatzfelder auf Vorgangs-Relationen (Issue #239), Status-Transition-Guards, Auto-Referenznummern, Datei-Attachments.
 
 ---
 
-### Phase 6.1 – Relationen-Panel im Admin-Formular ✅
-Suche über alle Typen, Relationstyp wählen, Metadaten auf der Relation.
-
-**Erledigt:**
-- `PUT /v1/relations/{id}` endpoint für Bearbeitung von `relation_type` und `metadata_`
-- Inline-Bearbeitungspanel pro Relation im Admin-Formular
-- Key-Value-Editor für Relation-Metadaten (JSONB)
-- Visueller Gegenrichtung-Indikator (`←`) für eingehende Relationen
+## Offene Phasen
 
 ### Phase 8.1 – Facettiertes Browsing + Portal-Konfiguration
 **Ziel:** Sammlungsverantwortliche konfigurieren im Admin, welche Facetten und Felder im Portal sichtbar sind.
@@ -205,10 +196,11 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 | Feature | Status |
 |---|---|
-| ES-Indexierung + Suche (End-to-End) | ❌ keine Tests |
-| Relationen erstellen/traversieren | ❌ nur Auth-Tests |
+| ES-Indexierung + Suche (End-to-End) | ⚠️ Teiltests für Visibility vorhanden, kein echtes ES-E2E |
+| Relationen erstellen/traversieren | ⚠️ Service-/Validierungstests vorhanden, UI-E2E fehlt |
 | Snapshot erstellen/wiederherstellen | ❌ keine Tests |
 | Media-Upload-Workflow + IIIF-Manifest | ✅ 19 Unit-Tests (Cantaloupe, Tasks, API) |
+| Procedure-Workflows | ✅ Integrationstests für CRUD, aktive `loan_out`-Sperre und Schema-Subtypen |
 | OAI-PMH ResumptionToken Roundtrip | ❌ keine Tests |
 
 ---
@@ -225,13 +217,13 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 ### MVP-Pflicht (vor oder gleichzeitig mit Beta)
 
 1. Inherited Fields: Denormalisierte Relationsfelder im ES-Index (Phase 13) – Issue #213
-2. Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7) – Issue #214
+2. ~~Robuste ES-Indexierung: Retry, Reconciliation, Health (Phase 7)~~ ✅ Issue #214
 
 ### Nachrangig (Post-Beta)
 
 3. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
 4. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
-5. Phase 14 – Procedure-Typ: Leihverkehr, Erwerbung, Restaurierung – Issue #238
+5. Procedure-Post-MVP: strukturierte Zusatzfelder auf Vorgangs-Relationen (#239), Status-Transition-Guards, Auto-Referenznummern, Datei-Attachments
 
 ---
 
