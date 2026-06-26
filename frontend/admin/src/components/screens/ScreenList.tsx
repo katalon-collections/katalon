@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, schema, ConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, ConflictError } from '../../api/client'
 import type { AnyRecord, FieldDefinition, Page, RecordType } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Plus, Search, Trash } from '../ui/Icons'
@@ -10,6 +10,21 @@ const TABS = [
   { id: 'internal', label: 'Intern' },
   { id: 'public',   label: 'Öffentlich' },
 ]
+const PROCEDURE_TABS = [
+  { id: 'all',       label: 'Alle' },
+  { id: 'draft',     label: 'Entwurf' },
+  { id: 'active',    label: 'Aktiv' },
+  { id: 'completed', label: 'Abgeschlossen' },
+  { id: 'cancelled', label: 'Abgebrochen' },
+]
+const PROCEDURE_TYPES = [
+  { id: 'loan_out', label: 'Ausleihe ausgehend' },
+  { id: 'loan_in', label: 'Ausleihe eingehend' },
+  { id: 'acquisition', label: 'Erwerbung' },
+  { id: 'conservation', label: 'Restaurierung' },
+  { id: 'object_entry', label: 'Objekteingang' },
+  { id: 'deaccession', label: 'Deakzession' },
+]
 
 const PAGE_SIZE = 50
 
@@ -18,6 +33,7 @@ const TYPE_LABELS: Record<RecordType, string> = {
   entity: 'Entitäten',
   place: 'Orte',
   occurrence: 'Occurrences',
+  procedure: 'Vorgänge',
 }
 
 const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
@@ -25,6 +41,7 @@ const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
   entity: 'entity_type',
   place: 'place_type',
   occurrence: 'occurrence_type',
+  procedure: 'procedure_type',
 }
 
 function getApi(recordType: RecordType) {
@@ -33,6 +50,7 @@ function getApi(recordType: RecordType) {
     case 'entity':     return entities
     case 'place':      return places
     case 'occurrence': return occurrences
+    case 'procedure':  return procedures
   }
 }
 
@@ -70,6 +88,9 @@ export function ScreenList({ recordType, onOpen }: Props) {
 
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
+  const [procedureType, setProcedureType] = useState('')
+  const [dueBefore, setDueBefore] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
   const [page, setPage] = useState(1)
   const [data, setData] = useState<Page<AnyRecord>>({ total: 0, page: 1, page_size: PAGE_SIZE, items: [] })
   const [loading, setLoading] = useState(true)
@@ -94,6 +115,9 @@ export function ScreenList({ recordType, onOpen }: Props) {
   useEffect(() => {
     setTab('all')
     setQ('')
+    setProcedureType('')
+    setDueBefore('')
+    setReferenceNumber('')
     setPage(1)
     setDebouncedQ('')
     setSel(new Set())
@@ -114,16 +138,26 @@ export function ScreenList({ recordType, onOpen }: Props) {
       status: tab === 'all' ? undefined : tab,
     }
     if (debouncedQ) params.q = debouncedQ
+    if (recordType === 'procedure') {
+      if (procedureType) params.procedure_type = procedureType
+      if (dueBefore) params.due_before = dueBefore
+      if (referenceNumber) params.reference_number = referenceNumber
+    }
     ;(api.list as (p: typeof params) => Promise<Page<AnyRecord>>)(params)
       .then(d => { setData(d); setSel(new Set()) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [page, tab, debouncedQ, api, recordType])
+  }, [page, tab, debouncedQ, procedureType, dueBefore, referenceNumber, api, recordType])
 
   useEffect(() => { load() }, [load])
 
   function handleTabChange(id: string) { setTab(id); setPage(1) }
   function handleSearch(v: string) { setQ(v); setPage(1) }
+  function handleOverdue() {
+    setTab('active')
+    setDueBefore(new Date().toISOString().slice(0, 10))
+    setPage(1)
+  }
 
   async function handleDelete(id: string) {
     if (!window.confirm(`${TYPE_LABELS[recordType].slice(0, -1)} wirklich löschen?`)) return
@@ -149,6 +183,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }
 
   const items = data.items
+  const tabs = recordType === 'procedure' ? PROCEDURE_TABS : TABS
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const allSel = items.length > 0 && items.every(o => sel.has(o.id))
   const someSel = items.some(o => sel.has(o.id))
@@ -194,7 +229,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       </div>
 
       <div className="tabs">
-        {TABS.map(t => (
+            {tabs.map(t => (
           <button key={t.id} className={`tab${tab === t.id ? ' active' : ''}`} onClick={() => handleTabChange(t.id)}>
             {t.label}
             {t.id === 'all' && <span className="ct">{data.total}</span>}
@@ -211,6 +246,17 @@ export function ScreenList({ recordType, onOpen }: Props) {
             onChange={e => handleSearch(e.target.value)}
           />
         </div>
+        {recordType === 'procedure' && (
+          <>
+            <select className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>
+              <option value="">Alle Vorgangstypen</option>
+              {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+            <input className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
+            <input className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
+            <button className="btn gh" onClick={handleOverdue}>Überfällig</button>
+          </>
+        )}
       </div>
 
       {someSel && (

@@ -33,7 +33,7 @@ async def test_count_relations_returns_nonzero() -> None:
 
 @pytest.mark.asyncio
 async def test_count_relations_all_types() -> None:
-    for record_type in ("object", "entity", "place", "occurrence"):
+    for record_type in ("object", "entity", "place", "occurrence", "procedure"):
         db = _make_db(1)
         rid = uuid.uuid4()
         count = await count_relations(db, record_type, rid)
@@ -51,7 +51,7 @@ async def test_delete_relations_executes_query() -> None:
 
 @pytest.mark.asyncio
 async def test_delete_relations_all_types() -> None:
-    for record_type in ("object", "entity", "place", "occurrence"):
+    for record_type in ("object", "entity", "place", "occurrence", "procedure"):
         db = AsyncMock()
         db.execute = AsyncMock(return_value=MagicMock())
         rid = uuid.uuid4()

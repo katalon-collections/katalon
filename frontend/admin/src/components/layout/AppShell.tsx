@@ -29,6 +29,8 @@ const CRUMBS: Record<string, Crumb[]> = {
   'places-form':      [{ label: 'Katalon' }, { label: 'Orte', route: 'places-list' }, { label: 'Bearbeiten' }],
   'occurrences-list': [{ label: 'Katalon' }, { label: 'Occurrences' }],
   'occurrences-form': [{ label: 'Katalon' }, { label: 'Occurrences', route: 'occurrences-list' }, { label: 'Bearbeiten' }],
+  'procedures-list':  [{ label: 'Katalon' }, { label: 'Vorgänge' }],
+  'procedures-form':  [{ label: 'Katalon' }, { label: 'Vorgänge', route: 'procedures-list' }, { label: 'Bearbeiten' }],
   banners:            [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Banner' }],
   subtypes:           [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Subtypen' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
@@ -121,6 +123,8 @@ export function AppShell() {
       case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} />
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
+      case 'procedures-list':   return <ScreenList recordType="procedure" onOpen={(id) => navigate('procedures-form', id)} />
+      case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />

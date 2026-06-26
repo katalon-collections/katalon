@@ -10,6 +10,7 @@ const TYPES = [
   { id: 'entity',      label: 'Entitäten',   key: 'entity' },
   { id: 'place',       label: 'Orte',        key: 'place' },
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
+  { id: 'procedure',   label: 'Vorgänge',    key: 'procedure' },
 ]
 
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
@@ -465,6 +466,7 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
                   <option value="entity">Entitäten</option>
                   <option value="place">Orte</option>
                   <option value="occurrence">Occurrences</option>
+                  <option value="procedure">Vorgänge</option>
                 </select>
               </div>
               <div className="field">

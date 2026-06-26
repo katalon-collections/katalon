@@ -4,7 +4,7 @@ import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
 const TYPE_LABELS: Record<string, string> = {
-  object: 'Obj', entity: 'Ent', place: 'Ort', occurrence: 'Occ',
+  object: 'Obj', entity: 'Ent', place: 'Ort', occurrence: 'Occ', procedure: 'Vor',
 }
 
 interface Props {
@@ -57,6 +57,8 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout }: Props) {
       onNavigate?.('places-form', r.id)
     } else if (r.record_type === 'occurrence') {
       onNavigate?.('occurrences-form', r.id)
+    } else if (r.record_type === 'procedure') {
+      onNavigate?.('procedures-form', r.id)
     }
   }
 

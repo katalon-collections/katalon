@@ -1,26 +1,43 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from katalon.core.dependencies import get_db
 from katalon.main import app
 
 
 @pytest.mark.asyncio
 async def test_search_rate_limit_allows_under_limit() -> None:
     """Requests under the rate limit should succeed."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # First few requests should succeed
-        for _ in range(3):
-            r = await client.get("/v1/search?q=test")
-            assert r.status_code == 200
+    result = {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+    with patch("katalon.api.v1.search.search_service.search", AsyncMock(return_value=result)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First few requests should succeed
+            for _ in range(3):
+                r = await client.get("/v1/search?q=test")
+                assert r.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_oai_rate_limit_allows_under_limit() -> None:
     """OAI-PMH requests under the rate limit should succeed."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        for _ in range(3):
-            r = await client.get("/v1/oai?verb=Identify")
-            assert r.status_code == 200
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=result)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for _ in range(3):
+                r = await client.get("/v1/oai?verb=Identify")
+                assert r.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio

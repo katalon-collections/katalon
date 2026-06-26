@@ -79,13 +79,14 @@ async def _validate_relation_target(
     target_type = settings.get("target_type")
     if not target_type:
         return None
-    from katalon.core.models import Entity, Object, Occurrence, Place
+    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
 
     model_map = {
         "object": Object,
         "entity": Entity,
         "place": Place,
         "occurrence": Occurrence,
+        "procedure": Procedure,
     }
     model = model_map.get(target_type)
     if model is None:

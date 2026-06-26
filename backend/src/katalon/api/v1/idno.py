@@ -8,7 +8,7 @@ from katalon.services.idno_service import peek_next_idno
 
 router = APIRouter(prefix="/idno", tags=["idno"])
 
-_VALID_TYPES = frozenset({"object", "entity", "place", "occurrence"})
+_VALID_TYPES = frozenset({"object", "entity", "place", "occurrence", "procedure"})
 
 
 class NextIdnoResponse(BaseModel):
@@ -18,7 +18,7 @@ class NextIdnoResponse(BaseModel):
 @router.get("/next", response_model=NextIdnoResponse)
 async def get_next_idno(
     db: DBDep,
-    type: str = Query(..., description="Primary record type: object / entity / place / occurrence"),
+    type: str = Query(..., description="Primary record type"),
     _=require_role("editor"),
 ) -> NextIdnoResponse:
     """Return the next suggested idno for a given record type WITHOUT incrementing the counter."""

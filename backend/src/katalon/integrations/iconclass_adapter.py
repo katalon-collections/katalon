@@ -22,7 +22,6 @@ class ICONCLASSAdapter(AuthoritySource):
             data = r.json()
         hits: list[AuthorityHit] = []
         for notation in (data.get("result") or [])[:limit]:
-            label = notation  # plain notation; detail fetched separately
             # Search result only gives notations; fetch text for each (up to 5)
             if len(hits) < 5:
                 detail = await self._fetch_notation(notation)

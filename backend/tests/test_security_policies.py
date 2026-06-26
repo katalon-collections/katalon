@@ -66,6 +66,31 @@ async def test_anonymous_lists_keep_public_visibility_with_explicit_status(
     assert f"{status_column} IN (__[POSTCOMPILE_status_" in statements[0]
 
 
+@pytest.mark.asyncio
+async def test_anonymous_object_lists_keep_active_collection_visibility() -> None:
+    statements: list[str] = []
+    session = AsyncMock()
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return _count_result() if len(statements) == 1 else _items_result()
+
+    session.execute = AsyncMock(side_effect=execute)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/v1/objects")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "objects.collection_status = :collection_status_" in statements[0]
+
+
 @pytest.mark.parametrize(
     ("method", "path", "json_body"),
     [
@@ -76,6 +101,11 @@ async def test_anonymous_lists_keep_public_visibility_with_explicit_status(
             "post",
             "/v1/occurrences",
             {"idno": "OCC-1", "occurrence_type": "event", "metadata": {}},
+        ),
+        (
+            "post",
+            "/v1/procedures",
+            {"idno": "PRO-1", "procedure_type": "loan_out", "metadata": {}},
         ),
         ("post", "/v1/relations", {
             "from_type": "object",

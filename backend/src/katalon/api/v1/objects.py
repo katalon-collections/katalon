@@ -38,6 +38,7 @@ from katalon.services.subtype_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/objects", tags=["objects"])
+COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
 
 
 @router.get("", response_model=dict)
@@ -99,6 +100,8 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
     errors = await validate_metadata(db, "object", data.metadata_, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
+    if data.collection_status not in COLLECTION_STATUSES:
+        raise HTTPException(status_code=422, detail="Ungültiger Sammlungsstatus.")
 
     existing = await db.execute(select(Object).where(Object.idno == idno))
     if existing.scalar_one_or_none():
@@ -107,6 +110,7 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
     obj = Object(
         idno=idno,
         object_type=object_type,
+        collection_status=data.collection_status,
         status=data.status,
         metadata_=data.metadata_,
     )
@@ -152,15 +156,19 @@ async def update_object(
     errors = await validate_metadata(db, "object", data.metadata_, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
+    if data.collection_status not in COLLECTION_STATUSES:
+        raise HTTPException(status_code=422, detail="Ungültiger Sammlungsstatus.")
 
     old_fields = {
         "idno": obj.idno,
         "object_type": obj.object_type,
+        "collection_status": obj.collection_status,
         "status": obj.status,
         "metadata": obj.metadata_,
     }
     obj.idno = data.idno.strip()
     obj.object_type = object_type
+    obj.collection_status = data.collection_status
     obj.status = data.status
     obj.metadata_ = data.metadata_
 
@@ -176,6 +184,7 @@ async def update_object(
             "old": old_fields,
             "new": {
                 "object_type": object_type,
+                "collection_status": data.collection_status,
                 "status": data.status,
                 "metadata": data.metadata_,
             },
@@ -255,6 +264,7 @@ async def create_snapshot(
         snapshot={
             "idno": obj.idno,
             "object_type": obj.object_type,
+            "collection_status": obj.collection_status,
             "status": obj.status,
             "metadata": obj.metadata_,
         },
@@ -344,6 +354,8 @@ async def restore_snapshot(
         obj.status = data["status"]
     if "object_type" in data:
         obj.object_type = data["object_type"]
+    if "collection_status" in data:
+        obj.collection_status = data["collection_status"]
     if "metadata" in data:
         obj.metadata_ = data["metadata"]
     await db.flush()

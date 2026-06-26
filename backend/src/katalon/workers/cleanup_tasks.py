@@ -11,19 +11,20 @@ def _run(coro: Any) -> Any:
 
 
 async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:
-    """Remove dangling {id: deleted_id} entries from metadata_ JSONB across all four primary types.
+    """Remove dangling {id: deleted_id} entries from metadata_ JSONB across primary types.
 
     Factored out of the Celery task for testability.
     """
     from sqlalchemy import select
 
-    from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place
+    from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, Procedure
 
     MODEL_MAP: dict[str, Any] = {
         "object": Object,
         "entity": Entity,
         "place": Place,
         "occurrence": Occurrence,
+        "procedure": Procedure,
     }
 
     fd_result = await session.execute(
@@ -73,7 +74,7 @@ async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:
 
 @celery_app.task(name="katalon.cleanup_relation_refs")
 def cleanup_relation_refs(deleted_type: str, deleted_id: str) -> dict:
-    """Remove dangling relation-field entries from metadata_ JSONB in all four primary type tables."""
+    """Remove dangling relation-field entries from metadata_ JSONB in primary type tables."""
     from katalon.database import AsyncSessionLocal
 
     async def _run_cleanup() -> dict:

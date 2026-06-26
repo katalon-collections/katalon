@@ -5,6 +5,59 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-26
+
+### Added
+- Objektformular hat eigenes Panel „Vorgänge" für feste Objekt-Vorgang-Verknüpfungen
+
+### Fixed
+- Vorgangsschemata laden mit eingebauten Vorgangstypen wie `conservation`
+
+## [0.2.4] - 2026-06-26
+
+### Added
+- Vorgangsformular hat eigenes Panel „Objekte im Vorgang" mit Objektstatus und schnellem Objekt-Hinzufügen
+
+## [0.2.3] - 2026-06-26
+
+### Added
+- Vorgangsliste hat Schnellfilter für überfällige aktive Vorgänge
+- Vorgangsdokumentation beschreibt API-Endpunkte, Portal-Sichtbarkeit und Reindex-Schritt für `collection_status`
+
+### Changed
+- Vorgang-Abschluss nutzt einen klaren Dialog mit Statuswechsel/ohne Statuswechsel statt Browser-Confirm
+- Vorgangsformular benennt Objektverknüpfungen sichtbarer als „Objekte & Beziehungen"
+
+## [0.2.2] - 2026-06-26
+
+### Added
+- Admin-Vorgangsliste filtert nach Vorgangstyp, Fälligkeit bis und Referenznummer
+- Elasticsearch-Index enthält `collection_status` für Objekte
+
+### Changed
+- Anonyme Suche blendet nicht aktive Objekte aus, ohne andere Record-Typen zu verstecken
+- Vorgang-Abschluss nutzt Bestätigungsdialog statt freier Prompt-Eingabe für vorgeschlagenen Sammlungsstatus
+
+## [0.2.1] - 2026-06-26
+
+### Added
+- Admin-Objektformular zeigt und speichert `collection_status` als Systemfeld
+
+### Changed
+- Öffentliche Objektlisten und Objektdetails zeigen anonym nur noch Objekte mit aktivem Sammlungsstatus
+
+## [0.2.0] - 2026-06-26
+
+### Added
+- Procedure/Vorgänge als fünfter interner Record-Typ mit CRUD-API, Migration, Admin-Liste/Formular, Audit Log, Snapshots und Schema-Feldern
+- `collection_status` auf Objekten als Systemfeld für Sammlungsstatus
+- Validierung gegen zweite aktive ausgehende Leihgabe (`loan_out`) für dasselbe Objekt
+- Abschluss-Workflow für Vorgänge kann verknüpfte Objekt-Sammlungsstatus in einer Transaktion setzen
+- Konzeptpapier `docs/konzept-vorgaenge.md`
+
+### Changed
+- Ruff ignoriert historische Zeilenlängen (`E501`); echte `E/W/F/I/UP`-Regeln laufen backendweit grün
+
 ## [0.1.22] - 2026-06-18
 
 ### Added

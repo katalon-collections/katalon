@@ -146,7 +146,7 @@ async def test_target_record_not_found_returns_error() -> None:
 
 @pytest.mark.asyncio
 async def test_target_all_primary_types_accepted() -> None:
-    for target_type in ("object", "entity", "place", "occurrence"):
+    for target_type in ("object", "entity", "place", "occurrence", "procedure"):
         db = AsyncMock()
         db.execute = AsyncMock(return_value=_found_result())
         entry = {"id": str(uuid.uuid4()), "label": "Test"}
@@ -170,7 +170,11 @@ async def test_relation_field_valid_single() -> None:
 
 @pytest.mark.asyncio
 async def test_relation_field_valid_repeatable() -> None:
-    field = make_relation_field("photographer", is_repeatable=True, settings={"target_type": "entity"})
+    field = make_relation_field(
+        "photographer",
+        is_repeatable=True,
+        settings={"target_type": "entity"},
+    )
     entries = [
         {"id": str(uuid.uuid4()), "label": "Alice", "relation_type": "Fotografin"},
         {"id": str(uuid.uuid4()), "label": "Bob", "relation_type": "Auftraggeber"},

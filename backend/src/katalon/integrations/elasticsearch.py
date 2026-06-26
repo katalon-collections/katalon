@@ -153,6 +153,7 @@ async def search_documents(
     extra_filters: dict[str, str] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
+    active_objects_only: bool = False,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -180,6 +181,16 @@ async def search_documents(
         filters.append({"term": {f"facet_{field}": value}})
     for field, value in (rel_filters or {}).items():
         filters.append({"term": {field: value}})
+    if active_objects_only:
+        filters.append({
+            "bool": {
+                "should": [
+                    {"bool": {"must_not": {"term": {"record_type": "object"}}}},
+                    {"term": {"collection_status": "active"}},
+                ],
+                "minimum_should_match": 1,
+            }
+        })
 
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 

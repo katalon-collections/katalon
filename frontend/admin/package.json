@@ -1,6 +1,6 @@
 {
   "name": "katalon-admin",
-  "version": "0.1.22",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "scripts": {

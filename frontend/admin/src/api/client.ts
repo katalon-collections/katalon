@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, MetadataMapping, Occurrence, Page, Place, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -168,6 +168,29 @@ export const occurrences = {
     list:    (id: string) => req<Snapshot[]>(`/v1/occurrences/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/occurrences/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
     restore: (id: string, snapId: string) => req<Occurrence>(`/v1/occurrences/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+  },
+}
+
+// Procedures
+export const procedures = {
+  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; q?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<Procedure>>(`/v1/procedures${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<Procedure>(`/v1/procedures/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/procedures/${id}/audit-log`),
+  create: (data: Partial<Procedure>) => req<Procedure>('/v1/procedures', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Procedure>) => req<Procedure>(`/v1/procedures/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/procedures/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  complete: (id: string, collection_status?: string | null) =>
+    req<Procedure>(`/v1/procedures/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ collection_status: collection_status ?? null }),
+    }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/procedures/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/procedures/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string) => req<Procedure>(`/v1/procedures/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
   },
 }
 

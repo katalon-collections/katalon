@@ -11,7 +11,24 @@ from sqlalchemy import or_, select
 from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import FieldDefinition
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
-from katalon.services.subtype_service import ensure_subtype_exists, validate_primary_type
+from katalon.services.subtype_service import ensure_subtype_exists
+
+
+SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+PROCEDURE_TYPES = {"loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession"}
+
+
+def _validate_schema_target_type(target_type: str) -> None:
+    if target_type not in SCHEMA_TARGET_TYPES:
+        raise HTTPException(status_code=422, detail="Ungültiger Primärtyp.")
+
+
+async def _ensure_schema_subtype_exists(db: DBDep, target_type: str, subtype: str | None) -> None:
+    if target_type == "procedure":
+        if subtype is not None and subtype not in PROCEDURE_TYPES:
+            raise HTTPException(status_code=422, detail=f"Ungültiger Vorgangstyp '{subtype}'.")
+        return
+    await ensure_subtype_exists(db, target_type, subtype)
 
 
 def _fd_read(f: FieldDefinition, children: list[FieldDefinitionRead] | None = None) -> FieldDefinitionRead:
@@ -71,9 +88,9 @@ async def list_fields(
     subtype: str | None = Query(default=None, description="Filter to generic + this subtype"),
     include_deleted: bool = Query(False, description="Include soft-deleted fields"),
 ) -> list[FieldDefinitionRead]:
-    validate_primary_type(target_type)
+    _validate_schema_target_type(target_type)
     if subtype is not None:
-        await ensure_subtype_exists(db, target_type, subtype)
+        await _ensure_schema_subtype_exists(db, target_type, subtype)
     q = select(FieldDefinition).where(
         FieldDefinition.target_type == target_type,
         FieldDefinition.parent_id.is_(None),  # top-level only; sub-fields embedded via children
@@ -116,11 +133,11 @@ async def _validate_parent(db: DBDep, parent_id: uuid.UUID, field_type: str) -> 
 async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
-    validate_primary_type(data.target_type)
+    _validate_schema_target_type(data.target_type)
     if data.parent_id:
         await _validate_parent(db, data.parent_id, data.field_type)
     else:
-        await ensure_subtype_exists(db, data.target_type, data.target_subtype)
+        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
@@ -134,11 +151,11 @@ async def update_field(
 ) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
-    validate_primary_type(data.target_type)
+    _validate_schema_target_type(data.target_type)
     if data.parent_id:
         await _validate_parent(db, data.parent_id, data.field_type)
     else:
-        await ensure_subtype_exists(db, data.target_type, data.target_subtype)
+        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -225,7 +242,7 @@ async def import_schema(
         )
 
     target_type: str = data["target_type"]
-    validate_primary_type(target_type)
+    _validate_schema_target_type(target_type)
     raw_fields: list = data.get("fields", [])
 
     if not isinstance(raw_fields, list):
