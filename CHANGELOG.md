@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-26
+
+### Added
+- Vorgangsliste hat Schnellfilter für überfällige aktive Vorgänge
+- Vorgangsdokumentation beschreibt API-Endpunkte, Portal-Sichtbarkeit und Reindex-Schritt für `collection_status`
+
+### Changed
+- Vorgang-Abschluss nutzt einen klaren Dialog mit Statuswechsel/ohne Statuswechsel statt Browser-Confirm
+- Vorgangsformular benennt Objektverknüpfungen sichtbarer als „Objekte & Beziehungen"
+
 ## [0.2.2] - 2026-06-26
 
 ### Added

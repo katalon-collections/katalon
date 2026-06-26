@@ -153,6 +153,11 @@ export function ScreenList({ recordType, onOpen }: Props) {
 
   function handleTabChange(id: string) { setTab(id); setPage(1) }
   function handleSearch(v: string) { setQ(v); setPage(1) }
+  function handleOverdue() {
+    setTab('active')
+    setDueBefore(new Date().toISOString().slice(0, 10))
+    setPage(1)
+  }
 
   async function handleDelete(id: string) {
     if (!window.confirm(`${TYPE_LABELS[recordType].slice(0, -1)} wirklich löschen?`)) return
@@ -249,6 +254,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
             </select>
             <input className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
             <input className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
+            <button className="btn gh" onClick={handleOverdue}>Überfällig</button>
           </>
         )}
       </div>

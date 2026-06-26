@@ -229,6 +229,12 @@ Nach dem ersten Start den Index und die Mappings aufbauen:
 curl -X POST https://deine-domain.de/v1/search/reindex
 ```
 
+Nach dem Vorgänge-Update (`0.2.x`) muss für bestehende Daten mindestens der Objektindex neu aufgebaut werden, weil `collection_status` in die öffentlichen Suchfilter aufgenommen wurde:
+
+```bash
+curl -X POST https://deine-domain.de/v1/search/reindex/object
+```
+
 ## 9. Erster Login
 
 Beim ersten API-Start ohne vorhandenen Admin/Superuser erzeugt Katalon automatisch:
@@ -251,6 +257,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 docker compose exec api alembic upgrade head
 # Falls Schema-Änderungen: Reindex anstoßen
 curl -X POST https://deine-domain.de/v1/search/reindex
+```
+
+Für Updates, die nur Objekt-Suchfelder ändern, reicht:
+
+```bash
+curl -X POST https://deine-domain.de/v1/search/reindex/object
 ```
 
 ## Backups

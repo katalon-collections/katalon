@@ -694,6 +694,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [editRelType, setEditRelType]     = useState('')
   const [editMeta, setEditMeta]           = useState<{ key: string; value: string }[]>([])
   const [editSaving, setEditSaving]       = useState(false)
+  const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
 
   // Warn on browser tab close / reload
   useEffect(() => {
@@ -763,6 +764,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setRels([])
     setRelTitles({})
     setAddOpen(false)
+    setCompletionDialog(null)
 
     // Load available subtypes for this record type
     if (subtypeKey) {
@@ -1290,12 +1292,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             return targetType === 'object'
           }).length
           const suggested = PROCEDURE_COMPLETION_STATUS[subtype] ?? null
-          const collectionStatus = objectCount > 0 && suggested && window.confirm(
-            `${objectCount} verknüpfte Objekt(e): Sammlungsstatus auf "${suggested}" setzen?`,
-          ) ? suggested : null
-          await procedures.complete(recordId!, collectionStatus)
-          setStatus('completed')
-          setLoadedStatus('completed')
+          if (objectCount > 0 && suggested) {
+            setCompletionDialog({ count: objectCount, status: suggested })
+          } else {
+            await completeProcedure(null)
+          }
         } else {
           setLoadedStatus(status)
         }
@@ -1303,6 +1304,25 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setSaveOk(true)
         setTimeout(() => setSaveOk(false), 3000)
       }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function completeProcedure(collectionStatus: string | null) {
+    if (!recordId) return
+    setSaving(true)
+    setError(null)
+    try {
+      await procedures.complete(recordId, collectionStatus)
+      setStatus('completed')
+      setLoadedStatus('completed')
+      setCompletionDialog(null)
+      setIsDirty(false)
+      setSaveOk(true)
+      setTimeout(() => setSaveOk(false), 3000)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -1431,6 +1451,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             </ul>
           )}
         </div>
+      )}
+
+      {completionDialog && (
+        <dialog open style={{ position: 'fixed', inset: 0, margin: 'auto', width: 420, maxWidth: 'calc(100vw - 32px)', border: '1px solid var(--border)', borderRadius: 8, padding: 0, background: 'var(--bg)', color: 'var(--fg)', boxShadow: '0 24px 80px rgba(0,0,0,.24)', zIndex: 20 }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>Vorgang abschließen</div>
+          <div style={{ padding: 16, fontSize: 13, lineHeight: 1.5 }}>
+            {completionDialog.count} verknüpfte Objekt(e) gefunden. Sammlungsstatus auf <span className="mono">{completionDialog.status}</span> setzen?
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-s)' }}>
+            <button className="btn gh" onClick={() => completeProcedure(null)} disabled={saving}>Ohne Statuswechsel</button>
+            <button className="btn pri" onClick={() => completeProcedure(completionDialog.status)} disabled={saving}>Status setzen</button>
+          </div>
+        </dialog>
       )}
 
       {justCreated && (
@@ -2001,11 +2034,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               {!isNew && (
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div className="hd">
-                    <span>Beziehungen</span>
+                    <span>{showProcedureFields ? 'Objekte & Beziehungen' : 'Beziehungen'}</span>
                     {rels.length > 0 && <span className="sub">{rels.length}</span>}
                     <div className="grow" />
                     {!addOpen && hasSavedId && (
-                      <button className="btn sm gh" onClick={() => setAddOpen(true)}><Plus size={12} /> Hinzufügen</button>
+                      <button className="btn sm gh" onClick={() => { if (showProcedureFields) setAddTargetType('object'); setAddOpen(true) }}><Plus size={12} /> {showProcedureFields ? 'Objekt verknüpfen' : 'Hinzufügen'}</button>
                     )}
                   </div>
                   <div className="bd">

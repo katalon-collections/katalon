@@ -61,6 +61,8 @@ Vorgänge verändern den **Sammlungsstatus** eines Objekts. Katalon führt dazu 
 
 Der Status wird **nicht automatisch** gewechselt. Beim Abschließen eines Vorgangs erscheint ein Dialog: *„Sammlungsstatus von X Objekten auf ‚active' setzen?"* – die Entscheidung liegt bei der Sachbearbeiterin.
 
+Im Admin-Formular ist der Sammlungsstatus zusätzlich direkt am Objekt sichtbar und bearbeitbar. Vorgänge können damit den Status setzen, aber sie sind nicht die einzige Änderungsquelle.
+
 ---
 
 ## User Stories
@@ -169,6 +171,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 ## Sichtbarkeit im Portal
 
 - Das öffentliche Portal zeigt standardmäßig nur Objekte mit Sammlungsstatus `active`
+- Die öffentliche Elasticsearch-Suche filtert anonyme Treffer ebenfalls auf aktive Objekte. Nach Deployments, die `collection_status` neu in den Index aufnehmen, muss der Objektindex neu aufgebaut werden.
 - Leihgaben, Erwerbungen, Restaurierungen sind **nicht öffentlich** (interne Vorgänge)
 - Ausnahme: Sammlungsverantwortliche können einzelne Vorgangsdetails manuell in Objektbeschreibungen einarbeiten
 
@@ -179,10 +182,34 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 - Neue Datenbanktabelle `procedures` mit Pflichtfeldern und freiem `metadata_`-JSONB
 - Sammlungsstatus auf `objects` als nicht-konfigurierbares Systemfeld
 - Verknüpfung mit Objekten, Entitäten, Orten über das bestehende Relationssystem
-- Filterung und Suche über PostgreSQL (kein Elasticsearch nötig)
+- Admin-Listenfilter für Vorgangstyp, Status, Fälligkeit und Referenznummer
+- Öffentliche Suche über Elasticsearch respektiert `collection_status=active`
 - Vollständiges Audit Log bei jedem Statuswechsel
 - Neue Admin-Screens: Vorgangsliste, Vorgangs-Formular
 - Kein neues Datenbankvolumen nötig, keine Architekturänderung
+
+### API-Endpunkte
+
+- `GET /v1/procedures` mit `status`, `procedure_type`, `due_before`, `reference_number`, `q`
+- `POST /v1/procedures`
+- `GET /v1/procedures/{id}`
+- `PUT /v1/procedures/{id}`
+- `DELETE /v1/procedures/{id}`
+- `POST /v1/procedures/{id}/complete` mit optionalem `collection_status`
+
+### Reindex nach Deployment
+
+Für bestehende Daten muss nach dem Deployment mindestens der Objektindex neu aufgebaut werden, damit öffentliche Suche den neuen Sammlungsstatus kennt:
+
+```bash
+curl -X POST https://deine-domain.de/v1/search/reindex/object
+```
+
+Alternativ vollständig neu indexieren:
+
+```bash
+curl -X POST https://deine-domain.de/v1/search/reindex
+```
 
 ---
 
