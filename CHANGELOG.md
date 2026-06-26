@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-06-26
+
+### Added
+- Vorgangsformular hat eigenes Panel „Objekte im Vorgang" mit Objektstatus und schnellem Objekt-Hinzufügen
+
 ## [0.2.3] - 2026-06-26
 
 ### Added

@@ -181,7 +181,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 
 - Neue Datenbanktabelle `procedures` mit Pflichtfeldern und freiem `metadata_`-JSONB
 - Sammlungsstatus auf `objects` als nicht-konfigurierbares Systemfeld
-- Verknüpfung mit Objekten, Entitäten, Orten über das bestehende Relationssystem
+- Eigenes Admin-Panel „Objekte im Vorgang" auf Basis des bestehenden Relationssystems; Entitäten und Orte bleiben im allgemeinen Beziehungsblock
 - Admin-Listenfilter für Vorgangstyp, Status, Fälligkeit und Referenznummer
 - Öffentliche Suche über Elasticsearch respektiert `collection_status=active`
 - Vollständiges Audit Log bei jedem Statuswechsel
