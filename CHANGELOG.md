@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-26
+
+### Changed
+- Beziehungen-Panel ist jetzt read-only Navigationsansicht; alle Relationen werden als klickbare Links angezeigt. Anlegen von Relationen ausschließlich über Schema-Felder im Metadaten-Formular (closes #240).
+
+### Removed
+- Generisches „Hinzufügen" im Beziehungen-Panel entfernt (inkl. Add/Edit-Formular und Edit/Delete-Buttons pro Relation).
+
 ## [0.2.6] - 2026-06-26
 
 ### Changed

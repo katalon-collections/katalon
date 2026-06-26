@@ -79,6 +79,17 @@ function navigateToRecord(type: string, id: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
+function procedureSearchResult(proc: AnyRecord): SearchResult {
+  const idno = (proc as { idno?: string | null }).idno
+  return {
+    id: proc.id,
+    record_type: 'procedure',
+    title: extractTitle(proc.metadata_ as Record<string, unknown>, idno ?? proc.id.slice(0, 8) + '…'),
+    status: proc.status,
+    score: null,
+  }
+}
+
 const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
   object:     'object_type',
   entity:     'entity_type',
@@ -689,20 +700,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
+  const [relMeta, setRelMeta]     = useState<Record<string, Record<string, unknown>>>({})
   const [objectStatuses, setObjectStatuses] = useState<Record<string, string>>({})
-  const [addOpen, setAddOpen]     = useState(false)
   const [addTargetType, setAddTargetType] = useState<RecordType>('object')
   const [addSearchQ, setAddSearchQ]       = useState('')
   const [addResults, setAddResults]       = useState<SearchResult[]>([])
   const [addSearching, setAddSearching]   = useState(false)
-  const [addRelType, setAddRelType]       = useState('')
   const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
   const [addSaving, setAddSaving]         = useState(false)
-
-  const [editRel, setEditRel]             = useState<Relation | null>(null)
-  const [editRelType, setEditRelType]     = useState('')
-  const [editMeta, setEditMeta]           = useState<{ key: string; value: string }[]>([])
-  const [editSaving, setEditSaving]       = useState(false)
   const [addProcedureOpen, setAddProcedureOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
 
@@ -735,6 +740,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       const loaded = [...fromRels, ...toRels]
       setRels(loaded)
       const titleMap: Record<string, string> = {}
+      const metaMap: Record<string, Record<string, unknown>> = {}
       const statusMap: Record<string, string> = {}
       await Promise.all(loaded.map(async r => {
         const isFrom = r.from_id === id
@@ -745,6 +751,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
           const m = rec.metadata_ as Record<string, unknown>
           titleMap[key] = extractTitle(m, (rec as { idno?: string | null }).idno ?? targetId.slice(0, 8) + '…')
+          metaMap[key] = m
           if (targetType === 'object') {
             statusMap[targetId] = (rec as { collection_status?: string | null }).collection_status ?? 'active'
           }
@@ -753,6 +760,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
       }))
       setRelTitles(titleMap)
+      setRelMeta(metaMap)
       setObjectStatuses(statusMap)
     } catch {
       // silently ignore
@@ -778,8 +786,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setMediaFiles([])
     setRels([])
     setRelTitles({})
+    setRelMeta({})
     setObjectStatuses({})
-    setAddOpen(false)
     setAddProcedureOpen(false)
     setCompletionDialog(null)
 
@@ -887,35 +895,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   useEffect(() => {
     const searchOpen =
-      addOpen ||
       (showProcedureFields && addTargetType === 'object') ||
       (showCollectionStatus && addProcedureOpen && addTargetType === 'procedure')
     if (!searchOpen || addSearchQ.trim().length < 2) { setAddResults([]); return }
     setAddSearching(true)
     const timer = setTimeout(() => {
-      searchApi.query(addSearchQ.trim(), addTargetType, 6)
-        .then(r => setAddResults(r.items))
+      const q = addSearchQ.trim()
+      const request = addTargetType === 'procedure'
+        ? procedures.list({ q, page_size: 6 }).then(r => r.items.map(procedureSearchResult))
+        : searchApi.query(q, addTargetType, 6).then(r => r.items)
+      request
+        .then(setAddResults)
         .catch(() => setAddResults([]))
         .finally(() => setAddSearching(false))
     }, 300)
     return () => clearTimeout(timer)
-  }, [addSearchQ, addTargetType, addOpen, showProcedureFields, showCollectionStatus, addProcedureOpen])
-
-  async function handleAddRelation() {
-    if (!addSelected || !addRelType.trim() || !savedId) return
-    setAddSaving(true)
-    try {
-      const created = await relationsApi.create({
-        from_type: recordType, from_id: savedId,
-        to_type: addSelected.record_type, to_id: addSelected.id,
-        relation_type: addRelType.trim(),
-      })
-      setRels(prev => [...prev, created])
-      setRelTitles(prev => ({ ...prev, [`${created.to_type}/${created.to_id}`]: addSelected.title }))
-      setAddOpen(false); setAddSearchQ(''); setAddRelType(''); setAddSelected(null); setAddResults([])
-    } catch (e) { alert((e as Error).message) }
-    finally { setAddSaving(false) }
-  }
+  }, [addSearchQ, addTargetType, showProcedureFields, showCollectionStatus, addProcedureOpen])
 
   async function handleAddObjectRelation(result: SearchResult) {
     if (!savedId) return
@@ -937,17 +932,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     finally { setAddSaving(false) }
   }
 
-  async function handleAddProcedureRelation() {
-    if (!addSelected || !savedId) return
+  async function handleAddProcedureRelation(selected = addSelected) {
+    if (!selected || !savedId) return
     setAddSaving(true)
     try {
       const created = await relationsApi.create({
         from_type: recordType, from_id: savedId,
-        to_type: 'procedure', to_id: addSelected.id,
+        to_type: 'procedure', to_id: selected.id,
         relation_type: 'concerns',
       })
       setRels(prev => [...prev, created])
-      setRelTitles(prev => ({ ...prev, [`procedure/${created.to_id}`]: addSelected.title }))
+      setRelTitles(prev => ({ ...prev, [`procedure/${created.to_id}`]: selected.title }))
       setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([])
     } catch (e) { alert((e as Error).message) }
     finally { setAddSaving(false) }
@@ -964,31 +959,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setObjectStatuses(prev => { const next = { ...prev }; delete next[targetId]; return next })
       }
     } catch (e) { alert((e as Error).message) }
-  }
-
-  function openEditRelation(r: Relation) {
-    setEditRel(r)
-    setEditRelType(r.relation_type)
-    const meta = r.metadata_ ?? {}
-    setEditMeta(Object.entries(meta).map(([key, value]) => ({ key, value: String(value ?? '') })))
-  }
-
-  async function handleUpdateRelation() {
-    if (!editRel || !editRelType.trim()) return
-    setEditSaving(true)
-    try {
-      const metadata_: Record<string, unknown> = {}
-      editMeta.forEach(({ key, value }) => { if (key.trim()) metadata_[key.trim()] = value })
-      const updated = await relationsApi.update(editRel.id, {
-        relation_type: editRelType.trim(),
-        metadata_,
-      })
-      setRels(prev => prev.map(r => r.id === updated.id ? updated : r))
-      setEditRel(null)
-      setEditRelType('')
-      setEditMeta([])
-    } catch (e) { alert((e as Error).message) }
-    finally { setEditSaving(false) }
   }
 
   // All user-triggered value mutations go through this wrapper to mark the form dirty
@@ -1467,6 +1437,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : showCollectionStatus
       ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'procedure')
       : rels
+  const linkedProcedureIds = new Set(procedureRels.map(r => r.from_id === savedId ? r.to_id : r.from_id))
+  const visibleProcedureResults = addTargetType === 'procedure'
+    ? addResults.filter(r => !linkedProcedureIds.has(r.id))
+    : []
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
   const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
 
@@ -2101,7 +2075,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {showCollectionStatus && !isNew && (
-                <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card" style={{ marginBottom: 14, overflow: addProcedureOpen ? 'visible' : undefined }}>
                   <div className="hd">
                     <span>Vorgänge</span>
                     {procedureRels.length > 0 && <span className="sub">{procedureRels.length}</span>}
@@ -2112,7 +2086,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         onClick={() => {
                           setAddTargetType('procedure')
                           setAddProcedureOpen(true)
-                          setAddOpen(false)
                           setAddSearchQ('')
                           setAddSelected(null)
                           setAddResults([])
@@ -2149,43 +2122,36 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <div style={{ borderTop: procedureRels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: procedureRels.length > 0 ? 12 : 0 }}>
                         <div className="field" style={{ marginBottom: 8 }}>
                           <div className="lbl">Vorgang suchen</div>
-                          {addSelected ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 13, flex: 1 }}>{addSelected.title}</span>
-                              <button className="btn sm ico gh" onClick={() => { setAddSelected(null); setAddSearchQ('') }}><X size={12} /></button>
-                            </div>
-                          ) : (
-                            <>
-                              <input
-                                className="fld"
-                                value={addTargetType === 'procedure' ? addSearchQ : ''}
-                                onFocus={() => setAddTargetType('procedure')}
-                                onChange={e => { setAddTargetType('procedure'); setAddSearchQ(e.target.value) }}
-                                placeholder="Suchbegriff (mind. 2 Zeichen)…"
-                                autoFocus
-                              />
-                              {addTargetType === 'procedure' && addSearching && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Suche…</div>}
-                              {addTargetType === 'procedure' && addResults.length > 0 && !addSearching && (
-                                <div style={{ border: '1px solid var(--border-s)', borderRadius: 4, marginTop: 4, maxHeight: 140, overflowY: 'auto' }}>
-                                  {addResults.map(r => (
-                                    <div key={r.id} onClick={() => { setAddSelected(r); setAddSearchQ('') }}
-                                      style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border-s)' }}
-                                      className="hover-row">
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              className="fld"
+                              value={addTargetType === 'procedure' ? addSearchQ : ''}
+                              onFocus={() => setAddTargetType('procedure')}
+                              onChange={e => { setAddTargetType('procedure'); setAddSearchQ(e.target.value) }}
+                              placeholder="Vorgang suchen…"
+                              autoFocus
+                              aria-label="Vorgang suchen"
+                            />
+                            {addTargetType === 'procedure' && addSearchQ.trim().length >= 2 && (
+                              <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', border: '1px solid var(--border-s)', borderRadius: 6, background: '#fff', boxShadow: '0 10px 24px rgba(15, 23, 42, .12)', maxHeight: 180, overflowY: 'auto' }}>
+                                {addSearching ? (
+                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Suche…</div>
+                                ) : visibleProcedureResults.length > 0 ? (
+                                  visibleProcedureResults.map(r => (
+                                    <button key={r.id} className="btn gh" style={{ width: '100%', justifyContent: 'flex-start', border: 0, borderRadius: 0, borderBottom: '1px solid var(--border-s)', padding: '8px 10px', fontSize: 12 }} onClick={() => handleAddProcedureRelation(r)} disabled={addSaving}>
                                       {r.title}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {addTargetType === 'procedure' && addSearchQ.trim().length >= 2 && addResults.length === 0 && !addSearching && (
-                                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Keine Ergebnisse.</div>
-                              )}
-                            </>
-                          )}
+                                    </button>
+                                  ))
+                                ) : addResults.length > 0 ? (
+                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Alle Treffer sind bereits verknüpft.</div>
+                                ) : (
+                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Keine Ergebnisse.</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn pri sm" onClick={handleAddProcedureRelation} disabled={!addSelected || addSaving}>
-                            {addSaving ? 'Speichert…' : 'Speichern'}
-                          </button>
                           <button className="btn gh sm" onClick={() => { setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([]) }}>
                             Abbrechen
                           </button>
@@ -2256,13 +2222,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     <span>Beziehungen</span>
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}
                     <div className="grow" />
-                    {!addOpen && hasSavedId && (
-                      <button className="btn sm gh" onClick={() => { if (showProcedureFields) setAddTargetType('entity'); setAddProcedureOpen(false); setAddOpen(true) }}><Plus size={12} /> Hinzufügen</button>
-                    )}
                   </div>
                   <div className="bd">
                     {otherRels.length > 0 && (
-                      <div style={{ marginBottom: addOpen ? 12 : 0 }}>
+                      <div style={{ marginBottom: 0 }}>
                         {otherRels.map(r => {
                           const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
                           const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
@@ -2270,9 +2233,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           const isFrom = r.from_id === savedId
                           const targetType = isFrom ? r.to_type : r.from_type
                           const targetId = isFrom ? r.to_id : r.from_id
+                          const targetKey = `${targetType}/${targetId}`
+                          const inheritedFieldNames = fields
+                            .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType)
+                            .flatMap(f => (f.settings?.inherited_fields as string[]) ?? [])
+                          const inheritedMeta = relMeta[targetKey]
                           return (
                             <div key={r.id}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                                 <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
                                   {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
                                   {relTypeLabel}
@@ -2286,56 +2254,24 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                     onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
                                     onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
                                   >
-                                    {relTitles[`${targetType}/${targetId}`] ?? targetId.slice(0, 8) + '…'}
+                                    {relTitles[targetKey] ?? targetId.slice(0, 8) + '…'}
                                   </a>
                                 </span>
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  <button className="btn sm ico gh dn" onClick={() => openEditRelation(r)} title="Bearbeiten"><Edit size={11} /></button>
-                                  <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
-                                </div>
                               </div>
-                              {editRel?.id === r.id && (
-                                <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
-                                  <div className="field" style={{ marginBottom: 8 }}>
-                                    <div className="lbl">Relationstyp</div>
-                                    {relTypeTerms.length > 0 ? (
-                                      <select className="fld" value={editRelType} onChange={e => setEditRelType(e.target.value)}>
-                                        <option value="">— Typ wählen —</option>
-                                        {relTypeTerms.map(t => (
-                                          <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
-                                        ))}
-                                      </select>
-                                    ) : (
-                                      <input className="fld mono" value={editRelType} onChange={e => setEditRelType(e.target.value)} />
-                                    )}
-                                  </div>
-                                  <div className="field" style={{ marginBottom: 8 }}>
-                                    <div className="lbl">Metadaten</div>
-                                    {editMeta.map((entry, idx) => (
-                                      <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                                        <input className="fld mono" style={{ flex: 1 }} placeholder="Key" value={entry.key} onChange={e => {
-                                          const next = [...editMeta]
-                                          next[idx] = { ...entry, key: e.target.value }
-                                          setEditMeta(next)
-                                        }} />
-                                        <input className="fld" style={{ flex: 1.5 }} placeholder="Value" value={entry.value} onChange={e => {
-                                          const next = [...editMeta]
-                                          next[idx] = { ...entry, value: e.target.value }
-                                          setEditMeta(next)
-                                        }} />
-                                        <button className="btn sm ico gh" onClick={() => setEditMeta(prev => prev.filter((_, i) => i !== idx))}><X size={12} /></button>
-                                      </div>
-                                    ))}
-                                    <button className="btn sm gh" onClick={() => setEditMeta(prev => [...prev, { key: '', value: '' }])}><Plus size={11} /> Eintrag</button>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: 6 }}>
-                                    <button className="btn pri sm" onClick={handleUpdateRelation} disabled={!editRelType.trim() || editSaving}>
-                                      {editSaving ? 'Speichert…' : 'Speichern'}
-                                    </button>
-                                    <button className="btn gh sm" onClick={() => { setEditRel(null); setEditRelType(''); setEditMeta([]) }}>
-                                      Abbrechen
-                                    </button>
-                                  </div>
+                              {inheritedMeta && inheritedFieldNames.length > 0 && (
+                                <div style={{ padding: '3px 0 5px', borderBottom: '1px solid var(--border-s)', display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
+                                  {inheritedFieldNames.map(fname => {
+                                    const val = inheritedMeta[fname]
+                                    if (val == null) return null
+                                    let text: string | null = null
+                                    if (typeof val === 'string') text = val || null
+                                    else if (Array.isArray(val) && val.length > 0) {
+                                      const first = val[0]
+                                      text = typeof first === 'string' ? first : (typeof first === 'object' && first !== null ? String((first as Record<string,unknown>).value ?? '') || null : null)
+                                    }
+                                    if (!text) return null
+                                    return <span key={fname} style={{ fontSize: 11, color: 'var(--fg-3)' }}>{fname}: {text}</span>
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -2343,78 +2279,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         })}
                       </div>
                     )}
-                    {otherRels.length === 0 && !addOpen && (
+                    {otherRels.length === 0 && (
                       <div className="empty" style={{ padding: '16px 0' }}>Noch keine Relationen.</div>
-                    )}
-                    {addOpen && (
-                      <div style={{ borderTop: otherRels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: otherRels.length > 0 ? 12 : 0 }}>
-                        <div className="field" style={{ marginBottom: 8 }}>
-                          <div className="lbl">Ziel-Typ</div>
-                          <select className="fld" value={addTargetType} onChange={e => { setAddTargetType(e.target.value as RecordType); setAddSelected(null); setAddResults([]) }}>
-                            {!showProcedureFields && <option value="object">Objekt</option>}
-                            <option value="entity">Entität</option>
-                            <option value="place">Ort</option>
-                            <option value="occurrence">Occurrence</option>
-                          </select>
-                        </div>
-                        <div className="field" style={{ marginBottom: 8 }}>
-                          <div className="lbl">Datensatz suchen</div>
-                          {addSelected ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 13, flex: 1 }}>{addSelected.title}</span>
-                              <button className="btn sm ico gh" onClick={() => { setAddSelected(null); setAddSearchQ('') }}><X size={12} /></button>
-                            </div>
-                          ) : (
-                            <>
-                              <input className="fld" value={addSearchQ} onChange={e => setAddSearchQ(e.target.value)}
-                                placeholder="Suchbegriff (mind. 2 Zeichen)…" autoFocus />
-                              {addSearching && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Suche…</div>}
-                              {addResults.length > 0 && !addSearching && (
-                                <div style={{ border: '1px solid var(--border-s)', borderRadius: 4, marginTop: 4, maxHeight: 140, overflowY: 'auto' }}>
-                                  {addResults.map(r => (
-                                    <div key={r.id} onClick={() => { setAddSelected(r); setAddSearchQ('') }}
-                                      style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border-s)' }}
-                                      className="hover-row">
-                                      {r.title}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {addSearchQ.trim().length >= 2 && addResults.length === 0 && !addSearching && (
-                                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Keine Ergebnisse.</div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        <div className="field" style={{ marginBottom: 10 }}>
-                          <div className="lbl">Relationstyp</div>
-                          {relTypeTerms.length > 0 ? (
-                            <select className="fld" value={addRelType} onChange={e => setAddRelType(e.target.value)}>
-                              <option value="">— Typ wählen —</option>
-                              {relTypeTerms.map(t => (
-                                <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <>
-                              <input className="fld mono" value={addRelType} onChange={e => setAddRelType(e.target.value)}
-                                placeholder="z.B. depicts, created_by, part_of" />
-                              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                                Kein Vokabular <span style={{ fontFamily: 'var(--mono)' }}>relation_types</span> definiert — freie Eingabe aktiv.
-                                Vokabular anlegen unter <em>Konfiguration → Vokabular</em>.
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn pri sm" onClick={handleAddRelation} disabled={!addSelected || !addRelType.trim() || addSaving}>
-                            {addSaving ? 'Speichert…' : 'Speichern'}
-                          </button>
-                          <button className="btn gh sm" onClick={() => { setAddOpen(false); setAddSearchQ(''); setAddRelType(''); setAddSelected(null); setAddResults([]) }}>
-                            Abbrechen
-                          </button>
-                        </div>
-                      </div>
                     )}
                   </div>
                 </div>
