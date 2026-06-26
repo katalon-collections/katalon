@@ -2229,8 +2229,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {otherRels.map(r => {
                           const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
                           const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
-                          const relTypeLabel = relTypeTerm ? getLabel(relTypeTerm, r.relation_type) : r.relation_type
                           const isFrom = r.from_id === savedId
+                          const relTypeLabel = relTypeTerm
+                            ? (isFrom
+                              ? getLabel(relTypeTerm, r.relation_type)
+                              : (relTypeTerm.inverse_label?.de ?? relTypeTerm.inverse_label?.en ?? getLabel(relTypeTerm, r.relation_type)))
+                            : r.relation_type
                           const targetType = isFrom ? r.to_type : r.from_type
                           const targetId = isFrom ? r.to_id : r.from_id
                           const targetKey = `${targetType}/${targetId}`

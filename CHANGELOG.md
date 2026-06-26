@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-26
+
+### Fixed
+- Beziehungen-Panel zeigt jetzt `inverse_label` (Gegenrichtung) wenn der aktuelle Record das Ziel der Relation ist, statt immer das Forward-Label.
+
 ## [0.2.7] - 2026-06-26
 
 ### Changed
