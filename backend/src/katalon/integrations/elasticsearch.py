@@ -161,9 +161,13 @@ async def search_documents(
     filters: list[dict] = []
 
     if query:
+        q = query.strip()
+        # Add trailing wildcard for prefix/autocomplete unless query already has operators
+        if q and not any(c in q for c in (':', '"', '*', '?', '+', '-', '~', '(')):
+            q = q + '*'
         must.append({
             "query_string": {
-                "query": query,
+                "query": q,
                 "fields": ["title^3", "search_text^2"],
                 "default_operator": "AND",
                 "lenient": True,

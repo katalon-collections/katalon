@@ -31,8 +31,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 ### Access
 
-- **Admin UI**: <http://localhost:4000>
-- **Portal UI**: <http://localhost:4001>
+- **Admin UI**: <http://localhost:3000>
+- **Portal UI**: <http://localhost:3001>
 - **API**: <http://localhost:8000>
 - **API Docs**: <http://localhost:8000/api/docs>
 

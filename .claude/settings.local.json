@@ -36,7 +36,11 @@
       "Bash(awk -F: '{print $1}')",
       "Bash(git fetch *)",
       "Bash(git rebase *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "WebFetch(domain:collectionstrust.org.uk)",
+      "mcp__plugin_claude-mem_mcp-search__get_observations",
+      "mcp__plugin_claude-mem_mcp-search__observation_search",
+      "mcp__plugin_claude-mem_mcp-search__search"
     ]
   }
 }

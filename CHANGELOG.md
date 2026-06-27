@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-06-27
+
+### Fixed
+- Upload-Limit für Importer erhöht: nginx.admin.conf fehlte `client_max_body_size`, Standard-Limit von 1 MB blockierte Dateien > 1 MB.
+
+### Changed
+- Importer: Zeilen werden nach dem Upload in Redis gespeichert (1h TTL). Dry-Run und Import nutzen `upload_id` statt alle Zeilen als JSON hin- und herzuschicken. Zeilenlimit (vorher 10.000) entfällt.
+
+
 ## [0.2.8] - 2026-06-26
 
 ### Fixed

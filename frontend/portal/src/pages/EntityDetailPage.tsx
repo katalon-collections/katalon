@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { marked } from 'marked'
-import { api, BASE, fetchRecordTitle, type EntitySummary, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
+import { api, BASE, fetchRecord, type EntitySummary, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
@@ -34,6 +34,7 @@ export function EntityDetailPage() {
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
+  const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('entity')
@@ -74,10 +75,15 @@ export function EntityDetailPage() {
           const isFrom = rel.from_id === e.id
           return { type: isFrom ? rel.to_type : rel.from_type, id: isFrom ? rel.to_id : rel.from_id }
         })
-        const entries = await Promise.all(pairs.map(p => fetchRecordTitle(p.type, p.id).then(t => ({ key: `${p.type}/${p.id}`, title: t }))))
-        const map: Record<string, string> = {}
-        for (const entry of entries) if (entry.title) map[entry.key] = entry.title
-        setRelationTitles(map)
+        const entries = await Promise.all(pairs.map(p => fetchRecord(p.type, p.id).then(r => ({ key: `${p.type}/${p.id}`, ...r }))))
+        const titleMap: Record<string, string> = {}
+        const metaMap: Record<string, Record<string, unknown>> = {}
+        for (const entry of entries) {
+          if (entry.title) titleMap[entry.key] = entry.title
+          metaMap[entry.key] = entry.metadata
+        }
+        setRelationTitles(titleMap)
+        setRelationMeta(metaMap)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -194,6 +200,8 @@ export function EntityDetailPage() {
             currentId={entity.id}
             resolveLabel={resolveRelationType}
             titles={relationTitles}
+            metadata={relationMeta}
+            fieldDefs={fieldDefs}
           />
         </div>
 

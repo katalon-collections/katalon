@@ -84,17 +84,23 @@ const TYPE_ENDPOINT: Record<string, string> = {
 
 /** Fetch the display title of any record by type + id. Returns null on failure. */
 export async function fetchRecordTitle(type: string, id: string): Promise<string | null> {
+  const { title } = await fetchRecord(type, id)
+  return title
+}
+
+/** Fetch title + full metadata of any record. Returns null title and empty metadata on failure. */
+export async function fetchRecord(type: string, id: string): Promise<{ title: string | null; metadata: Record<string, unknown> }> {
   const endpoint = TYPE_ENDPOINT[type] ?? `${type}s`
   try {
     const res = await fetch(`${BASE}/v1/${endpoint}/${id}`)
-    if (!res.ok) return null
+    if (!res.ok) return { title: null, metadata: {} }
     const rec = await res.json() as { metadata_?: Record<string, unknown>; idno?: string | null; id: string }
     const m = rec.metadata_ ?? {}
     const raw = m.name ?? m.title ?? m.label ?? m.display_name ?? m.place_name ?? rec.idno ?? rec.id
-    if (typeof raw === 'string') return raw || null
-    return String(raw) || null
+    const title = typeof raw === 'string' ? raw || null : String(raw) || null
+    return { title, metadata: m }
   } catch {
-    return null
+    return { title: null, metadata: {} }
   }
 }
 

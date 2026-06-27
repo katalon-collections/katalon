@@ -92,12 +92,13 @@ type FieldFormState = {
   relation_target_type: string
   relation_target_subtype: string
   relation_type_vocab: string
+  inherited_fields: string[]
   // sub-fields of this group field (populated when editing an existing group field)
   subFields?: FieldDefinition[]
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '' }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [] }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -121,6 +122,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     relation_target_type: (f.settings?.target_type as string) ?? 'entity',
     relation_target_subtype: (f.settings?.target_subtype as string) ?? '',
     relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
+    inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
     subFields: f.children ?? [],
   }
 }
@@ -343,6 +345,12 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
     subtypes.list(form.target_type).then(setAvailableSubtypes).catch(() => {})
   }, [showSubtype, form.target_type])
 
+  const [targetTypeFields, setTargetTypeFields] = useState<FieldDefinition[]>([])
+  useEffect(() => {
+    if (form.field_type !== 'relation') { setTargetTypeFields([]); return }
+    schema.list(form.relation_target_type).then(setTargetTypeFields).catch(() => setTargetTypeFields([]))
+  }, [form.field_type, form.relation_target_type])
+
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
       <div className="hd">
@@ -482,6 +490,27 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
                 {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
+            {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
+              <div className="field">
+                <div className="lbl">Felder des Zieldatensatzes mit anzeigen <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — z.B. Land bei Ortsverknüpfung)</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                  {targetTypeFields.filter(f => f.field_type !== 'relation').map(f => (
+                    <label key={f.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.inherited_fields.includes(f.name)}
+                        onChange={e => set('inherited_fields', e.target.checked
+                          ? [...form.inherited_fields, f.name]
+                          : form.inherited_fields.filter(n => n !== f.name)
+                        )}
+                      />
+                      {f.label?.de ?? f.label?.en ?? f.name}
+                      <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{f.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
         <ExportMappingPanel fieldId={fieldId} fieldType={form.field_type} isNew={isNew} />
@@ -847,6 +876,7 @@ export function ScreenSchema() {
           target_type: form.relation_target_type,
           ...(form.relation_target_subtype.trim() ? { target_subtype: form.relation_target_subtype.trim() } : {}),
           ...(form.relation_type_vocab ? { relation_type_vocab: form.relation_type_vocab } : {}),
+          ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
         } : {}),
       },
     }

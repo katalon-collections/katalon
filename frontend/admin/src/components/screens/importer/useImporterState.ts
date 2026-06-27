@@ -52,8 +52,8 @@ function loadPersistedState(): PersistedImporterState | null {
 // ── Initial state ─────────────────────────────────────────────────────────────
 
 function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
-  const hasRows = (persisted?.uploaded?.rows?.length ?? 0) > 0
-  const needsReupload = !!persisted?.uploaded && !hasRows && (persisted?.step ?? 0) > 0
+  const hasUploadId = !!persisted?.uploaded?.upload_id
+  const needsReupload = !!persisted?.uploaded && !hasUploadId && (persisted?.step ?? 0) > 0
   return {
     step:           needsReupload ? 0 : (persisted?.step ?? 0),
     recordType:     persisted?.recordType    ?? 'object',
@@ -212,7 +212,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       step: state.step, recordType: state.recordType, subtype: state.subtype,
       mapping: state.mapping, idnoStrategy: state.idnoStrategy, idnoColumn: state.idnoColumn,
       upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish,
-      uploaded: state.uploaded ? { ...state.uploaded, rows: [] } : null,
+      uploaded: state.uploaded ? { ...state.uploaded, upload_id: '' } : null,
       dryResult: state.dryResult, taskId: state.taskId,
       pendingFields: state.pendingFields,
     }
@@ -319,10 +319,10 @@ export function useImporterState(): ImporterStateAndHandlers {
         payload: {
           uploaded: {
             source_type: 'xml',
+            upload_id: result.upload_id,
             headers: result.headers,
             row_count: result.row_count,
             preview: result.preview,
-            rows: result.rows,
             suggestions: result.suggestions,
           },
           selectors: result.selectors,
@@ -338,7 +338,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.rows, state.mapping, state.subtype)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -349,7 +349,7 @@ export function useImporterState(): ImporterStateAndHandlers {
   async function handleImport() {
     if (!state.uploaded) return
     try {
-      const { task_id } = await importer.import(state.recordType, state.uploaded.rows, state.mapping, {
+      const { task_id } = await importer.import(state.recordType, state.uploaded.upload_id, state.mapping, {
         idno_strategy: state.idnoStrategy,
         upsert_strategy: state.upsertStrategy,
         auto_publish: state.autoPublish,

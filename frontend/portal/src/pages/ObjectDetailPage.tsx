@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, fetchRecordTitle, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
+import { api, BASE, fetchRecord, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
@@ -59,6 +59,7 @@ export function ObjectDetailPage() {
 
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
+  const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [viewerError, setViewerError] = useState(false)
   const fieldDefs = useFieldDefinitions('object')
   const resolveRelationType = useRelationTypeLabels()
@@ -81,11 +82,16 @@ export function ObjectDetailPage() {
           const isFrom = rel.from_id === o.id
           return { type: isFrom ? rel.to_type : rel.from_type, id: isFrom ? rel.to_id : rel.from_id }
         })
-        Promise.all(pairs.map(p => fetchRecordTitle(p.type, p.id).then(t => ({ key: `${p.type}/${p.id}`, title: t }))))
+        Promise.all(pairs.map(p => fetchRecord(p.type, p.id).then(r => ({ key: `${p.type}/${p.id}`, ...r }))))
           .then(entries => {
-            const map: Record<string, string> = {}
-            for (const e of entries) if (e.title) map[e.key] = e.title
-            setRelationTitles(map)
+            const titleMap: Record<string, string> = {}
+            const metaMap: Record<string, Record<string, unknown>> = {}
+            for (const e of entries) {
+              if (e.title) titleMap[e.key] = e.title
+              metaMap[e.key] = e.metadata
+            }
+            setRelationTitles(titleMap)
+            setRelationMeta(metaMap)
           })
       })
       .catch(e => setError(e.message))
@@ -186,6 +192,8 @@ export function ObjectDetailPage() {
             currentId={obj.id}
             resolveLabel={resolveRelationType}
             titles={relationTitles}
+            metadata={relationMeta}
+            fieldDefs={fieldDefs}
           />
         </div>
 

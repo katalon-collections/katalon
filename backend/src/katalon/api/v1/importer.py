@@ -20,9 +20,9 @@ from katalon.services.subtype_service import has_any_subtypes
 router = APIRouter(prefix="/importer", tags=["importer"])
 
 MAX_SIZE = 100 * 1024 * 1024  # 100 MB
-MAX_IMPORT_ROWS = 10_000
 
-_XML_UPLOAD_TTL = 3600  # seconds
+_UPLOAD_TTL = 3600  # seconds — for both raw XML and parsed rows
+_XML_UPLOAD_TTL = _UPLOAD_TTL  # keep alias used below
 
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
 
@@ -56,7 +56,7 @@ class MappingEntry(BaseModel):
 class MappingRequest(BaseModel):
     mapping: dict[str, MappingEntry]   # selector -> {target, transforms?}
     # selector = CSV/Excel column header OR Clark-notation XPath for XML
-    rows: list[dict[str, str]]
+    upload_id: str
     record_type: str = "object"
     subtype: str | None = None
 
@@ -83,6 +83,22 @@ def _get_redis():
 
     from katalon.config import settings
     return redis_lib.from_url(settings.redis_url, decode_responses=False)
+
+
+def _store_rows(r, rows: list[dict]) -> str:
+    import json
+    upload_id = str(uuid.uuid4())
+    r.setex(f"file_upload:{upload_id}", _UPLOAD_TTL, json.dumps(rows))
+    return upload_id
+
+
+def _load_rows(upload_id: str) -> list[dict]:
+    import json
+    r = _get_redis()
+    data = r.get(f"file_upload:{upload_id}")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Upload nicht gefunden oder abgelaufen (max 1 Stunde)")
+    return json.loads(data)
 
 
 @router.post("/upload")
@@ -112,17 +128,17 @@ async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
         headers, rows, _ = parse_file(filename, content)
     except (ValueError, NotImplementedError):
         raise HTTPException(status_code=422, detail="Nur CSV, TSV, Excel (.xlsx) und XML werden unterstützt")
-    if len(rows) > MAX_IMPORT_ROWS:
-        raise HTTPException(status_code=413, detail=f"Zu viele Zeilen für Browser-Import (max {MAX_IMPORT_ROWS})")
 
+    r = _get_redis()
+    upload_id = _store_rows(r, rows)
     suggestions = importer_service.suggest_field_types(headers, rows)
     source_type = "excel" if filename.lower().endswith((".xlsx", ".xls")) else "csv"
     return {
         "source_type": source_type,
+        "upload_id": upload_id,
         "headers": headers,
         "row_count": len(rows),
         "preview": rows[:5],
-        "rows": rows,
         "suggestions": suggestions,
     }
 
@@ -141,18 +157,18 @@ async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) 
         rows = list(xml_fmt.parse_flat(content, record_xpath=body.record_xpath))
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"XML konnte nicht verarbeitet werden: {exc}") from exc
-    if len(rows) > MAX_IMPORT_ROWS:
-        raise HTTPException(status_code=413, detail=f"Zu viele Zeilen für Browser-Import (max {MAX_IMPORT_ROWS})")
 
+    r = _get_redis()
+    upload_id = _store_rows(r, rows)
     headers = [s.path for s in selectors]
     suggestions = importer_service.suggest_field_types(headers, rows)
     return {
         "source_type": "xml",
+        "upload_id": upload_id,
         "headers": headers,
         "selectors": [{"path": s.path, "label": s.label, "sample": s.sample, "kind": s.kind} for s in selectors],
         "row_count": len(rows),
         "preview": rows[:5],
-        "rows": rows,
         "suggestions": suggestions,
     }
 
@@ -181,12 +197,14 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
     )
     field_defs = {f.name: f for f in result.scalars().all()}
 
+    rows = _load_rows(body.upload_id)
+
     # Build normalized mapping for dry_run: {csv_col -> {"target": ..., "transforms": [...]}}
     norm_mapping: dict[str, dict[str, Any]] = {}
     for k, v in body.mapping.items():
         norm_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
 
-    dry_result = importer_service.dry_run(body.rows, norm_mapping, field_defs)
+    dry_result = importer_service.dry_run(rows, norm_mapping, field_defs)
 
     # Warn if type has subtypes but none was provided
     if not body.subtype and await has_any_subtypes(db, body.record_type):
@@ -197,7 +215,7 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
 
     # Run full schema validation per row (catches pid/relation/regex/required errors)
     from katalon.services.importer_service import apply_mapping
-    all_records, _ = apply_mapping(body.rows, norm_mapping, field_defs)
+    all_records, _ = apply_mapping(rows, norm_mapping, field_defs)
     for i, metadata in enumerate(all_records):
         row_num = i + 2
         val_errors = await validate_metadata(db, body.record_type, metadata, body.subtype)
@@ -244,6 +262,7 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
 async def run_import(body: ImportRequest, current_user=require_admin_or_editor()) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
+    rows = _load_rows(body.upload_id)
     from katalon.workers.import_tasks import import_records_task
     # Serialize mapping for Celery (plain dict)
     serializable_mapping: dict[str, Any] = {}
@@ -251,7 +270,7 @@ async def run_import(body: ImportRequest, current_user=require_admin_or_editor()
         serializable_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
     task = import_records_task.delay(
         body.record_type,
-        body.rows,
+        rows,
         serializable_mapping,
         idno_strategy=body.idno_strategy,
         upsert_strategy=body.upsert_strategy,
