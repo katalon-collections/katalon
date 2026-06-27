@@ -358,6 +358,13 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
     return {"created": len(created_fields), "fields": created_fields, "restored": restored_names}
 
 
+@router.post("/task/{task_id}/cancel")
+async def cancel_task(task_id: str, _=require_admin_or_editor()) -> dict:
+    r = _get_redis()
+    r.setex(f"cancel:{task_id}", 3600, "1")
+    return {"cancelled": True}
+
+
 @router.get("/task/{task_id}")
 async def task_status(task_id: str, _=require_admin_or_editor()) -> dict:
     from celery.result import AsyncResult

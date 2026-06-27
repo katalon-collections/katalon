@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-27
+
+### Added
+- Import-Status-Banner: läuft ein Import, erscheint auf allen Screens ein Banner mit Fortschritt, Ergebnis und Abbrechen-Button. Überlebt Tab-Close / Navigation.
+- Import abbrechen: Abbrechen-Button setzt Redis-Flag; Worker bricht nach max. 10 Zeilen sauber ab und meldet bereits erstellte Datensätze.
+- Probelauf-Button zeigt Spinner während Prüfung läuft.
+- Probelauf-Fehlertabelle gruppiert Fehler nach Meldung (statt 80k Einzelzeilen im DOM).
+- Pflichtfelder blockieren Import nicht mehr — nur noch Warnung (amber), Datensätze werden als Draft angelegt.
+- nginx.admin.conf: `resolver 127.0.0.11` + Variable-Upstream verhindert 502 nach API-Rebuild.
+
+
 ## [0.2.9] - 2026-06-27
 
 ### Fixed

@@ -297,16 +297,18 @@ export function StepMapping({
       )}
 
       {(missingRequired.length > 0 || idnoMissing) && (
-        <div style={{ marginTop: 12, fontSize: 12, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 4, padding: '6px 10px' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px' }}>
           {idnoMissing && <div>ID-Nummer: Bitte eine Spalte auswählen oder "Automatisch" wählen.</div>}
-          {missingRequired.length > 0 && <div>Pflichtfelder noch nicht gemappt: {missingRequired.map(f => getLabel(f, f.name)).join(', ')}</div>}
+          {missingRequired.length > 0 && <div>Pflichtfelder nicht gemappt (Import trotzdem möglich): {missingRequired.map(f => getLabel(f, f.name)).join(', ')}</div>}
         </div>
       )}
 
       <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
         <button className="btn" onClick={onBack}>Zurück</button>
-        <button className="btn pri" onClick={onDryRun} disabled={dryRunning || mappedCount === 0 || missingRequired.length > 0 || idnoMissing}>
-          {dryRunning ? 'Prüfe…' : 'Weiter → Probelauf'}
+        <button className="btn pri" onClick={onDryRun} disabled={dryRunning || mappedCount === 0 || idnoMissing}>
+          {dryRunning
+            ? <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .7s linear infinite', marginRight: 6 }} />Prüfe…</>
+            : 'Weiter → Probelauf'}
         </button>
         {onProfileExport && Object.keys(mapping).length > 0 && (
           <button className="btn gh" onClick={onProfileExport} style={{ marginLeft: 'auto' }}>

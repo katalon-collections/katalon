@@ -87,6 +87,13 @@ def import_records_task(
             _mapping_targets.append(v)
     has_idno_column = "__idno__" in _mapping_targets
 
+    import redis as redis_lib
+    from katalon.config import settings as _settings
+    _redis = redis_lib.from_url(_settings.redis_url, decode_responses=True)
+
+    def _is_cancelled() -> bool:
+        return bool(_redis.get(f"cancel:{self.request.id}"))
+
     created = 0
     updated = 0
     skipped = 0
@@ -255,6 +262,9 @@ def import_records_task(
                     state="STARTED",
                     meta={"current": i + 1, "total": total, "stage": "importing"},
                 )
+                if i % 10 == 0 and _is_cancelled():
+                    warnings.append({"row": None, "warning": "Import wurde abgebrochen."})
+                    break
 
                 # Determine idno
                 row_idno = idnos[i] if i < len(idnos) else None
@@ -302,7 +312,7 @@ def import_records_task(
                     continue
 
                 # Validate metadata before insert
-                val_errors = await validate_metadata(session, record_type, metadata, subtype)
+                val_errors = await validate_metadata(session, record_type, metadata, subtype, skip_required=True)
                 if val_errors:
                     errors.append({"row": row_num, "error": "; ".join(val_errors)})
                     continue

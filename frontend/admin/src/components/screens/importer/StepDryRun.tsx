@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import type { DryRunResult } from '../../../api/client'
 import { UPSERT_STRATEGIES } from './types'
+
+const PAGE = 50
 
 interface Props {
   dryResult: DryRunResult
@@ -16,6 +19,22 @@ export function StepDryRun({
   dryResult, upsertStrategy, onUpsertStrategyChange,
   autoPublish, onAutoPublishChange, idnoStrategy, onImport, onBack,
 }: Props) {
+  const [page, setPage] = useState(0)
+
+  // Group errors by message to avoid rendering tens of thousands of rows
+  const grouped = Object.values(
+    dryResult.errors.reduce<Record<string, { message: string; rows: number[]; count: number }>>((acc, e) => {
+      const key = e.message
+      if (!acc[key]) acc[key] = { message: key, rows: [], count: 0 }
+      acc[key].count++
+      if (acc[key].rows.length < 5) acc[key].rows.push(e.row ?? 0)
+      return acc
+    }, {})
+  ).sort((a, b) => b.count - a.count)
+
+  const totalPages = Math.ceil(grouped.length / PAGE)
+  const pageItems = grouped.slice(page * PAGE, (page + 1) * PAGE)
+
   return (
     <>
       <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -39,19 +58,29 @@ export function StepDryRun({
         </div>
       )}
 
-      {dryResult.errors.length > 0 && (
+      {grouped.length > 0 && (
         <div className="tw" style={{ marginBottom: 12 }}>
           <table className="tbl">
-            <thead><tr><th>Zeile</th><th>Fehler</th></tr></thead>
+            <thead><tr><th>Fehler</th><th style={{ width: 80, textAlign: 'right' }}>Zeilen</th><th>Beispiel-Zeilen</th></tr></thead>
             <tbody>
-              {dryResult.errors.map((e, i) => (
+              {pageItems.map((g, i) => (
                 <tr key={i}>
-                  <td className="mono" style={{ width: 60 }}>{e.row ?? '—'}</td>
-                  <td style={{ color: '#b91c1c', fontSize: 12 }}>{e.message}</td>
+                  <td style={{ color: '#b91c1c', fontSize: 12 }}>{g.message}</td>
+                  <td className="mono" style={{ textAlign: 'right' }}>{g.count}</td>
+                  <td className="mono" style={{ fontSize: 11, color: '#6b7280' }}>
+                    {g.rows.filter(r => r > 0).join(', ')}{g.count > 5 ? ' …' : ''}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+              <button className="btn sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>‹</button>
+              <span>{page + 1} / {totalPages} ({grouped.length} verschiedene Fehler)</span>
+              <button className="btn sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}>›</button>
+            </div>
+          )}
         </div>
       )}
 

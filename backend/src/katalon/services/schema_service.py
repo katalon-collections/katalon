@@ -102,7 +102,8 @@ async def _validate_relation_target(
 
 
 async def validate_metadata(
-    db: AsyncSession, record_type: str, metadata: dict, target_subtype: str | None = None
+    db: AsyncSession, record_type: str, metadata: dict, target_subtype: str | None = None,
+    *, skip_required: bool = False,
 ) -> list[str]:
     """Return list of validation error messages (empty = valid)."""
     fields = await get_field_definitions(db, record_type, target_subtype)
@@ -111,7 +112,7 @@ async def validate_metadata(
     for field in fields:
         value = metadata.get(field.name)
 
-        if field.is_required and (value is None or value == "" or value == []):
+        if not skip_required and field.is_required and (value is None or value == "" or value == []):
             errors.append(f"Feld '{field.name}' ist erforderlich.")
             continue
 
@@ -131,7 +132,7 @@ async def validate_metadata(
                     continue
                 for sf in sub_fields:
                     sv = instance.get(sf.name)
-                    if sf.is_required and (sv is None or sv == ""):
+                    if not skip_required and sf.is_required and (sv is None or sv == ""):
                         errors.append(
                             f"Feld '{field.name}.{sf.name}' (Eintrag {idx + 1}): Pflichtfeld."
                         )

@@ -16,6 +16,7 @@ import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { BannerBar } from '../ui/BannerBar'
+import { ImportStatusBanner } from '../ui/ImportStatusBanner'
 import { FeedbackButton } from '../feedback/FeedbackButton'
 
 type Crumb = { label: string; route?: string }
@@ -145,6 +146,7 @@ export function AppShell() {
       <div className="main">
         <Topbar crumbs={crumbs} onNavigate={(r, id) => safeNavigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
         <BannerBar surface="admin" />
+        <ImportStatusBanner currentRoute={route} />
         {renderScreen()}
       </div>
       <FeedbackButton />
