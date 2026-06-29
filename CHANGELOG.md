@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-29
+
+### Added
+- Portal zeigt Gegenrichtungslabels jetzt auch in den Inline-Objektkarten auf Orts-, Entitäts- und Occurrence-Detailseiten.
+- Backend legt `relation_types` automatisch an und übernimmt vorhandene Relationscodes als bearbeitbare Terme.
+
+### Fixed
+- Schema-abgeleitete Relationen berücksichtigen nur echte Top-Level-Relationsfelder; Gruppen-Subfelder werden nicht doppelt als Top-Level behandelt.
+- Medien-Uploads bleiben in der Admin-UI sichtbar, selbst wenn nachgelagertes Speichern von Lizenz/Rechteinhaber fehlschlägt.
+- Rechteinhaber-Felder in der Medienkarte senden beim Blur jetzt konsistente Werte ohne Lost-Update zwischen Name und URI.
+- Validierungsfehler für Relations-Subfelder in Gruppen nennen den betroffenen Eintrag explizit.
+
 ## [0.3.1] - 2026-06-29
 
 ### Added

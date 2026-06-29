@@ -117,6 +117,7 @@ async def sync_schema_relations(
         select(FieldDefinition).where(
             FieldDefinition.target_type == record_type,
             FieldDefinition.field_type == "relation",
+            FieldDefinition.parent_id.is_(None),
             FieldDefinition.is_deleted.is_(False),
         )
     )

@@ -1,6 +1,6 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-06-26
+## Stand: 2026-06-27
 
 ---
 

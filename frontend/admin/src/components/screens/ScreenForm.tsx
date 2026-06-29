@@ -117,6 +117,22 @@ export type AuthorityEntry = { source: string; external_id: string; label: strin
 export type VocabEntry = { id: string; label: string }
 export type RelationEntry = { id: string; label: string; relation_type: string }
 
+function buildRightsHolder(name: string, uri: string): { name: string; uri?: string } | null {
+  return name ? { name, ...(uri ? { uri } : {}) } : null
+}
+
+function mediaRightsFromInputs(root: ParentNode | null) {
+  const value = (field: string) =>
+    (root?.querySelector<HTMLInputElement>(`input[data-media-rights="${field}"]`)?.value ?? '').trim()
+  const licenseUri = value('license_uri')
+  const rightsName = value('rights_holder_name')
+  const rightsUri = value('rights_holder_uri')
+  return {
+    license_uri: licenseUri || null,
+    rights_holder: buildRightsHolder(rightsName, rightsUri),
+  }
+}
+
 function VocabInput({ vocabId, value, onChange, disabled }: {
   vocabId: string
   value: VocabEntry | null
@@ -1404,15 +1420,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setUploading(true)
     setUploadError(null)
     try {
-      const f = await media.upload(savedId, file)
-      const rights_holder = uploadRightsName.trim()
-        ? { name: uploadRightsName.trim(), ...(uploadRightsUri.trim() ? { uri: uploadRightsUri.trim() } : {}) }
-        : null
-      const updated = await media.patch(savedId, f.id, {
-        license_uri: uploadLicenseUri.trim() || null,
-        rights_holder,
-      })
-      setMediaFiles(prev => [...prev, updated])
+      const uploaded = await media.upload(savedId, file)
+      setMediaFiles(prev => [...prev, uploaded])
+      try {
+        const updated = await media.patch(savedId, uploaded.id, {
+          license_uri: uploadLicenseUri.trim() || null,
+          rights_holder: buildRightsHolder(uploadRightsName.trim(), uploadRightsUri.trim()),
+        })
+        setMediaFiles(prev => prev.map(f => f.id === uploaded.id ? updated : f))
+      } catch (e) {
+        setUploadError(`Upload erfolgreich, Rechte konnten nicht gespeichert werden: ${(e as Error).message}`)
+      }
     } catch (e) {
       setUploadError((e as Error).message)
     } finally {
@@ -2096,31 +2114,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 className="fld"
                                 style={{ fontSize: 10, padding: '3px 5px' }}
                                 defaultValue={f.license_uri ?? ''}
+                                data-media-rights="license_uri"
                                 list="media-license-options"
                                 placeholder="Lizenz-URI"
-                                onBlur={e => handleMediaRights(f.id, { license_uri: e.target.value.trim() || null })}
+                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
                               />
                               <input
                                 className="fld"
                                 style={{ fontSize: 10, padding: '3px 5px' }}
                                 defaultValue={f.rights_holder?.name ?? ''}
+                                data-media-rights="rights_holder_name"
                                 placeholder="Rechteinhaber"
-                                onBlur={e => handleMediaRights(f.id, {
-                                  rights_holder: e.target.value.trim()
-                                    ? { name: e.target.value.trim(), ...(f.rights_holder?.uri ? { uri: f.rights_holder.uri } : {}) }
-                                    : null,
-                                })}
+                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
                               />
                               <input
                                 className="fld"
                                 style={{ fontSize: 10, padding: '3px 5px' }}
                                 defaultValue={f.rights_holder?.uri ?? ''}
+                                data-media-rights="rights_holder_uri"
                                 placeholder="Rechteinhaber-URI"
-                                onBlur={e => handleMediaRights(f.id, {
-                                  rights_holder: f.rights_holder?.name
-                                    ? { name: f.rights_holder.name, ...(e.target.value.trim() ? { uri: e.target.value.trim() } : {}) }
-                                    : null,
-                                })}
+                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
                               />
                             </div>
                           </div>

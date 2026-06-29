@@ -133,9 +133,11 @@ async def validate_metadata(
                     continue
                 for sf in sub_fields:
                     sv = instance.get(sf.name)
+                    field_path = f"{field.name}.{sf.name}"
+                    indexed_prefix = f"Feld '{field_path}' (Eintrag {idx + 1})"
                     if not skip_required and sf.is_required and (sv is None or sv == ""):
                         errors.append(
-                            f"Feld '{field.name}.{sf.name}' (Eintrag {idx + 1}): Pflichtfeld."
+                            f"{indexed_prefix}: Pflichtfeld."
                         )
                     if sv is not None and sf.field_type == "text":
                         regex = sf.settings.get("validation_regex")
@@ -143,23 +145,23 @@ async def validate_metadata(
                             try:
                                 if not re.fullmatch(regex, sv):
                                     errors.append(
-                                        f"Feld '{field.name}.{sf.name}' (Eintrag {idx + 1}): "
+                                        f"{indexed_prefix}: "
                                         "entspricht nicht dem erwarteten Format."
                                     )
                             except re.error:
                                 pass
                     if sv is not None and sf.field_type == "relation":
                         struct_err = _validate_relation_structure(
-                            sv, f"{field.name}.{sf.name}"
+                            sv, field_path
                         )
                         if struct_err:
-                            errors.append(struct_err)
+                            errors.append(struct_err.replace(f"Feld '{field_path}'", indexed_prefix, 1))
                             continue
                         target_err = await _validate_relation_target(
-                            sv, f"{field.name}.{sf.name}", sf.settings, db
+                            sv, field_path, sf.settings, db
                         )
                         if target_err:
-                            errors.append(target_err)
+                            errors.append(target_err.replace(f"Feld '{field_path}'", indexed_prefix, 1))
             continue
 
         if field.field_type == "pid":

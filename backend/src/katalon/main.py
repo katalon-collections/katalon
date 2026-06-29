@@ -58,6 +58,7 @@ from katalon.core.models import (
     AuthoritySource as AuthoritySourceModel,
 )
 from katalon.database import AsyncSessionLocal
+from katalon.services.relation_type_service import sync_relation_type_terms
 
 logger = logging.getLogger(__name__)
 # 15 random bytes via token_urlsafe produce ~20 URL-safe chars (letters, digits, -,_).
@@ -173,6 +174,18 @@ async def _ensure_media_types_vocab() -> None:
             for term_key, label in _DEFAULT_MEDIA_TYPES:
                 db.add(VocabularyTerm(vocabulary_id=vocab.id, term=term_key, label=label))
             await db.commit()
+
+
+async def _ensure_relation_types_vocab() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Vocabulary).where(Vocabulary.name == "relation_types"))
+        vocab = result.scalar_one_or_none()
+        if vocab is None:
+            vocab = Vocabulary(name="relation_types", is_hierarchical=False)
+            db.add(vocab)
+            await db.flush()
+        await sync_relation_type_terms(db, vocab)
+        await db.commit()
 
 
 _DEFAULT_AUTHORITY_SOURCES = [
@@ -329,6 +342,7 @@ async def lifespan(app: FastAPI):
     _check_production_secrets()
     await _ensure_admin()
     await _ensure_media_types_vocab()
+    await _ensure_relation_types_vocab()
     await _ensure_record_subtypes()
     await _ensure_portal_config()
     await _ensure_admin_config()

@@ -174,6 +174,7 @@ export function EntityDetailPage() {
                   const om = obj.metadata_ as Record<string, unknown>
                   const otitle = String(om.title ?? om.name ?? obj.idno ?? obj.id)
                   const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
+                  const isFrom = rel ? rel.from_id === entity.id : true
                   return (
                     <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
                       <div className="thumb">
@@ -183,7 +184,7 @@ export function EntityDetailPage() {
                         <div className="title">{otitle}</div>
                         {rel && (
                           <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
-                            {resolveRelationType(rel.relation_type)}
+                            {resolveRelationType(rel.relation_type, isFrom)}
                           </div>
                         )}
                         {obj.idno && <div className="meta">{obj.idno}</div>}

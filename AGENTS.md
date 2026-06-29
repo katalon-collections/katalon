@@ -182,6 +182,21 @@ Prefer these tools over grep/find for code exploration:
 
 Always use CodeGraph before falling back to grep or sequential file reads.
 
+## Full-Stack Exploration Rule
+
+**Any feature touches both backend AND frontend.** Before starting exploration or planning:
+
+1. Read backend model/schema first
+2. Immediately also read the corresponding frontend component(s) — search `frontend/admin/src` and `frontend/portal/src`
+3. Never conclude "what exists" from backend alone
+
+Key mappings:
+- Schema fields → `frontend/admin/src/screens/ScreenSchema.tsx`
+- Record forms → `frontend/admin/src/screens/ScreenForm.tsx`
+- Vocabularies → `frontend/admin/src/screens/ScreenVocab.tsx`
+- Relations panel → `frontend/admin/src/screens/ScreenForm.tsx` (Beziehungen section)
+- Public record view → `frontend/portal/src/`
+
 ## Versionierung
 
 Katalon verwendet Semantic Versioning (`MAJOR.MINOR.PATCH`).
