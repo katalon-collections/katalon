@@ -149,6 +149,43 @@ async def test_list_media_returns_files() -> None:
         app.dependency_overrides.pop(get_db, None)
 
 
+@pytest.mark.asyncio
+async def test_patch_media_rights(override_auth) -> None:
+    obj_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    media_file = MediaFile(
+        id=media_id,
+        object_id=obj_id,
+        filename="test.jpg",
+        mime_type="image/jpeg",
+        file_path="/media/test.jpg",
+        status="ready",
+        is_primary=True,
+        created_at=datetime.now(),
+    )
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mock_result(media_file))
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.patch(
+                f"/v1/objects/{obj_id}/media/{media_id}",
+                json={
+                    "license_uri": "https://creativecommons.org/licenses/by/4.0/",
+                    "rights_holder": {"name": "Museum", "uri": "https://example.org/museum"},
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["rights_holder"]["name"] == "Museum"
+        assert media_file.license_uri.endswith("/by/4.0/")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
 # ---------------------------------------------------------------------------
 # GET /v1/objects/{id}/media/{media_id}/file
 # ---------------------------------------------------------------------------

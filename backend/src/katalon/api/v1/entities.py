@@ -27,7 +27,7 @@ from katalon.services.relation_service import (
     delete_relations,
     sync_schema_relations,
 )
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     has_any_subtypes,
@@ -86,16 +86,20 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admi
     _has_subtypes = await has_any_subtypes(db, "entity")
     entity_type = normalize_subtype_name(data.entity_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "entity", entity_type)
-    errors = await validate_metadata(db, "entity", data.metadata_, entity_type)
+    metadata = await prepare_metadata(
+        db, "entity", data.metadata_, entity_type,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "entity", metadata, entity_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Entity).where(Entity.idno == idno))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=data.metadata_)
+    entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=metadata)
     db.add(entity)
     await db.flush()
-    await sync_schema_relations(db, "entity", entity.id, data.metadata_)
+    await sync_schema_relations(db, "entity", entity.id, metadata)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
     try:
@@ -128,7 +132,11 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     entity_type = normalize_subtype_name(data.entity_type, allow_null=False)
     await ensure_subtype_exists(db, "entity", entity_type)
-    errors = await validate_metadata(db, "entity", data.metadata_, entity_type)
+    metadata = await prepare_metadata(
+        db, "entity", data.metadata_, entity_type, existing=entity.metadata_,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "entity", metadata, entity_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -140,10 +148,10 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     entity.idno = data.idno.strip()
     entity.entity_type = entity_type
     entity.status = data.status
-    entity.metadata_ = data.metadata_
-    await sync_schema_relations(db, "entity", entity.id, data.metadata_)
+    entity.metadata_ = metadata
+    await sync_schema_relations(db, "entity", entity.id, metadata)
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": data.metadata_}})
+                     changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": metadata}})
     try:
         await search_service.index_record("entity", entity, db)
     except Exception:

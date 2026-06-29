@@ -282,6 +282,8 @@ export interface MediaFile {
   status: string
   is_primary: boolean
   media_type: string | null
+  license_uri: string | null
+  rights_holder: { name: string; uri?: string } | null
   created_at: string
 }
 
@@ -329,7 +331,7 @@ export const media = {
     }
     return res.json()
   },
-  patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean }) =>
+  patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean; license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null }) =>
     req<MediaFile>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
   batchImport: async (archive: File | null, mapping: File | null, files: File[]): Promise<{ status: string; task_id: string; batch_id: string }> => {

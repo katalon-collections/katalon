@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, getTokenUser } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
@@ -19,10 +19,25 @@ function extractTitle(m: Record<string, unknown>, fallback: string): string {
   return fallback
 }
 
+function defaultsFor(fields: FieldDefinition[]): Record<string, unknown> {
+  return Object.fromEntries(
+    fields
+      .filter(f => f.settings?.default_value !== undefined)
+      .map(f => [f.name, f.settings.default_value]),
+  )
+}
+
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 const PROCEDURE_STATUSES: ProcedureStatus[] = ['draft', 'active', 'completed', 'cancelled']
 const PROCEDURE_STATUS_LABELS: Record<ProcedureStatus, string> = { draft: 'Entwurf', active: 'Aktiv', completed: 'Abgeschlossen', cancelled: 'Abgebrochen' }
+const MEDIA_LICENSES = [
+  ['https://creativecommons.org/publicdomain/zero/1.0/', 'CC0 1.0'],
+  ['https://creativecommons.org/publicdomain/mark/1.0/', 'Public Domain Mark 1.0'],
+  ['https://creativecommons.org/licenses/by/4.0/', 'CC BY 4.0'],
+  ['https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0'],
+  ['https://rightsstatements.org/vocab/InC/1.0/', 'In Copyright'],
+] as const
 const PROCEDURE_TYPES = [
   { id: 'loan_out', label: 'Ausleihe ausgehend' },
   { id: 'loan_in', label: 'Ausleihe eingehend' },
@@ -655,6 +670,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showGeo   = recordType === 'place'
   const showProcedureFields = recordType === 'procedure'
   const showCollectionStatus = recordType === 'object'
+  const user = getTokenUser()
+  const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [idno, setIdno]       = useState('')
@@ -691,6 +708,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [uploadError, setUploadError]   = useState<string | null>(null)
   const [dragOver, setDragOver]         = useState(false)
   const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
+  const [uploadLicenseUri, setUploadLicenseUri] = useState('')
+  const [uploadRightsName, setUploadRightsName] = useState('')
+  const [uploadRightsUri, setUploadRightsUri] = useState('')
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -832,6 +852,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
+        if (!rec) setValues(defaultsFor(fieldDefs))
       })
       .catch(e => setError(e.message))
       .finally(() => { setLoading(false); setIsDirty(false) })
@@ -849,7 +870,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // Reload field definitions when subtype changes on new forms (values preserved in state)
   useEffect(() => {
     if (!isNew || !subtypeKey || !subtype) return
-    schema.list(recordType, subtype).then(setFields).catch(() => {})
+    schema.list(recordType, subtype).then(fieldDefs => {
+      setFields(fieldDefs)
+      setValues(prev => ({ ...defaultsFor(fieldDefs), ...prev }))
+    }).catch(() => {})
   }, [isNew, subtype, recordType, subtypeKey])
 
   useEffect(() => {
@@ -1089,6 +1113,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             vocabId={(sf.settings?.vocabulary_id as string) ?? ''}
             value={(val as string) ?? ''}
             onChange={v => onChange(v)}
+            disabled={disabled}
+          />
+        )
+      case 'relation':
+        return val ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
+            <button className="btn sm ico gh" onClick={() => onChange(undefined)} disabled={disabled}><X size={10} /></button>
+          </div>
+        ) : (
+          <RelationInput
+            targetType={(sf.settings?.target_type as string) ?? ''}
+            onAdd={entry => onChange(entry)}
             disabled={disabled}
           />
         )
@@ -1368,11 +1405,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setUploadError(null)
     try {
       const f = await media.upload(savedId, file)
-      setMediaFiles(prev => [...prev, f])
+      const rights_holder = uploadRightsName.trim()
+        ? { name: uploadRightsName.trim(), ...(uploadRightsUri.trim() ? { uri: uploadRightsUri.trim() } : {}) }
+        : null
+      const updated = await media.patch(savedId, f.id, {
+        license_uri: uploadLicenseUri.trim() || null,
+        rights_holder,
+      })
+      setMediaFiles(prev => [...prev, updated])
     } catch (e) {
       setUploadError((e as Error).message)
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleMediaRights(mediaId: string, data: { license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null }) {
+    if (!savedId) return
+    try {
+      const updated = await media.patch(savedId, mediaId, data)
+      setMediaFiles(prev => prev.map(f => f.id === mediaId ? updated : f))
+    } catch (e) {
+      alert((e as Error).message)
     }
   }
 
@@ -1644,11 +1698,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     : undefined
 
                   return (
-                    <div key={f.id} className="field">
+                    <fieldset key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0 }}>
                       <div className="lbl">
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
                         {repeatable && <span className="h">wiederholbar</span>}
+                        {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
                       </div>
 
                       {f.field_type === 'vocab' ? (
@@ -1962,7 +2017,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       {fieldErrors[f.name] && (
                         <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
                       )}
-                    </div>
+                    </fieldset>
                   )
                 })}
 
@@ -2036,12 +2091,60 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
                               ))}
                             </select>
+                            <div style={{ padding: 6, display: 'grid', gap: 4, borderTop: '1px solid var(--border-s)' }}>
+                              <input
+                                className="fld"
+                                style={{ fontSize: 10, padding: '3px 5px' }}
+                                defaultValue={f.license_uri ?? ''}
+                                list="media-license-options"
+                                placeholder="Lizenz-URI"
+                                onBlur={e => handleMediaRights(f.id, { license_uri: e.target.value.trim() || null })}
+                              />
+                              <input
+                                className="fld"
+                                style={{ fontSize: 10, padding: '3px 5px' }}
+                                defaultValue={f.rights_holder?.name ?? ''}
+                                placeholder="Rechteinhaber"
+                                onBlur={e => handleMediaRights(f.id, {
+                                  rights_holder: e.target.value.trim()
+                                    ? { name: e.target.value.trim(), ...(f.rights_holder?.uri ? { uri: f.rights_holder.uri } : {}) }
+                                    : null,
+                                })}
+                              />
+                              <input
+                                className="fld"
+                                style={{ fontSize: 10, padding: '3px 5px' }}
+                                defaultValue={f.rights_holder?.uri ?? ''}
+                                placeholder="Rechteinhaber-URI"
+                                onBlur={e => handleMediaRights(f.id, {
+                                  rights_holder: f.rights_holder?.name
+                                    ? { name: f.rights_holder.name, ...(e.target.value.trim() ? { uri: e.target.value.trim() } : {}) }
+                                    : null,
+                                })}
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
 
                     {hasSavedId ? (
+                      <>
+                      <datalist id="media-license-options">
+                        {MEDIA_LICENSES.map(([uri, label]) => <option key={uri} value={uri}>{label}</option>)}
+                      </datalist>
+                      <div className="fg-2" style={{ marginBottom: 10 }}>
+                        <div className="field">
+                          <div className="lbl">Lizenz für neue Uploads <span className="h">optional</span></div>
+                          <input className="fld" list="media-license-options" value={uploadLicenseUri} onChange={e => setUploadLicenseUri(e.target.value)} placeholder="Lizenz-URI wählen oder eingeben" />
+                          {!uploadLicenseUri && <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>Keine Lizenz angegeben. Upload bleibt möglich.</div>}
+                        </div>
+                        <div className="field">
+                          <div className="lbl">Rechteinhaber für neue Uploads <span className="h">optional</span></div>
+                          <input className="fld" value={uploadRightsName} onChange={e => setUploadRightsName(e.target.value)} placeholder="Name" />
+                          <input className="fld" value={uploadRightsUri} onChange={e => setUploadRightsUri(e.target.value)} placeholder="URI (optional)" style={{ marginTop: 4 }} />
+                        </div>
+                      </div>
                       <div
                         className="dz"
                         style={{ padding: '20px 16px', opacity: uploading ? 0.5 : 1, border: dragOver ? '2px dashed var(--accent)' : undefined }}
@@ -2065,6 +2168,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         )}
                         {uploadError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{uploadError}</div>}
                       </div>
+                      </>
                     ) : (
                       <div style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }}>
                         Objekt zuerst speichern, dann Bilder hochladen.

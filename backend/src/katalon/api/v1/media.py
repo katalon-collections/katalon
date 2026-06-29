@@ -33,6 +33,8 @@ def _serialize(f: MediaFile) -> dict:
         "status": f.status,
         "is_primary": f.is_primary,
         "media_type": f.media_type,
+        "license_uri": f.license_uri,
+        "rights_holder": f.rights_holder,
         "created_at": f.created_at.isoformat(),
     }
 
@@ -96,6 +98,8 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
 class MediaPatch(BaseModel):
     media_type: str | None = None
     is_primary: bool | None = None
+    license_uri: str | None = None
+    rights_holder: dict | None = None
 
 
 @router.patch("/{media_id}", response_model=dict)
@@ -109,6 +113,10 @@ async def patch_media(
 
     if data.media_type is not None:
         media.media_type = data.media_type
+    if "license_uri" in data.model_fields_set:
+        media.license_uri = data.license_uri
+    if "rights_holder" in data.model_fields_set:
+        media.rights_holder = data.rights_holder
 
     if data.is_primary is True:
         all_files = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()

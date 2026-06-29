@@ -29,7 +29,7 @@ from katalon.services.relation_service import (
     procedure_object_ids,
     sync_schema_relations,
 )
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
 logger = logging.getLogger(__name__)
@@ -136,6 +136,11 @@ async def create_procedure(
     db: DBDep,
     current_user=require_admin_or_editor(),
 ) -> Procedure:
+    metadata = await prepare_metadata(
+        db, "procedure", data.metadata_, data.procedure_type,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    data = data.model_copy(update={"metadata_": metadata})
     await _validate_procedure(data, db)
     idno = await _idno(data, db)
     existing = await db.execute(select(Procedure).where(Procedure.idno == idno))
@@ -259,6 +264,11 @@ async def update_procedure(
     ).scalar_one_or_none()
     if not proc:
         raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
+    metadata = await prepare_metadata(
+        db, "procedure", data.metadata_, data.procedure_type, existing=proc.metadata_,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    data = data.model_copy(update={"metadata_": metadata})
     existing = await db.execute(
         select(Procedure).where(
             Procedure.idno == data.idno.strip(),

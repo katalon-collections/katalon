@@ -21,7 +21,7 @@ from katalon.services.relation_service import (
     delete_relations,
     sync_schema_relations,
 )
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     has_any_subtypes,
@@ -79,7 +79,11 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
     _has_subtypes = await has_any_subtypes(db, "place")
     place_type = normalize_subtype_name(data.place_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "place", place_type)
-    errors = await validate_metadata(db, "place", data.metadata_, place_type)
+    metadata = await prepare_metadata(
+        db, "place", data.metadata_, place_type,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "place", metadata, place_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Place).where(Place.idno == idno))
@@ -89,14 +93,14 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
         idno=idno,
         place_type=place_type,
         status=data.status,
-        metadata_=data.metadata_,
+        metadata_=metadata,
     )
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     db.add(place)
     await db.flush()
-    await sync_schema_relations(db, "place", place.id, data.metadata_)
+    await sync_schema_relations(db, "place", place.id, metadata)
     await db.flush()
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="create")
     try:
@@ -129,7 +133,11 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     place_type = normalize_subtype_name(data.place_type, allow_null=True)
     await ensure_subtype_exists(db, "place", place_type)
-    errors = await validate_metadata(db, "place", data.metadata_, place_type)
+    metadata = await prepare_metadata(
+        db, "place", data.metadata_, place_type, existing=place.metadata_,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "place", metadata, place_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -141,8 +149,8 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     place.idno = data.idno.strip()
     place.place_type = place_type
     place.status = data.status
-    place.metadata_ = data.metadata_
-    await sync_schema_relations(db, "place", place.id, data.metadata_)
+    place.metadata_ = metadata
+    await sync_schema_relations(db, "place", place.id, metadata)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)

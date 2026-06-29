@@ -120,8 +120,27 @@ async def sync_schema_relations(
             FieldDefinition.is_deleted.is_(False),
         )
     )
-    rel_fields = result.scalars().all()
-    if not rel_fields:
+    rel_fields = list(result.scalars().all())
+    group_result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == record_type,
+            FieldDefinition.field_type == "group",
+            FieldDefinition.parent_id.is_(None),
+            FieldDefinition.is_deleted.is_(False),
+        )
+    )
+    group_fields = list(group_result.scalars().all())
+    group_relation_fields: list[tuple[FieldDefinition, FieldDefinition]] = []
+    for group in group_fields:
+        children = await db.execute(
+            select(FieldDefinition).where(
+                FieldDefinition.parent_id == group.id,
+                FieldDefinition.field_type == "relation",
+                FieldDefinition.is_deleted.is_(False),
+            )
+        )
+        group_relation_fields.extend((group, child) for child in children.scalars().all())
+    if not rel_fields and not group_relation_fields:
         # Nothing to sync — just clean up any stale derived relations
         await db.execute(
             sa_delete(Relation).where(
@@ -165,6 +184,27 @@ async def sync_schema_relations(
                     to_id=uuid.UUID(str(entry["id"])),
                     relation_type=str(entry.get("relation_type", "")),
                     metadata_={"source_field": field.name, "is_schema_relation": True},
+                    is_schema_derived=True,
+                )
+            )
+    for group, field in group_relation_fields:
+        for instance in metadata_.get(group.name, []):
+            if not isinstance(instance, dict):
+                continue
+            entry = instance.get(field.name)
+            if not isinstance(entry, dict) or not entry.get("id"):
+                continue
+            db.add(
+                Relation(
+                    from_type=record_type,
+                    from_id=record_id,
+                    to_type=(field.settings or {}).get("target_type", ""),
+                    to_id=uuid.UUID(str(entry["id"])),
+                    relation_type=str(entry.get("relation_type", "")),
+                    metadata_={
+                        "source_field": f"{group.name}.{field.name}",
+                        "is_schema_relation": True,
+                    },
                     is_schema_derived=True,
                 )
             )

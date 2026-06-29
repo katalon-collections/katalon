@@ -28,7 +28,7 @@ from katalon.services.relation_service import (
     delete_relations,
     sync_schema_relations,
 )
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     has_any_subtypes,
@@ -97,7 +97,11 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
     _has_subtypes = await has_any_subtypes(db, "object")
     object_type = normalize_subtype_name(data.object_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "object", object_type)
-    errors = await validate_metadata(db, "object", data.metadata_, object_type)
+    metadata = await prepare_metadata(
+        db, "object", data.metadata_, object_type,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "object", metadata, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if data.collection_status not in COLLECTION_STATUSES:
@@ -112,11 +116,11 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
         object_type=object_type,
         collection_status=data.collection_status,
         status=data.status,
-        metadata_=data.metadata_,
+        metadata_=metadata,
     )
     db.add(obj)
     await db.flush()
-    await sync_schema_relations(db, "object", obj.id, data.metadata_)
+    await sync_schema_relations(db, "object", obj.id, metadata)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
     try:
@@ -153,7 +157,11 @@ async def update_object(
 
     object_type = normalize_subtype_name(data.object_type, allow_null=True)
     await ensure_subtype_exists(db, "object", object_type)
-    errors = await validate_metadata(db, "object", data.metadata_, object_type)
+    metadata = await prepare_metadata(
+        db, "object", data.metadata_, object_type, existing=obj.metadata_,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "object", metadata, object_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if data.collection_status not in COLLECTION_STATUSES:
@@ -170,9 +178,9 @@ async def update_object(
     obj.object_type = object_type
     obj.collection_status = data.collection_status
     obj.status = data.status
-    obj.metadata_ = data.metadata_
+    obj.metadata_ = metadata
 
-    await sync_schema_relations(db, "object", obj.id, data.metadata_)
+    await sync_schema_relations(db, "object", obj.id, metadata)
 
     await log_change(
         db,
@@ -186,7 +194,7 @@ async def update_object(
                 "object_type": object_type,
                 "collection_status": data.collection_status,
                 "status": data.status,
-                "metadata": data.metadata_,
+                "metadata": metadata,
             },
         },
     )

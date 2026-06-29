@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from copy import deepcopy
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -147,6 +148,18 @@ async def validate_metadata(
                                     )
                             except re.error:
                                 pass
+                    if sv is not None and sf.field_type == "relation":
+                        struct_err = _validate_relation_structure(
+                            sv, f"{field.name}.{sf.name}"
+                        )
+                        if struct_err:
+                            errors.append(struct_err)
+                            continue
+                        target_err = await _validate_relation_target(
+                            sv, f"{field.name}.{sf.name}", sf.settings, db
+                        )
+                        if target_err:
+                            errors.append(target_err)
             continue
 
         if field.field_type == "pid":
@@ -201,3 +214,30 @@ async def validate_metadata(
                         errors.append(f"Feld '{field.name}': entspricht nicht dem erwarteten Format.")
 
     return errors
+
+
+async def prepare_metadata(
+    db: AsyncSession,
+    record_type: str,
+    metadata: dict,
+    target_subtype: str | None = None,
+    *,
+    existing: dict | None = None,
+    can_edit_locked: bool = False,
+) -> dict:
+    """Apply schema defaults and protect locked fields."""
+    prepared = deepcopy(metadata)
+    for field in await get_field_definitions(db, record_type, target_subtype):
+        settings = field.settings or {}
+        if settings.get("is_locked") and not can_edit_locked:
+            if existing is not None and field.name in existing:
+                prepared[field.name] = deepcopy(existing[field.name])
+                continue
+            prepared.pop(field.name, None)
+        if (
+            field.field_type in {"text", "vocab", "vocab_free", "date", "number"}
+            and prepared.get(field.name) in (None, "", [])
+            and "default_value" in settings
+        ):
+            prepared[field.name] = deepcopy(settings["default_value"])
+    return prepared

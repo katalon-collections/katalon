@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-29
+
+### Added
+- Containerfelder unterstützen Relationen zu Objekten, Entitäten, Orten und Ereignissen.
+- Mediendateien speichern optionale Lizenz- und Rechteinhaber-Angaben.
+- Schemafelder können Standardwerte erhalten und für Nicht-Administratoren gesperrt werden.
+
 ## [0.3.0] - 2026-06-27
 
 ### Added

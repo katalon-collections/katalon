@@ -27,7 +27,7 @@ from katalon.services.relation_service import (
     delete_relations,
     sync_schema_relations,
 )
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     has_any_subtypes,
@@ -86,16 +86,20 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=requ
     _has_subtypes = await has_any_subtypes(db, "occurrence")
     occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=not _has_subtypes)
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
-    errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
+    metadata = await prepare_metadata(
+        db, "occurrence", data.metadata_, occurrence_type,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "occurrence", metadata, occurrence_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=data.metadata_)
+    occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=metadata)
     db.add(occ)
     await db.flush()
-    await sync_schema_relations(db, "occurrence", occ.id, data.metadata_)
+    await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
     try:
@@ -130,7 +134,11 @@ async def update_occurrence(
         raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
-    errors = await validate_metadata(db, "occurrence", data.metadata_, occurrence_type)
+    metadata = await prepare_metadata(
+        db, "occurrence", data.metadata_, occurrence_type, existing=occ.metadata_,
+        can_edit_locked=current_user.role in {"admin", "superuser"},
+    )
+    errors = await validate_metadata(db, "occurrence", metadata, occurrence_type)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -142,8 +150,8 @@ async def update_occurrence(
     occ.idno = data.idno.strip()
     occ.occurrence_type = occurrence_type
     occ.status = data.status
-    occ.metadata_ = data.metadata_
-    await sync_schema_relations(db, "occurrence", occ.id, data.metadata_)
+    occ.metadata_ = metadata
+    await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})
     try:

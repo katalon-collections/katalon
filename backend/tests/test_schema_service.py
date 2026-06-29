@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from katalon.services.schema_service import validate_metadata
+from katalon.services.schema_service import prepare_metadata, validate_metadata
 
 
 def make_field(name: str, *, is_required: bool = False, is_repeatable: bool = False, field_type: str = "text") -> MagicMock:
@@ -189,3 +189,51 @@ async def test_group_field_optional_absent() -> None:
     db = mock_db(group, sub_fields=[])
     errors = await validate_metadata(db, "object", {})
     assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_group_relation_sub_field_validates_structure() -> None:
+    group = make_field("object_history", field_type="group")
+    person = make_field("person", field_type="relation")
+    person.settings = {"target_type": "entity"}
+    db = mock_db(group, sub_fields=[person])
+    errors = await validate_metadata(
+        db, "object", {"object_history": [{"person": {"label": "No ID"}}]}
+    )
+    assert len(errors) == 1
+    assert "object_history.person" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_prepare_metadata_applies_default() -> None:
+    language = make_field("language")
+    language.settings = {"default_value": "de"}
+    metadata = await prepare_metadata(mock_db(language), "object", {})
+    assert metadata == {"language": "de"}
+
+
+@pytest.mark.asyncio
+async def test_prepare_metadata_preserves_locked_value_for_editor() -> None:
+    institution = make_field("institution")
+    institution.settings = {"is_locked": True}
+    metadata = await prepare_metadata(
+        mock_db(institution),
+        "object",
+        {"institution": "changed"},
+        existing={"institution": "original"},
+    )
+    assert metadata == {"institution": "original"}
+
+
+@pytest.mark.asyncio
+async def test_prepare_metadata_allows_admin_to_change_locked_value() -> None:
+    institution = make_field("institution")
+    institution.settings = {"is_locked": True}
+    metadata = await prepare_metadata(
+        mock_db(institution),
+        "object",
+        {"institution": "changed"},
+        existing={"institution": "original"},
+        can_edit_locked=True,
+    )
+    assert metadata == {"institution": "changed"}

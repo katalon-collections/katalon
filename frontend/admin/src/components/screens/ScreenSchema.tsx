@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
 import type { SchemaImportResult } from '../../api/client'
-import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary } from '../../types'
+import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
 
@@ -22,7 +22,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 }
 
 // Field types allowed as sub-fields of a group (no recursion)
-const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free'] as const
+const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation'] as const
 type SubFieldType = typeof SUB_FIELD_TYPES[number]
 
 type SubFieldFormState = {
@@ -35,6 +35,7 @@ type SubFieldFormState = {
   sort_order: number
   validation_regex: string
   vocabulary_id: string
+  relation_target_type: string
 }
 
 const AUTHORITY_SOURCES = [
@@ -93,12 +94,14 @@ type FieldFormState = {
   relation_target_subtype: string
   relation_type_vocab: string
   inherited_fields: string[]
+  default_value: unknown
+  is_locked: boolean
   // sub-fields of this group field (populated when editing an existing group field)
   subFields?: FieldDefinition[]
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [] }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [], default_value: '', is_locked: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -123,6 +126,8 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     relation_target_subtype: (f.settings?.target_subtype as string) ?? '',
     relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
     inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
+    default_value: f.settings?.default_value ?? '',
+    is_locked: Boolean(f.settings?.is_locked),
     subFields: f.children ?? [],
   }
 }
@@ -150,7 +155,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number): SubFieldFormState {
-  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '' }
+  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity' }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -275,6 +280,7 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
       sort_order: sf.sort_order,
       validation_regex: (sf.settings?.validation_regex as string) ?? '',
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
+      relation_target_type: (sf.settings?.target_type as string) ?? 'entity',
     })
     setSubFieldError(null)
     setSubNameManual(true)
@@ -301,6 +307,7 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
       settings: {
         ...(subFieldForm.validation_regex.trim() ? { validation_regex: subFieldForm.validation_regex.trim() } : {}),
         ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
+        ...(subFieldForm.field_type === 'relation' ? { target_type: subFieldForm.relation_target_type } : {}),
       },
       parent_id: fieldId,
     }
@@ -335,9 +342,17 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
   }
 
   const [allVocabs, setAllVocabs] = useState<Vocabulary[]>([])
+  const [defaultTerms, setDefaultTerms] = useState<VocabularyTerm[]>([])
   useEffect(() => {
     vocabularies.list().then(setAllVocabs).catch(() => {})
   }, [])
+  useEffect(() => {
+    if (form.field_type !== 'vocab' || !form.vocabulary_id) {
+      setDefaultTerms([])
+      return
+    }
+    vocabularies.listTerms(form.vocabulary_id).then(setDefaultTerms).catch(() => setDefaultTerms([]))
+  }, [form.field_type, form.vocabulary_id])
 
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   useEffect(() => {
@@ -464,6 +479,26 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
             </select>
           </div>
         )}
+        {['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
+          <div className="field">
+            <div className="lbl">Standardwert <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+            {form.field_type === 'vocab' ? (
+              <select className="fld" value={(form.default_value as { id?: string })?.id ?? ''} onChange={e => {
+                const term = defaultTerms.find(t => t.id === e.target.value)
+                set('default_value', term ? { id: term.id, label: getLabel(term) } : '')
+              }}>
+                <option value="">— kein Standardwert —</option>
+                {defaultTerms.map(t => <option key={t.id} value={t.id}>{getLabel(t, t.term)}</option>)}
+              </select>
+            ) : (
+              <input className="fld" type={form.field_type === 'number' ? 'number' : 'text'} value={String(form.default_value ?? '')} onChange={e => set('default_value', e.target.value)} />
+            )}
+          </div>
+        )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
+          <span style={{ fontSize: 13 }}>Feld sperren (nur durch Admins änderbar)</span>
+        </label>
         {form.field_type === 'relation' && (
           <>
             <div className="fg-2">
@@ -662,6 +697,17 @@ function SubFieldFormPanel({ sf, allVocabs, nameManual, saving, error, onChange,
           <select className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
             <option value="">— Vokabular wählen —</option>
             {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </div>
+      )}
+      {sf.field_type === 'relation' && (
+        <div className="field">
+          <div className="lbl">Ziel-Typ</div>
+          <select className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
+            <option value="object">Objekte</option>
+            <option value="entity">Entitäten</option>
+            <option value="place">Orte</option>
+            <option value="occurrence">Occurrences</option>
           </select>
         </div>
       )}
@@ -878,6 +924,8 @@ export function ScreenSchema() {
           ...(form.relation_type_vocab ? { relation_type_vocab: form.relation_type_vocab } : {}),
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
         } : {}),
+        ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
+        ...(form.is_locked ? { is_locked: true } : {}),
       },
     }
     try {
