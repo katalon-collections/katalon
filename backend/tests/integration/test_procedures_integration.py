@@ -133,11 +133,24 @@ async def test_procedure_validation_uses_procedure_type_schema(async_client, aut
         json={
             "idno": f"PRO-{uuid.uuid4().hex[:12]}",
             "procedure_type": "conservation",
+            "status": "active",
             "metadata_": {"label": "Restaurierung"},
         },
     )
     assert missing_response.status_code == 422
     assert field_name in str(missing_response.json()["detail"])
+
+    draft_response = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+            "procedure_type": "conservation",
+            "status": "draft",
+            "metadata_": {"label": "Restaurierung"},
+        },
+    )
+    assert draft_response.status_code == 201, draft_response.text
 
     ok_response = await async_client.post(
         "/v1/procedures",
@@ -145,6 +158,7 @@ async def test_procedure_validation_uses_procedure_type_schema(async_client, aut
         json={
             "idno": f"PRO-{uuid.uuid4().hex[:12]}",
             "procedure_type": "conservation",
+            "status": "active",
             "metadata_": {"label": "Restaurierung", field_name: "gereinigt"},
         },
     )

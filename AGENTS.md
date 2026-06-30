@@ -161,6 +161,17 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 - Wenn ich Fehler berichte, schau immer in die Logs der entsprechenden Container statt Annahmen zu treffen.
 
+## Port-Regel Dev vs. Prod-Compose
+
+**Port-Verwechslung vermeiden:**
+
+- `http://localhost:3000` = Admin im normalen/production-like Compose-Stack
+- `http://localhost:3001` = Portal im normalen/production-like Compose-Stack
+- `http://localhost:4000` = Admin **nur** im Dev-Compose-Stack (`docker-compose.dev.yml`)
+- `http://localhost:4001` = Portal **nur** im Dev-Compose-Stack (`docker-compose.dev.yml`)
+
+**Wichtig:** Wenn nicht explizit gesagt wird, dass der Dev-Stack gemeint ist, verwende für Browser-Checks standardmäßig `3000/3001`, nicht `4000/4001`.
+
 ## Datensicherheit – ABSOLUTE VERBOTE
 
 **NIEMALS die Datenbank-Volumes löschen, neu erstellen oder `docker compose down -v` ausführen ohne explizite Bestätigung von Karl.** Das gilt auch dann, wenn es als schnelle Lösung erscheint (z. B. bei Passwort-Konflikten, Schema-Problemen oder Container-Fehlern). Datenverlust ist irreversibel.

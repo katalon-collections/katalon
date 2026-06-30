@@ -80,6 +80,14 @@ export interface FieldDefinition {
   children?: FieldDefinition[]
 }
 
+export interface FieldAIConfig {
+  enabled: boolean
+  mode: 'text' | 'vision'
+  prompt: string
+  include_fields: string[]
+  send_existing_value: boolean
+}
+
 export interface MetadataMapping {
   id: string
   field_definition_id: string

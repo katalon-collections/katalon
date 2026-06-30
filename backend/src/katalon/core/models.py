@@ -486,7 +486,39 @@ class AdminConfig(Base):
     reconciliation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     reconciliation_threshold: Mapped[int] = mapped_column(Integer, default=5)
     reconciliation_id_diff_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ai_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    ai_max_input_tokens: Mapped[int] = mapped_column(Integer, default=6000)
+    ai_max_output_tokens: Mapped[int] = mapped_column(Integer, default=800)
+    ai_daily_user_token_limit: Mapped[int] = mapped_column(Integer, default=50000)
+    ai_monthly_global_token_limit: Mapped[int] = mapped_column(Integer, default=1000000)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class AppSecret(Base):
+    __tablename__ = "app_secrets"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    encrypted_value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class AIUsageEvent(Base):
+    __tablename__ = "ai_usage_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model: Mapped[str] = mapped_column(String(256), index=True)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+
+    __table_args__ = (
+        Index("ix_ai_usage_events_user_created", "user_id", "created_at"),
+        Index("ix_ai_usage_events_created", "created_at"),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -74,6 +74,8 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=requ
     if not data.idno or not data.idno.strip():
         if schema:
             idno = await consume_next_idno(db, "occurrence", schema)
+        elif data.status == "draft":
+            idno = None
         else:
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
@@ -84,18 +86,24 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=requ
             await maybe_advance_counter(db, "occurrence", schema, idno)
 
     _has_subtypes = await has_any_subtypes(db, "occurrence")
-    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=not _has_subtypes)
+    occurrence_type = normalize_subtype_name(
+        data.occurrence_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     metadata = await prepare_metadata(
         db, "occurrence", data.metadata_, occurrence_type,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "occurrence", metadata, occurrence_type)
+    errors = await validate_metadata(
+        db, "occurrence", metadata, occurrence_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if idno is not None:
+        existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=metadata)
     db.add(occ)
     await db.flush()
@@ -123,22 +131,33 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCur
 async def update_occurrence(
     occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> Occurrence:
-    if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
-    existing = await db.execute(select(Occurrence).where(Occurrence.idno == data.idno.strip(), Occurrence.id != occ_id))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    occurrence_type = normalize_subtype_name(data.occurrence_type, allow_null=False)
+    if not data.idno or not data.idno.strip():
+        if data.status == "draft":
+            idno = None
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno, Occurrence.id != occ_id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    _has_subtypes = await has_any_subtypes(db, "occurrence")
+    occurrence_type = normalize_subtype_name(
+        data.occurrence_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     metadata = await prepare_metadata(
         db, "occurrence", data.metadata_, occurrence_type, existing=occ.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "occurrence", metadata, occurrence_type)
+    errors = await validate_metadata(
+        db, "occurrence", metadata, occurrence_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -147,7 +166,7 @@ async def update_occurrence(
         "status": occ.status,
         "metadata": occ.metadata_,
     }
-    occ.idno = data.idno.strip()
+    occ.idno = idno
     occ.occurrence_type = occurrence_type
     occ.status = data.status
     occ.metadata_ = metadata

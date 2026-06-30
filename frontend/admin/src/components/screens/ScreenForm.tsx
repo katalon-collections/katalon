@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, getTokenUser } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, ai, getTokenUser } from '../../api/client'
 import type { AuthorityHit, MediaFile } from '../../api/client'
 import type { AnyRecord, AuditEntry, FieldDefinition, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit } from '../ui/Icons'
+import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit, Lightning } from '../ui/Icons'
 
 function extractTitle(m: Record<string, unknown>, fallback: string): string {
   for (const key of ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']) {
@@ -25,6 +25,16 @@ function defaultsFor(fields: FieldDefinition[]): Record<string, unknown> {
       .filter(f => f.settings?.default_value !== undefined)
       .map(f => [f.name, f.settings.default_value]),
   )
+}
+
+function getFieldAiConfig(field: FieldDefinition): { enabled: boolean; mode: 'text' | 'vision'; prompt: string } | null {
+  const aiConfig = field.settings?.ai_config as Record<string, unknown> | undefined
+  if (!aiConfig?.enabled) return null
+  return {
+    enabled: true,
+    mode: (aiConfig.mode as 'text' | 'vision' | undefined) ?? 'text',
+    prompt: String(aiConfig.prompt ?? ''),
+  }
 }
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
@@ -175,7 +185,8 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
 
   useEffect(() => {
     clearTimeout(timer.current)
-    if (!vocabId || q.trim().length < 1) { setResults([]); setOpen(false); return }
+    if (!vocabId) { setResults([]); setOpen(false); return }
+    if (q.trim().length < 1) { setResults([]); return }
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, q.trim())
@@ -185,6 +196,15 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
     }, 200)
     return () => clearTimeout(timer.current)
   }, [q, vocabId])
+
+  function openSuggestions() {
+    if (!vocabId) return
+    setBusy(true)
+    vocabularies.searchTerms(vocabId, q.trim())
+      .then(r => { setResults(r); setOpen(r.length > 0) })
+      .catch(() => { setResults([]); setOpen(false) })
+      .finally(() => setBusy(false))
+  }
 
   function pick(term: VocabularyTerm) {
     onChange({ id: term.id, label: getLabel(term) })
@@ -217,6 +237,7 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
         className="fld"
         value={q}
         onChange={e => setQ(e.target.value)}
+        onFocus={openSuggestions}
         placeholder={vocabId ? 'Tippen zum Suchen…' : 'Kein Vokabular zugewiesen'}
         disabled={disabled || !vocabId}
       />
@@ -303,7 +324,8 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
 
   useEffect(() => {
     clearTimeout(timer.current)
-    if (!vocabId || draft.trim().length < 1) { setResults([]); setOpen(false); return }
+    if (!vocabId) { setResults([]); setOpen(false); return }
+    if (draft.trim().length < 1) { setResults([]); return }
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, draft.trim())
@@ -313,6 +335,15 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
     }, 200)
     return () => clearTimeout(timer.current)
   }, [draft, vocabId])
+
+  function openSuggestions() {
+    if (!vocabId) return
+    setBusy(true)
+    vocabularies.searchTerms(vocabId, draft.trim())
+      .then(r => { setResults(r); setOpen(r.length > 0) })
+      .catch(() => { setResults([]); setOpen(false) })
+      .finally(() => setBusy(false))
+  }
 
   function commit(text: string) {
     if (!text.trim()) return
@@ -339,6 +370,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
           setDraft(e.target.value)
           if (!onAdd) onChange?.(e.target.value)
         }}
+        onFocus={openSuggestions}
         onKeyDown={e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
           if (e.key === 'Escape') { setOpen(false); setResults([]) }
@@ -560,7 +592,7 @@ function RelationInput({
 
   useEffect(() => {
     clearTimeout(timer.current)
-    if (q.trim().length < 2) { setResults([]); setShowDrop(false); return }
+    if (q.trim().length < 2) { setResults([]); return }
     timer.current = setTimeout(() => {
       setSearching(true)
       searchApi.query(q.trim(), targetType as RecordType, 8)
@@ -573,6 +605,21 @@ function RelationInput({
     }, 300)
     return () => clearTimeout(timer.current)
   }, [q, targetType])
+
+  function openSuggestions() {
+    if (!targetType) return
+    setSearching(true)
+    searchApi.query(q.trim(), targetType as RecordType, 8)
+      .then(r => {
+        setResults(r.items)
+        setShowDrop(r.items.length > 0)
+      })
+      .catch(() => {
+        setResults([])
+        setShowDrop(false)
+      })
+      .finally(() => setSearching(false))
+  }
 
   function pickRecord(r: SearchResult) {
     setPicked(r)
@@ -626,6 +673,7 @@ function RelationInput({
         className="fld"
         value={q}
         onChange={e => setQ(e.target.value)}
+        onFocus={openSuggestions}
         placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
         disabled={disabled || !targetType}
       />
@@ -706,6 +754,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [fieldWarnings, setFieldWarnings] = useState<Record<string, string>>({})
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [snapLabel, setSnapLabel] = useState('')
@@ -733,6 +782,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
   const [saveOk, setSaveOk]   = useState(false)
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
 
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
@@ -746,6 +796,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [addSaving, setAddSaving]         = useState(false)
   const [addProcedureOpen, setAddProcedureOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
+  const [aiBusyField, setAiBusyField] = useState<string | null>(null)
 
   // Warn on browser tab close / reload
   useEffect(() => {
@@ -1164,22 +1215,27 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       (typeof val === 'object' && val !== null && Object.keys(val).length === 0)
   }
 
-  function validateFields(): Record<string, string> {
+  function validateFields(): { errors: Record<string, string>; warnings: Record<string, string> } {
     const errors: Record<string, string> = {}
+    const warnings: Record<string, string> = {}
+    const addRequired = (key: string, message: string) => {
+      if (isDraftStatus) warnings[key] = message
+      else errors[key] = message
+    }
     // idno is required for all record types
     if (!idno.trim()) {
-      errors['__idno'] = 'ID-Nr. ist ein Pflichtfeld.'
+      addRequired('__idno', 'ID-Nr. ist ein Pflichtfeld.')
     }
     // subtype is required when subtypes are configured
     if (subtypeKey && (availableSubtypes.length > 0 || showProcedureFields) && !subtype) {
-      errors['__subtype'] = 'Subtyp ist ein Pflichtfeld.'
+      addRequired('__subtype', 'Subtyp ist ein Pflichtfeld.')
     }
     for (const f of fields) {
       const val = values[f.name]
 
       // Required field check (all types)
       if (f.is_required && isEmptyValue(val)) {
-        errors[f.name] = `Feld '${getLabel(f, f.name)}' ist ein Pflichtfeld.`
+        addRequired(f.name, `Feld '${getLabel(f, f.name)}' ist ein Pflichtfeld.`)
         continue
       }
 
@@ -1189,7 +1245,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (f.field_type === 'group') {
         const instances = (val as Record<string, unknown>[] | undefined) ?? []
         if (f.is_required && instances.length === 0) {
-          errors[f.name] = `Feld '${getLabel(f, f.name)}' muss mindestens einen Eintrag haben.`
+          addRequired(f.name, `Feld '${getLabel(f, f.name)}' muss mindestens einen Eintrag haben.`)
           continue
         }
         for (let idx = 0; idx < instances.length; idx++) {
@@ -1197,8 +1253,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           for (const sf of (f.children ?? [])) {
             const sv = instance[sf.name]
             if (sf.is_required && isEmptyValue(sv)) {
-              errors[`${f.name}.${sf.name}:${idx}`] =
+              addRequired(
+                `${f.name}.${sf.name}:${idx}`,
                 `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}) ist ein Pflichtfeld.`
+              )
             }
             if (sv !== undefined && sv !== null && sv !== '' &&
                 sf.field_type === 'text' && sf.settings?.validation_regex) {
@@ -1221,7 +1279,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (f.is_repeatable) {
         const arr = Array.isArray(val) ? val : []
         if (f.is_required && arr.length === 0) {
-          errors[f.name] = `Feld '${getLabel(f, f.name)}' muss mindestens einen Wert haben.`
+          addRequired(f.name, `Feld '${getLabel(f, f.name)}' muss mindestens einen Wert haben.`)
           continue
         }
         // Validate each item
@@ -1281,25 +1339,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
       }
     }
-    return errors
+    return { errors, warnings }
   }
 
-  function validateSingleField(field: FieldDefinition): string | null {
+  function validateSingleField(field: FieldDefinition): { level: 'error' | 'warning'; message: string } | null {
     const val = values[field.name]
     if (field.is_required && isEmptyValue(val)) {
-      return `Feld '${getLabel(field, field.name)}' ist ein Pflichtfeld.`
+      return {
+        level: isDraftStatus ? 'warning' : 'error',
+        message: `Feld '${getLabel(field, field.name)}' ist ein Pflichtfeld.`,
+      }
     }
     if (val === undefined || val === null || val === '') return null
     if (field.field_type === 'date') {
       const v = val as string
       if (v && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)) {
-        return 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+        return { level: 'error', message: 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD' }
       }
     }
     if (field.field_type === 'number') {
       const v = val as string
       if (v && !/^-?\d+(\.\d+)?$/.test(v)) {
-        return 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)'
+        return { level: 'error', message: 'Ungültige Zahl. Erlaubt: Ganze Zahlen und Dezimalzahlen (z.B. 42 oder 3.14)' }
       }
     }
     if (field.field_type === 'text' && field.settings?.validation_regex) {
@@ -1308,7 +1369,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (v) {
         try {
           if (!new RegExp(regex).test(v)) {
-            return 'Eingabe entspricht nicht dem erwarteten Format.'
+            return { level: 'error', message: 'Eingabe entspricht nicht dem erwarteten Format.' }
           }
         } catch {
           // ignore
@@ -1319,30 +1380,65 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }
 
   function handleFieldBlur(field: FieldDefinition) {
-    const err = validateSingleField(field)
+    const result = validateSingleField(field)
     setFieldErrors(prev => {
       const next = { ...prev }
-      if (err) {
-        next[field.name] = err
-      } else {
-        delete next[field.name]
-      }
+      if (result?.level === 'error') next[field.name] = result.message
+      else delete next[field.name]
       return next
     })
+    setFieldWarnings(prev => {
+      const next = { ...prev }
+      if (result?.level === 'warning') next[field.name] = result.message
+      else delete next[field.name]
+      return next
+    })
+  }
+
+  async function runAIForField(field: FieldDefinition) {
+    const aiConfig = getFieldAiConfig(field)
+    const targetId = savedId ?? currentId
+    if (!aiConfig || !targetId) return
+    const currentValue = values[field.name]
+    const hasValue = !isEmptyValue(currentValue)
+    if (hasValue && !window.confirm(`Vorhandenen Wert in "${getLabel(field, field.name)}" durch KI-Vorschlag ersetzen?`)) {
+      return
+    }
+    setAiBusyField(field.name)
+    setError(null)
+    try {
+      const result = await ai.complete({
+        field_definition_id: field.id,
+        record_type: recordType,
+        record_id: targetId,
+      })
+      setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
+      clearFieldFeedback(field.name)
+      if (result.warning) {
+        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setAiBusyField(null)
+    }
   }
 
   async function handleSave() {
     setSaving(true)
     setError(null)
-    const fieldErrors = validateFields()
-    if (Object.keys(fieldErrors).length > 0) {
-      console.log('[Katalon] Validierungsfehler beim Speichern:', fieldErrors)
-      setFieldErrors(fieldErrors)
+    setSaveNotice(null)
+    const validation = validateFields()
+    if (Object.keys(validation.errors).length > 0) {
+      console.log('[Katalon] Validierungsfehler beim Speichern:', validation.errors)
+      setFieldErrors(validation.errors)
+      setFieldWarnings(validation.warnings)
       setSaving(false)
       setError('Bitte korrigieren Sie die markierten Felder.')
       return
     }
     setFieldErrors({})
+    setFieldWarnings(validation.warnings)
     try {
       const completingProcedure = showProcedureFields && !isNew && loadedStatus !== 'completed' && status === 'completed'
       const payload: Record<string, unknown> = {
@@ -1369,6 +1465,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setLoadedStatus(created.status as Status)
         onSaved?.(created.id)
         if (showMedia) loadMedia(created.id)
+        setIsDirty(false)
+        setSaveOk(true)
+        setSaveNotice(
+          Object.keys(validation.warnings).length > 0
+            ? 'Entwurf gespeichert mit Validierungshinweisen.'
+            : `${label} gespeichert.${showMedia ? ' Bilder können jetzt hochgeladen werden.' : ''}`
+        )
+        setTimeout(() => setSaveOk(false), 3000)
       } else {
         await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
         if (completingProcedure) {
@@ -1387,6 +1491,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
         setIsDirty(false)
         setSaveOk(true)
+        setSaveNotice(
+          Object.keys(validation.warnings).length > 0
+            ? 'Entwurf gespeichert mit Validierungshinweisen.'
+            : 'Änderungen gespeichert.'
+        )
         setTimeout(() => setSaveOk(false), 3000)
       }
     } catch (e) {
@@ -1515,6 +1624,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : []
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
   const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
+  const isDraftStatus = status === 'draft'
+
+  function clearFieldFeedback(name: string) {
+    setFieldErrors(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+    setFieldWarnings(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  function getFeedbackStyle(name: string) {
+    if (fieldErrors[name]) return { borderColor: '#dc2626', background: '#fef2f2' }
+    if (fieldWarnings[name]) return { borderColor: '#f59e0b', background: '#fffbeb' }
+    return undefined
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1550,7 +1681,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             {justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
           {!justCreated && (
-            <button className="btn pri" onClick={handleSave} disabled={saving || Object.keys(fieldErrors).length > 0}>
+            <button className="btn pri" onClick={handleSave} disabled={saving}>
               {saving ? 'Speichert…' : 'Speichern'}
             </button>
           )}
@@ -1587,8 +1718,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         </div>
       )}
       {saveOk && (
-        <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
-          Änderungen gespeichert.
+        <div style={{ background: saveNotice?.includes('Validierungshinweisen') ? '#fffbeb' : '#f0fdf4', borderBottom: saveNotice?.includes('Validierungshinweisen') ? '1px solid #fcd34d' : '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: saveNotice?.includes('Validierungshinweisen') ? '#92400e' : '#166534', flexShrink: 0 }}>
+          {saveNotice ?? 'Änderungen gespeichert.'}
         </div>
       )}
 
@@ -1607,17 +1738,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       onChange={e => { setIdno(e.target.value); setIsDirty(true) }}
                       onBlur={() => {
                         if (!idno.trim()) {
-                          setFieldErrors(err => ({ ...err, __idno: 'ID-Nr. ist ein Pflichtfeld.' }))
+                          if (isDraftStatus) setFieldWarnings(err => ({ ...err, __idno: 'ID-Nr. ist ein Pflichtfeld.' }))
+                          else setFieldErrors(err => ({ ...err, __idno: 'ID-Nr. ist ein Pflichtfeld.' }))
                         } else {
-                          setFieldErrors(err => { const n = { ...err }; delete n.__idno; return n })
+                          clearFieldFeedback('__idno')
                         }
                       }}
                       placeholder="z.B. FOT.1958.0412"
                       disabled={justCreated}
-                      style={fieldErrors['__idno'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                      style={getFeedbackStyle('__idno')}
                     />
-                    {fieldErrors['__idno'] && (
-                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__idno']}</div>
+                    {(fieldErrors['__idno'] || fieldWarnings['__idno']) && (
+                      <div style={{ fontSize: 11, color: fieldErrors['__idno'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
+                        {fieldErrors['__idno'] ?? fieldWarnings['__idno']}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1628,15 +1762,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     <select
                       className="fld"
                       value={subtype}
-                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); if (fieldErrors['__subtype']) { setFieldErrors(err => { const n = { ...err }; delete n['__subtype']; return n }) } }}
+                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
                       disabled={justCreated}
-                      style={fieldErrors['__subtype'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                      style={getFeedbackStyle('__subtype')}
                     >
                       <option value="">— Vorgangstyp wählen —</option>
                       {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                     </select>
-                    {fieldErrors['__subtype'] && (
-                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__subtype']}</div>
+                    {(fieldErrors['__subtype'] || fieldWarnings['__subtype']) && (
+                      <div style={{ fontSize: 11, color: fieldErrors['__subtype'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
+                        {fieldErrors['__subtype'] ?? fieldWarnings['__subtype']}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1647,17 +1783,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     <select
                       className="fld"
                       value={subtype}
-                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); if (fieldErrors['__subtype']) { setFieldErrors(err => { const n = { ...err }; delete n['__subtype']; return n }) } }}
+                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
                       disabled={justCreated}
-                      style={fieldErrors['__subtype'] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined}
+                      style={getFeedbackStyle('__subtype')}
                     >
                       <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
                     </select>
-                    {fieldErrors['__subtype'] && (
-                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors['__subtype']}</div>
+                    {(fieldErrors['__subtype'] || fieldWarnings['__subtype']) && (
+                      <div style={{ fontSize: 11, color: fieldErrors['__subtype'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
+                        {fieldErrors['__subtype'] ?? fieldWarnings['__subtype']}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1722,6 +1860,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {f.is_required && <span className="req">*</span>}
                         {repeatable && <span className="h">wiederholbar</span>}
                         {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
+                        {getFieldAiConfig(f) && (
+                          <button
+                            type="button"
+                            className="btn sm gh"
+                            style={{ marginLeft: 8, padding: '2px 8px', height: 24 }}
+                            onClick={() => runAIForField(f)}
+                            disabled={justCreated || !savedId || aiBusyField !== null}
+                            title={!savedId ? 'Datensatz zuerst speichern.' : undefined}
+                          >
+                            <Lightning size={12} /> {aiBusyField === f.name ? 'KI läuft…' : 'KI'}
+                          </button>
+                        )}
                       </div>
 
                       {f.field_type === 'vocab' ? (
@@ -1988,14 +2138,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           value={(val as string) ?? ''}
                           onChange={e => {
                             setField(f.name, e.target.value)
-                            if (fieldErrors[f.name]) {
-                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                            }
+                            clearFieldFeedback(f.name)
                           }}
                           onBlur={() => handleFieldBlur(f)}
                           placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
                           disabled={justCreated}
-                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          style={getFeedbackStyle(f.name)} />
                       ) : f.field_type === 'number' ? (
                         <input className="fld"
                           type="number"
@@ -2003,37 +2151,35 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           value={(val as string) ?? ''}
                           onChange={e => {
                             setField(f.name, e.target.value)
-                            if (fieldErrors[f.name]) {
-                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                            }
+                            clearFieldFeedback(f.name)
                           }}
                           onBlur={() => handleFieldBlur(f)}
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
-                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          style={getFeedbackStyle(f.name)} />
                       ) : f.field_type === 'richtext' ? (
                         <textarea className="fld" rows={4}
                           value={(val as string) ?? ''}
-                          onChange={e => setField(f.name, e.target.value)}
+                          onChange={e => { setField(f.name, e.target.value); clearFieldFeedback(f.name) }}
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
-                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          style={getFeedbackStyle(f.name)} />
                       ) : (
                         <input className="fld"
                           value={(val as string) ?? ''}
                           onChange={e => {
                             setField(f.name, e.target.value)
-                            if (fieldErrors[f.name]) {
-                              setFieldErrors(err => { const n = { ...err }; delete n[f.name]; return n })
-                            }
+                            clearFieldFeedback(f.name)
                           }}
                           onBlur={() => handleFieldBlur(f)}
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
-                          style={fieldErrors[f.name] ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} />
+                          style={getFeedbackStyle(f.name)} />
                       )}
-                      {fieldErrors[f.name] && (
-                        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{fieldErrors[f.name]}</div>
+                      {(fieldErrors[f.name] || fieldWarnings[f.name]) && (
+                        <div style={{ fontSize: 11, color: fieldErrors[f.name] ? '#dc2626' : '#92400e', marginTop: 4 }}>
+                          {fieldErrors[f.name] ?? fieldWarnings[f.name]}
+                        </div>
                       )}
                     </fieldset>
                   )

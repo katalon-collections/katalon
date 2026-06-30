@@ -61,6 +61,7 @@ services:
       CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
       DEBUG: ${DEBUG:-false}
       MEDIA_ROOT: /var/lib/katalon/media
       KATALON_BASE_URL: ${KATALON_BASE_URL:-}
@@ -78,6 +79,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      cantaloupe:
         condition: service_healthy
     restart: unless-stopped
     ports:
@@ -100,12 +103,15 @@ services:
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       MEDIA_ROOT: /var/lib/katalon/media
       SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      cantaloupe:
         condition: service_healthy
 
   beat:
@@ -121,10 +127,13 @@ services:
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       MEDIA_ROOT: /var/lib/katalon/media
       SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      cantaloupe:
         condition: service_healthy
 
   admin:

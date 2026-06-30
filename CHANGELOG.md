@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-06-30
+
+### Added
+- KI-Unterstützung in Admin-Einstellungen und Formularen: Basis-URL, Modell, Token-Limits und verschlüsselt gespeicherter API-Key für Feldvorschläge.
+- Formularfelder für Vokabulare, freie Vokabulare und Relationen zeigen Vorschläge direkt beim Fokussieren.
+
+### Changed
+- Entwürfe dürfen jetzt auch mit unvollständigen oder leeren Pflichtfeldern gespeichert werden; die Admin-UI zeigt dafür Validierungshinweise statt sofort hart zu blockieren.
+- Docker-/Compose-Dokumentation und Dev-Setup beschreiben Rebuild-/Restart-Fälle klarer.
+
+### Fixed
+- `KATALON_SECRETS_KEY` wird an die relevanten Container durchgereicht und ist für Secret-Verschlüsselung verpflichtend.
+- Backend startet nicht mehr ohne erreichbaren Cantaloupe-Service, damit Medien-Uploads nicht in einem halb defekten Stack landen.
+
+### Breaking
+- Installationen ohne gesetztes `KATALON_SECRETS_KEY` starten nicht mehr. `.env` und Deployment-Secrets müssen ergänzt werden.
+
 ## [0.3.2] - 2026-06-29
 
 ### Added

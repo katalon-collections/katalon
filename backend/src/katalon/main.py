@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from katalon.api.v1 import (
     admin_config,
+    ai,
     audit,
     auth,
     authority,
@@ -227,7 +228,13 @@ async def _ensure_admin_config() -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
         if result.scalar_one_or_none() is None:
-            db.add(AdminConfig(key="default", idno_schemas={}, idno_patterns={}))
+            db.add(AdminConfig(
+                key="default",
+                idno_schemas={},
+                idno_patterns={},
+                ai_base_url="https://api.openai.com/v1",
+                ai_model="gpt-4.1-mini",
+            ))
             await db.commit()
 
 
@@ -312,7 +319,7 @@ def _check_production_secrets() -> None:
 
 
 async def _check_cantaloupe_health() -> None:
-    """Ping Cantaloupe at startup so misconfiguration surfaces in logs, not on first upload."""
+    """Fail startup if Cantaloupe is unavailable; media uploads depend on it."""
     import httpx
 
     url = f"{settings.cantaloupe_url}/iiif/3"
@@ -320,21 +327,16 @@ async def _check_cantaloupe_health() -> None:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code >= 400:
-                logger.warning(
-                    "Cantaloupe health check at %s returned HTTP %d — "
-                    "IIIF tile generation will fail",
-                    url,
-                    resp.status_code,
+                raise RuntimeError(
+                    f"Cantaloupe health check failed at {url} with HTTP {resp.status_code}. "
+                    "Refusing to start without a working image server."
                 )
-            else:
-                logger.info("Cantaloupe reachable at %s", settings.cantaloupe_url)
+            logger.info("Cantaloupe reachable at %s", settings.cantaloupe_url)
     except Exception as exc:
-        logger.warning(
-            "Cantaloupe unreachable at %s (%s) — "
-            "IIIF tile generation will fail until this is fixed",
-            url,
-            exc,
-        )
+        raise RuntimeError(
+            f"Cantaloupe unreachable at {url} ({exc}). "
+            "Refusing to start without a working image server."
+        ) from exc
 
 
 @asynccontextmanager
@@ -379,6 +381,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_config.router, prefix="/v1")
+app.include_router(ai.router, prefix="/v1")
 app.include_router(index_health.router, prefix="/v1")
 app.include_router(idno.router, prefix="/v1")
 app.include_router(auth.router, prefix="/v1")

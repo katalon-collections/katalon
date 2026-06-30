@@ -85,6 +85,8 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
     if not data.idno or not data.idno.strip():
         if schema:
             idno = await consume_next_idno(db, "object", schema)
+        elif data.status == "draft":
+            idno = None
         else:
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
@@ -95,21 +97,27 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
             await maybe_advance_counter(db, "object", schema, idno)
 
     _has_subtypes = await has_any_subtypes(db, "object")
-    object_type = normalize_subtype_name(data.object_type, allow_null=not _has_subtypes)
+    object_type = normalize_subtype_name(
+        data.object_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(
         db, "object", data.metadata_, object_type,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "object", metadata, object_type)
+    errors = await validate_metadata(
+        db, "object", metadata, object_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if data.collection_status not in COLLECTION_STATUSES:
         raise HTTPException(status_code=422, detail="Ungültiger Sammlungsstatus.")
 
-    existing = await db.execute(select(Object).where(Object.idno == idno))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if idno is not None:
+        existing = await db.execute(select(Object).where(Object.idno == idno))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
     obj = Object(
         idno=idno,
@@ -144,24 +152,35 @@ async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
 async def update_object(
     object_id: uuid.UUID, data: ObjectCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> Object:
-    if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
 
-    existing = await db.execute(select(Object).where(Object.idno == data.idno.strip(), Object.id != object_id))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if not data.idno or not data.idno.strip():
+        if data.status == "draft":
+            idno = None
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        existing = await db.execute(select(Object).where(Object.idno == idno, Object.id != object_id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
-    object_type = normalize_subtype_name(data.object_type, allow_null=True)
+    _has_subtypes = await has_any_subtypes(db, "object")
+    object_type = normalize_subtype_name(
+        data.object_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(
         db, "object", data.metadata_, object_type, existing=obj.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "object", metadata, object_type)
+    errors = await validate_metadata(
+        db, "object", metadata, object_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if data.collection_status not in COLLECTION_STATUSES:
@@ -174,7 +193,7 @@ async def update_object(
         "status": obj.status,
         "metadata": obj.metadata_,
     }
-    obj.idno = data.idno.strip()
+    obj.idno = idno
     obj.object_type = object_type
     obj.collection_status = data.collection_status
     obj.status = data.status

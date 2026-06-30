@@ -74,6 +74,8 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admi
     if not data.idno or not data.idno.strip():
         if schema:
             idno = await consume_next_idno(db, "entity", schema)
+        elif data.status == "draft":
+            idno = None
         else:
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
@@ -84,18 +86,24 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admi
             await maybe_advance_counter(db, "entity", schema, idno)
 
     _has_subtypes = await has_any_subtypes(db, "entity")
-    entity_type = normalize_subtype_name(data.entity_type, allow_null=not _has_subtypes)
+    entity_type = normalize_subtype_name(
+        data.entity_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "entity", entity_type)
     metadata = await prepare_metadata(
         db, "entity", data.metadata_, entity_type,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "entity", metadata, entity_type)
+    errors = await validate_metadata(
+        db, "entity", metadata, entity_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Entity).where(Entity.idno == idno))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if idno is not None:
+        existing = await db.execute(select(Entity).where(Entity.idno == idno))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=metadata)
     db.add(entity)
     await db.flush()
@@ -121,22 +129,33 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
 
 @router.put("/{entity_id}", response_model=EntityRead)
 async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
-    if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    existing = await db.execute(select(Entity).where(Entity.idno == data.idno.strip(), Entity.id != entity_id))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    entity_type = normalize_subtype_name(data.entity_type, allow_null=False)
+    if not data.idno or not data.idno.strip():
+        if data.status == "draft":
+            idno = None
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        existing = await db.execute(select(Entity).where(Entity.idno == idno, Entity.id != entity_id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    _has_subtypes = await has_any_subtypes(db, "entity")
+    entity_type = normalize_subtype_name(
+        data.entity_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "entity", entity_type)
     metadata = await prepare_metadata(
         db, "entity", data.metadata_, entity_type, existing=entity.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "entity", metadata, entity_type)
+    errors = await validate_metadata(
+        db, "entity", metadata, entity_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -145,7 +164,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
         "status": entity.status,
         "metadata": entity.metadata_,
     }
-    entity.idno = data.idno.strip()
+    entity.idno = idno
     entity.entity_type = entity_type
     entity.status = data.status
     entity.metadata_ = metadata

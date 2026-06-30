@@ -50,6 +50,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-deps p
 | API-Calls | relative Pfade (`/v1/...`), Vite proxied nach `http://api:8000` | relative Pfade, nginx proxied |
 | Hot-Reload | ja | nein |
 
+**Merksatz:** `4000/4001` nur mit `docker-compose.dev.yml`. Für normalen Compose-Stack und für produktionsnahe Browser-Checks immer `3000/3001`.
+
 **Wichtig:** `VITE_API_URL` muss in Dev **leer** bleiben. Der Proxy-Target für den
 Vite-Prozess kommt aus `API_PROXY_TARGET`. Das verhindert, dass der Browser versucht
 `http://api:8000` direkt aufzurufen (DNS nicht auflösbar vom Browser).

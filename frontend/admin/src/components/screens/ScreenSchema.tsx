@@ -96,12 +96,17 @@ type FieldFormState = {
   inherited_fields: string[]
   default_value: unknown
   is_locked: boolean
+  ai_enabled: boolean
+  ai_mode: 'text' | 'vision'
+  ai_prompt: string
+  ai_include_fields: string[]
+  ai_send_existing_value: boolean
   // sub-fields of this group field (populated when editing an existing group field)
   subFields?: FieldDefinition[]
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [], default_value: '', is_locked: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -128,12 +133,18 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
     default_value: f.settings?.default_value ?? '',
     is_locked: Boolean(f.settings?.is_locked),
+    ai_enabled: Boolean((f.settings?.ai_config as Record<string, unknown> | undefined)?.enabled),
+    ai_mode: (((f.settings?.ai_config as Record<string, unknown> | undefined)?.mode as 'text' | 'vision' | undefined) ?? 'text'),
+    ai_prompt: ((f.settings?.ai_config as Record<string, unknown> | undefined)?.prompt as string) ?? '',
+    ai_include_fields: ((f.settings?.ai_config as Record<string, unknown> | undefined)?.include_fields as string[]) ?? [],
+    ai_send_existing_value: Boolean((f.settings?.ai_config as Record<string, unknown> | undefined)?.send_existing_value),
     subFields: f.children ?? [],
   }
 }
 
 interface FieldDetailProps {
   form: FieldFormState
+  availableFields: FieldDefinition[]
   fieldId: string | null   // null when creating a new field
   isNew: boolean
   saving: boolean
@@ -251,7 +262,7 @@ function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | n
   )
 }
 
-function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
 
   // Sub-field editing state (only relevant when form.field_type === 'group')
@@ -365,6 +376,8 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
     if (form.field_type !== 'relation') { setTargetTypeFields([]); return }
     schema.list(form.relation_target_type).then(setTargetTypeFields).catch(() => setTargetTypeFields([]))
   }, [form.field_type, form.relation_target_type])
+
+  const aiEligible = ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
 
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
@@ -499,6 +512,54 @@ function FieldDetail({ form, fieldId, isNew, saving, error, showSubtype, onChang
           <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
           <span style={{ fontSize: 13 }}>Feld sperren (nur durch Admins änderbar)</span>
         </label>
+        {aiEligible && (
+          <div style={{ marginBottom: 16, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--panel)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
+              <input type="checkbox" className="ck" checked={form.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
+              KI-Assistent für dieses Feld aktivieren
+            </label>
+            {form.ai_enabled && (
+              <>
+                <div className="field">
+                  <div className="lbl">Modus</div>
+                  <select className="fld" value={form.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
+                    <option value="text">Nur Textkontext</option>
+                    <option value="vision">Bild + Textkontext</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <div className="lbl">Prompt</div>
+                  <textarea className="fld" value={form.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={5} placeholder="Beschreibe das Bild in 2-3 Sätzen auf Deutsch." />
+                </div>
+                <div className="field">
+                  <div className="lbl">Weitere Felder als Kontext</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+                    {availableFields
+                      .filter(f => f.id !== fieldId && f.parent_id == null)
+                      .map(f => (
+                        <label key={f.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={form.ai_include_fields.includes(f.name)}
+                            onChange={e => set('ai_include_fields', e.target.checked
+                              ? [...form.ai_include_fields, f.name]
+                              : form.ai_include_fields.filter(name => name !== f.name)
+                            )}
+                          />
+                          <span>{getLabel(f, f.name)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{f.name}</span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <input type="checkbox" className="ck" checked={form.ai_send_existing_value} onChange={e => set('ai_send_existing_value', e.target.checked)} />
+                  Vorhandenen Feldwert als Kontext mitsenden
+                </label>
+              </>
+            )}
+          </div>
+        )}
         {form.field_type === 'relation' && (
           <>
             <div className="fg-2">
@@ -926,6 +987,15 @@ export function ScreenSchema() {
         } : {}),
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
         ...(form.is_locked ? { is_locked: true } : {}),
+        ...(form.ai_enabled ? {
+          ai_config: {
+            enabled: true,
+            mode: form.ai_mode,
+            prompt: form.ai_prompt.trim(),
+            include_fields: form.ai_include_fields,
+            send_existing_value: form.ai_send_existing_value,
+          },
+        } : {}),
       },
     }
     try {
@@ -1023,6 +1093,7 @@ export function ScreenSchema() {
           {showDetail ? (
             <FieldDetail
               form={form!}
+              availableFields={fields}
               fieldId={activeFieldId}
               isNew={isNew}
               saving={saving}

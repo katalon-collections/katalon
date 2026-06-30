@@ -67,6 +67,8 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
     if not data.idno or not data.idno.strip():
         if schema:
             idno = await consume_next_idno(db, "place", schema)
+        elif data.status == "draft":
+            idno = None
         else:
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
@@ -77,18 +79,24 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
             await maybe_advance_counter(db, "place", schema, idno)
 
     _has_subtypes = await has_any_subtypes(db, "place")
-    place_type = normalize_subtype_name(data.place_type, allow_null=not _has_subtypes)
+    place_type = normalize_subtype_name(
+        data.place_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "place", place_type)
     metadata = await prepare_metadata(
         db, "place", data.metadata_, place_type,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "place", metadata, place_type)
+    errors = await validate_metadata(
+        db, "place", metadata, place_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    existing = await db.execute(select(Place).where(Place.idno == idno))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if idno is not None:
+        existing = await db.execute(select(Place).where(Place.idno == idno))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     place = Place(
         idno=idno,
         place_type=place_type,
@@ -122,22 +130,33 @@ async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurren
 
 @router.put("/{place_id}", response_model=PlaceRead)
 async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
-    if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
-    existing = await db.execute(select(Place).where(Place.idno == data.idno.strip(), Place.id != place_id))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    place_type = normalize_subtype_name(data.place_type, allow_null=True)
+    if not data.idno or not data.idno.strip():
+        if data.status == "draft":
+            idno = None
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        existing = await db.execute(select(Place).where(Place.idno == idno, Place.id != place_id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    _has_subtypes = await has_any_subtypes(db, "place")
+    place_type = normalize_subtype_name(
+        data.place_type,
+        allow_null=data.status == "draft" or not _has_subtypes,
+    )
     await ensure_subtype_exists(db, "place", place_type)
     metadata = await prepare_metadata(
         db, "place", data.metadata_, place_type, existing=place.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    errors = await validate_metadata(db, "place", metadata, place_type)
+    errors = await validate_metadata(
+        db, "place", metadata, place_type, skip_required=data.status == "draft"
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     old = {
@@ -146,7 +165,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
         "status": place.status,
         "metadata": place.metadata_,
     }
-    place.idno = data.idno.strip()
+    place.idno = idno
     place.place_type = place_type
     place.status = data.status
     place.metadata_ = metadata

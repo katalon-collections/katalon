@@ -627,14 +627,44 @@ export interface AdminConfigRead {
   reconciliation_enabled: boolean
   reconciliation_threshold: number
   reconciliation_id_diff_enabled: boolean
+  ai_enabled: boolean
+  ai_base_url: string | null
+  ai_model: string | null
+  ai_max_input_tokens: number
+  ai_max_output_tokens: number
+  ai_daily_user_token_limit: number
+  ai_monthly_global_token_limit: number
+  ai_secret: {
+    has_key: boolean
+    updated_at: string | null
+  }
 }
 
 export const adminConfig = {
   get: () => req<AdminConfigRead>('/v1/admin/config'),
   update: (data: Partial<AdminConfigRead>) =>
     req<AdminConfigRead>('/v1/admin/config', { method: 'PUT', body: JSON.stringify(data) }),
+  setAiSecret: (api_key: string) =>
+    req<AdminConfigRead['ai_secret']>('/v1/admin/config/ai-secret', { method: 'PUT', body: JSON.stringify({ api_key }) }),
+  deleteAiSecret: () => req<AdminConfigRead['ai_secret']>('/v1/admin/config/ai-secret', { method: 'DELETE' }),
 }
 
 export const idno = {
   next: (type: string) => req<{ next: string | null }>(`/v1/idno/next?type=${encodeURIComponent(type)}`),
+}
+
+export interface AICompleteResponse {
+  field_name: string
+  value: unknown
+  confidence: number | null
+  warning: string | null
+  usage: {
+    input_tokens: number
+    output_tokens: number
+  }
+}
+
+export const ai = {
+  complete: (data: { field_definition_id: string; record_type: string; record_id: string }) =>
+    req<AICompleteResponse>('/v1/ai/complete', { method: 'POST', body: JSON.stringify(data) }),
 }

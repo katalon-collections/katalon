@@ -8,7 +8,7 @@ interface Props {
   isAdmin: boolean
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno'
+type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -738,6 +738,154 @@ function SectionIdnoSchemas() {
   )
 }
 
+function SectionAI() {
+  const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [apiKey, setApiKey] = useState('')
+  const [secretBusy, setSecretBusy] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    adminConfig.get()
+      .then(setCfg)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  function set<K extends keyof AdminConfigRead>(key: K, value: AdminConfigRead[K]) {
+    if (!cfg) return
+    setCfg({ ...cfg, [key]: value })
+  }
+
+  async function handleSave() {
+    if (!cfg) return
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      const updated = await adminConfig.update({
+        ai_enabled: cfg.ai_enabled,
+        ai_base_url: cfg.ai_base_url,
+        ai_model: cfg.ai_model,
+        ai_max_input_tokens: cfg.ai_max_input_tokens,
+        ai_max_output_tokens: cfg.ai_max_output_tokens,
+        ai_daily_user_token_limit: cfg.ai_daily_user_token_limit,
+        ai_monthly_global_token_limit: cfg.ai_monthly_global_token_limit,
+      })
+      setCfg(updated)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  async function saveSecret() {
+    if (!apiKey.trim() || !cfg) return
+    setSecretBusy(true); setError(null)
+    try {
+      const secret = await adminConfig.setAiSecret(apiKey.trim())
+      setCfg({ ...cfg, ai_secret: secret })
+      setApiKey('')
+    } catch (e) { setError((e as Error).message) }
+    finally { setSecretBusy(false) }
+  }
+
+  async function deleteSecret() {
+    if (!cfg || !window.confirm('API-Key wirklich löschen?')) return
+    setSecretBusy(true); setError(null)
+    try {
+      const secret = await adminConfig.deleteAiSecret()
+      setCfg({ ...cfg, ai_secret: secret })
+    } catch (e) { setError((e as Error).message) }
+    finally { setSecretBusy(false) }
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+  if (!cfg) return <div className="empty">Keine Konfiguration geladen.</div>
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+        Globale KI-Anbindung für feldbezogene Vorschläge. API-Key wird verschlüsselt in Datenbank gespeichert und nie im Klartext zurückgegeben.
+      </p>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">LLM-Anbindung</div>
+        <div className="bd">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 12 }}>
+            <input type="checkbox" className="ck" checked={cfg.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
+            KI-Unterstützung aktiv
+          </label>
+          <div className="field">
+            <div className="lbl">Base URL</div>
+            <input className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
+          </div>
+          <div className="field">
+            <div className="lbl">Modell</div>
+            <input className="fld mono" value={cfg.ai_model ?? ''} onChange={e => set('ai_model', e.target.value)} placeholder="gpt-4.1-mini" />
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">API-Key</div>
+        <div className="bd">
+          <div style={{ fontSize: 12, color: cfg.ai_secret.has_key ? '#166534' : 'var(--fg-3)', marginBottom: 10 }}>
+            {cfg.ai_secret.has_key ? `Key gesetzt${cfg.ai_secret.updated_at ? ` · aktualisiert ${new Date(cfg.ai_secret.updated_at).toLocaleString()}` : ''}` : 'Noch kein Key gespeichert'}
+          </div>
+          <div className="field">
+            <div className="lbl">Neuen API-Key setzen / ersetzen</div>
+            <input className="fld mono" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn pri" onClick={saveSecret} disabled={secretBusy || !apiKey.trim()}>
+              {secretBusy ? 'Speichert…' : 'Key speichern'}
+            </button>
+            {cfg.ai_secret.has_key && (
+              <button className="btn dn" onClick={deleteSecret} disabled={secretBusy}>
+                Löschen
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Token-Limits</div>
+        <div className="bd">
+          <div className="fg-2">
+            <div className="field">
+              <div className="lbl">Max. Input-Tokens pro Request</div>
+              <input className="fld mono" type="number" min={1} value={cfg.ai_max_input_tokens} onChange={e => set('ai_max_input_tokens', Number(e.target.value))} />
+            </div>
+            <div className="field">
+              <div className="lbl">Max. Output-Tokens pro Request</div>
+              <input className="fld mono" type="number" min={1} value={cfg.ai_max_output_tokens} onChange={e => set('ai_max_output_tokens', Number(e.target.value))} />
+            </div>
+          </div>
+          <div className="fg-2">
+            <div className="field">
+              <div className="lbl">Tageslimit pro Benutzer</div>
+              <input className="fld mono" type="number" min={1} value={cfg.ai_daily_user_token_limit} onChange={e => set('ai_daily_user_token_limit', Number(e.target.value))} />
+            </div>
+            <div className="field">
+              <div className="lbl">Monatslimit global</div>
+              <input className="fld mono" type="number" min={1} value={cfg.ai_monthly_global_token_limit} onChange={e => set('ai_monthly_global_token_limit', Number(e.target.value))} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -747,6 +895,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
+  { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
 ]
 
@@ -790,6 +939,7 @@ export function ScreenSettings({ isAdmin }: Props) {
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}
+          {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
         </div>
       </div>

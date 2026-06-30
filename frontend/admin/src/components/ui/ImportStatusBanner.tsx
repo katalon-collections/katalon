@@ -50,6 +50,9 @@ export function ImportStatusBanner({ currentRoute }: Props) {
           clearInterval(pollRef.current!)
         }
       } catch {
+        clearTaskId()
+        setTaskId(null)
+        setStatus(null)
         clearInterval(pollRef.current!)
       }
     }

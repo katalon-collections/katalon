@@ -5,7 +5,7 @@ ENV VITE_ADMIN_FEEDBACK_ENABLED=$VITE_ADMIN_FEEDBACK_ENABLED
 COPY frontend/admin/package*.json ./
 RUN npm install
 COPY frontend/admin /app
-RUN VITE_BASE_PATH=/admin/ npm run build
+RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html

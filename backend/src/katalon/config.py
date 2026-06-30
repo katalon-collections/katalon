@@ -1,8 +1,9 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://katalon:katalon@localhost:5432/katalon"
     redis_url: str = "redis://localhost:6379/0"
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
     cantaloupe_public_url: str = ""  # if set, used in IIIF manifests instead of cantaloupe_url
 
     secret_key: str = "dev-secret-key-change-in-production"
+    katalon_secrets_key: str = Field(min_length=32)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 8
 
@@ -40,6 +42,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    ai_request_timeout_seconds: int = 60
 
     debug: bool = False
     cors_origins: list[str] = [

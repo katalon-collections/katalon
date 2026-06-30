@@ -51,14 +51,25 @@ async def _validate_procedure(
     db: DBDep,
     procedure_id: uuid.UUID | None = None,
 ) -> None:
-    if data.procedure_type not in PROCEDURE_TYPES:
+    procedure_type = data.procedure_type.strip()
+    if not procedure_type:
+        if data.status == "draft":
+            return
+        raise HTTPException(status_code=422, detail="Vorgangstyp ist erforderlich.")
+    if procedure_type not in PROCEDURE_TYPES:
         raise HTTPException(status_code=422, detail="Ungültiger Vorgangstyp.")
     if data.status not in PROCEDURE_STATUSES:
         raise HTTPException(status_code=422, detail="Ungültiger Vorgangsstatus.")
-    errors = await validate_metadata(db, "procedure", data.metadata_, data.procedure_type)
+    errors = await validate_metadata(
+        db,
+        "procedure",
+        data.metadata_,
+        procedure_type,
+        skip_required=data.status == "draft",
+    )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
-    if data.procedure_type == "loan_out" and data.status == "active" and procedure_id:
+    if procedure_type == "loan_out" and data.status == "active" and procedure_id:
         for object_id in await procedure_object_ids(db, procedure_id):
             existing = await get_active_loan_out_for_object(
                 db,
@@ -72,7 +83,7 @@ async def _validate_procedure(
                 )
 
 
-async def _idno(data: ProcedureCreate, db: DBDep) -> str:
+async def _idno(data: ProcedureCreate, db: DBDep) -> str | None:
     cfg = (
         await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     ).scalar_one_or_none()
@@ -81,6 +92,8 @@ async def _idno(data: ProcedureCreate, db: DBDep) -> str:
     if not data.idno or not data.idno.strip():
         if schema:
             return await consume_next_idno(db, "procedure", schema)
+        if data.status == "draft":
+            return None
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     idno = data.idno.strip()
     if pattern and not validate_idno_pattern(pattern, idno):
@@ -136,16 +149,18 @@ async def create_procedure(
     db: DBDep,
     current_user=require_admin_or_editor(),
 ) -> Procedure:
+    procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
-        db, "procedure", data.metadata_, data.procedure_type,
+        db, "procedure", data.metadata_, procedure_type or None,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    data = data.model_copy(update={"metadata_": metadata})
+    data = data.model_copy(update={"metadata_": metadata, "procedure_type": procedure_type})
     await _validate_procedure(data, db)
     idno = await _idno(data, db)
-    existing = await db.execute(select(Procedure).where(Procedure.idno == idno))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    if idno is not None:
+        existing = await db.execute(select(Procedure).where(Procedure.idno == idno))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     proc = Procedure(
         idno=idno,
         procedure_type=data.procedure_type,
@@ -257,26 +272,32 @@ async def update_procedure(
     db: DBDep,
     current_user=require_admin_or_editor(),
 ) -> Procedure:
-    if not data.idno or not data.idno.strip():
-        raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
     ).scalar_one_or_none()
     if not proc:
         raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
+    procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
-        db, "procedure", data.metadata_, data.procedure_type, existing=proc.metadata_,
+        db, "procedure", data.metadata_, procedure_type or None, existing=proc.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
-    data = data.model_copy(update={"metadata_": metadata})
-    existing = await db.execute(
-        select(Procedure).where(
-            Procedure.idno == data.idno.strip(),
-            Procedure.id != procedure_id,
+    data = data.model_copy(update={"metadata_": metadata, "procedure_type": procedure_type})
+    if not data.idno or not data.idno.strip():
+        if data.status == "draft":
+            idno = None
+        else:
+            raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
+    else:
+        idno = data.idno.strip()
+        existing = await db.execute(
+            select(Procedure).where(
+                Procedure.idno == idno,
+                Procedure.id != procedure_id,
+            )
         )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     await _validate_procedure(data, db, procedure_id)
     old = {
         "idno": proc.idno,
@@ -288,7 +309,7 @@ async def update_procedure(
         "reference_number": proc.reference_number,
         "metadata": proc.metadata_,
     }
-    proc.idno = data.idno.strip()
+    proc.idno = idno
     proc.procedure_type = data.procedure_type
     proc.status = data.status
     proc.start_date = data.start_date

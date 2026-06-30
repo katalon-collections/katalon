@@ -30,6 +30,8 @@ services:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend.dev
+    environment:
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
@@ -44,6 +46,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      cantaloupe:
+        condition: service_started
 
   worker:
     build:
@@ -51,6 +55,7 @@ services:
       dockerfile: ../docker/Dockerfile.backend.dev
     environment:
       SECRET_KEY: change-me-in-production
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
     volumes:
       - ./backend/src:/app/src
       - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
@@ -62,6 +67,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      cantaloupe:
+        condition: service_started
 
   admin:
     build:

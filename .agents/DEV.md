@@ -36,6 +36,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 - **API**: <http://localhost:8000>
 - **API Docs**: <http://localhost:8000/api/docs>
 
+**Merksatz:** `3000/3001` gehören zum normalen/production-like Compose-Stack. `4000/4001` gehören nur zum Dev-Compose-Stack weiter unten.
+
 ### Run migrations after startup
 
 ```bash
@@ -110,6 +112,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 - **Admin UI**: <http://localhost:3000>
 - **Portal UI**: <http://localhost:3001>
 - **API**: proxied via nginx at <http://localhost>
+
+**Merksatz:** Für Browser-Checks ohne expliziten Dev-Hinweis zuerst `3000/3001` probieren. `4000/4001` sind kein allgemeiner Standard-Port, sondern nur Dev-Override.
 
 ---
 
