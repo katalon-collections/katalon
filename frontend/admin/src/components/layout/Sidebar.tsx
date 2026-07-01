@@ -40,9 +40,10 @@ interface Props {
   route: Route
   setRoute: (r: Route) => void
   onLogout: () => void
+  appTitle?: string
 }
 
-export function Sidebar({ route, setRoute, onLogout }: Props) {
+export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon' }: Props) {
   const user = getTokenUser()
   const initials = user?.email ? user.email[0].toUpperCase() : 'A'
   const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', cataloger: 'Katalogisierer', viewer: 'Betrachter' }
@@ -51,7 +52,7 @@ export function Sidebar({ route, setRoute, onLogout }: Props) {
     <aside className="sb">
       <div className="sb-brand">
         <div className="logo">K</div>
-        <div className="sb-name">Katalon</div>
+        <div className="sb-name">{appTitle}</div>
         <div className="sb-env">Stage</div>
       </div>
 

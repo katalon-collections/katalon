@@ -18,6 +18,8 @@ import { ScreenBanners } from '../screens/ScreenBanners'
 import { BannerBar } from '../ui/BannerBar'
 import { ImportStatusBanner } from '../ui/ImportStatusBanner'
 import { FeedbackButton } from '../feedback/FeedbackButton'
+import { BASE, req } from '../../api/client'
+import type { PortalConfigRead } from '../../types'
 
 type Crumb = { label: string; route?: string }
 
@@ -44,6 +46,16 @@ const CRUMBS: Record<string, Crumb[]> = {
   settings:           [{ label: 'Katalon' }, { label: 'Einstellungen' }],
 }
 
+function withBrand(crumbs: Crumb[], appTitle: string): Crumb[] {
+  return crumbs.map((crumb, index) => (index === 0 ? { ...crumb, label: appTitle } : crumb))
+}
+
+function adminDocumentTitle(appTitle: string, route: string, crumbs: Crumb[]): string {
+  if (route === 'settings') return `${appTitle} Admin`
+  const current = crumbs[crumbs.length - 1]?.label
+  return current && current !== appTitle ? `${current} - ${appTitle} Admin` : `${appTitle} Admin`
+}
+
 function hashToState(hash: string): { route: string; editId: string | null } {
   const h = hash.replace(/^#/, '') || 'list'
   const slash = h.indexOf('/')
@@ -66,6 +78,7 @@ function Placeholder({ label }: { label: string }) {
 export function AppShell() {
   const [loggedIn, setLoggedIn] = useState(hasToken)
   const isDirtyRef = useRef(false)
+  const [appTitle, setAppTitle] = useState('Katalon')
 
   const init = hashToState(window.location.hash)
   const [route, setRoute] = useState(init.route)
@@ -73,6 +86,14 @@ export function AppShell() {
 
   useEffect(() => {
     onUnauthorized(() => setLoggedIn(false))
+  }, [])
+
+  useEffect(() => {
+    req<PortalConfigRead>(`${BASE}/v1/portal/config`)
+      .then(config => {
+        if (config.site_title?.trim()) setAppTitle(config.site_title.trim())
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -112,7 +133,11 @@ export function AppShell() {
   const currentUser = getTokenUser()
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
 
-  const crumbs = CRUMBS[route] ?? [{ label: 'Katalon' }]
+  const crumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
+
+  useEffect(() => {
+    document.title = adminDocumentTitle(appTitle, route, crumbs)
+  }, [appTitle, route, crumbs])
 
   function renderScreen() {
     switch (route) {
@@ -142,7 +167,7 @@ export function AppShell() {
 
   return (
     <div className="app">
-      <Sidebar route={route} setRoute={(r) => safeNavigate(r)} onLogout={handleLogout} />
+      <Sidebar route={route} setRoute={(r) => safeNavigate(r)} onLogout={handleLogout} appTitle={appTitle} />
       <div className="main">
         <Topbar crumbs={crumbs} onNavigate={(r, id) => safeNavigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
         <BannerBar surface="admin" />

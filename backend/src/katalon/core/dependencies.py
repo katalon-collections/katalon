@@ -65,7 +65,8 @@ async def get_current_user(
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         role: str | None = payload.get("role")
-        if user_id_str is None or role is None:
+        token_type: str | None = payload.get("typ")
+        if user_id_str is None or role is None or token_type != "access":
             raise credentials_exception
         token_data = TokenData(user_id=uuid.UUID(user_id_str), role=role)
     except (JWTError, ValueError):
@@ -111,7 +112,8 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
-        if not user_id_str:
+        token_type: str | None = payload.get("typ")
+        if not user_id_str or token_type != "access":
             return None
         result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
         user = result.scalar_one_or_none()

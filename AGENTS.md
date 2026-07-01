@@ -161,6 +161,11 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 - Wenn ich Fehler berichte, schau immer in die Logs der entsprechenden Container statt Annahmen zu treffen.
 
+## Python/uv Hinweise
+
+- Backend-Python-Kommandos immer aus `backend/` ausführen. Im Repo-Root existiert auch eine `.venv`; von dort gestartete Backend-Tests können im falschen Interpreter landen und dann Dependencies wie `jinja2` "verlieren".
+- Wenn `uv` über `backend/uv.lock` stolpert: der problematische Fall ist `click-didyoumean` mit inkonsistentem Lock-Eintrag (`version = "0.3.2"` zeigt auf `click_didyoumean-0.3.1` Dateien). Bis Upstream sauber ist, `click-didyoumean==0.3.1` beibehalten.
+
 ## Port-Regel Dev vs. Prod-Compose
 
 **Port-Verwechslung vermeiden:**

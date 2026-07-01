@@ -17,7 +17,7 @@ export function ScreenLogin({ onLogin }: Props) {
     setLoading(true)
     try {
       const token = await auth.login(email, password)
-      setToken(token.access_token)
+      setToken(token.access_token, token.refresh_token)
       onLogin()
     } catch (err) {
       setError((err as Error).message)

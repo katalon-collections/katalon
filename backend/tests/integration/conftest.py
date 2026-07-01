@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from testcontainers.postgres import PostgresContainer
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+TEST_SECRETS_KEY = "test-katalon-secrets-key-32-chars"
 
 
 def _to_asyncpg(url: str) -> str:
@@ -33,6 +34,7 @@ def postgres_url() -> str:
 def migrated_database(postgres_url: str) -> str:
     env = os.environ.copy()
     env["DATABASE_URL"] = postgres_url
+    env.setdefault("KATALON_SECRETS_KEY", TEST_SECRETS_KEY)
 
     subprocess.run(
         ["python", "-m", "alembic", "-c", "migrations/alembic.ini", "upgrade", "head"],
@@ -48,6 +50,7 @@ def migrated_database(postgres_url: str) -> str:
 async def app(migrated_database: str):
     os.environ["DATABASE_URL"] = migrated_database
     os.environ["DEBUG"] = "true"
+    os.environ.setdefault("KATALON_SECRETS_KEY", TEST_SECRETS_KEY)
 
     import katalon.config as config_module
     import katalon.database as database_module
@@ -56,6 +59,11 @@ async def app(migrated_database: str):
     importlib.reload(config_module)
     importlib.reload(database_module)
     importlib.reload(main_module)
+
+    async def _skip_cantaloupe_health() -> None:
+        return None
+
+    main_module._check_cantaloupe_health = _skip_cantaloupe_health
 
     yield main_module.app
 

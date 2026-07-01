@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     katalon_secrets_key: str = Field(min_length=32)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 8
+    refresh_token_expire_days: int = 30
 
     media_root: str = "/var/lib/katalon/media"
     max_upload_size_mb: int = 100

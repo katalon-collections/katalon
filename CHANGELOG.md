@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-07-01
+
+### Added
+- Admin erneuert abgelaufene Sitzungen jetzt automatisch per Refresh-Token statt Benutzer nach 8 Stunden sofort auszuloggen.
+
+### Changed
+- Admin übernimmt den konfigurierten Institutionsnamen jetzt in Sidebar, Breadcrumbs und Browser-Tab; im Admin-Bereich wird der Tab als `<Institutionsname> Admin` benannt.
+
+### Fixed
+- Backend-`uv.lock` ist gegen inkonsistente `click-didyoumean`-Metadaten abgesichert; Backend-`uv`-Kommandos laufen damit wieder reproduzierbar.
+- Projekthinweise dokumentieren jetzt explizit, dass Backend-Tests aus `backend/` gegen die richtige `.venv` laufen müssen.
+
 ## [0.3.4] - 2026-07-01
 
 ### Fixed

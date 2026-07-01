@@ -4,11 +4,28 @@ export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
 
 let _token: string | null = localStorage.getItem('katalon_token')
+let _refreshToken: string | null = localStorage.getItem('katalon_refresh_token')
 let _onUnauthorized: (() => void) | null = null
+let _refreshPromise: Promise<string | null> | null = null
 
-export function setToken(t: string | null) {
+function resolveUrl(path: string) {
+  return path.startsWith('http') ? path : `${BASE}${path}`
+}
+
+function buildHeaders(init?: HeadersInit): Record<string, string> {
+  return { ...(init as Record<string, string> ?? {}) }
+}
+
+export function setToken(t: string | null, refreshToken?: string | null) {
   _token = t
   t ? localStorage.setItem('katalon_token', t) : localStorage.removeItem('katalon_token')
+  if (refreshToken !== undefined) {
+    _refreshToken = refreshToken
+    refreshToken ? localStorage.setItem('katalon_refresh_token', refreshToken) : localStorage.removeItem('katalon_refresh_token')
+  } else if (t === null) {
+    _refreshToken = null
+    localStorage.removeItem('katalon_refresh_token')
+  }
 }
 
 export function hasToken(): boolean {
@@ -29,6 +46,44 @@ export function onUnauthorized(cb: () => void) {
   _onUnauthorized = cb
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  if (!_refreshToken) return null
+  if (_refreshPromise) return _refreshPromise
+  _refreshPromise = (async () => {
+    const res = await fetch(resolveUrl('/v1/auth/refresh'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: _refreshToken }),
+    })
+    if (res.status === 401) {
+      setToken(null)
+      _onUnauthorized?.()
+      return null
+    }
+    if (!res.ok) throw new Error('Sitzung konnte nicht erneuert werden.')
+    const token = await res.json() as Token
+    setToken(token.access_token, token.refresh_token)
+    return token.access_token
+  })().finally(() => {
+    _refreshPromise = null
+  })
+  return _refreshPromise
+}
+
+async function authorizedFetch(path: string, init: RequestInit = {}, allowRefresh = true): Promise<Response> {
+  const headers = buildHeaders(init.headers)
+  if (_token) headers['Authorization'] = `Bearer ${_token}`
+  const res = await fetch(resolveUrl(path), { ...init, headers })
+  if (res.status !== 401 || !allowRefresh || !_refreshToken || path === '/v1/auth/refresh') return res
+
+  const refreshedToken = await refreshAccessToken()
+  if (!refreshedToken) return res
+
+  const retryHeaders = buildHeaders(init.headers)
+  retryHeaders['Authorization'] = `Bearer ${refreshedToken}`
+  return fetch(resolveUrl(path), { ...init, headers: retryHeaders })
+}
+
 export class ConflictError extends Error {
   related_count: number
   constructor(message: string, related_count: number) {
@@ -40,8 +95,7 @@ export class ConflictError extends Error {
 
 export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
-  if (_token) headers['Authorization'] = `Bearer ${_token}`
-  const res = await fetch(path.startsWith('http') ? path : `${BASE}${path}`, { ...init, headers })
+  const res = await authorizedFetch(path, { ...init, headers })
   if (res.status === 401) {
     setToken(null)
     _onUnauthorized?.()
@@ -214,12 +268,10 @@ export const schema = {
   import: async (file: File, opts: { dryRun?: boolean; overwrite?: boolean } = {}): Promise<SchemaImportResult> => {
     const formData = new FormData()
     formData.append('file', file)
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
     const qs = new URLSearchParams()
     if (opts.dryRun) qs.set('dry_run', 'true')
     if (opts.overwrite) qs.set('overwrite', 'true')
-    const res = await fetch(`${BASE}/v1/schema/import${qs.toString() ? `?${qs}` : ''}`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch(`/v1/schema/import${qs.toString() ? `?${qs}` : ''}`, { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
@@ -262,12 +314,10 @@ export const vocabularies = {
     if (opts.mapping) {
       formData.append('mapping', JSON.stringify(opts.mapping))
     }
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
     const qs = new URLSearchParams()
     qs.set('dry_run', String(opts.dryRun ?? true))
     qs.set('strategy', opts.strategy ?? 'append')
-    const res = await fetch(`${BASE}/v1/vocabularies/${vocabId}/import?${qs}`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch(`/v1/vocabularies/${vocabId}/import?${qs}`, { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
@@ -317,9 +367,7 @@ export const media = {
   upload: async (objectId: string, file: File): Promise<MediaFile> => {
     const formData = new FormData()
     formData.append('file', file)
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
-    const res = await fetch(`${BASE}/v1/objects/${objectId}/media`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch(`/v1/objects/${objectId}/media`, { method: 'POST', body: formData })
     if (res.status === 401) {
       setToken(null)
       _onUnauthorized?.()
@@ -339,9 +387,7 @@ export const media = {
     if (archive) formData.append('archive', archive)
     if (mapping) formData.append('mapping', mapping)
     for (const file of files) formData.append('files', file, fileFormName(file as FolderFile))
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
-    const res = await fetch(`${BASE}/v1/media/batch-import`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch('/v1/media/batch-import', { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
@@ -532,9 +578,7 @@ export const importer = {
   upload: async (file: File): Promise<UploadResult> => {
     const formData = new FormData()
     formData.append('file', file)
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
-    const res = await fetch(`${BASE}/v1/importer/upload`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch('/v1/importer/upload', { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
@@ -552,9 +596,7 @@ export const importer = {
   xmlUpload: async (file: File): Promise<XmlUploadResult> => {
     const formData = new FormData()
     formData.append('file', file)
-    const headers: Record<string, string> = {}
-    if (_token) headers['Authorization'] = `Bearer ${_token}`
-    const res = await fetch(`${BASE}/v1/importer/upload`, { method: 'POST', body: formData, headers })
+    const res = await authorizedFetch('/v1/importer/upload', { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
