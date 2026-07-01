@@ -172,6 +172,16 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 **Wichtig:** Wenn nicht explizit gesagt wird, dass der Dev-Stack gemeint ist, verwende für Browser-Checks standardmäßig `3000/3001`, nicht `4000/4001`.
 
+## Kritische Build-Konfigurationen – NICHT ÄNDERN ohne Test
+
+Die folgenden Konfigurationswerte sind deployment-kritisch. Änderungen ohne Verifikation der Produktionsumgebung brechen die App still (kein Build-Fehler, aber falsche Laufzeit-Pfade):
+
+| Datei | Wert | Warum kritisch |
+|-------|------|---------------|
+| `docker/Dockerfile.admin` | `VITE_BASE_PATH=/admin/` | Ohne diesen Wert baut Vite Assets mit absolutem Pfad `/assets/`, der vom äußeren nginx zum Portal geroutet wird statt zum Admin-Container. Die Admin-UI lädt dann nicht (404 für JS/CSS). |
+
+**Regel:** Vor jeder Änderung an `docker/Dockerfile.admin`, `docker/nginx.admin.conf` oder `frontend/admin/vite.config.ts` explizit prüfen ob `VITE_BASE_PATH` und nginx-`location`-Blöcke konsistent sind. Nach dem Deploy `https://katalon.kraegelin.dev/admin/` im Browser öffnen und JS/CSS-Requests in den DevTools prüfen.
+
 ## Datensicherheit – ABSOLUTE VERBOTE
 
 **NIEMALS die Datenbank-Volumes löschen, neu erstellen oder `docker compose down -v` ausführen ohne explizite Bestätigung von Karl.** Das gilt auch dann, wenn es als schnelle Lösung erscheint (z. B. bei Passwort-Konflikten, Schema-Problemen oder Container-Fehlern). Datenverlust ist irreversibel.

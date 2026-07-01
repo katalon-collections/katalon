@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-01
+
+### Fixed
+- `VITE_BASE_PATH=/admin/` in `Dockerfile.admin` wiederhergestellt — war in 0.3.3 versehentlich entfernt worden, was dazu führte dass die Admin-UI unter `/admin/` nicht lud (Assets wurden mit absolutem Pfad `/assets/` gebaut statt `/admin/assets/`).
+
 ## [0.3.3] - 2026-06-30
 
 ### Added
