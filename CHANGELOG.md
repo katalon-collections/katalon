@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-07-03
+
+### Fixed
+- `MEDIA_ROOT` in `docker-compose.prod.yml` wurde für `api`/`worker` fälschlich mit dem Host-Bind-Pfad aus `.env` überschrieben statt dem Container-internen Pfad `/var/lib/katalon/media`. Dadurch landeten hochgeladene Bilder im Container-Overlay statt im geteilten Media-Volume, sodass Cantaloupe sie nicht fand (404 bei der IIIF-Tile-Generierung) und Uploads dauerhaft im Status `error` hängen blieben.
+
 ## [0.3.5] - 2026-07-01
 
 ### Added
