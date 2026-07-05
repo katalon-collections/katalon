@@ -78,6 +78,7 @@ Windowed Pagination mit Ellipsis in Suchergebnissen.
 Abstrakte Basisklasse `AuthoritySource(ABC)`, DB-Registry mit Lazy Loading, Cache-Invalidierung.
 Endpoints: `GET /v1/authorities/`, `/v1/authorities/search`, `/v1/authorities/fetch`.
 41 Unit-Tests (Adapter + Service-Layer) vollständig grün.
+Normdaten auch an Vokabultermen: `metadata.authorities` (mehrere pro Term), Autocomplete im Term-Editor, CSV-Import mit Source-Dropdown (v0.3.7, #258). `AuthorityInput` in `frontend/admin/src/components/AuthorityInput.tsx` geteilt.
 
 **Noch offen:**
 - (keine – Authority-Source ist bereits an `AuthorityInput` durchgereicht)
