@@ -112,6 +112,7 @@ export interface VocabularyTerm {
   term: string
   label: Record<string, string>
   inverse_label: Record<string, string>
+  metadata_: Record<string, unknown>
   parent_id: string | null
 }
 

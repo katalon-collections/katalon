@@ -186,6 +186,7 @@ async def import_terms(
     _: CurrentUser,
     strategy: Literal["append", "replace"] = Query("append"),
     dry_run: bool = Query(True),
+    authority_source: str | None = Query(None),
     mapping: str | None = Form(None),
 ) -> dict:
     """Import vocabulary terms from CSV or JSON with optional dry-run."""
@@ -225,12 +226,19 @@ async def import_terms(
             "errors": errors,
         }
 
+    if any(t.external_id for t in terms) and not authority_source:
+        raise HTTPException(
+            status_code=422,
+            detail="Normdaten-Spalte gemappt, aber keine Normdaten-Quelle gewählt.",
+        )
+
     result = await vocabulary_import_service.import_vocabulary_terms(
         db=db,
         vocab_id=vocab_id,
         terms=terms,
         strategy=strategy,
         dry_run=dry_run,
+        authority_source=authority_source,
     )
     result["strategy"] = strategy
     result["dry_run"] = dry_run

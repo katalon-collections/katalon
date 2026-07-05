@@ -31,10 +31,10 @@ export const MOCK_VOCABS: Vocabulary[] = [
 ]
 
 export const MOCK_TERMS: VocabularyTerm[] = [
-  { id: 't1', vocabulary_id: 'v3', term: 'Silbergelatine',  label: { de: 'Silbergelatine-Abzug' }, inverse_label: {}, parent_id: null },
-  { id: 't2', vocabulary_id: 'v3', term: 'Chromogen-Druck', label: { de: 'Chromogener Farbdruck' }, inverse_label: {}, parent_id: null },
-  { id: 't3', vocabulary_id: 'v3', term: 'Negativ, Glas',   label: { de: 'Glasnegativ' },           inverse_label: {}, parent_id: null },
-  { id: 't4', vocabulary_id: 'v3', term: 'Cyanotypie',      label: { de: 'Cyanotypie' },            inverse_label: {}, parent_id: null },
+  { id: 't1', vocabulary_id: 'v3', term: 'Silbergelatine',  label: { de: 'Silbergelatine-Abzug' }, inverse_label: {}, metadata_: {}, parent_id: null },
+  { id: 't2', vocabulary_id: 'v3', term: 'Chromogen-Druck', label: { de: 'Chromogener Farbdruck' }, inverse_label: {}, metadata_: {}, parent_id: null },
+  { id: 't3', vocabulary_id: 'v3', term: 'Negativ, Glas',   label: { de: 'Glasnegativ' },           inverse_label: {}, metadata_: {}, parent_id: null },
+  { id: 't4', vocabulary_id: 'v3', term: 'Cyanotypie',      label: { de: 'Cyanotypie' },            inverse_label: {}, metadata_: {}, parent_id: null },
 ]
 
 export const MOCK_AUDIT: AuditEntry[] = [

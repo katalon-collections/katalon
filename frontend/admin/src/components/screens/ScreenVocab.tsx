@@ -1,8 +1,64 @@
-import { useState, useEffect, useCallback } from 'react'
-import { vocabularies } from '../../api/client'
+import { Fragment, useState, useEffect, useCallback } from 'react'
+import { vocabularies, authority } from '../../api/client'
+import type { AuthoritySource } from '../../api/client'
 import type { Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
+import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
+
+function readAuthorities(meta: Record<string, unknown> | undefined | null): AuthorityEntry[] {
+  const raw = (meta ?? {})['authorities']
+  return Array.isArray(raw) ? (raw as AuthorityEntry[]) : []
+}
+
+/** Multi-normdata editor: source picker + AuthorityInput to add, list with remove. */
+function AuthoritiesEditor({ value, onChange, sources }: {
+  value: AuthorityEntry[]
+  onChange: (v: AuthorityEntry[]) => void
+  sources: AuthoritySource[]
+}) {
+  const enabled = sources.filter(s => s.is_enabled)
+  const [source, setSource] = useState<string>('')
+  const activeSource = source || enabled[0]?.id || ''
+  return (
+    <div className="field">
+      <div className="lbl">Normdaten</div>
+      {value.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+          {value.map((entry, i) => (
+            <span key={`${entry.source}:${entry.external_id}`} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 8px', borderRadius: 4,
+              background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+            }}>
+              {entry.label || entry.external_id}
+              <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>{entry.source}:{entry.external_id}</span>
+              <button className="btn sm ico gh" onClick={() => onChange(value.filter((_, idx) => idx !== i))} title="Entfernen"><X size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      {enabled.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Normdaten-Quelle konfiguriert.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
+          <select className="fld" value={activeSource} onChange={e => setSource(e.target.value)}>
+            {enabled.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          <AuthorityInput
+            source={activeSource}
+            value={null}
+            onChange={v => {
+              if (!v) return
+              if (value.some(a => a.source === v.source && a.external_id === v.external_id)) return
+              onChange([...value, v])
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ScreenVocabProps {
   initialVocab?: string | null
@@ -50,6 +106,10 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     errors: { row: number | null; message: string }[]
   }>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [sources, setSources] = useState<AuthoritySource[]>([])
+  const [importAuthoritySource, setImportAuthoritySource] = useState<string>('')
+  const [newTermAuthorities, setNewTermAuthorities] = useState<AuthorityEntry[]>([])
+  const [editTermAuthorities, setEditTermAuthorities] = useState<AuthorityEntry[]>([])
 
   const CSV_TARGETS = [
     { value: '', label: 'Ignorieren' },
@@ -124,6 +184,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }, [activeVocab, initialVocab])
 
   useEffect(() => { loadVocabs() }, [])
+  useEffect(() => { authority.list().then(setSources).catch(() => setSources([])) }, [])
 
   const loadTerms = useCallback(() => {
     if (!activeVocab) return
@@ -163,11 +224,13 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         term: newTermTerm.trim(),
         label: { de: newTermLabelDe.trim() },
         inverse_label: newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
+        metadata_: newTermAuthorities.length ? { authorities: newTermAuthorities } : {},
         parent_id: null,
       })
       setNewTermTerm('')
       setNewTermLabelDe('')
       setNewTermInverseLabelDe('')
+      setNewTermAuthorities([])
       setShowNewTerm(false)
       loadTerms()
     } catch (e) {
@@ -182,6 +245,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermTerm(t.term)
     setEditTermLabelDe(t.label.de ?? '')
     setEditTermInverseLabelDe(t.inverse_label?.de ?? '')
+    setEditTermAuthorities(readAuthorities(t.metadata_))
   }
 
   async function saveEditTerm(t: VocabularyTerm) {
@@ -192,6 +256,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         term: editTermTerm.trim(),
         label: { de: editTermLabelDe.trim() },
         inverse_label: editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
+        metadata_: { ...(t.metadata_ ?? {}), authorities: editTermAuthorities },
         parent_id: t.parent_id,
       })
       setEditTermId(null)
@@ -215,11 +280,17 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
 
   const isCsvImport = importFile ? /\.(csv|tsv)$/i.test(importFile.name) : false
   const hasTermMapping = Object.values(mapping).includes('term')
+  const hasAuthorityMapping = isCsvImport && Object.values(mapping).includes('external_id')
+  const enabledSources = sources.filter(s => s.is_enabled)
 
   async function runVocabularyImport(dryRun: boolean) {
     if (!activeVocab || !importFile) return
     if (isCsvImport && !hasTermMapping) {
       setImportFeedback("Bitte mindestens eine Spalte auf 'ID' mappen.")
+      return
+    }
+    if (hasAuthorityMapping && !importAuthoritySource) {
+      setImportFeedback('Normdaten-Spalte gemappt: bitte Normdaten-Quelle wählen.')
       return
     }
     setImportBusy(true)
@@ -229,6 +300,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         dryRun,
         strategy: importStrategy,
         mapping: isCsvImport ? mapping : undefined,
+        authoritySource: hasAuthorityMapping ? importAuthoritySource : undefined,
       })
       setImportResult(result)
       if (!dryRun && result.errors.length === 0) {
@@ -368,6 +440,25 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     </div>
                   )}
 
+                  {hasAuthorityMapping && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div className="lbl" style={{ marginBottom: 6 }}>Normdaten-Quelle (für gemappte Normdaten-Spalte)</div>
+                      {enabledSources.length === 0 ? (
+                        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Normdaten-Quelle konfiguriert.</div>
+                      ) : (
+                        <select
+                          className="fld"
+                          style={{ maxWidth: 220 }}
+                          value={importAuthoritySource}
+                          onChange={e => setImportAuthoritySource(e.target.value)}
+                        >
+                          <option value="">— Quelle wählen —</option>
+                          {enabledSources.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <select
                       className="fld"
@@ -420,6 +511,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
                       </div>
                     </div>
+                    <AuthoritiesEditor value={newTermAuthorities} onChange={setNewTermAuthorities} sources={sources} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                       <button className="btn pri" onClick={createTerm} disabled={savingTerm}>Anlegen</button>
                       <button className="btn gh" onClick={() => setShowNewTerm(false)}><X size={12} /></button>
@@ -445,9 +537,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       <tr><td colSpan={4} className="empty">Keine Terme.</td></tr>
                     )}
                     {!termsLoading && terms.map(t => (
-                      <tr key={t.id}>
-                        {editTermId === t.id ? (
-                          <>
+                      editTermId === t.id ? (
+                        <Fragment key={t.id}>
+                          <tr>
                             <td><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ maxWidth: 160 }} /></td>
                             <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
                             <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>
@@ -458,22 +550,38 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                 <button className="btn sm gh" onClick={() => setEditTermId(null)}><X size={12} /></button>
                               </div>
                             </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
-                            <td style={{ maxWidth: 220 }}>{getLabel(t, '—')}</td>
-                            <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>
-                            <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
-                            <td className="col-act">
-                              <div className="row-actions">
-                                <button className="btn sm ico gh" onClick={() => startEditTerm(t)}><Edit size={12} /></button>
-                                <button className="btn sm ico gh dn" onClick={() => deleteTerm(t.id)}><Trash size={12} /></button>
-                              </div>
+                          </tr>
+                          <tr>
+                            <td colSpan={5} style={{ background: 'var(--panel)' }}>
+                              <AuthoritiesEditor value={editTermAuthorities} onChange={setEditTermAuthorities} sources={sources} />
                             </td>
-                          </>
-                        )}
-                      </tr>
+                          </tr>
+                        </Fragment>
+                      ) : (
+                        <tr key={t.id}>
+                          <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
+                          <td style={{ maxWidth: 220 }}>
+                            {getLabel(t, '—')}
+                            {readAuthorities(t.metadata_).length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                {readAuthorities(t.metadata_).map(a => (
+                                  <span key={`${a.source}:${a.external_id}`} className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 4px' }}>
+                                    {a.source}:{a.external_id}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>
+                          <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
+                          <td className="col-act">
+                            <div className="row-actions">
+                              <button className="btn sm ico gh" onClick={() => startEditTerm(t)}><Edit size={12} /></button>
+                              <button className="btn sm ico gh dn" onClick={() => deleteTerm(t.id)}><Trash size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
                     ))}
                   </tbody>
                 </table>

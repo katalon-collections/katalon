@@ -226,9 +226,28 @@ vocabulary_terms (
     vocabulary_id   UUID,
     term            VARCHAR,       -- interner Bezeichner
     label           JSONB,         -- {"de": "Silbergelatine", "en": "Silver gelatin"}
+    metadata        JSONB,         -- freie Term-Metadaten, u.a. Normdaten (siehe unten)
     parent_id       UUID           -- NULL = Wurzelelement
 )
 ```
+
+**Normdaten an Termen.** Das `metadata`-JSONB hält unter dem Schlüssel `authorities` eine Liste
+struktureller Normdaten-Verweise. Jeder Eintrag hat die gleiche Form wie bei `authority`-Feldern
+der vier Primärtypen:
+
+```json
+{
+  "authorities": [
+    {"source": "gnd", "external_id": "4149094-6", "label": "Digitale Rechteverwaltung"}
+  ]
+}
+```
+
+Ein Term kann beliebig viele Normdaten-Verweise tragen (z.B. GND **und** Wikidata). Verlinkt wird
+über das bestehende Authority-System (GND, Geonames, Wikidata, Iconclass, VIAF, TGN) mit
+Autocomplete-Lookup im Term-Editor. Beim CSV-Import lässt sich pro Import **eine** Quelle wählen und
+eine Spalte mit der Normdaten-ID mappen — automatisches Matching per Label gibt es bewusst nicht
+(Normdaten-Verknüpfung muss ein Mensch bestätigen).
 
 **Wann braucht man Vokabulare?**
 

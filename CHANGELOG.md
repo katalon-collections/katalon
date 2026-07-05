@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-07-05
+
+### Added
+- Vokabularterme können jetzt Normdaten tragen: strukturierte Verweise (GND, Geonames, Wikidata, Iconclass, VIAF, TGN) mit Autocomplete-Lookup im Term-Editor, mehrere pro Term. Neue `metadata`-JSONB-Spalte an `vocabulary_terms` hält die Verweise unter `authorities`.
+- Vokabular-CSV-Import kann eine Normdaten-Spalte übernehmen: pro Import eine Quelle wählbar, Normdaten-ID-Spalte mappbar. Automatisches Label-Matching gibt es bewusst nicht — Normdaten-Verknüpfung bestätigt ein Mensch.
+
+### Fixed
+- Vokabular-Import verwarf zuvor gemappte `external_id`-Werte stillschweigend (keine Ziel-Spalte im Modell); Normdaten werden jetzt korrekt als `metadata.authorities` gespeichert.
+
 ## [0.3.6] - 2026-07-03
 
 ### Fixed

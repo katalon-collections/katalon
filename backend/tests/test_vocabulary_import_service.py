@@ -1,4 +1,26 @@
-from katalon.services.vocabulary_import_service import parse_csv_terms, parse_json_terms
+from katalon.core.models import VocabularyTerm
+from katalon.services.vocabulary_import_service import (
+    _add_authority,
+    parse_csv_terms,
+    parse_json_terms,
+)
+
+
+def test_add_authority_appends_and_dedupes() -> None:
+    term = VocabularyTerm(term="drm", label={}, inverse_label={}, metadata_={})
+
+    _add_authority(term, "gnd", "4149094-6")
+    assert term.metadata_["authorities"] == [
+        {"source": "gnd", "external_id": "4149094-6", "label": ""}
+    ]
+
+    # Second source is added
+    _add_authority(term, "wikidata", "Q234")
+    assert len(term.metadata_["authorities"]) == 2
+
+    # Same source+id is not duplicated
+    _add_authority(term, "gnd", "4149094-6")
+    assert len(term.metadata_["authorities"]) == 2
 
 
 def test_parse_csv_terms_with_mapping_and_parent() -> None:

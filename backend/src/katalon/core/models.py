@@ -251,6 +251,9 @@ class VocabularyTerm(Base):
     term: Mapped[str] = mapped_column(String(256))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
     inverse_label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    # Free-form term metadata; holds authority/normdata refs under "authorities":
+    # [{"source": "gnd", "external_id": "...", "label": "..."}]
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("vocabulary_terms.id", ondelete="SET NULL"), nullable=True
     )

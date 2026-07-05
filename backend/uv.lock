@@ -1026,7 +1026,7 @@ wheels = [
 
 [[package]]
 name = "katalon"
-version = "0.3.2"
+version = "0.3.7"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1034,6 +1034,8 @@ dependencies = [
     { name = "asyncpg" },
     { name = "bcrypt" },
     { name = "celery", extra = ["redis"] },
+    { name = "click-didyoumean" },
+    { name = "cryptography" },
     { name = "elasticsearch", extra = ["async"] },
     { name = "fastapi" },
     { name = "geoalchemy2" },
@@ -1072,6 +1074,8 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "bcrypt", specifier = ">=4.0" },
     { name = "celery", extras = ["redis"], specifier = ">=5.4.0" },
+    { name = "click-didyoumean", specifier = "==0.3.1" },
+    { name = "cryptography", specifier = ">=43.0.0" },
     { name = "elasticsearch", extras = ["async"], specifier = ">=8.13.0,<9.0.0" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "geoalchemy2", specifier = ">=0.15.1" },
