@@ -1,6 +1,6 @@
 # Katalon – Architekturelle Bewertung
 
-*Stand: 2026-05-16. Basiert auf vollständiger Codebase-Analyse.*
+*Stand: 2026-07-06. Historischer Snapshot vor Phase 7/14; einige Punkte sind inzwischen umgesetzt.*
 
 ---
 
@@ -9,6 +9,8 @@
 Die Kernentscheidungen sind korrekt und nicht trivial. Das Datenmodell und die Erweiterungspunkte (Schema-Engine, Relationen, Authority-Plugins) spiegeln echtes Domänenwissen wider. Die Schwächen liegen überwiegend in der Betriebsschicht — ES-Kopplung, fehlende FK-Constraints, Copy-Paste über vier Typ-Module — nicht in der Grundstruktur. Keine der Schwächen erfordert architektonisches Umbauen.
 
 **Status:** Solide Grundlage, umsetzbar bis zur Produktion ohne strukturelle Neuentwicklung.
+
+Hinweis: IIIF, Elasticsearch-Reconciliation und Procedure sind inzwischen umgesetzt. Die Bewertung bleibt als damalige Analyse erhalten.
 
 ---
 
@@ -106,7 +108,7 @@ Admin speichert Token in `localStorage` — XSS-zugänglich. Für internes Admin
 |---|---|
 | Metadaten-Flexibilität (neue Felder) | ✅ Kein Schema-Change nötig |
 | Neue Authority-Quellen | ✅ Nur ein neuer Adapter |
-| Fünfter Primärtyp | ⚠️ Neue Tabelle + 4 Module |
+| Procedure / Vorgang | ✅ Bereits als Phase 14 umgesetzt |
 | Höhere Last (10k+ Records) | ⚠️ GIN-Index-Performance prüfen, ES-Shard-Strategie |
 | Mehrere Institutionen (SaaS) | ❌ Erfordert architektonischen Umbau (Row-Level-Security oder Schema-per-Tenant) |
 | Wechsel des Suchindex (z. B. OpenSearch) | ✅ Nur `integrations/elasticsearch.py` + `search_service.py` |

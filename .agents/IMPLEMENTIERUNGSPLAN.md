@@ -1,6 +1,8 @@
 # Katalon – Implementierungsplan
 
-## Stand: 2026-06-27
+## Stand: 2026-07-06
+
+GitHub Roadmap: https://github.com/users/karkraeg/projects/1
 
 ---
 
@@ -50,14 +52,11 @@ Vokabular-Verwaltung vollständig verdrahtet.
 - ~~Snapshot-UI im Formular (Phase 7)~~ ✅ – Snapshots anzeigen, erstellen und wiederherstellen
 - ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
-### Phase 7 – Elasticsearch + Versionierung ⚠️
+### Phase 7 – Elasticsearch + Versionierung ✅
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
 ES-Facetten für vocab- und authority-Felder funktionieren korrekt (Label wird extrahiert, nicht das Raw-Objekt).
 Snapshot-UI im Admin-Formular für alle 4 Typen vollständig ✅ (Issue #217, 2026-05-29).
 Robuste ES-Indexierung via Celery-Retry, manueller Reindex, Index-Health und Reconciliation-Job vollständig ✅ (Issue #214, 2026-06-26).
-
-**Noch offen:**
-- (keine bekannten Phase-7-Pflichtpunkte)
 
 ### Phase 8 – Public-Portal ✅ (mit laufenden Verbesserungen)
 Homepage, Suchergebnisse, alle 4 Detailseiten, Theme-System.
@@ -83,9 +82,9 @@ Normdaten auch an Vokabultermen: `metadata.authorities` (mehrere pro Term), Auto
 **Noch offen:**
 - (keine – Authority-Source ist bereits an `AuthorityInput` durchgereicht)
 
-### Phase 10 – Importer-Wizard ✅ (mit kleinen Lücken)
+### Phase 10 – Importer-Wizard ✅
 Vollständiger 4-Schritte-Wizard: Upload → Mapping → Dry Run → Import.
-Formate: CSV, TSV, Excel (.xlsx), XML.
+Formate: CSV, TSV, Excel (.xlsx/.xls), XML.
 Transforms: split, replace, regex_extract, trim, vocab_map, expression.
 Dry Run mit Vorschau, Warnungen, Heterogenitätserkennung.
 Import als Celery-Task mit Fortschrittsanzeige + ETA.
@@ -105,14 +104,9 @@ Celery-Task für asynchrone Verarbeitung, Fortschritts-Anzeige im Admin.
 Wiederverwendet Vokabular "media_types" für Typ-Mapping.
 UI im Importer-Wizard (`StepMedia.tsx`) vorhanden.
 
-### Phase 11 – OAI-PMH ⚠️
+### Phase 11 – OAI-PMH ✅
 Endpoint `/v1/oai` vorhanden. OAI-PMH nutzt die generische Export-Mapping-Schicht.
-
-**Offen:**
-- ListSets
-- ResumptionToken für große Collections (Pagination)
-- Spezifische Fehlerbehandlung: Aktuell wird bei jedem Fehler (inkl. ES-Timeout) `noRecordsMatch` zurückgeliefert (`oai.py:134, 176, 203`). Harvester können transiente von permanenten Fehlern nicht unterscheiden.
-- Tests für Token-Roundtrips und Pagination-Edge-Cases
+ListSets, ResumptionToken, GetRecord, `badResumptionToken` und OAI-Tests sind implementiert; bei ES-Ausfällen liefert der Endpoint `503` mit `Retry-After`.
 
 ### Phase 11.1 – Export-Mapping für OAI-PMH ✅ – Issue #225
 **Umsetzung:** Generische `metadata_mappings`-Tabelle + `/v1/metadata-mappings` API + Export-Abschnitt im Schema-Editor.
@@ -222,9 +216,8 @@ Diese Punkte blockieren keine Feature-Arbeit, sollten aber vor einem öffentlich
 
 ### Nachrangig (Post-Beta)
 
-3. OAI-PMH ResumptionToken + Fehlerbehandlung (Phase 11) – Issue #145
-4. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
-5. Procedure-Post-MVP: strukturierte Zusatzfelder auf Vorgangs-Relationen (#239), Status-Transition-Guards, Auto-Referenznummern, Datei-Attachments
+3. Importer-UX: Auto-Mapping (#199), 10-Zeilen-Vorschau (#201), Diff-Preview (#202), Streaming-Upload (#204)
+4. Phase 12 Resthardening: TLS-Terminierung, locust, OpenAPI
 
 ---
 

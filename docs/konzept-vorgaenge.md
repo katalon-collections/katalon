@@ -1,14 +1,14 @@
 # Katalon – Konzeptpapier: Vorgänge (Leihverkehr, Erwerbung, Restaurierung)
 
-**Version:** Entwurf, Juni 2026  
+**Version:** Implementiert, Juli 2026
 **Adressat:** Stakeholder, Sammlungsverantwortliche, Projektbeteiligte  
-**Status:** Geplant – Phase 14
+**Status:** Implementiert – Phase 14
 
 ---
 
 ## Ausgangslage
 
-Katalon verwaltet heute vier Kerntypen: **Objekte**, **Entitäten** (Personen, Institutionen), **Orte** und **Ereignisse** (Werke, Konzepte, historische Ereignisse). Diese Typen bilden den *Bestand* – was existiert und was es bedeutet.
+Katalon verwaltet heute vier Kerntypen für den Bestand: **Objekte**, **Entitäten** (Personen, Institutionen), **Orte** und **Ereignisse** (Werke, Konzepte, historische Ereignisse). Dazu kommt der separate Procedure-Typ für Vorgänge. Diese Typen bilden den *Bestand* – was existiert und was es bedeutet.
 
 Was bislang fehlt: **Prozesse und Transaktionen** rund um den Bestand. Welches Objekt befindet sich gerade als Leihgabe im Ausland? Wann wurde etwas erworben, und von wem? Wann wurde ein Objekt restauriert, und mit welchem Ergebnis? Solche Vorgänge sind in Museen, Archiven und Bibliotheken täglich relevant – für Versicherung, Standortverwaltung, Berichtspflichten und institutionelles Gedächtnis.
 
@@ -165,6 +165,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 - **Automatische Statusübergänge** (z. B. Objekt wird automatisch „zurückgegeben" wenn Rückgabedatum verstrichen): Bewusste Entscheidung für manuelle Kontrolle
 - **Automatische Referenznummernvergabe**: Generierung nach institutionsspezifischer Logik ist zu divers; Feld ist Freitext
 - **Per-Objekt strukturierte Zusatzfelder auf Vorgangs-Relationen** (z. B. individuelle Versicherungswerte pro Objekt innerhalb einer Mehrfach-Leihgabe): Post-MVP
+- **Subtyp-Feinschliff im generischen Schema-Editor** für Vorgänge: Issue #255
 
 ---
 
@@ -215,6 +216,8 @@ curl -X POST https://deine-domain.de/v1/search/reindex
 
 ## Zeitplan
 
-Phase 14 ist als **Post-Beta**-Feature geplant. Beta-kritische Arbeiten (Suche, Indexierung, Importer) haben Vorrang. Sobald diese abgeschlossen sind, ist Phase 14 der nächste logische Schritt.
+Phase 14 ist umgesetzt. Offen bleiben nur die zurückgestellten Folgepunkte:
 
-Geschätzter Aufwand: 3–4 Entwicklungstage für Backend + Admin-UI (ohne Dateianhänge, ohne automatische Statusübergänge).
+- strukturierte Zusatzfelder auf Vorgangs-Relationen (#239)
+- Subtyp-Feinschliff für Vorgänge (#255)
+- Dateianhänge, automatische Statusübergänge, Auto-Referenznummern

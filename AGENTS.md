@@ -32,9 +32,9 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 | Frontend         | React + TypeScript (Vite) – zwei separate Apps             |
 | Deployment       | Docker Compose                                             |
 | IIIF im MVP      | Ja                                                         |
-| Vier Primärtypen | Vier getrennte Tabellen (nicht generische records-Tabelle) |
+| Vier Primärtypen | Vier getrennte Tabellen für Bestandsdaten; Vorgänge als separater Procedure-Typ |
 
-## Vier Primärtypen (alle mit frei konfigurierbaren Metadaten)
+## Vier Bestands-Typen (alle mit frei konfigurierbaren Metadaten)
 
 | Typ        | DB-Tabelle    | Beschreibung                         |
 |------------|---------------|--------------------------------------|
@@ -44,6 +44,8 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 | Occurrence | `occurrences` | Werke (FRBR), Ereignisse, Konzepte   |
 
 **Alle vier Typen** haben dynamisch konfigurierbare Metadaten via `field_definitions`.
+
+Vorgänge (Procedure) sind ein separater fünfter Typ für Leihverkehr, Erwerbung und Restaurierung.
 
 ## Monorepo-Struktur
 
@@ -137,19 +139,21 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 | 2     | ✅      | Schema-Engine (field_definitions, repeatable, Vokabulare)      |
 | 3     | ✅      | CRUD alle 4 Typen + generische Relationen mit Metadaten        |
 | 4     | ✅      | Auth (FastAPI-Users, JWT, Rollen) + Audit Log                  |
-| 5     | ⚠️      | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
+| 5     | ✅      | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
 | 6     | ✅      | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett          |
-| 7     | ⚠️      | Elasticsearch + Versionierung (Snapshots)                      |
+| 7     | ✅      | Elasticsearch + Versionierung (Snapshots)                      |
 | 8     | ✅      | Public-Portal (React: Suche, Facetten, IIIF-Viewer)            |
 | 9     | ✅      | Authority-Plugin-System + Adapter GND/Geonames                 |
-| 10    | ⚠️      | Smart Importer (Excel/CSV ETL, Dry Run)                        |
-| 11    | ⚠️      | OAI-PMH                                                        |
-| 12    | 🔲     | Hardening                                                      |
+| 10    | ✅      | Smart Importer (Excel/CSV/XML ETL, Dry Run)                    |
+| 11    | ✅      | OAI-PMH                                                        |
+| 12    | ⚠️      | Hardening                                                      |
+| 13    | ⚠️      | Inherited Fields (ES-Denormalisierung)                         |
+| 14    | ✅      | Procedure-Typ (Leihverkehr, Erwerbung, Restaurierung)          |
 
 ## Nicht im Scope
 
 - Video/Audio-Transcoding
-- Leihverkehr / Standortverwaltung
+- Eigenes Standortverwaltungsmodul
 - Typ-Hierarchien (Post-MVP)
 - Sets (Nice-to-have, Post-MVP)
 
@@ -241,4 +245,4 @@ Dazu bei jedem Commit:
 
 ## Nächster logischer Schritt
 
-Siehe `.agents/IMPLEMENTIERUNGSPLAN.md` für aktuelle Prioritäten.
+Siehe `.agents/IMPLEMENTIERUNGSPLAN.md` und die GitHub Roadmap für aktuelle Prioritäten.

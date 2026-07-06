@@ -81,7 +81,7 @@ Ein Sammler besitzt tausende historische Fotografien aus Marokko. Sein Ziel:
 
 ## 5. Primärtypen
 
-Katalon kennt vier gleichwertige Primärtypen. Alle haben **frei konfigurierbare Metadaten** (Schema-Engine gilt für alle Typen).
+Katalon kennt vier gleichwertige Primärtypen für den Bestand. Alle haben **frei konfigurierbare Metadaten** (Schema-Engine gilt für alle Typen).
 
 | Typ | Beschreibung | Beispiele |
 |---|---|---|
@@ -91,6 +91,8 @@ Katalon kennt vier gleichwertige Primärtypen. Alle haben **frei konfigurierbare
 | **Occurrence** | Ereignisse, abstrakte Werke und Konzepte | Ausstellung, Kampagne, Musikwerk, historisches Ereignis |
 
 Typ-Hierarchien (Untertypen mit eigenen Pflichtfeldern) sind **Post-MVP**.
+
+Vorgänge werden als separater fünfter Typ geführt und decken Leihverkehr, Erwerbung und Restaurierung ab.
 
 ### Zur Herkunft des Begriffs „Occurrence"
 
@@ -369,6 +371,8 @@ Wiederholbares Feld:
 | 12 | Hardening | Infra |
 
 **MVP = Phasen 0–6** (vollständiges System mit Admin-UI, alle 4 Typen, Relationen, IIIF).
+
+Aktueller Status: Phasen 7, 10 und 11 sind umgesetzt; Phase 12 ist als Resthardening offen.
 
 ---
 

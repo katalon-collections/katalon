@@ -8,7 +8,7 @@ Der CSV-Importer dient der Massenerfassung von Datensätzen aus tabellarischen Q
 - Initialerfassung von Beständen aus vorhandenen Inventartabellen
 - Übernahme von extern erstellten Metadatenlisten
 
-Der Importer erstellt ausschließlich neue Datensätze. Für das Aktualisieren bestehender Datensätze ist er nicht vorgesehen.
+Der Importer legt neue Datensätze an und kann bestehende Datensätze je nach Upsert-Strategie `skip`, `merge` oder `replace` behandeln.
 
 Der Importer ist in der Admin-UI unter **Importer** erreichbar.
 
@@ -18,12 +18,12 @@ Der Importer ist in der Admin-UI unter **Importer** erreichbar.
 
 | Eigenschaft | Details |
 |---|---|
-| Dateiformate | CSV, TSV |
+| Dateiformate | CSV, TSV, Excel (.xlsx/.xls), XML |
 | Zeichenkodierung | UTF-8 (mit oder ohne BOM) |
 | Trennzeichen | Automatische Erkennung: Komma (`,`), Semikolon (`;`), Tabulator (`\t`), Pipe (`\|`) |
 | Kopfzeile | Pflicht — erste Zeile wird als Spaltennamen interpretiert |
-| Maximale Dateigröße | 10 MB |
-| Excel-Dateien (.xlsx) | Nicht unterstützt. Excel-Dateien vorher als CSV exportieren: Datei → Speichern unter → CSV (UTF-8). |
+| Maximale Dateigröße | 100 MB |
+| XML | Zwei-Schritt-Flow: Upload, dann Record-Element wählen |
 
 Die Trennzeichenerkennung analysiert die ersten 4 KB der Datei und wählt das häufigste Zeichen aus den unterstützten Trennzeichen.
 
@@ -34,12 +34,12 @@ Die Trennzeichenerkennung analysiert die ersten 4 KB der Datei und wählt das h�
 ### Schritt 1: Upload
 
 1. Im oberen Bereich des Importers den **Ziel-Typ** wählen (Objekte, Entitäten, Orte, Occurrences). Dieser bestimmt, welche Felder im Mapping-Schritt zur Verfügung stehen.
-2. Die CSV-Datei per Drag & Drop in den Upload-Bereich ziehen oder durch Klick auswählen.
+2. Die Datei per Drag & Drop in den Upload-Bereich ziehen oder durch Klick auswählen.
 3. Nach dem Upload zeigt der Importer: Anzahl der erkannten Zeilen, Liste der Spaltenköpfe, Vorschau der ersten fünf Zeilen.
 
 Wenn der Upload fehlschlägt:
-- Datei ist größer als 10 MB → Datei aufteilen
-- Dateiformat nicht unterstützt → Datei als CSV exportieren
+- Datei ist größer als 100 MB → Datei aufteilen
+- Dateiformat nicht unterstützt → CSV, TSV, Excel oder XML verwenden
 - Kodierungsfehler → Datei als UTF-8 speichern
 
 ### Schritt 2: Mapping
@@ -54,6 +54,15 @@ Die Mapping-Tabelle zeigt:
 Für jede Spalte kann entweder ein Katalon-Feld gewählt oder **— ignorieren —** ausgewählt werden. Ignorierte Spalten werden nicht importiert.
 
 Pflichtfelder sind in der Dropdown-Liste mit einem Stern (`*`) gekennzeichnet.
+
+Unterstützte Transformationsschritte pro Spalte:
+
+- `split`
+- `replace`
+- `regex_extract`
+- `trim`
+- `vocab_map`
+- `expression`
 
 #### Auto-Mapping
 
@@ -105,20 +114,22 @@ Mögliche Zustände:
 - **Abgeschlossen** — zeigt Anzahl angelegter Datensätze und eventuelle Fehler
 - **Fehlgeschlagen** — zeigt die Fehlermeldung des Tasks
 
+Je nach Import-Option kann der Lauf neue Datensätze nachträglich veröffentlichen.
+
 Nach dem Import: **Neuer Import** setzt den Wizard zurück.
 
 ---
 
 ## Was wird importiert
 
-Alle erfolgreich importierten Datensätze werden mit **Status `draft`** (Entwurf) angelegt. Sie sind im Public-Portal nicht sichtbar und müssen nach der Überprüfung manuell auf `internal` oder `public` gesetzt werden.
+Neue Datensätze werden standardmäßig mit **Status `draft`** (Entwurf) angelegt. Sie sind im Public-Portal nicht sichtbar und können nach der Überprüfung manuell veröffentlicht werden oder per `auto_publish` direkt nach dem Import live gehen.
 
 Jeder Feldwert wird als einfacher Textwert gespeichert:
 ```json
 {"title": [{"value": "Straße in Marrakesch"}]}
 ```
 
-Das bedeutet: Relationsfelder (Verknüpfungen auf andere Datensätze), Vokabularfelder (Term-IDs) und PID-Felder werden beim CSV-Import als Rohtext importiert und müssen anschließend manuell nachbearbeitet werden. Für Relationen und Vokabulare ist der CSV-Importer daher nur dann direkt nutzbar, wenn die gemappte Spalte bereits die internen Katalon-IDs oder Term-Werte enthält.
+Mit `vocab_map` und anderen Transformationsschritten lassen sich Werte vor dem Import normalisieren.
 
 ---
 
@@ -142,10 +153,9 @@ Spalten, die auf den leeren String gemappt sind oder nicht im Mapping erscheinen
 
 | Einschränkung | Details |
 |---|---|
-| Nur CSV/TSV | Excel-Dateien (.xlsx, .xls) werden nicht unterstützt. |
-| Max. 10 MB | Größere Dateien müssen aufgeteilt werden. |
-| Kein Medien-Import | Bilddateien können nicht per CSV importiert werden. Für Batch-Medienimport ist ein separater Mechanismus geplant (Phase 10.1). |
-| Kein Update bestehender Datensätze | Der Importer legt nur neue Datensätze an. |
-| Relationen und Vokabulare als Rohtext | Keine automatische Auflösung von Feldwerten auf Datensatz-IDs oder Vokabular-Term-IDs. |
-| Status immer `draft` | Importierte Datensätze können nicht direkt als `public` importiert werden. |
+| Nur CSV/TSV | Excel-Dateien (.xlsx, .xls) und XML werden ebenfalls unterstützt. |
+| Max. 100 MB | Größere Dateien müssen aufgeteilt werden. |
+| Kein Medien-Import | Bilddateien laufen über den separaten Batch-Medienimport im Wizard. |
+| Kein Update bestehender Datensätze | Der Import unterstützt `skip`, `merge` und `replace`. |
+| Status immer `draft` | Neue Datensätze starten standardmäßig als `draft`, können aber per `auto_publish` veröffentlicht werden. |
 | Keine Zeichenkodierungskonvertierung | Die Datei muss in UTF-8 vorliegen. Latin-1 oder Windows-1252 kann zu Zeichenfehlern führen. |

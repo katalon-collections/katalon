@@ -1,10 +1,10 @@
 # Katalon – Code Quality Assessment
 
-Date: 2026-06-05 (updated after remediation commit `d5f326f`)
+Date: 2026-07-06 (updated after remediation commit `d5f326f` and later `#214` closure)
 Scope: `backend/src` (77 files, ~9.7k LOC Python) + `frontend/{admin,portal}` (60 TS/TSX files)
 Tools: `ruff 0.x`, manual review, pattern grep, codegraph index.
 
-**Remediation status:** C1, H1, M1 fixed in `d5f326f`. M2–M4 and all Low items still open.
+**Remediation status:** C1, H1, M1 fixed in `d5f326f`. M3 fixed in `#214`. M2 and M4 plus all Low items still open.
 
 ---
 
@@ -17,15 +17,15 @@ and the single `dangerouslySetInnerHTML` is wrapped in DOMPurify.
 
 The original review found **one critical, unauthenticated privilege-escalation
 vector** and **one guaranteed runtime crash bug**, plus lint hygiene that contradicts
-the documented pre-commit policy. The two top items and one Medium have since been
-fixed; the rest remain.
+the documented pre-commit policy. The critical, high, and M3 findings have since
+been fixed; the rest remain.
 
 | Severity | Status | Headline |
 |----------|--------|----------|
 | Critical | ✅ fixed `d5f326f` | Unauthenticated `/auth/register` accepts arbitrary `role` |
 | High | ✅ fixed `d5f326f` | `IntegrityError` undefined → `NameError` at runtime |
 | Medium | ✅ fixed `d5f326f` | M1 — mock URN router mounted in production |
-| Medium | ⬜ open | M2 role not validated, M3 ES/DB drift, M4 broad `except: pass` |
+| Medium | ⬜ open | M2 role not validated, M4 broad `except: pass` |
 | Low | ⬜ open | 214 ruff violations, JWT claims, CORS config drift |
 
 ---
@@ -107,7 +107,7 @@ flag) in `main.py`.
 as a role. A typo (`"editorr"`) silently creates a user who matches no `require_role`
 set. Use a `Literal`/`Enum` and validate.
 
-### M3 — Elasticsearch indexed synchronously in request path; DB commits even on index failure
+### M3 — Elasticsearch indexed synchronously in request path; DB commits even on index failure — ✅ FIXED (`#214`)
 `api/v1/objects.py:121` (and the parallel entities/places/occurrences handlers).
 
 ```python
@@ -118,11 +118,8 @@ except Exception:
 return obj   # db.get_db commits anyway -> record exists, ES does not
 ```
 
-Failure is logged (good — better than the older silent `pass`), but the request still
-succeeds and the row is committed, producing permanent ES/DB drift with no
-reconciliation. Celery `index_tasks` exist but are unused. This is the known Issue #214
-surface — worth prioritizing: move indexing to a Celery task with retry, or add a
-reconciliation sweep.
+This was closed by the later #214 remediation: retry/reconciliation now exist in the
+implemented code path. Original finding kept below for audit context.
 
 ### M4 — Broad `except Exception: pass` without logging
 `services/publish_service.py:97,103`, `services/authority_service.py:60`,
@@ -191,6 +188,5 @@ explicit (acceptable, but document it).
 3. ~~**M1** — gate `dnb_urn_mock` behind `debug`~~ ✅ done `d5f326f`.
 4. **M2** — replace free-string `role` with a `Literal`/`Enum` on the `/v1/users` path.
 5. **L1** — `ruff --fix`, fix E402 logger placement, re-enable the pre-commit hook + CI.
-6. **M3/M4** — move ES indexing to Celery + add logging to silent excepts (folds into
-   Issues #213/#214 already on the roadmap).
+6. **M4** — add logging to silent excepts.
 7. **L2/L3** — JWT claims + CORS pruning during Phase 12 hardening.
