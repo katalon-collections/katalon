@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [0.3.7] - 2026-07-05
+## [0.4.0] - 2026-07-06
 
 ### Added
 - Vokabularterme können jetzt Normdaten tragen: strukturierte Verweise (GND, Geonames, Wikidata, Iconclass, VIAF, TGN) mit Autocomplete-Lookup im Term-Editor, mehrere pro Term. Neue `metadata`-JSONB-Spalte an `vocabulary_terms` hält die Verweise unter `authorities`.
