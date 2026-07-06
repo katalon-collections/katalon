@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-06
+
+### Added
+- Produkt- und Designkontext dokumentieren Katalon als professionellen, responsiven kuratorischen Arbeitsplatz.
+- Admin-E2E-Test deckt mobile Navigation bei 319 × 359 Pixeln ab.
+
+### Changed
+- Admin-Sidebar öffnet auf mobilen Viewports als bedienbarer Drawer; Topbar passt Navigation, Suche und Benutzeraktion an schmale Bildschirme an.
+- Playwright startet die bestehende Compose-API und nutzt den Vite-Proxy statt einer zweiten, unvollständig konfigurierten Backend-Instanz.
+
+### Fixed
+- Login-Wechsel zur Admin-App verletzt nicht mehr die React-Hook-Reihenfolge.
+- E2E-Tests warten zuverlässig auf den gespeicherten Login-Token und hängen nicht mehr von installationsspezifischen Schemafeldern oder einer defekten PNG-Fixture ab.
+
 ## [0.5.0] - 2026-07-06
 
 ### Added

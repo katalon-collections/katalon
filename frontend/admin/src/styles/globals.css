@@ -33,6 +33,7 @@ svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 
 /* App shell */
 .app { display: grid; grid-template-columns: 236px 1fr; height: 100%; }
+.sb-backdrop, .sb-close, .mobile-menu { display: none; }
 
 /* Sidebar */
 .sb { background: var(--sb-bg); color: var(--sb-fg); display: flex; flex-direction: column; border-right: 1px solid var(--sb-line); min-height: 0; }
@@ -267,3 +268,36 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .empty { padding: 60px 20px; text-align: center; color: var(--fg-3); font-size: 13px; }
 hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; }
+  .sb {
+    position: fixed; inset: 0 auto 0 0; width: min(300px, calc(100vw - 40px));
+    z-index: 300; transform: translateX(-100%); transition: transform .2s ease-out;
+  }
+  .sb.open { transform: translateX(0); }
+  .sb-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 290;
+    border: 0; background: rgba(11,26,51,.48);
+  }
+  .sb-close {
+    display: grid; place-items: center; width: 44px; height: 44px; margin: -9px -10px -9px 0;
+    border: 0; background: transparent; color: var(--sb-fg); font-size: 26px; line-height: 1;
+  }
+  .main { width: 100vw; }
+  .tb { height: 52px; gap: 8px; padding: 0 12px; }
+  .mobile-menu {
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    width: 44px; height: 44px; padding: 0 11px; border: 0; border-radius: var(--r);
+    background: transparent; color: var(--fg);
+  }
+  .mobile-menu:hover { background: var(--panel-2); }
+  .mobile-menu span { display: block; width: 20px; height: 1.5px; background: currentColor; }
+  .cr { min-width: 0; }
+  .cr > span { display: none; }
+  .cr b { display: block; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb .gs { width: auto; min-width: 0; flex: 1; }
+  .tb .gs input { min-width: 0; }
+  .user-menu-trigger { width: 44px; justify-content: center; }
+  .user-menu-trigger span { display: none; }
+}

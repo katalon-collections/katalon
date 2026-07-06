@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-06T11:48:08Z",
+  "title": "Design System: Katalon",
+  "extensions": {
+    "colorMeta": {
+      "archive-navy": {
+        "role": "neutral",
+        "displayName": "Archiv-Navy",
+        "canonical": "#0b1a33",
+        "tonalRamp": ["#071020", "#0b1a33", "#1e304d", "#40506a", "#68758a", "#929cab", "#c0c6cf", "#eef0f3"]
+      },
+      "collection-blue": {
+        "role": "primary",
+        "displayName": "Sammlungsblau",
+        "canonical": "#1e3a8a",
+        "tonalRamp": ["#0d1b45", "#15296b", "#1e3a8a", "#3556a8", "#5a73c8", "#8d9dde", "#c2caed", "#eef2fb"]
+      },
+      "workspace": {
+        "role": "neutral",
+        "displayName": "Arbeitsfläche",
+        "canonical": "#f4f5f7",
+        "tonalRamp": ["#181a1f", "#3a4150", "#5a6173", "#8a92a3", "#aab1c0", "#d4d7de", "#e4e6eb", "#f4f5f7"]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Seitentitel"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Verwaltungsoberfläche und Datendarstellung"
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "IDs, Schlüssel, Zähler und technische Metadaten"
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 8px 24px rgba(0,0,0,.12)",
+        "purpose": "Menüs und Suchvorschläge"
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 80px rgba(0,0,0,.24)",
+        "purpose": "Modale Bestätigungen"
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "150ms ease-out",
+        "purpose": "Hover- und Zustandswechsel"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "768px"
+      },
+      {
+        "name": "narrow-mobile",
+        "value": "480px"
+      },
+      {
+        "name": "form-single-column",
+        "value": "1180px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primäre Aktion innerhalb eines Arbeitskontexts.",
+      "html": "<button class=\"ds-btn-primary\">Speichern</button>",
+      "css": ".ds-btn-primary { height: 30px; padding: 0 11px; border: 1px solid var(--accent, #1e3a8a); border-radius: 6px; background: var(--accent, #1e3a8a); color: #fff; font: 500 12.5px 'IBM Plex Sans', system-ui, sans-serif; } .ds-btn-primary:hover { background: var(--accent-ink, #15296b); } .ds-btn-primary:focus-visible { outline: 3px solid var(--accent-100, #dde3f5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Sekundäre oder neutrale Aktion.",
+      "html": "<button class=\"ds-btn-secondary\">Abbrechen</button>",
+      "css": ".ds-btn-secondary { height: 30px; padding: 0 11px; border: 1px solid var(--border-s, #d4d7de); border-radius: 6px; background: #fff; color: var(--fg, #181a1f); font: 500 12.5px 'IBM Plex Sans', system-ui, sans-serif; } .ds-btn-secondary:hover { background: var(--panel-2, #fafbfc); } .ds-btn-secondary:focus-visible { outline: 3px solid var(--accent-100, #dde3f5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Kompaktes Eingabefeld für Metadaten.",
+      "html": "<input class=\"ds-input\" value=\"Inventarnummer\" aria-label=\"Inventarnummer\">",
+      "css": ".ds-input { width: 240px; height: 32px; padding: 0 10px; border: 1px solid var(--border-s, #d4d7de); border-radius: 6px; background: #fff; color: var(--fg, #181a1f); font: 400 13px 'IBM Plex Sans', system-ui, sans-serif; } .ds-input:hover { border-color: var(--fg-5, #aab1c0); } .ds-input:focus-visible { border-color: var(--accent, #1e3a8a); outline: 3px solid var(--accent-50, #eef2fb); }"
+    },
+    {
+      "name": "Selected Chip",
+      "kind": "chip",
+      "description": "Aktiver Filter oder ausgewählter Wert.",
+      "html": "<span class=\"ds-chip\">Fotografie</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border: 1px solid var(--accent-100, #dde3f5); border-radius: 12px; background: var(--accent-50, #eef2fb); color: var(--accent-ink, #15296b); font: 500 11.5px 'IBM Plex Sans', system-ui, sans-serif; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flacher Inhaltsbereich mit klarer Grenze.",
+      "html": "<section class=\"ds-card\"><strong>Grunddaten</strong><p>Kuratorische Metadaten</p></section>",
+      "css": ".ds-card { width: 260px; padding: 16px; border: 1px solid var(--border, #e4e6eb); border-radius: 10px; background: var(--panel, #fff); color: var(--fg, #181a1f); font: 400 13.5px/1.45 'IBM Plex Sans', system-ui, sans-serif; } .ds-card strong { font-weight: 600; } .ds-card p { margin: 6px 0 0; color: var(--fg-3, #5a6173); }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "description": "Aktiver Hauptnavigationseintrag.",
+      "html": "<button class=\"ds-nav-item\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" aria-hidden=\"true\"><path d=\"M4 5h16v14H4z M7 8h10v8H7z\" fill=\"currentColor\" fill-rule=\"evenodd\"/></svg><span>Objekte</span></button>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: 10px; width: 220px; padding: 7px 10px; border: 0; border-radius: 5px; background: rgba(255,255,255,.14); color: #fff; font: 600 13px 'IBM Plex Sans', system-ui, sans-serif; text-align: left; } .ds-nav-item:hover { background: rgba(255,255,255,.18); } .ds-nav-item:focus-visible { outline: 2px solid #dde3f5; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Kuratorischer Arbeitsplatz",
+    "overview": "Katalon wirkt wie ein präziser, zeitgemäßer Arbeitsplatz für professionelle Sammlungsarbeit. Oberfläche bleibt flach und ruhig. Dichte Fachinformationen sind klar gegliedert; Interaktionen bleiben vertraut und direkt. System verbindet kompakte Verwaltungsoberflächen mit zugänglichen Abständen und eindeutigen Zuständen.",
+    "keyCharacteristics": [
+      "Ruhige, helle Arbeitsfläche mit dunkler Navigation",
+      "Kompakte, aber lesbare Informationsdichte",
+      "Klare Grenzen statt dekorativer Schatten",
+      "Ein zurückhaltender blauer Aktionsakzent",
+      "Responsive Struktur ohne entfernte Kernfunktionen"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Sammlungsblau kennzeichnet Aktion, Auswahl oder Fokus, nie bloße Dekoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Mono Rule",
+        "body": "Monospace signalisiert strukturierte oder technische Daten, nicht dekorativen Stil.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-by-Default Rule",
+        "body": "Dauerhafte Flächen bleiben schattenlos; nur temporär überlagerte Elemente erhalten Tiefe.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do Sammlungsblau (#1e3a8a) nur für Aktionen, Auswahl und Fokus verwenden.",
+      "Do Kernfunktionen auf kleinen Bildschirmen erhalten und Informationsdichte strukturell anpassen.",
+      "Do Touch-Ziele mobil auf mindestens 44px vergrößern.",
+      "Do Flächen primär durch Hintergrund und 1px-Grenzen gliedern.",
+      "Do IBM Plex Mono nur für strukturierte oder technische Daten einsetzen."
+    ],
+    "donts": [
+      "Don't generische SaaS-Dashboards ohne Bezug zu fachlicher Sammlungsarbeit nachbilden.",
+      "Don't verspielte oder dekorative Museumsästhetik verwenden, die Arbeitsabläufe behindert.",
+      "Don't Desktop-only-Oberflächen bauen oder Kernfunktionen mobil verstecken.",
+      "Don't dauerhafte Karten und Panels mit dekorativen Schatten stapeln.",
+      "Don't Hover als einzigen Zugang zu Aktionen verwenden."
+    ]
+  }
+}

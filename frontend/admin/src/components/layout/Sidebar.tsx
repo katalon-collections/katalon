@@ -42,19 +42,22 @@ interface Props {
   setRoute: (r: Route) => void
   onLogout: () => void
   appTitle?: string
+  open?: boolean
+  onClose?: () => void
 }
 
-export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon' }: Props) {
+export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open = false, onClose }: Props) {
   const user = getTokenUser()
   const initials = user?.email ? user.email[0].toUpperCase() : 'A'
   const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', cataloger: 'Katalogisierer', viewer: 'Betrachter' }
 
   return (
-    <aside className="sb">
+    <aside className={`sb${open ? ' open' : ''}`} aria-label="Hauptnavigation">
       <div className="sb-brand">
         <div className="logo">K</div>
         <div className="sb-name">{appTitle}</div>
         <div className="sb-env">Stage</div>
+        <button className="sb-close" aria-label="Navigation schließen" onClick={onClose}>×</button>
       </div>
 
       <nav className="sb-nav">

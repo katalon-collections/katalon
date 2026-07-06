@@ -52,6 +52,29 @@ Vokabular-Verwaltung vollständig verdrahtet.
 - ~~Snapshot-UI im Formular (Phase 7)~~ ✅ – Snapshots anzeigen, erstellen und wiederherstellen
 - ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
+### Phase 6.2 – Mobile Admin-Optimierung ⚠️ – Issue #253
+
+**Ziel:** Admin-Kernfunktionen auf Smartphones und Tablets möglichst vollständig nutzbar machen, ohne separate Mobile-UI.
+
+**Erledigt (v0.5.1):**
+- Produkt- und Designkontext in `PRODUCT.md`, `DESIGN.md` und `DESIGN.json`
+- Responsive App-Shell bei ≤768 px
+- Sidebar als Drawer mit Overlay und 44-px-Touchzielen
+- Kompakte Topbar für Navigation, globale Suche und Benutzeraktion
+- Playwright-Regressionstest für Öffnen und Schließen bei 319 × 359 px
+- E2E-Runner nutzt Compose-API über den bestehenden Vite-Proxy
+- Login-, Objektanlage-, Medienupload- und Mobile-Navigationstests laufen wieder vollständig
+
+**Nächste Session, Reihenfolge:**
+1. Globale Mobile-Regeln für Seitenheader, Toolbars, Tabs, Tabellen und Pagination
+2. Schema-Screen: Subtypen-Auswahl statt fester 220-px-Spalte; Feldzeilen mobil reduzieren
+3. Record-Formulare: Aktionsleiste umbrechen; Datums-, Geo- und weitere Inline-Grids stapeln
+4. Restliche Admin-Screens bei 319 px, 375 px und Tablet prüfen
+5. Playwright-Screenshots und Regressionstests ergänzen
+
+**Bekannte Test-Infrastruktur-Lücke:**
+- Admin-`lint`-Script findet `eslint` nicht, weil Dependency fehlt
+
 ### Phase 7 – Elasticsearch + Versionierung ✅
 Elasticsearch-Integration: Index beim Create/Update/Delete, `/v1/search`-Endpoint mit Facetten.
 ES-Facetten für vocab- und authority-Felder funktionieren korrekt (Label wird extrahiert, nicht das Raw-Objekt).

@@ -76,6 +76,7 @@ function Placeholder({ label }: { label: string }) {
 
 export function AppShell() {
   const [loggedIn, setLoggedIn] = useState(hasToken)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDirtyRef = useRef(false)
   const [appTitle, setAppTitle] = useState('Katalon')
 
@@ -117,6 +118,7 @@ export function AppShell() {
   function safeNavigate(r: string, id?: string | null) {
     if (isDirtyRef.current && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
     isDirtyRef.current = false
+    setSidebarOpen(false)
     navigate(r, id)
   }
 
@@ -125,18 +127,19 @@ export function AppShell() {
     setLoggedIn(false)
   }
 
+  useEffect(() => {
+    const titleCrumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
+    document.title = adminDocumentTitle(appTitle, route, titleCrumbs)
+  }, [appTitle, route])
+
+  const crumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
+
   if (!loggedIn) {
     return <ScreenLogin onLogin={() => setLoggedIn(true)} />
   }
 
   const currentUser = getTokenUser()
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
-
-  const crumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
-
-  useEffect(() => {
-    document.title = adminDocumentTitle(appTitle, route, crumbs)
-  }, [appTitle, route, crumbs])
 
   function renderScreen() {
     switch (route) {
@@ -166,9 +169,23 @@ export function AppShell() {
 
   return (
     <div className="app">
-      <Sidebar route={route} setRoute={(r) => safeNavigate(r)} onLogout={handleLogout} appTitle={appTitle} />
+      <Sidebar
+        route={route}
+        setRoute={(r) => safeNavigate(r)}
+        onLogout={handleLogout}
+        appTitle={appTitle}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+      {sidebarOpen && <button className="sb-backdrop" aria-label="Navigation schließen" onClick={() => setSidebarOpen(false)} />}
       <div className="main">
-        <Topbar crumbs={crumbs} onNavigate={(r, id) => safeNavigate(r, id)} currentUser={currentUser} onLogout={handleLogout} />
+        <Topbar
+          crumbs={crumbs}
+          onNavigate={(r, id) => safeNavigate(r, id)}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onOpenNavigation={() => setSidebarOpen(true)}
+        />
         <BannerBar surface="admin" />
         <ImportStatusBanner currentRoute={route} />
         {renderScreen()}

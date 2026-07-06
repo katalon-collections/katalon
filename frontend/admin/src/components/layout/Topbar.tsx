@@ -12,9 +12,10 @@ interface Props {
   onNavigate?: (route: string, id?: string) => void
   currentUser?: { email: string; role: string } | null
   onLogout?: () => void
+  onOpenNavigation?: () => void
 }
 
-export function Topbar({ crumbs, onNavigate, currentUser, onLogout }: Props) {
+export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNavigation }: Props) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
@@ -64,6 +65,11 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout }: Props) {
 
   return (
     <div className="tb">
+      <button className="mobile-menu" aria-label="Navigation öffnen" onClick={onOpenNavigation}>
+        <span />
+        <span />
+        <span />
+      </button>
       <div className="cr">
         {crumbs.map((c, i) =>
           i === crumbs.length - 1 ? (
@@ -128,8 +134,8 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout }: Props) {
       {/* <button className="ib" title="Hilfe"><Help size={15} /></button> */}
       {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
       <div ref={userMenuRef} style={{ position: 'relative' }}>
-        <button className="btn gh sm" onClick={() => setUserMenuOpen(v => !v)}>
-          {currentUser?.email || 'Benutzer'} ▾
+        <button className="btn gh sm user-menu-trigger" onClick={() => setUserMenuOpen(v => !v)}>
+          <span>{currentUser?.email || 'Benutzer'}</span> ▾
         </button>
         {userMenuOpen && (
           <div style={{
