@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-06
+
+### Fixed
+- Backend-Unit- und Integration-Jobs setzen den verpflichtenden Testschlüssel für verschlüsselte Konfiguration, sodass Tests in GitHub Actions wieder gesammelt werden.
+- Playwright-Workflow verwendet denselben nicht-geheimen Testschlüssel.
+
 ## [0.5.1] - 2026-07-06
 
 ### Added

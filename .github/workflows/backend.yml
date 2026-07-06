@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  KATALON_SECRETS_KEY: test-katalon-secrets-key-32-chars
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest

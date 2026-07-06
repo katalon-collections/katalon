@@ -68,6 +68,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://katalon:katalon@127.0.0.1:5432/katalon
           REDIS_URL: redis://127.0.0.1:6379/0
           MEDIA_ROOT: /tmp/katalon-media
+          KATALON_SECRETS_KEY: test-katalon-secrets-key-32-chars
         run: npm run test
 
       - name: Upload Playwright report
