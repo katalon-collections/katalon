@@ -54,6 +54,7 @@ svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .sb-it.active .ic { opacity: 1; }
 .sb-it .ct { margin-left: auto; font-family: 'IBM Plex Mono',monospace; font-size: 10.5px; color: var(--sb-mute); }
 .sb-it.active .ct { color: var(--sb-fg); }
+.sb-feedback { padding: 0 8px 4px; }
 .sb-ver { padding: 4px 16px 6px; font-size: 10px; font-family: 'IBM Plex Mono',monospace; color: var(--sb-mute); }
 .sb-foot { padding: 10px 12px; border-top: 1px solid var(--sb-line); display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .panel-it { display: flex; align-items: center; gap: 10px; padding: 7px 12px; color: var(--fg-2); font-size: 13px; cursor: pointer; border: 0; border-left: 3px solid transparent; background: transparent; width: 100%; text-align: left; font-family: inherit; line-height: 1.2; }

@@ -6,8 +6,8 @@ const feedbackEnabled = Boolean(import.meta.env.VITE_ADMIN_FEEDBACK_ENABLED?.tri
 
 const panel = {
   position: 'fixed',
-  right: 18,
-  bottom: 66,
+  left: 18,
+  bottom: 18,
   zIndex: 40,
   width: 'min(360px, calc(100vw - 32px))',
   background: '#fff',
@@ -103,19 +103,11 @@ export function FeedbackButton() {
       )}
       <button
         type="button"
-        className="btn pri"
-        style={{
-          position: 'fixed',
-          right: 18,
-          bottom: 18,
-          zIndex: 40,
-          height: 36,
-          boxShadow: '0 10px 24px rgba(15, 23, 42, .18)',
-        }}
+        className="sb-it"
         onClick={() => setOpen(true)}
       >
-        <Help size={15} />
-        Feedback
+        <Help className="ic" size={15} />
+        <span>Feedback</span>
       </button>
     </>
   )

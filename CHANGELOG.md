@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-06
+
+### Fixed
+- Feedback-Button im Admin überlagerte die Editieren-Buttons nicht mehr: Trigger sitzt jetzt als Sidebar-Eintrag über der Versionsnummer, das Feedback-Panel öffnet unten links.
+
 ## [0.4.0] - 2026-07-06
 
 ### Added

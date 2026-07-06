@@ -17,7 +17,6 @@ import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { BannerBar } from '../ui/BannerBar'
 import { ImportStatusBanner } from '../ui/ImportStatusBanner'
-import { FeedbackButton } from '../feedback/FeedbackButton'
 import { BASE, req } from '../../api/client'
 import type { PortalConfigRead } from '../../types'
 
@@ -174,7 +173,6 @@ export function AppShell() {
         <ImportStatusBanner currentRoute={route} />
         {renderScreen()}
       </div>
-      <FeedbackButton />
     </div>
   )
 }
