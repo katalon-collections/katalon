@@ -14,6 +14,7 @@ from katalon.core.schemas import (
     VocabularyTermRead,
 )
 from katalon.services import vocabulary_import_service
+from katalon.services.schema_service import validate_metadata
 
 router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
 
@@ -147,7 +148,15 @@ async def get_ancestors(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> l
 async def create_term(
     vocab_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
 ) -> VocabularyTerm:
-    term = VocabularyTerm(**data.model_dump() | {"vocabulary_id": vocab_id})
+    vocab = await db.get(Vocabulary, vocab_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    errors = await validate_metadata(
+        db, "vocabulary_term", data.metadata_, str(vocab_id)
+    )
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
+    term = VocabularyTerm(**data.model_dump(exclude={"vocabulary_id"}) | {"vocabulary_id": vocab_id})
     db.add(term)
     await db.flush()
     return term
@@ -161,7 +170,12 @@ async def update_term(
     term = result.scalar_one_or_none()
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
-    for k, v in data.model_dump().items():
+    errors = await validate_metadata(
+        db, "vocabulary_term", data.metadata_, str(term.vocabulary_id)
+    )
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
+    for k, v in data.model_dump(exclude={"vocabulary_id"}).items():
         setattr(term, k, v)
     return term
 
@@ -186,7 +200,6 @@ async def import_terms(
     _: CurrentUser,
     strategy: Literal["append", "replace"] = Query("append"),
     dry_run: bool = Query(True),
-    authority_source: str | None = Query(None),
     mapping: str | None = Form(None),
 ) -> dict:
     """Import vocabulary terms from CSV or JSON with optional dry-run."""
@@ -226,19 +239,12 @@ async def import_terms(
             "errors": errors,
         }
 
-    if any(t.external_id for t in terms) and not authority_source:
-        raise HTTPException(
-            status_code=422,
-            detail="Normdaten-Spalte gemappt, aber keine Normdaten-Quelle gewählt.",
-        )
-
     result = await vocabulary_import_service.import_vocabulary_terms(
         db=db,
         vocab_id=vocab_id,
         terms=terms,
         strategy=strategy,
         dry_run=dry_run,
-        authority_source=authority_source,
     )
     result["strategy"] = strategy
     result["dry_run"] = dry_run

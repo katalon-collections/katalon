@@ -104,6 +104,7 @@ export interface Vocabulary {
   id: string
   name: string
   is_hierarchical: boolean
+  kind: 'term' | 'relation'
 }
 
 export interface VocabularyTerm {

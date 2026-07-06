@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -90,6 +91,7 @@ class RecordSubtypeRead(RecordSubtypeCreate):
 class VocabularyCreate(BaseModel):
     name: str
     is_hierarchical: bool = False
+    kind: Literal["term", "relation"] = "term"
 
 
 class VocabularyRead(VocabularyCreate):

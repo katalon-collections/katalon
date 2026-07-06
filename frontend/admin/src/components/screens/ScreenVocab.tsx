@@ -1,63 +1,99 @@
 import { Fragment, useState, useEffect, useCallback } from 'react'
-import { vocabularies, authority } from '../../api/client'
-import type { AuthoritySource } from '../../api/client'
-import type { Vocabulary, VocabularyTerm } from '../../types'
+import { schema, vocabularies } from '../../api/client'
+import type { FieldDefinition, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
 
-function readAuthorities(meta: Record<string, unknown> | undefined | null): AuthorityEntry[] {
-  const raw = (meta ?? {})['authorities']
-  return Array.isArray(raw) ? (raw as AuthorityEntry[]) : []
+function fieldLabel(field: FieldDefinition): string {
+  return field.label.de || field.label.en || field.name
 }
 
-/** Multi-normdata editor: source picker + AuthorityInput to add, list with remove. */
-function AuthoritiesEditor({ value, onChange, sources }: {
-  value: AuthorityEntry[]
-  onChange: (v: AuthorityEntry[]) => void
-  sources: AuthoritySource[]
+function CustomFieldsEditor({ fields, value, onChange }: {
+  fields: FieldDefinition[]
+  value: Record<string, unknown>
+  onChange: (value: Record<string, unknown>) => void
 }) {
-  const enabled = sources.filter(s => s.is_enabled)
-  const [source, setSource] = useState<string>('')
-  const activeSource = source || enabled[0]?.id || ''
+  function set(name: string, fieldValue: unknown) {
+    const next = { ...value }
+    if (fieldValue === '' || fieldValue === null || (Array.isArray(fieldValue) && fieldValue.length === 0)) {
+      delete next[name]
+    } else {
+      next[name] = fieldValue
+    }
+    onChange(next)
+  }
+
+  function renderSingle(field: FieldDefinition, current: unknown, update: (next: unknown) => void) {
+    if (field.field_type === 'boolean') {
+      return <input type="checkbox" className="ck" checked={current === true} onChange={e => update(e.target.checked)} />
+    }
+    if (field.field_type === 'authority') {
+      return (
+        <AuthorityInput
+          source={String(field.settings.source ?? '')}
+          value={(current as AuthorityEntry | null) ?? null}
+          onChange={update}
+        />
+      )
+    }
+    return (
+      <input
+        className="fld"
+        type={field.field_type === 'number' ? 'number' : 'text'}
+        value={current == null ? '' : String(current)}
+        onChange={e => update(field.field_type === 'number'
+          ? (e.target.value === '' ? '' : Number(e.target.value))
+          : e.target.value)}
+      />
+    )
+  }
+
   return (
-    <div className="field">
-      <div className="lbl">Normdaten</div>
-      {value.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
-          {value.map((entry, i) => (
-            <span key={`${entry.source}:${entry.external_id}`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '3px 8px', borderRadius: 4,
-              background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
-            }}>
-              {entry.label || entry.external_id}
-              <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>{entry.source}:{entry.external_id}</span>
-              <button className="btn sm ico gh" onClick={() => onChange(value.filter((_, idx) => idx !== i))} title="Entfernen"><X size={12} /></button>
-            </span>
-          ))}
-        </div>
-      )}
-      {enabled.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Normdaten-Quelle konfiguriert.</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
-          <select className="fld" value={activeSource} onChange={e => setSource(e.target.value)}>
-            {enabled.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
-          <AuthorityInput
-            source={activeSource}
-            value={null}
-            onChange={v => {
-              if (!v) return
-              if (value.some(a => a.source === v.source && a.external_id === v.external_id)) return
-              onChange([...value, v])
-            }}
-          />
-        </div>
-      )}
-    </div>
+    <>
+      {fields.map(field => {
+        const current = value[field.name]
+        const items = field.is_repeatable ? (Array.isArray(current) ? current : []) : []
+        return (
+          <div className="field" key={field.id}>
+            <div className="lbl">{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</div>
+            {field.is_repeatable ? (
+              <>
+                {items.map((item, index) => (
+                  <div key={index} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ flex: 1 }}>{renderSingle(field, item, next => set(field.name, items.map((old, i) => i === index ? next : old)))}</div>
+                    <button type="button" className="btn sm gh" onClick={() => set(field.name, items.filter((_, i) => i !== index))}><X size={12} /></button>
+                  </div>
+                ))}
+                <button type="button" className="btn sm" onClick={() => set(field.name, [...items, field.field_type === 'boolean' ? false : null])}>
+                  <Plus size={12} /> Wert
+                </button>
+              </>
+            ) : renderSingle(field, current, next => set(field.name, next))}
+          </div>
+        )
+      })}
+    </>
   )
+}
+
+function MetadataSummary({ fields, metadata }: { fields: FieldDefinition[]; metadata: Record<string, unknown> }) {
+  const values = fields.flatMap(field => {
+    const raw = metadata[field.name]
+    if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return []
+    const items = Array.isArray(raw) ? raw : [raw]
+    const text = items.map(item => {
+      if (typeof item === 'object' && item && 'external_id' in item) {
+        const authority = item as AuthorityEntry
+        return authority.label || `${authority.source}:${authority.external_id}`
+      }
+      return item === true ? 'Ja' : item === false ? 'Nein' : String(item)
+    }).join(', ')
+    return [`${fieldLabel(field)}: ${text}`]
+  })
+  return values.length > 0
+    ? <div style={{ marginTop: 4, color: 'var(--fg-3)', fontSize: 11 }}>{values.join(' · ')}</div>
+    : null
 }
 
 interface ScreenVocabProps {
@@ -77,6 +113,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [showNewVocab, setShowNewVocab] = useState(false)
   const [newVocabName, setNewVocabName] = useState('')
   const [newVocabHierarchical, setNewVocabHierarchical] = useState(false)
+  const [newVocabKind, setNewVocabKind] = useState<'term' | 'relation'>('term')
   const [savingVocab, setSavingVocab] = useState(false)
 
   // new term form
@@ -85,6 +122,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [newTermLabelDe, setNewTermLabelDe] = useState('')
   const [newTermInverseLabelDe, setNewTermInverseLabelDe] = useState('')
   const [savingTerm, setSavingTerm] = useState(false)
+  const [newTermMetadata, setNewTermMetadata] = useState<Record<string, unknown>>({})
 
   // edit term inline
   const [editTermId, setEditTermId] = useState<string | null>(null)
@@ -92,6 +130,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [editTermLabelDe, setEditTermLabelDe] = useState('')
   const [editTermInverseLabelDe, setEditTermInverseLabelDe] = useState('')
   const [savingEditTerm, setSavingEditTerm] = useState(false)
+  const [editTermMetadata, setEditTermMetadata] = useState<Record<string, unknown>>({})
+  const [termFields, setTermFields] = useState<FieldDefinition[]>([])
   const [importFile, setImportFile] = useState<File | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [mapping, setMapping] = useState<Record<string, string>>({})
@@ -106,16 +146,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     errors: { row: number | null; message: string }[]
   }>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [sources, setSources] = useState<AuthoritySource[]>([])
-  const [importAuthoritySource, setImportAuthoritySource] = useState<string>('')
-  const [newTermAuthorities, setNewTermAuthorities] = useState<AuthorityEntry[]>([])
-  const [editTermAuthorities, setEditTermAuthorities] = useState<AuthorityEntry[]>([])
 
   const CSV_TARGETS = [
     { value: '', label: 'Ignorieren' },
     { value: 'term', label: 'ID' },
     { value: 'parent_term', label: 'Parent-ID' },
-    { value: 'external_id', label: 'Externe ID' },
     { value: 'label:de', label: 'Label (de)' },
     { value: 'label:en', label: 'Label (en)' },
     { value: 'inverse_label:de', label: 'Gegenrichtung (de)' },
@@ -147,7 +182,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         const normalized = header.toLowerCase()
         if (normalized === 'term') acc[header] = 'term'
         else if (normalized === 'parent_term' || normalized === 'parent') acc[header] = 'parent_term'
-        else if (normalized === 'external_id') acc[header] = 'external_id'
         else if (normalized === 'label_de' || normalized === 'de') acc[header] = 'label:de'
         else if (normalized === 'label_en' || normalized === 'en') acc[header] = 'label:en'
         else acc[header] = ''
@@ -184,7 +218,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }, [activeVocab, initialVocab])
 
   useEffect(() => { loadVocabs() }, [])
-  useEffect(() => { authority.list().then(setSources).catch(() => setSources([])) }, [])
 
   const loadTerms = useCallback(() => {
     if (!activeVocab) return
@@ -196,17 +229,33 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }, [activeVocab])
 
   useEffect(() => { loadTerms() }, [loadTerms])
+  useEffect(() => {
+    if (!activeVocab) {
+      setTermFields([])
+      return
+    }
+    schema.list('vocabulary_term', activeVocab)
+      .then(setTermFields)
+      .catch(() => setTermFields([]))
+    setNewTermMetadata({})
+    setEditTermId(null)
+  }, [activeVocab])
 
   async function createVocab() {
     if (!newVocabName.trim()) return
     setSavingVocab(true)
     try {
-      const v = await vocabularies.create({ name: newVocabName.trim(), is_hierarchical: newVocabHierarchical })
+      const v = await vocabularies.create({
+        name: newVocabName.trim(),
+        is_hierarchical: newVocabHierarchical,
+        kind: newVocabKind,
+      })
       setVocabs(prev => [...prev, v])
       setActiveVocab(v.id)
       onVocabSelect?.(v.name)
       setNewVocabName('')
       setNewVocabHierarchical(false)
+      setNewVocabKind('term')
       setShowNewVocab(false)
     } catch (e) {
       alert((e as Error).message)
@@ -223,14 +272,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         vocabulary_id: activeVocab,
         term: newTermTerm.trim(),
         label: { de: newTermLabelDe.trim() },
-        inverse_label: newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
-        metadata_: newTermAuthorities.length ? { authorities: newTermAuthorities } : {},
+        inverse_label: vocab?.kind === 'relation' && newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
+        metadata_: newTermMetadata,
         parent_id: null,
       })
       setNewTermTerm('')
       setNewTermLabelDe('')
       setNewTermInverseLabelDe('')
-      setNewTermAuthorities([])
+      setNewTermMetadata({})
       setShowNewTerm(false)
       loadTerms()
     } catch (e) {
@@ -245,7 +294,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermTerm(t.term)
     setEditTermLabelDe(t.label.de ?? '')
     setEditTermInverseLabelDe(t.inverse_label?.de ?? '')
-    setEditTermAuthorities(readAuthorities(t.metadata_))
+    setEditTermMetadata({ ...(t.metadata_ ?? {}) })
   }
 
   async function saveEditTerm(t: VocabularyTerm) {
@@ -255,8 +304,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         vocabulary_id: activeVocab!,
         term: editTermTerm.trim(),
         label: { de: editTermLabelDe.trim() },
-        inverse_label: editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
-        metadata_: { ...(t.metadata_ ?? {}), authorities: editTermAuthorities },
+        inverse_label: vocab?.kind === 'relation' && editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
+        metadata_: editTermMetadata,
         parent_id: t.parent_id,
       })
       setEditTermId(null)
@@ -280,17 +329,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
 
   const isCsvImport = importFile ? /\.(csv|tsv)$/i.test(importFile.name) : false
   const hasTermMapping = Object.values(mapping).includes('term')
-  const hasAuthorityMapping = isCsvImport && Object.values(mapping).includes('external_id')
-  const enabledSources = sources.filter(s => s.is_enabled)
 
   async function runVocabularyImport(dryRun: boolean) {
     if (!activeVocab || !importFile) return
     if (isCsvImport && !hasTermMapping) {
       setImportFeedback("Bitte mindestens eine Spalte auf 'ID' mappen.")
-      return
-    }
-    if (hasAuthorityMapping && !importAuthoritySource) {
-      setImportFeedback('Normdaten-Spalte gemappt: bitte Normdaten-Quelle wählen.')
       return
     }
     setImportBusy(true)
@@ -300,7 +343,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         dryRun,
         strategy: importStrategy,
         mapping: isCsvImport ? mapping : undefined,
-        authoritySource: hasAuthorityMapping ? importAuthoritySource : undefined,
       })
       setImportResult(result)
       if (!dryRun && result.errors.length === 0) {
@@ -342,6 +384,13 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 <div className="lbl">Name</div>
                 <input className="fld" value={newVocabName} onChange={e => setNewVocabName(e.target.value)} placeholder="Vokabular-Name" autoFocus />
               </div>
+              <div className="field">
+                <div className="lbl">Art</div>
+                <select className="fld" value={newVocabKind} onChange={e => setNewVocabKind(e.target.value as 'term' | 'relation')}>
+                  <option value="term">Termvokabular</option>
+                  <option value="relation">Relationsvokabular</option>
+                </select>
+              </div>
               <div className="field" style={{ paddingTop: 20 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={newVocabHierarchical} onChange={e => setNewVocabHierarchical(e.target.checked)} />
@@ -381,7 +430,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{vocab.name}</div>
                   <div style={{ color: 'var(--fg-3)', fontSize: 12 }}>
-                    {terms.length} Terme · {vocab.is_hierarchical ? 'Hierarchisch' : 'Flach'}
+                    {terms.length} Terme · {vocab.is_hierarchical ? 'Hierarchisch' : 'Flach'} · {vocab.kind === 'relation' ? 'Relationen' : 'Auswahlliste'}
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -440,25 +489,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     </div>
                   )}
 
-                  {hasAuthorityMapping && (
-                    <div style={{ marginBottom: 10 }}>
-                      <div className="lbl" style={{ marginBottom: 6 }}>Normdaten-Quelle (für gemappte Normdaten-Spalte)</div>
-                      {enabledSources.length === 0 ? (
-                        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Normdaten-Quelle konfiguriert.</div>
-                      ) : (
-                        <select
-                          className="fld"
-                          style={{ maxWidth: 220 }}
-                          value={importAuthoritySource}
-                          onChange={e => setImportAuthoritySource(e.target.value)}
-                        >
-                          <option value="">— Quelle wählen —</option>
-                          {enabledSources.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                        </select>
-                      )}
-                    </div>
-                  )}
-
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <select
                       className="fld"
@@ -506,12 +536,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         <div className="lbl">Label DE</div>
                         <input className="fld" value={newTermLabelDe} onChange={e => setNewTermLabelDe(e.target.value)} placeholder="Anzeigetext (Hinrichtung)" />
                       </div>
-                      <div className="field">
-                        <div className="lbl">Gegenrichtung DE</div>
-                        <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
-                      </div>
+                      {vocab.kind === 'relation' && (
+                        <div className="field">
+                          <div className="lbl">Gegenrichtung DE</div>
+                          <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
+                        </div>
+                      )}
                     </div>
-                    <AuthoritiesEditor value={newTermAuthorities} onChange={setNewTermAuthorities} sources={sources} />
+                    <CustomFieldsEditor fields={termFields} value={newTermMetadata} onChange={setNewTermMetadata} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                       <button className="btn pri" onClick={createTerm} disabled={savingTerm}>Anlegen</button>
                       <button className="btn gh" onClick={() => setShowNewTerm(false)}><X size={12} /></button>
@@ -526,15 +558,15 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     <tr>
                       <th>ID</th>
                       <th>Label DE</th>
-                      <th>Gegenrichtung DE</th>
+                      {vocab.kind === 'relation' && <th>Gegenrichtung DE</th>}
                       <th>Übergeordnet</th>
                       <th className="col-act" />
                     </tr>
                   </thead>
                   <tbody>
-                    {termsLoading && <tr><td colSpan={4} className="empty">Lade…</td></tr>}
+                    {termsLoading && <tr><td colSpan={vocab.kind === 'relation' ? 5 : 4} className="empty">Lade…</td></tr>}
                     {!termsLoading && terms.length === 0 && (
-                      <tr><td colSpan={4} className="empty">Keine Terme.</td></tr>
+                      <tr><td colSpan={vocab.kind === 'relation' ? 5 : 4} className="empty">Keine Terme.</td></tr>
                     )}
                     {!termsLoading && terms.map(t => (
                       editTermId === t.id ? (
@@ -542,7 +574,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <tr>
                             <td><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ maxWidth: 160 }} /></td>
                             <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
-                            <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>
+                            {vocab.kind === 'relation' && <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>}
                             <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>
                             <td className="col-act">
                               <div className="row-actions">
@@ -552,8 +584,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             </td>
                           </tr>
                           <tr>
-                            <td colSpan={5} style={{ background: 'var(--panel)' }}>
-                              <AuthoritiesEditor value={editTermAuthorities} onChange={setEditTermAuthorities} sources={sources} />
+                            <td colSpan={vocab.kind === 'relation' ? 5 : 4} style={{ background: 'var(--panel)' }}>
+                              <CustomFieldsEditor fields={termFields} value={editTermMetadata} onChange={setEditTermMetadata} />
                             </td>
                           </tr>
                         </Fragment>
@@ -562,17 +594,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
                           <td style={{ maxWidth: 220 }}>
                             {getLabel(t, '—')}
-                            {readAuthorities(t.metadata_).length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                                {readAuthorities(t.metadata_).map(a => (
-                                  <span key={`${a.source}:${a.external_id}`} className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 4px' }}>
-                                    {a.source}:{a.external_id}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                            <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
-                          <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>}
                           <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
                           <td className="col-act">
                             <div className="row-actions">

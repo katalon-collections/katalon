@@ -24,10 +24,10 @@ export const MOCK_FIELDS: FieldDefinition[] = [
 ]
 
 export const MOCK_VOCABS: Vocabulary[] = [
-  { id: 'v1', name: 'IconClass',             is_hierarchical: true },
-  { id: 'v2', name: 'GND – Personen',        is_hierarchical: false },
-  { id: 'v3', name: 'photo_medium (lokal)',  is_hierarchical: false },
-  { id: 'v4', name: 'GeoNames – Orte',       is_hierarchical: true },
+  { id: 'v1', name: 'IconClass',             is_hierarchical: true, kind: 'term' },
+  { id: 'v2', name: 'GND – Personen',        is_hierarchical: false, kind: 'term' },
+  { id: 'v3', name: 'photo_medium (lokal)',  is_hierarchical: false, kind: 'term' },
+  { id: 'v4', name: 'GeoNames – Orte',       is_hierarchical: true, kind: 'term' },
 ]
 
 export const MOCK_TERMS: VocabularyTerm[] = [

@@ -197,6 +197,31 @@ async def validate_metadata(
                     errors.append(target_err)
             continue
 
+        if record_type == "vocabulary_term":
+            items = (
+                value
+                if field.is_repeatable and isinstance(value, list)
+                else ([] if field.is_repeatable else [value])
+            )
+            for item in items:
+                if field.field_type == "text" and not isinstance(item, str):
+                    errors.append(f"Feld '{field.name}' muss Text enthalten.")
+                elif field.field_type == "number" and (
+                    not isinstance(item, (int, float)) or isinstance(item, bool)
+                ):
+                    errors.append(f"Feld '{field.name}' muss eine Zahl enthalten.")
+                elif field.field_type == "boolean" and not isinstance(item, bool):
+                    errors.append(f"Feld '{field.name}' muss einen Boolean enthalten.")
+                elif field.field_type == "authority":
+                    if not isinstance(item, dict) or not item.get("external_id"):
+                        errors.append(
+                            f"Feld '{field.name}' muss einen gültigen Authority-Eintrag enthalten."
+                        )
+                    elif item.get("source") != field.settings.get("source"):
+                        errors.append(
+                            f"Feld '{field.name}' verwendet die falsche Authority-Quelle."
+                        )
+
         if field.is_repeatable:
             if not isinstance(value, list):
                 errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")

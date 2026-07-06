@@ -21,7 +21,6 @@ class ImportTerm:
     label: dict[str, str]
     inverse_label: dict[str, str]
     parent_term: str | None
-    external_id: str | None
     row: int | None
 
 
@@ -61,8 +60,6 @@ def _merge_term(
     existing.label.update(item.label)
     if item.inverse_label:
         existing.inverse_label.update(item.inverse_label)
-    if item.external_id:
-        existing.external_id = item.external_id
     if item.parent_term and not existing.parent_term:
         existing.parent_term = item.parent_term
     if item.parent_term and existing.parent_term and item.parent_term != existing.parent_term:
@@ -100,7 +97,6 @@ def parse_csv_terms(
         row_values = {_norm(k): _norm(v) for k, v in row.items() if k}
         term = ""
         parent_term = None
-        external_id = None
         label: dict[str, str] = {}
         inverse_label: dict[str, str] = {}
 
@@ -112,8 +108,6 @@ def parse_csv_terms(
                 term = source_val
             elif target_field == "parent_term":
                 parent_term = source_val
-            elif target_field == "external_id":
-                external_id = source_val
             elif target_field.startswith("label:"):
                 lang = target_field.split(":", 1)[1].strip()
                 if lang:
@@ -134,7 +128,6 @@ def parse_csv_terms(
                 label=label,
                 inverse_label=inverse_label,
                 parent_term=parent_term,
-                external_id=external_id,
                 row=i,
             ),
             errors,
@@ -179,7 +172,6 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
             label = {DEFAULT_LABEL_LANGUAGE: _norm(raw_label)}
 
         this_parent = _norm(str(node.get("parent_term", ""))) or parent_term
-        external_id = _norm(str(node.get("external_id", ""))) or None
         raw_inverse = node.get("inverse_label", {})
         inverse_label: dict[str, str] = {}
         if isinstance(raw_inverse, dict):
@@ -193,7 +185,6 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
                 label=label,
                 inverse_label=inverse_label,
                 parent_term=this_parent,
-                external_id=external_id,
                 row=None,
             ),
             errors,
@@ -214,24 +205,12 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
     return list(terms.values()), errors
 
 
-def _add_authority(term_model: VocabularyTerm, source: str, external_id: str) -> None:
-    """Attach a normdata/authority ref to a term's metadata, deduped by source+id."""
-    meta = dict(term_model.metadata_ or {})
-    authorities = list(meta.get("authorities") or [])
-    if any(a.get("source") == source and a.get("external_id") == external_id for a in authorities):
-        return
-    authorities.append({"source": source, "external_id": external_id, "label": ""})
-    meta["authorities"] = authorities
-    term_model.metadata_ = meta
-
-
 async def import_vocabulary_terms(
     db: AsyncSession,
     vocab_id: uuid.UUID,
     terms: list[ImportTerm],
     strategy: str,
     dry_run: bool,
-    authority_source: str | None = None,
 ) -> dict[str, Any]:
     result = await db.execute(
         select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id)
@@ -295,8 +274,6 @@ async def import_vocabulary_terms(
             term_model.label = item.label
         if item.inverse_label:
             term_model.inverse_label = item.inverse_label
-        if item.external_id and authority_source:
-            _add_authority(term_model, authority_source, item.external_id)
         touched[item.term] = term_model
     await db.flush()
 

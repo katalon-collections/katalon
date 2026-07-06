@@ -9,13 +9,14 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import or_, select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import FieldDefinition
+from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
+from katalon.services import authority_service
 from katalon.services.subtype_service import ensure_subtype_exists
 
-
-SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure", "vocabulary_term"}
 PROCEDURE_TYPES = {"loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession"}
+VOCABULARY_TERM_FIELD_TYPES = {"text", "number", "boolean", "authority"}
 
 
 def _validate_schema_target_type(target_type: str) -> None:
@@ -24,11 +25,63 @@ def _validate_schema_target_type(target_type: str) -> None:
 
 
 async def _ensure_schema_subtype_exists(db: DBDep, target_type: str, subtype: str | None) -> None:
+    if target_type == "vocabulary_term":
+        if not subtype:
+            raise HTTPException(status_code=422, detail="Vokabular ist erforderlich.")
+        try:
+            vocab_id = uuid.UUID(subtype)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Ungültige Vokabular-ID.") from exc
+        if not await db.get(Vocabulary, vocab_id):
+            raise HTTPException(status_code=422, detail="Vokabular nicht gefunden.")
+        return
     if target_type == "procedure":
         if subtype is not None and subtype not in PROCEDURE_TYPES:
             raise HTTPException(status_code=422, detail=f"Ungültiger Vorgangstyp '{subtype}'.")
         return
     await ensure_subtype_exists(db, target_type, subtype)
+
+
+async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> None:
+    if (
+        data.target_type == "vocabulary_term"
+        and data.field_type not in VOCABULARY_TERM_FIELD_TYPES
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Dieser Feldtyp ist für Vokabularterme nicht erlaubt.",
+        )
+
+    if data.field_type == "authority":
+        source = data.settings.get("source")
+        db_sources = list((await db.execute(select(AuthoritySource))).scalars().all())
+        enabled = (
+            {item.id for item in db_sources if item.is_enabled}
+            if db_sources
+            else set(authority_service.list_sources())
+        )
+        if source not in enabled:
+            raise HTTPException(
+                status_code=422,
+                detail="Unbekannte oder deaktivierte Authority-Quelle.",
+            )
+
+    vocab_id = data.settings.get("vocabulary_id")
+    expected_kind = "term"
+    if data.field_type == "relation":
+        vocab_id = data.settings.get("relation_type_vocab")
+        expected_kind = "relation"
+    if not vocab_id:
+        return
+    try:
+        vocab = await db.get(Vocabulary, uuid.UUID(str(vocab_id)))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Ungültige Vokabular-ID.") from exc
+    if not vocab or vocab.kind != expected_kind:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Vokabular muss vom Typ '{expected_kind}' sein.",
+        )
 
 
 def _fd_read(f: FieldDefinition, children: list[FieldDefinitionRead] | None = None) -> FieldDefinitionRead:
@@ -42,6 +95,8 @@ router = APIRouter(prefix="/schema", tags=["schema"])
 
 def _enqueue_reindex(target_type: str) -> None:
     """Fire-and-forget: enqueue a type-specific ES reindex after schema changes."""
+    if target_type == "vocabulary_term":
+        return
     try:
         from katalon.workers.index_tasks import bulk_reindex_type_task
         bulk_reindex_type_task.delay(target_type)
@@ -138,6 +193,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
         await _validate_parent(db, data.parent_id, data.field_type)
     else:
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    await _validate_field_settings(db, data)
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     await db.flush()
@@ -156,6 +212,7 @@ async def update_field(
         await _validate_parent(db, data.parent_id, data.field_type)
     else:
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    await _validate_field_settings(db, data)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -252,8 +309,8 @@ async def import_schema(
     existing_result = await db.execute(
         select(FieldDefinition).where(FieldDefinition.target_type == target_type)
     )
-    existing_map: dict[str, FieldDefinition] = {
-        f.name: f for f in existing_result.scalars().all()
+    existing_map: dict[tuple[str | None, str], FieldDefinition] = {
+        (f.target_subtype, f.name): f for f in existing_result.scalars().all()
     }
 
     created = 0
@@ -282,10 +339,12 @@ async def import_schema(
             sort_order=raw.get("sort_order", idx),
             settings=raw.get("settings", {}),
         )
-        await ensure_subtype_exists(db, target_type, field_data.target_subtype)
+        await _ensure_schema_subtype_exists(db, target_type, field_data.target_subtype)
+        await _validate_field_settings(db, field_data)
 
-        if name in existing_map:
-            existing = existing_map[name]
+        key = (field_data.target_subtype, name)
+        if key in existing_map:
+            existing = existing_map[key]
             if not overwrite:
                 skipped += 1
                 result_fields.append(existing)

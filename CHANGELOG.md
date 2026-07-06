@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-06
+
+### Added
+- Vokabularterme nutzen jetzt die bestehende Schema-Engine für frei konfigurierbare Text-, Zahlen-, Boolean- und Authority-Felder.
+- Vokabulare werden beim Anlegen unveränderlich als Term- oder Relationsvokabular klassifiziert; Schemafelder bieten nur passende Vokabulare an.
+
+### Changed
+- Normdaten an Vokabulartermen sind keine fest eingebaute Sonderstruktur mehr, sondern normale konfigurierte Authority-Felder.
+- Vokabular-Felddefinitionen verwenden die stabile Vocabulary-UUID als Subtyp.
+- Der spezielle Authority-CSV-Import wurde entfernt; normaler Term-, Label- und Hierarchieimport bleibt erhalten.
+
+### Fixed
+- Term-Metadaten werden serverseitig gegen Feldtyp, Pflichtstatus, Wiederholbarkeit und konfigurierte Authority-Quelle validiert.
+- Bestehende Relationsvokabulare und das Systemvokabular `relation_types` werden bei der Migration korrekt klassifiziert.
+
 ## [0.4.1] - 2026-07-06
 
 ### Fixed

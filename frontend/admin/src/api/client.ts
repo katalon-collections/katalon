@@ -307,7 +307,7 @@ export const vocabularies = {
   importTerms: async (
     vocabId: string,
     file: File,
-    opts: { dryRun?: boolean; strategy?: 'append' | 'replace'; mapping?: Record<string, string>; authoritySource?: string } = {},
+    opts: { dryRun?: boolean; strategy?: 'append' | 'replace'; mapping?: Record<string, string> } = {},
   ): Promise<{ strategy: string; dry_run: boolean; created: number; updated: number; deleted: number; errors: { row: number | null; message: string }[] }> => {
     const formData = new FormData()
     formData.append('file', file)
@@ -317,7 +317,6 @@ export const vocabularies = {
     const qs = new URLSearchParams()
     qs.set('dry_run', String(opts.dryRun ?? true))
     qs.set('strategy', opts.strategy ?? 'append')
-    if (opts.authoritySource) qs.set('authority_source', opts.authoritySource)
     const res = await authorizedFetch(`/v1/vocabularies/${vocabId}/import?${qs}`, { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
-import type { SchemaImportResult } from '../../api/client'
+import { authority, metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
+import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
@@ -11,9 +11,11 @@ const TYPES = [
   { id: 'place',       label: 'Orte',        key: 'place' },
   { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
   { id: 'procedure',   label: 'Vorgänge',    key: 'procedure' },
+  { id: 'vocabulary_term', label: 'Vokabulare', key: 'vocabulary_term' },
 ]
 
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
+const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
   boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
@@ -37,15 +39,6 @@ type SubFieldFormState = {
   vocabulary_id: string
   relation_target_type: string
 }
-
-const AUTHORITY_SOURCES = [
-  { id: 'gnd',       label: 'GND (Gemeinsame Normdatei)' },
-  { id: 'wikidata',  label: 'Wikidata' },
-  { id: 'viaf',      label: 'VIAF' },
-  { id: 'geonames',  label: 'Geonames' },
-  { id: 'tgn',       label: 'Getty TGN' },
-  { id: 'iconclass', label: 'ICONCLASS' },
-]
 
 const EXPORT_FORMATS = [
   { id: 'oai_dc', label: 'OAI DC', enabled: true },
@@ -150,6 +143,7 @@ interface FieldDetailProps {
   saving: boolean
   error: string | null
   showSubtype: boolean
+  authoritySources: AuthoritySource[]
   onChange: (form: FieldFormState) => void
   onSave: () => void
   onDelete: () => void
@@ -262,7 +256,7 @@ function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | n
   )
 }
 
-function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
 
   // Sub-field editing state (only relevant when form.field_type === 'group')
@@ -377,7 +371,16 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
     schema.list(form.relation_target_type).then(setTargetTypeFields).catch(() => setTargetTypeFields([]))
   }, [form.field_type, form.relation_target_type])
 
-  const aiEligible = ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
+  const isVocabularyTerm = form.target_type === 'vocabulary_term'
+  const fieldTypes = isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES
+  const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
+  useEffect(() => {
+    if (form.field_type !== 'authority') return
+    const enabled = authoritySources.filter(source => source.is_enabled)
+    if (!enabled.some(source => source.id === form.authority_source) && enabled[0]) {
+      onChange({ ...form, authority_source: enabled[0].id })
+    }
+  }, [authoritySources, form, onChange])
 
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
@@ -417,7 +420,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <div className="field">
             <div className="lbl">Feldtyp</div>
             <select className="fld" value={form.field_type} onChange={e => set('field_type', e.target.value)}>
-              {FIELD_TYPES.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
+              {fieldTypes.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
             </select>
           </div>
         </div>
@@ -446,22 +449,26 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <input type="checkbox" className="ck" checked={form.is_repeatable} onChange={e => set('is_repeatable', e.target.checked)} />
               <span style={{ fontSize: 13 }}>Wiederholbar</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>In Suche einbeziehen</span>
-            </label>
+            {!isVocabularyTerm && (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Suche einbeziehen</span>
+                </label>
+              </>
+            )}
           </div>
         </div>
         {form.field_type === 'text' && (
@@ -476,7 +483,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <div className="field">
             <div className="lbl">Normdaten-Quelle</div>
             <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
-              {AUTHORITY_SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              {authoritySources.filter(s => s.is_enabled).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
         )}
@@ -488,11 +495,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             </div>
             <select className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
               <option value="">— Vokabular wählen —</option>
-              {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
         )}
-        {['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
+        {!isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
           <div className="field">
             <div className="lbl">Standardwert <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
             {form.field_type === 'vocab' ? (
@@ -508,10 +515,12 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             )}
           </div>
         )}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
-          <span style={{ fontSize: 13 }}>Feld sperren (nur durch Admins änderbar)</span>
-        </label>
+        {!isVocabularyTerm && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
+            <span style={{ fontSize: 13 }}>Feld sperren (nur durch Admins änderbar)</span>
+          </label>
+        )}
         {aiEligible && (
           <div style={{ marginBottom: 16, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--panel)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
@@ -583,7 +592,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <div className="lbl">Relationstyp-Vokabular <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — Dropdown in Erfassungsmaske)</span></div>
               <select className="fld" value={form.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
                 <option value="">— Vokabular wählen —</option>
-                {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
             {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
@@ -609,7 +618,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             )}
           </>
         )}
-        <ExportMappingPanel fieldId={fieldId} fieldType={form.field_type} isNew={isNew} />
+        {!isVocabularyTerm && <ExportMappingPanel fieldId={fieldId} fieldType={form.field_type} isNew={isNew} />}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
             {saving ? 'Speichert…' : 'Speichern'}
@@ -757,7 +766,7 @@ function SubFieldFormPanel({ sf, allVocabs, nameManual, saving, error, onChange,
           <div className="lbl">Vokabular</div>
           <select className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
             <option value="">— Vokabular wählen —</option>
-            {allVocabs.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         </div>
       )}
@@ -886,6 +895,7 @@ export function ScreenSchema() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
 
   const activeFieldIdRef = useRef<string | null>(null)
   activeFieldIdRef.current = activeFieldId
@@ -893,7 +903,17 @@ export function ScreenSchema() {
   const hasSubtypes = subtypesList.length > 0
 
   useEffect(() => {
-    subtypes.list(activeType)
+    const request = activeType === 'vocabulary_term'
+      ? vocabularies.list().then(list => list.map(v => ({
+          id: v.id,
+          name: v.id,
+          label: { de: v.name },
+          primary_type: 'vocabulary_term',
+          sort_order: 0,
+          is_default: false,
+        })))
+      : subtypes.list(activeType)
+    request
       .then(list => {
         setSubtypesList(list)
         if (activeSubtype && !list.find(s => s.name === activeSubtype)) {
@@ -902,6 +922,10 @@ export function ScreenSchema() {
       })
       .catch(() => setSubtypesList([]))
   }, [activeType])
+
+  useEffect(() => {
+    authority.list().then(setAuthoritySources).catch(() => setAuthoritySources([]))
+  }, [])
 
   const loadFields = useCallback(() => {
     setLoading(true)
@@ -1054,7 +1078,7 @@ export function ScreenSchema() {
         <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ/Subtyp</div></div>
         <div className="right">
           <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
-          <button className="btn pri" onClick={openNew}><Plus size={13} /> Neues Feld</button>
+          <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> Neues Feld</button>
         </div>
       </div>
 
@@ -1076,7 +1100,7 @@ export function ScreenSchema() {
             <div style={{ padding: '14px 12px 6px', fontFamily: "'IBM Plex Mono',monospace", fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-4)', fontWeight: 500 }}>
               Subtypen
             </div>
-            {[{ id: '', name: '', label: { de: 'Alle / Global' } }, ...subtypesList].map(s => (
+            {(activeType === 'vocabulary_term' ? subtypesList : [{ id: '', name: '', label: { de: 'Alle / Global' } }, ...subtypesList]).map(s => (
               <button
                 key={s.id}
                 className={`panel-it${activeSubtype === s.name ? ' active' : ''}`}
@@ -1098,7 +1122,8 @@ export function ScreenSchema() {
               isNew={isNew}
               saving={saving}
               error={saveError}
-              showSubtype={hasSubtypes}
+              showSubtype={hasSubtypes && activeType !== 'vocabulary_term'}
+              authoritySources={authoritySources}
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}

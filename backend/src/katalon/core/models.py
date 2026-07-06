@@ -237,6 +237,7 @@ class Vocabulary(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     is_hierarchical: Mapped[bool] = mapped_column(Boolean, default=False)
+    kind: Mapped[str] = mapped_column(String(16), default="term", server_default="term")
 
     terms: Mapped[list["VocabularyTerm"]] = relationship(back_populates="vocabulary")
 
@@ -251,8 +252,7 @@ class VocabularyTerm(Base):
     term: Mapped[str] = mapped_column(String(256))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
     inverse_label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
-    # Free-form term metadata; holds authority/normdata refs under "authorities":
-    # [{"source": "gnd", "external_id": "...", "label": "..."}]
+    # Values for vocabulary_term field definitions.
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("vocabulary_terms.id", ondelete="SET NULL"), nullable=True

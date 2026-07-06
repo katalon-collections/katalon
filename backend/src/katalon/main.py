@@ -182,9 +182,11 @@ async def _ensure_relation_types_vocab() -> None:
         result = await db.execute(select(Vocabulary).where(Vocabulary.name == "relation_types"))
         vocab = result.scalar_one_or_none()
         if vocab is None:
-            vocab = Vocabulary(name="relation_types", is_hierarchical=False)
+            vocab = Vocabulary(name="relation_types", is_hierarchical=False, kind="relation")
             db.add(vocab)
             await db.flush()
+        elif vocab.kind != "relation":
+            vocab.kind = "relation"
         await sync_relation_type_terms(db, vocab)
         await db.commit()
 
