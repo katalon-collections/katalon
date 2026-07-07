@@ -2,13 +2,25 @@ from __future__ import annotations
 
 import httpx
 
+from katalon.config import settings
+
 from .authority import AuthorityHit, AuthoritySource
 
 
 class WikidataAdapter(AuthoritySource):
     source_id = "wikidata"
 
-    _headers = {"User-Agent": "Katalon/1.0 (https://github.com/your-org/katalon; contact@example.org) httpx"}
+    @staticmethod
+    def _user_agent() -> str:
+        if settings.wikidata_user_agent.strip():
+            return settings.wikidata_user_agent.strip()
+        base_url = settings.katalon_base_url.strip() or "https://github.com/karkraeg/Katalon"
+        contact = settings.oai_admin_email.strip() or settings.default_admin_email.strip()
+        return f"Katalon/1.0 ({base_url}; {contact}) httpx"
+
+    @property
+    def _headers(self) -> dict[str, str]:
+        return {"User-Agent": self._user_agent()}
 
     async def search(self, query: str, limit: int = 10, language: str = "de") -> list[AuthorityHit]:
         async with httpx.AsyncClient(timeout=10, headers=self._headers) as client:

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     es_index_name: str = "katalon_records"
 
     geonames_username: str = "demo"
+    wikidata_user_agent: str = ""
 
     dnb_urn_enabled: bool = False
     dnb_urn_api_url: str = "https://api.nbn-resolving.org/v2/"

@@ -190,15 +190,14 @@ Das ist ~0,5 Tage Backend + ~0,5 Tage Frontend, setzt aber die Registry-Umstrukt
 
 ---
 
-## Warum `/v1/oai` statt `/oai`?
+## Warum `/oai` statt `/v1/oai`?
 
-Der OAI-Router wird in `main.py` wie alle anderen Router mit `prefix="/v1"` eingehängt. OAI-PMH kennt keine Protokoll-Versionierung, daher ist `/v1` semantisch unpassend — er ist nur ein Implementierungsdetail.
+OAI-PMH ist ein Protokoll-Endpunkt, kein versionierter REST-Endpoint. Darum hängt Katalon den OAI-Router direkt unter `/oai` ein.
 
-**In Produktion:** nginx bildet `https://example.org/oai` auf `/v1/oai` ab (`location = /oai`). Harvester sollten die kurze URL ohne `/v1` verwenden.
+Harvester sollten immer die kurze URL verwenden:
 
-**Migration:** Wenn der OAI-Endpoint ohne `/v1` direkt am FastAPI-App eingehängt werden soll:
-```python
-# main.py: statt prefix="/v1"
-app.include_router(oai.router, prefix="")
+```text
+https://example.org/oai
 ```
-Das ist ein Breaking Change, sobald Harvester die `/v1/oai`-URL gespeichert haben.
+
+Die übrige REST API bleibt unter `/v1`.

@@ -180,6 +180,20 @@ async def test_viaf_fetch_404_returns_none() -> None:
 # ── Wikidata ──────────────────────────────────────────────────────────────────
 
 
+def test_wikidata_user_agent_uses_explicit_setting(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("katalon.integrations.wikidata_adapter.settings.wikidata_user_agent", "KatalonTest/1.0 (https://example.org; admin@example.org)")
+
+    assert WikidataAdapter()._headers["User-Agent"] == "KatalonTest/1.0 (https://example.org; admin@example.org)"
+
+
+def test_wikidata_user_agent_falls_back_to_instance_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("katalon.integrations.wikidata_adapter.settings.wikidata_user_agent", "")
+    monkeypatch.setattr("katalon.integrations.wikidata_adapter.settings.katalon_base_url", "https://katalon.example.org")
+    monkeypatch.setattr("katalon.integrations.wikidata_adapter.settings.oai_admin_email", "admin@example.org")
+
+    assert WikidataAdapter()._headers["User-Agent"] == "Katalon/1.0 (https://katalon.example.org; admin@example.org) httpx"
+
+
 @pytest.mark.asyncio
 async def test_wikidata_search_parses_items() -> None:
     data = {"search": [

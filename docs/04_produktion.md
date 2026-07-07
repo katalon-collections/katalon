@@ -17,7 +17,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `KATALON_BASE_URL`, `CORS_ORIGINS`
 - [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
 - [ ] `docker-compose.prod.yml` VITE-Build-Argumente auf eigene URLs gesetzt
-- [ ] Wikidata-Adapter: `User-Agent` in `backend/src/katalon/integrations/wikidata_adapter.py` auf eigene Instanz-URL und Kontaktadresse aktualisieren (Wikidata-Policy erfordert identifizierbaren User-Agent)
+- [ ] Wikidata-Adapter: `WIKIDATA_USER_AGENT` setzen oder `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL` vollständig pflegen (Wikidata-Policy erfordert identifizierbaren User-Agent)
 - [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
 - [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
 - [ ] Nach erstem Start: `alembic upgrade head` ausgeführt
@@ -50,6 +50,7 @@ Mindestens diese Werte anpassen:
 | `DEFAULT_ADMIN_PASSWORD` | Fallback-Passwort für lokale Entwicklung ohne `KATALON_BASE_URL` |
 | `CORS_ORIGINS` | Komma-separierte Liste erlaubter Frontends |
 | `OAI_ADMIN_EMAIL` | Erscheint im OAI-PMH Identify-Response |
+| `WIKIDATA_USER_AGENT` | Optionaler User-Agent für Wikidata. Leer = automatisch aus `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL`. |
 
 ### Instanzspezifische Docker-Compose-Anpassungen
 
@@ -312,13 +313,13 @@ docker compose logs nginx      # Zugriffslog
 
 ```bash
 # Identify
-curl "https://deine-domain.de/v1/oai?verb=Identify"
+curl "https://deine-domain.de/oai?verb=Identify"
 
 # Alle Sets
-curl "https://deine-domain.de/v1/oai?verb=ListSets"
+curl "https://deine-domain.de/oai?verb=ListSets"
 
 # Alle Records (paginiert)
-curl "https://deine-domain.de/v1/oai?verb=ListRecords&metadataPrefix=oai_dc"
+curl "https://deine-domain.de/oai?verb=ListRecords&metadataPrefix=oai_dc"
 ```
 
 ## Ressourcen-Empfehlungen

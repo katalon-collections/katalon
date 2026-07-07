@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-07
+
+### Added
+- Wikidata-User-Agent kann per `WIKIDATA_USER_AGENT` konfiguriert werden.
+
+### Changed
+- OAI-PMH ist als Protokoll-Endpunkt direkt unter `/oai` erreichbar statt unter `/v1/oai`.
+- Dokumentation verweist auf die ausgelagerte Starlight-Dokumentationssite.
+
 ## [0.5.3] - 2026-07-07
 
 ### Changed

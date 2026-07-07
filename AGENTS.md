@@ -16,7 +16,7 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 - `KONZEPT.md` – vollständiges Konzeptdokument mit Datenmodell
 - `.agents/IMPLEMENTIERUNGSPLAN.md` – detaillierter Phasenplan
 - `.agents/DEV.md` – Entwickler-Setup und Workflows
-- `docs/` – technische Dokumentation (Architektur, Datenmodell, OAI, Produktion, Upgrading …)
+- `docs/` – Übergangskopie der technischen Dokumentation; primär gepflegt in `karkraeg/katalon-docs`
 - `e2e/` – Playwright-E2E-Tests
 
 ## Fixierte Architekturentscheidungen

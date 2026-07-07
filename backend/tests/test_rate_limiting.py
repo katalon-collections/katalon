@@ -34,10 +34,36 @@ async def test_oai_rate_limit_allows_under_limit() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             for _ in range(3):
-                r = await client.get("/v1/oai?verb=Identify")
+                r = await client.get("/oai?verb=Identify")
                 assert r.status_code == 200
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_oai_is_available_without_api_version_prefix() -> None:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=result)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/oai?verb=Identify")
+            assert r.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_oai_is_not_versioned_rest_endpoint() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/v1/oai?verb=Identify")
+        assert r.status_code == 404
 
 
 @pytest.mark.asyncio

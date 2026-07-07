@@ -159,7 +159,7 @@ Wichtige Endpunkte:
 | GET            | `/v1/search`                   | Volltext- und Facettensuche                                |
 | POST           | `/v1/pids/urn/register`        | URN via DNB-API registrieren (PID-Feld)                    |
 | GET            | `/v1/authorities/search`       | Normdaten-Suche                                            |
-| GET            | `/v1/oai`                      | OAI-PMH Endpoint                                           |
+| GET            | `/oai`                         | OAI-PMH Endpoint                                           |
 | GET            | `/v1/portal/config`            | Portal-Konfiguration                                       |
 | POST           | `/v1/portal/logo`              | Logo hochladen                                             |
 | GET            | `/v1/audit`                    | Audit-Log abrufen                                          |
@@ -245,16 +245,13 @@ Unterstützt flache Listen oder verschachtelte `children`:
 
 ## Dokumentation
 
-| Dokument                                                             | Inhalt                                                 |
-|----------------------------------------------------------------------|--------------------------------------------------------|
-| [`KONZEPT.md`](KONZEPT.md)                                           | Vollständiges Konzept mit Datenmodell und User-Stories |
-| [`docs/00_architektur.md`](docs/00_architektur.md)                   | Systemarchitektur, Service-Details, Auth-Flow          |
-| [`docs/01_datenmodell.md`](docs/01_datenmodell.md)                   | Datenbankschema, ORM-Modelle                           |
-| [`docs/02_schema_verwaltung.md`](docs/02_schema_verwaltung.md)       | Schema-Engine, Feldtypen, Import-Format                |
-| [`docs/03_csv_import.md`](docs/03_csv_import.md)                     | Vokabular-Import, CSV-Mapping                          |
-| [`docs/04_produktion.md`](docs/04_produktion.md)                     | Produktions-Deployment, TLS, nginx                     |
-| [`docs/05_oai_serialisierungen.md`](docs/05_oai_serialisierungen.md) | OAI-PMH Formate und Mappings                           |
-| [`docs/06_anpassungen.md`](docs/06_anpassungen.md)                   | Theme-System, Custom CSS                               |
+Die Anwender- und Betriebsdokumentation liegt im separaten Docs-Repo:
+
+```text
+https://github.com/karkraeg/katalon-docs
+```
+
+Die lokale `docs/`-Ablage bleibt vorerst als Übergangskopie im Hauptrepo.
 
 ---
 
