@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-07-07
+
+### Changed
+- Produkt- und Designkontext dokumentieren native Interaktion und sichtbaren Fokus als Accessibility-Grundlage.
+
+### Fixed
+- Portal-Karten, Suchtreffer, Vorschläge und Facetten verwenden native Links oder Buttons statt klickbarer `div`s.
+- Portal und Admin erhalten sichtbare Tastatur-Fokuszustände, Suchlabels, Landmarken und Pagination-Semantik.
+- Admin-Topbar-Suchergebnisse sind per Tastatur als Buttons erreichbar.
+
 ## [0.5.2] - 2026-07-06
 
 ### Fixed

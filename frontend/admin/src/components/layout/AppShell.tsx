@@ -188,7 +188,9 @@ export function AppShell() {
         />
         <BannerBar surface="admin" />
         <ImportStatusBanner currentRoute={route} />
-        {renderScreen()}
+        <main className="screen" id="main-content">
+          {renderScreen()}
+        </main>
       </div>
     </div>
   )

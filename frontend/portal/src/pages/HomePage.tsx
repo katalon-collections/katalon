@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, BASE, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
 
 const DEFAULT_CONFIG: PortalConfig = {
@@ -109,7 +109,7 @@ export function HomePage() {
             </h2>
             <div className="obj-grid">
               {featured.map(obj => (
-                <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
+                <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
                   <div className="thumb">
                     {thumbnails[obj.id] ? (
                       <img src={thumbnails[obj.id]} alt="" loading="lazy" />
@@ -119,7 +119,7 @@ export function HomePage() {
                     <div className="title">{objTitle(obj)}</div>
                     {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </>
@@ -142,7 +142,7 @@ export function HomePage() {
         {!loading && recent.length > 0 && (
           <div className="obj-grid">
             {recent.map(obj => (
-              <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
+              <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
                 <div className="thumb">
                   {thumbnails[obj.id] ? (
                     <img src={thumbnails[obj.id]} alt="" loading="lazy" />
@@ -152,7 +152,7 @@ export function HomePage() {
                   <div className="title">{objTitle(obj)}</div>
                   {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

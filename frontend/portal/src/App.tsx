@@ -77,13 +77,11 @@ function Header() {
     inputRef.current?.blur()
   }
 
-  function goToResult(item: { record_type: string; id: string }) {
-    setShowSuggestions(false)
-    const path = item.record_type === 'entity' ? `/entities/${item.id}`
+  function resultPath(item: { record_type: string; id: string }) {
+    return item.record_type === 'entity' ? `/entities/${item.id}`
       : item.record_type === 'place' ? `/places/${item.id}`
       : item.record_type === 'occurrence' ? `/occurrences/${item.id}`
       : `/objects/${item.id}`
-    navigate(path)
   }
 
   return (
@@ -100,6 +98,9 @@ function Header() {
         <form className="search-bar" onSubmit={submit}>
           <input
             ref={inputRef}
+            aria-label="Sammlung durchsuchen"
+            aria-expanded={showSuggestions}
+            aria-controls="search-suggestions"
             value={q}
             onChange={e => setQ(e.target.value)}
             onFocus={() => { if (suggestions.length) setShowSuggestions(true) }}
@@ -107,7 +108,7 @@ function Header() {
           />
         </form>
         {showSuggestions && (
-          <div className="search-suggestions">
+          <div className="search-suggestions" id="search-suggestions">
             {suggestions.length === 0 && loadingSuggestions && (
               <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Suche…</div>
             )}
@@ -115,14 +116,14 @@ function Header() {
               <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Keine Ergebnisse</div>
             )}
             {suggestions.map(item => (
-              <div key={`${item.record_type}-${item.id}`} className="suggest-item" onClick={() => goToResult(item)}>
+              <Link key={`${item.record_type}-${item.id}`} className="suggest-item" to={resultPath(item)} onClick={() => setShowSuggestions(false)}>
                 <span className="suggest-title">{item.title || item.id}</span>
                 <span className="suggest-badge">{TYPE_LABELS[item.record_type] ?? item.record_type}</span>
-              </div>
+              </Link>
             ))}
-            <div className="suggest-footer" onClick={() => submit()}>
+            <button type="button" className="suggest-footer" onClick={() => submit()}>
               Alle Ergebnisse anzeigen →
-            </div>
+            </button>
           </div>
         )}
       </div>
@@ -172,7 +173,7 @@ function AppInner() {
       </Helmet>
       <BannerBar />
       <Header />
-      <main style={{ flex: 1, width: '100%' }}>
+      <main id="main-content" style={{ flex: 1, width: '100%' }}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />

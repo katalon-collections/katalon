@@ -32,4 +32,4 @@ Professionell, leicht bedienbar, zeitgemäß für Museen und andere GLAM-Institu
 
 ## Accessibility & Inclusion
 
-Admin-Oberfläche braucht solide Accessibility-Grundlagen, ohne formales Konformitätsziel. Öffentliches Portal soll Screenreader unterstützen und technisch auf eine spätere Ausrichtung an WCAG 2.2 AA vorbereitet sein.
+Admin-Oberfläche braucht solide Accessibility-Grundlagen, ohne formales Konformitätsziel. Öffentliches Portal soll Tastatur- und Screenreader-Nutzung unterstützen und technisch auf eine spätere Ausrichtung an WCAG 2.2 AA vorbereitet sein. Primäre Navigation, Suche, Facetten und Trefferlisten müssen native Links oder Buttons verwenden.

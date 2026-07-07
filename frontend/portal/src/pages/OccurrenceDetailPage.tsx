@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { marked } from 'marked'
 import { api, BASE, fetchRecord, type MediaFile, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
@@ -177,7 +177,7 @@ export function OccurrenceDetailPage() {
                   const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
                   const isFrom = rel ? rel.from_id === occurrence.id : true
                   return (
-                    <div key={obj.id} className="obj-card" onClick={() => navigate(`/objects/${obj.id}`)}>
+                    <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
                       <div className="thumb">
                         {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
                       </div>
@@ -190,7 +190,7 @@ export function OccurrenceDetailPage() {
                         )}
                         {obj.idno && <div className="meta">{obj.idno}</div>}
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>

@@ -88,6 +88,9 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNaviga
       <div className="gs" ref={wrapRef} style={{ position: 'relative' }}>
         <Search size={14} />
         <input
+          aria-label="Global suchen"
+          aria-expanded={open}
+          aria-controls="global-search-results"
           placeholder="Global suchen — Objekte, Entitäten, Vokabeln…"
           value={q}
           onChange={e => setQ(e.target.value)}
@@ -97,15 +100,16 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNaviga
         {/* <span className="kbd">⌘K</span> */}
 
         {open && results.length > 0 && (
-          <div style={{
+          <div id="global-search-results" style={{
             position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
             background: '#fff', border: '1px solid var(--border)', borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200, overflow: 'hidden',
           }}>
             {results.map(r => (
-              <div key={r.id}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}
-                onMouseDown={() => handleSelect(r)}
+              <button key={r.id}
+                type="button"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', fontSize: 13, width: '100%', border: 0, background: 'transparent', textAlign: 'left' }}
+                onClick={() => handleSelect(r)}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
@@ -114,7 +118,7 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNaviga
                 </span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                 {r.status && <span style={{ fontSize: 11, color: 'var(--fg-3)', flexShrink: 0 }}>{r.status}</span>}
-              </div>
+              </button>
             ))}
           </div>
         )}

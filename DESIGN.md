@@ -168,6 +168,10 @@ System bleibt flach. Flächen unterscheiden sich durch Hintergrundton und 1px-Gr
 
 Dunkle Sidebar strukturiert Hauptbereiche mit kompakten Gruppenlabels. Aktiver Eintrag nutzt stärkeren Kontrast und Sammlungsblau. Mobil wird Navigation als explizit steuerbarer Drawer angeboten; aktuelle Seite bleibt im Kopfbereich erkennbar.
 
+### Interaction & Accessibility
+
+Interaktive Karten, Suchtreffer, Vorschläge und Facetten verwenden native Links oder Buttons. Fokus bleibt sichtbar und nutzt Sammlungsblau mit ausreichendem Abstand. Hover darf Zustand ergänzen, aber nie der einzige Zugang zu Aktion oder Information sein.
+
 ### Data Tables
 
 Tabellen bleiben auf breiten Flächen kompakt. Mobil dürfen sie horizontal scrollen, wenn Spaltenvergleich wesentlich ist; einfache Listen wechseln zu gestapelten Zeilen mit sichtbaren Primäraktionen.

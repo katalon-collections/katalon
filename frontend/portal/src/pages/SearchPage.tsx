@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
 
@@ -129,23 +129,27 @@ export function SearchPage() {
     return (
       <div style={{ marginBottom: 20 }}>
         <h3>{label}</h3>
-        <div
+        <button
+          type="button"
           className="facet-item"
           onClick={() => onSelect('')}
-          style={{ cursor: 'pointer', fontWeight: !active ? 600 : undefined }}
+          aria-pressed={!active}
+          style={{ fontWeight: !active ? 600 : undefined }}
         >
           <span>Alle</span>
-        </div>
+        </button>
         {buckets.map(b => (
-          <div
+          <button
+            type="button"
             key={b.value}
             className="facet-item"
             onClick={() => onSelect(b.value)}
-            style={{ cursor: 'pointer', fontWeight: active === b.value ? 600 : undefined }}
+            aria-pressed={active === b.value}
+            style={{ fontWeight: active === b.value ? 600 : undefined }}
           >
             <span>{TYPE_LABELS[b.value] ?? b.value}</span>
             <span className="ct">{b.count}</span>
-          </div>
+          </button>
         ))}
       </div>
     )
@@ -155,6 +159,7 @@ export function SearchPage() {
     <div className="container page">
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input
+          aria-label="Suche verfeinern"
           className="hero-search"
           style={{ flex: 1, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 14px', fontSize: 14, outline: 'none', color: 'var(--fg)' }}
           value={localQ}
@@ -232,7 +237,7 @@ export function SearchPage() {
               : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
               : `/objects/${r.id}`
             return (
-              <div key={r.id} className="result-row" onClick={() => { saveLastSearch(window.location.pathname + window.location.search); navigate(path) }}>
+              <Link key={r.id} className="result-row" to={path} onClick={() => saveLastSearch(window.location.pathname + window.location.search)}>
                 <div className="thumb-sm">
                   {thumbnails[r.id] ? (
                     <img src={thumbnails[r.id]} alt="" loading="lazy" />
@@ -244,14 +249,14 @@ export function SearchPage() {
                     {TYPE_LABELS[r.record_type] ?? r.record_type} · {r.status ?? '—'}
                   </div>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
       </div>
 
       {totalPages > 1 && (
-        <div className="pagination">
+        <nav className="pagination" aria-label="Suchergebnisseiten">
           {(() => {
             const pages: (number | '...')[] = []
             const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
@@ -266,10 +271,10 @@ export function SearchPage() {
             return withEllipsis.map((n, i) =>
               n === '...'
                 ? <span key={`e${i}`} className="page-ellipsis">…</span>
-                : <button key={n} className={`page-btn${n === page ? ' active' : ''}`} onClick={() => setPage(n as number)}>{n}</button>
+                : <button key={n} className={`page-btn${n === page ? ' active' : ''}`} aria-current={n === page ? 'page' : undefined} onClick={() => setPage(n as number)}>{n}</button>
             )
           })()}
-        </div>
+        </nav>
       )}
     </div>
   )

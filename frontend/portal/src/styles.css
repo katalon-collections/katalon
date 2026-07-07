@@ -1,4 +1,6 @@
 *, *::before, *::after { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; }
+:focus-visible { outline: 3px solid var(--accent, #1e3a8a); outline-offset: 3px; }
 html, body { margin: 0; padding: 0; min-height: 100%; }
 #root { display: flex; flex-direction: column; min-height: 100vh; }
 body {
@@ -67,6 +69,7 @@ input, select, textarea { font-family: inherit; }
   background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb);
   border-radius: 10px; overflow: hidden; cursor: pointer; transition: box-shadow .15s;
 }
+.obj-card, .result-row { color: inherit; text-decoration: none; }
 .obj-card:hover { box-shadow: 0 6px 24px -6px rgba(0,0,0,.12); }
 .obj-card .thumb {
   aspect-ratio: 4/3; background: linear-gradient(135deg, #cfd5e1, #a4afc4);
@@ -84,7 +87,7 @@ input, select, textarea { font-family: inherit; }
 .search-layout { display: grid; grid-template-columns: 240px 1fr; gap: 28px; margin-top: 28px; }
 .facets { background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 16px; align-self: start; }
 .facets h3 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3, #5a6173); font-weight: 600; }
-.facet-item { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 13px; cursor: pointer; }
+.facet-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; border: 0; background: transparent; color: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .facet-item:hover { color: var(--accent, #1e3a8a); }
 .facet-item .ct { font-size: 11px; color: var(--fg-4, #8a92a3); font-family: 'IBM Plex Mono', monospace; }
 .result-list { display: flex; flex-direction: column; gap: 12px; }
@@ -150,6 +153,8 @@ input, select, textarea { font-family: inherit; }
   font-size: 13px;
   cursor: pointer;
   border-bottom: 1px solid var(--border, #e4e6eb);
+  color: inherit;
+  text-decoration: none;
 }
 .suggest-item:last-of-type { border-bottom: 0; }
 .suggest-item:hover { background: var(--accent-50, #eef2fb); }
@@ -165,6 +170,12 @@ input, select, textarea { font-family: inherit; }
   border-radius: 10px;
 }
 .suggest-footer {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
   padding: 8px 14px;
   font-size: 12.5px;
   font-weight: 600;
