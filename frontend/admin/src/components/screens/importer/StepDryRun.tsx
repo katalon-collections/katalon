@@ -12,12 +12,13 @@ interface Props {
   onAutoPublishChange: (v: boolean) => void
   idnoStrategy: string
   onImport: () => void
+  onApplyCluster: (field: string, canonical: string, variants: string[]) => void
   onBack: () => void
 }
 
 export function StepDryRun({
   dryResult, upsertStrategy, onUpsertStrategyChange,
-  autoPublish, onAutoPublishChange, idnoStrategy, onImport, onBack,
+  autoPublish, onAutoPublishChange, idnoStrategy, onImport, onApplyCluster, onBack,
 }: Props) {
   const [page, setPage] = useState(0)
 
@@ -94,6 +95,27 @@ export function StepDryRun({
               }
             </div>
           ))}
+        </div>
+      )}
+
+      {dryResult.vocab_clusters && dryResult.vocab_clusters.some(fc => fc.clusters.length > 0) && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">Mögliche Schreibweisen-Varianten</div>
+          <div className="bd" style={{ display: 'grid', gap: 8 }}>
+            {dryResult.vocab_clusters.flatMap(fc => fc.clusters.map((c, i) => (
+              <div key={`${fc.field}-${i}`} style={{
+                fontSize: 12, border: '1px solid var(--border-soft)', borderRadius: 4,
+                padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+              }}>
+                <span>
+                  <b>{fc.label}</b>: {c.variants.map(v => `"${v}" (${c.counts[v]})`).join(', ')} → <b>„{c.canonical}"</b>
+                </span>
+                <button className="btn sm pri" onClick={() => onApplyCluster(fc.field, c.canonical, c.variants)}>
+                  Zusammenführen
+                </button>
+              </div>
+            )))}
+          </div>
         </div>
       )}
 

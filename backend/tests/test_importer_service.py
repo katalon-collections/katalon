@@ -1,8 +1,10 @@
 import io
+from types import SimpleNamespace
 
 import openpyxl
 
 from katalon.services.importer_service import (
+    _cluster_values,
     apply_mapping,
     detect_delimiter,
     dry_run,
@@ -170,3 +172,42 @@ def test_dry_run_empty_mapping() -> None:
     mapping: dict = {}
     result = dry_run(rows, mapping)
     assert result["errors"][0]["row"] == 2  # row 1 is the header; first data row is row 2
+
+
+def test_cluster_values_groups_typo_variants() -> None:
+    counts = {"Berlin": 5, "berlin": 2, "Brlin": 1, "Hamburg": 3}
+    clusters = _cluster_values(counts)
+    assert len(clusters) == 1
+    cluster = clusters[0]
+    assert cluster["canonical"] == "Berlin"  # most frequent wins
+    assert set(cluster["variants"]) == {"Berlin", "berlin", "Brlin"}
+    assert cluster["counts"] == {"Berlin": 5, "berlin": 2, "Brlin": 1}
+
+
+def test_cluster_values_no_singletons() -> None:
+    counts = {"Berlin": 5, "Hamburg": 3, "Munich": 1}
+    assert _cluster_values(counts) == []
+
+
+def test_cluster_values_respects_max_cluster_size() -> None:
+    counts = {f"aaaaaaaaa{i}": 1 for i in range(20)}
+    clusters = _cluster_values(counts, threshold=0.5, max_cluster_size=4)
+    assert all(len(c["variants"]) <= 4 for c in clusters)
+
+
+def test_dry_run_vocab_clusters_suggests_canonical_value() -> None:
+    rows = [
+        {"place": "Berlin"},
+        {"place": "Berlin"},
+        {"place": "berlin"},
+        {"place": "Brlin"},
+    ]
+    mapping = {"place": {"target": "place", "transforms": []}}
+    field_defs = {
+        "place": SimpleNamespace(field_type="vocab", label={"de": "Ort"}, is_required=False, is_repeatable=False),
+    }
+    result = dry_run(rows, mapping, field_defs)
+    assert "place" in result["vocab_clusters"]
+    cluster = result["vocab_clusters"]["place"][0]
+    assert cluster["canonical"] == "Berlin"
+    assert set(cluster["variants"]) == {"Berlin", "berlin", "Brlin"}

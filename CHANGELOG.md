@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-07-09
+
+### Added
+- Importer: Fuzzy-Clustering für Vokabular-Spalten im Probelauf (Levenshtein-Ähnlichkeit via `rapidfuzz`) erkennt Schreibweisen-Varianten (z. B. `Berlin`/`berlin`/`Brlin`) und schlägt einen kanonischen Wert vor. Bestätigung im UI übernimmt die Variante als `vocab_map`-Transform. (#269)
+
 ## [0.5.5] - 2026-07-09
 
 ### Added

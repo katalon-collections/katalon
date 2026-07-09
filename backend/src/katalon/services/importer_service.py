@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from jinja2.sandbox import SandboxedEnvironment
+from rapidfuzz.distance import Levenshtein
 
 from katalon.services.importer import parse_csv, parse_excel  # noqa: F401
 from katalon.services.importer.formats.csv_format import (
@@ -269,9 +270,9 @@ def _collect_vocab_values(
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
     field_defs: dict[str, Any],
-) -> dict[str, list[str]]:
-    """Return unique raw values (after splits) per vocab-typed mapped field."""
-    result: dict[str, list[str]] = {}
+) -> dict[str, dict[str, int]]:
+    """Return raw values (after splits) with occurrence counts per vocab-typed mapped field."""
+    result: dict[str, dict[str, int]] = {}
     for selector, val in mapping.items():
         if isinstance(val, dict):
             field_name = val.get("target", "")
@@ -283,7 +284,7 @@ def _collect_vocab_values(
         fd = field_defs.get(field_name)
         if not fd or fd.field_type not in ("vocab",):
             continue
-        seen: set[str] = set()
+        counts: dict[str, int] = {}
         for row in rows:
             raw = row.get(selector, "").strip()
             if not raw:
@@ -291,9 +292,49 @@ def _collect_vocab_values(
             parts = apply_transforms(raw, transforms) if transforms else [raw]
             for p in parts:
                 if p:
-                    seen.add(p)
-        result[field_name] = sorted(seen)
+                    counts[p] = counts.get(p, 0) + 1
+        result[field_name] = counts
     return result
+
+
+CLUSTER_SIMILARITY_THRESHOLD = 0.82
+CLUSTER_MAX_SIZE = 10
+
+
+def _cluster_values(
+    value_counts: dict[str, int],
+    threshold: float = CLUSTER_SIMILARITY_THRESHOLD,
+    max_cluster_size: int = CLUSTER_MAX_SIZE,
+) -> list[dict[str, Any]]:
+    """Group near-duplicate values (typos, case/whitespace variants) by normalized Levenshtein similarity.
+
+    Greedy: most frequent unassigned value becomes a cluster's canonical suggestion; nearby
+    values (by similarity of trimmed/lowercased form) join it, capped at max_cluster_size.
+    Singleton clusters are dropped — only real variant groups are returned.
+    """
+    remaining = sorted(value_counts, key=lambda v: (-value_counts[v], v))
+    assigned: set[str] = set()
+    clusters: list[dict[str, Any]] = []
+    for pivot in remaining:
+        if pivot in assigned:
+            continue
+        variants = [pivot]
+        assigned.add(pivot)
+        pivot_norm = pivot.strip().lower()
+        for candidate in remaining:
+            if candidate in assigned or len(variants) >= max_cluster_size:
+                continue
+            cand_norm = candidate.strip().lower()
+            if Levenshtein.normalized_similarity(pivot_norm, cand_norm) >= threshold:
+                variants.append(candidate)
+                assigned.add(candidate)
+        if len(variants) > 1:
+            clusters.append({
+                "canonical": pivot,
+                "variants": variants,
+                "counts": {v: value_counts[v] for v in variants},
+            })
+    return clusters
 
 
 def dry_run(
@@ -374,9 +415,15 @@ def dry_run(
     if field_defs:
         warnings.extend(_validate_types(rows, mapping, field_defs))
 
-    vocab_stats: dict[str, list[str]] = {}
+    vocab_value_counts: dict[str, dict[str, int]] = {}
     if field_defs:
-        vocab_stats = _collect_vocab_values(rows, mapping, field_defs)
+        vocab_value_counts = _collect_vocab_values(rows, mapping, field_defs)
+
+    vocab_clusters: dict[str, list[dict[str, Any]]] = {}
+    for field_name, counts in vocab_value_counts.items():
+        clusters = _cluster_values(counts)
+        if clusters:
+            vocab_clusters[field_name] = clusters
 
     return {
         "total": len(rows),
@@ -385,7 +432,8 @@ def dry_run(
         "warnings": warnings,
         "preview": mapped[:5],
         "has_idno_mapping": has_idno_mapping,
-        "vocab_stats": vocab_stats,
+        "vocab_stats": {name: sorted(counts) for name, counts in vocab_value_counts.items()},
+        "vocab_clusters": vocab_clusters,
     }
 
 

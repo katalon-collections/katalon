@@ -255,6 +255,15 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
 
     dry_result["vocab_warnings"] = vocab_warnings
 
+    # Group fuzzy-clustered vocab variant suggestions by field, with field labels attached
+    vocab_clusters_raw: dict[str, list[dict[str, Any]]] = dry_result.pop("vocab_clusters", {})
+    vocab_clusters = []
+    for field_name, clusters in vocab_clusters_raw.items():
+        fd = field_defs.get(field_name)
+        label = ((fd.label or {}).get("de") or field_name) if fd else field_name
+        vocab_clusters.append({"field": field_name, "label": label, "clusters": clusters})
+    dry_result["vocab_clusters"] = vocab_clusters
+
     return dry_result
 
 

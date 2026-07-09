@@ -35,7 +35,7 @@ export function ScreenImporter() {
     state, needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
-    handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
+    handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
     handleProfileLoaded, handleProfileExport,
   } = useImporterState()
 
@@ -168,6 +168,7 @@ export function ScreenImporter() {
                 onAutoPublishChange={v => dispatch({ type: 'OPTIONS_CHANGED', payload: { autoPublish: v } })}
                 idnoStrategy={state.idnoStrategy}
                 onImport={handleImport}
+                onApplyCluster={applyVocabCluster}
                 onBack={() => dispatch({ type: 'STEP_SET', payload: mappingStep })}
               />
             )}

@@ -536,6 +536,11 @@ export interface DryRunResult {
   warnings: { row: number | null; message: string }[]
   preview: Record<string, unknown>[]
   vocab_warnings?: { field: string; label: string; unique_count: number; new_count: number; high_cardinality: boolean }[]
+  vocab_clusters?: {
+    field: string
+    label: string
+    clusters: { canonical: string; variants: string[]; counts: Record<string, number> }[]
+  }[]
 }
 
 export interface TaskStatus {

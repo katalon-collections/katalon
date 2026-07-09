@@ -192,6 +192,7 @@ export interface ImporterStateAndHandlers {
   handleFile: (file: File) => Promise<void>
   handleXmlRecordXpath: (clarkTag: string) => Promise<void>
   handleDryRun: () => Promise<void>
+  applyVocabCluster: (field: string, canonical: string, variants: string[]) => Promise<void>
   handleImport: () => Promise<void>
   handleProfileLoaded: (profile: ImportProfile) => Promise<void>
   handleProfileExport: () => Promise<void>
@@ -346,6 +347,31 @@ export function useImporterState(): ImporterStateAndHandlers {
     }
   }
 
+  async function applyVocabCluster(field: string, canonical: string, variants: string[]) {
+    if (!state.uploaded) return
+    const nextMapping = { ...state.mapping }
+    for (const [selector, entry] of Object.entries(nextMapping)) {
+      if (entry.target !== field) continue
+      const transforms = entry.transforms ? [...entry.transforms] : []
+      const idx = transforms.findIndex(t => t.type === 'vocab_map')
+      const vocabMap = idx >= 0 ? { ...(transforms[idx].vocab_map ?? {}) } : {}
+      for (const v of variants) {
+        if (v !== canonical) vocabMap[v] = canonical
+      }
+      if (idx >= 0) transforms[idx] = { ...transforms[idx], vocab_map: vocabMap }
+      else transforms.push({ type: 'vocab_map', vocab_map: vocabMap, strict: false })
+      nextMapping[selector] = { ...entry, transforms }
+    }
+    dispatch({ type: 'MAPPING_CHANGED', payload: nextMapping })
+    dispatch({ type: 'DRY_RUN_STARTED' })
+    try {
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, nextMapping, state.subtype)
+      dispatch({ type: 'DRY_RUN_OK', payload: result })
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
   async function handleImport() {
     if (!state.uploaded) return
     try {
@@ -399,7 +425,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     state, needsReupload: state.needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
-    handleFile, handleXmlRecordXpath, handleDryRun, handleImport,
+    handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
     handleProfileLoaded, handleProfileExport,
   }
 }
