@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-07-09
+
+### Added
+- `.agents/knowledge/decisions/importer-fuzzy-vocab-clustering.md` — Decision-Doku zu Issue #269: rapidfuzz + Greedy-Clustering statt k-means, kanonischer Wert = häufigster Cluster-Wert, kein Silent-Merge.
+
 ## [0.5.6] - 2026-07-09
 
 ### Added

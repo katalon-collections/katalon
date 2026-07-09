@@ -10,3 +10,4 @@
 * [Docker-Customization-Strategie](docker-customization-strategy.md) - Volume Mounts + Override-Datei statt Image-Rebuilds
 * [Beta-Release-Scope](beta-release-scope.md) - Zugänglichkeit vor Feature-Vollständigkeit
 * [Knowledge vs. Prozessdokumente](knowledge-vs-prozessdokumente.md) - OKF-Bundle bleibt getrennt von DEV.md/IMPLEMENTIERUNGSPLAN.md/KONZEPT.md/PRODUCT.md/DESIGN.md, beide lazy-geladen
+* [Importer Fuzzy-Vokabular-Clustering](importer-fuzzy-vocab-clustering.md) - rapidfuzz + Greedy-Clustering statt k-means, User bestätigt vor Merge (#269)
