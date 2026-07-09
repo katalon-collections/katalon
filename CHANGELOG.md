@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-07-09
+
+### Added
+- Dev-only OKF-Wissensbasis `.agents/knowledge/` (Decisions, Playbooks, Gotchas, Architecture, Glossary) mit lokalem Static-Site-Generator (`.agents/tools/okf_site.py`, `make knowledge-site`).
+- `.agents/rules/backend.md` und `.agents/rules/frontend.md` — sprachspezifische Coding-Regeln, aus bestehenden Configs/Docs extrahiert.
+- `AGENTS.md`: Lazy-Loading-Verdrahtung für Coding-Rules, Knowledge-Base und lebende Prozess-/Produktdokumente (`IMPLEMENTIERUNGSPLAN.md`, `DEV.md`, `KONZEPT.md`, `PRODUCT.md`, `DESIGN.md`).
+
 ## [0.5.4] - 2026-07-07
 
 ### Added

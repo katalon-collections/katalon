@@ -17,5 +17,6 @@ docker-compose.override.yml
 .claude/
 .env
 .codegraph/
+.agents/knowledge/_site/
 first-run-credentials.txt
 reset-credentials.txt

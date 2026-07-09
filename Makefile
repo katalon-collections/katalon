@@ -3,7 +3,7 @@
 
 .PHONY: help build build-api build-worker build-admin build-portal rebuild \
         rebuild-api rebuild-worker rebuild-admin rebuild-portal \
-        up up-dev down down-volumes clean clean-all
+        up up-dev down down-volumes clean clean-all knowledge-site
 
 # Compose command — override with: COMPOSE="docker-compose" make up
 COMPOSE ?= docker compose
@@ -36,6 +36,9 @@ help:
 	@echo "Cleanup:"
 	@echo "  make clean          Remove dangling images and build cache"
 	@echo "  make clean-all      Full docker system prune (images, containers, cache, volumes)"
+	@echo ""
+	@echo "Dev knowledge:"
+	@echo "  make knowledge-site Render .agents/knowledge/ (OKF bundle) to a local static site"
 
 # ---------------------------------------------------------------------------
 # Build (with cache)
@@ -102,3 +105,10 @@ clean-all: down-volumes
 	@echo "==> Full system prune (containers, images, cache, volumes)..."
 	-docker system prune -f --volumes
 	@echo "==> Done."
+
+# ---------------------------------------------------------------------------
+# Dev knowledge (OKF bundle)
+# ---------------------------------------------------------------------------
+knowledge-site:
+	uv run .agents/tools/okf_site.py .agents/knowledge .agents/knowledge/_site
+	@echo "Open .agents/knowledge/_site/index.html"

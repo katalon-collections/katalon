@@ -212,6 +212,31 @@ Prefer these tools over grep/find for code exploration:
 
 Always use CodeGraph before falling back to grep or sequential file reads.
 
+## Dev Knowledge Base (OKF)
+
+`.agents/knowledge/` ist eine dev-only [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)-Wissensbasis für Katalon selbst — architektonische Entscheidungen mit Begründung, nicht Code-Doku. Getrennt von `.agents/DEV.md`/`IMPLEMENTIERUNGSPLAN.md`/`PLAN*.md` (die bleiben lebende Prozessdokumente).
+
+**Nachschlagen**: Bei Architektur-/Design-Fragen ("warum ist das so gebaut?") erst `.agents/knowledge/decisions/index.md` prüfen, bevor Code-Archäologie betrieben wird. Lokale HTML-Ansicht: `make knowledge-site`.
+
+**Pflege**: Nach jeder Session, in der eine architektonisch relevante Entscheidung getroffen wird (neue Komponente, Trade-off zwischen Ansätzen, Abweichung von einem bestehenden Muster) — nicht bei reinen Bugfixes oder Feature-Implementierungen ohne Designfrage — ein neues Konzept unter `.agents/knowledge/decisions/` anlegen (Format wie bestehende Dateien: YAML-Frontmatter mit `type: Decision`, Sections Kontext/Entscheidung/Begründung/Citations) und in `decisions/index.md` verlinken.
+
+## Kontext-Dateien — Lazy Loading
+
+Lebende Prozess-/Produkt-Dokumente bleiben an ihrem Ort (nicht Teil von `.agents/knowledge/`, siehe oben), werden aber nur bei Bedarf gelesen statt pauschal vorausgesetzt:
+
+- Frage zu Roadmap, Phasenstatus, offenen Issues, Priorität → `.agents/IMPLEMENTIERUNGSPLAN.md`
+- Frage zu lokalem Setup, Dev-Workflow, Docker-Stack-Wahl → `.agents/DEV.md`
+- Frage zum Datenmodell im Detail (über die Kurzfassung hier hinaus) → `KONZEPT.md`
+- UI-/UX-/Produktentscheidung, Zielgruppe, Design-Prinzipien → `PRODUCT.md` + `DESIGN.md`
+
+## Coding Rules — Lazy Loading
+
+Sprachspezifische Coding-Regeln liegen nicht hier, sondern in `.agents/rules/`, und werden nur bei Bedarf geladen:
+
+- Wird `backend/` angefasst → vorher `.agents/rules/backend.md` lesen.
+- Wird `frontend/admin/` oder `frontend/portal/` angefasst → vorher `.agents/rules/frontend.md` lesen.
+- Beide betroffen (siehe Full-Stack Exploration Rule unten) → beide Dateien lesen.
+
 ## Full-Stack Exploration Rule
 
 **Any feature touches both backend AND frontend.** Before starting exploration or planning:
