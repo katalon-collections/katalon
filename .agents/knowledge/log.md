@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-07-10
+* **Creation**: [Testsuite braucht KATALON_SECRETS_KEY](gotchas/pytest-secrets-key.md) — wiederkehrender Collection-Abbruch bei blankem `pytest`; Env-Var-Workaround dokumentiert.
+
 ## 2026-07-09
 * **Creation**: Bundle scaffolded for Issue #271, seeded with [Vier Bestandstypen](decisions/vier-bestandstypen.md).
 * **Update**: Mined git history and claude-mem session memory for undocumented architectural decisions; added [Tech-Stack](decisions/tech-stack.md), [Relationen-Design](decisions/relationen-design.md), [Vokabular-Custom-Fields](decisions/vocabulary-custom-fields.md), [Inherited Fields (ES)](decisions/inherited-fields-es.md), [XML-Importer-Scope](decisions/xml-importer-scope.md), [Importer-Plugin-Architektur](decisions/importer-multi-format-architektur.md), [Docker-Customization-Strategie](decisions/docker-customization-strategy.md), [Beta-Release-Scope](decisions/beta-release-scope.md).
