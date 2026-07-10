@@ -335,11 +335,16 @@ export function useImporterState(): ImporterStateAndHandlers {
     }
   }
 
+  const pendingFieldsPayload = () => state.pendingFields.map(f => ({
+    name: f.name, field_type: f.field_type,
+    label_de: f.label_de, label_en: f.label_en, is_repeatable: f.is_repeatable,
+  }))
+
   async function handleDryRun() {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload())
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -365,7 +370,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     dispatch({ type: 'MAPPING_CHANGED', payload: nextMapping })
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, nextMapping, state.subtype)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, nextMapping, state.subtype, pendingFieldsPayload())
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       alert((e as Error).message)
@@ -380,10 +385,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         upsert_strategy: state.upsertStrategy,
         auto_publish: state.autoPublish,
         subtype: state.subtype,
-        fields_to_create: state.pendingFields.map(f => ({
-          name: f.name, field_type: f.field_type,
-          label_de: f.label_de, label_en: f.label_en, is_repeatable: f.is_repeatable,
-        })),
+        fields_to_create: pendingFieldsPayload(),
       })
       dispatch({ type: 'IMPORT_STARTED', payload: task_id })
     } catch (e) {

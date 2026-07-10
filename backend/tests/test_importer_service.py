@@ -211,3 +211,18 @@ def test_dry_run_vocab_clusters_suggests_canonical_value() -> None:
     cluster = result["vocab_clusters"]["place"][0]
     assert cluster["canonical"] == "Berlin"
     assert set(cluster["variants"]) == {"Berlin", "berlin", "Brlin"}
+
+
+def test_dry_run_clusters_pending_vocab_field() -> None:
+    """On-the-fly fields are merged into the dry-run as transient field defs with
+    settings=None (never flushed). Clustering must tolerate that shape."""
+    rows = [{"genre": v} for v in ("Electronic", "Electronic", "electronic", "Electronik")]
+    mapping = {"genre": {"target": "genre", "transforms": []}}
+    pending = SimpleNamespace(
+        field_type="vocab", label={"de": "Genre"},
+        is_required=False, is_repeatable=False, settings=None,
+    )
+    result = dry_run(rows, mapping, {"genre": pending})
+    cluster = result["vocab_clusters"]["genre"][0]
+    assert cluster["canonical"] == "Electronic"
+    assert set(cluster["variants"]) == {"Electronic", "electronic", "Electronik"}

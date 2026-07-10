@@ -59,13 +59,15 @@ class MappingRequest(BaseModel):
     upload_id: str
     record_type: str = "object"
     subtype: str | None = None
+    # Fields the user will create on-the-fly. In dry-run these are merged as
+    # transient (unpersisted) field defs so clustering/type-validation see them.
+    fields_to_create: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ImportRequest(MappingRequest):
     idno_strategy: str = "auto"   # "auto" | "column" | "skip"
     upsert_strategy: str = "skip"  # "skip" | "merge" | "replace"
     auto_publish: bool = False  # if True, publish records that pass validation after import
-    fields_to_create: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class CreateFieldsRequest(BaseModel):
@@ -196,6 +198,27 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
         )
     )
     field_defs = {f.name: f for f in result.scalars().all()}
+
+    # Merge on-the-fly fields as transient (not persisted) defs so clustering,
+    # type- and required-validation see them in the preview. DB fields win on name clash.
+    for f in body.fields_to_create:
+        name = str(f.get("name", "")).strip()
+        if not name or name in field_defs:
+            continue
+        label: dict[str, str] = {}
+        if f.get("label_de"):
+            label["de"] = str(f["label_de"]).strip()
+        if f.get("label_en"):
+            label["en"] = str(f["label_en"]).strip()
+        field_defs[name] = FieldDefinition(
+            target_type=body.record_type,
+            name=name,
+            label=label,
+            field_type=str(f.get("field_type", "text")).strip(),
+            is_required=False,
+            is_repeatable=bool(f.get("is_repeatable", False)),
+            sort_order=0,
+        )
 
     rows = _load_rows(body.upload_id)
 

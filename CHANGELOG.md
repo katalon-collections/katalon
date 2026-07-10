@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-07-10
+
+### Fixed
+- Importer-Probelauf berücksichtigt jetzt on-the-fly angelegte Felder: Der Dry-Run-Request sendet `fields_to_create` mit, das Backend merged sie als transiente Felddefinitionen. Fuzzy-Vokabular-Clustering, Typ- und Pflichtfeld-Validierung greifen dadurch schon in der Vorschau statt erst beim echten Import.
+
 ## [0.5.7] - 2026-07-09
 
 ### Added
