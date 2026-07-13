@@ -46,6 +46,19 @@ def migrated_database(postgres_url: str) -> str:
     return postgres_url
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _celery_without_redis():
+    """Integration tests bring up Postgres but no Redis. Point Celery at an
+    in-memory broker so ``.delay()`` enqueues (and returns) without a broker
+    connection — the task body never runs (no worker consumes it), matching the
+    fire-and-forget contract of the request path."""
+    from katalon.workers.celery_app import celery_app
+
+    celery_app.conf.broker_url = "memory://"
+    celery_app.conf.result_backend = "cache+memory://"
+    yield
+
+
 @pytest.fixture
 async def app(migrated_database: str):
     os.environ["DATABASE_URL"] = migrated_database

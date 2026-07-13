@@ -5,7 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [0.6.0] - 2026-07-13
+## [0.6.1] - 2026-07-13
+
+### Fixed
+- Integration-Tests: `test_object_crud_roundtrip` (und alle schreibenden Pfade) liefen ins Leere, weil `.delay()` einen Redis-Broker erwartet, den die Testumgebung (nur Postgres via testcontainers) nicht hat. Neue autouse-Fixture stellt Celery im Test auf einen In-Memory-Broker um — `.delay()` enqueued ohne Redis, Task-Body läuft nicht (kein Worker). Kein Produktionsverhalten geändert.
 
 ### Added
 - Optimistic Locking gegen stilles Überschreiben bei parallelem Edit (#272): alle 5 Record-Typen haben eine `version`-Spalte (Migration 0027). PUT erwartet `If-Match: <version>`; bei veralteter Version antwortet das Backend mit `409 {"error":"version_conflict","current_version":N}` statt blind zu überschreiben. Fehlt der Header (Importer/Skripte), bleibt das alte Verhalten.
