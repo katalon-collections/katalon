@@ -268,25 +268,65 @@ curl -X POST https://deine-domain.de/v1/search/reindex/object
 
 ## Backups
 
-### Datenbank
+### Automatisch (backup-Service)
+
+Der Compose-Stack enthält einen `backup`-Service (`docker/backup.sh`), der **täglich**
+läuft und beides sichert:
+
+- Datenbank: `pg_dump` → `db_<timestamp>.sql.gz`
+- Mediendateien (`MEDIA_ROOT`): `media_<timestamp>.tar.gz`
+
+Dumps landen im Host-Verzeichnis `BACKUP_ROOT` (Default `/srv/katalon/backups`) und
+werden nach `BACKUP_RETENTION_DAYS` (Default 14) automatisch gelöscht. Intervall über
+`BACKUP_INTERVAL_SECONDS` (Default 86400 = täglich) steuerbar.
 
 ```bash
-# Backup erstellen
-docker compose exec db pg_dump -U katalon katalon | gzip > backup_$(date +%Y%m%d).sql.gz
+# Einmaliges Backup sofort auslösen (z. B. vor einem Deploy)
+docker compose run --rm backup once
 
-# Restore
-gunzip -c backup_20260101.sql.gz | docker compose exec -T db psql -U katalon katalon
+# Vorhandene Backups ansehen
+ls -lh /srv/katalon/backups
 ```
 
-### Mediendateien
+**Off-site empfohlen:** `BACKUP_ROOT` zusätzlich per `rsync`/S3 auf einen zweiten
+Standort spiegeln — ein Backup auf demselben Host schützt nicht vor Host-Verlust.
 
-Das Volume `media_data` liegt unter `/var/lib/docker/volumes/katalon_media_data/_data/` (Standardpfad).
+### Restore
+
+Datenbank:
 
 ```bash
-# Backup
-tar czf media_backup_$(date +%Y%m%d).tar.gz \
-  $(docker volume inspect katalon_media_data --format '{{ .Mountpoint }}')
+gunzip -c /srv/katalon/backups/db_20260101_030000.sql.gz \
+  | docker compose exec -T db psql -U katalon katalon
 ```
+
+Mediendateien (`.` = Inhalt von `MEDIA_ROOT`):
+
+```bash
+tar xzf /srv/katalon/backups/media_20260101_030000.tar.gz -C "$MEDIA_ROOT"
+```
+
+Nach dem DB-Restore Elasticsearch neu aufbauen:
+
+```bash
+curl -X POST https://deine-domain.de/v1/search/reindex/object   # je Typ
+```
+
+### Restore-Drill (durchgespielt 2026-07-13)
+
+Ein Restore ist nur so viel wert wie sein letzter Test. Verifizierter Ablauf auf
+frischer Umgebung:
+
+1. Frisches Verzeichnis + `.env` mit **anderem** `POSTGRES_DB` (z. B. `katalon_restore`).
+2. Nur DB starten: `docker compose up -d db`.
+3. Neueste `db_*.sql.gz` per obigem `psql`-Befehl einspielen.
+4. Zeilenzahl gegen Quelle prüfen:
+   `docker compose exec -T db psql -U katalon -d katalon_restore -c "SELECT count(*) FROM objects;"`
+5. Media-tar in ein Testverzeichnis entpacken, Dateizahl vergleichen.
+6. Voll starten, `curl .../health` → `ok`, Stichprobe im Admin-UI.
+
+Ergebnis: Dump lässt sich sauber einspielen (PostGIS-Extension inklusive), Media-tar
+entpackt vollständig. Drill mindestens halbjährlich wiederholen.
 
 ### Elasticsearch
 

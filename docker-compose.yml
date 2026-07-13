@@ -192,6 +192,25 @@ services:
       portal:
         condition: service_healthy
 
+  backup:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-katalon}
+      POSTGRES_DB: ${POSTGRES_DB:-katalon}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    volumes:
+      - ./docker/backup.sh:/backup.sh:ro
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/media:ro
+      - ${BACKUP_ROOT:-/srv/katalon/backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db_data:
   es_data:

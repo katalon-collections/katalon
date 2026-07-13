@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-07-13
+
+### Added
+- `backup`-Service im Compose-Stack (`docker/backup.sh`): täglicher `pg_dump` (gzip) + Media-`tar` mit Retention (`BACKUP_RETENTION_DAYS`, Default 14) und konfigurierbarem Intervall (`BACKUP_INTERVAL_SECONDS`). Ablage im Host-Verzeichnis `BACKUP_ROOT`. One-shot-Modus (`docker compose run --rm backup once`) für Ad-hoc-Backups vor Deploys. Nutzt dasselbe `postgis/postgis:16-3.4`-Image wie der DB-Server, damit `pg_dump`/`psql`-Minor-Versionen exakt passen. Restore-Drill dokumentiert und durchgespielt (`docs/04_produktion.md`) — Dump inkl. PostGIS-Extension sauber wiederhergestellt, Zeilenzahl verifiziert. (#273)
+
 ## [0.5.9] - 2026-07-13
 
 ### Changed
