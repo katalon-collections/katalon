@@ -41,6 +41,7 @@ async def trigger_reconciliation(mode: str = "id_diff") -> dict[str, str]:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="mode must be 'count' or 'id_diff'")
 
+    from katalon.workers.enqueue import enqueue_or_503
     from katalon.workers.index_tasks import reconciliation_job_task
-    reconciliation_job_task.delay(mode=mode, force=True)
+    enqueue_or_503(reconciliation_job_task, mode=mode, force=True)
     return {"status": "started", "mode": mode}

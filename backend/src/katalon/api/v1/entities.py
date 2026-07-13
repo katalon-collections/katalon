@@ -235,7 +235,8 @@ async def delete_entity(
     await db.delete(entity)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
-    cleanup_relation_refs.delay("entity", str(entity_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(cleanup_relation_refs, "entity", str(entity_id))
 
 
 @router.post("/{entity_id}/snapshots", response_model=SnapshotRead, status_code=201)

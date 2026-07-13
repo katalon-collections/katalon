@@ -380,7 +380,8 @@ async def delete_procedure(
         logger.warning("ES index/remove failed", exc_info=True)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
-    cleanup_relation_refs.delay("procedure", str(procedure_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(cleanup_relation_refs, "procedure", str(procedure_id))
 
 
 @router.post("/{procedure_id}/snapshots", response_model=SnapshotRead, status_code=201)

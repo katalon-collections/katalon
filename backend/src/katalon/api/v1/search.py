@@ -83,8 +83,9 @@ async def search(
 
 @router.post("/reindex", dependencies=[require_role("admin")])
 async def trigger_reindex() -> dict[str, str]:
+    from katalon.workers.enqueue import enqueue_or_503
     from katalon.workers.index_tasks import reindex_all_task
-    reindex_all_task.delay()
+    enqueue_or_503(reindex_all_task)
     return {"status": "queued"}
 
 
@@ -94,6 +95,7 @@ async def trigger_reindex_type(target_type: str) -> dict[str, str]:
     if target_type not in valid:
         from fastapi import HTTPException
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ. Erlaubt: {', '.join(sorted(valid))}")
+    from katalon.workers.enqueue import enqueue_or_503
     from katalon.workers.index_tasks import bulk_reindex_type_task
-    bulk_reindex_type_task.delay(target_type)
+    enqueue_or_503(bulk_reindex_type_task, target_type)
     return {"status": "queued", "target_type": target_type}

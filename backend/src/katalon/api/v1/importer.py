@@ -300,7 +300,9 @@ async def run_import(body: ImportRequest, current_user=require_admin_or_editor()
     serializable_mapping: dict[str, Any] = {}
     for k, v in body.mapping.items():
         serializable_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
-    task = import_records_task.delay(
+    from katalon.workers.enqueue import enqueue_or_503
+    task_id = enqueue_or_503(
+        import_records_task,
         body.record_type,
         rows,
         serializable_mapping,
@@ -311,7 +313,7 @@ async def run_import(body: ImportRequest, current_user=require_admin_or_editor()
         subtype=body.subtype,
         fields_to_create=body.fields_to_create,
     )
-    return {"status": "queued", "task_id": task.id}
+    return {"status": "queued", "task_id": task_id}
 
 
 @router.post("/create-fields", dependencies=[require_role("admin")])

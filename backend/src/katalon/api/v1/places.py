@@ -239,7 +239,8 @@ async def delete_place(
     await db.delete(place)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
-    cleanup_relation_refs.delay("place", str(place_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(cleanup_relation_refs, "place", str(place_id))
 
 
 @router.post("/{place_id}/snapshots", response_model=SnapshotRead, status_code=201)

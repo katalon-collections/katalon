@@ -97,11 +97,9 @@ def _enqueue_reindex(target_type: str) -> None:
     """Fire-and-forget: enqueue a type-specific ES reindex after schema changes."""
     if target_type == "vocabulary_term":
         return
-    try:
-        from katalon.workers.index_tasks import bulk_reindex_type_task
-        bulk_reindex_type_task.delay(target_type)
-    except Exception:
-        pass  # ES / Celery may not be available in all environments
+    from katalon.workers.enqueue import enqueue
+    from katalon.workers.index_tasks import bulk_reindex_type_task
+    enqueue(bulk_reindex_type_task, target_type)
 
 
 class ImportResult(BaseModel):

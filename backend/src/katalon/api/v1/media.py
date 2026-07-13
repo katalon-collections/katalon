@@ -90,7 +90,8 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     db.add(media)
     await db.commit()  # commit before Celery dispatch so the worker can find the row
 
-    generate_iiif_tiles.delay(str(file_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(generate_iiif_tiles, str(file_id))
 
     return _serialize(media)
 
@@ -220,8 +221,9 @@ async def start_batch_import(
             while chunk := await mapping.read(65536):
                 await out.write(chunk)
 
-    task = import_media_batch_task.delay(str(job_id), str(job_dir))
-    return {"status": "queued", "task_id": task.id, "batch_id": str(job_id)}
+    from katalon.workers.enqueue import enqueue_or_503
+    task_id = enqueue_or_503(import_media_batch_task, str(job_id), str(job_dir))
+    return {"status": "queued", "task_id": task_id, "batch_id": str(job_id)}
 
 
 @batch_router.get(

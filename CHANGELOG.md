@@ -5,7 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [0.6.1] - 2026-07-13
+## [0.6.2] - 2026-07-13
+
+### Fixed
+- Broker-Ausfall bricht keine schreibenden Requests mehr (#274). Fire-and-forget-`.delay()`-Aufrufe im Request-Pfad (Relation-Cleanup bei Delete aller 5 Typen, IIIF-Tile-Generierung beim Upload, Schema-Reindex) liefen bei nicht erreichbarem Redis in ein 500, obwohl der DB-Schreibvorgang bereits erfolgreich war. Neuer Helper `workers/enqueue.py`: `enqueue()` loggt Broker-Fehler und macht weiter, `enqueue_or_503()` liefert für job-id-basierte Endpunkte (Batch-Media-Import, Record-Import) sowie explizit nutzer-getriggerte Reindex-/Reconciliation-Endpunkte ein sauberes 503 statt 500. Entfernt nebenbei ein stilles `except: pass` in `schema_admin.py`.
 
 ### Fixed
 - Integration-Tests: `test_object_crud_roundtrip` (und alle schreibenden Pfade) liefen ins Leere, weil `.delay()` einen Redis-Broker erwartet, den die Testumgebung (nur Postgres via testcontainers) nicht hat. Neue autouse-Fixture stellt Celery im Test auf einen In-Memory-Broker um — `.delay()` enqueued ohne Redis, Task-Body läuft nicht (kein Worker). Kein Produktionsverhalten geändert.

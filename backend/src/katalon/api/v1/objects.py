@@ -279,7 +279,8 @@ async def delete_object(
     await db.delete(obj)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
-    cleanup_relation_refs.delay("object", str(object_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(cleanup_relation_refs, "object", str(object_id))
 
 
 @router.post("/{object_id}/snapshots", response_model=SnapshotRead, status_code=201)

@@ -235,7 +235,8 @@ async def delete_occurrence(
     await db.delete(occ)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
-    cleanup_relation_refs.delay("occurrence", str(occ_id))
+    from katalon.workers.enqueue import enqueue
+    enqueue(cleanup_relation_refs, "occurrence", str(occ_id))
 
 
 @router.post("/{occ_id}/snapshots", response_model=SnapshotRead, status_code=201)
