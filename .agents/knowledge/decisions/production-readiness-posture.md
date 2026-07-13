@@ -46,11 +46,16 @@ Lesepfade nicht am Task-Queue-Zustand hängen soll.
 
 # Status
 
-`/health`-Fix umgesetzt und released (v0.5.9, Commit 818c0a6). Offene
-Folge-Issues aus dem Audit:
+`/health`-Fix umgesetzt und released (v0.5.9, Commit 818c0a6). Die beiden
+vertagten High-Issues wurden anschließend gebaut:
 
-- #272 Optimistic Locking (High)
-- #273 Backup-Automatisierung + Restore-Drill (High)
+- #273 Backup-Automatisierung + getesteter Restore-Drill — erledigt (v0.5.10/
+  v0.5.11), Restore-Drill real durchgespielt.
+- #272 Optimistic Locking — erledigt (v0.6.0), siehe [[optimistic-locking]].
+- #274 (Folgefund beim Locking-/Test-Fix): Broker-Ausfall bricht schreibende
+  Requests nicht mehr — erledigt (v0.6.2), siehe [[broker-tolerant-enqueue]].
+  Löst ein, was diese Posture nur behauptet hatte (Redis nicht im Health-Check,
+  weil Schreibpfade broker-unabhängig bleiben sollen).
 
 Nicht umgesetzt (bewusst): Magic-Byte-Sniffing für Uploads — Client-MIME
 ist spoofbar, aber Cantaloupe reprozessiert Bilder, Restrisiko niedrig, neue

@@ -143,6 +143,10 @@ ListSets, ResumptionToken, GetRecord, `badResumptionToken` und OAI-Tests sind im
 - Rate Limiting ✅ – `/v1/search`, `/v1/oai` auf 100/min; `/v1/authorities/search`, `/v1/authorities/fetch` auf 60/min (Issue #219, geschlossen).
 - Verwaiste Relationen ✅ – `delete_relations()` + `cleanup_relation_refs` Celery-Task auf allen 4 Typen (Issue #149, geschlossen).
 - Produktions-Secrets ✅ – Startup-Guard in `main.py` verweigert Start wenn `SECRET_KEY` Default/zu kurz oder `DEFAULT_ADMIN_PASSWORD` ein bekanntes Default ist (Issue #20, geschlossen).
+- Deep `/health` ✅ – prüft Postgres + Elasticsearch aktiv, liefert 503 bei Degradation (v0.5.9, Production-Readiness-Audit).
+- Backup-Automatisierung ✅ – `backup`-Compose-Service (`docker/backup.sh`): tägliches `pg_dump` + Media-tar, Retention, konfigurierbar via `.env` (an/aus, Uhrzeit/Intervall); Restore-Drill real durchgespielt (Issue #273, v0.5.10/v0.5.11).
+- Optimistic Locking ✅ – `version`-Spalte + `If-Match` + 409 auf allen 5 Typen, feldweiser 3-Wege-Merge in der Admin-UI (Issue #272, v0.6.0).
+- Broker-Resilienz ✅ – Redis-Ausfall bricht keine schreibenden Requests mehr; `workers/enqueue.py` (fire-and-forget schluckt, Job-ID-Pfade 503) (Issue #274, v0.6.2).
 - nginx TLS-Terminierung (Infra, deployment-spezifisch)
 - Perf-Tests (locust)
 - OpenAPI-Dokumentation finalisieren

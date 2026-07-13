@@ -13,3 +13,4 @@
 * [Importer Fuzzy-Vokabular-Clustering](importer-fuzzy-vocab-clustering.md) - rapidfuzz + Greedy-Clustering statt k-means, User bestätigt vor Merge (#269)
 * [Production-Readiness-Posture](production-readiness-posture.md) - tiefer /health (DB+ES, kein Redis, kein Liveness-Split), Optimistic Locking bewusst als Issue vertagt (#272, #273)
 * [Optimistic Locking](optimistic-locking.md) - version-Spalte + If-Match + 409, feldweiser 3-Wege-Merge in der Admin-UI, nur Metadaten (#272)
+* [Broker-toleranter Enqueue](broker-tolerant-enqueue.md) - fire-and-forget schluckt+loggt Broker-Ausfall, Job-ID-Pfade liefern 503 statt 500 (#274)
