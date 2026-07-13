@@ -1,9 +1,10 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
 
+from katalon.core.concurrency import check_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
@@ -128,11 +129,18 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
 
 
 @router.put("/{entity_id}", response_model=EntityRead)
-async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
+async def update_entity(
+    entity_id: uuid.UUID,
+    data: EntityCreate,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
+) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    check_version(entity.version, if_match)
     if not data.idno or not data.idno.strip():
         if data.status == "draft":
             idno = None
@@ -168,6 +176,7 @@ async def update_entity(entity_id: uuid.UUID, data: EntityCreate, db: DBDep, cur
     entity.entity_type = entity_type
     entity.status = data.status
     entity.metadata_ = metadata
+    entity.version += 1
     await sync_schema_relations(db, "entity", entity.id, metadata)
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": metadata}})

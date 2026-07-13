@@ -136,6 +136,7 @@ class ObjectRead(ObjectCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class EntityCreate(RecordBase):
@@ -147,6 +148,7 @@ class EntityRead(EntityCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class PlaceCreate(RecordBase):
@@ -160,6 +162,7 @@ class PlaceRead(PlaceCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class OccurrenceCreate(RecordBase):
@@ -171,6 +174,7 @@ class OccurrenceRead(OccurrenceCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class ProcedureCreate(BaseModel):
@@ -190,6 +194,7 @@ class ProcedureRead(ProcedureCreate):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class ProcedureComplete(BaseModel):

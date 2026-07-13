@@ -44,6 +44,7 @@ class Object(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     media_files: Mapped[list["MediaFile"]] = relationship(back_populates="object")
 
@@ -64,6 +65,7 @@ class Entity(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __table_args__ = (
         Index("ix_entities_metadata_gin", "metadata", postgresql_using="gin"),
@@ -82,6 +84,7 @@ class Place(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __table_args__ = (
         Index("ix_places_metadata_gin", "metadata", postgresql_using="gin"),
@@ -100,6 +103,7 @@ class Occurrence(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __table_args__ = (
         Index("ix_occurrences_metadata_gin", "metadata", postgresql_using="gin"),
@@ -121,6 +125,7 @@ class Procedure(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __table_args__ = (
         Index("ix_procedures_metadata_gin", "metadata", postgresql_using="gin"),

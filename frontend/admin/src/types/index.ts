@@ -11,6 +11,7 @@ export interface KatalonObject {
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
 }
 
 export interface Entity {
@@ -21,6 +22,7 @@ export interface Entity {
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
 }
 
 export interface Place {
@@ -33,6 +35,7 @@ export interface Place {
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
 }
 
 export interface Occurrence {
@@ -43,6 +46,7 @@ export interface Occurrence {
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
 }
 
 export interface Procedure {
@@ -57,6 +61,7 @@ export interface Procedure {
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
 }
 
 export type AnyRecord = KatalonObject | Entity | Place | Occurrence | Procedure

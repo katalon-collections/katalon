@@ -93,6 +93,20 @@ export class ConflictError extends Error {
   }
 }
 
+/** Optimistic-locking conflict: the record was changed by someone else since load. */
+export class VersionConflictError extends Error {
+  current_version: number
+  constructor(current_version: number) {
+    super('Datensatz wurde zwischenzeitlich von jemand anderem geändert.')
+    this.name = 'VersionConflictError'
+    this.current_version = current_version
+  }
+}
+
+function ifMatch(version?: number): Record<string, string> | undefined {
+  return version != null ? { 'If-Match': String(version) } : undefined
+}
+
 export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
   const res = await authorizedFetch(path, { ...init, headers })
@@ -104,6 +118,9 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 409) {
     const body = await res.json().catch(() => ({ detail: {} }))
     const d = body.detail ?? {}
+    if (d.error === 'version_conflict') {
+      throw new VersionConflictError(typeof d.current_version === 'number' ? d.current_version : 0)
+    }
     throw new ConflictError(
       typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
       typeof d.related_count === 'number' ? d.related_count : 0,
@@ -158,7 +175,7 @@ export const objects = {
   get:    (id: string) => req<KatalonObject>(`/v1/objects/${id}`),
   audit:  (id: string) => req<AuditEntry[]>(`/v1/objects/${id}/audit-log`),
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<KatalonObject>) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<KatalonObject>, version?: number) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/objects/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/objects/${id}/publish`, { method: 'POST' }),
   snapshots: {
@@ -177,7 +194,7 @@ export const entities = {
   get:    (id: string) => req<Entity>(`/v1/entities/${id}`),
   audit:  (id: string) => req<AuditEntry[]>(`/v1/entities/${id}/audit-log`),
   create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Entity>) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Entity>, version?: number) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/entities/${id}/publish`, { method: 'POST' }),
   snapshots: {
@@ -196,7 +213,7 @@ export const places = {
   get:    (id: string) => req<Place>(`/v1/places/${id}`),
   audit:  (id: string) => req<AuditEntry[]>(`/v1/places/${id}/audit-log`),
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Place>) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Place>, version?: number) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/places/${id}/publish`, { method: 'POST' }),
   snapshots: {
@@ -215,7 +232,7 @@ export const occurrences = {
   get:    (id: string) => req<Occurrence>(`/v1/occurrences/${id}`),
   audit:  (id: string) => req<AuditEntry[]>(`/v1/occurrences/${id}/audit-log`),
   create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Occurrence>) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Occurrence>, version?: number) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/occurrences/${id}/publish`, { method: 'POST' }),
   snapshots: {
@@ -234,7 +251,7 @@ export const procedures = {
   get:    (id: string) => req<Procedure>(`/v1/procedures/${id}`),
   audit:  (id: string) => req<AuditEntry[]>(`/v1/procedures/${id}/audit-log`),
   create: (data: Partial<Procedure>) => req<Procedure>('/v1/procedures', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Procedure>) => req<Procedure>(`/v1/procedures/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Procedure>, version?: number) => req<Procedure>(`/v1/procedures/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/procedures/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   complete: (id: string, collection_status?: string | null) =>
     req<Procedure>(`/v1/procedures/${id}/complete`, {

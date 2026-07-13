@@ -2,9 +2,10 @@ import logging
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
 
+from katalon.core.concurrency import check_version
 from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import AdminConfig, Object, Procedure, RecordSnapshot
 from katalon.core.schemas import (
@@ -271,12 +272,14 @@ async def update_procedure(
     data: ProcedureCreate,
     db: DBDep,
     current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
     ).scalar_one_or_none()
     if not proc:
         raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
+    check_version(proc.version, if_match)
     procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
         db, "procedure", data.metadata_, procedure_type or None, existing=proc.metadata_,
@@ -317,6 +320,7 @@ async def update_procedure(
     proc.due_date = data.due_date
     proc.reference_number = data.reference_number
     proc.metadata_ = data.metadata_
+    proc.version += 1
     await sync_schema_relations(db, "procedure", proc.id, data.metadata_)
     await log_change(
         db,

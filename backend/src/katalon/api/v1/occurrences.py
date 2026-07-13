@@ -1,9 +1,10 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
 
+from katalon.core.concurrency import check_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
 from katalon.core.schemas import (
@@ -129,12 +130,17 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCur
 
 @router.put("/{occ_id}", response_model=OccurrenceRead)
 async def update_occurrence(
-    occ_id: uuid.UUID, data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()
+    occ_id: uuid.UUID,
+    data: OccurrenceCreate,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    check_version(occ.version, if_match)
     if not data.idno or not data.idno.strip():
         if data.status == "draft":
             idno = None
@@ -170,6 +176,7 @@ async def update_occurrence(
     occ.occurrence_type = occurrence_type
     occ.status = data.status
     occ.metadata_ = metadata
+    occ.version += 1
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})

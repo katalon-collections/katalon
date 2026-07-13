@@ -5,7 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [0.5.11] - 2026-07-13
+## [0.6.0] - 2026-07-13
+
+### Added
+- Optimistic Locking gegen stilles Überschreiben bei parallelem Edit (#272): alle 5 Record-Typen haben eine `version`-Spalte (Migration 0027). PUT erwartet `If-Match: <version>`; bei veralteter Version antwortet das Backend mit `409 {"error":"version_conflict","current_version":N}` statt blind zu überschreiben. Fehlt der Header (Importer/Skripte), bleibt das alte Verhalten.
+- Admin-UI: Bearbeitungskonflikt-Dialog mit feldweisem 3-Wege-Merge. Bei 409 holt die UI den Serverstand und vergleicht pro Metadatenfeld `base`/`server`/`mine`; nur echte beidseitige Kollisionen werden abgefragt, der Rest automatisch gemergt. B's ungespeicherte Änderungen bleiben dabei erhalten. Skalare (idno/status/…) werden aus B's Payload übernommen.
 
 ### Added
 - Backup-Service konfigurierbar: `BACKUP_ENABLED` (an/aus) und `BACKUP_AT` (feste Uhrzeit `HH:MM` statt nur Intervall). Ist `BACKUP_AT` gesetzt, läuft das Backup täglich zur Uhrzeit (GNU-`date`-Zeitplan im Container); leer = Intervall-Modus wie bisher. Zeitzone über `TZ` steuerbar. (#273)

@@ -1,9 +1,10 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
 
+from katalon.core.concurrency import check_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
@@ -129,11 +130,18 @@ async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurren
 
 
 @router.put("/{place_id}", response_model=PlaceRead)
-async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
+async def update_place(
+    place_id: uuid.UUID,
+    data: PlaceCreate,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
+) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    check_version(place.version, if_match)
     if not data.idno or not data.idno.strip():
         if data.status == "draft":
             idno = None
@@ -169,6 +177,7 @@ async def update_place(place_id: uuid.UUID, data: PlaceCreate, db: DBDep, curren
     place.place_type = place_type
     place.status = data.status
     place.metadata_ = metadata
+    place.version += 1
     await sync_schema_relations(db, "place", place.id, metadata)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement

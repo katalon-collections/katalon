@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, ai, getTokenUser } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
@@ -588,6 +588,81 @@ function getApi(recordType: RecordType) {
   }
 }
 
+// --- Optimistic-locking conflict resolution (#272) ------------------------
+type ConflictItem = { name: string; label: string; server: unknown; mine: unknown }
+type ConflictState = {
+  items: ConflictItem[]
+  autoMerged: Record<string, unknown>   // fields resolved without asking the user
+  serverVersion: number
+  basePayload: Record<string, unknown>  // the payload B tried to save (scalars kept)
+}
+
+const valuesEqual = (a: unknown, b: unknown) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+/** Compact, human-readable rendering of a metadata field value for the diff. */
+function formatConflictValue(v: unknown): string {
+  if (v == null || v === '') return '(leer)'
+  if (Array.isArray(v)) {
+    return v.map(el => {
+      if (el && typeof el === 'object') {
+        const o = el as Record<string, unknown>
+        return String(o.value ?? o.label ?? o.entity_id ?? JSON.stringify(o))
+      }
+      return String(el)
+    }).join(', ')
+  }
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+function ConflictDialog({ conflict, saving, onCancel, onResolve }: {
+  conflict: ConflictState
+  saving: boolean
+  onCancel: () => void
+  onResolve: (mergedMetadata: Record<string, unknown>) => void
+}) {
+  const [choices, setChoices] = useState<Record<string, 'server' | 'mine'>>(
+    () => Object.fromEntries(conflict.items.map(it => [it.name, 'mine' as const])),
+  )
+  const apply = () => {
+    const merged: Record<string, unknown> = { ...conflict.autoMerged }
+    for (const it of conflict.items) {
+      merged[it.name] = choices[it.name] === 'server' ? it.server : it.mine
+    }
+    onResolve(merged)
+  }
+  return (
+    <dialog open style={{ position: 'fixed', inset: 0, margin: 'auto', width: 560, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 64px)', overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 0, background: 'var(--bg)', color: 'var(--fg)', boxShadow: '0 24px 80px rgba(0,0,0,.24)', zIndex: 25 }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>Bearbeitungskonflikt</div>
+      <div style={{ padding: 16, fontSize: 13, lineHeight: 1.5 }}>
+        <p style={{ marginTop: 0 }}>
+          Jemand anderes hat diesen Datensatz gespeichert, während du ihn bearbeitet hast.
+          Für die folgenden Felder gibt es unterschiedliche Werte. Wähle je Feld, welcher gelten soll.
+          Deine übrigen Änderungen bleiben erhalten.
+        </p>
+        {conflict.items.map(it => (
+          <div key={it.name} className="field" style={{ borderTop: '1px solid var(--border-s)', paddingTop: 10, marginTop: 10 }}>
+            <div className="lbl" style={{ fontWeight: 600 }}>{it.label}</div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 6 }}>
+              <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'server'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'server' }))} />
+              <span><span style={{ color: 'var(--muted)' }}>Aktuell gespeichert (andere Person):</span> {formatConflictValue(it.server)}</span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 4 }}>
+              <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'mine'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'mine' }))} />
+              <span><span style={{ color: 'var(--muted)' }}>Meine Änderung:</span> {formatConflictValue(it.mine)}</span>
+            </label>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-s)' }}>
+        <button className="btn gh" onClick={onCancel} disabled={saving}>Abbrechen</button>
+        <button className="btn pri" onClick={apply} disabled={saving}>Auswahl übernehmen &amp; speichern</button>
+      </div>
+    </dialog>
+  )
+}
+
 interface Props {
   recordType: RecordType
   recordId?: string
@@ -623,6 +698,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [dueDate, setDueDate] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
   const [values, setValues]   = useState<Record<string, unknown>>({})
+  // Optimistic locking (#272): version loaded with the record + the metadata as
+  // loaded (base), so a save conflict can be resolved field-by-field.
+  const [version, setVersion] = useState<number | null>(null)
+  const [baseValues, setBaseValues] = useState<Record<string, unknown>>({})
+  const [conflict, setConflict] = useState<ConflictState | null>(null)
   const [showAudit, setShowAudit] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
@@ -767,6 +847,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           setStatus(rec.status as Status)
           setLoadedStatus(rec.status as Status)
           setValues(rec.metadata_)
+          setVersion(rec.version)
+          setBaseValues(rec.metadata_ ?? {})
           const m = rec.metadata_ as Record<string, unknown>
           if (showIdno)  setIdno((rec as { idno?: string | null }).idno ?? '')
           if (subtypeKey) {
@@ -1347,7 +1429,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         )
         setTimeout(() => setSaveOk(false), 3000)
       } else {
-        await (api.update as (id: string, d: typeof payload) => Promise<AnyRecord>)(recordId!, payload)
+        try {
+          const updated = await (api.update as (id: string, d: typeof payload, v?: number) => Promise<AnyRecord>)(recordId!, payload, version ?? undefined)
+          setVersion(updated.version)
+          setBaseValues(payload.metadata_ as Record<string, unknown>)
+        } catch (e) {
+          if (e instanceof VersionConflictError) {
+            await resolveConflict(payload)
+            return
+          }
+          throw e
+        }
         if (completingProcedure) {
           const objectCount = rels.filter(r => {
             const targetType = r.from_id === recordId ? r.to_type : r.from_type
@@ -1372,6 +1464,67 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setTimeout(() => setSaveOk(false), 3000)
       }
     } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Save hit a 409: fetch the current server state and do a 3-way merge
+  // (base = as loaded, server = A's change, mine = B's edits) per metadata field.
+  // Only genuine both-sides-changed fields are shown to the user.
+  async function resolveConflict(payload: Record<string, unknown>) {
+    const server = await (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
+    const serverMeta = (server.metadata_ ?? {}) as Record<string, unknown>
+    const merged: Record<string, unknown> = {}
+    const items: ConflictItem[] = []
+    const names = new Set<string>([
+      ...Object.keys(baseValues),
+      ...Object.keys(serverMeta),
+      ...Object.keys(values),
+    ])
+    for (const name of names) {
+      const base = baseValues[name]
+      const srv = serverMeta[name]
+      const mine = values[name]
+      if (valuesEqual(mine, srv)) { merged[name] = mine; continue }   // both agree
+      if (valuesEqual(mine, base)) { merged[name] = srv; continue }   // only A changed
+      if (valuesEqual(srv, base)) { merged[name] = mine; continue }   // only B changed
+      const f = fields.find(fd => fd.name === name)
+      items.push({ name, label: f ? getLabel(f.label) : name, server: srv, mine })
+    }
+    if (items.length === 0) {
+      await commitMerge(payload, merged, server.version)
+      return
+    }
+    setConflict({ items, autoMerged: merged, serverVersion: server.version, basePayload: payload })
+  }
+
+  async function commitMerge(
+    payload: Record<string, unknown>,
+    mergedMetadata: Record<string, unknown>,
+    serverVersion: number,
+  ) {
+    setSaving(true)
+    setError(null)
+    try {
+      const finalPayload = { ...payload, metadata_: mergedMetadata }
+      const updated = await (api.update as (id: string, d: typeof finalPayload, v?: number) => Promise<AnyRecord>)(recordId!, finalPayload, serverVersion)
+      setValues(mergedMetadata)
+      setBaseValues(mergedMetadata)
+      setVersion(updated.version)
+      setLoadedStatus(updated.status as Status)
+      setConflict(null)
+      setIsDirty(false)
+      setSaveOk(true)
+      setSaveNotice('Konflikt gelöst – Änderungen gespeichert.')
+      setTimeout(() => setSaveOk(false), 3000)
+    } catch (e) {
+      if (e instanceof VersionConflictError) {
+        // Yet another save landed in between — recompute against the newest state.
+        await resolveConflict(payload)
+        return
+      }
       setError((e as Error).message)
     } finally {
       setSaving(false)
@@ -1583,6 +1736,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             <button className="btn pri" onClick={() => completeProcedure(completionDialog.status)} disabled={saving}>Status setzen</button>
           </div>
         </dialog>
+      )}
+
+      {conflict && (
+        <ConflictDialog
+          conflict={conflict}
+          saving={saving}
+          onCancel={() => setConflict(null)}
+          onResolve={merged => commitMerge(conflict.basePayload, merged, conflict.serverVersion)}
+        />
       )}
 
       {justCreated && (

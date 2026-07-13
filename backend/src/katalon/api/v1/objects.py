@@ -2,9 +2,10 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlalchemy import func, select
 
+from katalon.core.concurrency import check_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
@@ -150,12 +151,17 @@ async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
 
 @router.put("/{object_id}", response_model=ObjectRead)
 async def update_object(
-    object_id: uuid.UUID, data: ObjectCreate, db: DBDep, current_user=require_admin_or_editor()
+    object_id: uuid.UUID,
+    data: ObjectCreate,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    check_version(obj.version, if_match)
 
     if not data.idno or not data.idno.strip():
         if data.status == "draft":
@@ -198,6 +204,7 @@ async def update_object(
     obj.collection_status = data.collection_status
     obj.status = data.status
     obj.metadata_ = metadata
+    obj.version += 1
 
     await sync_schema_relations(db, "object", obj.id, metadata)
 
