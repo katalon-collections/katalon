@@ -298,8 +298,12 @@ Elasticsearch-Daten können jederzeit aus der Datenbank neu indexiert werden (`P
 
 ```bash
 curl https://deine-domain.de/health
-# → {"status": "ok"}
+# → {"status": "ok", "checks": {"database": "ok", "elasticsearch": "ok"}}
 ```
+
+Der Endpoint prüft Datenbank und Elasticsearch aktiv. Ist eine Abhängigkeit
+nicht erreichbar, liefert er HTTP `503` mit `{"status": "degraded", ...}` —
+so kann ein Load Balancer einen ausgefallenen Backend-Zustand erkennen.
 
 ### Logs
 

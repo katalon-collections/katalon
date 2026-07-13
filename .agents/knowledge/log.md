@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-07-13
+* **Creation**: [Production-Readiness-Posture](decisions/production-readiness-posture.md) — Audit-Ergebnis: tiefer `/health` (DB+ES, kein Redis, kein Liveness-Split), Optimistic Locking bewusst als Issue #272 vertagt, Backup-Automatisierung als #273. `/health`-Fix in v0.5.9 (818c0a6).
+
 ## 2026-07-10
 * **Creation**: [Testsuite braucht KATALON_SECRETS_KEY](gotchas/pytest-secrets-key.md) — wiederkehrender Collection-Abbruch bei blankem `pytest`; Env-Var-Workaround dokumentiert.
 

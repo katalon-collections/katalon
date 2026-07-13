@@ -11,3 +11,4 @@
 * [Beta-Release-Scope](beta-release-scope.md) - Zugänglichkeit vor Feature-Vollständigkeit
 * [Knowledge vs. Prozessdokumente](knowledge-vs-prozessdokumente.md) - OKF-Bundle bleibt getrennt von DEV.md/IMPLEMENTIERUNGSPLAN.md/KONZEPT.md/PRODUCT.md/DESIGN.md, beide lazy-geladen
 * [Importer Fuzzy-Vokabular-Clustering](importer-fuzzy-vocab-clustering.md) - rapidfuzz + Greedy-Clustering statt k-means, User bestätigt vor Merge (#269)
+* [Production-Readiness-Posture](production-readiness-posture.md) - tiefer /health (DB+ES, kein Redis, kein Liveness-Split), Optimistic Locking bewusst als Issue vertagt (#272, #273)
