@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -421,5 +421,38 @@ if settings.debug:
 
 
 @app.get("/health", tags=["system"])
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health(response: Response) -> dict[str, object]:
+    """Readiness check: verifies DB and Elasticsearch are reachable.
+
+    Returns 503 if any dependency is down so load balancers can fail over.
+    """
+    from sqlalchemy import text
+
+    from katalon.integrations.elasticsearch import get_es
+
+    checks: dict[str, str] = {}
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        logger.warning("Health check: database unreachable", exc_info=True)
+        checks["database"] = f"error: {exc.__class__.__name__}"
+
+    es = get_es()
+    try:
+        if await es.ping():
+            checks["elasticsearch"] = "ok"
+        else:
+            checks["elasticsearch"] = "error: ping failed"
+    except Exception as exc:
+        logger.warning("Health check: elasticsearch unreachable", exc_info=True)
+        checks["elasticsearch"] = f"error: {exc.__class__.__name__}"
+    finally:
+        await es.close()
+
+    healthy = all(v == "ok" for v in checks.values())
+    if not healthy:
+        response.status_code = 503
+    return {"status": "ok" if healthy else "degraded", "checks": checks}

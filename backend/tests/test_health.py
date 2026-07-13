@@ -8,8 +8,13 @@ from katalon.main import app
 async def test_health() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.get("/health")
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    assert r.status_code in (200, 503)
+    body = r.json()
+    assert set(body["checks"]) == {"database", "elasticsearch"}
+    # status/code are consistent with the individual checks
+    healthy = all(v == "ok" for v in body["checks"].values())
+    assert body["status"] == ("ok" if healthy else "degraded")
+    assert r.status_code == (200 if healthy else 503)
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-07-13
+
+### Changed
+- `/health` prüft jetzt Datenbank und Elasticsearch aktiv und liefert HTTP 503 mit `{"status": "degraded", "checks": {...}}`, wenn eine Abhängigkeit nicht erreichbar ist. Vorher gab der Endpoint statisch `{"status": "ok"}` zurück, wodurch Load Balancer einen ausgefallenen Backend-Zustand nicht erkennen konnten. (Production-Readiness-Audit)
+
 ## [0.5.8] - 2026-07-10
 
 ### Fixed
