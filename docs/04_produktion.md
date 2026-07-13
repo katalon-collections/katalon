@@ -277,8 +277,24 @@ läuft und beides sichert:
 - Mediendateien (`MEDIA_ROOT`): `media_<timestamp>.tar.gz`
 
 Dumps landen im Host-Verzeichnis `BACKUP_ROOT` (Default `/srv/katalon/backups`) und
-werden nach `BACKUP_RETENTION_DAYS` (Default 14) automatisch gelöscht. Intervall über
-`BACKUP_INTERVAL_SECONDS` (Default 86400 = täglich) steuerbar.
+werden nach `BACKUP_RETENTION_DAYS` (Default 14) automatisch gelöscht.
+
+Konfiguration über `.env`:
+
+| Variable | Default | Bedeutung |
+|----------|---------|-----------|
+| `BACKUP_ENABLED` | `true` | `false` = Service läuft, macht aber keine Backups |
+| `BACKUP_ROOT` | `/srv/katalon/backups` | Host-Zielverzeichnis |
+| `BACKUP_RETENTION_DAYS` | `14` | ältere Dumps werden gelöscht |
+| `BACKUP_AT` | `03:00` | feste Uhrzeit `HH:MM` (Container-Zeitzone, s. u.) |
+| `BACKUP_INTERVAL_SECONDS` | `86400` | nur wirksam wenn `BACKUP_AT` **leer** ist |
+
+Zwei Zeitplan-Modi: Ist `BACKUP_AT` gesetzt, läuft das Backup täglich zur festen
+Uhrzeit. Ist es leer, greift der Intervall-Modus (`BACKUP_INTERVAL_SECONDS`, Backup
+sofort beim Start + dann alle N Sekunden).
+
+**Zeitzone:** `BACKUP_AT` wird in der Container-Zeitzone interpretiert (Standard UTC).
+Für lokale Zeit `TZ=Europe/Berlin` im `environment` des `backup`-Service setzen.
 
 ```bash
 # Einmaliges Backup sofort auslösen (z. B. vor einem Deploy)

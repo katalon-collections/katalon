@@ -1,7 +1,13 @@
 #!/bin/sh
-# Katalon backup loop: daily pg_dump (gzip) + media tar, with retention.
-# Runs inside a postgres:16-alpine container (pg_dump 16 + busybox tar/gzip/find).
-# Restore is documented in docs/04_produktion.md.
+# Katalon backup loop: pg_dump (gzip) + media tar, with retention.
+# Runs inside the postgis/postgis:16-3.4 image (same as the DB server, so
+# pg_dump and psql minor versions match). Restore: see docs/04_produktion.md.
+#
+# Env:
+#   BACKUP_ENABLED           true|false (default true) — false = idle, no backups
+#   BACKUP_AT                HH:MM daily clock time (e.g. 03:00). Empty = interval mode.
+#   BACKUP_INTERVAL_SECONDS  interval mode: seconds between runs (default 86400)
+#   BACKUP_RETENTION_DAYS    delete dumps older than N days (default 14)
 set -eu
 
 BACKUP_DIR=/backups
@@ -29,13 +35,40 @@ run_backup() {
   echo "[$(date -Iseconds)] done"
 }
 
+# Sleep until the next BACKUP_AT clock time (GNU date, present in the debian image).
+sleep_until_at() {
+  now="$(date +%s)"
+  target="$(date -d "today ${BACKUP_AT}" +%s 2>/dev/null)" \
+    || { echo "invalid BACKUP_AT=${BACKUP_AT}, expected HH:MM"; exit 1; }
+  [ "$target" -le "$now" ] && target="$(date -d "tomorrow ${BACKUP_AT}" +%s)"
+  wait=$((target - now))
+  echo "[$(date -Iseconds)] next backup at ${BACKUP_AT} (in ${wait}s)"
+  sleep "$wait"
+}
+
 # One-shot mode for a manual run / restore drill: `backup.sh once`.
 if [ "${1:-}" = "once" ]; then
   run_backup
   exit 0
 fi
 
-while true; do
-  run_backup || echo "[$(date -Iseconds)] backup FAILED (will retry next interval)"
-  sleep "${INTERVAL}"
-done
+case "${BACKUP_ENABLED:-true}" in
+  false|0|no|off)
+    echo "[$(date -Iseconds)] BACKUP_ENABLED=${BACKUP_ENABLED} — backups disabled, idling"
+    exec sleep infinity
+    ;;
+esac
+
+if [ -n "${BACKUP_AT:-}" ]; then
+  # Clock-scheduled mode: wait until the target time, then back up.
+  while true; do
+    sleep_until_at
+    run_backup || echo "[$(date -Iseconds)] backup FAILED (will retry next schedule)"
+  done
+else
+  # Interval mode: back up now, then every INTERVAL seconds.
+  while true; do
+    run_backup || echo "[$(date -Iseconds)] backup FAILED (will retry next interval)"
+    sleep "${INTERVAL}"
+  done
+fi

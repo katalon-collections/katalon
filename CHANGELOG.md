@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-07-13
+
+### Added
+- Backup-Service konfigurierbar: `BACKUP_ENABLED` (an/aus) und `BACKUP_AT` (feste Uhrzeit `HH:MM` statt nur Intervall). Ist `BACKUP_AT` gesetzt, läuft das Backup täglich zur Uhrzeit (GNU-`date`-Zeitplan im Container); leer = Intervall-Modus wie bisher. Zeitzone über `TZ` steuerbar. (#273)
+
 ## [0.5.10] - 2026-07-13
 
 ### Added
