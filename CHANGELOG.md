@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-07-15
+
+### Fixed
+- CI: `test_reindex_type_accepts_procedure` schlug seit v0.6.2 fehl. `enqueue_or_503()` (#274) ruft immer `task.delay(...).id` auf; der Test-Mock `fake_delay` gab `None` zurück statt eines Objekts mit `.id` (wie echtes Celery `AsyncResult`). Mock korrigiert, kein Produktionscode geändert.
+
 ## [0.6.3] - 2026-07-15
 
 ### Changed

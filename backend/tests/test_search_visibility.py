@@ -49,8 +49,12 @@ async def test_procedure_index_doc_builds() -> None:
 async def test_reindex_type_accepts_procedure(monkeypatch) -> None:
     calls: list[str] = []
 
-    def fake_delay(target_type: str) -> None:
+    class _FakeAsyncResult:
+        id = "fake-task-id"
+
+    def fake_delay(target_type: str) -> _FakeAsyncResult:
         calls.append(target_type)
+        return _FakeAsyncResult()
 
     monkeypatch.setattr("katalon.workers.index_tasks.bulk_reindex_type_task.delay", fake_delay)
 
