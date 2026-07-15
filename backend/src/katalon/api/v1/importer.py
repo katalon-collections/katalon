@@ -103,7 +103,15 @@ def _load_rows(upload_id: str) -> list[dict]:
     return json.loads(data)
 
 
-@router.post("/upload")
+@router.post(
+    "/upload",
+    summary="Upload a file for import (CSV, TSV, Excel, or XML)",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        413: {"description": "File too large (max 100 MB)"},
+        422: {"description": "Unsupported file format or unparseable XML"},
+    },
+)
 async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
@@ -145,7 +153,15 @@ async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
     }
 
 
-@router.post("/xml-selectors")
+@router.post(
+    "/xml-selectors",
+    summary="Resolve XML selectors and rows after choosing the record element",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Upload not found or expired"},
+        422: {"description": "XML could not be processed"},
+    },
+)
 async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) -> dict:
     """Resolve selectors and rows for XML after the user has chosen the record element."""
     r = _get_redis()
@@ -175,7 +191,15 @@ async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) 
     }
 
 
-@router.post("/dry-run")
+@router.post(
+    "/dry-run",
+    summary="Preview an import without persisting records",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid record type or subtype"},
+        404: {"description": "Upload not found or expired"},
+    },
+)
 async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
@@ -290,7 +314,16 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
     return dry_result
 
 
-@router.post("/import")
+@router.post(
+    "/import",
+    summary="Queue a background import job",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid record type"},
+        404: {"description": "Upload not found or expired"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
+)
 async def run_import(body: ImportRequest, current_user=require_admin_or_editor()) -> dict:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
@@ -316,7 +349,15 @@ async def run_import(body: ImportRequest, current_user=require_admin_or_editor()
     return {"status": "queued", "task_id": task_id}
 
 
-@router.post("/create-fields", dependencies=[require_role("admin")])
+@router.post(
+    "/create-fields",
+    dependencies=[require_role("admin")],
+    summary="Create field definitions on-the-fly for unmapped import columns",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid record type"},
+    },
+)
 async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
     """Create new field definitions on-the-fly for unmapped CSV columns.
 
@@ -392,14 +433,22 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
     return {"created": len(created_fields), "fields": created_fields, "restored": restored_names}
 
 
-@router.post("/task/{task_id}/cancel")
+@router.post(
+    "/task/{task_id}/cancel",
+    summary="Request cancellation of a running import task",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def cancel_task(task_id: str, _=require_admin_or_editor()) -> dict:
     r = _get_redis()
     r.setex(f"cancel:{task_id}", 3600, "1")
     return {"cancelled": True}
 
 
-@router.get("/task/{task_id}")
+@router.get(
+    "/task/{task_id}",
+    summary="Get the status of an import task",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def task_status(task_id: str, _=require_admin_or_editor()) -> dict:
     from celery.result import AsyncResult
 

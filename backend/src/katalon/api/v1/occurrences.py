@@ -40,7 +40,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
 
-@router.get("", response_model=dict)
+@router.get(
+    "",
+    response_model=dict,
+    summary="List occurrences with pagination and filters",
+)
 async def list_occurrences(
     db: DBDep,
     current_user: OptionalCurrentUser,
@@ -65,7 +69,17 @@ async def list_occurrences(
             "items": [OccurrenceRead.model_validate(i) for i in items]}
 
 
-@router.post("", response_model=OccurrenceRead, status_code=201)
+@router.post(
+    "",
+    response_model=OccurrenceRead,
+    status_code=201,
+    summary="Create a new occurrence record",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        400: {"description": "Idno already taken"},
+        422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
+    },
+)
 async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Occurrence:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
@@ -118,7 +132,14 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=requ
     return occ
 
 
-@router.get("/{occ_id}", response_model=OccurrenceRead)
+@router.get(
+    "/{occ_id}",
+    response_model=OccurrenceRead,
+    summary="Get a single occurrence by ID",
+    responses={
+        404: {"description": "Occurrence not found"},
+    },
+)
 async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
@@ -128,7 +149,18 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCur
     return occ
 
 
-@router.put("/{occ_id}", response_model=OccurrenceRead)
+@router.put(
+    "/{occ_id}",
+    response_model=OccurrenceRead,
+    summary="Update an occurrence record",
+    responses={
+        404: {"description": "Occurrence not found"},
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict (If-Match mismatch)"},
+        400: {"description": "Idno already taken"},
+        422: {"description": "Idno missing or metadata validation failed"},
+    },
+)
 async def update_occurrence(
     occ_id: uuid.UUID,
     data: OccurrenceCreate,
@@ -187,7 +219,13 @@ async def update_occurrence(
     return occ
 
 
-@router.post("/{occ_id}/publish")
+@router.post(
+    "/{occ_id}/publish",
+    summary="Publish an occurrence after validating required fields",
+    responses={
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def publish_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
@@ -202,7 +240,16 @@ async def publish_occurrence(
     return result
 
 
-@router.delete("/{occ_id}", status_code=204)
+@router.delete(
+    "/{occ_id}",
+    status_code=204,
+    summary="Delete an occurrence record",
+    responses={
+        404: {"description": "Occurrence not found"},
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Record has linked relations (pass force=true to delete anyway)"},
+    },
+)
 async def delete_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
@@ -239,7 +286,16 @@ async def delete_occurrence(
     enqueue(cleanup_relation_refs, "occurrence", str(occ_id))
 
 
-@router.post("/{occ_id}/snapshots", response_model=SnapshotRead, status_code=201)
+@router.post(
+    "/{occ_id}/snapshots",
+    response_model=SnapshotRead,
+    status_code=201,
+    summary="Create a snapshot of the current occurrence state",
+    responses={
+        404: {"description": "Occurrence not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_snapshot(
     occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
@@ -259,7 +315,11 @@ async def create_snapshot(
     return snap
 
 
-@router.get("/{occ_id}/snapshots", response_model=list[SnapshotRead])
+@router.get(
+    "/{occ_id}/snapshots",
+    response_model=list[SnapshotRead],
+    summary="List snapshots for an occurrence",
+)
 async def list_snapshots(occ_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     result = await db.execute(
         select(RecordSnapshot)
@@ -269,7 +329,15 @@ async def list_snapshots(occ_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     return list(result.scalars().all())
 
 
-@router.post("/{occ_id}/snapshots/{snapshot_id}/restore", response_model=OccurrenceRead)
+@router.post(
+    "/{occ_id}/snapshots/{snapshot_id}/restore",
+    response_model=OccurrenceRead,
+    summary="Restore an occurrence from a snapshot",
+    responses={
+        404: {"description": "Occurrence or snapshot not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def restore_snapshot(
     occ_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Occurrence:
@@ -300,7 +368,11 @@ async def restore_snapshot(
     return occ
 
 
-@router.get("/{occ_id}/audit-log", response_model=list[AuditLogRead])
+@router.get(
+    "/{occ_id}/audit-log",
+    response_model=list[AuditLogRead],
+    summary="List audit log entries for an occurrence",
+)
 async def list_occurrence_audit_log(occ_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log
     return await list_audit_log(db, record_type="occurrence", record_id=occ_id, limit=100)

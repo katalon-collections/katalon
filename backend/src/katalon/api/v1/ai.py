@@ -23,7 +23,22 @@ class AICompleteResponse(BaseModel):
     usage: dict[str, int]
 
 
-@router.post("/complete", response_model=AICompleteResponse, dependencies=[require_admin_or_editor()])
+@router.post(
+    "/complete",
+    response_model=AICompleteResponse,
+    dependencies=[require_admin_or_editor()],
+    summary="Generate an AI-assisted field completion suggestion",
+    responses={
+        401: {"description": "Missing, invalid, or expired credentials"},
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Record or field definition not found"},
+        409: {"description": "AI assistance disabled or not fully configured"},
+        422: {"description": "Invalid record/field type or malformed AI response"},
+        429: {"description": "AI token usage limit exceeded"},
+        500: {"description": "Admin configuration missing"},
+        502: {"description": "AI provider request failed"},
+    },
+)
 async def complete_ai_field(
     data: AICompleteRequest,
     db: DBDep,

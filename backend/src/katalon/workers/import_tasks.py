@@ -88,6 +88,7 @@ def import_records_task(
     has_idno_column = "__idno__" in _mapping_targets
 
     import redis as redis_lib
+
     from katalon.config import settings as _settings
     _redis = redis_lib.from_url(_settings.redis_url, decode_responses=True)
 

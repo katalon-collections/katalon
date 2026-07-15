@@ -27,7 +27,7 @@ _DEFAULTS = {
 }
 
 
-@router.get("")
+@router.get("", summary="Get the active portal theme manifest (falls back to defaults)")
 async def get_theme() -> JSONResponse:
     """Return active theme manifest. Falls back to defaults if no theme configured."""
     theme_name = getattr(settings, "portal_theme", None)

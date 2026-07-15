@@ -15,7 +15,15 @@ class NextIdnoResponse(BaseModel):
     next: str | None
 
 
-@router.get("/next", response_model=NextIdnoResponse)
+@router.get(
+    "/next",
+    response_model=NextIdnoResponse,
+    summary="Preview the next suggested idno for a record type without incrementing the counter",
+    responses={
+        401: {"description": "Missing, invalid, or expired credentials"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def get_next_idno(
     db: DBDep,
     type: str = Query(..., description="Primary record type"),

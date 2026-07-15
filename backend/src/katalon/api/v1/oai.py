@@ -82,7 +82,10 @@ async def _es_search_for_oai(
     return result.body
 
 
-@router.get("")
+@router.get(
+    "",
+    summary="Handle OAI-PMH protocol requests (Identify, ListRecords, GetRecord, etc.)",
+)
 @limiter.limit("100/minute")
 async def oai_endpoint(request: Request, db: DBDep) -> Response:
     params = dict(request.query_params)

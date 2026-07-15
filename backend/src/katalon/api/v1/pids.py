@@ -29,7 +29,18 @@ class DnbUrnRegisterOut(BaseModel):
     value: dict
 
 
-@router.post("/urn/register", response_model=DnbUrnRegisterOut)
+@router.post(
+    "/urn/register",
+    response_model=DnbUrnRegisterOut,
+    summary="Register a DNB URN persistent identifier for a record field",
+    responses={
+        401: {"description": "Missing, invalid, or expired credentials"},
+        404: {"description": "Record, field, or admin config not found"},
+        422: {"description": "Invalid input data"},
+        500: {"description": "Unexpected error during URN registration"},
+        502: {"description": "DNB URN API request failed"},
+    },
+)
 async def register_dnb_urn(
     data: DnbUrnRegisterIn, db: DBDep, current_user: CurrentUser
 ) -> DnbUrnRegisterOut:

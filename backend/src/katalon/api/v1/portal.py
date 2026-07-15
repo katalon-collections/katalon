@@ -75,7 +75,11 @@ async def _get_or_create(db: DBDep) -> PortalConfig:
     return config
 
 
-@router.get("/config", response_model=PortalConfigRead)
+@router.get(
+    "/config",
+    response_model=PortalConfigRead,
+    summary="Get the public portal configuration",
+)
 async def get_portal_config(db: DBDep) -> PortalConfig:
     from katalon.core.models import FieldDefinition
 
@@ -94,7 +98,12 @@ async def get_portal_config(db: DBDep) -> PortalConfig:
     return config
 
 
-@router.put("/config", response_model=PortalConfigRead)
+@router.put(
+    "/config",
+    response_model=PortalConfigRead,
+    summary="Update the public portal configuration",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def update_portal_config(
     data: PortalConfigUpdate, db: DBDep, _=require_role("admin")
 ) -> PortalConfig:
@@ -105,7 +114,16 @@ async def update_portal_config(
     return config
 
 
-@router.post("/logo", response_model=PortalConfigRead, status_code=200)
+@router.post(
+    "/logo",
+    response_model=PortalConfigRead,
+    status_code=200,
+    summary="Upload the portal logo",
+    responses={
+        415: {"description": "Unsupported file type"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def upload_logo(file: UploadFile, db: DBDep, _=require_role("admin")) -> PortalConfig:
     if file.content_type not in _LOGO_ALLOWED:
         raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
@@ -129,7 +147,11 @@ async def upload_logo(file: UploadFile, db: DBDep, _=require_role("admin")) -> P
     return config
 
 
-@router.get("/logo/file")
+@router.get(
+    "/logo/file",
+    summary="Serve the uploaded portal logo file",
+    responses={404: {"description": "No logo uploaded"}},
+)
 async def serve_logo() -> FileResponse:
     logo_dir = Path(settings.media_root) / "logos"
     candidates = sorted(logo_dir.glob("logo.*")) if logo_dir.exists() else []

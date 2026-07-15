@@ -12,13 +12,26 @@ from katalon.core.schemas import OAISetCreate, OAISetRead
 router = APIRouter(prefix="/oai-sets", tags=["oai-pmh"])
 
 
-@router.get("", response_model=list[OAISetRead])
+@router.get(
+    "",
+    response_model=list[OAISetRead],
+    summary="List OAI-PMH sets",
+)
 async def list_oai_sets(db: DBDep) -> list[OAISet]:
     result = await db.execute(select(OAISet).order_by(OAISet.set_spec))
     return list(result.scalars().all())
 
 
-@router.post("", response_model=OAISetRead, status_code=201)
+@router.post(
+    "",
+    response_model=OAISetRead,
+    status_code=201,
+    summary="Create an OAI-PMH set",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        400: {"description": "set_spec already taken"},
+    },
+)
 async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUser) -> OAISet:
     if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets anlegen.")
@@ -32,7 +45,16 @@ async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUse
     return oai_set
 
 
-@router.put("/{set_id}", response_model=OAISetRead)
+@router.put(
+    "/{set_id}",
+    response_model=OAISetRead,
+    summary="Update an OAI-PMH set",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "OAI set not found"},
+        400: {"description": "set_spec already taken"},
+    },
+)
 async def update_oai_set(
     set_id: uuid.UUID,
     data: OAISetCreate,
@@ -57,7 +79,15 @@ async def update_oai_set(
     return oai_set
 
 
-@router.delete("/{set_id}", status_code=204)
+@router.delete(
+    "/{set_id}",
+    status_code=204,
+    summary="Delete an OAI-PMH set",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "OAI set not found"},
+    },
+)
 async def delete_oai_set(set_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
     if current_user.role not in {"admin", "superuser"}:
         raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets löschen.")

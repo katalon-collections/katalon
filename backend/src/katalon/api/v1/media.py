@@ -39,7 +39,12 @@ def _serialize(f: MediaFile) -> dict:
     }
 
 
-@router.get("", response_model=list[dict])
+@router.get(
+    "",
+    response_model=list[dict],
+    summary="List media files for an object",
+    responses={404: {"description": "Object not found"}},
+)
 async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict]:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
@@ -50,7 +55,17 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     return [_serialize(f) for f in result.scalars().all()]
 
 
-@router.post("", status_code=201)
+@router.post(
+    "",
+    status_code=201,
+    summary="Upload a media file for an object",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Object not found"},
+        413: {"description": "File too large"},
+        415: {"description": "Unsupported file type"},
+    },
+)
 async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user=require_admin_or_editor()) -> dict:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     if not obj_result.scalar_one_or_none():
@@ -103,7 +118,15 @@ class MediaPatch(BaseModel):
     rights_holder: dict | None = None
 
 
-@router.patch("/{media_id}", response_model=dict)
+@router.patch(
+    "/{media_id}",
+    response_model=dict,
+    summary="Update media file metadata",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Media file not found"},
+    },
+)
 async def patch_media(
     object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user=require_admin_or_editor()
 ) -> dict:
@@ -130,7 +153,11 @@ async def patch_media(
     return _serialize(media)
 
 
-@router.get("/{media_id}/file")
+@router.get(
+    "/{media_id}/file",
+    summary="Serve the raw media file",
+    responses={404: {"description": "Object, media file, or file on disk not found"}},
+)
 async def serve_media_file(
     object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
 ) -> FileResponse:
@@ -146,7 +173,15 @@ async def serve_media_file(
     return FileResponse(media.file_path, media_type=media.mime_type, filename=media.filename)
 
 
-@router.delete("/{media_id}", status_code=204)
+@router.delete(
+    "/{media_id}",
+    status_code=204,
+    summary="Delete a media file",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Media file not found"},
+    },
+)
 async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user=require_admin_or_editor()) -> None:
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
@@ -167,6 +202,12 @@ def _safe_join(root: Path, relative: str) -> Path:
 @batch_router.post(
     "/batch-import",
     dependencies=[require_admin_or_editor()],
+    summary="Start a batch media import job from a ZIP archive or file list",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Missing or invalid archive, files, or mapping file"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
 )
 async def start_batch_import(
     archive: UploadFile | None = File(None),
@@ -229,6 +270,8 @@ async def start_batch_import(
 @batch_router.get(
     "/batch-import/task/{task_id}",
     dependencies=[require_admin_or_editor()],
+    summary="Get the status of a batch media import task",
+    responses={403: {"description": "Insufficient permissions"}},
 )
 async def batch_import_status(task_id: str) -> dict:
     result = AsyncResult(task_id, app=celery_app)

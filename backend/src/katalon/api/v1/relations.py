@@ -11,7 +11,7 @@ from katalon.services.relation_service import get_active_loan_out_for_object, pr
 router = APIRouter(prefix="/relations", tags=["relations"])
 
 
-@router.get("", response_model=list[RelationRead])
+@router.get("", response_model=list[RelationRead], summary="List relations, optionally filtered by endpoint")
 async def list_relations(
     db: DBDep,
     from_type: str | None = None,
@@ -32,7 +32,16 @@ async def list_relations(
     return list((await db.execute(query)).scalars().all())
 
 
-@router.post("", response_model=RelationRead, status_code=201)
+@router.post(
+    "",
+    response_model=RelationRead,
+    status_code=201,
+    summary="Create a relation between two records",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Object is already in an active loan-out procedure"},
+    },
+)
 async def create_relation(
     data: RelationCreate,
     db: DBDep,
@@ -65,7 +74,15 @@ async def create_relation(
     return rel
 
 
-@router.put("/{relation_id}", response_model=RelationRead)
+@router.put(
+    "/{relation_id}",
+    response_model=RelationRead,
+    summary="Update a relation's type or metadata",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Relation not found"},
+    },
+)
 async def update_relation(
     relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user=require_admin_or_editor()
 ) -> Relation:
@@ -81,7 +98,15 @@ async def update_relation(
     return rel
 
 
-@router.delete("/{relation_id}", status_code=204)
+@router.delete(
+    "/{relation_id}",
+    status_code=204,
+    summary="Delete a relation",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Relation not found"},
+    },
+)
 async def delete_relation(
     relation_id: uuid.UUID,
     db: DBDep,

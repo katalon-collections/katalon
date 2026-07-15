@@ -27,7 +27,16 @@ async def _unset_default_for_type(db: DBDep, primary_type: str, *, keep_id: uuid
             subtype.is_default = False
 
 
-@router.get("", response_model=list[RecordSubtypeRead], dependencies=[require_role("admin")])
+@router.get(
+    "",
+    response_model=list[RecordSubtypeRead],
+    dependencies=[require_role("admin")],
+    summary="List record subtypes, optionally filtered by primary type",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid primary type"},
+    },
+)
 async def list_record_subtypes(db: DBDep, primary_type: str | None = Query(default=None)) -> list[RecordSubtype]:
     q = select(RecordSubtype)
     if primary_type is not None:
@@ -37,7 +46,18 @@ async def list_record_subtypes(db: DBDep, primary_type: str | None = Query(defau
     return list(result.scalars().all())
 
 
-@router.post("", response_model=RecordSubtypeRead, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "",
+    response_model=RecordSubtypeRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create a new record subtype",
+    responses={
+        400: {"description": "Subtype already exists"},
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid primary type or subtype name"},
+    },
+)
 async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordSubtype:
     validate_primary_type(data.primary_type)
     name = normalize_subtype_name(data.name, allow_null=False)
@@ -65,7 +85,18 @@ async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordS
     return subtype
 
 
-@router.put("/{subtype_id}", response_model=RecordSubtypeRead, dependencies=[require_role("admin")])
+@router.put(
+    "/{subtype_id}",
+    response_model=RecordSubtypeRead,
+    dependencies=[require_role("admin")],
+    summary="Update a record subtype",
+    responses={
+        400: {"description": "Subtype already exists"},
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Subtype not found"},
+        422: {"description": "Invalid primary type or subtype name"},
+    },
+)
 async def update_record_subtype(
     subtype_id: uuid.UUID, data: RecordSubtypeCreate, db: DBDep
 ) -> RecordSubtype:
@@ -99,7 +130,17 @@ async def update_record_subtype(
     return subtype
 
 
-@router.delete("/{subtype_id}", status_code=204, dependencies=[require_role("admin")])
+@router.delete(
+    "/{subtype_id}",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Delete a record subtype",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Subtype not found"},
+        409: {"description": "Subtype still in use by existing records"},
+    },
+)
 async def delete_record_subtype(subtype_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(select(RecordSubtype).where(RecordSubtype.id == subtype_id))
     subtype = result.scalar_one_or_none()

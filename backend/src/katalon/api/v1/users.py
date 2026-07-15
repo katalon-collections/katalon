@@ -14,13 +14,30 @@ router = APIRouter(prefix="/users", tags=["users"])
 _VALID_ROLES = {"admin", "superuser", "editor", "cataloger", "viewer"}
 
 
-@router.get("", response_model=list[UserRead], dependencies=[require_role("admin")])
+@router.get(
+    "",
+    response_model=list[UserRead],
+    dependencies=[require_role("admin")],
+    summary="List all users",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def list_users(db: DBDep) -> list[User]:
     result = await db.execute(select(User).order_by(User.created_at))
     return list(result.scalars().all())
 
 
-@router.post("", response_model=UserRead, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "",
+    response_model=UserRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create a new user",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid role"},
+        400: {"description": "Email already taken"},
+    },
+)
 async def create_user(data: UserCreate, db: DBDep) -> User:
     if data.role not in _VALID_ROLES:
         raise HTTPException(status_code=422, detail=f"Ungültige Rolle. Erlaubt: {_VALID_ROLES}")
@@ -37,12 +54,17 @@ async def create_user(data: UserCreate, db: DBDep) -> User:
     return user
 
 
-@router.get("/me", response_model=UserRead)
+@router.get("/me", response_model=UserRead, summary="Get the current authenticated user")
 async def get_me(current_user: CurrentUser) -> User:
     return current_user
 
 
-@router.put("/me/password", status_code=204)
+@router.put(
+    "/me/password",
+    status_code=204,
+    summary="Change the current user's own password",
+    responses={400: {"description": "Current password incorrect"}},
+)
 async def change_own_password(data: PasswordChange, db: DBDep, current_user: CurrentUser) -> None:
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
@@ -57,7 +79,12 @@ async def change_own_password(data: PasswordChange, db: DBDep, current_user: Cur
     )
 
 
-@router.put("/me/email", response_model=UserRead)
+@router.put(
+    "/me/email",
+    response_model=UserRead,
+    summary="Change the current user's own email",
+    responses={400: {"description": "Current password incorrect or email already taken"}},
+)
 async def change_own_email(data: EmailChange, db: DBDep, current_user: CurrentUser) -> User:
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
@@ -79,7 +106,16 @@ async def change_own_email(data: EmailChange, db: DBDep, current_user: CurrentUs
     return current_user
 
 
-@router.get("/{user_id}", response_model=UserRead, dependencies=[require_role("admin")])
+@router.get(
+    "/{user_id}",
+    response_model=UserRead,
+    dependencies=[require_role("admin")],
+    summary="Get a user by ID",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "User not found"},
+    },
+)
 async def get_user(user_id: uuid.UUID, db: DBDep) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -88,7 +124,18 @@ async def get_user(user_id: uuid.UUID, db: DBDep) -> User:
     return user
 
 
-@router.put("/{user_id}", response_model=UserRead, dependencies=[require_role("admin")])
+@router.put(
+    "/{user_id}",
+    response_model=UserRead,
+    dependencies=[require_role("admin")],
+    summary="Update a user's role, email, status, or password",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "User not found"},
+        422: {"description": "Invalid role"},
+        400: {"description": "Invalid self-demotion, self-deactivation, or email already taken"},
+    },
+)
 async def update_user(
     user_id: uuid.UUID, data: UserUpdate, db: DBDep, current_user: CurrentUser
 ) -> User:
@@ -137,7 +184,17 @@ async def update_user(
     return user
 
 
-@router.delete("/{user_id}", status_code=204, dependencies=[require_role("admin")])
+@router.delete(
+    "/{user_id}",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Delete a user",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        400: {"description": "Cannot delete own account"},
+        404: {"description": "User not found"},
+    },
+)
 async def delete_user(user_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Eigenes Konto kann nicht gelöscht werden")

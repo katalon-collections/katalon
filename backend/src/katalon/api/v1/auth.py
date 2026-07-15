@@ -63,7 +63,15 @@ def issue_token_pair(user: User) -> Token:
     )
 
 
-@router.post("/token", response_model=Token)
+@router.post(
+    "/token",
+    response_model=Token,
+    summary="Authenticate with username/password and issue an access/refresh token pair",
+    responses={
+        400: {"description": "Account deactivated"},
+        401: {"description": "Invalid credentials"},
+    },
+)
 async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep) -> Token:
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
@@ -78,7 +86,14 @@ async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
     return issue_token_pair(user)
 
 
-@router.post("/refresh", response_model=Token)
+@router.post(
+    "/refresh",
+    response_model=Token,
+    summary="Exchange a refresh token for a new access/refresh token pair",
+    responses={
+        401: {"description": "Invalid or expired refresh token"},
+    },
+)
 async def refresh_token(data: RefreshTokenRequest, db: DBDep) -> Token:
     try:
         payload = jwt.decode(data.refresh_token, settings.secret_key, algorithms=[settings.algorithm])

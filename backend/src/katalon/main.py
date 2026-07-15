@@ -1,6 +1,8 @@
 import logging
 import secrets
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -60,6 +62,39 @@ from katalon.core.models import (
 )
 from katalon.database import AsyncSessionLocal
 from katalon.services.relation_type_service import sync_relation_type_terms
+
+OPENAPI_TAGS = [
+    {"name": "system", "description": "Health-Check und Systemstatus."},
+    {"name": "objects", "description": "Object records (Fotos, Dokumente, Gemälde)."},
+    {"name": "entities", "description": "Entity records (Personen, Organisationen)."},
+    {"name": "places", "description": "Place records (geografische Orte, PostGIS)."},
+    {"name": "occurrences", "description": "Occurrence records (Werke, Ereignisse, Konzepte)."},
+    {"name": "procedures", "description": "Vorgänge: Leihverkehr, Erwerbung, Restaurierung."},
+    {"name": "relations", "description": "Generische Relationen zwischen den fünf Record-Typen."},
+    {"name": "schema", "description": "field_definitions-Verwaltung (Schema-Engine)."},
+    {"name": "record-subtypes", "description": "Konfigurierbare Subtypen je Record-Typ."},
+    {"name": "vocabularies", "description": "Vokabulare und Terms."},
+    {"name": "metadata-mappings", "description": "Mapping-Konfiguration für Importer/Export."},
+    {"name": "media", "description": "Upload, IIIF-Tiles, Medien-Verknüpfung."},
+    {"name": "search", "description": "Elasticsearch-Suche, Facetten, Reindex."},
+    {"name": "importer", "description": "Excel/CSV/XML-Import, Dry Run, Batch."},
+    {"name": "oai-pmh", "description": "OAI-PMH-Schnittstelle."},
+    {"name": "auth", "description": "Login, Token, Passwort-Verwaltung."},
+    {"name": "users", "description": "Nutzerverwaltung und Rollen."},
+    {"name": "api-keys", "description": "API-Key-Verwaltung für Machine-to-Machine-Zugriff."},
+    {"name": "authorities", "description": "Authority-Adapter (GND, Geonames) und Normdaten-Abgleich."},
+    {"name": "audit", "description": "Audit-Log und Record-Snapshots (Versionierung)."},
+    {"name": "admin", "description": "Admin-Konfiguration und Systemeinstellungen."},
+    {"name": "banners", "description": "Portal-Hinweisbanner."},
+    {"name": "theme", "description": "Portal-/Admin-Theming."},
+    {"name": "pages", "description": "Statische Portal-Seiten."},
+    {"name": "portal", "description": "Öffentliche Portal-Endpoints."},
+    {"name": "pids", "description": "Persistent Identifiers."},
+    {"name": "idno", "description": "Inventarnummern-Generierung."},
+    {"name": "feedback", "description": "Nutzer-Feedback."},
+    {"name": "ai", "description": "KI-gestützte Vorschläge (z. B. Auto-Mapping)."},
+    {"name": "dnb-urn-mock", "description": "Test-Double für DNB-URN-Vergabe (nur Dev/Test)."},
+]
 
 logger = logging.getLogger(__name__)
 # 15 random bytes via token_urlsafe produce ~20 URL-safe chars (letters, digits, -,_).
@@ -361,14 +396,20 @@ async def lifespan(app: FastAPI):
     yield
 
 
+try:
+    _api_version = pkg_version("katalon")
+except PackageNotFoundError:
+    _api_version = "0.0.0-dev"
+
 app = FastAPI(
     lifespan=lifespan,
     title="Katalon API",
     description="Metadata Management System for GLAM collections",
-    version="0.1.0",
+    version=_api_version,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    openapi_tags=OPENAPI_TAGS,
 )
 
 app.state.limiter = limiter

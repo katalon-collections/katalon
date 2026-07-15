@@ -25,7 +25,16 @@ class IndexHealthResponse(BaseModel):
     types: dict[str, TypeHealth]
 
 
-@router.get("", response_model=IndexHealthResponse, dependencies=[require_role("admin")])
+@router.get(
+    "",
+    response_model=IndexHealthResponse,
+    dependencies=[require_role("admin")],
+    summary="Get record counts and DB/Elasticsearch sync deltas per record type",
+    responses={
+        401: {"description": "Missing, invalid, or expired credentials"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def get_index_health(db: DBDep) -> IndexHealthResponse:
     types: dict[str, TypeHealth] = {}
     for record_type, model in _MODEL_MAP.items():
@@ -35,7 +44,17 @@ async def get_index_health(db: DBDep) -> IndexHealthResponse:
     return IndexHealthResponse(types=types)
 
 
-@router.post("/reconcile", dependencies=[require_role("admin")])
+@router.post(
+    "/reconcile",
+    dependencies=[require_role("admin")],
+    summary="Trigger an asynchronous Elasticsearch reconciliation job",
+    responses={
+        400: {"description": "mode must be 'count' or 'id_diff'"},
+        401: {"description": "Missing, invalid, or expired credentials"},
+        403: {"description": "Insufficient permissions"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
+)
 async def trigger_reconciliation(mode: str = "id_diff") -> dict[str, str]:
     if mode not in ("count", "id_diff"):
         from fastapi import HTTPException

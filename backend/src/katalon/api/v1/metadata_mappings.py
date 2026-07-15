@@ -21,7 +21,11 @@ def _require_admin(current_user: CurrentUser) -> None:
         )
 
 
-@router.get("", response_model=list[MetadataMappingRead])
+@router.get(
+    "",
+    response_model=list[MetadataMappingRead],
+    summary="List metadata mappings",
+)
 async def list_metadata_mappings(
     db: DBDep,
     format_key: str | None = Query(None),
@@ -34,7 +38,17 @@ async def list_metadata_mappings(
     )
 
 
-@router.post("", response_model=MetadataMappingRead, status_code=201)
+@router.post(
+    "",
+    response_model=MetadataMappingRead,
+    status_code=201,
+    summary="Create a metadata mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid mapping target"},
+        404: {"description": "Field definition not found"},
+    },
+)
 async def create_metadata_mapping(
     data: MetadataMappingCreate,
     db: DBDep,
@@ -61,7 +75,16 @@ async def create_metadata_mapping(
     return mapping
 
 
-@router.put("/field/{field_definition_id}/{format_key}", response_model=MetadataMappingRead | None)
+@router.put(
+    "/field/{field_definition_id}/{format_key}",
+    response_model=MetadataMappingRead | None,
+    summary="Create, update, or clear a field-to-format mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition not found"},
+        422: {"description": "Invalid mapping target"},
+    },
+)
 async def set_field_format_mapping(
     field_definition_id: uuid.UUID,
     format_key: str,
@@ -111,7 +134,15 @@ async def set_field_format_mapping(
     return mapping
 
 
-@router.delete("/{mapping_id}", status_code=204)
+@router.delete(
+    "/{mapping_id}",
+    status_code=204,
+    summary="Delete a metadata mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Metadata mapping not found"},
+    },
+)
 async def delete_metadata_mapping(
     mapping_id: uuid.UUID,
     db: DBDep,

@@ -39,7 +39,11 @@ def _generate_key() -> tuple[str, str, str]:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/users/me/api-keys", response_model=list[ApiKeyRead])
+@router.get(
+    "/users/me/api-keys",
+    response_model=list[ApiKeyRead],
+    summary="List the current user's own API keys",
+)
 async def list_own_api_keys(current_user: CurrentUser, db: DBDep) -> list[ApiKey]:
     result = await db.execute(
         select(ApiKey).where(ApiKey.user_id == current_user.id).order_by(ApiKey.created_at)
@@ -47,7 +51,12 @@ async def list_own_api_keys(current_user: CurrentUser, db: DBDep) -> list[ApiKey
     return list(result.scalars().all())
 
 
-@router.post("/users/me/api-keys", response_model=ApiKeyCreated, status_code=201)
+@router.post(
+    "/users/me/api-keys",
+    response_model=ApiKeyCreated,
+    status_code=201,
+    summary="Create a new API key for the current user",
+)
 async def create_own_api_key(data: ApiKeyCreate, current_user: CurrentUser, db: DBDep) -> ApiKeyCreated:
     full_key, prefix, hashed = _generate_key()
     api_key = ApiKey(
@@ -72,7 +81,12 @@ async def create_own_api_key(data: ApiKeyCreate, current_user: CurrentUser, db: 
     )
 
 
-@router.delete("/users/me/api-keys/{key_id}", status_code=204)
+@router.delete(
+    "/users/me/api-keys/{key_id}",
+    status_code=204,
+    summary="Revoke the current user's own API key",
+    responses={404: {"description": "API key not found"}},
+)
 async def revoke_own_api_key(key_id: uuid.UUID, current_user: CurrentUser, db: DBDep) -> None:
     result = await db.execute(
         select(ApiKey).where(ApiKey.id == key_id, ApiKey.user_id == current_user.id)
@@ -88,7 +102,16 @@ async def revoke_own_api_key(key_id: uuid.UUID, current_user: CurrentUser, db: D
 # ---------------------------------------------------------------------------
 
 
-@router.get("/users/{user_id}/api-keys", response_model=list[ApiKeyRead], dependencies=[require_role("admin")])
+@router.get(
+    "/users/{user_id}/api-keys",
+    response_model=list[ApiKeyRead],
+    dependencies=[require_role("admin")],
+    summary="List API keys for a given user (admin)",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "User not found"},
+    },
+)
 async def list_user_api_keys(user_id: uuid.UUID, db: DBDep) -> list[ApiKey]:
     user_result = await db.execute(select(User).where(User.id == user_id))
     if not user_result.scalar_one_or_none():
@@ -99,7 +122,17 @@ async def list_user_api_keys(user_id: uuid.UUID, db: DBDep) -> list[ApiKey]:
     return list(result.scalars().all())
 
 
-@router.post("/users/{user_id}/api-keys", response_model=ApiKeyCreated, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "/users/{user_id}/api-keys",
+    response_model=ApiKeyCreated,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create an API key for a given user (admin)",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "User not found"},
+    },
+)
 async def create_user_api_key(user_id: uuid.UUID, data: ApiKeyCreate, db: DBDep) -> ApiKeyCreated:
     user_result = await db.execute(select(User).where(User.id == user_id))
     if not user_result.scalar_one_or_none():
@@ -127,7 +160,16 @@ async def create_user_api_key(user_id: uuid.UUID, data: ApiKeyCreate, db: DBDep)
     )
 
 
-@router.delete("/users/{user_id}/api-keys/{key_id}", status_code=204, dependencies=[require_role("admin")])
+@router.delete(
+    "/users/{user_id}/api-keys/{key_id}",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Revoke an API key for a given user (admin)",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "API key not found"},
+    },
+)
 async def revoke_user_api_key(user_id: uuid.UUID, key_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(
         select(ApiKey).where(ApiKey.id == key_id, ApiKey.user_id == user_id)

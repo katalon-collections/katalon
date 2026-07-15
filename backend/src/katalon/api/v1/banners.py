@@ -66,7 +66,11 @@ def _active_filter(q: object, *, surface: str) -> object:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/active/admin", response_model=list[BannerRead])
+@router.get(
+    "/active/admin",
+    response_model=list[BannerRead],
+    summary="List active banners for the admin surface",
+)
 async def active_admin_banners(db: DBDep) -> list[Banner]:
     """Return active banners for the admin surface."""
     q = select(Banner).order_by(Banner.created_at.desc())
@@ -75,7 +79,11 @@ async def active_admin_banners(db: DBDep) -> list[Banner]:
     return list(result.scalars().all())
 
 
-@router.get("/active/portal", response_model=list[BannerRead])
+@router.get(
+    "/active/portal",
+    response_model=list[BannerRead],
+    summary="List active banners for the portal surface",
+)
 async def active_portal_banners(db: DBDep) -> list[Banner]:
     """Return active banners for the portal surface."""
     q = select(Banner).order_by(Banner.created_at.desc())
@@ -89,13 +97,27 @@ async def active_portal_banners(db: DBDep) -> list[Banner]:
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=list[BannerRead])
+@router.get(
+    "",
+    response_model=list[BannerRead],
+    summary="List all banners (admin)",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def list_banners(db: DBDep, _=require_admin()) -> list[Banner]:
     result = await db.execute(select(Banner).order_by(Banner.created_at.desc()))
     return list(result.scalars().all())
 
 
-@router.post("", response_model=BannerRead, status_code=201)
+@router.post(
+    "",
+    response_model=BannerRead,
+    status_code=201,
+    summary="Create a new banner",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid color"},
+    },
+)
 async def create_banner(body: BannerCreate, db: DBDep, _=require_admin()) -> Banner:
     if body.color not in VALID_COLORS:
         raise HTTPException(status_code=422, detail=f"Ungültige Farbe. Erlaubt: {', '.join(VALID_COLORS)}")
@@ -106,7 +128,16 @@ async def create_banner(body: BannerCreate, db: DBDep, _=require_admin()) -> Ban
     return banner
 
 
-@router.put("/{banner_id}", response_model=BannerRead)
+@router.put(
+    "/{banner_id}",
+    response_model=BannerRead,
+    summary="Update a banner",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Banner not found"},
+        422: {"description": "Invalid color"},
+    },
+)
 async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _=require_admin()) -> Banner:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()
@@ -121,7 +152,15 @@ async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _=r
     return banner
 
 
-@router.delete("/{banner_id}", status_code=204)
+@router.delete(
+    "/{banner_id}",
+    status_code=204,
+    summary="Delete a banner",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Banner not found"},
+    },
+)
 async def delete_banner(banner_id: uuid.UUID, db: DBDep, _=require_admin()) -> None:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()

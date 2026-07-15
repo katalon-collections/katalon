@@ -33,7 +33,11 @@ class SearchResponse(BaseModel):
     facets: dict[str, list[FacetBucket]]
 
 
-@router.get("", response_model=SearchResponse)
+@router.get(
+    "",
+    response_model=SearchResponse,
+    summary="Search records with filters and facets",
+)
 @limiter.limit("100/minute")
 async def search(
     request: Request,
@@ -81,7 +85,15 @@ async def search(
     return SearchResponse(**result)
 
 
-@router.post("/reindex", dependencies=[require_role("admin")])
+@router.post(
+    "/reindex",
+    dependencies=[require_role("admin")],
+    summary="Trigger a full search index rebuild",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
+)
 async def trigger_reindex() -> dict[str, str]:
     from katalon.workers.enqueue import enqueue_or_503
     from katalon.workers.index_tasks import reindex_all_task
@@ -89,7 +101,16 @@ async def trigger_reindex() -> dict[str, str]:
     return {"status": "queued"}
 
 
-@router.post("/reindex/{target_type}", dependencies=[require_role("admin")])
+@router.post(
+    "/reindex/{target_type}",
+    dependencies=[require_role("admin")],
+    summary="Trigger a search index rebuild for one record type",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid target type"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
+)
 async def trigger_reindex_type(target_type: str) -> dict[str, str]:
     valid = {"object", "entity", "place", "occurrence", "procedure"}
     if target_type not in valid:

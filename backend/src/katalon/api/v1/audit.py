@@ -46,7 +46,11 @@ async def _resolve_record_labels(db, logs: list[AuditLog]) -> dict[uuid.UUID, st
     return labels
 
 
-@router.get("", response_model=list[AuditLogRead])
+@router.get(
+    "",
+    response_model=list[AuditLogRead],
+    summary="List audit log entries with optional filters by type, record, user, and action",
+)
 async def list_audit_log(
     db: DBDep,
     record_type: str | None = None,

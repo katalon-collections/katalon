@@ -134,7 +134,12 @@ async def _embed_children(
     return out
 
 
-@router.get("/{target_type}", response_model=list[FieldDefinitionRead])
+@router.get(
+    "/{target_type}",
+    response_model=list[FieldDefinitionRead],
+    summary="List field definitions for a target type",
+    responses={422: {"description": "Invalid target type or subtype"}},
+)
 async def list_fields(
     target_type: str,
     db: DBDep,
@@ -182,7 +187,18 @@ async def _validate_parent(db: DBDep, parent_id: uuid.UUID, field_type: str) -> 
         )
 
 
-@router.post("", response_model=FieldDefinitionRead, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "",
+    response_model=FieldDefinitionRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create a new field definition",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Parent field not found"},
+        422: {"description": "Invalid field name, target type, subtype, parent, or settings"},
+    },
+)
 async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
@@ -199,7 +215,17 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     return _fd_read(field)
 
 
-@router.put("/{field_id}", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
+@router.put(
+    "/{field_id}",
+    response_model=FieldDefinitionRead,
+    dependencies=[require_role("admin")],
+    summary="Update an existing field definition",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition or parent field not found"},
+        422: {"description": "Invalid field name, target type, subtype, parent, or settings"},
+    },
+)
 async def update_field(
     field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep
 ) -> FieldDefinitionRead:
@@ -228,7 +254,17 @@ async def update_field(
     return _fd_read(field)
 
 
-@router.delete("/{field_id}", status_code=204, dependencies=[require_role("admin")])
+@router.delete(
+    "/{field_id}",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Soft-delete a field definition",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition not found"},
+        422: {"description": "Field 'label' is a system field and cannot be deleted"},
+    },
+)
 async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(
         select(FieldDefinition).where(
@@ -246,7 +282,16 @@ async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
     _enqueue_reindex(target_type)
 
 
-@router.post("/{field_id}/restore", response_model=FieldDefinitionRead, dependencies=[require_role("admin")])
+@router.post(
+    "/{field_id}/restore",
+    response_model=FieldDefinitionRead,
+    dependencies=[require_role("admin")],
+    summary="Restore a soft-deleted field definition",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Deleted field definition not found"},
+    },
+)
 async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
     result = await db.execute(
         select(FieldDefinition).where(
@@ -263,7 +308,17 @@ async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
     return _fd_read(field)
 
 
-@router.post("/import", response_model=ImportResult, status_code=200, dependencies=[require_role("admin")])
+@router.post(
+    "/import",
+    response_model=ImportResult,
+    status_code=200,
+    dependencies=[require_role("admin")],
+    summary="Import field definitions from a YAML or JSON file",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "File could not be parsed or has an invalid format"},
+    },
+)
 async def import_schema(
     file: UploadFile,
     db: DBDep,

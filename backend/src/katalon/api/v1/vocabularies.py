@@ -52,13 +52,26 @@ def _build_tree(terms: list[VocabularyTerm]) -> list[VocabularyTermNode]:
 # Vocabulary CRUD
 # ---------------------------------------------------------------------------
 
-@router.get("", response_model=list[VocabularyRead])
+@router.get(
+    "",
+    response_model=list[VocabularyRead],
+    summary="List all vocabularies",
+)
 async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
     result = await db.execute(select(Vocabulary).order_by(Vocabulary.name))
     return list(result.scalars().all())
 
 
-@router.post("", response_model=VocabularyRead, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "",
+    response_model=VocabularyRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create a new vocabulary",
+    responses={
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
     vocab = Vocabulary(**data.model_dump())
     db.add(vocab)
@@ -70,7 +83,11 @@ async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
 # Terms – flat list
 # ---------------------------------------------------------------------------
 
-@router.get("/{vocab_id}/terms", response_model=list[VocabularyTermRead])
+@router.get(
+    "/{vocab_id}/terms",
+    response_model=list[VocabularyTermRead],
+    summary="List terms of a vocabulary, optionally filtered by search",
+)
 async def list_terms(
     vocab_id: uuid.UUID,
     db: DBDep,
@@ -95,7 +112,14 @@ async def list_terms(
 # Terms – tree
 # ---------------------------------------------------------------------------
 
-@router.get("/{vocab_id}/tree", response_model=list[VocabularyTermNode])
+@router.get(
+    "/{vocab_id}/tree",
+    response_model=list[VocabularyTermNode],
+    summary="Get terms of a vocabulary as a nested tree",
+    responses={
+        404: {"description": "Vocabulary not found"},
+    },
+)
 async def get_tree(vocab_id: uuid.UUID, db: DBDep) -> list[VocabularyTermNode]:
     """Return terms of a vocabulary as a nested tree.
 
@@ -114,7 +138,14 @@ async def get_tree(vocab_id: uuid.UUID, db: DBDep) -> list[VocabularyTermNode]:
     return _build_tree(terms)
 
 
-@router.get("/{vocab_id}/terms/{term_id}/ancestors", response_model=list[VocabularyTermRead])
+@router.get(
+    "/{vocab_id}/terms/{term_id}/ancestors",
+    response_model=list[VocabularyTermRead],
+    summary="Get the ancestor chain of a vocabulary term",
+    responses={
+        404: {"description": "Term not found"},
+    },
+)
 async def get_ancestors(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> list[VocabularyTerm]:
     """Return ancestor chain from root down to (not including) the given term."""
     result = await db.execute(
@@ -144,7 +175,18 @@ async def get_ancestors(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> l
 # Term CRUD
 # ---------------------------------------------------------------------------
 
-@router.post("/{vocab_id}/terms", response_model=VocabularyTermRead, status_code=201, dependencies=[require_role("admin")])
+@router.post(
+    "/{vocab_id}/terms",
+    response_model=VocabularyTermRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Create a new vocabulary term",
+    responses={
+        404: {"description": "Vocabulary not found"},
+        422: {"description": "Metadata validation failed"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_term(
     vocab_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
 ) -> VocabularyTerm:
@@ -162,7 +204,17 @@ async def create_term(
     return term
 
 
-@router.put("/terms/{term_id}", response_model=VocabularyTermRead, dependencies=[require_role("admin")])
+@router.put(
+    "/terms/{term_id}",
+    response_model=VocabularyTermRead,
+    dependencies=[require_role("admin")],
+    summary="Update a vocabulary term",
+    responses={
+        404: {"description": "Term not found"},
+        422: {"description": "Metadata validation failed"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def update_term(
     term_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
 ) -> VocabularyTerm:
@@ -180,7 +232,16 @@ async def update_term(
     return term
 
 
-@router.delete("/terms/{term_id}", status_code=204, dependencies=[require_role("admin")])
+@router.delete(
+    "/terms/{term_id}",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Delete a vocabulary term",
+    responses={
+        404: {"description": "Term not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
     result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
     term = result.scalar_one_or_none()
@@ -192,6 +253,12 @@ async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
 @router.post(
     "/{vocab_id}/import",
     dependencies=[require_role("admin")],
+    summary="Import vocabulary terms from CSV/TSV or JSON with optional dry-run",
+    responses={
+        404: {"description": "Vocabulary not found"},
+        422: {"description": "Import mapping, parsing, or file type error"},
+        403: {"description": "Insufficient permissions"},
+    },
 )
 async def import_terms(
     vocab_id: uuid.UUID,

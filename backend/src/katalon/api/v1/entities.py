@@ -40,7 +40,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
-@router.get("", response_model=dict)
+@router.get(
+    "",
+    response_model=dict,
+    summary="List entities with pagination, filters and search",
+)
 async def list_entities(
     db: DBDep,
     current_user: OptionalCurrentUser,
@@ -65,7 +69,17 @@ async def list_entities(
     return {"total": total, "page": page, "page_size": page_size, "items": [EntityRead.model_validate(i) for i in items]}
 
 
-@router.post("", response_model=EntityRead, status_code=201)
+@router.post(
+    "",
+    response_model=EntityRead,
+    status_code=201,
+    summary="Create a new entity",
+    responses={
+        422: {"description": "Metadata validation failed or ID-Nr. pattern mismatch"},
+        400: {"description": "ID-Nr. already assigned"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
@@ -118,7 +132,14 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admi
     return entity
 
 
-@router.get("/{entity_id}", response_model=EntityRead)
+@router.get(
+    "/{entity_id}",
+    response_model=EntityRead,
+    summary="Get a single entity by ID",
+    responses={
+        404: {"description": "Entity not found"},
+    },
+)
 async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -128,7 +149,18 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     return entity
 
 
-@router.put("/{entity_id}", response_model=EntityRead)
+@router.put(
+    "/{entity_id}",
+    response_model=EntityRead,
+    summary="Update an entity",
+    responses={
+        404: {"description": "Entity not found"},
+        400: {"description": "ID-Nr. already assigned"},
+        422: {"description": "Metadata validation failed"},
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict (If-Match mismatch)"},
+    },
+)
 async def update_entity(
     entity_id: uuid.UUID,
     data: EntityCreate,
@@ -187,7 +219,14 @@ async def update_entity(
     return entity
 
 
-@router.post("/{entity_id}/publish")
+@router.post(
+    "/{entity_id}/publish",
+    summary="Publish an entity after validating required fields",
+    responses={
+        422: {"description": "Required fields missing or invalid"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def publish_entity(
     entity_id: uuid.UUID,
     db: DBDep,
@@ -202,7 +241,16 @@ async def publish_entity(
     return result
 
 
-@router.delete("/{entity_id}", status_code=204)
+@router.delete(
+    "/{entity_id}",
+    status_code=204,
+    summary="Delete an entity",
+    responses={
+        404: {"description": "Entity not found"},
+        409: {"description": "Entity has related records (use force=true to override)"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def delete_entity(
     entity_id: uuid.UUID,
     db: DBDep,
@@ -239,7 +287,16 @@ async def delete_entity(
     enqueue(cleanup_relation_refs, "entity", str(entity_id))
 
 
-@router.post("/{entity_id}/snapshots", response_model=SnapshotRead, status_code=201)
+@router.post(
+    "/{entity_id}/snapshots",
+    response_model=SnapshotRead,
+    status_code=201,
+    summary="Create a snapshot of an entity's current state",
+    responses={
+        404: {"description": "Entity not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_snapshot(
     entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
@@ -255,7 +312,11 @@ async def create_snapshot(
     return snap
 
 
-@router.get("/{entity_id}/snapshots", response_model=list[SnapshotRead])
+@router.get(
+    "/{entity_id}/snapshots",
+    response_model=list[SnapshotRead],
+    summary="List snapshots for an entity",
+)
 async def list_snapshots(entity_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     result = await db.execute(
         select(RecordSnapshot)
@@ -265,7 +326,15 @@ async def list_snapshots(entity_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
     return list(result.scalars().all())
 
 
-@router.post("/{entity_id}/snapshots/{snapshot_id}/restore", response_model=EntityRead)
+@router.post(
+    "/{entity_id}/snapshots/{snapshot_id}/restore",
+    response_model=EntityRead,
+    summary="Restore an entity from a snapshot",
+    responses={
+        404: {"description": "Snapshot or entity not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def restore_snapshot(
     entity_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Entity:
@@ -296,7 +365,11 @@ async def restore_snapshot(
     return entity
 
 
-@router.get("/{entity_id}/audit-log", response_model=list[AuditLogRead])
+@router.get(
+    "/{entity_id}/audit-log",
+    response_model=list[AuditLogRead],
+    summary="List audit log entries for an entity",
+)
 async def list_entity_audit_log(entity_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log
     return await list_audit_log(db, record_type="entity", record_id=entity_id, limit=100)

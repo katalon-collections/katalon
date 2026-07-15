@@ -28,7 +28,11 @@ class HitOut(BaseModel):
     extra: dict
 
 
-@router.get("/", response_model=list[SourceOut])
+@router.get(
+    "/",
+    response_model=list[SourceOut],
+    summary="List registered authority sources",
+)
 async def list_sources(db: DBDep, _: CurrentUser) -> list[SourceOut]:
     result = await db.execute(select(AuthoritySourceModel))
     sources = result.scalars().all()
@@ -41,7 +45,12 @@ async def list_sources(db: DBDep, _: CurrentUser) -> list[SourceOut]:
     return [SourceOut(id=s.id, label=s.label, is_enabled=s.is_enabled) for s in sources]
 
 
-@router.get("/search", response_model=list[HitOut])
+@router.get(
+    "/search",
+    response_model=list[HitOut],
+    summary="Search an external authority source",
+    responses={404: {"description": "Unknown authority source"}},
+)
 @limiter.limit("60/minute")
 async def search(
     request: Request,
@@ -56,7 +65,12 @@ async def search(
     return [HitOut(**r.__dict__) for r in results]
 
 
-@router.get("/fetch", response_model=HitOut)
+@router.get(
+    "/fetch",
+    response_model=HitOut,
+    summary="Fetch a single record from an external authority source",
+    responses={404: {"description": "Record not found"}},
+)
 @limiter.limit("60/minute")
 async def fetch(
     request: Request,

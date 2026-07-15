@@ -88,12 +88,22 @@ async def _to_read(db: DBDep, config: AdminConfig) -> AdminConfigRead:
     )
 
 
-@router.get("", response_model=AdminConfigRead)
+@router.get(
+    "",
+    response_model=AdminConfigRead,
+    summary="Get the admin configuration",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def get_admin_config(db: DBDep, _=require_role("admin")) -> AdminConfigRead:
     return await _to_read(db, await _get_or_create(db))
 
 
-@router.put("", response_model=AdminConfigRead)
+@router.put(
+    "",
+    response_model=AdminConfigRead,
+    summary="Update the admin configuration",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def update_admin_config(
     data: AdminConfigUpdate, db: DBDep, _=require_role("admin")
 ) -> AdminConfigRead:
@@ -130,7 +140,15 @@ class AdminSecretWrite(BaseModel):
     api_key: str
 
 
-@router.put("/ai-secret", response_model=SecretStatus)
+@router.put(
+    "/ai-secret",
+    response_model=SecretStatus,
+    summary="Set the AI provider API key",
+    responses={
+        422: {"description": "API key too short"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def update_ai_secret(
     data: AdminSecretWrite, db: DBDep, _=require_role("admin")
 ) -> SecretStatus:
@@ -140,7 +158,12 @@ async def update_ai_secret(
     return SecretStatus(has_key=True, updated_at=secret.updated_at)
 
 
-@router.delete("/ai-secret", response_model=SecretStatus)
+@router.delete(
+    "/ai-secret",
+    response_model=SecretStatus,
+    summary="Remove the AI provider API key",
+    responses={403: {"description": "Insufficient permissions"}},
+)
 async def remove_ai_secret(db: DBDep, _=require_role("admin")) -> SecretStatus:
     await delete_secret(db, AI_API_KEY_SECRET)
     return SecretStatus(has_key=False, updated_at=None)

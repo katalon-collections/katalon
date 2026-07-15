@@ -34,7 +34,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/places", tags=["places"])
 
 
-@router.get("", response_model=dict)
+@router.get(
+    "",
+    response_model=dict,
+    summary="List places with pagination and filters",
+)
 async def list_places(
     db: DBDep,
     current_user: OptionalCurrentUser,
@@ -58,7 +62,17 @@ async def list_places(
     return {"total": total, "page": page, "page_size": page_size, "items": [PlaceRead.model_validate(i) for i in items]}
 
 
-@router.post("", response_model=PlaceRead, status_code=201)
+@router.post(
+    "",
+    response_model=PlaceRead,
+    status_code=201,
+    summary="Create a new place record",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        400: {"description": "Idno already taken"},
+        422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
+    },
+)
 async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
@@ -119,7 +133,14 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
     return place
 
 
-@router.get("/{place_id}", response_model=PlaceRead)
+@router.get(
+    "/{place_id}",
+    response_model=PlaceRead,
+    summary="Get a single place by ID",
+    responses={
+        404: {"description": "Place not found"},
+    },
+)
 async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
@@ -129,7 +150,18 @@ async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurren
     return place
 
 
-@router.put("/{place_id}", response_model=PlaceRead)
+@router.put(
+    "/{place_id}",
+    response_model=PlaceRead,
+    summary="Update a place record",
+    responses={
+        404: {"description": "Place not found"},
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict (If-Match mismatch)"},
+        400: {"description": "Idno already taken"},
+        422: {"description": "Idno missing or metadata validation failed"},
+    },
+)
 async def update_place(
     place_id: uuid.UUID,
     data: PlaceCreate,
@@ -191,7 +223,13 @@ async def update_place(
     return place
 
 
-@router.post("/{place_id}/publish")
+@router.post(
+    "/{place_id}/publish",
+    summary="Publish a place after validating required fields",
+    responses={
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def publish_place(
     place_id: uuid.UUID,
     db: DBDep,
@@ -206,7 +244,16 @@ async def publish_place(
     return result
 
 
-@router.delete("/{place_id}", status_code=204)
+@router.delete(
+    "/{place_id}",
+    status_code=204,
+    summary="Delete a place record",
+    responses={
+        404: {"description": "Place not found"},
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "Record has linked relations (pass force=true to delete anyway)"},
+    },
+)
 async def delete_place(
     place_id: uuid.UUID,
     db: DBDep,
@@ -243,7 +290,16 @@ async def delete_place(
     enqueue(cleanup_relation_refs, "place", str(place_id))
 
 
-@router.post("/{place_id}/snapshots", response_model=SnapshotRead, status_code=201)
+@router.post(
+    "/{place_id}/snapshots",
+    response_model=SnapshotRead,
+    status_code=201,
+    summary="Create a snapshot of the current place state",
+    responses={
+        404: {"description": "Place not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_snapshot(
     place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
 ) -> RecordSnapshot:
@@ -263,7 +319,11 @@ async def create_snapshot(
     return snap
 
 
-@router.get("/{place_id}/snapshots", response_model=list[SnapshotRead])
+@router.get(
+    "/{place_id}/snapshots",
+    response_model=list[SnapshotRead],
+    summary="List snapshots for a place",
+)
 async def list_snapshots(place_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     result = await db.execute(
         select(RecordSnapshot)
@@ -273,7 +333,15 @@ async def list_snapshots(place_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]
     return list(result.scalars().all())
 
 
-@router.post("/{place_id}/snapshots/{snapshot_id}/restore", response_model=PlaceRead)
+@router.post(
+    "/{place_id}/snapshots/{snapshot_id}/restore",
+    response_model=PlaceRead,
+    summary="Restore a place from a snapshot",
+    responses={
+        404: {"description": "Place or snapshot not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def restore_snapshot(
     place_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Place:
@@ -304,7 +372,11 @@ async def restore_snapshot(
     return place
 
 
-@router.get("/{place_id}/audit-log", response_model=list[AuditLogRead])
+@router.get(
+    "/{place_id}/audit-log",
+    response_model=list[AuditLogRead],
+    summary="List audit log entries for a place",
+)
 async def list_place_audit_log(place_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log
     return await list_audit_log(db, record_type="place", record_id=place_id, limit=100)

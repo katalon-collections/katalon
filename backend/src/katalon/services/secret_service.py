@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from katalon.config import settings
 from katalon.core.models import AppSecret
 
-
 AI_API_KEY_SECRET = "ai_api_key"
 
 

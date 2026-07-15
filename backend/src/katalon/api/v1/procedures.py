@@ -107,7 +107,11 @@ async def _idno(data: ProcedureCreate, db: DBDep) -> str | None:
     return idno
 
 
-@router.get("", response_model=dict)
+@router.get(
+    "",
+    response_model=dict,
+    summary="List procedures with pagination and filters",
+)
 async def list_procedures(
     db: DBDep,
     page: int = Query(1, ge=1),
@@ -144,7 +148,18 @@ async def list_procedures(
     }
 
 
-@router.post("", response_model=ProcedureRead, status_code=201)
+@router.post(
+    "",
+    response_model=ProcedureRead,
+    status_code=201,
+    summary="Create a new procedure",
+    responses={
+        422: {"description": "Invalid procedure type/status or metadata validation failed"},
+        409: {"description": "Object already has an active loan-out procedure"},
+        400: {"description": "ID-Nr. already assigned"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_procedure(
     data: ProcedureCreate,
     db: DBDep,
@@ -190,7 +205,16 @@ async def create_procedure(
     return proc
 
 
-@router.post("/{procedure_id}/complete", response_model=ProcedureRead)
+@router.post(
+    "/{procedure_id}/complete",
+    response_model=ProcedureRead,
+    summary="Complete a procedure and update linked objects' collection status",
+    responses={
+        404: {"description": "Procedure not found"},
+        422: {"description": "Invalid collection status"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def complete_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureComplete,
@@ -256,7 +280,14 @@ async def complete_procedure(
     return proc
 
 
-@router.get("/{procedure_id}", response_model=ProcedureRead)
+@router.get(
+    "/{procedure_id}",
+    response_model=ProcedureRead,
+    summary="Get a single procedure by ID",
+    responses={
+        404: {"description": "Procedure not found"},
+    },
+)
 async def get_procedure(procedure_id: uuid.UUID, db: DBDep) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
@@ -266,7 +297,23 @@ async def get_procedure(procedure_id: uuid.UUID, db: DBDep) -> Procedure:
     return proc
 
 
-@router.put("/{procedure_id}", response_model=ProcedureRead)
+@router.put(
+    "/{procedure_id}",
+    response_model=ProcedureRead,
+    summary="Update a procedure",
+    responses={
+        404: {"description": "Procedure not found"},
+        400: {"description": "ID-Nr. already assigned"},
+        422: {"description": "Invalid procedure type/status or metadata validation failed"},
+        403: {"description": "Insufficient permissions"},
+        409: {
+            "description": (
+                "Version conflict (If-Match mismatch) or object already in an "
+                "active loan-out procedure"
+            )
+        },
+    },
+)
 async def update_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureCreate,
@@ -340,7 +387,16 @@ async def update_procedure(
     return proc
 
 
-@router.delete("/{procedure_id}", status_code=204)
+@router.delete(
+    "/{procedure_id}",
+    status_code=204,
+    summary="Delete a procedure",
+    responses={
+        404: {"description": "Procedure not found"},
+        409: {"description": "Procedure has related records (use force=true to override)"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def delete_procedure(
     procedure_id: uuid.UUID,
     db: DBDep,
@@ -384,7 +440,16 @@ async def delete_procedure(
     enqueue(cleanup_relation_refs, "procedure", str(procedure_id))
 
 
-@router.post("/{procedure_id}/snapshots", response_model=SnapshotRead, status_code=201)
+@router.post(
+    "/{procedure_id}/snapshots",
+    response_model=SnapshotRead,
+    status_code=201,
+    summary="Create a snapshot of a procedure's current state",
+    responses={
+        404: {"description": "Procedure not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def create_snapshot(
     procedure_id: uuid.UUID,
     data: SnapshotCreate,
@@ -408,7 +473,11 @@ async def create_snapshot(
     return snap
 
 
-@router.get("/{procedure_id}/snapshots", response_model=list[SnapshotRead])
+@router.get(
+    "/{procedure_id}/snapshots",
+    response_model=list[SnapshotRead],
+    summary="List snapshots for a procedure",
+)
 async def list_snapshots(procedure_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     result = await db.execute(
         select(RecordSnapshot)
@@ -418,7 +487,15 @@ async def list_snapshots(procedure_id: uuid.UUID, db: DBDep) -> list[RecordSnaps
     return list(result.scalars().all())
 
 
-@router.post("/{procedure_id}/snapshots/{snapshot_id}/restore", response_model=ProcedureRead)
+@router.post(
+    "/{procedure_id}/snapshots/{snapshot_id}/restore",
+    response_model=ProcedureRead,
+    summary="Restore a procedure from a snapshot",
+    responses={
+        404: {"description": "Snapshot or procedure not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
 async def restore_snapshot(
     procedure_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
 ) -> Procedure:
@@ -449,7 +526,11 @@ async def restore_snapshot(
     return proc
 
 
-@router.get("/{procedure_id}/audit-log", response_model=list[AuditLogRead])
+@router.get(
+    "/{procedure_id}/audit-log",
+    response_model=list[AuditLogRead],
+    summary="List audit log entries for a procedure",
+)
 async def list_procedure_audit_log(procedure_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log
     return await list_audit_log(db, record_type="procedure", record_id=procedure_id, limit=100)

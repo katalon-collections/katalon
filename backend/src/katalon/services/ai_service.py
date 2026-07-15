@@ -14,7 +14,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.models import AIUsageEvent, AdminConfig, Entity, FieldDefinition, MediaFile, Object, Occurrence, Place, Procedure
+from katalon.core.models import (
+    AdminConfig,
+    AIUsageEvent,
+    Entity,
+    FieldDefinition,
+    MediaFile,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+)
 from katalon.services.audit_service import log_change
 from katalon.services.secret_service import AI_API_KEY_SECRET, get_secret
 

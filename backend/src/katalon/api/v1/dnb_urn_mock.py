@@ -25,7 +25,10 @@ class RegisterUrnIn(BaseModel):
     urls: list[RegisterUrlIn]
 
 
-@router.get("/namespaces/name/{name}/urn-suggestion")
+@router.get(
+    "/namespaces/name/{name}/urn-suggestion",
+    summary="Suggest a mock URN for a namespace",
+)
 async def urn_suggestion(name: str) -> dict:
     suffix = random.randint(1_000_000_000, 9_999_999_999)
     return {
@@ -35,7 +38,12 @@ async def urn_suggestion(name: str) -> dict:
     }
 
 
-@router.post("/urns", status_code=201)
+@router.post(
+    "/urns",
+    status_code=201,
+    summary="Register a mock URN with its target URLs",
+    responses={400: {"description": "At least one URL is required"}},
+)
 async def register_urn(data: RegisterUrnIn) -> dict:
     if not data.urls:
         raise HTTPException(status_code=400, detail="Mindestens eine URL ist erforderlich.")
@@ -51,7 +59,11 @@ async def register_urn(data: RegisterUrnIn) -> dict:
     }
 
 
-@router.get("/urns/urn/{urn}/my-urls")
+@router.get(
+    "/urns/urn/{urn}/my-urls",
+    summary="List registered URLs for a mock URN",
+    responses={404: {"description": "URN not found"}},
+)
 async def get_my_urls(urn: str) -> dict:
     items = _registered.get(urn)
     if not items:

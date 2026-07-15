@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-15
+
+### Changed
+- OpenAPI-Dokumentation finalisiert (Phase 12 Hardening): `/api/openapi.json`-`info.version` liest jetzt live aus dem installierten Paket (`importlib.metadata`) statt fest verdrahtetem `"0.1.0"`. Alle 30 Router-Tags haben jetzt eine Kurzbeschreibung (`openapi_tags` in `main.py`). Alle 149 Endpunkte über 30 Dateien in `api/v1/` haben `summary=` und, wo zutreffend, `responses={...}` für tatsächlich geworfene 400/403/404/409/422/503-Fälle (Rollen-Check, `If-Match`-Konflikt, Relation-Konflikt beim Löschen, Broker-Ausfall bei `enqueue_or_503`).
+
 ## [0.6.2] - 2026-07-13
 
 ### Fixed
