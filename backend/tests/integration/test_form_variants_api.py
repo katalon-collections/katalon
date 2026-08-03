@@ -47,6 +47,19 @@ async def test_create_form_variant_rejects_unknown_field_names(async_client: Asy
 
 
 @pytest.mark.asyncio
+async def test_create_form_variant_rejects_missing_required_field(async_client: AsyncClient, auth_headers: dict) -> None:
+    # "label" is required for every primary type (system field); a variant
+    # that omits it must be rejected so a required field can never be hidden.
+    r = await async_client.post(
+        "/v1/form-variants",
+        headers=auth_headers,
+        json={"target_type": "entity", "name": "Ohne Pflichtfeld", "field_names": []},
+    )
+    assert r.status_code == 422
+    assert "label" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_create_and_list_form_variant(async_client: AsyncClient, auth_headers: dict) -> None:
     # "label" is a system field guaranteed to exist for every primary type.
     create_r = await async_client.post(
@@ -74,14 +87,14 @@ async def test_update_form_variant(async_client: AsyncClient, auth_headers: dict
     create_r = await async_client.post(
         "/v1/form-variants",
         headers=auth_headers,
-        json={"target_type": "entity", "name": "Voll", "field_names": []},
+        json={"target_type": "entity", "name": "Voll", "field_names": ["label"]},
     )
     variant_id = create_r.json()["id"]
 
     update_r = await async_client.put(
         f"/v1/form-variants/{variant_id}",
         headers=auth_headers,
-        json={"target_type": "entity", "name": "Vollerfassung", "field_names": [], "sort_order": 5},
+        json={"target_type": "entity", "name": "Vollerfassung", "field_names": ["label"], "sort_order": 5},
     )
     assert update_r.status_code == 200, update_r.text
     assert update_r.json()["name"] == "Vollerfassung"
@@ -93,7 +106,7 @@ async def test_delete_form_variant_soft_deletes(async_client: AsyncClient, auth_
     create_r = await async_client.post(
         "/v1/form-variants",
         headers=auth_headers,
-        json={"target_type": "place", "name": "Temp", "field_names": []},
+        json={"target_type": "place", "name": "Temp", "field_names": ["label"]},
     )
     variant_id = create_r.json()["id"]
 
@@ -109,7 +122,7 @@ async def test_set_role_default_surfaces_in_list_for_that_role(async_client: Asy
     create_r = await async_client.post(
         "/v1/form-variants",
         headers=auth_headers,
-        json={"target_type": "occurrence", "name": "Kurationsmaske", "field_names": []},
+        json={"target_type": "occurrence", "name": "Kurationsmaske", "field_names": ["label"]},
     )
     variant_id = create_r.json()["id"]
 
@@ -142,12 +155,12 @@ async def test_setting_role_default_unsets_previous_variant_for_same_role(
     first_r = await async_client.post(
         "/v1/form-variants",
         headers=auth_headers,
-        json={"target_type": "procedure", "name": "A", "field_names": []},
+        json={"target_type": "procedure", "name": "A", "field_names": ["label"]},
     )
     second_r = await async_client.post(
         "/v1/form-variants",
         headers=auth_headers,
-        json={"target_type": "procedure", "name": "B", "field_names": []},
+        json={"target_type": "procedure", "name": "B", "field_names": ["label"]},
     )
     first_id, second_id = first_r.json()["id"], second_r.json()["id"]
 

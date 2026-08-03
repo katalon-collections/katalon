@@ -84,7 +84,10 @@ export function ScreenFormVariants() {
   function startNew() {
     setEditId(null)
     setIsNew(true)
-    setForm(emptyForm(activeType, activeSubtype))
+    // Required fields can never be hidden by a variant (backend enforces this
+    // too) — pre-select them so the form starts in a savable state.
+    const requiredNames = availableFields.filter(f => f.is_required).map(f => f.name)
+    setForm({ ...emptyForm(activeType, activeSubtype), field_names: requiredNames })
     setError(null)
   }
 
@@ -135,10 +138,13 @@ export function ScreenFormVariants() {
   }
 
   function toggleField(name: string) {
+    const isRequired = availableFields.find(f => f.name === name)?.is_required
     setForm(f => {
       if (!f) return f
       const names = f.field_names ?? []
-      return { ...f, field_names: names.includes(name) ? names.filter(n => n !== name) : [...names, name] }
+      const included = names.includes(name)
+      if (included && isRequired) return f // required fields can't be unchecked
+      return { ...f, field_names: included ? names.filter(n => n !== name) : [...names, name] }
     })
   }
 
@@ -227,10 +233,12 @@ export function ScreenFormVariants() {
             <div style={{ border: '1px solid var(--border)', borderRadius: 6, maxHeight: 260, overflowY: 'auto' }}>
               {(form.field_names ?? []).map(name => {
                 const fd = availableFields.find(f => f.name === name)
+                const required = fd?.is_required ?? false
                 return (
                   <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <input type="checkbox" checked onChange={() => toggleField(name)} />
+                    <input type="checkbox" checked disabled={required} title={required ? 'Pflichtfeld — kann nicht ausgeblendet werden' : undefined} onChange={() => toggleField(name)} />
                     <span style={{ flex: 1, fontSize: 13 }}>{fd?.label.de ?? name}</span>
+                    {required && <span style={{ fontSize: 11, color: '#dc2626' }}>Pflicht</span>}
                     <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'monospace' }}>{name}</span>
                     <button onClick={() => moveField(name, -1)} style={{ background: 'none', border: 0, cursor: 'pointer', color: 'var(--fg-3)' }}>↑</button>
                     <button onClick={() => moveField(name, 1)} style={{ background: 'none', border: 0, cursor: 'pointer', color: 'var(--fg-3)' }}>↓</button>
@@ -241,6 +249,7 @@ export function ScreenFormVariants() {
                 <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
                   <input type="checkbox" checked={false} onChange={() => toggleField(f.name)} />
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--fg-3)' }}>{f.label.de ?? f.name}</span>
+                  {f.is_required && <span style={{ fontSize: 11, color: '#dc2626' }}>Pflicht — fehlt noch</span>}
                   <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'monospace' }}>{f.name}</span>
                 </div>
               ))}

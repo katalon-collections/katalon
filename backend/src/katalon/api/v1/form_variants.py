@@ -25,10 +25,8 @@ def _validate_target_type(target_type: str) -> None:
 async def _validate_field_names(
     db: DBDep, target_type: str, target_subtype: str | None, field_names: list[str]
 ) -> None:
-    if not field_names:
-        return
     result = await db.execute(
-        select(FieldDefinition.name).where(
+        select(FieldDefinition.name, FieldDefinition.is_required).where(
             FieldDefinition.target_type == target_type,
             FieldDefinition.is_deleted.is_(False),
             FieldDefinition.parent_id.is_(None),
@@ -36,12 +34,23 @@ async def _validate_field_names(
             | (FieldDefinition.target_subtype == target_subtype),
         )
     )
-    known = set(result.scalars().all())
-    unknown = [name for name in field_names if name not in known]
-    if unknown:
+    rows = result.all()
+    known = {name for name, _ in rows}
+
+    if field_names:
+        unknown = [name for name in field_names if name not in known]
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unbekannte Felder für diesen Typ/Subtyp: {', '.join(unknown)}",
+            )
+
+    required = {name for name, is_required in rows if is_required}
+    missing_required = required - set(field_names)
+    if missing_required:
         raise HTTPException(
             status_code=422,
-            detail=f"Unbekannte Felder für diesen Typ/Subtyp: {', '.join(unknown)}",
+            detail=f"Pflichtfelder fehlen in dieser Variante: {', '.join(sorted(missing_required))}",
         )
 
 

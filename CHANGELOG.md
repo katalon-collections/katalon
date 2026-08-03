@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+- Formularvarianten (#275) konnten Pflichtfelder ausblenden: `validate_metadata` prüft required-Status immer gegen das volle Schema, unabhängig von der Variante — eine Variante ohne ein Pflichtfeld führte dazu, dass der Datensatz nie non-draft gespeichert werden konnte, ohne dass das fehlende Feld im Formular sichtbar war. Backend (`form_variants.py`) lehnt jetzt Varianten ab, die ein Pflichtfeld des Typs/Subtyps auslassen; `ScreenFormVariants` zeigt Pflichtfelder gesperrt (nicht abwählbar) an und selektiert sie bei neuen Varianten automatisch vor.
+
 ## [0.7.0] - 2026-08-03
 
 ### Added
