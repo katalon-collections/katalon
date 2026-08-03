@@ -84,6 +84,32 @@ class RecordSubtypeRead(RecordSubtypeCreate):
     id: uuid.UUID
 
 
+class FormVariantCreate(BaseModel):
+    target_type: str
+    target_subtype: str | None = None
+    name: str
+    label: dict = {}
+    field_names: list[str] = []
+    is_default_global: bool = False
+    sort_order: int = 0
+
+
+class FormVariantRoleDefaultRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+
+
+class FormVariantRead(FormVariantCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    is_deleted: bool = False
+    # roles for which this variant is the default, scoped to target_type/target_subtype;
+    # populated only from the requesting user's own role by the list endpoint
+    default_for_roles: list[str] = []
+
+
 # ---------------------------------------------------------------------------
 # Vocabularies
 # ---------------------------------------------------------------------------

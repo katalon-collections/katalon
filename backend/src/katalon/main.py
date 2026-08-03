@@ -22,6 +22,7 @@ from katalon.api.v1 import (
     dnb_urn_mock,
     entities,
     feedback,
+    form_variants,
     idno,
     importer,
     index_health,
@@ -73,6 +74,7 @@ OPENAPI_TAGS = [
     {"name": "relations", "description": "Generische Relationen zwischen den fünf Record-Typen."},
     {"name": "schema", "description": "field_definitions-Verwaltung (Schema-Engine)."},
     {"name": "record-subtypes", "description": "Konfigurierbare Subtypen je Record-Typ."},
+    {"name": "form-variants", "description": "Konfigurierbare Formularvarianten je Record-Typ und Subtyp."},
     {"name": "vocabularies", "description": "Vokabulare und Terms."},
     {"name": "metadata-mappings", "description": "Mapping-Konfiguration für Importer/Export."},
     {"name": "media", "description": "Upload, IIIF-Tiles, Medien-Verknüpfung."},
@@ -433,6 +435,7 @@ app.include_router(users.router, prefix="/v1")
 app.include_router(objects.router, prefix="/v1")
 app.include_router(schema_admin.router, prefix="/v1")
 app.include_router(record_subtypes.router, prefix="/v1")
+app.include_router(form_variants.router, prefix="/v1")
 app.include_router(vocabularies.router, prefix="/v1")
 app.include_router(audit.router, prefix="/v1")
 app.include_router(entities.router, prefix="/v1")

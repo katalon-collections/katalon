@@ -1,0 +1,53 @@
+---
+title: "Schema Engine"
+summary: "The schema engine defines configurable metadata fields for records and vocabulary terms, then drives validation, admin forms, search flags, facets, relation mirroring, and export mappings."
+topics: [concepts, metadata, schema, admin]
+sources:
+  - id: models
+    type: file
+    path: backend/src/katalon/core/models.py
+  - id: schema-api
+    type: file
+    path: backend/src/katalon/api/v1/schema_admin.py
+  - id: schema-service
+    type: file
+    path: backend/src/katalon/services/schema_service.py
+  - id: schema-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenSchema.tsx
+  - id: schema-doc
+    type: file
+    path: docs/02_schema_verwaltung.md
+---
+
+The schema engine is Katalon's configurable metadata layer. It stores field definitions in `field_definitions`, stores record values in JSONB metadata columns, and lets admins change field structure without adding database columns for each cataloguing field [@models]. The current API accepts schema targets for objects, entities, places, occurrences, procedures, and vocabulary terms, validates subtype scope, embeds group sub-fields, soft-deletes fields, and queues reindex work for create, delete, restore, and facet-flag changes [@schema-api]. The admin schema screen uses the same definitions to render field editors, subtype filters, visibility flags, facets, authority fields, relation settings, group fields, defaults, locks, AI settings, and metadata export mappings [@schema-screen].
+
+## Field Definitions
+
+A field definition names one metadata field and binds it to a `target_type`. The model includes a multilingual `label`, `field_type`, required and repeatable flags, search and facet flags, sort order, display flags, arbitrary JSONB `settings`, an optional `target_subtype`, and an optional `parent_id` for group sub-fields [@models]. The repository documentation describes the intended admin workflow: admins create fields in the schema UI, and saved fields become visible in record forms without database migrations [@schema-doc].
+
+Runtime behavior is stricter than a plain JSON editor. The schema API rejects unknown target types, verifies subtype references, blocks nested group fields, validates authority and vocabulary settings, and prevents deletion of the system `label` field [@schema-api]. Deletion is a soft delete through `is_deleted`, so old JSONB values can remain stored while the field disappears from normal schema reads [@schema-api].
+
+## Values In Metadata
+
+Primary records keep cataloguing data in a JSONB column named `metadata` on their ORM tables, exposed in Python as `metadata_` [@models]. `validate_metadata` loads active top-level fields for the record type and optional subtype, checks required values, repeatability, text regexes, PID structures, relation structures, relation target existence, group instances, and vocabulary-term field constraints [@schema-service]. `prepare_metadata` applies configured defaults for text, vocab, vocab-free, date, and number fields, and it preserves or removes locked fields depending on editor permissions [@schema-service].
+
+Group fields are repeatable container fields. The database represents the group itself as a `FieldDefinition` row with `field_type == "group"` and each child as another `FieldDefinition` row whose `parent_id` points at the group [@models]. The API returns top-level fields with embedded `children`, and the admin UI only allows non-group sub-fields under saved group fields [@schema-api] [@schema-screen].
+
+## Admin And Search Effects
+
+The schema screen exposes field properties that affect more than form rendering. `show_in_detail` and `show_in_list` tell downstream UI whether a field belongs in detail or list views, `is_facet` marks fields for faceting, and `is_searchable` controls whether a field should be included in search behavior [@models] [@schema-screen]. The schema API enqueues a type-specific Elasticsearch reindex for create, delete, and restore operations except for `vocabulary_term`; updates enqueue reindex work only when a field's facet flag changes [@schema-api].
+
+Relation fields are part of the schema engine but produce entries in the generic relation graph. A relation field stores target settings such as target type, optional target subtype, relation-type vocabulary, and inherited target fields in JSONB settings [@schema-screen]. The relation synchronization service later mirrors saved relation-field values into `relations`, which connects this page to [generic relations](../relations/generic-relations) [@schema-service].
+
+## Vocabulary Terms
+
+Vocabulary terms use the same `field_definitions` table with `target_type == "vocabulary_term"` and the vocabulary UUID as `target_subtype` [@schema-api]. The API limits vocabulary-term custom fields to `text`, `number`, `boolean`, and `authority`, and the admin screen switches its field-type list when the active target is vocabulary terms [@schema-api] [@schema-screen]. This ties the schema engine to [vocabularies](vocabularies) without creating a second metadata system for term-level custom data.
+
+## Form Variants
+
+Field definitions are the field catalog; they say nothing about which subset a given form shows or in what order. That layer is `FormVariant` (#275): a named, ordered selection of existing field names per `target_type`/`target_subtype`, with optional role-based and global defaults, resolved client-side in [Schema Driven Record Forms](../../architecture/workflows/schema-driven-record-forms). No new field data is introduced — deleting or renaming the underlying `FieldDefinition` is still the schema engine's concern.
+
+## Related Pages
+
+Read [vocabularies](vocabularies) for controlled terms and relation-type vocabularies, [record subtypes](record-subtypes) for the subtype scope that field definitions use, and [generic relations](../relations/generic-relations) for relation fields after they are mirrored into the relation table.

@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -474,6 +474,20 @@ export const subtypes = {
   update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; sort_order?: number; is_default?: boolean }) =>
     req<RecordSubtype>(`/v1/record-subtypes/${id}`, { method: 'PUT', body: JSON.stringify({ sort_order: 0, is_default: false, ...data }) }),
   delete: (id: string) => req<void>(`/v1/record-subtypes/${id}`, { method: 'DELETE' }),
+}
+
+export type FormVariantData = { target_type: string; target_subtype?: string | null; name: string; label?: Record<string, string>; field_names?: string[]; is_default_global?: boolean; sort_order?: number }
+
+export const formVariants = {
+  list: (targetType: string, subtype?: string) => {
+    const qs = new URLSearchParams({ target_type: targetType, ...(subtype ? { subtype } : {}) })
+    return req<FormVariant[]>(`/v1/form-variants?${qs}`)
+  },
+  create: (data: FormVariantData) => req<FormVariant>('/v1/form-variants', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: FormVariantData) => req<FormVariant>(`/v1/form-variants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/form-variants/${id}`, { method: 'DELETE' }),
+  setRoleDefault: (id: string, role: string) => req<void>(`/v1/form-variants/${id}/role-defaults/${role}`, { method: 'POST' }),
+  removeRoleDefault: (id: string, role: string) => req<void>(`/v1/form-variants/${id}/role-defaults/${role}`, { method: 'DELETE' }),
 }
 
 // Audit

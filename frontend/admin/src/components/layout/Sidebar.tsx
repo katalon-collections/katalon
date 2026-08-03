@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { g: 'Konfiguration', roles: ['admin', 'superuser'] },
   { id: 'subtypes', label: 'Subtypen',       Icon: ListTree, roles: ['admin', 'superuser'] },
   { id: 'schema', label: 'Schemata',        Icon: Layers,  ct: '5', roles: ['admin', 'superuser'] },
+  { id: 'form-variants', label: 'Formularvarianten', Icon: Layers, roles: ['admin', 'superuser'] },
   { id: 'vocab',  label: 'Vokabular',       Icon: Tag,     ct: '4', roles: ['admin', 'superuser'] },
   { id: 'pages',     label: 'Statische Seiten', Icon: File,  roles: ['admin', 'superuser'] },
   { id: 'oai-sets',  label: 'OAI-PMH Sets',    Icon: Globe, roles: ['admin', 'superuser'] },

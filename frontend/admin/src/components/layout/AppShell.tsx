@@ -15,6 +15,7 @@ import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenBanners } from '../screens/ScreenBanners'
+import { ScreenFormVariants } from '../screens/ScreenFormVariants'
 import { BannerBar } from '../ui/BannerBar'
 import { ImportStatusBanner } from '../ui/ImportStatusBanner'
 import { BASE, req } from '../../api/client'
@@ -36,6 +37,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   banners:            [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Banner' }],
   subtypes:           [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Subtypen' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
+  'form-variants':    [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Formularvarianten' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
   pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
   'oai-sets':         [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'OAI-PMH Sets' }],
@@ -156,6 +158,7 @@ export function AppShell() {
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return <ScreenSchema />
+      case 'form-variants':     return isAdmin ? <ScreenFormVariants /> : <Placeholder label="Kein Zugriff" />
       case 'vocab':             return <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} />
       case 'pages':             return <ScreenPages />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />

@@ -231,6 +231,54 @@ class RecordSubtype(Base):
     )
 
 
+class FormVariant(Base):
+    __tablename__ = "form_variants"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    # object/entity/place/occurrence/procedure
+    target_type: Mapped[str] = mapped_column(String(32), index=True)
+    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    name: Mapped[str] = mapped_column(String(128))
+    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    # ordered list of FieldDefinition.name for this target_type/subtype
+    field_names: Mapped[list] = mapped_column(JSONB, default=list)
+    is_default_global: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    role_defaults: Mapped[list["FormVariantRoleDefault"]] = relationship(
+        back_populates="variant",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_form_variants_target_type", "target_type"),
+    )
+
+
+class FormVariantRoleDefault(Base):
+    __tablename__ = "form_variant_role_defaults"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    target_type: Mapped[str] = mapped_column(String(32), index=True)
+    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    role: Mapped[str] = mapped_column(String(32))
+    variant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("form_variants.id", ondelete="CASCADE"),
+        index=True,
+    )
+
+    variant: Mapped[FormVariant] = relationship(back_populates="role_defaults")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "target_type", "target_subtype", "role",
+            name="uq_form_variant_role_defaults_scope_role",
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Vocabularies
 # ---------------------------------------------------------------------------

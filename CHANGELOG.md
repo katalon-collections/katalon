@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-03
+
+### Added
+- Formularvarianten je Datensatztyp und Subtyp (#275): Admins können in Konfiguration → Formularvarianten benannte Varianten anlegen, die eine Teilmenge vorhandener Felddefinitionen auswählen und ordnen (Voll-, Schnellerfassung, workflow-spezifische Masken). Gespeicherte Metadaten bleiben unabhängig von der gewählten Variante. Neue Tabellen `form_variants` und `form_variant_role_defaults` (Migration 0028), Endpunkte unter `/v1/form-variants`.
+- Formular-Tab-Leiste in Objekt-/Entity-/Place-/Occurrence-/Vorgangsformularen: Variante wird nach Priorität aufgelöst (Kontext-Override > gemerkte manuelle Wahl > Rollen-Default > globaler Default > Vollschema als Fallback), letzte manuelle Wahl bleibt pro Typ/Subtyp lokal gespeichert.
+
 ## [0.6.4] - 2026-07-15
 
 ### Fixed

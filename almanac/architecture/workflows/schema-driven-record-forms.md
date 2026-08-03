@@ -1,0 +1,81 @@
+---
+title: "Schema Driven Record Forms"
+summary: "Admin record forms use the same React workflow for objects, entities, places, occurrences, and procedures, loading field definitions and record state before validating and saving metadata."
+topics: [architecture, workflows, frontend, records, schema]
+sources:
+  - id: screen-form
+    type: file
+    path: frontend/admin/src/components/screens/ScreenForm.tsx
+  - id: screen-list
+    type: file
+    path: frontend/admin/src/components/screens/ScreenList.tsx
+  - id: admin-client
+    type: file
+    path: frontend/admin/src/api/client.ts
+  - id: objects-api
+    type: file
+    path: backend/src/katalon/api/v1/objects.py
+  - id: entities-api
+    type: file
+    path: backend/src/katalon/api/v1/entities.py
+  - id: procedures-api
+    type: file
+    path: backend/src/katalon/api/v1/procedures.py
+  - id: schema-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenSchema.tsx
+  - id: feedback-triage
+    type: conversation
+    path: /Users/karl/.codex/sessions/2026/07/26/rollout-2026-07-26T21-53-22-019f9ffd-4174-75f1-a3eb-765bef3502f8.jsonl
+  - id: form-variants-api
+    type: file
+    path: backend/src/katalon/api/v1/form_variants.py
+  - id: form-variants-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenFormVariants.tsx
+  - id: form-variants-lib
+    type: file
+    path: frontend/admin/src/lib/formVariants.ts
+---
+
+Schema-driven record forms are the admin workflow that turns Katalon's configurable metadata model into editable screens. One `ScreenForm` component handles objects, entities, places, occurrences, and procedures by selecting the correct API module, loading the record and field definitions, rendering inputs from `field_type`, validating the local draft, then saving a payload that combines record scalars with `metadata_` [@screen-form] [@admin-client]. The backend repeats the same contract for each record type: prepare metadata through schema rules, validate required fields unless the status is `draft`, synchronize schema relation fields, log the change, and update the search index [@objects-api] [@entities-api] [@procedures-api].
+
+## List-To-Form Flow
+
+The list screen chooses an API module from `recordType`, loads records with pagination, status filters, search, and procedure-specific filters, and opens the form with the selected id [@screen-list]. List columns are also schema-driven: `ScreenList` fetches `schema.list(recordType)`, keeps fields marked `show_in_list`, sorts them by `sort_order`, and reads display values from each record's metadata [@screen-list].
+
+`ScreenForm` uses the same `recordType` to choose its endpoint wrapper and to enable type-specific scalars: object collection status and media, place coordinates, procedure dates and reference number, and subtype fields for the supported record types [@screen-form]. On new forms it asks the ID-number endpoint for the next id, loads subtypes when needed, and loads schema definitions for the current record type and subtype [@screen-form].
+
+## Dynamic Metadata Inputs
+
+Field definitions control both default values and rendered controls. The form applies `settings.default_value` on new records, reloads subtype-specific definitions when a new record's subtype changes, and renders specialized controls for vocabularies, free vocabulary text, authority links, schema relation fields, groups, PID fields, booleans, numbers, dates, and text [@screen-form].
+
+Repeatable fields are represented as arrays in local state, while group fields are arrays of child-field objects [@screen-form]. Vocabulary and relation fields call their own lookup endpoints through the admin API client; relation-field inputs use search results and relation-type vocabularies when configured [@screen-form] [@admin-client].
+
+The component also handles object media after a record has an id. It loads existing media, uploads a selected or dropped file, patches rights and media type data, marks a primary image, deletes media, and polls until pending uploads finish processing [@screen-form] [@admin-client].
+
+## Form Variants (#275)
+
+Admins can configure multiple named form variants per record type and optional subtype (Konfiguration → Formularvarianten, `ScreenFormVariants`) [@form-variants-screen]. A variant is a `FormVariant` row (`target_type`, optional `target_subtype`, `name`, `label`, an ordered `field_names` array referencing existing `field_definitions.name` values, `is_default_global`, `sort_order`) — it never copies field definitions or introduces a second metadata store; records keep saving to the same `metadata_` JSONB regardless of which variant was active [@form-variants-api]. `FormVariantRoleDefault` rows map `(target_type, target_subtype, role)` to one variant, enforced unique at the database level so setting a new role default for a scope automatically supersedes the previous one [@form-variants-api].
+
+`ScreenForm` fetches available variants alongside field definitions for the active `recordType`/subtype and resolves which one is active through a priority chain, implemented as the pure function `resolveActiveVariant` [@form-variants-lib]: an optional context-override prop (`variantHint`, exposed as a hook for future workflow/quick-add callers but not yet wired to any caller) beats a manually remembered choice in `localStorage` (keyed per record type and subtype), which beats the current user's role-based default, which beats a variant flagged as the global default for that scope. If none match, the form falls back to the full schema — identical to pre-#275 behavior — which is also what happens when the user explicitly picks the "Vollständig" tab, stored as a distinct sentinel so it isn't silently overridden by a role or global default on the next visit [@form-variants-lib]. A tab bar above the dynamic fields lets the user switch variants manually; the active variant filters and reorders the already-loaded `FieldDefinition[]` by `field_names`, so group parent/child rendering is unaffected as long as the group's own name is included [@screen-form].
+
+## Feedback-Tracked Form Gaps
+
+The July 2026 feedback triage turned four form gaps into GitHub issues instead of treating them as implemented behavior: configurable form variants for full and quick entry became #275 (implemented, see above), inline creation of related entities and places from the record form became #277, authority fields inside group sub-fields became #278, and AI support for group sub-fields became #279 [@feedback-triage]. Current forms already render group sub-fields, relation fields, authority fields, and AI settings, but the schema UI limits group sub-field types to `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, and `relation`, so authority and AI configuration do not reach group child fields yet [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
+
+## Validation And Save
+
+Validation runs before each save. `ScreenForm` treats missing `idno`, missing required subtype, and missing required metadata as warnings while the record is still a draft, but as errors for non-draft statuses [@screen-form]. It also validates date, number, text regex, repeatable values, and required group children on the client [@screen-form].
+
+The save payload always sends `status` and `metadata_`, then adds the scalars relevant to the active record type [@screen-form]. New records call `create`; existing records call `update` with the loaded `version`, which the API client sends as `If-Match` [@screen-form] [@admin-client]. The backend object, entity, and procedure endpoints then prepare and validate metadata, increment `version` on updates, synchronize schema relations, write audit entries, and re-index records [@objects-api] [@entities-api] [@procedures-api].
+
+If the backend reports an optimistic-locking conflict, the form fetches the current server record and performs a metadata-only three-way merge using loaded base values, server values, and the user's current values [@screen-form]. Fields changed only on one side are merged automatically; fields changed on both sides are shown in a conflict dialog and then committed with the server's newer version [@screen-form].
+
+## Related Panels
+
+Existing records load both incoming and outgoing generic relations, fetch display titles for related records, and let users add or remove relations from the form side panel [@screen-form]. Procedure forms can add related objects; object forms can show linked procedures and add procedure relations [@screen-form].
+
+Snapshots and audit history are part of the same editing surface. The form loads snapshot lists and audit entries for saved records, can create and restore snapshots through the record API module, and can show audit entries without leaving the edit screen [@screen-form] [@admin-client]. Those persistence details are covered in [Audit And Snapshots](audit-and-snapshots).
+
+When a procedure is moved to `completed`, the form saves ordinary procedure changes first and then calls the procedure completion endpoint. If linked objects exist and the procedure type has a suggested collection status, the user chooses whether completion should update those objects [@screen-form] [@procedures-api]. That makes procedure completion a workflow step rather than a plain status edit.

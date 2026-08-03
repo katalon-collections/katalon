@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import type { AnyRecord, AuditEntry, FieldDefinition, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
+import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
 import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit, Lightning } from '../ui/Icons'
 
 function extractTitle(m: Record<string, unknown>, fallback: string): string {
@@ -669,9 +670,12 @@ interface Props {
   onBack?: () => void
   onSaved?: (id: string) => void
   onDirtyChange?: (dirty: boolean) => void
+  // Context override for form-variant resolution (#275), e.g. from a workflow
+  // or quick-add entry point. Not yet set by any caller in this issue's scope.
+  variantHint?: string
 }
 
-export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange }: Props) {
+export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
@@ -686,6 +690,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [variants, setVariants] = useState<FormVariant[]>([])
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null)
   const [idno, setIdno]       = useState('')
   const [subtype, setSubtype] = useState('')
   const [lat, setLat]         = useState('')
@@ -875,6 +881,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
         if (!rec) setValues(defaultsFor(fieldDefs))
+
+        const variantList = await formVariants.list(recordType, recSubtype).catch(() => [])
+        setVariants(variantList)
+        const remembered = localStorage.getItem(localVariantKey(recordType, recSubtype))
+        const resolved = resolveActiveVariant(variantList, user?.role ?? '', remembered, variantHint)
+        setActiveVariantId(resolved?.id ?? null)
       })
       .catch(e => setError(e.message))
       .finally(() => { setLoading(false); setIsDirty(false) })
@@ -896,6 +908,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       setFields(fieldDefs)
       setValues(prev => ({ ...defaultsFor(fieldDefs), ...prev }))
     }).catch(() => {})
+    formVariants.list(recordType, subtype).then(variantList => {
+      setVariants(variantList)
+      const remembered = localStorage.getItem(localVariantKey(recordType, subtype))
+      const resolved = resolveActiveVariant(variantList, user?.role ?? '', remembered, variantHint)
+      setActiveVariantId(resolved?.id ?? null)
+    }).catch(() => setVariants([]))
   }, [isNew, subtype, recordType, subtypeKey])
 
   useEffect(() => {
@@ -1673,6 +1691,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     return undefined
   }
 
+  // Form variants (#275): a variant filters+reorders the already-loaded field
+  // definitions; no variant selected falls back to the full schema (fields as-is).
+  const activeVariant = variants.find(v => v.id === activeVariantId) ?? null
+  const displayFields = activeVariant
+    ? activeVariant.field_names.map(name => fields.find(f => f.name === name)).filter((f): f is FieldDefinition => f != null)
+    : fields
+
+  function selectVariant(variantId: string | null) {
+    setActiveVariantId(variantId)
+    localStorage.setItem(localVariantKey(recordType, subtype), variantId ?? FULL_SCHEMA_CHOICE)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -1876,7 +1906,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </>
                 )}
 
-                {fields.map(f => {
+                {variants.length > 0 && (
+                  <div className="tabs" style={{ marginBottom: 12 }}>
+                    <button className={`tab${activeVariant === null ? ' active' : ''}`} onClick={() => selectVariant(null)}>
+                      Vollständig
+                    </button>
+                    {variants.map(v => (
+                      <button key={v.id} className={`tab${activeVariantId === v.id ? ' active' : ''}`} onClick={() => selectVariant(v.id)}>
+                        {v.label.de || v.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {displayFields.map(f => {
                   const val = values[f.name]
                   const repeatable = f.is_repeatable
                   const vals = repeatable ? ((val as string[] | undefined) ?? []) : undefined
@@ -2220,10 +2263,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   )
                 })}
 
-                {fields.length === 0 && !showIdno && !subtypeKey && !showGeo && (
+                {displayFields.length === 0 && !showIdno && !subtypeKey && !showGeo && (
                   <div className="empty">Keine Felder definiert. Schema unter Konfiguration → Schemata anlegen.</div>
                 )}
-                {fields.length === 0 && (showIdno || subtypeKey || showGeo) && (
+                {displayFields.length === 0 && (showIdno || subtypeKey || showGeo) && (
                   <div style={{ fontSize: 12, color: 'var(--fg-3)', paddingTop: 4 }}>
                     Keine weiteren dynamischen Felder. Schema unter Konfiguration → Schemata anlegen.
                   </div>

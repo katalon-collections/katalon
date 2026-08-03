@@ -85,6 +85,19 @@ export interface FieldDefinition {
   children?: FieldDefinition[]
 }
 
+export interface FormVariant {
+  id: string
+  target_type: string
+  target_subtype: string | null
+  name: string
+  label: Record<string, string>
+  field_names: string[]
+  is_default_global: boolean
+  sort_order: number
+  is_deleted: boolean
+  default_for_roles: string[]
+}
+
 export interface FieldAIConfig {
   enabled: boolean
   mode: 'text' | 'vision'
