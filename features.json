@@ -1,0 +1,1061 @@
+{
+  "$schema": "./features.schema.json",
+  "meta": {
+    "title": "Katalon – Feature List",
+    "version": "0.7.0",
+    "generated": "2026-08-04",
+    "description": "Vollständige Feature-Liste für das Katalon Metadata Management System, gruppiert nach Domänen von High-Level bis Low-Level."
+  },
+  "domains": [
+    {
+      "id": "records",
+      "name": "Bestandsdaten (Records)",
+      "description": "Die fünf Primärtypen, ihre Subtypen und das generische CRUD-Framework.",
+      "features": [
+        {
+          "id": "records.types",
+          "name": "Fünf Primärtypen",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "records.types.object",
+              "name": "Object – physische oder digitale Artefakte (Fotos, Dokumente, Gemälde, Born-Digital)",
+              "status": "done",
+              "details": ["idno (eindeutige Inventarnummer)", "object_type", "collection_status (Systemfeld)"]
+            },
+            {
+              "id": "records.types.entity",
+              "name": "Entity – Personen und Organisationen",
+              "status": "done",
+              "details": ["entity_type (person/organization)", "Normdaten-Verknüpfung"]
+            },
+            {
+              "id": "records.types.place",
+              "name": "Place – geografische Orte mit PostGIS-Koordinaten",
+              "status": "done",
+              "details": ["geom GEOMETRY(Point, 4326)", "OSM-Karte im Portal"]
+            },
+            {
+              "id": "records.types.occurrence",
+              "name": "Occurrence – Ereignisse, Werke (FRBR), Konzepte",
+              "status": "done",
+              "details": ["occurrence_type (work/event/concept/…)", "fasst FRBR-Werke und CIDOC-CRM-Ereignisse zusammen"]
+            },
+            {
+              "id": "records.types.procedure",
+              "name": "Procedure – Vorgänge (Leihverkehr, Erwerbung, Restaurierung)",
+              "status": "done",
+              "details": ["procedure_type (loan_in/loan_out/acquisition/conservation)", "reference_number", "Datumsfelder (scheduled_date, completed_date, due_date)", "Completion-Workflow", "Validierung: keine zweite aktive loan_out pro Objekt"]
+            }
+          ]
+        },
+        {
+          "id": "records.subtypes",
+          "name": "Konfigurierbare Subtypen pro Primärtyp",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "records.subtypes.definition",
+              "name": "Subtyp-Verwaltung im Admin (ScreenSubtype)",
+              "status": "done",
+              "details": ["Anlegen/Bearbeiten/Löschen pro Typ", "target_subtype in field_definitions"]
+            },
+            {
+              "id": "records.subtypes.form",
+              "name": "Subtyp-abhängige Felder im Formular",
+              "status": "done",
+              "details": ["Subtyp-Dropdown im Formular", "Felder anderer Subtypen werden ausgeblendet", "Werte bleiben beim Wechsel erhalten"]
+            },
+            {
+              "id": "records.subtypes.defaults",
+              "name": "Default-Subtypen pro Typ",
+              "status": "done"
+            },
+            {
+              "id": "records.subtypes.required",
+              "name": "Subtyp-Pflichtfeld: label-Feld pro Subtyp",
+              "status": "done",
+              "details": ["Automatisch angelegt beim Subtyp-Erstellen", "Geschützt vor Löschung"]
+            }
+          ]
+        },
+        {
+          "id": "records.crud",
+          "name": "Generisches CRUD-Framework",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "records.crud.api",
+              "name": "REST-API für alle 5 Typen",
+              "status": "done",
+              "details": ["GET /v1/{type} (Liste mit Pagination)", "POST /v1/{type} (Anlegen)", "GET /v1/{type}/{id} (Einzeln)", "PUT /v1/{type}/{id} (Aktualisieren)", "DELETE /v1/{type}/{id} (Löschen)", "PATCH /v1/procedures/{id}/complete (Abschluss)"]
+            },
+            {
+              "id": "records.crud.status",
+              "name": "Sichtbarkeitsstatus",
+              "status": "done",
+              "details": ["draft / internal / public", "Status-Filter in API und Admin-Liste"]
+            },
+            {
+              "id": "records.crud.optimistic",
+              "name": "Optimistic Locking (Versionierungskonflikte)",
+              "status": "done",
+              "details": ["version-Spalte auf allen 5 Typen", "If-Match-Header", "409 bei Konflikt", "Feldweiser 3-Wege-Merge in Admin-UI"]
+            },
+            {
+              "id": "records.crud.validation",
+              "name": "Client-seitige Formularvalidierung",
+              "status": "done",
+              "details": ["Pflichtfeld-Prüfung für alle Feldtypen", "Fehler-Banner mit konkreten Meldungen"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schema",
+      "name": "Schema & Metadaten (Schema Engine)",
+      "description": "Dynamische Felddefinitionen, Containerfelder und die Schema-Engine.",
+      "features": [
+        {
+          "id": "schema.definitions",
+          "name": "Dynamische Felddefinitionen (field_definitions)",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "schema.definitions.types",
+              "name": "Feldtypen",
+              "status": "done",
+              "details": ["text", "textarea", "richtext", "number", "date", "boolean", "geo", "vocab (kontrolliertes Vokabular)", "vocab_free (freies Vokabular)", "authority (Normdaten)", "relation", "group (Containerfeld)", "pid (Persistent Identifier)"]
+            },
+            {
+              "id": "schema.definitions.properties",
+              "name": "Feldeigenschaften",
+              "status": "done",
+              "details": ["is_required", "is_repeatable", "is_searchable", "is_facet", "show_in_detail", "sort_order", "settings (feldtyp-spezifisch)", "default_value", "admin_only (nur Admins editierbar)"]
+            },
+            {
+              "id": "schema.definitions.labels",
+              "name": "Mehrsprachige Labels (JSONB)",
+              "status": "done",
+              "details": ["label: {de, en, …}", "interner Name als Slug aus DE-Label"]
+            },
+            {
+              "id": "schema.definitions.editor",
+              "name": "Schema-Editor im Admin (ScreenSchema)",
+              "status": "done",
+              "details": ["Subtyp-Seitenleiste", "pro Typ/Subtyp konfigurierbar", "Drag-and-Drop-Reihenfolge", "Soft-Delete für Felddefinitionen"]
+            }
+          ]
+        },
+        {
+          "id": "schema.containers",
+          "name": "Containerfelder (verschachtelte Metadatengruppen)",
+          "level": "mid",
+          "status": "done",
+          "details": ["field_type = 'group'", "parent_id (self-referential FK, CASCADE DELETE)", "Sub-Felder inline im Schema-Editor", "Wiederholbare Gruppen", "Rekursive Validierung", "ES-Indexierung als nested-Typ", "Relations-Subfelder in Gruppen"]
+        },
+        {
+          "id": "schema.mds",
+          "name": "MDS Schema Controls",
+          "level": "mid",
+          "status": "done",
+          "details": ["admin_only-Flag für Felder", "default_value für Felder"]
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "name": "Eingabe & Formulare (Input)",
+      "description": "Formularvarianten, dynamische Eingabemasken und Eingabe-Workflows.",
+      "features": [
+        {
+          "id": "input.forms",
+          "name": "Dynamische Eingabeformulare",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "input.forms.dynamic",
+              "name": "Pro Typ/Subtyp dynamisch generiert",
+              "status": "done",
+              "details": ["Felder aus field_definitions", "Reihenfolge aus sort_order", "Wiederholbare Felder mit Add/Remove", "Subtyp-Wechsel lädt korrekte Felder nach"]
+            },
+            {
+              "id": "input.forms.variants",
+              "name": "Konfigurierbare Formularvarianten (v0.7.0)",
+              "level": "low",
+              "status": "done",
+              "children": [
+                {
+                  "id": "input.forms.variants.definition",
+                  "name": "Benannte Varianten pro Typ/Subtyp",
+                  "status": "done",
+                  "details": ["Voll-, Schnellerfassung, workflow-spezifische Masken", "Teilmenge vorhandener Felddefinitionen", "Eigene Reihenfolge", "Pflichtfelder nicht abwählbar"]
+                },
+                {
+                  "id": "input.forms.variants.roles",
+                  "name": "Rollen-Defaults pro Variante",
+                  "status": "done",
+                  "details": ["form_variant_role_defaults-Tabelle", "Pro Rolle automatisch vorausgewählt"]
+                },
+                {
+                  "id": "input.forms.variants.resolution",
+                  "name": "Auflösungspriorität im Formular",
+                  "status": "done",
+                  "details": ["Kontext-Override > gemerkte manuelle Wahl > Rollen-Default > globaler Default > Vollschema-Fallback"]
+                },
+                {
+                  "id": "input.forms.variants.validation",
+                  "name": "Validierung mit vollem Schema",
+                  "status": "done",
+                  "details": ["Pflichtfelder immer gegen volles Schema geprüft", "Variante ohne Pflichtfeld wird abgelehnt"]
+                }
+              ]
+            },
+            {
+              "id": "input.forms.tabs",
+              "name": "Formular-Tab-Leiste (Varianten-Umschalter)",
+              "status": "done",
+              "details": ["In Objekt-/Entity-/Place-/Occurrence-/Vorgangsformularen", "Letzte manuelle Wahl pro Typ/Subtyp lokal gespeichert"]
+            }
+          ]
+        },
+        {
+          "id": "input.unsaved",
+          "name": "Warnung bei ungespeicherten Änderungen",
+          "level": "low",
+          "status": "done",
+          "details": ["Dirty-Check vor Navigation", "Verwerfen-Button mit Bestätigung"]
+        },
+        {
+          "id": "input.draft",
+          "name": "Entwurf-Speichern mit unvollständigen Pflichtfeldern",
+          "level": "low",
+          "status": "done",
+          "details": ["Draft-Status erlaubt unvollständige Metadaten", "Validierungshinweise statt Blockade"]
+        },
+        {
+          "id": "input.stay",
+          "name": "Nach Speichern im Formular bleiben",
+          "level": "low",
+          "status": "done",
+          "details": ["Kein Redirect zur Liste", "Direkt weiterbearbeiten möglich"]
+        }
+      ]
+    },
+    {
+      "id": "relations",
+      "name": "Relationen & Verknüpfungen (Relations)",
+      "description": "Generische Relationen zwischen allen Typen mit Metadaten.",
+      "features": [
+        {
+          "id": "relations.generic",
+          "name": "Generisches Relationssystem",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "relations.generic.model",
+              "name": "Beliebige Verknüpfungen zwischen allen 5 Typen",
+              "status": "done",
+              "details": ["from_type/from_id → to_type/to_id", "relation_type (aus Vokabular)", "metadata JSONB auf der Relation"]
+            },
+            {
+              "id": "relations.generic.schema",
+              "name": "Schema-abgeleitete Relationen",
+              "status": "done",
+              "details": ["Relationsfelder ins relations-Tabelle gespiegelt", "Bidirektionale Lookups", "is_schema_derived-Flag"]
+            },
+            {
+              "id": "relations.generic.labels",
+              "name": "Richtungsabhängige Labels (inverse_label)",
+              "status": "done",
+              "details": ["Forward- und Gegenrichtungslabel aus Vokabular", "Korrekte Anzeige je nach Perspektive", "CSV-Import: inverse_label:de / inverse_label:en"]
+            },
+            {
+              "id": "relations.generic.cleanup",
+              "name": "Verwaiste Relationen-Bereinigung",
+              "status": "done",
+              "details": ["delete_relations() bei Record-Löschung", "cleanup_relation_refs Celery-Task"]
+            }
+          ]
+        },
+        {
+          "id": "relations.panels",
+          "name": "Relations-Panels in Admin-Formularen",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "relations.panels.readonly",
+              "name": "Read-only Beziehungen-Panel (Navigation)",
+              "status": "done",
+              "details": ["Alle Relationen als klickbare Links", "Echter Datensatz-Name statt idno-Fallback", "Navigiert direkt ins Bearbeitungsformular", "Gegenrichtungslabel korrekt"]
+            },
+            {
+              "id": "relations.panels.schema",
+              "name": "Relationen über Schema-Felder anlegen",
+              "status": "done",
+              "details": ["Relationsfelder im Metadaten-Formular", "Autocomplete für verknüpfte Records"]
+            },
+            {
+              "id": "relations.panels.procedure",
+              "name": "Vorgangsspezifische Panels",
+              "status": "done",
+              "details": ["Objekt-Panel im Vorgangsformular", "Vorgangs-Panel im Objektformular", "Objektstatus-Anzeige"]
+            }
+          ]
+        },
+        {
+          "id": "relations.portal",
+          "name": "Relationen im Portal",
+          "level": "mid",
+          "status": "done",
+          "details": ["Vorschaubilder in zugehörigen Objekten", "Gegenrichtungslabels in Inline-Karten", "Relation-Facetten beim Objekt-Browsing (ES-denormalisiert)"]
+        },
+        {
+          "id": "relations.inherited",
+          "name": "Inherited Fields (ES-Denormalisierung)",
+          "level": "low",
+          "status": "planned",
+          "details": ["Felder verlinkter Records im ES-Index einbetten", "Suchtbar und facettierbar", "Kaskaden-Reindex bei Änderung, max. 1 Ebene", "Issue #213"]
+        }
+      ]
+    },
+    {
+      "id": "vocab",
+      "name": "Vokabulare & Normdaten (Vocabularies & Authorities)",
+      "description": "Kontrollierte Vokabulare, Normdaten-Integration und Authority-Plugin-System.",
+      "features": [
+        {
+          "id": "vocab.management",
+          "name": "Vokabular-Verwaltung",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "vocab.management.hierarchical",
+              "name": "Hierarchische Vokabulare",
+              "status": "done",
+              "details": ["Baumstruktur mit parent_id", "is_hierarchical-Flag", "Baum-API-Endpunkt"]
+            },
+            {
+              "id": "vocab.management.types",
+              "name": "Vokabular-Typen",
+              "status": "done",
+              "details": ["Term-Vokabulare (kontrollierte Werte)", "Relations-Vokabulare (relation_types)", "Systemvokabular relation_types (automatisch angelegt)"]
+            },
+            {
+              "id": "vocab.management.terms",
+              "name": "Vocabulary Terms mit konfigurierbaren Feldern",
+              "status": "done",
+              "details": ["Schema-Engine für Term-Metadaten", "Text-, Zahlen-, Boolean-, Authority-Felder", "Klassifikation bei Anlage (term/relation)"]
+            },
+            {
+              "id": "vocab.management.editor",
+              "name": "Vokabular-Editor im Admin (ScreenVocab)",
+              "status": "done",
+              "details": ["Term anlegen/bearbeiten/löschen", "Hierarchie verschieben", "CSV-Import mit Encoding-Erkennung", "Deep Links (#vocab/name)"]
+            }
+          ]
+        },
+        {
+          "id": "vocab.authorities",
+          "name": "Authority-Plugin-System (Normdaten)",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "vocab.authorities.adapters",
+              "name": "6 Authority-Adapter",
+              "status": "done",
+              "details": ["GND (lobid.org)", "Geonames", "VIAF", "Wikidata (SPARQL, konfigurierbarer User-Agent)", "Getty TGN (SPARQL)", "ICONCLASS"]
+            },
+            {
+              "id": "vocab.authorities.plugin",
+              "name": "Plugin-Architektur",
+              "status": "done",
+              "details": ["AuthoritySource(ABC) mit search()/fetch()", "DB-Registry mit Lazy Loading", "Cache-Invalidierung", "GET /v1/authorities/, /search, /fetch"]
+            },
+            {
+              "id": "vocab.authorities.records",
+              "name": "Normdaten an Records (AuthorityInput)",
+              "status": "done",
+              "details": ["Autocomplete-Lookup im Formular", "Von Normdaten übernehmen per Klick", "Geteilte AuthorityInput-Komponente"]
+            },
+            {
+              "id": "vocab.authorities.terms",
+              "name": "Normdaten an Vokabulartermen",
+              "status": "done",
+              "details": ["metadata.authorities (mehrere pro Term)", "Autocomplete im Term-Editor", "CSV-Import mit Source-Dropdown"]
+            }
+          ]
+        },
+        {
+          "id": "vocab.import",
+          "name": "Vokabular-Import (CSV)",
+          "level": "mid",
+          "status": "done",
+          "details": ["UTF-8/cp1252/latin-1-Erkennung", "Term + Label + Hierarchie + external_id", "Normdaten-Spalte mit Source-Auswahl"]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Medien & IIIF (Media)",
+      "description": "Medien-Upload, IIIF-Integration und Bildverarbeitung.",
+      "features": [
+        {
+          "id": "media.upload",
+          "name": "Medien-Upload",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "media.upload.single",
+              "name": "Einzel-Upload",
+              "status": "done",
+              "details": ["Drag-and-Drop / Dateiauswahl", "media_type aus Vokabular (Vorderseite, Rückseite, Detail…)", "Sofortige Thumbnail-Vorschau nach Upload", "Lizenz- und Rechteinhaber-Angaben pro Datei"]
+            },
+            {
+              "id": "media.upload.batch",
+              "name": "Batch-Medienimport (ZIP + CSV/TSV-Mapping)",
+              "status": "done",
+              "details": ["ZIP-Archiv mit Bildern + Mapping-Datei", "Dateiname → Objekt-ID + media_type", "Celery-Task asynchron", "Fortschritts-Anzeige im Admin", "Importer-Wizard StepMedia.tsx"]
+            },
+            {
+              "id": "media.upload.limit",
+              "name": "Upload-Limit 50 MB",
+              "status": "done"
+            }
+          ]
+        },
+        {
+          "id": "media.iiif",
+          "name": "IIIF-Integration",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "media.iiif.cantaloupe",
+              "name": "Cantaloupe IIIF Image Server",
+              "status": "done",
+              "details": ["Tile-Generierung via Celery-Task", "info.json-Aufruf zur Dimensionsermittlung", "FilesystemSource-Konfiguration", "Korrekte https://-URLs hinter Reverse Proxy", "Health-Check beim API-Start"]
+            },
+            {
+              "id": "media.iiif.manifest",
+              "name": "IIIF-Manifest pro Object",
+              "status": "done",
+              "details": ["Multi-Canvas-Manifest", "Canvas-Dimensionen aus Cantaloupe", "Metadaten aus Record-Feldern", "link:alternate im HTML-Head"]
+            },
+            {
+              "id": "media.iiif.viewer",
+              "name": "IIIF-Viewer im Portal",
+              "status": "done",
+              "details": ["Clover IIIF Viewer", "Deep Zoom", "End-to-End mit Cantaloupe-Tiles"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "name": "Suche & Discovery (Search)",
+      "description": "Elasticsearch-Volltextsuche, Facetten und Portal-Suche.",
+      "features": [
+        {
+          "id": "search.es",
+          "name": "Elasticsearch-Integration",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "search.es.indexing",
+              "name": "Automatische Indexierung",
+              "status": "done",
+              "details": ["Create/Update/Delete → ES-Index", "Celery-Retry bei Fehlern", "refresh=true für sofortige Suchbarkeit", "Konfigurierbarer Index-Name (ES_INDEX_NAME)"]
+            },
+            {
+              "id": "search.es.reindex",
+              "name": "Reindex & Reconciliation",
+              "status": "done",
+              "details": ["Manueller Reindex aller Typen", "Reindex nach Schema-Änderung", "Reconciliation-Job (DB ↔ ES-Abgleich)", "Index-Health-Dashboard"]
+            },
+            {
+              "id": "search.es.facets",
+              "name": "Facetten",
+              "status": "done",
+              "details": ["Dynamisch aus field_definitions.is_facet", "Vocab-/Authority-Label-Extraktion", "Per-Typ-Facettenkonfiguration", "Relation-Facetten (denormalisiert)"]
+            },
+            {
+              "id": "search.es.visibility",
+              "name": "Sichtbarkeits-Filter",
+              "status": "done",
+              "details": ["Nur public-Records in anonymer Suche", "collection_status-Guard für Objekte", "Procedures nicht öffentlich"]
+            }
+          ]
+        },
+        {
+          "id": "search.api",
+          "name": "Such-API",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "search.api.fulltext",
+              "name": "GET /v1/search – Volltextsuche",
+              "status": "done",
+              "details": ["Query-Parameter q", "Typ-Filter", "Pagination", "Facetten-Aggregationen"]
+            },
+            {
+              "id": "search.api.perfield",
+              "name": "Per-Field Searchability",
+              "status": "done",
+              "details": ["is_searchable-Flag pro Feld", "Wildcard-Query-Support"]
+            }
+          ]
+        },
+        {
+          "id": "search.portal",
+          "name": "Portal-Suche",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "search.portal.quick",
+              "name": "Quick Search (Homepage)",
+              "status": "done"
+            },
+            {
+              "id": "search.portal.results",
+              "name": "Suchergebnisse mit Facetten",
+              "status": "done",
+              "details": ["Facettiertes Browsing", "Windowed Pagination mit Ellipsis", "Typ-Icons"]
+            },
+            {
+              "id": "search.portal.config",
+              "name": "Portal-Konfiguration (geplant)",
+              "level": "low",
+              "status": "planned",
+              "details": ["Admin-Screen für sichtbare Felder und Facetten", "portal_config-DB-Tabelle", "Phase 8.1"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "name": "Import & Export",
+      "description": "Importer-Wizard, Export-Mappings und OAI-PMH.",
+      "features": [
+        {
+          "id": "import.wizard",
+          "name": "Importer-Wizard (ETL)",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "import.wizard.steps",
+              "name": "4-Schritte-Wizard",
+              "status": "done",
+              "details": ["Upload → Mapping → Dry Run → Import", "Formate: CSV, TSV, Excel (.xlsx/.xls), XML"]
+            },
+            {
+              "id": "import.wizard.formats",
+              "name": "Multi-Format-Architektur",
+              "status": "done",
+              "details": ["SourceFormat-ABC + Registry", "Generisches XML-Parsing (lxml)", "Element-Level-Record-Picker für XML", "500 MB XML-Limit"]
+            },
+            {
+              "id": "import.wizard.mapping",
+              "name": "Visuelles Spalten-Mapping",
+              "status": "done",
+              "details": ["idno-Pseudo-Feld (__idno__)", "Subtyp-Auswahl", "Transform-Pipeline: split, replace, regex_extract, trim, vocab_map, expression (Jinja2)", "Mehrzeilige Transform-Vorschau"]
+            },
+            {
+              "id": "import.wizard.dryrun",
+              "name": "Dry Run mit Fehler-Report",
+              "status": "done",
+              "details": ["Typ-Validierung", "Pflichtfeld-Prüfung", "Fuzzy-Vokabular-Clustering (rapidfuzz)", "On-the-fly-Felder schon in Vorschau", "Fehler gruppiert nach Meldung"]
+            },
+            {
+              "id": "import.wizard.import",
+              "name": "Async Import (Celery)",
+              "status": "done",
+              "details": ["Redis-basierte Zeilenspeicherung (1h TTL)", "Kein Zeilenlimit", "Fortschrittsanzeige + ETA", "Status-Banner auf allen Screens", "Abbrechen-Button", "UPSERT über idno", "Schema on-the-fly: neue Felder automatisch", "Vokabular-Terme bei Bedarf anlegen", "Publish-Flow mit Auto-Publish"]
+            },
+            {
+              "id": "import.wizard.profiles",
+              "name": "Portable Import-Profile",
+              "status": "done",
+              "details": ["JSON-Export/-Import des Mappings", "Wiederverwendbar über Installationen"]
+            },
+            {
+              "id": "import.wizard.persistence",
+              "name": "localStorage-Persistenz",
+              "status": "done",
+              "details": ["Mapping + Optionen bleiben erhalten", "Rows werden nicht gespeichert"]
+            }
+          ]
+        },
+        {
+          "id": "import.open",
+          "name": "Geplante Importer-Verbesserungen",
+          "level": "low",
+          "status": "planned",
+          "children": [
+            {"id": "import.open.automap", "name": "Auto-Mapping-Heuristik (Levenshtein + Synonyme)", "status": "planned", "details": ["#199"]},
+            {"id": "import.open.preview", "name": "10-Zeilen-Vorschau-Import mit Rollback", "status": "planned", "details": ["#201"]},
+            {"id": "import.open.diff", "name": "Diff-Preview bei Upsert", "status": "planned", "details": ["#202"]},
+            {"id": "import.open.streaming", "name": "Streaming-Upload > 10 MB", "status": "planned", "details": ["#204"]}
+          ]
+        },
+        {
+          "id": "export.mappings",
+          "name": "Export-Mappings (generisch)",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "export.mappings.table",
+              "name": "metadata_mappings-Tabelle + API",
+              "status": "done",
+              "details": ["/v1/metadata-mappings", "Export-Abschnitt im Schema-Editor"]
+            },
+            {
+              "id": "export.mappings.formats",
+              "name": "Export-Format-Stubs",
+              "status": "partial",
+              "details": ["oai_dc (vollständig)", "LIDO (Stub)", "METS/MODS (Stub)"]
+            }
+          ]
+        },
+        {
+          "id": "export.oai",
+          "name": "OAI-PMH",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "export.oai.endpoint",
+              "name": "OAI-PMH-Endpoint (/oai)",
+              "status": "done",
+              "details": ["ListSets, ListRecords, ListIdentifiers, GetRecord", "ResumptionToken", "Dublin Core via generische Mappings", "Status-Filter (nur public)", "503 + Retry-After bei ES-Ausfall"]
+            },
+            {
+              "id": "export.oai.sets",
+              "name": "OAI-Sets (Admin-UI)",
+              "status": "done",
+              "details": ["ScreenOAISets.tsx", "Set-Definitionen in DB"]
+            }
+          ]
+        },
+        {
+          "id": "export.pids",
+          "name": "Persistent Identifiers (PIDs)",
+          "level": "mid",
+          "status": "done",
+          "details": ["DNB URN PID Adapter", "Mock-Endpoint", "Nur für Object-Records"]
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "name": "Rechte & Rollen (Auth & Permissions)",
+      "description": "Authentifizierung, Rollensystem, API-Keys und Sichtbarkeitssteuerung.",
+      "features": [
+        {
+          "id": "rights.auth",
+          "name": "Authentifizierung",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "rights.auth.jwt",
+              "name": "JWT-basierte Auth (jose)",
+              "status": "done",
+              "details": ["Access + Refresh Token", "Automatische Token-Erneuerung im Admin", "bcrypt für Passwörter und API-Keys", "E-Mail im JWT-Payload"]
+            },
+            {
+              "id": "rights.auth.login",
+              "name": "Login-Screen + Sitzungsmanagement",
+              "status": "done",
+              "details": ["JWT in localStorage", "Automatischer Logout bei 401", "Korrekte Fehlermeldung bei falschen Credentials"]
+            }
+          ]
+        },
+        {
+          "id": "rights.roles",
+          "name": "Rollensystem",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "rights.roles.types",
+              "name": "Drei Rollen",
+              "status": "done",
+              "details": ["admin (uneingeschränkt)", "editor (CRUD, kein Schema-Edit)", "viewer (nur lesend)"]
+            },
+            {
+              "id": "rights.roles.superuser",
+              "name": "Superuser-Berechtigungen",
+              "status": "done",
+              "details": ["Alle Admin-Navigation sichtbar", "Alle Typen/Subtypen zugänglich"]
+            },
+            {
+              "id": "rights.roles.guard",
+              "name": "Endpoint-Guards",
+              "status": "done",
+              "details": ["CurrentUser/require_role-Dependency", "Schreibende Endpoints auth-geschützt"]
+            }
+          ]
+        },
+        {
+          "id": "rights.apikeys",
+          "name": "API-Keys",
+          "level": "mid",
+          "status": "done",
+          "details": ["CRUD-API für API-Keys", "bcrypt-gehasht", "Pro User verwaltbar"]
+        },
+        {
+          "id": "rights.visibility",
+          "name": "Sichtbarkeitssteuerung",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "rights.visibility.records",
+              "name": "Record-Status (draft/internal/public)",
+              "status": "done",
+              "details": ["Status-Filter in API", "Public-Search-Guard via ES/Visibility-Layer"]
+            },
+            {
+              "id": "rights.visibility.collection",
+              "name": "collection_status auf Objekten",
+              "status": "done",
+              "details": ["Nur aktive Objekte im Portal sichtbar", "Vorgang-Abschluss kann Status setzen"]
+            }
+          ]
+        },
+        {
+          "id": "rights.audit",
+          "name": "Audit Log",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "rights.audit.logging",
+              "name": "Vollständiges Änderungsprotokoll",
+              "status": "done",
+              "details": ["record_type, record_id, user_id, action, changed_fields JSONB, created_at", "Automatisch bei Create/Update/Delete"]
+            },
+            {
+              "id": "rights.audit.ui",
+              "name": "Audit-Tab im Admin",
+              "status": "done",
+              "details": ["Pro Record abrufbar", "Benutzernamen aufgelöst", "Record-Labels in Einträgen"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "customization",
+      "name": "Anpassung & Konfiguration (Customization)",
+      "description": "Theme-System, Portal-Konfiguration, ID-Schemata und Banners.",
+      "features": [
+        {
+          "id": "customization.theme",
+          "name": "Theme-System (Portal)",
+          "level": "high",
+          "status": "partial",
+          "children": [
+            {
+              "id": "customization.theme.current",
+              "name": "Aktuell: Farb-Tokens + Logo",
+              "status": "done",
+              "details": ["GET /v1/theme", "CSS Custom Properties auf :root", "theme.json + custom.css", "Drop-in-Installation (kein Rebuild)", "Defaults.ts, inject.ts, loader.ts"]
+            },
+            {
+              "id": "customization.theme.planned",
+              "name": "Geplant: Volles Theme-Bundle",
+              "level": "low",
+              "status": "planned",
+              "details": ["Google Fonts", "Layout-Varianten", "Favicon", "Vorschau im Admin", "Siehe KONZEPT.md Abschnitt 11"]
+            }
+          ]
+        },
+        {
+          "id": "customization.portal",
+          "name": "Portal-Konfiguration",
+          "level": "mid",
+          "status": "partial",
+          "children": [
+            {
+              "id": "customization.portal.pages",
+              "name": "Statische Seiten (ScreenPages)",
+              "status": "done",
+              "details": ["Markdown-Inhalt", "Im Portal unter /page/:slug", "Markdown-Rendering mit marked + DOMPurify", "Navigation in Portal-Sidebar"]
+            },
+            {
+              "id": "customization.portal.config",
+              "name": "Portal-Einstellungen",
+              "status": "done",
+              "details": ["Farb-Tokens im Admin konfigurierbar", "Logo-Upload", "Institutionsname in Admin und Portal"]
+            },
+            {
+              "id": "customization.portal.facets",
+              "name": "Portal Facet Config (Phase 8.1)",
+              "level": "low",
+              "status": "planned",
+              "details": ["Admin-Screen: sichtbare Felder und Facetten", "portal_config-DB-Tabelle", "Portal liest Konfiguration via /v1/theme"]
+            }
+          ]
+        },
+        {
+          "id": "customization.banners",
+          "name": "Maintenance Banners",
+          "level": "low",
+          "status": "done",
+          "details": ["Admin- und Portal-Banner konfigurierbar", "ScreenBanners.tsx", "BannerBar-Komponente in beiden Apps"]
+        },
+        {
+          "id": "customization.idno",
+          "name": "Konfigurierbare ID-Schemata",
+          "level": "low",
+          "status": "done",
+          "details": ["Pro Typ konfigurierbar", "Auto-Increment-Template", "Vorschau auf nächste ID", "ScreenSettings.tsx"]
+        },
+        {
+          "id": "customization.feedback",
+          "name": "Feedback-System",
+          "level": "low",
+          "status": "done",
+          "details": ["Admin-Feedback-Button (API-Call via Telegram)", "Portal-Feedback-Button (öffentlich)", "Konfigurierbar via Env-Vars"]
+        },
+        {
+          "id": "customization.ai",
+          "name": "KI-Unterstützung (AI)",
+          "level": "low",
+          "status": "done",
+          "details": ["Konfigurierbare Basis-URL, Modell, API-Key", "Verschlüsselte Secrets", "Feldvorschläge im Formular", "Vocab-/Relations-Feld-Vorschläge bei Fokus"]
+        }
+      ]
+    },
+    {
+      "id": "portal",
+      "name": "Öffentliches Portal (Public Portal)",
+      "description": "Discovery-Portal für Endnutzer.",
+      "features": [
+        {
+          "id": "portal.pages",
+          "name": "Portal-Seiten",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {"id": "portal.pages.home", "name": "Homepage mit Quick Search", "status": "done"},
+            {"id": "portal.pages.search", "name": "Suchergebnisse mit Facetten und Pagination", "status": "done"},
+            {"id": "portal.pages.object", "name": "Object-Detailseite (IIIF-Viewer, Metadaten, Relationen)", "status": "done"},
+            {"id": "portal.pages.entity", "name": "Entity-Detailseite", "status": "done"},
+            {"id": "portal.pages.place", "name": "Place-Detailseite mit OSM-Karte", "status": "done"},
+            {"id": "portal.pages.occurrence", "name": "Occurrence-Detailseite", "status": "done"},
+            {"id": "portal.pages.static", "name": "Statische Seiten (/page/:slug)", "status": "done"}
+          ]
+        },
+        {
+          "id": "portal.seo",
+          "name": "SEO & Metadaten",
+          "level": "mid",
+          "status": "done",
+          "details": ["OpenGraph/Meta-Tags (react-helmet-async)", "IIIF link:alternate im Head", "Title/Search-Label aus Field-Definitions"]
+        },
+        {
+          "id": "portal.a11y",
+          "name": "Accessibility",
+          "level": "low",
+          "status": "done",
+          "details": ["Native Links/Buttons statt klickbarer divs", "Sichtbare Tastatur-Fokus-Zustände", "Landmarken und Pagination-Semantik", "Suchlabels"]
+        },
+        {
+          "id": "portal.relations",
+          "name": "Relationen-Darstellung",
+          "level": "mid",
+          "status": "done",
+          "details": ["Vorschaubilder in zugehörigen Objekten", "Markdown-Rendering für lange Textfelder", "Gegenrichtungslabels in Inline-Karten"]
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "name": "Admin-Oberfläche (Admin UI)",
+      "description": "Eingabeoberfläche für Kuratoren und Admins.",
+      "features": [
+        {
+          "id": "admin.screens",
+          "name": "Admin-Screens",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {"id": "admin.screens.login", "name": "Login-Screen", "status": "done"},
+            {"id": "admin.screens.list", "name": "ScreenList – Listenansicht aller 5 Typen", "status": "done", "details": ["Pagination", "Status-Filter", "Sticky Action Column", "Subtyp-Filter"]},
+            {"id": "admin.screens.form", "name": "ScreenForm – Dynamisches Eingabeformular", "status": "done", "details": ["Alle Feldtypen", "Formularvarianten-Tabs", "Relationen-Panel", "Vorgangs-Panel", "Audit-Tab", "Snapshot-Tab"]},
+            {"id": "admin.screens.schema", "name": "ScreenSchema – Schema-Editor", "status": "done"},
+            {"id": "admin.screens.subtype", "name": "ScreenSubtype – Subtyp-Verwaltung", "status": "done"},
+            {"id": "admin.screens.vocab", "name": "ScreenVocab – Vokabular-Verwaltung", "status": "done"},
+            {"id": "admin.screens.users", "name": "ScreenUsers – Benutzerverwaltung", "status": "done"},
+            {"id": "admin.screens.settings", "name": "ScreenSettings – Einstellungen", "status": "done", "details": ["ID-Schemata", "Portal-Farben/Logo", "Portal-Facettenkonfiguration", "KI-Einstellungen"]},
+            {"id": "admin.screens.importer", "name": "ScreenImporter – Import-Wizard", "status": "done"},
+            {"id": "admin.screens.pages", "name": "ScreenPages – Statische Seiten", "status": "done"},
+            {"id": "admin.screens.banners", "name": "ScreenBanners – Wartungsbanner", "status": "done"},
+            {"id": "admin.screens.audit", "name": "ScreenAudit – Audit Log (global)", "status": "done"},
+            {"id": "admin.screens.oai", "name": "ScreenOAISets – OAI-Sets", "status": "done"}
+          ]
+        },
+        {
+          "id": "admin.layout",
+          "name": "App-Shell & Navigation",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "admin.layout.sidebar",
+              "name": "Sidebar mit Navigation und Version",
+              "status": "done",
+              "details": ["Institutionsname", "Version im Footer", "Feedback-Button"]
+            },
+            {
+              "id": "admin.layout.mobile",
+              "name": "Mobile-optimierte App-Shell",
+              "status": "done",
+              "details": ["Sidebar als Drawer bei ≤768 px", "44-px-Touchziele", "Kompakte Topbar", "Responsive Tabellen und Formulare"]
+            },
+            {
+              "id": "admin.layout.topbar",
+              "name": "Topbar mit globaler Suche und Benutzeraktionen",
+              "status": "done"
+            }
+          ]
+        },
+        {
+          "id": "admin.ux",
+          "name": "UX-Details",
+          "level": "low",
+          "status": "done",
+          "children": [
+            {
+              "id": "admin.ux.validation",
+              "name": "Validierungs-Feedback",
+              "status": "done",
+              "details": ["Pflichtfeld-Fehler für alle Feldtypen sichtbar", "Fehler-Banner mit konkreten Meldungen", "Draft-Speichern mit Hinweisen"]
+            },
+            {
+              "id": "admin.ux.form_variants_ui",
+              "name": "Formularvarianten-UI",
+              "level": "low",
+              "status": "done",
+              "details": ["ScreenFormVariants (Konfiguration)", "Pflichtfelder gesperrt", "Neue Varianten mit Pflichtfeldern vorausgewählt"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "infra",
+      "name": "Administration & Infrastruktur",
+      "description": "Systemadministration, Health, Backup und technisches Hardening.",
+      "features": [
+        {
+          "id": "infra.backup",
+          "name": "Automatisiertes Backup",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {
+              "id": "infra.backup.service",
+              "name": "backup-Compose-Service",
+              "status": "done",
+              "details": ["Tägliches pg_dump (gzip) + Media-tar", "Retention (BACKUP_RETENTION_DAYS)", "Konfigurierbar: BACKUP_ENABLED, BACKUP_AT, BACKUP_INTERVAL_SECONDS", "One-shot-Modus", "Restore-Drill dokumentiert"]
+            }
+          ]
+        },
+        {
+          "id": "infra.health",
+          "name": "Health Monitoring",
+          "level": "mid",
+          "status": "done",
+          "children": [
+            {
+              "id": "infra.health.deep",
+              "name": "Deep /health-Endpoint",
+              "status": "done",
+              "details": ["Prüft Postgres + Elasticsearch aktiv", "503 bei Degradation", "Cantaloupe-Health-Check beim API-Start"]
+            },
+            {
+              "id": "infra.health.index",
+              "name": "Index Health Dashboard",
+              "status": "done",
+              "details": ["Manueller Reindex", "Reconciliation-Job", "Index-Status-Endpunkt"]
+            }
+          ]
+        },
+        {
+          "id": "infra.hardening",
+          "name": "Production Hardening",
+          "level": "mid",
+          "status": "partial",
+          "children": [
+            {"id": "infra.hardening.ratelimit", "name": "Rate Limiting", "status": "done", "details": ["Search/OAI: 100/min", "Authorities: 60/min"]},
+            {"id": "infra.hardening.secrets", "name": "Production Secrets Guard", "status": "done", "details": ["Startup-Guard: SECRET_KEY zu kurz/Default → verweigert", "KATALON_SECRETS_KEY verpflichtend"]},
+            {"id": "infra.hardening.broker", "name": "Broker-Resilienz (Redis)", "status": "done", "details": ["Fire-and-forget schluckt Broker-Ausfall", "Job-ID-Pfade liefern 503 statt 500"]},
+            {"id": "infra.hardening.tls", "name": "nginx TLS-Terminierung", "status": "planned"},
+            {"id": "infra.hardening.perf", "name": "Performance-Tests (locust)", "status": "planned"},
+            {"id": "infra.hardening.openapi", "name": "OpenAPI-Dokumentation finalisiert", "status": "done", "details": ["Live-Version aus importlib.metadata", "30 Router-Tags mit Beschreibungen", "149 Endpunkte mit summary + responses"]}
+          ]
+        },
+        {
+          "id": "infra.cli",
+          "name": "CLI-Verwaltungsbefehle",
+          "level": "low",
+          "status": "done",
+          "details": ["Emergency Admin Password Reset", "First-Run Superuser Bootstrap"]
+        },
+        {
+          "id": "infra.snapshots",
+          "name": "Record Snapshots (Versionierung)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Manuelles Speichern benannter Zustände", "Wiederherstellen aus Snapshot", "Snapshot-Tab im Admin-Formular", "Für alle 5 Record-Typen"]
+        },
+        {
+          "id": "infra.docker",
+          "name": "Docker Compose Deployment",
+          "level": "high",
+          "status": "done",
+          "children": [
+            {"id": "infra.docker.prod", "name": "Production Stack", "status": "done", "details": ["api, worker, db (PostGIS), elasticsearch, redis, cantaloupe, admin, portal, nginx, backup"]},
+            {"id": "infra.docker.dev", "name": "Dev Stack (docker-compose.dev.yml)", "status": "done", "details": ["Hot Reload für Admin/Portal", "Healthchecks mit depends_on"]},
+            {"id": "infra.docker.override", "name": "docker-compose.override.yml Pattern", "status": "done", "details": ["Traefik-Integration als Overlay", "Customization ohne Image-Rebuild"]}
+          ]
+        }
+      ]
+    }
+  ],
+  "legend": {
+    "status": {
+      "done": "Implementiert und getestet",
+      "partial": "Teilweise implementiert",
+      "planned": "Geplant, noch nicht gebaut",
+      "post_mvp": "Post-MVP (konzipiert)"
+    },
+    "level": {
+      "high": "High-Level-Feature (domänenprägend)",
+      "mid": "Mittlere Ebene (Subsystem)",
+      "low": "Low-Level-Detail (konkrete Ausprägung)"
+    }
+  }
+}
