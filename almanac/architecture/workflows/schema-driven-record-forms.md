@@ -24,18 +24,24 @@ sources:
   - id: schema-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenSchema.tsx
-  - id: feedback-triage
-    type: conversation
-    path: /Users/karl/.codex/sessions/2026/07/26/rollout-2026-07-26T21-53-22-019f9ffd-4174-75f1-a3eb-765bef3502f8.jsonl
   - id: form-variants-api
     type: file
     path: backend/src/katalon/api/v1/form_variants.py
+  - id: form-variants-models
+    type: file
+    path: backend/src/katalon/core/models.py
   - id: form-variants-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenFormVariants.tsx
   - id: form-variants-lib
     type: file
     path: frontend/admin/src/lib/formVariants.ts
+  - id: form-variants-tests
+    type: file
+    path: backend/tests/test_form_variants_validation.py
+  - id: changelog
+    type: file
+    path: CHANGELOG.md
 ---
 
 Schema-driven record forms are the admin workflow that turns Katalon's configurable metadata model into editable screens. One `ScreenForm` component handles objects, entities, places, occurrences, and procedures by selecting the correct API module, loading the record and field definitions, rendering inputs from `field_type`, validating the local draft, then saving a payload that combines record scalars with `metadata_` [@screen-form] [@admin-client]. The backend repeats the same contract for each record type: prepare metadata through schema rules, validate required fields unless the status is `draft`, synchronize schema relation fields, log the change, and update the search index [@objects-api] [@entities-api] [@procedures-api].
@@ -56,13 +62,17 @@ The component also handles object media after a record has an id. It loads exist
 
 ## Form Variants (#275)
 
-Admins can configure multiple named form variants per record type and optional subtype (Konfiguration → Formularvarianten, `ScreenFormVariants`) [@form-variants-screen]. A variant is a `FormVariant` row (`target_type`, optional `target_subtype`, `name`, `label`, an ordered `field_names` array referencing existing `field_definitions.name` values, `is_default_global`, `sort_order`) — it never copies field definitions or introduces a second metadata store; records keep saving to the same `metadata_` JSONB regardless of which variant was active [@form-variants-api]. `FormVariantRoleDefault` rows map `(target_type, target_subtype, role)` to one variant, enforced unique at the database level so setting a new role default for a scope automatically supersedes the previous one [@form-variants-api].
+Admins can configure multiple named form variants per record type and optional subtype (Konfiguration → Formularvarianten, `ScreenFormVariants`) [@form-variants-screen]. A variant is a `FormVariant` row (`target_type`, optional `target_subtype`, `name`, `label`, an ordered `field_names` array referencing existing `field_definitions.name` values, `is_default_global`, `sort_order`) — it never copies field definitions or introduces a second metadata store; records keep saving to the same `metadata_` JSONB regardless of which variant was active [@form-variants-models] [@changelog]. `FormVariantRoleDefault` rows map `(target_type, target_subtype, role)` to one variant, enforced unique at the database level so setting a new role default for a scope automatically supersedes the previous one [@form-variants-api] [@form-variants-models].
 
 `ScreenForm` fetches available variants alongside field definitions for the active `recordType`/subtype and resolves which one is active through a priority chain, implemented as the pure function `resolveActiveVariant` [@form-variants-lib]: an optional context-override prop (`variantHint`, exposed as a hook for future workflow/quick-add callers but not yet wired to any caller) beats a manually remembered choice in `localStorage` (keyed per record type and subtype), which beats the current user's role-based default, which beats a variant flagged as the global default for that scope. If none match, the form falls back to the full schema — identical to pre-#275 behavior — which is also what happens when the user explicitly picks the "Vollständig" tab, stored as a distinct sentinel so it isn't silently overridden by a role or global default on the next visit [@form-variants-lib]. A tab bar above the dynamic fields lets the user switch variants manually; the active variant filters and reorders the already-loaded `FieldDefinition[]` by `field_names`, so group parent/child rendering is unaffected as long as the group's own name is included [@screen-form].
 
+Form variants must include every required top-level field for their target type and subtype. The backend validates create and update requests by loading active top-level field definitions (`parent_id IS NULL`), rejecting unknown `field_names`, and rejecting variants that omit a required field [@form-variants-api] [@form-variants-tests]. The admin variant editor mirrors that invariant by preselecting required fields for new variants and disabling their checkboxes with a "Pflicht" marker [@form-variants-screen]. This keeps `validate_metadata` from requiring a field that the selected variant has hidden from the editor.
+
+The remaining validation boundary is required sub-fields inside group fields. `field_names` contains top-level field names only, and `_validate_field_names` currently checks only top-level definitions; if a non-required group contains a required child, a variant can still hide the whole group and therefore hide the child required by metadata validation [@form-variants-api].
+
 ## Feedback-Tracked Form Gaps
 
-The July 2026 feedback triage turned four form gaps into GitHub issues instead of treating them as implemented behavior: configurable form variants for full and quick entry became #275 (implemented, see above), inline creation of related entities and places from the record form became #277, authority fields inside group sub-fields became #278, and AI support for group sub-fields became #279 [@feedback-triage]. Current forms already render group sub-fields, relation fields, authority fields, and AI settings, but the schema UI limits group sub-field types to `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, and `relation`, so authority and AI configuration do not reach group child fields yet [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
+Current forms already render group sub-fields, relation fields, authority fields, and AI settings, but the schema UI limits group sub-field types to `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, and `relation`, so authority and AI configuration do not reach group child fields yet [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
 
 ## Validation And Save
 
