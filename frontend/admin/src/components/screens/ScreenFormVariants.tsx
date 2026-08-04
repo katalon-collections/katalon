@@ -37,6 +37,10 @@ function variantToForm(v: FormVariant): FormState {
   }
 }
 
+function isVariantRequired(field: FieldDefinition): boolean {
+  return field.is_required || (field.field_type === 'group' && field.children?.some(child => child.is_required) === true)
+}
+
 const inp: React.CSSProperties = {
   width: '100%', border: '1px solid var(--border)', borderRadius: 6,
   padding: '7px 10px', fontSize: 13, background: 'var(--bg)', color: 'var(--fg)',
@@ -74,7 +78,7 @@ export function ScreenFormVariants() {
       formVariants.list(activeType, activeSubtype || undefined),
       schema.list(activeType, activeSubtype || undefined),
     ])
-      .then(([v, f]) => { setVariants(v); setAvailableFields(f) })
+      .then(([v, f]) => { setVariants(v); setAvailableFields(activeSubtype ? f : f.filter(field => field.target_subtype == null)) })
       .catch(() => { setVariants([]); setAvailableFields([]) })
       .finally(() => setLoading(false))
   }, [activeType, activeSubtype])
@@ -86,7 +90,7 @@ export function ScreenFormVariants() {
     setIsNew(true)
     // Required fields can never be hidden by a variant (backend enforces this
     // too) — pre-select them so the form starts in a savable state.
-    const requiredNames = availableFields.filter(f => f.is_required).map(f => f.name)
+    const requiredNames = availableFields.filter(isVariantRequired).map(f => f.name)
     setForm({ ...emptyForm(activeType, activeSubtype), field_names: requiredNames })
     setError(null)
   }
@@ -138,7 +142,7 @@ export function ScreenFormVariants() {
   }
 
   function toggleField(name: string) {
-    const isRequired = availableFields.find(f => f.name === name)?.is_required
+    const isRequired = availableFields.some(f => f.name === name && isVariantRequired(f))
     setForm(f => {
       if (!f) return f
       const names = f.field_names ?? []
@@ -233,7 +237,7 @@ export function ScreenFormVariants() {
             <div style={{ border: '1px solid var(--border)', borderRadius: 6, maxHeight: 260, overflowY: 'auto' }}>
               {(form.field_names ?? []).map(name => {
                 const fd = availableFields.find(f => f.name === name)
-                const required = fd?.is_required ?? false
+                const required = fd ? isVariantRequired(fd) : false
                 return (
                   <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
                     <input type="checkbox" checked disabled={required} title={required ? 'Pflichtfeld — kann nicht ausgeblendet werden' : undefined} onChange={() => toggleField(name)} />
@@ -249,7 +253,7 @@ export function ScreenFormVariants() {
                 <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
                   <input type="checkbox" checked={false} onChange={() => toggleField(f.name)} />
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--fg-3)' }}>{f.label.de ?? f.name}</span>
-                  {f.is_required && <span style={{ fontSize: 11, color: '#dc2626' }}>Pflicht — fehlt noch</span>}
+                  {isVariantRequired(f) && <span style={{ fontSize: 11, color: '#dc2626' }}>Pflicht — fehlt noch</span>}
                   <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'monospace' }}>{f.name}</span>
                 </div>
               ))}

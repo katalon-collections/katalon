@@ -60,6 +60,108 @@ async def test_create_form_variant_rejects_missing_required_field(async_client: 
 
 
 @pytest.mark.asyncio
+async def test_create_form_variant_requires_group_with_required_child(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    subtype_name = "form_variant_required_child_scope"
+    subtype_r = await async_client.post(
+        "/v1/record-subtypes",
+        headers=auth_headers,
+        json={
+            "primary_type": "object",
+            "name": subtype_name,
+            "label": {"de": "Formularvarianten-Test"},
+        },
+    )
+    assert subtype_r.status_code == 201, subtype_r.text
+    subtype_id = subtype_r.json()["id"]
+    group_id = child_id = variant_id = None
+
+    try:
+        group_name = "variant_required_child_group"
+        group_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "target_subtype": subtype_name,
+                "name": group_name,
+                "label": {"de": "Pflicht-Unterfeld-Gruppe"},
+                "field_type": "group",
+                "is_required": False,
+                "is_repeatable": True,
+                "sort_order": 99,
+                "settings": {},
+            },
+        )
+        assert group_r.status_code == 201, group_r.text
+        group_id = group_r.json()["id"]
+
+        child_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "target_subtype": subtype_name,
+                "name": "variant_required_child",
+                "label": {"de": "Pflicht-Unterfeld"},
+                "field_type": "text",
+                "is_required": True,
+                "is_repeatable": False,
+                "sort_order": 0,
+                "settings": {},
+                "parent_id": group_id,
+            },
+        )
+        assert child_r.status_code == 201, child_r.text
+        child_id = child_r.json()["id"]
+
+        without_group_r = await async_client.post(
+            "/v1/form-variants",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "target_subtype": subtype_name,
+                "name": "Ohne Gruppe",
+                "field_names": ["label"],
+            },
+        )
+        assert without_group_r.status_code == 422
+        assert group_name in without_group_r.json()["detail"]
+
+        with_group_r = await async_client.post(
+            "/v1/form-variants",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "target_subtype": subtype_name,
+                "name": "Mit Gruppe",
+                "field_names": ["label", group_name],
+            },
+        )
+        assert with_group_r.status_code == 201, with_group_r.text
+        variant_id = with_group_r.json()["id"]
+    finally:
+        cleanup_statuses = []
+        if variant_id is not None:
+            cleanup_statuses.append(
+                (await async_client.delete(f"/v1/form-variants/{variant_id}", headers=auth_headers)).status_code
+            )
+        if child_id is not None:
+            cleanup_statuses.append(
+                (await async_client.delete(f"/v1/schema/{child_id}", headers=auth_headers)).status_code
+            )
+        if group_id is not None:
+            cleanup_statuses.append(
+                (await async_client.delete(f"/v1/schema/{group_id}", headers=auth_headers)).status_code
+            )
+        cleanup_statuses.append(
+            (await async_client.delete(f"/v1/record-subtypes/{subtype_id}", headers=auth_headers)).status_code
+        )
+        assert cleanup_statuses == [204] * len(cleanup_statuses)
+
+
+@pytest.mark.asyncio
 async def test_create_and_list_form_variant(async_client: AsyncClient, auth_headers: dict) -> None:
     # "label" is a system field guaranteed to exist for every primary type.
     create_r = await async_client.post(

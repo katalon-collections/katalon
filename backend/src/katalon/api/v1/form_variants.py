@@ -26,7 +26,12 @@ async def _validate_field_names(
     db: DBDep, target_type: str, target_subtype: str | None, field_names: list[str]
 ) -> None:
     result = await db.execute(
-        select(FieldDefinition.name, FieldDefinition.is_required).where(
+        select(
+            FieldDefinition.id,
+            FieldDefinition.name,
+            FieldDefinition.field_type,
+            FieldDefinition.is_required,
+        ).where(
             FieldDefinition.target_type == target_type,
             FieldDefinition.is_deleted.is_(False),
             FieldDefinition.parent_id.is_(None),
@@ -35,7 +40,7 @@ async def _validate_field_names(
         )
     )
     rows = result.all()
-    known = {name for name, _ in rows}
+    known = {name for _, name, _, _ in rows}
 
     if field_names:
         unknown = [name for name in field_names if name not in known]
@@ -45,7 +50,19 @@ async def _validate_field_names(
                 detail=f"Unbekannte Felder für diesen Typ/Subtyp: {', '.join(unknown)}",
             )
 
-    required = {name for name, is_required in rows if is_required}
+    required = {name for _, name, _, is_required in rows if is_required}
+    groups = {field_id: name for field_id, name, field_type, _ in rows if field_type == "group"}
+    if groups:
+        child_result = await db.execute(
+            select(FieldDefinition.parent_id).where(
+                FieldDefinition.target_type == target_type,
+                FieldDefinition.parent_id.in_(groups),
+                FieldDefinition.is_required.is_(True),
+                FieldDefinition.is_deleted.is_(False),
+            )
+        )
+        required.update(groups[parent_id] for parent_id in set(child_result.scalars().all()))
+
     missing_required = required - set(field_names)
     if missing_required:
         raise HTTPException(

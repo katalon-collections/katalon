@@ -168,6 +168,7 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 ## Python/uv Hinweise
 
 - Backend-Python-Kommandos immer aus `backend/` ausführen. Im Repo-Root existiert auch eine `.venv`; von dort gestartete Backend-Tests können im falschen Interpreter landen und dann Dependencies wie `jinja2` "verlieren".
+- Backend-Tests immer mit einem mindestens 32 Zeichen langen Testschlüssel starten, z. B. `KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest ...`. Nicht erst einen Lauf ohne diese Variable versuchen.
 - Wenn `uv` über `backend/uv.lock` stolpert: der problematische Fall ist `click-didyoumean` mit inkonsistentem Lock-Eintrag (`version = "0.3.2"` zeigt auf `click_didyoumean-0.3.1` Dateien). Bis Upstream sauber ist, `click-didyoumean==0.3.1` beibehalten.
 
 ## Port-Regel Dev vs. Prod-Compose
