@@ -175,12 +175,13 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 **Port-Verwechslung vermeiden:**
 
-- `http://localhost:3000` = Admin im normalen/production-like Compose-Stack
-- `http://localhost:3001` = Portal im normalen/production-like Compose-Stack
+- `http://localhost/admin/` = Admin im normalen/production-like Compose-Stack (über äußeres `nginx`, Port 80)
+- `http://localhost/` = Portal im normalen/production-like Compose-Stack (über äußeres `nginx`, Port 80)
+- `http://localhost:3000` / `http://localhost:3001` = Admin/Portal-Container **direkt**, nur zum Debuggen des jeweiligen Containers geeignet. **Nicht zum normalen Testen verwenden** – der Admin-Container wird mit `VITE_BASE_PATH=/admin/` gebaut (siehe unten), Assets liegen also unter `/admin/assets/...`. Direkter Aufruf von `localhost:3000/` liefert nur die HTML-Shell, die JS/CSS-Requests laufen ins SPA-Fallback (`text/html` statt `application/javascript`) → weiße Seite.
 - `http://localhost:4000` = Admin **nur** im Dev-Compose-Stack (`docker-compose.dev.yml`)
 - `http://localhost:4001` = Portal **nur** im Dev-Compose-Stack (`docker-compose.dev.yml`)
 
-**Wichtig:** Wenn nicht explizit gesagt wird, dass der Dev-Stack gemeint ist, verwende für Browser-Checks standardmäßig `3000/3001`, nicht `4000/4001`.
+**Wichtig:** Wenn nicht explizit gesagt wird, dass der Dev-Stack gemeint ist, verwende für Browser-Checks standardmäßig `http://localhost/admin/` und `http://localhost/`, nicht die direkten Container-Ports.
 
 ## Kritische Build-Konfigurationen – NICHT ÄNDERN ohne Test
 
@@ -220,6 +221,10 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 **Nachschlagen**: Bei Architektur-/Design-Fragen ("warum ist das so gebaut?") erst `.agents/knowledge/decisions/index.md` prüfen, bevor Code-Archäologie betrieben wird. Lokale HTML-Ansicht: `make knowledge-site`.
 
 **Pflege**: Nach jeder Session, in der eine architektonisch relevante Entscheidung getroffen wird (neue Komponente, Trade-off zwischen Ansätzen, Abweichung von einem bestehenden Muster) — nicht bei reinen Bugfixes oder Feature-Implementierungen ohne Designfrage — ein neues Konzept unter `.agents/knowledge/decisions/` anlegen (Format wie bestehende Dateien: YAML-Frontmatter mit `type: Decision`, Sections Kontext/Entscheidung/Begründung/Citations) und in `decisions/index.md` verlinken.
+
+## CodeAlmanac
+
+Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur ändern, `almanac/` aktualisieren. Veraltete Seiten korrigieren oder kennzeichnen; rein aus dem Code ablesbare Details nicht duplizieren.
 
 ## Kontext-Dateien — Lazy Loading
 
