@@ -18,10 +18,12 @@ function buildHeaders(init?: HeadersInit): Record<string, string> {
 
 export function setToken(t: string | null, refreshToken?: string | null) {
   _token = t
-  t ? localStorage.setItem('katalon_token', t) : localStorage.removeItem('katalon_token')
+  if (t) localStorage.setItem('katalon_token', t)
+  else localStorage.removeItem('katalon_token')
   if (refreshToken !== undefined) {
     _refreshToken = refreshToken
-    refreshToken ? localStorage.setItem('katalon_refresh_token', refreshToken) : localStorage.removeItem('katalon_refresh_token')
+    if (refreshToken) localStorage.setItem('katalon_refresh_token', refreshToken)
+    else localStorage.removeItem('katalon_refresh_token')
   } else if (t === null) {
     _refreshToken = null
     localStorage.removeItem('katalon_refresh_token')

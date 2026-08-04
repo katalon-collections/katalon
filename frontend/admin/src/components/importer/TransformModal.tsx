@@ -110,7 +110,7 @@ export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, 
   const effectiveSamples = sampleValues.length > 0 ? sampleValues.slice(0, 3) : ['Beispielwert']
   const previews = useMemo(() => {
     return effectiveSamples.map(v => applyTransformsLocal(v, transforms))
-  }, [effectiveSamples.join('|'), transforms]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [effectiveSamples.join('|'), transforms])
 
   function addTransform(type: TransformConfig['type']) {
     const base: TransformConfig = { type }

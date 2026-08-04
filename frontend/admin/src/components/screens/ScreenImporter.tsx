@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { FieldDefinition } from '../../types'
 import { RECORD_TYPES, STEPS, STEPS_XML } from './importer/types'
 import { useImporterState } from './importer/useImporterState'
 import { StepDryRun } from './importer/StepDryRun'

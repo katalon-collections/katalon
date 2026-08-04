@@ -197,7 +197,12 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const someSel = items.some(o => sel.has(o.id))
 
   function toggle(id: string) {
-    setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSel(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
   function toggleAll() {
     if (allSel) setSel(new Set()); else setSel(new Set(items.map(o => o.id)))
@@ -210,8 +215,6 @@ export function ScreenList({ recordType, onOpen }: Props) {
   // Always: Checkbox, ID-Nr., [Subtype], [listFields...], Status, Geändert, Actions
   const showIdno = true
   const showSubtype = Boolean(subtypeKey)
-  const hasListFields = listFields.length > 0
-
   // Primary label field: first list field, or fallback to label
   const primaryField = listFields[0]
   const primaryLabel = primaryField?.label?.de || primaryField?.label?.en || primaryField?.name || 'Titel'

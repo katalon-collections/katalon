@@ -1,13 +1,12 @@
 import React, { useEffect, useReducer, useRef } from 'react'
 import { importer, schema, subtypes as subtypesApi } from '../../../api/client'
-import type { MappingEntry, UploadResult, XmlElementLevel, XmlSelector } from '../../../api/client'
+import type { MappingEntry, UploadResult, XmlElementLevel } from '../../../api/client'
 import type { FieldDefinition, RecordSubtype } from '../../../types'
 import {
   IMPORTER_STATE_KEY,
   type ImporterAction,
   type ImporterState,
   type ImportProfile,
-  type PendingField,
   type PersistedImporterState,
   type ProfileApplyResult,
 } from './types'
@@ -238,7 +237,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       setFields(fs.concat(virtuals))
     }).catch(() => setFields([]))
     subtypesApi.list(state.recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
-  }, [state.recordType, state.subtype]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.recordType, state.subtype])
 
   // Re-merge pending fields when they change
   useEffect(() => {
@@ -299,7 +298,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       // CSV/Excel: auto-map obvious column names
       const autoMap: Record<string, MappingEntry> = {}
       for (const col of (result.headers ?? [])) {
-        const norm = col.toLowerCase().replace(/[\s\-]/g, '_')
+        const norm = col.toLowerCase().replace(/[\s-]/g, '_')
         const match = fields.find(f => f.name === norm || f.label.de?.toLowerCase() === col.toLowerCase())
         if (match) autoMap[col] = { target: match.name }
       }

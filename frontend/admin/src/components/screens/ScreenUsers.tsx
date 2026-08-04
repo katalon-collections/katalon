@@ -239,7 +239,8 @@ export function ScreenUsers() {
   function toggleKeys(userId: string) {
     setExpandedKeys(prev => {
       const next = new Set(prev)
-      next.has(userId) ? next.delete(userId) : next.add(userId)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
       return next
     })
   }
@@ -248,7 +249,8 @@ export function ScreenUsers() {
     setSaveError(null)
     setExpandedCredentials(prev => {
       const next = new Set(prev)
-      next.has(user.id) ? next.delete(user.id) : next.add(user.id)
+      if (next.has(user.id)) next.delete(user.id)
+      else next.add(user.id)
       return next
     })
     setDraftEmail(prev => ({ ...prev, [user.id]: prev[user.id] ?? user.email }))

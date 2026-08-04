@@ -38,7 +38,7 @@ export function ImportStatusBanner({ currentRoute }: Props) {
       setDismissed(false)
       setStatus(null)
     }
-  }, [currentRoute]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentRoute])
 
   useEffect(() => {
     if (!taskId) return

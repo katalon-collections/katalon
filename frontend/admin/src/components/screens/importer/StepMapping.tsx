@@ -56,7 +56,7 @@ export function StepMapping({
 
   function confirmCreateField() {
     if (!newFieldModal) return
-    const name = newFieldModal.toLowerCase().replace(/[\s\-]/g, '_')
+    const name = newFieldModal.toLowerCase().replace(/[\s-]/g, '_')
     const existing = fields.find(f => f.name === name)
     if (existing) {
       onMappingChange({ ...mapping, [newFieldModal]: { target: existing.name } })

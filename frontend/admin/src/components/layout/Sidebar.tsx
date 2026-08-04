@@ -2,7 +2,6 @@ import pkg from '../../../package.json'
 import { getTokenUser } from '../../api/client'
 import { FeedbackButton } from '../feedback/FeedbackButton'
 import { Bell, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
-import { Search } from '../ui/Icons'
 
 type Route = string
 

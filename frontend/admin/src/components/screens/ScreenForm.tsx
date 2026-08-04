@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, authority as authorityApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
-import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Edit, Lightning } from '../ui/Icons'
+import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Lightning } from '../ui/Icons'
 
 function extractTitle(m: Record<string, unknown>, fallback: string): string {
   for (const key of ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']) {
@@ -413,7 +413,6 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
 
 function RelationInput({
   targetType,
-  targetSubtype,
   relTypeVocabId,
   onAdd,
   disabled,

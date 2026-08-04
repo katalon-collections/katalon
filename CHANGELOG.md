@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-08-04
+
+### Fixed
+- Admin-Linting mit einer minimalen ESLint-Flat-Config wiederhergestellt und bestehende Lintfehler bereinigt.
+
 ## [0.7.2] - 2026-08-04
 
 ### Fixed

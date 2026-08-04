@@ -31,7 +31,7 @@ export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
       const rate = (newest.n - oldest.n) / ((newest.t - oldest.t) / 1000)
       if (rate > 0) setEta(Math.ceil((taskStatus.meta.total - newest.n) / rate))
     }
-  }, [taskStatus?.state, taskStatus?.meta?.current]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [taskStatus?.state, taskStatus?.meta?.current])
 
   return (
     <div style={{ maxWidth: 520 }}>
