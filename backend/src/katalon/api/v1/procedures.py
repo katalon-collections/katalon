@@ -4,8 +4,9 @@ from datetime import date
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version
+from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import AdminConfig, Object, Procedure, RecordSnapshot
 from katalon.core.schemas import (
@@ -27,6 +28,7 @@ from katalon.services.relation_service import (
     count_relations,
     delete_relations,
     get_active_loan_out_for_object,
+    lock_objects,
     procedure_object_ids,
     sync_schema_relations,
 )
@@ -71,7 +73,9 @@ async def _validate_procedure(
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if procedure_type == "loan_out" and data.status == "active" and procedure_id:
-        for object_id in await procedure_object_ids(db, procedure_id):
+        object_ids = await procedure_object_ids(db, procedure_id)
+        await lock_objects(db, object_ids)
+        for object_id in object_ids:
             existing = await get_active_loan_out_for_object(
                 db,
                 object_id,
@@ -188,7 +192,7 @@ async def create_procedure(
         metadata_=data.metadata_,
     )
     db.add(proc)
-    await db.flush()
+    await flush_record(db, proc)
     await sync_schema_relations(db, "procedure", proc.id, data.metadata_)
     await db.flush()
     await log_change(
@@ -231,6 +235,7 @@ async def complete_procedure(
 
     old_status = proc.status
     proc.status = "completed"
+    await flush_record(db, proc)
 
     changed_objects: list[str] = []
     if data.collection_status:
@@ -240,6 +245,7 @@ async def complete_procedure(
             for obj in result.scalars().all():
                 old_collection_status = obj.collection_status
                 obj.collection_status = data.collection_status
+                await flush_record(db, obj)
                 changed_objects.append(str(obj.id))
                 await log_change(
                     db,
@@ -367,7 +373,7 @@ async def update_procedure(
     proc.due_date = data.due_date
     proc.reference_number = data.reference_number
     proc.metadata_ = data.metadata_
-    proc.version += 1
+    await flush_record(db, proc)
     await sync_schema_relations(db, "procedure", proc.id, data.metadata_)
     await log_change(
         db,
@@ -430,6 +436,7 @@ async def delete_procedure(
         action="delete",
     )
     await db.delete(proc)
+    await flush_record(db, proc)
     try:
         await search_service.remove_record(procedure_id)
     except Exception:
@@ -494,10 +501,16 @@ async def list_snapshots(procedure_id: uuid.UUID, db: DBDep) -> list[RecordSnaps
     responses={
         404: {"description": "Snapshot or procedure not found"},
         403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict or active loan conflict"},
+        428: {"description": "If-Match header required"},
     },
 )
 async def restore_snapshot(
-    procedure_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
+    procedure_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Procedure:
     snap = (
         await db.execute(
@@ -515,14 +528,46 @@ async def restore_snapshot(
     ).scalar_one_or_none()
     if not proc:
         raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
-    for key in ("procedure_type", "status", "reference_number", "metadata_"):
+    require_version(proc.version, if_match)
+
+    target_type = snap.snapshot.get("procedure_type", proc.procedure_type)
+    target_status = snap.snapshot.get("status", proc.status)
+    if target_type == "loan_out" and target_status == "active":
+        object_ids = await procedure_object_ids(db, procedure_id)
+        await lock_objects(db, object_ids)
+        for object_id in object_ids:
+            existing = await get_active_loan_out_for_object(
+                db, object_id, exclude_procedure_id=procedure_id
+            )
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Objekt ist bereits in einem aktiven Ausleihvorgang.",
+                )
+
+    for key in ("idno", "procedure_type", "status", "reference_number", "metadata_"):
         if key in snap.snapshot:
             setattr(proc, key, snap.snapshot[key])
     for key in ("start_date", "end_date", "due_date"):
         if key in snap.snapshot:
             value = snap.snapshot[key]
             setattr(proc, key, date.fromisoformat(value) if value else None)
-    await db.flush()
+    flag_modified(proc, "metadata_")
+    await flush_record(db, proc)
+    await sync_schema_relations(db, "procedure", proc.id, proc.metadata_)
+    await log_change(
+        db,
+        record_type="procedure",
+        record_id=proc.id,
+        user_id=current_user.id,
+        action="restore",
+        changed_fields={"snapshot_id": str(snapshot_id)},
+    )
+    await db.commit()
+    try:
+        await search_service.index_record("procedure", proc, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return proc
 
 

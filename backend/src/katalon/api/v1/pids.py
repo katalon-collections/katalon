@@ -60,6 +60,8 @@ async def register_dnb_urn(
     except httpx.HTTPStatusError as exc:
         detail = f"DNB-URN-API Fehler: HTTP {exc.response.status_code}"
         raise HTTPException(status_code=502, detail=detail)
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Unexpected error during DNB URN registration")
         raise HTTPException(status_code=500, detail="URN-Registrierung fehlgeschlagen.")

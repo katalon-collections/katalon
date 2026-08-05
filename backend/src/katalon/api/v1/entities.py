@@ -3,8 +3,9 @@ import uuid
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version
+from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
@@ -121,7 +122,7 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admi
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=metadata)
     db.add(entity)
-    await db.flush()
+    await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, metadata)
     await db.flush()
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="create")
@@ -208,7 +209,8 @@ async def update_entity(
     entity.entity_type = entity_type
     entity.status = data.status
     entity.metadata_ = metadata
-    entity.version += 1
+
+    await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, metadata)
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "entity_type": entity_type, "status": data.status, "metadata": metadata}})
@@ -276,11 +278,12 @@ async def delete_entity(
         await delete_relations(db, "entity", entity_id)
 
     await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="delete")
+    await db.delete(entity)
+    await flush_record(db, entity)
     try:
         await search_service.remove_record(entity.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
-    await db.delete(entity)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
@@ -304,9 +307,18 @@ async def create_snapshot(
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    snap = RecordSnapshot(record_type="entity", record_id=entity.id, label=data.label,
-                          snapshot={"entity_type": entity.entity_type, "status": entity.status, "metadata": entity.metadata_},
-                          created_by=current_user.id)
+    snap = RecordSnapshot(
+        record_type="entity",
+        record_id=entity.id,
+        label=data.label,
+        snapshot={
+            "idno": entity.idno,
+            "entity_type": entity.entity_type,
+            "status": entity.status,
+            "metadata": entity.metadata_,
+        },
+        created_by=current_user.id,
+    )
     db.add(snap)
     await db.flush()
     return snap
@@ -333,10 +345,16 @@ async def list_snapshots(entity_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
     responses={
         404: {"description": "Snapshot or entity not found"},
         403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict"},
+        428: {"description": "If-Match header required"},
     },
 )
 async def restore_snapshot(
-    entity_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
+    entity_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Entity:
     snap_result = await db.execute(
         select(RecordSnapshot).where(
@@ -353,15 +371,33 @@ async def restore_snapshot(
     entity = entity_result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    require_version(entity.version, if_match)
 
     data = snap.snapshot
+    if "idno" in data:
+        entity.idno = data["idno"]
     if "entity_type" in data:
         entity.entity_type = data["entity_type"]
     if "status" in data:
         entity.status = data["status"]
     if "metadata" in data:
         entity.metadata_ = data["metadata"]
-    await db.flush()
+    flag_modified(entity, "metadata_")
+    await flush_record(db, entity)
+    await sync_schema_relations(db, "entity", entity.id, entity.metadata_)
+    await log_change(
+        db,
+        record_type="entity",
+        record_id=entity.id,
+        user_id=current_user.id,
+        action="restore",
+        changed_fields={"snapshot_id": str(snapshot_id)},
+    )
+    await db.commit()
+    try:
+        await search_service.index_record("entity", entity, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return entity
 
 

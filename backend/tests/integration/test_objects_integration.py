@@ -1,6 +1,12 @@
+import asyncio
 import uuid
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy import select
+
+from katalon.core.concurrency import flush_record
+from katalon.core.models import Object
 
 
 @pytest.mark.asyncio
@@ -89,3 +95,113 @@ async def test_object_draft_allows_missing_required_fields(async_client, auth_he
     )
     assert public_response.status_code == 422
     assert field_name in str(public_response.json()["detail"])
+
+
+@pytest.mark.asyncio
+async def test_concurrent_object_writes_only_allow_one_winner(
+    async_client, auth_headers
+) -> None:
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"RACE-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "object_type": "objekt",
+            "metadata_": {},
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    from katalon.database import AsyncSessionLocal
+
+    object_id = uuid.UUID(created.json()["id"])
+    async with AsyncSessionLocal() as first, AsyncSessionLocal() as second:
+        first_obj = (await first.execute(select(Object).where(Object.id == object_id))).scalar_one()
+        second_obj = (await second.execute(select(Object).where(Object.id == object_id))).scalar_one()
+        first_obj.status = "public"
+        second_obj.status = "archived"
+        await first.commit()
+        with pytest.raises(HTTPException) as conflict:
+            await flush_record(second, second_obj)
+        assert conflict.value.status_code == 409
+        assert conflict.value.detail == {"error": "version_conflict", "current_version": 2}
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.json()["status"] == "public"
+    assert persisted.json()["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_snapshot_restore_requires_current_version_and_writes_audit(
+    async_client, auth_headers
+) -> None:
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"SNAP-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "object_type": "objekt",
+            "collection_status": "active",
+            "metadata_": {"label": "before"},
+        },
+    )
+    record = created.json()
+    object_id = record["id"]
+    snapshot = await async_client.post(
+        f"/v1/objects/{object_id}/snapshots",
+        headers=auth_headers,
+        json={"label": "before edit"},
+    )
+    assert snapshot.status_code == 201, snapshot.text
+
+    updated = await async_client.put(
+        f"/v1/objects/{object_id}",
+        headers={**auth_headers, "If-Match": str(record["version"])},
+        json={
+            "idno": record["idno"],
+            "status": "draft",
+            "object_type": "objekt",
+            "collection_status": "pending",
+            "metadata_": {"label": "after"},
+        },
+    )
+    assert updated.status_code == 200, updated.text
+
+    restore_url = f"/v1/objects/{object_id}/snapshots/{snapshot.json()['id']}/restore"
+    missing = await async_client.post(restore_url, headers=auth_headers)
+    assert missing.status_code == 428
+    stale = await async_client.post(
+        restore_url,
+        headers={**auth_headers, "If-Match": str(record["version"])},
+    )
+    assert stale.status_code == 409
+
+    restored = await async_client.post(
+        restore_url,
+        headers={**auth_headers, "If-Match": str(updated.json()["version"])},
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["metadata_"] == {"label": "before"}
+    assert restored.json()["collection_status"] == "active"
+    assert restored.json()["version"] == updated.json()["version"] + 1
+
+    audit = await async_client.get(f"/v1/objects/{object_id}/audit-log", headers=auth_headers)
+    assert any(entry["action"] == "restore" for entry in audit.json())
+
+
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_idno_returns_client_error(async_client, auth_headers) -> None:
+    idno = f"DUP-{uuid.uuid4().hex[:12]}"
+    payload = {
+        "idno": idno,
+        "status": "draft",
+        "object_type": "objekt",
+        "metadata_": {},
+    }
+    responses = await asyncio.gather(
+        async_client.post("/v1/objects", headers=auth_headers, json=payload),
+        async_client.post("/v1/objects", headers=auth_headers, json=payload),
+    )
+    assert sorted(response.status_code for response in responses) == [201, 400]

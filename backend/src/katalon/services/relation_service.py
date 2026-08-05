@@ -6,7 +6,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import FieldDefinition, Procedure, Relation
+from katalon.core.models import FieldDefinition, Object, Procedure, Relation
 
 
 async def count_relations(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> int:
@@ -75,6 +75,17 @@ async def get_active_loan_out_for_object(
     if exclude_procedure_id:
         stmt = stmt.where(Procedure.id != exclude_procedure_id)
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def lock_objects(db: AsyncSession, object_ids: list[uuid.UUID]) -> None:
+    """Serialize loan checks for a deterministic set of object rows."""
+    if object_ids:
+        await db.execute(
+            select(Object.id)
+            .where(Object.id.in_(sorted(set(object_ids))))
+            .order_by(Object.id)
+            .with_for_update()
+        )
 
 
 async def procedure_object_ids(db: AsyncSession, procedure_id: uuid.UUID) -> list[uuid.UUID]:

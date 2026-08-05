@@ -3,8 +3,9 @@ import uuid
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version
+from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
@@ -122,7 +123,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     db.add(place)
-    await db.flush()
+    await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
     await db.flush()
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="create")
@@ -209,11 +210,12 @@ async def update_place(
     place.place_type = place_type
     place.status = data.status
     place.metadata_ = metadata
-    place.version += 1
-    await sync_schema_relations(db, "place", place.id, metadata)
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
+
+    await flush_record(db, place)
+    await sync_schema_relations(db, "place", place.id, metadata)
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "place_type": place_type, "status": data.status}})
     try:
@@ -279,11 +281,12 @@ async def delete_place(
         await delete_relations(db, "place", place_id)
 
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="delete")
+    await db.delete(place)
+    await flush_record(db, place)
     try:
         await search_service.remove_record(place.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
-    await db.delete(place)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
@@ -311,7 +314,12 @@ async def create_snapshot(
         record_type="place",
         record_id=place.id,
         label=data.label,
-        snapshot={"place_type": place.place_type, "status": place.status, "metadata": place.metadata_},
+        snapshot={
+            "idno": place.idno,
+            "place_type": place.place_type,
+            "status": place.status,
+            "metadata": place.metadata_,
+        },
         created_by=current_user.id,
     )
     db.add(snap)
@@ -340,10 +348,16 @@ async def list_snapshots(place_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]
     responses={
         404: {"description": "Place or snapshot not found"},
         403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict"},
+        428: {"description": "If-Match header required"},
     },
 )
 async def restore_snapshot(
-    place_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
+    place_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Place:
     snap_result = await db.execute(
         select(RecordSnapshot).where(
@@ -360,15 +374,33 @@ async def restore_snapshot(
     place = place_result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    require_version(place.version, if_match)
 
     data = snap.snapshot
+    if "idno" in data:
+        place.idno = data["idno"]
     if "place_type" in data:
         place.place_type = data["place_type"]
     if "status" in data:
         place.status = data["status"]
     if "metadata" in data:
         place.metadata_ = data["metadata"]
-    await db.flush()
+    flag_modified(place, "metadata_")
+    await flush_record(db, place)
+    await sync_schema_relations(db, "place", place.id, place.metadata_)
+    await log_change(
+        db,
+        record_type="place",
+        record_id=place.id,
+        user_id=current_user.id,
+        action="restore",
+        changed_fields={"snapshot_id": str(snapshot_id)},
+    )
+    await db.commit()
+    try:
+        await search_service.index_record("place", place, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return place
 
 

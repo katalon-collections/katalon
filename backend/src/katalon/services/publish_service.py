@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from katalon.core.concurrency import flush_record
 from katalon.core.models import Entity, Object, Occurrence, Place
 from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
@@ -82,7 +83,7 @@ async def publish_record(
         return {"ok": False, "errors": ["Datensatz nicht gefunden"]}
 
     rec.status = "public"
-    await db.flush()
+    await flush_record(db, rec)
 
     # Audit log
     try:

@@ -3,8 +3,9 @@ import uuid
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version
+from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
 from katalon.core.schemas import (
@@ -121,7 +122,7 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=requ
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
     occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=metadata)
     db.add(occ)
-    await db.flush()
+    await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await db.flush()
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="create")
@@ -208,7 +209,8 @@ async def update_occurrence(
     occ.occurrence_type = occurrence_type
     occ.status = data.status
     occ.metadata_ = metadata
-    occ.version += 1
+
+    await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
                      changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})
@@ -275,11 +277,12 @@ async def delete_occurrence(
         await delete_relations(db, "occurrence", occ_id)
 
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="delete")
+    await db.delete(occ)
+    await flush_record(db, occ)
     try:
         await search_service.remove_record(occ.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
-    await db.delete(occ)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
@@ -307,7 +310,12 @@ async def create_snapshot(
         record_type="occurrence",
         record_id=occ.id,
         label=data.label,
-        snapshot={"occurrence_type": occ.occurrence_type, "status": occ.status, "metadata": occ.metadata_},
+        snapshot={
+            "idno": occ.idno,
+            "occurrence_type": occ.occurrence_type,
+            "status": occ.status,
+            "metadata": occ.metadata_,
+        },
         created_by=current_user.id,
     )
     db.add(snap)
@@ -336,10 +344,16 @@ async def list_snapshots(occ_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
     responses={
         404: {"description": "Occurrence or snapshot not found"},
         403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict"},
+        428: {"description": "If-Match header required"},
     },
 )
 async def restore_snapshot(
-    occ_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
+    occ_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     snap_result = await db.execute(
         select(RecordSnapshot).where(
@@ -356,15 +370,33 @@ async def restore_snapshot(
     occ = occ_result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
+    require_version(occ.version, if_match)
 
     data = snap.snapshot
+    if "idno" in data:
+        occ.idno = data["idno"]
     if "occurrence_type" in data:
         occ.occurrence_type = data["occurrence_type"]
     if "status" in data:
         occ.status = data["status"]
     if "metadata" in data:
         occ.metadata_ = data["metadata"]
-    await db.flush()
+    flag_modified(occ, "metadata_")
+    await flush_record(db, occ)
+    await sync_schema_relations(db, "occurrence", occ.id, occ.metadata_)
+    await log_change(
+        db,
+        record_type="occurrence",
+        record_id=occ.id,
+        user_id=current_user.id,
+        action="restore",
+        changed_fields={"snapshot_id": str(snapshot_id)},
+    )
+    await db.commit()
+    try:
+        await search_service.index_record("occurrence", occ, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return occ
 
 

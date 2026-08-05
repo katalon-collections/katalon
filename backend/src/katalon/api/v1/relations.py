@@ -6,7 +6,11 @@ from sqlalchemy import select
 from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import Procedure, Relation
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
-from katalon.services.relation_service import get_active_loan_out_for_object, procedure_object_pair
+from katalon.services.relation_service import (
+    get_active_loan_out_for_object,
+    lock_objects,
+    procedure_object_pair,
+)
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 
@@ -54,6 +58,7 @@ async def create_relation(
             await db.execute(select(Procedure).where(Procedure.id == procedure_id))
         ).scalar_one_or_none()
         if procedure and procedure.procedure_type == "loan_out" and procedure.status == "active":
+            await lock_objects(db, [object_id])
             existing = await get_active_loan_out_for_object(
                 db,
                 object_id,
