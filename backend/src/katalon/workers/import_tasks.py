@@ -35,6 +35,7 @@ def import_records_task(
     """
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from sqlalchemy.orm.exc import StaleDataError
     from sqlalchemy.pool import NullPool
 
     from katalon.config import settings
@@ -281,20 +282,37 @@ def import_records_task(
                     if upsert_strategy == "skip":
                         skipped += 1
                         continue
-                    elif upsert_strategy == "merge":
-                        old_meta = existing.metadata_ or {}
-                        merged = {**old_meta}
-                        for k, v in metadata.items():
-                            if k not in merged:
-                                merged[k] = v
-                        existing.metadata_ = merged
-                        updated += 1
-                    elif upsert_strategy == "replace":
-                        existing.metadata_ = metadata
-                        if subtype_field:
-                            setattr(existing, subtype_field, subtype)
-                        updated += 1
 
+                    conflict = False
+                    try:
+                        async with session.begin_nested():
+                            if upsert_strategy == "merge":
+                                old_meta = existing.metadata_ or {}
+                                merged = {**old_meta}
+                                for k, v in metadata.items():
+                                    if k not in merged:
+                                        merged[k] = v
+                                existing.metadata_ = merged
+                            elif upsert_strategy == "replace":
+                                existing.metadata_ = metadata
+                                if subtype_field:
+                                    setattr(existing, subtype_field, subtype)
+                            await session.flush()
+                    except StaleDataError:
+                        conflict = True
+
+                    if conflict:
+                        skipped += 1
+                        warnings.append({
+                            "row": row_num,
+                            "warning": (
+                                "Datensatz wurde zwischenzeitlich geändert "
+                                "(Version-Konflikt) – Zeile übersprungen."
+                            ),
+                        })
+                        continue
+
+                    updated += 1
                     try:
                         await index_record(record_type, existing, session)
                     except Exception as e:

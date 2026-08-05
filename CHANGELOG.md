@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-08-05
+
+### Fixed
+- Importer-Upsert (`merge`/`replace`) kapselt jeden Zeilen-Write jetzt in einem SAVEPOINT. Ein `StaleDataError` durch konkurrierende Änderung derselben Zeile rollt nur diese Zeile zurück (Zeile wird als Version-Konflikt übersprungen) statt die gesamte Session für den Rest des Import-Batches unbrauchbar zu machen.
+
 ## [0.7.6] - 2026-08-05
 
 ### Fixed

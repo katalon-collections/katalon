@@ -133,6 +133,62 @@ async def test_concurrent_object_writes_only_allow_one_winner(
 
 
 @pytest.mark.asyncio
+async def test_import_savepoint_isolates_stale_row_from_batch(
+    async_client, auth_headers
+) -> None:
+    """Reproduces the import worker's per-row upsert pattern: a version conflict
+    on one row must roll back only that row's SAVEPOINT, not poison the shared
+    session so later rows in the same batch still commit."""
+    from sqlalchemy.orm.exc import StaleDataError
+
+    from katalon.database import AsyncSessionLocal
+
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"IMPORT-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "object_type": "objekt",
+            "metadata_": {},
+        },
+    )
+    assert created.status_code == 201, created.text
+    object_id = uuid.UUID(created.json()["id"])
+
+    async with AsyncSessionLocal() as batch_session, AsyncSessionLocal() as other:
+        batch_obj = (
+            await batch_session.execute(select(Object).where(Object.id == object_id))
+        ).scalar_one()
+
+        # A concurrent request bumps the version behind the batch session's back.
+        other_obj = (await other.execute(select(Object).where(Object.id == object_id))).scalar_one()
+        other_obj.metadata_ = {"label": "concurrent edit"}
+        await other.commit()
+
+        # Row 1 of the "import batch": stale write, must not blow up the session.
+        conflict = False
+        try:
+            async with batch_session.begin_nested():
+                batch_obj.metadata_ = {"label": "import row 1"}
+                await batch_session.flush()
+        except StaleDataError:
+            conflict = True
+        assert conflict is True
+
+        # Row 2 of the same batch: a brand-new insert must still succeed on the
+        # same session/transaction after the savepoint rollback.
+        second = Object(idno=f"IMPORT2-{uuid.uuid4().hex[:12]}", status="draft", object_type="objekt", metadata_={})
+        batch_session.add(second)
+        async with batch_session.begin_nested():
+            await batch_session.flush()
+        await batch_session.commit()
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.json()["metadata_"] == {"label": "concurrent edit"}
+
+
+@pytest.mark.asyncio
 async def test_snapshot_restore_requires_current_version_and_writes_audit(
     async_client, auth_headers
 ) -> None:
