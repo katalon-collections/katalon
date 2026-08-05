@@ -24,6 +24,21 @@ sources:
   - id: schema-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenSchema.tsx
+  - id: screen-form
+    type: file
+    path: frontend/admin/src/components/screens/ScreenForm.tsx
+  - id: authority-input
+    type: file
+    path: frontend/admin/src/components/AuthorityInput.tsx
+  - id: schema-service
+    type: file
+    path: backend/src/katalon/services/schema_service.py
+  - id: schema-service-tests
+    type: file
+    path: backend/tests/test_schema_service.py
+  - id: schema-container-tests
+    type: file
+    path: backend/tests/integration/test_schema_container_fields.py
   - id: vocab-decision
     type: file
     path: .agents/knowledge/decisions/vocabulary-custom-fields.md
@@ -70,7 +85,11 @@ The adapter directory contains concrete adapters for GND, GeoNames, VIAF, Wikida
 
 ## Metadata Use
 
-Authority fields are available in the schema UI as a field type with a selectable enabled authority source [@schema-screen]. Vocabulary-term custom metadata also supports authority fields, which lets [vocabularies](../metadata/vocabularies) store structured external references using the same source registry as record metadata [@schema-api]. The local vocabulary metadata decision records the intended structured form for authority values as `{source, external_id, label}` and explains why term metadata reuses the existing authority system instead of creating a vocabulary-only mechanism [@vocab-decision].
+Authority fields are available in the schema UI as a field type with a selectable enabled authority source [@schema-screen]. Record forms render top-level authority fields through the shared `AuthorityInput` component, which searches the selected source, supports keyboard listbox navigation, and stores `{source, external_id, label}` when a hit is picked [@screen-form] [@authority-input]. Vocabulary-term custom metadata also supports authority fields, which lets [vocabularies](../metadata/vocabularies) store structured external references using the same source registry as record metadata [@schema-api]. The local vocabulary metadata decision records the intended structured form for authority values as `{source, external_id, label}` and explains why term metadata reuses the existing authority system instead of creating a vocabulary-only mechanism [@vocab-decision].
+
+Authority is also allowed as a group sub-field. `SUB_FIELD_TYPES` includes `authority`, the sub-field editor requires an enabled configured source before saving, and existing authority sub-fields show a warning that changing the source invalidates already stored authority values [@schema-screen]. `ScreenForm` renders authority children with the same `AuthorityInput` component as top-level authority fields, so grouped and ordinary authority metadata share the stored value shape [@screen-form] [@authority-input].
+
+Backend metadata validation checks authority values for ordinary record fields, repeatable authority fields, and authority children inside group instances. The validator requires non-empty `source`, `external_id`, and `label` strings and rejects values whose `source` differs from the field's configured `settings.source`; unit and integration tests cover top-level authority validation, grouped authority validation, and creating an authority sub-field under a group [@schema-service] [@schema-service-tests] [@schema-container-tests].
 
 ## Related Pages
 

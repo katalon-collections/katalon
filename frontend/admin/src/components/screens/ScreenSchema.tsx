@@ -24,7 +24,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 }
 
 // Field types allowed as sub-fields of a group (no recursion)
-const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation'] as const
+const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority'] as const
 type SubFieldType = typeof SUB_FIELD_TYPES[number]
 
 type SubFieldFormState = {
@@ -38,6 +38,7 @@ type SubFieldFormState = {
   validation_regex: string
   vocabulary_id: string
   relation_target_type: string
+  authority_source: string
 }
 
 const EXPORT_FORMATS = [
@@ -159,8 +160,8 @@ function toSlug(label: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
-function emptySubFieldForm(sortOrder: number): SubFieldFormState {
-  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity' }
+function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
+  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', authority_source: authoritySource }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -268,7 +269,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 
   function openNewSubField() {
     setSubFieldEditing('new')
-    setSubFieldForm(emptySubFieldForm((form.subFields?.length ?? 0)))
+    setSubFieldForm(emptySubFieldForm(
+      form.subFields?.length ?? 0,
+      authoritySources.find(source => source.is_enabled)?.id ?? '',
+    ))
     setSubFieldError(null)
     setSubNameManual(false)
   }
@@ -286,6 +290,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       validation_regex: (sf.settings?.validation_regex as string) ?? '',
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
       relation_target_type: (sf.settings?.target_type as string) ?? 'entity',
+      authority_source: (sf.settings?.source as string) ?? '',
     })
     setSubFieldError(null)
     setSubNameManual(true)
@@ -294,6 +299,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   async function handleSubFieldSave() {
     if (!subFieldForm || !fieldId) return
     if (!subFieldForm.name.trim()) { setSubFieldError('Interner Name darf nicht leer sein.'); return }
+    if (subFieldForm.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === subFieldForm.authority_source)) {
+      setSubFieldError('Bitte eine aktive Normdaten-Quelle wählen.')
+      return
+    }
     setSubFieldSaving(true)
     setSubFieldError(null)
     const data = {
@@ -313,6 +322,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         ...(subFieldForm.validation_regex.trim() ? { validation_regex: subFieldForm.validation_regex.trim() } : {}),
         ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
         ...(subFieldForm.field_type === 'relation' ? { target_type: subFieldForm.relation_target_type } : {}),
+        ...(subFieldForm.field_type === 'authority' ? { source: subFieldForm.authority_source } : {}),
       },
       parent_id: fieldId,
     }
@@ -375,12 +385,12 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   const fieldTypes = isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES
   const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
   useEffect(() => {
-    if (form.field_type !== 'authority') return
+    if (!isNew || form.field_type !== 'authority') return
     const enabled = authoritySources.filter(source => source.is_enabled)
     if (!enabled.some(source => source.id === form.authority_source) && enabled[0]) {
       onChange({ ...form, authority_source: enabled[0].id })
     }
-  }, [authoritySources, form, onChange])
+  }, [authoritySources, form, isNew, onChange])
 
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
@@ -483,8 +493,15 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <div className="field">
             <div className="lbl">Normdaten-Quelle</div>
             <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
-              {authoritySources.filter(s => s.is_enabled).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              {authoritySources
+                .filter(source => source.is_enabled || source.id === form.authority_source)
+                .map(source => (
+                  <option key={source.id} value={source.id} disabled={!source.is_enabled}>
+                    {source.label}{source.is_enabled ? '' : ' (deaktiviert)'}
+                  </option>
+                ))}
             </select>
+            {!isNew && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Ein Quellenwechsel macht bereits gespeicherte Normdatenwerte ungültig.</div>}
           </div>
         )}
         {(form.field_type === 'vocab' || form.field_type === 'vocab_free') && (
@@ -651,6 +668,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <SubFieldFormPanel
                     sf={subFieldForm!}
                     allVocabs={allVocabs}
+                    authoritySources={authoritySources}
                     nameManual={subNameManual}
                     saving={subFieldSaving}
                     error={subFieldError}
@@ -678,6 +696,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 <SubFieldFormPanel
                   sf={subFieldForm!}
                   allVocabs={allVocabs}
+                  authoritySources={authoritySources}
                   nameManual={subNameManual}
                   saving={subFieldSaving}
                   error={subFieldError}
@@ -709,6 +728,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 interface SubFieldFormPanelProps {
   sf: SubFieldFormState
   allVocabs: Vocabulary[]
+  authoritySources: AuthoritySource[]
   nameManual: boolean
   saving: boolean
   error: string | null
@@ -718,7 +738,7 @@ interface SubFieldFormPanelProps {
   onCancel: () => void
 }
 
-function SubFieldFormPanel({ sf, allVocabs, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
+function SubFieldFormPanel({ sf, allVocabs, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, background: 'var(--panel)' }}>
@@ -779,6 +799,21 @@ function SubFieldFormPanel({ sf, allVocabs, nameManual, saving, error, onChange,
             <option value="place">Orte</option>
             <option value="occurrence">Occurrences</option>
           </select>
+        </div>
+      )}
+      {sf.field_type === 'authority' && (
+        <div className="field">
+          <div className="lbl">Normdaten-Quelle</div>
+          <select className="fld" value={sf.authority_source} onChange={e => set('authority_source', e.target.value)}>
+            {authoritySources
+              .filter(source => source.is_enabled || source.id === sf.authority_source)
+              .map(source => (
+                <option key={source.id} value={source.id} disabled={!source.is_enabled}>
+                  {source.label}{source.is_enabled ? '' : ' (deaktiviert)'}
+                </option>
+              ))}
+          </select>
+          {sf.id && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Ein Quellenwechsel macht bereits gespeicherte Normdatenwerte ungültig.</div>}
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -982,6 +1017,10 @@ export function ScreenSchema() {
     if (!form) return
     if (!form.name.trim()) {
       setSaveError('Interner Name darf nicht leer sein.')
+      return
+    }
+    if (form.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === form.authority_source)) {
+      setSaveError('Bitte eine aktive Normdaten-Quelle wählen.')
       return
     }
     setSaving(true)

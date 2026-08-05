@@ -6,6 +6,12 @@ sources:
   - id: screen-form
     type: file
     path: frontend/admin/src/components/screens/ScreenForm.tsx
+  - id: schema-service
+    type: file
+    path: backend/src/katalon/services/schema_service.py
+  - id: authority-input
+    type: file
+    path: frontend/admin/src/components/AuthorityInput.tsx
   - id: screen-list
     type: file
     path: frontend/admin/src/components/screens/ScreenList.tsx
@@ -66,13 +72,11 @@ Admins can configure multiple named form variants per record type and optional s
 
 `ScreenForm` fetches available variants alongside field definitions for the active `recordType`/subtype and resolves which one is active through a priority chain, implemented as the pure function `resolveActiveVariant` [@form-variants-lib]: an optional context-override prop (`variantHint`, exposed as a hook for future workflow/quick-add callers but not yet wired to any caller) beats a manually remembered choice in `localStorage` (keyed per record type and subtype), which beats the current user's role-based default, which beats a variant flagged as the global default for that scope. If none match, the form falls back to the full schema — identical to pre-#275 behavior — which is also what happens when the user explicitly picks the "Vollständig" tab, stored as a distinct sentinel so it isn't silently overridden by a role or global default on the next visit [@form-variants-lib]. A tab bar above the dynamic fields lets the user switch variants manually; the active variant filters and reorders the already-loaded `FieldDefinition[]` by `field_names`, so group parent/child rendering is unaffected as long as the group's own name is included [@screen-form].
 
-Form variants must include every required top-level field for their target type and subtype. The backend validates create and update requests by loading active top-level field definitions (`parent_id IS NULL`), rejecting unknown `field_names`, and rejecting variants that omit a required field [@form-variants-api] [@form-variants-tests]. The admin variant editor mirrors that invariant by preselecting required fields for new variants and disabling their checkboxes with a "Pflicht" marker [@form-variants-screen]. This keeps `validate_metadata` from requiring a field that the selected variant has hidden from the editor.
-
-The remaining validation boundary is required sub-fields inside group fields. `field_names` contains top-level field names only, and `_validate_field_names` currently checks only top-level definitions; if a non-required group contains a required child, a variant can still hide the whole group and therefore hide the child required by metadata validation [@form-variants-api].
+Form variants must include every required field path that could block saving. The backend validates create and update requests by loading active top-level field definitions (`parent_id IS NULL`), rejecting unknown `field_names`, rejecting omitted required top-level fields, and treating a group as required when any active child field under that group is required [@form-variants-api] [@form-variants-tests]. The admin variant editor mirrors that invariant by preselecting required fields and groups for new variants and disabling their checkboxes with a "Pflicht" marker [@form-variants-screen]. This keeps `validate_metadata` from requiring a field or group child that the selected variant has hidden from the editor [@schema-service].
 
 ## Feedback-Tracked Form Gaps
 
-Current forms already render group sub-fields, relation fields, authority fields, and AI settings, but the schema UI limits group sub-field types to `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, and `relation`, so authority and AI configuration do not reach group child fields yet [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
+Current forms render group sub-fields, relation fields, authority fields, and AI settings [@screen-form]. Authority now reaches group child fields: the schema UI includes `authority` in its sub-field type list, validates that the chosen source is enabled, warns on source changes for saved authority sub-fields, and `renderSubFieldInput` renders grouped authority values through the shared keyboard-accessible `AuthorityInput` [@schema-screen] [@screen-form] [@authority-input]. AI configuration still belongs to top-level eligible fields and is not exposed for group children [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
 
 ## Validation And Save
 

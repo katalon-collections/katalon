@@ -205,6 +205,42 @@ async def test_group_relation_sub_field_validates_structure() -> None:
 
 
 @pytest.mark.asyncio
+async def test_group_authority_sub_field_validates_structure_and_source() -> None:
+    group = make_field("materials", field_type="group")
+    material = make_field("material", field_type="authority")
+    material.settings = {"source": "gnd"}
+    db = mock_db(group, sub_fields=[material])
+    errors = await validate_metadata(
+        db,
+        "object",
+        {"materials": [{"material": {"source": "viaf", "external_id": "123", "label": "Holz"}}]},
+    )
+    assert len(errors) == 1
+    assert "materials.material" in errors[0]
+    assert "Authority-Quelle" in errors[0]
+
+    valid_errors = await validate_metadata(
+        mock_db(group, sub_fields=[material]),
+        "object",
+        {"materials": [{"material": {"source": "gnd", "external_id": "123", "label": "Holz"}}]},
+    )
+    assert valid_errors == []
+
+
+@pytest.mark.asyncio
+async def test_top_level_authority_field_validates_structure() -> None:
+    authority = make_field("creator", field_type="authority")
+    authority.settings = {"source": "gnd"}
+    errors = await validate_metadata(
+        mock_db(authority),
+        "object",
+        {"creator": {"source": "gnd", "external_id": "123", "label": ""}},
+    )
+    assert len(errors) == 1
+    assert "source, external_id und label" in errors[0]
+
+
+@pytest.mark.asyncio
 async def test_prepare_metadata_applies_default() -> None:
     language = make_field("language")
     language.settings = {"default_value": "de"}

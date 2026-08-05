@@ -73,6 +73,20 @@ def _validate_relation_structure(value: object, field_name: str) -> str | None:
     return None
 
 
+def _validate_authority_value(value: object, settings: dict, field_name: str) -> str | None:
+    """Validate one authority entry against the field's configured source."""
+    if not isinstance(value, dict) or not all(
+        isinstance(value.get(key), str) and value[key].strip()
+        for key in ("source", "external_id", "label")
+    ):
+        return (
+            f"Feld '{field_name}': Authority-Eintrag muss source, external_id und label enthalten."
+        )
+    if value["source"] != settings.get("source"):
+        return f"Feld '{field_name}' verwendet die falsche Authority-Quelle."
+    return None
+
+
 async def _validate_relation_target(
     value: dict, field_name: str, settings: dict, db: AsyncSession
 ) -> str | None:
@@ -162,6 +176,12 @@ async def validate_metadata(
                         )
                         if target_err:
                             errors.append(target_err.replace(f"Feld '{field_path}'", indexed_prefix, 1))
+                    if sv is not None and sf.field_type == "authority":
+                        authority_err = _validate_authority_value(sv, sf.settings, field_path)
+                        if authority_err:
+                            errors.append(
+                                authority_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
+                            )
             continue
 
         if field.field_type == "pid":
@@ -197,6 +217,23 @@ async def validate_metadata(
                     errors.append(target_err)
             continue
 
+        if field.field_type == "authority":
+            if field.is_repeatable:
+                if not isinstance(value, list):
+                    errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")
+                    continue
+                items = value
+            else:
+                if isinstance(value, list):
+                    errors.append(f"Feld '{field.name}' darf keine Liste sein (nicht wiederholbar).")
+                    continue
+                items = [value]
+            for item in items:
+                authority_err = _validate_authority_value(item, field.settings, field.name)
+                if authority_err:
+                    errors.append(authority_err)
+            continue
+
         if record_type == "vocabulary_term":
             items = (
                 value
@@ -212,16 +249,6 @@ async def validate_metadata(
                     errors.append(f"Feld '{field.name}' muss eine Zahl enthalten.")
                 elif field.field_type == "boolean" and not isinstance(item, bool):
                     errors.append(f"Feld '{field.name}' muss einen Boolean enthalten.")
-                elif field.field_type == "authority":
-                    if not isinstance(item, dict) or not item.get("external_id"):
-                        errors.append(
-                            f"Feld '{field.name}' muss einen gültigen Authority-Eintrag enthalten."
-                        )
-                    elif item.get("source") != field.settings.get("source"):
-                        errors.append(
-                            f"Feld '{field.name}' verwendet die falsche Authority-Quelle."
-                        )
-
         if field.is_repeatable:
             if not isinstance(value, list):
                 errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")

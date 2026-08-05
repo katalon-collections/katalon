@@ -85,6 +85,41 @@ async def test_create_sub_field_under_group(async_client: AsyncClient, auth_head
 
 
 @pytest.mark.asyncio
+async def test_create_authority_sub_field_under_group(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    group_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "authority_container",
+            "label": {"de": "Normierte Materialien"},
+            "field_type": "group",
+            "is_repeatable": True,
+            "settings": {},
+        },
+    )
+    assert group_r.status_code == 201, group_r.text
+
+    sub_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "authority_material",
+            "label": {"de": "Material"},
+            "field_type": "authority",
+            "is_repeatable": False,
+            "settings": {"source": "gnd"},
+            "parent_id": group_r.json()["id"],
+        },
+    )
+    assert sub_r.status_code == 201, sub_r.text
+    assert sub_r.json()["settings"] == {"source": "gnd"}
+
+
+@pytest.mark.asyncio
 async def test_list_schema_embeds_children(async_client: AsyncClient, auth_headers: dict) -> None:
     # Create group
     group_r = await async_client.post(

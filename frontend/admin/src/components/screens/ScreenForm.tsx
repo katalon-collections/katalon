@@ -1168,6 +1168,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             disabled={disabled}
           />
         )
+      case 'authority':
+        return (
+          <AuthorityInput
+            source={(sf.settings?.source as string) ?? ''}
+            value={(val as AuthorityEntry | undefined) ?? null}
+            onChange={value => onChange(value ?? undefined)}
+            disabled={disabled}
+          />
+        )
       default:
         return <input className="fld" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
     }
@@ -1240,6 +1249,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 }
               } catch {
                 // invalid regex on backend, ignore
+              }
+            }
+            if (!isEmptyValue(sv) && sf.field_type === 'authority') {
+              const entry = typeof sv === 'object' && sv !== null && !Array.isArray(sv)
+                ? sv as Partial<AuthorityEntry>
+                : null
+              const key = `${f.name}.${sf.name}:${idx}`
+              if (!entry?.source || !entry.external_id || !entry.label) {
+                errors[key] = `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}) enthält keinen gültigen Normdateneintrag.`
+              } else if (entry.source !== sf.settings?.source) {
+                errors[key] = `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}) verwendet die falsche Normdaten-Quelle.`
               }
             }
           }

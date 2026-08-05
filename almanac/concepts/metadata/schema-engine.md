@@ -15,6 +15,12 @@ sources:
   - id: schema-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenSchema.tsx
+  - id: schema-service-tests
+    type: file
+    path: backend/tests/test_schema_service.py
+  - id: schema-container-tests
+    type: file
+    path: backend/tests/integration/test_schema_container_fields.py
   - id: schema-doc
     type: file
     path: docs/02_schema_verwaltung.md
@@ -30,9 +36,9 @@ Runtime behavior is stricter than a plain JSON editor. The schema API rejects un
 
 ## Values In Metadata
 
-Primary records keep cataloguing data in a JSONB column named `metadata` on their ORM tables, exposed in Python as `metadata_` [@models]. `validate_metadata` loads active top-level fields for the record type and optional subtype, checks required values, repeatability, text regexes, PID structures, relation structures, relation target existence, group instances, and vocabulary-term field constraints [@schema-service]. `prepare_metadata` applies configured defaults for text, vocab, vocab-free, date, and number fields, and it preserves or removes locked fields depending on editor permissions [@schema-service].
+Primary records keep cataloguing data in a JSONB column named `metadata` on their ORM tables, exposed in Python as `metadata_` [@models]. `validate_metadata` loads active top-level fields for the record type and optional subtype, checks required values, repeatability, text regexes, PID structures, relation structures, relation target existence, authority entry shape and source matching, group instances, and vocabulary-term field constraints [@schema-service] [@schema-service-tests]. `prepare_metadata` applies configured defaults for text, vocab, vocab-free, date, and number fields, and it preserves or removes locked fields depending on editor permissions [@schema-service].
 
-Group fields are repeatable container fields. The database represents the group itself as a `FieldDefinition` row with `field_type == "group"` and each child as another `FieldDefinition` row whose `parent_id` points at the group [@models]. The API returns top-level fields with embedded `children`, and the admin UI only allows non-group sub-fields under saved group fields [@schema-api] [@schema-screen].
+Group fields are repeatable container fields. The database represents the group itself as a `FieldDefinition` row with `field_type == "group"` and each child as another `FieldDefinition` row whose `parent_id` points at the group [@models]. The API returns top-level fields with embedded `children`, blocks recursive groups, and accepts non-group child definitions under a saved group [@schema-api]. The admin UI's fixed sub-field type list is `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, `relation`, and `authority`; grouped authority fields use the same enabled-source setting and value validation as ordinary authority fields [@schema-screen] [@schema-service] [@schema-container-tests].
 
 ## Admin And Search Effects
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useId, useRef } from 'react'
 import { authority as authorityApi } from '../api/client'
 import type { AuthorityHit } from '../api/client'
 import { X } from './ui/Icons'
@@ -15,7 +15,9 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   const [results, setResults] = useState<AuthorityHit[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
+  const listId = useId()
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
@@ -51,8 +53,8 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
     timer.current = setTimeout(() => {
       setBusy(true)
       authorityApi.search(source, q.trim())
-        .then(r => { setResults(r); setOpen(r.length > 0) })
-        .catch(() => setResults([]))
+        .then(r => { setResults(r); setOpen(r.length > 0); setActiveIndex(r.length ? 0 : -1) })
+        .catch(() => { setResults([]); setActiveIndex(-1) })
         .finally(() => setBusy(false))
     }, 300)
     return () => clearTimeout(timer.current)
@@ -61,6 +63,23 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   function pick(hit: AuthorityHit) {
     onChange({ source: hit.source, external_id: hit.external_id, label: hit.label })
     setQ(''); setResults([]); setOpen(false)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      setOpen(false)
+      return
+    }
+    if (!results.length || !['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return
+    e.preventDefault()
+    if (e.key === 'Enter') {
+      if (open && activeIndex >= 0) pick(results[activeIndex])
+      return
+    }
+    setOpen(true)
+    setActiveIndex(i => e.key === 'ArrowDown'
+      ? Math.min(i + 1, results.length - 1)
+      : Math.max(i <= 0 ? results.length - 1 : i - 1, 0))
   }
 
   if (value) {
@@ -77,7 +96,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
           </span>
         </span>
         {!disabled && (
-          <button className="btn sm ico gh" onClick={() => onChange(null)} title="Entfernen">
+          <button className="btn sm ico gh" onClick={() => onChange(null)} title="Entfernen" aria-label={`${value.label || value.external_id} entfernen`}>
             <X size={12} />
           </button>
         )}
@@ -92,8 +111,16 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
         className="fld"
         value={q}
         onChange={e => setQ(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder={`${source.toUpperCase()} durchsuchen…`}
         disabled={disabled}
+        role="combobox"
+        aria-label={`${source.toUpperCase()} durchsuchen`}
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
+        aria-busy={busy}
       />
       {busy && (
         <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
@@ -101,19 +128,23 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
         </div>
       )}
       {open && results.length > 0 && dropPos && (
-        <div ref={dropRef} style={{
+        <div ref={dropRef} id={listId} role="listbox" style={{
           position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
           background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
         }}>
-          {results.map(hit => (
+          {results.map((hit, index) => (
             <button
               key={hit.external_id}
+              id={`${listId}-${index}`}
+              role="option"
+              aria-selected={index === activeIndex}
               onMouseDown={e => { e.preventDefault(); pick(hit) }}
+              onMouseEnter={() => setActiveIndex(index)}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)',
-                background: 'none', cursor: 'pointer',
+                background: index === activeIndex ? 'var(--accent-50)' : 'none', cursor: 'pointer',
               }}
               className="authority-hit"
             >

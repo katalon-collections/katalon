@@ -21,6 +21,9 @@ sources:
   - id: mapping-doc
     type: file
     path: docs/10_export_mappings.md
+  - id: schema-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenSchema.tsx
 ---
 
 Katalon's OAI-PMH workflow exposes public indexed records at `/oai` and currently disseminates the `oai_dc` metadata format. The HTTP handler dispatches OAI verbs, queries Elasticsearch with public-record filters, loads optional OAI set definitions, and passes hits to XML serializers [@oai-api]. Export mappings connect `field_definitions` to Dublin Core target paths, so an installation can map schema fields to `dc:title`, `dc:creator`, and other OAI-DC elements without changing the OAI handler [@mapping-service] [@mapping-doc]. The endpoint uses Elasticsearch as its read model, so [Search And Indexing](search-and-indexing) is part of the export path.
@@ -42,6 +45,8 @@ OAI sets are optional filters layered onto that public Elasticsearch query. A se
 The mapping service defines `oai_dc` as the active format key and allows only the fifteen Dublin Core element paths in `OAI_DC_TARGETS` for that format [@mapping-service]. `get_mapping_index()` joins enabled `MetadataMapping` rows to active `FieldDefinition` rows and returns a nested index by record type and field name [@mapping-service]. `extract_values()` flattens source metadata values from strings, lists, and dictionaries by preferring keys such as `value`, `label`, `term`, `name`, `title`, and `idno` [@mapping-service].
 
 The repository documentation describes the same design intent: `metadata_mappings` is format-neutral, a field can map to multiple target paths, and `oai_dc` is the first productive consumer while later formats such as LIDO or METS/MODS are prepared conceptually [@mapping-doc]. Current code implements the generic mapping read path and OAI-DC validation, but it still advertises and accepts only `oai_dc` at the protocol layer [@oai-api] [@mapping-service].
+
+Container fields are not independently mapped to OAI-DC. The schema editor exposes export mapping controls for top-level fields and explicitly marks `group` fields as not directly exported; sub-field editing has no separate export mapping panel [@schema-screen].
 
 ## XML Serialization
 

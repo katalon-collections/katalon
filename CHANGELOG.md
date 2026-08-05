@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-08-05
+
+### Added
+- Authority-Felder als Subfelder wiederholbarer Containergruppen (#278), inklusive Quellenwahl, Autocomplete und strukturierter Validierung.
+
+### Changed
+- Gemeinsames Authority-Autocomplete unterstützt Tastatursteuerung und ARIA-Combobox-Semantik; deaktivierte Quellen und folgenreiche Quellenwechsel werden im Schema-Editor sichtbar behandelt.
+- Projektworkflow prüft vor Umsetzungen UX-Einwände und relevante CodeAlmanac-Seiten und aktualisiert den Almanac anschließend.
+
 ## [0.7.3] - 2026-08-04
 
 ### Fixed

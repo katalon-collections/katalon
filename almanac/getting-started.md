@@ -46,6 +46,10 @@ For Admin tasks, pair [Admin Shell And API Client](architecture/frontend/admin-s
 
 Treat current code as runtime truth, and use ordinary repository documentation as intent unless it agrees with code. This matters in Katalon because the concept document describes the long-lived product model while the SQLAlchemy models and API routers define current behavior [@concept].
 
+Before implementation work, read the relevant CodeAlmanac pages and check the planned change for contradictions. The project instructions also require checking likely UX objections against `PRODUCT.md` and `DESIGN.md`, including accessibility, error states, responsive behavior, and operation impact, before changing even technically driven features [@agents].
+
+After implementation work changes documented behavior, workflow, or architecture, update the affected `almanac/` pages and verify those pages against current code instead of preserving stale synthesis [@agents].
+
 Never delete database volumes or run destructive Compose volume commands without explicit approval. The project instructions require log inspection and option presentation first because database volume deletion is irreversible [@agents].
 
 For production work, read [Production Deployment](guides/operations/production-deployment), [Admin Deploy Verification](guides/operations/admin-deploy-verification), [Environment And Secrets](reference/operations/environment-and-secrets), and [Known Gotchas](reference/operations/known-gotchas) before changing compose, nginx, Vite base paths, startup settings, or data recovery procedures.

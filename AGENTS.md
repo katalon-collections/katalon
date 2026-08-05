@@ -224,7 +224,9 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 
 ## CodeAlmanac
 
-Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur ändern, `almanac/` aktualisieren. Veraltete Seiten korrigieren oder kennzeichnen; rein aus dem Code ablesbare Details nicht duplizieren.
+Vor jeder Umsetzung die relevanten CodeAlmanac-Seiten konsultieren und den Plan auf Widersprüche prüfen. Zusätzlich mögliche UX-Einwände gegen `PRODUCT.md` und `DESIGN.md` prüfen und vor der Umsetzung benennen; auch technisch getriebene Features auf Auswirkungen für Bedienung, Accessibility, Fehlerzustände und Responsive-Verhalten prüfen.
+
+Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur ändern, `almanac/` aktualisieren und die betroffenen Seiten gegen den tatsächlichen Code verifizieren. Veraltete Seiten korrigieren oder kennzeichnen; rein aus dem Code ablesbare Details nicht duplizieren.
 
 ## Kontext-Dateien — Lazy Loading
 
