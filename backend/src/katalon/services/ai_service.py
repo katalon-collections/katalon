@@ -137,12 +137,23 @@ def _serialize_field_context(field: FieldDefinition, record: Any, include_fields
     return context
 
 
-def _build_messages(field: FieldDefinition, record: Any, ai_config: dict[str, Any], media: MediaFile | None, max_output_tokens: int) -> list[dict[str, Any]]:
+def _build_messages(
+    field: FieldDefinition,
+    record: Any,
+    ai_config: dict[str, Any],
+    media: MediaFile | None,
+    max_output_tokens: int,
+    group_instance: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     prompt = str(ai_config.get("prompt") or "").strip()
     if not prompt:
         raise HTTPException(status_code=422, detail="Für dieses Feld ist kein KI-Prompt konfiguriert.")
     include_fields = [str(name) for name in ai_config.get("include_fields", []) if isinstance(name, str)]
-    current_value = (getattr(record, "metadata_", {}) or {}).get(field.name)
+    current_value = (
+        group_instance.get(field.name)
+        if group_instance is not None
+        else (getattr(record, "metadata_", {}) or {}).get(field.name)
+    )
     context = {
         "field": {
             "name": field.name,
@@ -163,6 +174,10 @@ def _build_messages(field: FieldDefinition, record: Any, ai_config: dict[str, An
             "max_output_tokens": max_output_tokens,
         },
     }
+    if group_instance is not None:
+        context["group_context"] = {
+            name: value for name, value in group_instance.items() if name != field.name
+        }
     user_text = (
         f"{prompt}\n\n"
         "Antworte nur mit JSON. Nutze Schema: "
@@ -229,6 +244,8 @@ async def complete_field(
     record_type: str,
     record_id: uuid.UUID,
     field_definition_id: uuid.UUID,
+    group_index: int | None = None,
+    group_instance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     field = await _load_field(db, field_definition_id)
     if field.target_type != record_type:
@@ -241,9 +258,24 @@ async def complete_field(
         raise HTTPException(status_code=422, detail="Für dieses Feld ist keine KI-Konfiguration aktiv.")
 
     record = await _load_record(db, record_type, record_id)
+    if field.parent_id is not None:
+        if group_index is None or group_instance is None:
+            raise HTTPException(status_code=422, detail="Gruppenindex oder Gruppeninstanz fehlt.")
+        parent = await _load_field(db, field.parent_id)
+        if parent.field_type != "group" or parent.target_type != record_type:
+            raise HTTPException(status_code=422, detail="Ungültiges Gruppen-Subfeld.")
+    elif group_index is not None or group_instance is not None:
+        raise HTTPException(status_code=422, detail="Gruppenkontext ist nur für Subfelder erlaubt.")
     config = await get_admin_ai_config(db)
     media = await _load_primary_media(db, record_type, record_id)
-    messages = _build_messages(field, record, ai_config, media, config.ai_max_output_tokens)
+    messages = _build_messages(
+        field,
+        record,
+        ai_config,
+        media,
+        config.ai_max_output_tokens,
+        group_instance,
+    )
     estimated_input_tokens = _estimate_tokens(messages)
     config = await ensure_ai_allowed(db, user_id, estimated_input_tokens)
     api_key = await get_secret(db, AI_API_KEY_SECRET)
@@ -292,6 +324,7 @@ async def complete_field(
         changed_fields={
             "field_definition_id": str(field.id),
             "field_name": field.name,
+            "group_index": group_index,
             "provider": "openai-compatible",
             "model": config.ai_model,
             "input_tokens": input_tokens,

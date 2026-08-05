@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-08-05
+
+### Added
+- KI-Unterstützung für geeignete Subfelder wiederholbarer Containergruppen (#279): Konfiguration im Schema-Editor und Vorschläge pro konkreter Gruppeninstanz.
+
+### Changed
+- Gruppen-KI übergibt ausschließlich die aktuell sichtbare Instanz als Gruppenkontext, bestätigt das Ersetzen vorhandener Werte und übernimmt Vorschläge nur in den lokalen Formularzustand.
+
 ## [0.7.4] - 2026-08-05
 
 ### Added

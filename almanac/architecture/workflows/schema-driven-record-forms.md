@@ -76,7 +76,7 @@ Form variants must include every required field path that could block saving. Th
 
 ## Feedback-Tracked Form Gaps
 
-Current forms render group sub-fields, relation fields, authority fields, and AI settings [@screen-form]. Authority now reaches group child fields: the schema UI includes `authority` in its sub-field type list, validates that the chosen source is enabled, warns on source changes for saved authority sub-fields, and `renderSubFieldInput` renders grouped authority values through the shared keyboard-accessible `AuthorityInput` [@schema-screen] [@screen-form] [@authority-input]. AI configuration still belongs to top-level eligible fields and is not exposed for group children [@schema-screen]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
+Current forms render group sub-fields, relation fields, authority fields, and AI settings [@screen-form]. Authority reaches group child fields through the shared keyboard-accessible `AuthorityInput` [@schema-screen] [@screen-form] [@authority-input]. Eligible group child fields can also carry the existing `ai_config`: each rendered group instance gets its own AI action, sends that instance and its index as context, confirms before replacing a non-empty value, and writes the suggestion only into the local form state [@schema-screen] [@screen-form]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
 
 ## Validation And Save
 

@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_admin_or_editor
 from katalon.services.ai_service import complete_field
@@ -13,6 +13,8 @@ class AICompleteRequest(BaseModel):
     field_definition_id: uuid.UUID
     record_type: str
     record_id: uuid.UUID
+    group_index: int | None = Field(default=None, ge=0)
+    group_instance: dict[str, object] | None = None
 
 
 class AICompleteResponse(BaseModel):
@@ -50,5 +52,7 @@ async def complete_ai_field(
         record_type=data.record_type,
         record_id=data.record_id,
         field_definition_id=data.field_definition_id,
+        group_index=data.group_index,
+        group_instance=data.group_instance,
     )
     return AICompleteResponse.model_validate(result)

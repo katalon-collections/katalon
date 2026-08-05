@@ -39,6 +39,11 @@ type SubFieldFormState = {
   vocabulary_id: string
   relation_target_type: string
   authority_source: string
+  ai_enabled: boolean
+  ai_mode: 'text' | 'vision'
+  ai_prompt: string
+  ai_include_fields: string[]
+  ai_send_existing_value: boolean
 }
 
 const EXPORT_FORMATS = [
@@ -161,7 +166,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', authority_source: authoritySource }
+  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -291,6 +296,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
       relation_target_type: (sf.settings?.target_type as string) ?? 'entity',
       authority_source: (sf.settings?.source as string) ?? '',
+      ai_enabled: Boolean((sf.settings?.ai_config as Record<string, unknown> | undefined)?.enabled),
+      ai_mode: (((sf.settings?.ai_config as Record<string, unknown> | undefined)?.mode as 'text' | 'vision' | undefined) ?? 'text'),
+      ai_prompt: ((sf.settings?.ai_config as Record<string, unknown> | undefined)?.prompt as string) ?? '',
+      ai_include_fields: ((sf.settings?.ai_config as Record<string, unknown> | undefined)?.include_fields as string[]) ?? [],
+      ai_send_existing_value: Boolean((sf.settings?.ai_config as Record<string, unknown> | undefined)?.send_existing_value),
     })
     setSubFieldError(null)
     setSubNameManual(true)
@@ -323,6 +333,15 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
         ...(subFieldForm.field_type === 'relation' ? { target_type: subFieldForm.relation_target_type } : {}),
         ...(subFieldForm.field_type === 'authority' ? { source: subFieldForm.authority_source } : {}),
+        ...(subFieldForm.ai_enabled ? {
+          ai_config: {
+            enabled: true,
+            mode: subFieldForm.ai_mode,
+            prompt: subFieldForm.ai_prompt.trim(),
+            include_fields: subFieldForm.ai_include_fields,
+            send_existing_value: subFieldForm.ai_send_existing_value,
+          },
+        } : {}),
       },
       parent_id: fieldId,
     }
@@ -668,6 +687,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <SubFieldFormPanel
                     sf={subFieldForm!}
                     allVocabs={allVocabs}
+                    availableFields={availableFields}
                     authoritySources={authoritySources}
                     nameManual={subNameManual}
                     saving={subFieldSaving}
@@ -696,6 +716,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 <SubFieldFormPanel
                   sf={subFieldForm!}
                   allVocabs={allVocabs}
+                  availableFields={availableFields}
                   authoritySources={authoritySources}
                   nameManual={subNameManual}
                   saving={subFieldSaving}
@@ -728,6 +749,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 interface SubFieldFormPanelProps {
   sf: SubFieldFormState
   allVocabs: Vocabulary[]
+  availableFields: FieldDefinition[]
   authoritySources: AuthoritySource[]
   nameManual: boolean
   saving: boolean
@@ -738,8 +760,9 @@ interface SubFieldFormPanelProps {
   onCancel: () => void
 }
 
-function SubFieldFormPanel({ sf, allVocabs, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
+function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
+  const aiEligible = ['text', 'vocab_free', 'date', 'number', 'boolean'].includes(sf.field_type)
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, background: 'var(--panel)' }}>
       {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
@@ -814,6 +837,52 @@ function SubFieldFormPanel({ sf, allVocabs, authoritySources, nameManual, saving
               ))}
           </select>
           {sf.id && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Ein Quellenwechsel macht bereits gespeicherte Normdatenwerte ungültig.</div>}
+        </div>
+      )}
+      {aiEligible && (
+        <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
+            <input type="checkbox" className="ck" checked={sf.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
+            KI-Assistent für dieses Sub-Feld aktivieren
+          </label>
+          {sf.ai_enabled && (
+            <>
+              <div className="field">
+                <div className="lbl">Modus</div>
+                <select className="fld" value={sf.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
+                  <option value="text">Nur Textkontext</option>
+                  <option value="vision">Bild + Textkontext</option>
+                </select>
+              </div>
+              <div className="field">
+                <div className="lbl">Prompt</div>
+                <textarea className="fld" value={sf.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={4} />
+              </div>
+              <div className="field">
+                <div className="lbl">Weitere Datensatzfelder als Kontext</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
+                  {availableFields.filter(f => f.parent_id == null).map(f => (
+                    <label key={f.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={sf.ai_include_fields.includes(f.name)}
+                        onChange={e => set('ai_include_fields', e.target.checked
+                          ? [...sf.ai_include_fields, f.name]
+                          : sf.ai_include_fields.filter(name => name !== f.name)
+                        )}
+                      />
+                      <span>{getLabel(f, f.name)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
+                <input type="checkbox" className="ck" checked={sf.ai_send_existing_value} onChange={e => set('ai_send_existing_value', e.target.checked)} />
+                Vorhandenen Sub-Feldwert als Kontext mitsenden
+              </label>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Andere Werte derselben Gruppeninstanz werden automatisch als Kontext mitgesendet.</div>
+            </>
+          )}
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

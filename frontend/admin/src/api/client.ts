@@ -749,6 +749,6 @@ export interface AICompleteResponse {
 }
 
 export const ai = {
-  complete: (data: { field_definition_id: string; record_type: string; record_id: string }) =>
+  complete: (data: { field_definition_id: string; record_type: string; record_id: string; group_index?: number; group_instance?: Record<string, unknown> }) =>
     req<AICompleteResponse>('/v1/ai/complete', { method: 'POST', body: JSON.stringify(data) }),
 }

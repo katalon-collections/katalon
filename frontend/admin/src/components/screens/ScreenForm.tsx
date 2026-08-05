@@ -1416,6 +1416,37 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }
   }
 
+  async function runAIForGroupSubField(group: FieldDefinition, field: FieldDefinition, groupIndex: number) {
+    const aiConfig = getFieldAiConfig(field)
+    const targetId = savedId ?? currentId
+    if (!aiConfig || !targetId) return
+    const instance = ((values[group.name] as GroupInstance[] | undefined) ?? [])[groupIndex]
+    const currentValue = instance?.[field.name]
+    if (!isEmptyValue(currentValue) && !window.confirm(`Vorhandenen Wert in "${getLabel(field, field.name)}" durch KI-Vorschlag ersetzen?`)) {
+      return
+    }
+    const busyKey = `${group.name}:${groupIndex}:${field.name}`
+    setAiBusyField(busyKey)
+    setError(null)
+    try {
+      const result = await ai.complete({
+        field_definition_id: field.id,
+        record_type: recordType,
+        record_id: targetId,
+        group_index: groupIndex,
+        group_instance: instance,
+      })
+      updateGroupSubField(group.name, groupIndex, field.name, result.value)
+      if (result.warning) {
+        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setAiBusyField(null)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     setError(null)
@@ -2134,9 +2165,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               </div>
                               {(f.children ?? []).map(sf => (
                                 <div key={sf.id} className="field">
-                                  <div className="lbl">
-                                    {getLabel(sf, sf.name)}
-                                    {sf.is_required && <span className="req">*</span>}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                    <div className="lbl" style={{ marginBottom: 0, flex: 1 }}>
+                                      {getLabel(sf, sf.name)}
+                                      {sf.is_required && <span className="req">*</span>}
+                                    </div>
+                                    {getFieldAiConfig(sf) && (
+                                      <button
+                                        type="button"
+                                        className="btn sm gh"
+                                        onClick={() => runAIForGroupSubField(f, sf, i)}
+                                        disabled={justCreated || !savedId || aiBusyField !== null}
+                                        title={!savedId ? 'Datensatz zuerst speichern, dann KI-Vorschlag erzeugen.' : undefined}
+                                      >
+                                        <Lightning size={12} /> {aiBusyField === `${f.name}:${i}:${sf.name}` ? 'KI läuft…' : 'KI'}
+                                      </button>
+                                    )}
                                   </div>
                                   {renderSubFieldInput(sf, instance[sf.name], v => updateGroupSubField(f.name, i, sf.name, v), justCreated)}
                                 </div>
