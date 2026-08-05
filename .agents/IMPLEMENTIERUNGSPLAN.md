@@ -52,7 +52,7 @@ Vokabular-Verwaltung vollständig verdrahtet.
 - ~~Snapshot-UI im Formular (Phase 7)~~ ✅ – Snapshots anzeigen, erstellen und wiederherstellen
 - ~~Benutzer-Verwaltungs-Screen~~ ✅ – User-CRUD vollständig (Liste, Anlegen, Rolle ändern, Deaktivieren, Löschen, Zugangsdaten, API-Keys)
 
-### Phase 6.2 – Mobile Admin-Optimierung ⚠️ – Issue #253
+### Phase 6.2 – Mobile Admin-Optimierung ✅ – Issue #253
 
 **Ziel:** Admin-Kernfunktionen auf Smartphones und Tablets möglichst vollständig nutzbar machen, ohne separate Mobile-UI.
 
@@ -65,12 +65,19 @@ Vokabular-Verwaltung vollständig verdrahtet.
 - E2E-Runner nutzt Compose-API über den bestehenden Vite-Proxy
 - Login-, Objektanlage-, Medienupload- und Mobile-Navigationstests laufen wieder vollständig
 
-**Nächste Session, Reihenfolge:**
-1. Globale Mobile-Regeln für Seitenheader, Toolbars, Tabs, Tabellen und Pagination
-2. Schema-Screen: Subtypen-Auswahl statt fester 220-px-Spalte; Feldzeilen mobil reduzieren
-3. Record-Formulare: Aktionsleiste umbrechen; Datums-, Geo- und weitere Inline-Grids stapeln
-4. Restliche Admin-Screens bei 319 px, 375 px und Tablet prüfen
-5. Playwright-Screenshots und Regressionstests ergänzen
+**Erledigt (v0.7.6):**
+- Globale Mobile-Regeln (`globals.css`): Seitenheader, Toolbars, Tabs, Tabellen, Pagination umbrechen/scrollen; 44-px-Touchziele
+- `ScreenList`: Pagination über Seite 10 hinaus erreichbar (Bugfix), Request-Race-Schutz, native Indeterminate-Checkbox, eindeutige Zeilenlabels
+- `ScreenSchema`: mobiler nativer Subtyp-/Vokabular-Selektor statt fester 220-px-Spalte, Feldzeilen tastaturzugänglich, Global/Subtyp-Herkunft bleibt mobil sichtbar
+- `ScreenForm`: responsive Aktionsleiste, Status gegen Erstanlage ohne Speichermöglichkeit gehärtet, Portal-Link folgt gespeichertem Status, Geo-/Vorgangsfelder mobil einspaltig
+- `ScreenUsers`, `ScreenVocab`, `ScreenPages`, `ScreenFormVariants`, `ScreenOAISets`, `ScreenImporter`: Tabellen intern scrollbar, Liste/Editor-Wechsel mobil, Tabs/Icon-Aktionen 44 px
+- Neue Playwright-Spec `e2e/tests/admin-responsive.spec.ts`: Liste 319 px, Schema 375 px, Formular 768 px, read-only, keine Golden-Screenshots
+- E2E-Runner repariert (`e2e/playwright.config.ts`): Dev-Compose im Vordergrund statt Race beim `docker compose up -d`
+- CI (`e2e.yml`): Cantaloupe-Service ergänzt (Backend startet sonst nicht), Readiness-Check auf `/openapi.json` statt tiefen `/health`
+
+**Bekannte Grenzen:**
+- Lokaler E2E-Lauf teilt weiterhin den normalen Compose-/DB-Zustand (kein isolierter Testcontainer)
+- CI-Workflow-Änderung noch nicht in einem echten GitHub-Actions-Lauf verifiziert
 
 **Bekannte Test-Infrastruktur-Lücke:**
 - Admin-`lint`-Script findet `eslint` nicht, weil Dependency fehlt

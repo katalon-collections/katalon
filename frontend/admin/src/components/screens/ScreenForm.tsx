@@ -1128,7 +1128,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     switch (sf.field_type) {
       case 'boolean':
         return (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label className="form-checkbox">
             <input type="checkbox" className="ck" checked={Boolean(val)} onChange={e => onChange(e.target.checked)} disabled={disabled} />
             <span style={{ fontSize: 13 }}>{sf.label.de || sf.name}</span>
           </label>
@@ -1755,21 +1755,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', border: '1px solid var(--border-s)', borderRadius: 6, overflow: 'hidden' }}>
+      <div className="record-toolbar">
+        <div className="record-title">{title}</div>
+        <div className="record-actions">
+          <div className="record-status" role="group" aria-label="Status">
             {statusOptions.map(s => (
               <button key={s} onClick={() => { setStatus(s); setIsDirty(true) }}
-                style={{ border: 0, padding: '5px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
-                  background: status === s ? 'var(--accent)' : '#fff',
+                aria-pressed={status === s}
+                disabled={justCreated}
+                style={{ background: status === s ? 'var(--accent)' : '#fff',
                   color: status === s ? '#fff' : 'var(--fg-2)',
                   borderLeft: s !== 'draft' ? '1px solid var(--border-s)' : undefined }}>
                 {statusLabels[s]}
               </button>
             ))}
           </div>
-          {!isNew && recordType !== 'procedure' && status === 'public' && (
+          {!isNew && recordType !== 'procedure' && loadedStatus === 'public' && (
             <a
               className="btn gh"
               href={`${PORTAL_URL}/${PORTAL_PATH[recordType]}/${recordId}`}
@@ -1795,7 +1796,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       </div>
 
       {error && (
-        <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '8px 24px', fontSize: 13, color: '#b91c1c', flexShrink: 0 }}>
+        <div className="record-notice" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c' }}>
           {error}
           {Object.keys(fieldErrors).length > 0 && (
             <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.6 }}>
@@ -1828,18 +1829,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       )}
 
       {justCreated && (
-        <div style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: '#166534', flexShrink: 0 }}>
+        <div className="record-notice" style={{ background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', color: '#166534' }}>
           {label} gespeichert.{showMedia ? ' Bilder können jetzt hochgeladen werden.' : ''}
         </div>
       )}
       {saveOk && (
-        <div style={{ background: saveNotice?.includes('Validierungshinweisen') ? '#fffbeb' : '#f0fdf4', borderBottom: saveNotice?.includes('Validierungshinweisen') ? '1px solid #fcd34d' : '1px solid #bbf7d0', padding: '8px 24px', fontSize: 13, color: saveNotice?.includes('Validierungshinweisen') ? '#92400e' : '#166534', flexShrink: 0 }}>
+        <div className="record-notice" style={{ background: saveNotice?.includes('Validierungshinweisen') ? '#fffbeb' : '#f0fdf4', borderBottom: saveNotice?.includes('Validierungshinweisen') ? '1px solid #fcd34d' : '1px solid #bbf7d0', color: saveNotice?.includes('Validierungshinweisen') ? '#92400e' : '#166534' }}>
           {saveNotice ?? 'Änderungen gespeichert.'}
         </div>
       )}
 
       <div className="scroll">
-        <div className={showTwoCol ? 'form-grid' : undefined} style={showTwoCol ? undefined : { padding: '20px 24px', maxWidth: 680 }}>
+        <div className={showTwoCol ? 'form-grid' : 'form-single'}>
           <div>
             <div className="card">
               <div className="hd">Metadaten</div>
@@ -1932,7 +1933,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 {showGeo && (
                   <div className="field">
                     <div className="lbl">Koordinaten</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="fg-2">
                       <input className="fld mono" value={lat} onChange={e => { setLat(e.target.value); setIsDirty(true) }} placeholder="Breite (lat)" disabled={justCreated} />
                       <input className="fld mono" value={lon} onChange={e => { setLon(e.target.value); setIsDirty(true) }} placeholder="Länge (lon)" disabled={justCreated} />
                     </div>
@@ -1947,10 +1948,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     </div>
                     <div className="field">
                       <div className="lbl">Daten</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-                        <input className="fld mono" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Startdatum" />
-                        <input className="fld mono" type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Fälligkeitsdatum" />
-                        <input className="fld mono" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Enddatum" />
+                      <div className="fg-3">
+                        <input className="fld mono" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Startdatum" aria-label="Startdatum" />
+                        <input className="fld mono" type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Fälligkeitsdatum" aria-label="Fälligkeitsdatum" />
+                        <input className="fld mono" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Enddatum" aria-label="Enddatum" />
                       </div>
                     </div>
                   </>
@@ -2266,7 +2267,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           </button>
                         </>
                       ) : f.field_type === 'boolean' ? (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <label className="form-checkbox">
                           <input type="checkbox" className="ck"
                             checked={Boolean(val)}
                             onChange={e => setField(f.name, e.target.checked)}
@@ -2460,7 +2461,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         ) : (
                           <>
                             <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
-                            <label style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>
+                            <label className="upload-control">
                               &nbsp;auswählen
                               <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp" onChange={onFileChange} />
                             </label>

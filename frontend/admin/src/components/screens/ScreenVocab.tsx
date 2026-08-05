@@ -423,10 +423,10 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
           {vocabs.length === 0 && <div className="empty" style={{ padding: 12, fontSize: 12 }}>Keine Vokabulare.</div>}
         </div>
 
-        <div style={{ overflow: 'auto', padding: '18px 24px' }}>
+        <div className="vocab-detail">
           {vocab && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div className="vocab-detail-head">
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{vocab.name}</div>
                   <div style={{ color: 'var(--fg-3)', fontSize: 12 }}>
@@ -474,7 +474,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       <div className="lbl" style={{ marginBottom: 6 }}>Mapping-Dialog (CSV-Spalten → Zielfelder)</div>
                       <div style={{ display: 'grid', gap: 6 }}>
                         {csvHeaders.map(header => (
-                          <div key={header} style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 8 }}>
+                          <div key={header} className="vocab-mapping-row">
                             <input className="fld mono" value={header} readOnly />
                             <select
                               className="fld"

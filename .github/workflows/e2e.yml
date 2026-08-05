@@ -36,6 +36,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      cantaloupe:
+        image: islandora/cantaloupe:main
+        env:
+          CANTALOUPE_SOURCE_STATIC: FilesystemSource
+          CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY: BasicLookupStrategy
+          CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX: /var/lib/cantaloupe/images/
+          CANTALOUPE_BASE_URI: http://localhost
+        ports:
+          - 8182:8182
+        volumes:
+          - /tmp/katalon-media:/var/lib/cantaloupe/images
+        options: >-
+          --health-cmd "curl -sf http://localhost:8182/iiif/3"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -67,6 +83,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://katalon:katalon@127.0.0.1:5432/katalon
           REDIS_URL: redis://127.0.0.1:6379/0
+          CANTALOUPE_URL: http://127.0.0.1:8182
           MEDIA_ROOT: /tmp/katalon-media
           KATALON_SECRETS_KEY: test-katalon-secrets-key-32-chars
         run: npm run test

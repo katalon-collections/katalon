@@ -105,6 +105,8 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestSeqRef = useRef(0)
+  const selectAllRef = useRef<HTMLInputElement>(null)
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
 
@@ -138,6 +140,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }, [q])
 
   const load = useCallback(() => {
+    const requestSeq = ++requestSeqRef.current
     setLoading(true)
     setError(null)
     const params: Record<string, unknown> = {
@@ -152,9 +155,22 @@ export function ScreenList({ recordType, onOpen }: Props) {
       if (referenceNumber) params.reference_number = referenceNumber
     }
     ;(api.list as (p: typeof params) => Promise<Page<AnyRecord>>)(params)
-      .then(d => { setData(d); setSel(new Set()) })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      .then(d => {
+        if (requestSeq !== requestSeqRef.current) return
+        const lastPage = Math.max(1, Math.ceil(d.total / PAGE_SIZE))
+        setSel(new Set())
+        if (page > lastPage) {
+          setPage(lastPage)
+          return
+        }
+        setData(d)
+      })
+      .catch(e => {
+        if (requestSeq === requestSeqRef.current) setError(e.message)
+      })
+      .finally(() => {
+        if (requestSeq === requestSeqRef.current) setLoading(false)
+      })
   }, [page, tab, debouncedQ, procedureType, dueBefore, referenceNumber, api, recordType])
 
   useEffect(() => { load() }, [load])
@@ -193,8 +209,18 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const items = data.items
   const tabs = recordType === 'procedure' ? PROCEDURE_TABS : TABS
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
+  const visiblePageCount = Math.min(totalPages, 5)
+  const firstVisiblePage = Math.min(
+    Math.max(1, page - Math.floor(visiblePageCount / 2)),
+    totalPages - visiblePageCount + 1,
+  )
+  const visiblePages = Array.from({ length: visiblePageCount }, (_, i) => firstVisiblePage + i)
   const allSel = items.length > 0 && items.every(o => sel.has(o.id))
   const someSel = items.some(o => sel.has(o.id))
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSel && !allSel
+  }, [allSel, someSel])
 
   function toggle(id: string) {
     setSel(prev => {
@@ -252,6 +278,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
         <div className="search">
           <Search className="ic" size={14} />
           <input
+            aria-label={`${TYPE_LABELS[recordType]} durchsuchen`}
             placeholder="Suchen…"
             value={q}
             onChange={e => handleSearch(e.target.value)}
@@ -259,12 +286,12 @@ export function ScreenList({ recordType, onOpen }: Props) {
         </div>
         {recordType === 'procedure' && (
           <>
-            <select className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>
+            <select aria-label="Vorgangstyp" className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>
               <option value="">Alle Vorgangstypen</option>
               {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
-            <input className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
-            <input className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
+            <input aria-label="Fällig bis" className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
+            <input aria-label="Referenznummer" className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
             <button className="btn gh" onClick={handleOverdue}>Überfällig</button>
           </>
         )}
@@ -285,7 +312,16 @@ export function ScreenList({ recordType, onOpen }: Props) {
           <thead>
             <tr>
               <th className="col-ck">
-                <input type="checkbox" className={`ck${someSel && !allSel ? ' ind' : ''}`} checked={allSel} onChange={toggleAll} />
+                <label className="ck-hit">
+                  <input
+                    aria-label="Alle Datensätze auf dieser Seite auswählen"
+                    ref={selectAllRef}
+                    type="checkbox"
+                    className={`ck${someSel && !allSel ? ' ind' : ''}`}
+                    checked={allSel}
+                    onChange={toggleAll}
+                  />
+                </label>
               </th>
               {showIdno && <th>ID-Nr.</th>}
               {showSubtype && <th>Typ</th>}
@@ -308,10 +344,18 @@ export function ScreenList({ recordType, onOpen }: Props) {
             {!loading && items.map(rec => {
               const m = rec.metadata_ as Record<string, unknown>
               const subtypeVal = subtypeKey ? String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? '') : ''
+              const idno = (rec as { idno?: string | null }).idno
+              const title = getFieldValue(m, primaryKey)
+              const discriminator = idno || rec.id
+              const recordLabel = title ? `${title} (${discriminator})` : discriminator
               return (
                 <tr key={rec.id} className={sel.has(rec.id) ? 'sel' : ''}>
-                  <td className="col-ck"><input type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} /></td>
-                  {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{(rec as { idno?: string | null }).idno}</td>}
+                  <td className="col-ck">
+                    <label className="ck-hit">
+                      <input aria-label={`${recordLabel} auswählen`} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
+                    </label>
+                  </td>
+                  {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{idno}</td>}
                   {showSubtype && <td style={{ maxWidth: 120, color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
                   <td style={{ maxWidth: 280 }}><span className="tt">{getFieldValue(m, primaryKey)}</span></td>
                   {extraFields.map(f => (
@@ -323,8 +367,8 @@ export function ScreenList({ recordType, onOpen }: Props) {
                   <td style={{ maxWidth: 120, color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <button className="btn sm ico gh" title="Bearbeiten" onClick={() => onOpen?.(rec.id)}><Edit size={12} /></button>
-                      <button className="btn sm ico gh dn" title="Löschen" onClick={() => handleDelete(rec.id)}><Trash size={12} /></button>
+                      <button aria-label={`${recordLabel} bearbeiten`} className="btn sm ico gh" title="Bearbeiten" onClick={() => onOpen?.(rec.id)}><Edit size={12} /></button>
+                      <button aria-label={`${recordLabel} löschen`} className="btn sm ico gh dn" title="Löschen" onClick={() => handleDelete(rec.id)}><Trash size={12} /></button>
                     </div>
                   </td>
                 </tr>
@@ -333,15 +377,28 @@ export function ScreenList({ recordType, onOpen }: Props) {
           </tbody>
         </table>
         {totalPages > 1 && (
-          <div className="pg">
-            <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} von {data.total}</span>
-            <div className="nums">
-              {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map(n => (
-                <button key={n} className={`pg-num${n === page ? ' active' : ''}`} onClick={() => setPage(n)}>{n}</button>
-              ))}
+          <nav className="pg" aria-label="Seitennavigation">
+            <span className="pg-range">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} von {data.total}</span>
+            <div className="pg-controls">
+              <button className="pg-nav" disabled={page === 1} onClick={() => setPage(page - 1)}>Zurück</button>
+              <div className="nums">
+                {visiblePages.map(n => (
+                  <button
+                    key={n}
+                    aria-label={`Seite ${n}`}
+                    aria-current={n === page ? 'page' : undefined}
+                    className={`pg-num${n === page ? ' active' : ''}`}
+                    onClick={() => setPage(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button className="pg-nav" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Weiter</button>
             </div>
-            <span>{PAGE_SIZE} pro Seite</span>
-          </div>
+            <span className="pg-summary">Seite {page} von {totalPages}</span>
+            <span className="pg-size">{PAGE_SIZE} pro Seite</span>
+          </nav>
         )}
       </div>
     </div>

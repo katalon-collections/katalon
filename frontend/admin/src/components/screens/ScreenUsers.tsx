@@ -287,7 +287,7 @@ export function ScreenUsers() {
   }
 
   return (
-    <div className="scroll">
+    <div className="scroll users-screen">
       <div className="ph">
         <div><h1>Benutzer</h1><div className="sub">Benutzerkonten verwalten</div></div>
         <div className="right">
@@ -329,7 +329,7 @@ export function ScreenUsers() {
       {error && <div className="empty" style={{ paddingTop: 40, color: '#f87171' }}>{error}</div>}
 
       {!loading && !error && (
-        <div style={{ padding: '0 24px' }}>
+        <div className="users-table">
           <table className="tbl">
             <thead>
               <tr>

@@ -176,8 +176,8 @@ export function ScreenFormVariants() {
   }
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 1000 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+    <div className="settings-page">
+      <div className="settings-head" style={{ marginBottom: 8 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Formularvarianten</h1>
         <button
           onClick={startNew}
@@ -209,10 +209,10 @@ export function ScreenFormVariants() {
       )}
 
       {(isNew || editId) && form && (
-        <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, margin: '16px 0 24px' }}>
+        <div className="settings-card">
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 18px' }}>{isNew ? 'Neue Variante' : 'Variante bearbeiten'}</h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="fg-2" style={{ marginBottom: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>
                 Name <span style={{ color: '#dc2626' }}>*</span>
@@ -263,7 +263,7 @@ export function ScreenFormVariants() {
 
           {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="settings-actions">
             <button onClick={save} disabled={saving} style={{ background: 'var(--accent)', color: '#fff', border: 0, borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Speichere…' : 'Speichern'}
             </button>
@@ -284,7 +284,7 @@ export function ScreenFormVariants() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {variants.map(v => (
             <div key={v.id} className="schema-list" style={{ cursor: 'default' }}>
-              <div className="item" style={{ cursor: 'default', alignItems: 'flex-start' }}>
+              <div className="item settings-list-item" style={{ cursor: 'default', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>
                     {v.name}
@@ -300,7 +300,7 @@ export function ScreenFormVariants() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <div className="settings-actions">
                   <button onClick={() => startEdit(v)} title="Bearbeiten" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--fg-2)', display: 'flex', alignItems: 'center' }}>
                     <Edit size={14} />
                   </button>

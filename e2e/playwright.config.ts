@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
+const isCI = Boolean(process.env.CI)
+
 export default defineConfig({
   testDir: './tests',
   timeout: 60_000,
@@ -12,11 +14,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'docker compose up -d api',
-      cwd: '..',
-      url: 'http://localhost:8000/health',
+      command: isCI
+        ? 'alembic -c migrations/alembic.ini upgrade head && DEBUG=true python -m uvicorn katalon.main:app --host 127.0.0.1 --port 8000'
+        : 'docker compose -f docker-compose.yml -f docker-compose.dev.yml up api',
+      cwd: isCI ? '../backend' : '..',
+      url: 'http://localhost:8000/openapi.json',
       timeout: 120_000,
-      reuseExistingServer: true,
+      reuseExistingServer: !isCI,
     },
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 5173',

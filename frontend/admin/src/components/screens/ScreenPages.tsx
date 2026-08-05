@@ -112,7 +112,7 @@ export function ScreenPages() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className={`pages-screen${form ? ' has-editor' : ''}`}>
       <div className="ph">
         <div><h1>Statische Seiten</h1><div className="sub">FAQ, Impressum, Über die Sammlung</div></div>
         <div className="right">
@@ -120,9 +120,9 @@ export function ScreenPages() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div className="pages-layout">
         {/* Seitenliste */}
-        <div style={{ width: 260, flexShrink: 0, borderRight: '1px solid var(--border-s)', overflowY: 'auto' }}>
+        <div className="pages-list">
           {loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
           {!loading && pages.length === 0 && <div className="empty">Keine Seiten.</div>}
           {pages.map(p => (
@@ -131,18 +131,22 @@ export function ScreenPages() {
               className="schema-list"
               style={{ display: 'block' }}
             >
-              <div
-                className={`item${activeSlug === p.slug ? ' active' : ''}`}
-                onClick={() => openPage(p)}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
+              <div className={`item${activeSlug === p.slug ? ' active' : ''}`}>
+                <button
+                  type="button"
+                  className="pages-open"
+                  onClick={() => openPage(p)}
+                  aria-label={`Seite ${p.title.de || p.slug} öffnen`}
+                >
                   <div className="nm">{p.title.de || p.slug}</div>
                   <div className="sub">{p.slug}{!p.is_published ? ' · Entwurf' : ''}</div>
-                </div>
+                </button>
                 <button
                   className="btn sm ico gh dn"
                   style={{ flexShrink: 0 }}
-                  onClick={e => { e.stopPropagation(); handleDelete(p.slug) }}
+                  onClick={() => handleDelete(p.slug)}
+                  aria-label={`Seite ${p.title.de || p.slug} löschen`}
+                  title={`Seite ${p.title.de || p.slug} löschen`}
                 >
                   <Trash size={12} />
                 </button>
@@ -152,7 +156,7 @@ export function ScreenPages() {
         </div>
 
         {/* Editor */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div className="pages-editor">
           {form ? (
             <div className="card" style={{ margin: '18px 24px' }}>
               <div className="hd">

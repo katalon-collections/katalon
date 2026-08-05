@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-08-05
+
+### Added
+- Admin bei 319/375/768 px vollständig bedienbar (#253): responsive Header, Toolbars, Tabs, Tabellen, Pagination, Formulare über alle Admin-Screens.
+- Playwright-Spec `admin-responsive.spec.ts` für Liste (319 px), Schema (375 px) und Formular (768 px).
+- Cantaloupe-Service im CI-E2E-Workflow, sonst startet Backend dort nicht.
+
+### Fixed
+- Listen-Pagination oberhalb von Seite 10 war unerreichbar.
+- Formular: Status ließ sich nach Erstanlage ändern, ohne dass gespeichert werden konnte; Portal-Link folgte ungespeichertem statt gespeichertem Status.
+- Diverse mobile Touchziele unter 44 px, fehlende Tabellen-Scrollcontainer, Hover-only-Aktionen.
+
+### Changed
+- E2E-Runner startet Dev-Compose-API im Vordergrund statt per Hintergrund-`up -d` (vermeidet Start-Race).
+
 ## [0.7.5] - 2026-08-05
 
 ### Added

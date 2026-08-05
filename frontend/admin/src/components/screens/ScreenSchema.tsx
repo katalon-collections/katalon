@@ -1202,9 +1202,9 @@ export function ScreenSchema() {
         ))}
       </div>
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: hasSubtypes ? '220px 1fr' : '1fr', minHeight: 0, overflow: 'hidden' }}>
+      <div className="schema-workspace" style={{ gridTemplateColumns: hasSubtypes ? '220px 1fr' : '1fr' }}>
         {hasSubtypes && (
-          <div style={{ borderRight: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', minHeight: 0 }}>
+          <div className="schema-subtype-panel">
             <div style={{ padding: '14px 12px 6px', fontFamily: "'IBM Plex Mono',monospace", fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-4)', fontWeight: 500 }}>
               Subtypen
             </div>
@@ -1222,6 +1222,25 @@ export function ScreenSchema() {
         )}
 
         <div style={{ overflowY: 'auto', minHeight: 0 }}>
+          {hasSubtypes && (
+            <div className="schema-subtype-select field">
+              <label className="lbl" htmlFor="schema-subtype">
+                {activeType === 'vocabulary_term' ? 'Vokabular' : 'Subtyp'}
+              </label>
+              <select
+                id="schema-subtype"
+                className="fld"
+                value={activeSubtype}
+                onChange={e => setActiveSubtype(e.target.value)}
+              >
+                {activeType === 'vocabulary_term' && <option value="">Bitte wählen</option>}
+                {activeType !== 'vocabulary_term' && <option value="">Alle / Global</option>}
+                {subtypesList.map(s => (
+                  <option key={s.id} value={s.name}>{s.label?.de || s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {showDetail ? (
             <FieldDetail
               form={form!}
@@ -1250,33 +1269,36 @@ export function ScreenSchema() {
                       <span> für Subtyp <b>{activeSubtype}</b></span>
                     )}
                   </div>
-                  {fields.map(f => (
-                    <div key={f.id} className="field-row" onClick={() => openExisting(f)}>
-                      <span className="gp"><Grip size={14} /></span>
-                      <span className="nm">{getLabel(f, f.name)}</span>
-                      <span className="key">{f.name}</span>
-                      {f.target_subtype && (
-                        <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
-                      )}
-                      <span className="typ">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</span>
-                      {f.field_type === 'group' && <span className="typ" style={{ background: 'var(--fg-5)', color: 'var(--fg-3)' }}>{f.children?.length ?? 0} Sub-Felder</span>}
-                      {f.is_required && <span className="req-mark">Pflicht</span>}
-                      {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}
-                      <div className="actions" onClick={e => e.stopPropagation()}>
-                        <button className="btn sm ico gh" onClick={() => openExisting(f)}><Edit size={12} /></button>
-                        <button className="btn sm ico gh dn" onClick={async e => {
-                          e.stopPropagation()
-                          if (!window.confirm('Feld wirklich löschen?')) return
-                          try {
-                            await schema.delete(f.id)
-                            loadFields()
-                          } catch (err) {
-                            alert((err as Error).message)
-                          }
-                        }}><Trash size={12} /></button>
+                  {fields.map(f => {
+                    const fieldLabel = getLabel(f, f.name)
+                    return (
+                      <div key={f.id} className="field-row">
+                        <button className="field-row-main" onClick={() => openExisting(f)}>
+                          <span className="gp" aria-hidden="true"><Grip size={14} /></span>
+                          <span className="nm">{fieldLabel}</span>
+                          <span className="key">{f.name}</span>
+                          {f.target_subtype && (
+                            <span className="typ target-subtype" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
+                          )}
+                          <span className="typ">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</span>
+                          {f.field_type === 'group' && <span className="typ" style={{ background: 'var(--fg-5)', color: 'var(--fg-3)' }}>{f.children?.length ?? 0} Sub-Felder</span>}
+                          {f.is_required && <span className="req-mark">Pflicht</span>}
+                          {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}
+                        </button>
+                        <div className="actions">
+                          <button className="btn sm ico gh dn" aria-label={`Feld ${fieldLabel} löschen`} onClick={async () => {
+                            if (!window.confirm('Feld wirklich löschen?')) return
+                            try {
+                              await schema.delete(f.id)
+                              loadFields()
+                            } catch (err) {
+                              alert((err as Error).message)
+                            }
+                          }}><Trash size={12} /></button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {fields.length === 0 && <div className="empty">Keine Felder definiert.</div>}
                 </>
               )}

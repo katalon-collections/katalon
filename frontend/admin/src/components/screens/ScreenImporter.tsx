@@ -56,7 +56,7 @@ export function ScreenImporter() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-soft)', padding: '0 24px' }}>
+      <div className="importer-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-soft)', padding: '0 24px' }}>
         {IMPORTER_TABS.map(t => (
           <button
             key={t.id}
@@ -73,9 +73,9 @@ export function ScreenImporter() {
 
       {/* ===== METADATA TAB ===== */}
       {activeTab === 'metadata' && (
-        <div style={{ padding: '24px' }}>
+        <div className="importer-content">
           {/* Record type selector */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: availableSubtypes.length > 0 ? 8 : 16 }}>
+          <div className="importer-types" style={{ marginBottom: availableSubtypes.length > 0 ? 8 : 16 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Typ:</span>
             {RECORD_TYPES.map(t => (
               <button
@@ -88,7 +88,7 @@ export function ScreenImporter() {
 
           {/* Subtype selector */}
           {availableSubtypes.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+            <div className="importer-subtype">
               <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Subtyp:</span>
               <select
                 className="fld" style={{ height: 28, fontSize: 12, width: 220 }}

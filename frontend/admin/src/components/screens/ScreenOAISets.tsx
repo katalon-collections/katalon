@@ -116,8 +116,8 @@ export function ScreenOAISets() {
   const oaiUrl = `${BASE}/v1/oai`
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 900 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+    <div className="settings-page settings-page-oai">
+      <div className="settings-head" style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>OAI-PMH Sets</h1>
         <button
           onClick={startNew}
@@ -127,7 +127,7 @@ export function ScreenOAISets() {
         </button>
       </div>
 
-      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 20, lineHeight: 1.6 }}>
+      <p className="settings-intro" style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 20, lineHeight: 1.6 }}>
         OAI-PMH-Endpunkt: <a href={oaiUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{oaiUrl}</a>
         <br />
         Sets definieren gefilterte Teilmengen für Harvesting-Agenten (z.B. Europeana, BASE, DART).
@@ -135,10 +135,10 @@ export function ScreenOAISets() {
       </p>
 
       {(isNew || editId) && form && (
-        <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, marginBottom: 24 }}>
+        <div className="settings-card" style={{ marginTop: 0 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 18px' }}>{isNew ? 'Neues Set' : 'Set bearbeiten'}</h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="fg-2" style={{ marginBottom: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>
                 set_spec <span style={{ color: '#dc2626' }}>*</span>
@@ -164,7 +164,7 @@ export function ScreenOAISets() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="fg-3" style={{ marginBottom: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Typ-Filter</label>
               <select style={{ ...inp }} value={form.filter_record_type ?? ''} onChange={e => field('filter_record_type', e.target.value || null)}>
@@ -191,7 +191,7 @@ export function ScreenOAISets() {
 
           {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="settings-actions">
             <button
               onClick={save}
               disabled={saving}
@@ -216,7 +216,7 @@ export function ScreenOAISets() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sets.map(s => (
             <div key={s.id} className="schema-list" style={{ cursor: 'default' }}>
-              <div className="item" style={{ cursor: 'default' }}>
+              <div className="item settings-list-item" style={{ cursor: 'default' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{s.set_name}</div>
                   <div style={{ fontSize: 12, color: 'var(--fg-3)', fontFamily: 'monospace', marginTop: 2 }}>{s.set_spec}</div>
@@ -226,7 +226,7 @@ export function ScreenOAISets() {
                     {s.filter_q && <span>Suche: „{s.filter_q}"</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <div className="settings-actions">
                   <button
                     onClick={() => startEdit(s)}
                     title="Bearbeiten"
