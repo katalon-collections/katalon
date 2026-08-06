@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { api, BASE, fetchRecord, type MediaFile, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
@@ -146,7 +147,7 @@ export function OccurrenceDetailPage() {
             <div
               className="prose"
               style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}
-              dangerouslySetInnerHTML={{ __html: marked.parse(String(m.description)) as string }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(String(m.description)) as string) }}
             />
           )}
 
@@ -161,7 +162,7 @@ export function OccurrenceDetailPage() {
                 <div
                   className="prose"
                   style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}
-                  dangerouslySetInnerHTML={{ __html: marked.parse(rendered) as string }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(rendered) as string) }}
                 />
               </div>
             )
