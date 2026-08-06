@@ -1,24 +1,26 @@
 ───────────────────────────────────────────────────────────────────────────────
 Language            Files       Lines    Blanks  Comments       Code Complexity
 ───────────────────────────────────────────────────────────────────────────────
-Python                103      10.148     1.813       398      7.937      1.135
-TypeScript             54       8.711       677        79      7.955      1.304
-Markdown               18       3.777       997         0      2.780          0
-JSON                    7         123         0         0        123          0
-YAML                    6         474        39        14        421          0
-CSS                     2         436        34        30        372          0
-HTML                    2          30         0         0         30          0
-Shell                   2         493        52        29        412         55
+Python                171      22.119     3.431       940     17.748      2.224
+Markdown              125      11.041     2.882         0      8.159          0
+TypeScript             72      15.192     1.089       177     13.926      2.670
+JSON                    9       1.352         0         0      1.352          0
+YAML                    8         877        45        18        814          0
+HTML                    3         878        28         9        841          0
+Shell                   3         583        63        45        475         66
+CSS                     2         688        42        36        610          0
 INI                     1          38         8         0         30          0
+JavaScript              1          13         1         0         12          0
+Makefile                1         114        19        21         74          1
 Mako                    1          25         8         0         17          0
 Plain Text              1           0         0         0          0          0
-TOML                    1          66         8         0         58          1
+TOML                    1          72         8         0         64          1
 ───────────────────────────────────────────────────────────────────────────────
-Total                 198      24.321     3.636       550     20.135      2.495
+Total                 399      52.992     7.624     1.246     44.122      4.962
 ───────────────────────────────────────────────────────────────────────────────
-Estimated Cost to Develop (organic) $632.039
-Estimated Schedule Effort (organic) 11,55 months
-Estimated People Required (organic) 4,86
+Estimated Cost to Develop (organic) $1.440.400
+Estimated Schedule Effort (organic) 15,80 months
+Estimated People Required (organic) 8,10
 ───────────────────────────────────────────────────────────────────────────────
-Processed 949915 bytes, 0.950 megabytes (SI)
+Processed 2228104 bytes, 2.228 megabytes (SI)
 ───────────────────────────────────────────────────────────────────────────────

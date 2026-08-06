@@ -8,9 +8,9 @@ der Internationalen Computerspielesammlung (ICS) an.
 Designed für frische Installationen. Mehrfaches Ausführen erzeugt Duplikate.
 
 Aufruf (aus dem Repo-Root):
-    uv run --project backend python backend/scripts/seed_ics_demo.py
-    uv run --project backend python backend/scripts/seed_ics_demo.py --base-url http://localhost:8000
-    uv run --project backend python backend/scripts/seed_ics_demo.py --help
+    uv run --project backend python scripts/seed_ics_demo.py
+    uv run --project backend python scripts/seed_ics_demo.py --base-url http://localhost:8000
+    uv run --project backend python scripts/seed_ics_demo.py --help
 """
 
 from __future__ import annotations
@@ -193,14 +193,30 @@ FIELD_DEFINITIONS: list[dict[str, Any]] = [
     {"target_type": "occurrence", "name": "internal_note",          "label": {"de": "Interne Anmerkung"},                                  "field_type": "text",  "is_required": False, "is_repeatable": False, "sort_order": 10},
 ]
 
+# ══ Record-Subtypes ════════════════════════════════════════════════════════════
+# Primärtypen brauchen registrierte Subtypen (record_subtypes-Tabelle), sonst
+# lehnt die API published-Datensätze mit "Subtyp ist erforderlich" ab.
+# "person"/"geographikum"/"werk"/"objekt" existieren bereits als System-Default,
+# "organisation" und "werkversion" fehlen für dieses Demo-Set.
+
+RECORD_SUBTYPES: list[dict[str, Any]] = [
+    {"primary_type": "entity",     "name": "organisation", "label": {"de": "Organisation / Unternehmen"}},
+    {"primary_type": "occurrence", "name": "werkversion",  "label": {"de": "Werkversion"}},
+]
+
 # ══ Entitäten ══════════════════════════════════════════════════════════════════
+# idno wird explizit gesetzt: ohne konfiguriertes idno_schema (AdminConfig) verlangt
+# die API bei status="published" zwingend eine idno.
+# "label" ist system-weit ein Pflichtfeld (Basisschema), unabhängig vom ICS-Schema.
 
 ENTITIES: list[dict[str, Any]] = [
     {
         "_key": "id Software",
+        "idno": "ENT-0001",
         "entity_type": "organisation",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "id Software",
             "display_name": "id Software",
             "entity_subtype": "organisation",
             "bio": "US-amerikanisches Spieleentwicklungsstudio, gegründet 1991 in Mesquite, Texas. Bekannt für Wolfenstein 3D, Doom und Quake.",
@@ -211,9 +227,11 @@ ENTITIES: list[dict[str, Any]] = [
     },
     {
         "_key": "LucasArts",
+        "idno": "ENT-0002",
         "entity_type": "organisation",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "LucasArts",
             "display_name": "LucasArts",
             "entity_subtype": "organisation",
             "bio": "US-amerikanisches Spieleentwicklungs- und Publishingunternehmen, 1982 als Lucasfilm Games gegründet. Bekannt für Point-and-Click-Adventures wie Monkey Island und Grim Fandango.",
@@ -224,9 +242,11 @@ ENTITIES: list[dict[str, Any]] = [
     },
     {
         "_key": "Nintendo",
+        "idno": "ENT-0003",
         "entity_type": "organisation",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Nintendo Co., Ltd.",
             "display_name": "Nintendo Co., Ltd.",
             "entity_subtype": "organisation",
             "bio": "Japanisches Videospielunternehmen, gegründet 1889 in Kyoto. Hersteller von Game Boy, NES, SNES und zahlreichen Spielreihen.",
@@ -237,9 +257,11 @@ ENTITIES: list[dict[str, Any]] = [
     },
     {
         "_key": "John Carmack",
+        "idno": "ENT-0004",
         "entity_type": "person",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "John Carmack",
             "display_name": "John Carmack",
             "entity_subtype": "person",
             "bio": "US-amerikanischer Programmierer und Mitgründer von id Software. Chefentwickler der Doom- und Quake-3D-Engines.",
@@ -248,9 +270,11 @@ ENTITIES: list[dict[str, Any]] = [
     },
     {
         "_key": "Ron Gilbert",
+        "idno": "ENT-0005",
         "entity_type": "person",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Ron Gilbert",
             "display_name": "Ron Gilbert",
             "entity_subtype": "person",
             "bio": "US-amerikanischer Spieleentwickler. Schöpfer der Monkey-Island-Reihe und Mitentwickler der SCUMM-Engine bei LucasArts.",
@@ -259,9 +283,11 @@ ENTITIES: list[dict[str, Any]] = [
     },
     {
         "_key": "Alexei Paschitnow",
+        "idno": "ENT-0006",
         "entity_type": "person",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Alexei Paschitnow",
             "display_name": "Alexei Paschitnow",
             "entity_subtype": "person",
             "bio": "Russischer Computerwissenschaftler. Entwickelte 1984 Tetris am Dorodnizyn-Computing-Zentrum der Akademie der Wissenschaften der UdSSR in Moskau.",
@@ -275,9 +301,12 @@ ENTITIES: list[dict[str, Any]] = [
 PLACES: list[dict[str, Any]] = [
     {
         "_key": "Mesquite",
+        "idno": "PLC-0001",
+        "place_type": "geographikum",
         "lat": 32.7668, "lon": -96.9997,
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Mesquite, Texas",
             "place_name": "Mesquite, Texas",
             "country": "USA",
             "region": "Texas",
@@ -286,9 +315,12 @@ PLACES: list[dict[str, Any]] = [
     },
     {
         "_key": "San Rafael",
+        "idno": "PLC-0002",
+        "place_type": "geographikum",
         "lat": 37.9735, "lon": -122.5311,
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "San Rafael, Kalifornien",
             "place_name": "San Rafael, Kalifornien",
             "country": "USA",
             "region": "Kalifornien",
@@ -297,9 +329,12 @@ PLACES: list[dict[str, Any]] = [
     },
     {
         "_key": "Kyoto",
+        "idno": "PLC-0003",
+        "place_type": "geographikum",
         "lat": 35.0116, "lon": 135.7681,
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Kyoto",
             "place_name": "Kyoto",
             "country": "Japan",
             "description": "Hauptsitz von Nintendo Co., Ltd.",
@@ -307,9 +342,12 @@ PLACES: list[dict[str, Any]] = [
     },
     {
         "_key": "Moskau",
+        "idno": "PLC-0004",
+        "place_type": "geographikum",
         "lat": 55.7558, "lon": 37.6173,
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Moskau",
             "place_name": "Moskau",
             "country": "Russland (UdSSR)",
             "description": "Entstehungsort von Tetris (1984), Dorodnizyn-Computing-Zentrum.",
@@ -322,9 +360,11 @@ PLACES: list[dict[str, Any]] = [
 WERKE: list[dict[str, Any]] = [
     {
         "_key": "Doom",
+        "idno": "WRK-0001",
         "occurrence_type": "werk",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Doom",
             "title": "Doom",
             "description": "Wegweisender Ego-Shooter von id Software (1993). Gilt als eines der einflussreichsten Videospiele der Geschichte und begründete das Genre des modernen Ego-Shooters.",
             "first_publication_date": "1993-12-10",
@@ -334,9 +374,11 @@ WERKE: list[dict[str, Any]] = [
     },
     {
         "_key": "Monkey Island",
+        "idno": "WRK-0002",
         "occurrence_type": "werk",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "The Secret of Monkey Island",
             "title": "The Secret of Monkey Island",
             "description": "Point-and-Click-Adventure von LucasArts (1990). Spielt in der Karibik des 17. Jahrhunderts und folgt dem Piraten-Anwärter Guybrush Threepwood. Gilt als Klassiker des Genres.",
             "first_publication_date": "1990-10-01",
@@ -346,9 +388,11 @@ WERKE: list[dict[str, Any]] = [
     },
     {
         "_key": "Tetris",
+        "idno": "WRK-0003",
         "occurrence_type": "werk",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Tetris",
             "title": "Tetris",
             "description": "Klassisches Puzzlespiel, 1984 von Alexei Paschitnow in Moskau entwickelt. Eines der meistverkauften und meistgespielten Videospiele aller Zeiten.",
             "first_publication_date": "1984-06-06",
@@ -364,9 +408,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Doom DOS 1.0",
         "_werk": "Doom",
+        "idno": "WV-0001",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Doom – MS-DOS Shareware v1.0",
             "title": "Doom – MS-DOS Shareware v1.0",
             "system": ["dos"],
             "release_date": "1993-12-10",
@@ -376,9 +422,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Doom DOS 1.9",
         "_werk": "Doom",
+        "idno": "WV-0002",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Doom – MS-DOS v1.9 (Ultimate Doom, 4 Episoden)",
             "title": "Doom – MS-DOS v1.9 (Ultimate Doom, 4 Episoden)",
             "system": ["dos"],
             "release_date": "1994-10-01",
@@ -388,9 +436,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Monkey Island DOS Disk",
         "_werk": "Monkey Island",
+        "idno": "WV-0003",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "The Secret of Monkey Island – DOS Disketten-Edition",
             "title": "The Secret of Monkey Island – DOS Disketten-Edition",
             "system": ["dos"],
             "release_date": "1990-10-01",
@@ -400,9 +450,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Monkey Island CD-ROM",
         "_werk": "Monkey Island",
+        "idno": "WV-0004",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "The Secret of Monkey Island – CD-ROM Edition",
             "title": "The Secret of Monkey Island – CD-ROM Edition",
             "system": ["dos"],
             "release_date": "1992-01-01",
@@ -412,9 +464,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Tetris DOS",
         "_werk": "Tetris",
+        "idno": "WV-0005",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Tetris – DOS-Version (Spectrum HoloByte)",
             "title": "Tetris – DOS-Version (Spectrum HoloByte)",
             "system": ["dos"],
             "release_date": "1987-01-01",
@@ -424,9 +478,11 @@ WERKVERSIONEN: list[dict[str, Any]] = [
     {
         "_key": "Tetris Game Boy",
         "_werk": "Tetris",
+        "idno": "WV-0006",
         "occurrence_type": "werkversion",
-        "status": "published",
+        "status": "public",
         "metadata_": {
+            "label": "Tetris – Game Boy (Nintendo)",
             "title": "Tetris – Game Boy (Nintendo)",
             "system": ["game_boy"],
             "release_date": "1989-06-14",
@@ -443,8 +499,10 @@ OBJECTS: list[dict[str, Any]] = [
         "_werkversion": "Doom DOS 1.0",
         "_publisher_entity": "id Software",
         "idno": "ICS-0001",
-        "status": "published",
+        "object_type": "objekt",
+        "status": "public",
         "metadata_": {
+            "label": "Doom – Shareware-Diskette v1.0 (DOS)",
             "title": "Doom – Shareware-Diskette v1.0 (DOS)",
             "object_identifier": "ICS-0001",
             "inventory_number": "1",
@@ -461,8 +519,10 @@ OBJECTS: list[dict[str, Any]] = [
         "_werkversion": "Doom DOS 1.9",
         "_publisher_entity": "id Software",
         "idno": "ICS-0002",
-        "status": "published",
+        "object_type": "objekt",
+        "status": "public",
         "metadata_": {
+            "label": "Doom – Retail Box (DOS, GT Interactive)",
             "title": "Doom – Retail Box (DOS, GT Interactive)",
             "object_identifier": "ICS-0002",
             "inventory_number": "2",
@@ -480,8 +540,10 @@ OBJECTS: list[dict[str, Any]] = [
         "_werkversion": "Monkey Island DOS Disk",
         "_publisher_entity": "LucasArts",
         "idno": "ICS-0003",
-        "status": "published",
+        "object_type": "objekt",
+        "status": "public",
         "metadata_": {
+            "label": "The Secret of Monkey Island – Disketten-Edition (DOS)",
             "title": "The Secret of Monkey Island – Disketten-Edition (DOS)",
             "object_identifier": "ICS-0003",
             "inventory_number": "3",
@@ -501,8 +563,10 @@ OBJECTS: list[dict[str, Any]] = [
         "_werkversion": "Monkey Island CD-ROM",
         "_publisher_entity": "LucasArts",
         "idno": "ICS-0004",
-        "status": "published",
+        "object_type": "objekt",
+        "status": "public",
         "metadata_": {
+            "label": "The Secret of Monkey Island – CD-ROM Edition",
             "title": "The Secret of Monkey Island – CD-ROM Edition",
             "object_identifier": "ICS-0004",
             "inventory_number": "4",
@@ -520,8 +584,10 @@ OBJECTS: list[dict[str, Any]] = [
         "_werkversion": "Tetris Game Boy",
         "_publisher_entity": "Nintendo",
         "idno": "ICS-0005",
-        "status": "published",
+        "object_type": "objekt",
+        "status": "public",
         "metadata_": {
+            "label": "Tetris – Game Boy Modul (Nintendo, Bundle-Version)",
             "title": "Tetris – Game Boy Modul (Nintendo, Bundle-Version)",
             "object_identifier": "ICS-0005",
             "inventory_number": "5",
@@ -601,6 +667,27 @@ def seed(client: KatalonClient) -> None:
                 })
             except RuntimeError as e:
                 err(f"  term {term['term']}", e)
+
+    # ── 1b. Record-Subtypes ───────────────────────────────────────────────────
+    print("\n── Record-Subtypes ──────────────────────────────────────────────────")
+    existing_subtypes: set[tuple[str, str]] = set()
+    try:
+        es = client._http.get(f"{client.base}/v1/record-subtypes")
+        if es.is_success:
+            existing_subtypes = {(s["primary_type"], s["name"]) for s in es.json()}
+    except Exception:
+        pass
+
+    for subtype in RECORD_SUBTYPES:
+        key = (subtype["primary_type"], subtype["name"])
+        if key in existing_subtypes:
+            print(f"  ~ {subtype['primary_type']}.{subtype['name']} existiert bereits – überspringe")
+            continue
+        try:
+            client.post("/v1/record-subtypes", subtype)
+            print(f"  + {subtype['primary_type']}.{subtype['name']}")
+        except RuntimeError as e:
+            err(f"{subtype['primary_type']}.{subtype['name']}", e)
 
     # ── 2. Felddefinitionen ───────────────────────────────────────────────────
     print("\n── Felddefinitionen ─────────────────────────────────────────────────")

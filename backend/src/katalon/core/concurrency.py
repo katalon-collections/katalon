@@ -53,7 +53,14 @@ async def flush_record(db: AsyncSession, record: Any) -> None:
             detail={"error": "version_conflict", "current_version": current_version},
         ) from None
     except IntegrityError as exc:
-        constraint = getattr(exc.orig, "constraint_name", "") or ""
+        # asyncpg errors arrive wrapped in SQLAlchemy's plain DBAPI-compat
+        # exception (no constraint_name); the real asyncpg exception with the
+        # diagnostic fields is chained on as __cause__.
+        constraint = (
+            getattr(exc.orig, "constraint_name", None)
+            or getattr(getattr(exc.orig, "__cause__", None), "constraint_name", None)
+            or ""
+        )
         await db.rollback()
         if constraint.endswith("_idno_key") or (
             constraint.startswith("ix_") and constraint.endswith("_idno")
