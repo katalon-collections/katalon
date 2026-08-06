@@ -4,8 +4,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version
+from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
@@ -142,7 +143,7 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admi
         metadata_=metadata,
     )
     db.add(obj)
-    await db.flush()
+    await flush_record(db, obj)
     await sync_schema_relations(db, "object", obj.id, metadata)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
@@ -236,7 +237,8 @@ async def update_object(
     obj.collection_status = data.collection_status
     obj.status = data.status
     obj.metadata_ = metadata
-    obj.version += 1
+
+    await flush_record(db, obj)
 
     await sync_schema_relations(db, "object", obj.id, metadata)
 
@@ -319,11 +321,12 @@ async def delete_object(
         await delete_relations(db, "object", object_id)
 
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete")
+    await db.delete(obj)
+    await flush_record(db, obj)
     try:
         await search_service.remove_record(obj.id)
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
-    await db.delete(obj)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
@@ -435,10 +438,16 @@ async def list_snapshots(object_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot
     responses={
         404: {"description": "Object or snapshot not found"},
         403: {"description": "Insufficient permissions"},
+        409: {"description": "Version conflict"},
+        428: {"description": "If-Match header required"},
     },
 )
 async def restore_snapshot(
-    object_id: uuid.UUID, snapshot_id: uuid.UUID, db: DBDep, _=require_admin_or_editor()
+    object_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_admin_or_editor(),
+    if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     snap_result = await db.execute(
         select(RecordSnapshot).where(
@@ -455,6 +464,7 @@ async def restore_snapshot(
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    require_version(obj.version, if_match)
 
     data = snap.snapshot
     if "idno" in data:
@@ -467,7 +477,22 @@ async def restore_snapshot(
         obj.collection_status = data["collection_status"]
     if "metadata" in data:
         obj.metadata_ = data["metadata"]
-    await db.flush()
+    flag_modified(obj, "metadata_")
+    await flush_record(db, obj)
+    await sync_schema_relations(db, "object", obj.id, obj.metadata_)
+    await log_change(
+        db,
+        record_type="object",
+        record_id=obj.id,
+        user_id=current_user.id,
+        action="restore",
+        changed_fields={"snapshot_id": str(snapshot_id)},
+    )
+    await db.commit()
+    try:
+        await search_service.index_record("object", obj, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
     return obj
 
 

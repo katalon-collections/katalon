@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 
@@ -163,3 +164,51 @@ async def test_procedure_validation_uses_procedure_type_schema(async_client, aut
         },
     )
     assert ok_response.status_code == 201, ok_response.text
+
+
+async def test_concurrent_active_loan_relations_allow_one_winner(
+    async_client, auth_headers
+) -> None:
+    object_response = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"OBJ-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "object_type": "objekt",
+            "metadata_": {},
+        },
+    )
+    object_id = object_response.json()["id"]
+
+    procedure_ids = []
+    for _ in range(2):
+        response = await async_client.post(
+            "/v1/procedures",
+            headers=auth_headers,
+            json={
+                "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+                "procedure_type": "loan_out",
+                "status": "active",
+                "metadata_": {"label": "Concurrent loan"},
+            },
+        )
+        assert response.status_code == 201, response.text
+        procedure_ids.append(response.json()["id"])
+
+    async def link(procedure_id: str):
+        return await async_client.post(
+            "/v1/relations",
+            headers=auth_headers,
+            json={
+                "from_type": "procedure",
+                "from_id": procedure_id,
+                "to_type": "object",
+                "to_id": object_id,
+                "relation_type": "contains",
+                "metadata_": {},
+            },
+        )
+
+    responses = await asyncio.gather(*(link(procedure_id) for procedure_id in procedure_ids))
+    assert sorted(response.status_code for response in responses) == [201, 409]

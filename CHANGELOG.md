@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-08-06
+
+### Fixed
+- Importer-Upsert (`merge`/`replace`) kapselt jeden Zeilen-Write jetzt in einem SAVEPOINT. Ein `StaleDataError` durch konkurrierende Änderung derselben Zeile rollt nur diese Zeile zurück (Zeile wird als Version-Konflikt übersprungen) statt die gesamte Session für den Rest des Import-Batches unbrauchbar zu machen.
+- Datenbankseitiges Optimistic Locking (`version_id_col`) für Object, Entity, Place, Occurrence, Procedure statt rein Python-seitigem Check — schließt TOCTOU-Lücke bei konkurrierenden Speichervorgängen.
+- Snapshot-Restore verlangt jetzt `If-Match` (`428`/`409`), erhöht die Version, schreibt Audit `restore` und synchronisiert Schema-Relationen, statt konkurrierende Änderungen lautlos zu überschreiben.
+- Delete-Endpunkte (Object/Entity/Place/Occurrence/Procedure) flushen den Löschvorgang vor Elasticsearch-Entfernung und Cleanup-Task-Dispatch — verhindert verwaiste ES-Dokumente und Relations-Cleanup bei fehlgeschlagenem Delete durch Versionskonflikt.
+- Aktive Ausleihvorgänge (`loan_out`) sperren jetzt die betroffenen Objektzeilen bei Relationserstellung, Aktivierung und Snapshot-Restore — verhindert doppelte aktive Ausleihen unter Nebenläufigkeit.
+- Place-Update setzt Geometrie vor dem Flush statt danach — verhindert doppelte Versionierung durch zwei getrennte UPDATEs pro Request.
+- PID-Registrierung und Publish-Flow nutzen jetzt denselben versionierten Flush wie reguläre Updates.
+- Cleanup-Task nach Delete erkennt `StaleDataError` und retried statt fehlzuschlagen.
+
 ## [0.7.6] - 2026-08-05
 
 ### Added

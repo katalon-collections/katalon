@@ -46,6 +46,8 @@ class Object(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
+    __mapper_args__ = {"version_id_col": version}
+
     media_files: Mapped[list["MediaFile"]] = relationship(back_populates="object")
 
     __table_args__ = (
@@ -67,6 +69,8 @@ class Entity(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
+    __mapper_args__ = {"version_id_col": version}
+
     __table_args__ = (
         Index("ix_entities_metadata_gin", "metadata", postgresql_using="gin"),
     )
@@ -86,6 +90,8 @@ class Place(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
+    __mapper_args__ = {"version_id_col": version}
+
     __table_args__ = (
         Index("ix_places_metadata_gin", "metadata", postgresql_using="gin"),
         Index("ix_places_geom", "geom", postgresql_using="gist"),
@@ -104,6 +110,8 @@ class Occurrence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version}
 
     __table_args__ = (
         Index("ix_occurrences_metadata_gin", "metadata", postgresql_using="gin"),
@@ -126,6 +134,8 @@ class Procedure(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version}
 
     __table_args__ = (
         Index("ix_procedures_metadata_gin", "metadata", postgresql_using="gin"),

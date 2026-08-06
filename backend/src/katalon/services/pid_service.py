@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
+from katalon.core.concurrency import flush_record
 from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place
 from katalon.integrations.dnb_urn_adapter import DnbUrnAdapter
 
@@ -70,7 +71,7 @@ async def register_dnb_urn_for_record(
     else:
         metadata[field_name] = value
     record.metadata_ = metadata
-    await db.flush()
+    await flush_record(db, record)
 
     return {
         "urn": urn,

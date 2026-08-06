@@ -78,9 +78,18 @@ def cleanup_relation_refs(deleted_type: str, deleted_id: str) -> dict:
     from katalon.database import AsyncSessionLocal
 
     async def _run_cleanup() -> dict:
+        from sqlalchemy.orm.exc import StaleDataError
+
         async with AsyncSessionLocal() as session:
-            result = await _do_cleanup(session, deleted_type, deleted_id)
-            await session.commit()
-            return result
+            for attempt in range(3):
+                result = await _do_cleanup(session, deleted_type, deleted_id)
+                try:
+                    await session.commit()
+                    return result
+                except StaleDataError:
+                    await session.rollback()
+                    if attempt == 2:
+                        raise
+        raise RuntimeError("cleanup retry loop exhausted")
 
     return _run(_run_cleanup())
