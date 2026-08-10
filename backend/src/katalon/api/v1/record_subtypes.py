@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
-from katalon.core.dependencies import DBDep, require_role
+from katalon.core.dependencies import DBDep, require_admin_or_editor, require_role
 from katalon.core.models import RecordSubtype
 from katalon.core.schemas import RecordSubtypeCreate, RecordSubtypeRead
 from katalon.services.subtype_service import (
@@ -30,7 +30,7 @@ async def _unset_default_for_type(db: DBDep, primary_type: str, *, keep_id: uuid
 @router.get(
     "",
     response_model=list[RecordSubtypeRead],
-    dependencies=[require_role("admin")],
+    dependencies=[require_admin_or_editor()],
     summary="List record subtypes, optionally filtered by primary type",
     responses={
         403: {"description": "Insufficient permissions"},

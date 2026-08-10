@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from katalon.core.dependencies import DBDep, require_role
+from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import AdminConfig
 from katalon.services.idno_service import peek_next_idno
 
@@ -27,7 +27,7 @@ class NextIdnoResponse(BaseModel):
 async def get_next_idno(
     db: DBDep,
     type: str = Query(..., description="Primary record type"),
-    _=require_role("editor"),
+    _=require_admin_or_editor(),
 ) -> NextIdnoResponse:
     """Return the next suggested idno for a given record type WITHOUT incrementing the counter."""
     if type not in _VALID_TYPES:

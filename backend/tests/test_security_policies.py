@@ -29,6 +29,48 @@ def _one_result(value) -> MagicMock:
 
 
 @pytest.mark.parametrize(
+    ("role", "expected_status"),
+    [
+        ("viewer", 403),
+        ("cataloger", 200),
+        ("editor", 200),
+        ("admin", 200),
+        ("superuser", 200),
+    ],
+)
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/v1/record-subtypes",
+        "/v1/idno/next?type=invalid",
+    ],
+)
+@pytest.mark.asyncio
+async def test_form_lookup_routes_require_manage_content(
+    path: str,
+    role: str,
+    expected_status: int,
+) -> None:
+    user = User(id=uuid.uuid4(), email=f"{role}@example.org", hashed_password="x", role=role)
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_items_result())
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(path)
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == expected_status
+
+
+@pytest.mark.parametrize(
     ("path", "status_column"),
     [
         ("/v1/objects", "objects.status"),

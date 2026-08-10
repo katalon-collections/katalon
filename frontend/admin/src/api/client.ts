@@ -170,7 +170,7 @@ export const users = {
 
 // Objects
 export const objects = {
-  list: (params?: { page?: number; page_size?: number; status?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; object_type?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<KatalonObject>>(`/v1/objects${qs ? `?${qs}` : ''}`)
   },
@@ -208,7 +208,7 @@ export const entities = {
 
 // Places
 export const places = {
-  list: (params?: { page?: number; page_size?: number; status?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },

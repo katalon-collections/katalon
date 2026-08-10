@@ -60,14 +60,16 @@ def _celery_without_redis():
 
 
 @pytest.fixture
-async def app(migrated_database: str):
+async def app(migrated_database: str, monkeypatch: pytest.MonkeyPatch):
     os.environ["DATABASE_URL"] = migrated_database
     os.environ["DEBUG"] = "true"
     os.environ.setdefault("KATALON_SECRETS_KEY", TEST_SECRETS_KEY)
 
     import katalon.config as config_module
     import katalon.database as database_module
+    import katalon.integrations.elasticsearch as elasticsearch_module
     import katalon.main as main_module
+    from katalon.core.limiter import limiter
 
     importlib.reload(config_module)
     importlib.reload(database_module)
@@ -76,7 +78,14 @@ async def app(migrated_database: str):
     async def _skip_cantaloupe_health() -> None:
         return None
 
+    async def _skip_elasticsearch_setup() -> None:
+        return None
+
+    # SlowAPI keeps counters at module scope, while each test gets a fresh app.
+    # Keep those test apps isolated without disabling the production limiter.
+    limiter.reset()
     main_module._check_cantaloupe_health = _skip_cantaloupe_health
+    monkeypatch.setattr(elasticsearch_module, "ensure_index", _skip_elasticsearch_setup)
 
     yield main_module.app
 

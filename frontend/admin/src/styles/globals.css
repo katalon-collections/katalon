@@ -220,6 +220,36 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .fg-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .fg-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
+/* Inline relation creation (#277) */
+.relation-picker { position: relative; display: flex; flex-direction: column; gap: 7px; }
+.relation-create { align-self: flex-start; color: var(--accent-ink); }
+.relation-empty { padding: 14px 12px; color: var(--fg-3); font-size: 12px; text-align: center; }
+.generic-relation-picker { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.quick-create-dialog { width: min(680px, calc(100vw - 32px)); max-height: min(860px, calc(100vh - 32px)); padding: 0; border: 1px solid var(--border-s); border-radius: 10px; color: var(--fg); background: var(--panel); box-shadow: 0 24px 80px rgba(0,0,0,.24); overflow: hidden; }
+.quick-create-dialog::backdrop { background: rgba(11,26,51,.56); }
+.quick-create-head { display: flex; align-items: flex-start; gap: 16px; padding: 16px 20px 12px; }
+.quick-create-head h2 { margin: 0; font-size: 18px; line-height: 1.25; }
+.quick-create-context { margin-top: 3px; color: var(--fg-3); font-size: 12.5px; }
+.quick-create-close { margin-left: auto; }
+.quick-create-notice { display: flex; align-items: center; gap: 8px; margin: 0 20px; padding: 9px 10px; color: var(--accent-ink); background: var(--accent-50); border-radius: 6px; font-size: 12px; }
+.quick-create-form { height: min(700px, calc(100vh - 150px)) !important; }
+.quick-create-form .scroll { order: 1; }
+.quick-create-form .form-single { max-width: none; padding: 14px 20px 6px; }
+.quick-create-form .card { border: 0; margin: 0; }
+.quick-create-form .card > .hd { display: none; }
+.quick-create-form .card > .bd { padding: 0; }
+.quick-create-toolbar { order: 2; padding: 12px 20px; border-top: 1px solid var(--border); border-bottom: 0; }
+.quick-create-toolbar .record-actions { width: 100%; justify-content: flex-end; }
+
+@media (max-width: 600px) {
+  .quick-create-dialog { width: 100vw; height: 100dvh; max-height: none; max-width: none; margin: 0; border: 0; border-radius: 0; }
+  .quick-create-form { height: calc(100dvh - 102px) !important; }
+  .quick-create-dialog .btn, .quick-create-dialog .fld { min-height: 44px; }
+  .quick-create-toolbar { padding: 10px 12px; }
+  .quick-create-toolbar .record-actions { flex-wrap: wrap; }
+  .quick-create-toolbar .btn { flex: 1; justify-content: center; }
+}
+
 /* Schema editor */
 .schema-workspace { flex: 1; display: grid; min-height: 0; overflow: hidden; }
 .schema-subtype-panel { border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; min-height: 0; }

@@ -27,6 +27,18 @@ sources:
   - id: main
     type: file
     path: backend/src/katalon/main.py
+  - id: screen-form
+    type: file
+    path: frontend/admin/src/components/screens/ScreenForm.tsx
+  - id: admin-client
+    type: file
+    path: frontend/admin/src/api/client.ts
+  - id: idno-api
+    type: file
+    path: backend/src/katalon/api/v1/idno.py
+  - id: dependencies
+    type: file
+    path: backend/src/katalon/core/dependencies.py
 ---
 
 Record subtypes are configured labels and internal names under Katalon's four primary record types: object, entity, place, and occurrence. The `record_subtypes` table stores the subtype name, multilingual label, sort order, and default flag per primary type, while the primary record tables store their selected subtype in `object_type`, `entity_type`, `place_type`, or `occurrence_type` [@models]. The schema engine uses those subtype names to decide whether a field applies globally to a primary type or only to one subtype, so subtypes are a metadata-scope mechanism as well as a cataloguing classification [@subtype-service].
@@ -39,7 +51,7 @@ Katalon creates default subtype rows at startup for object `objekt`, entity `per
 
 ## Admin Lifecycle
 
-The record subtype API lists subtypes, optionally filtered by primary type, and allows admins to create, update, or delete subtype definitions [@subtype-api]. It normalizes non-empty names, rejects unknown primary types, enforces uniqueness, and unsets other defaults for the same primary type when a subtype is marked default [@subtype-api]. Deletion is blocked when records of that primary type still use the subtype name, because `subtype_has_assigned_records` counts assigned rows through the relevant type column [@subtype-service].
+The record subtype API lists subtypes, optionally filtered by primary type, and allows admins to create, update, or delete subtype definitions [@subtype-api]. Listing requires `manage_content`, while mutations remain admin-only. The ID-number suggestion used by new-record forms also requires `manage_content`, so catalogers can load both inputs needed for quick creation [@subtype-api] [@idno-api] [@dependencies]. The subtype API normalizes non-empty names, rejects unknown primary types, enforces uniqueness, and unsets other defaults for the same primary type when a subtype is marked default [@subtype-api]. Deletion is blocked when records of that primary type still use the subtype name, because `subtype_has_assigned_records` counts assigned rows through the relevant type column [@subtype-service].
 
 The admin subtype screen exposes tabs for objects, entities, places, and occurrences, then edits internal name, German and English labels, sort order, and default status [@subtype-screen]. Existing subtype internal names are disabled in the UI after creation, which matches the database's use of names as stable scope keys for records and schema fields [@subtype-screen].
 
@@ -48,6 +60,12 @@ The admin subtype screen exposes tabs for objects, entities, places, and occurre
 Field definitions can carry an optional `target_subtype` [@models]. When the schema service loads fields for a record type and subtype, it returns fields whose `target_subtype` is `NULL` together with fields that exactly match the requested subtype [@schema-service]. This lets one schema define shared fields for all objects while adding subtype-only fields for a narrower cataloguing case.
 
 The schema API verifies that a non-null subtype exists before creating or updating a top-level field for primary record types [@schema-api]. That validation is important because stored metadata lives in JSONB and would otherwise accept orphaned field scopes with no corresponding record classification.
+
+## Relation Search And Quick Creation
+
+A relation field's optional `target_subtype` narrows target searches through the corresponding object, entity, place, or occurrence list filter. The same subtype is preselected and locked in the quick-create form [@screen-form] [@admin-client]. Without a fixed subtype, the form selects the configured default when present. Entity quick creation requires a valid configured subtype if no default exists [@screen-form].
+
+The general relationships panel does not constrain the subtype. Users choose it in the target form, while procedures continue to use their six fixed `procedure_type` values [@screen-form].
 
 ## Related Pages
 

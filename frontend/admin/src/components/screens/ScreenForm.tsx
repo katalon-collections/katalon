@@ -117,6 +117,35 @@ function procedureSearchResult(proc: AnyRecord): SearchResult {
   }
 }
 
+function recordSearchResult(recordType: RecordType, record: AnyRecord): SearchResult {
+  const idno = (record as { idno?: string | null }).idno
+  return {
+    id: record.id,
+    record_type: recordType,
+    title: extractTitle(record.metadata_ as Record<string, unknown>, idno ?? record.id.slice(0, 8) + '…'),
+    status: record.status,
+    score: null,
+  }
+}
+
+async function searchRecords(targetType: RecordType, q: string, targetSubtype?: string): Promise<SearchResult[]> {
+  if (!targetSubtype && targetType !== 'procedure') {
+    return (await searchApi.query(q, targetType, 8)).items
+  }
+  switch (targetType) {
+    case 'object':
+      return (await objects.list({ q, object_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+    case 'entity':
+      return (await entities.list({ q, entity_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+    case 'place':
+      return (await places.list({ q, place_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+    case 'occurrence':
+      return (await occurrences.list({ q, occurrence_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+    case 'procedure':
+      return (await procedures.list({ q, procedure_type: targetSubtype, page_size: 8 })).items.map(procedureSearchResult)
+  }
+}
+
 const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
   object:     'object_type',
   entity:     'entity_type',
@@ -411,17 +440,86 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
   )
 }
 
+function QuickCreateDialog({
+  targetType,
+  targetSubtype,
+  context,
+  onCreated,
+  onClose,
+  onReturnFocus,
+}: {
+  targetType: RecordType
+  targetSubtype?: string
+  context?: string
+  onCreated: (record: AnyRecord) => void
+  onClose: () => void
+  onReturnFocus?: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [dirty, setDirty] = useState(false)
+
+  useEffect(() => {
+    dialogRef.current?.showModal()
+  }, [])
+
+  function close() {
+    if (dirty && !window.confirm('Eingaben verwerfen und Schnellanlage schließen?')) return
+    dialogRef.current?.close()
+    onClose()
+    requestAnimationFrame(() => onReturnFocus?.())
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="quick-create-dialog"
+      aria-labelledby="quick-create-title"
+      onCancel={e => { e.preventDefault(); close() }}
+    >
+      <div className="quick-create-head">
+        <div>
+          <h2 id="quick-create-title">{NEW_TYPE_LABELS[targetType]} anlegen</h2>
+          {context && <div className="quick-create-context">{context}</div>}
+        </div>
+        <button className="btn ico gh quick-create-close" onClick={close} aria-label="Schnellanlage schließen"><X size={16} /></button>
+      </div>
+      <div className="quick-create-notice"><AlertCircle size={15} /> Wird als Entwurf gespeichert</div>
+      <ScreenForm
+        recordType={targetType}
+        recordId="new"
+        quickCreate
+        initialSubtype={targetSubtype}
+        lockSubtype={Boolean(targetSubtype)}
+        onDirtyChange={setDirty}
+        onBack={close}
+        onCreated={record => {
+          setDirty(false)
+          dialogRef.current?.close()
+          onCreated(record)
+          onClose()
+          requestAnimationFrame(() => onReturnFocus?.())
+        }}
+      />
+    </dialog>
+  )
+}
+
 function RelationInput({
   targetType,
+  targetSubtype,
   relTypeVocabId,
+  fixedRelationType,
   onAdd,
   disabled,
+  allowCreate = true,
 }: {
-  targetType: string
+  targetType: RecordType | ''
   targetSubtype?: string
   relTypeVocabId?: string
-  onAdd: (entry: RelationEntry) => void
+  fixedRelationType?: string
+  onAdd: (entry: RelationEntry) => void | Promise<void>
   disabled?: boolean
+  allowCreate?: boolean
 }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -430,10 +528,20 @@ function RelationInput({
   const [relType, setRelType] = useState('')
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const [showDrop, setShowDrop] = useState(false)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const createButtonRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusAfterConfirm = useRef(false)
+
+  function focusPicker() {
+    pickerRef.current?.querySelector<HTMLElement>('button.btn.pri:not(:disabled), input:not(:disabled), select:not(:disabled), button:not(:disabled)')?.focus()
+  }
 
   useEffect(() => {
     if (!relTypeVocabId) { setRelTypeTerms([]); return }
@@ -465,27 +573,28 @@ function RelationInput({
 
   useEffect(() => {
     clearTimeout(timer.current)
-    if (q.trim().length < 2) { setResults([]); return }
+    if (q.trim().length < 2) { setResults([]); setSearching(false); return }
     timer.current = setTimeout(() => {
       setSearching(true)
-      searchApi.query(q.trim(), targetType as RecordType, 8)
-        .then(r => {
-          setResults(r.items)
-          setShowDrop(r.items.length > 0)
+      searchRecords(targetType as RecordType, q.trim(), targetSubtype)
+        .then(items => {
+          setResults(items)
+          setShowDrop(true)
         })
         .catch(() => setResults([]))
         .finally(() => setSearching(false))
     }, 300)
     return () => clearTimeout(timer.current)
-  }, [q, targetType])
+  }, [q, targetType, targetSubtype])
 
   function openSuggestions() {
     if (!targetType) return
+    if (q.trim().length < 2) { setSearching(false); return }
     setSearching(true)
-    searchApi.query(q.trim(), targetType as RecordType, 8)
-      .then(r => {
-        setResults(r.items)
-        setShowDrop(r.items.length > 0)
+    searchRecords(targetType as RecordType, q.trim(), targetSubtype)
+      .then(items => {
+        setResults(items)
+        setShowDrop(true)
       })
       .catch(() => {
         setResults([])
@@ -499,48 +608,73 @@ function RelationInput({
     setQ('')
     setResults([])
     setShowDrop(false)
-    setRelType('')
+    setLinkError(null)
   }
 
-  function confirm() {
-    if (!picked || !relType.trim()) return
-    onAdd({ id: picked.id, label: picked.title, relation_type: relType.trim() })
-    setPicked(null)
-    setRelType('')
+  async function confirm(record = picked) {
+    const relationType = fixedRelationType ?? relType.trim()
+    if (!record || !relationType) return
+    setConfirming(true)
+    setLinkError(null)
+    try {
+      await onAdd({ id: record.id, label: record.title, relation_type: relationType })
+      setPicked(null)
+      if (!fixedRelationType) setRelType('')
+      if (restoreFocusAfterConfirm.current) {
+        restoreFocusAfterConfirm.current = false
+        requestAnimationFrame(focusPicker)
+      }
+    } catch (e) {
+      setPicked(record)
+      setLinkError((e as Error).message)
+      if (restoreFocusAfterConfirm.current) requestAnimationFrame(focusPicker)
+    } finally {
+      setConfirming(false)
+    }
   }
 
   if (picked) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div ref={pickerRef} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, color: 'var(--fg-2)', flex: 1 }}>{picked.title}</span>
           <button className="btn sm ico gh" onClick={() => setPicked(null)} title="Auswahl aufheben"><X size={12} /></button>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {relTypeTerms.length > 0 ? (
+          {!fixedRelationType && relTypeTerms.length > 0 ? (
             <select className="fld" style={{ flex: 1 }} value={relType} onChange={e => setRelType(e.target.value)}>
               <option value="">— Relationstyp wählen —</option>
               {relTypeTerms.map(t => (
                 <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
               ))}
             </select>
-          ) : (
+          ) : !fixedRelationType ? (
             <input className="fld" style={{ flex: 1 }} value={relType}
               onChange={e => setRelType(e.target.value)}
               placeholder="Relationstyp (z.B. depicts, created_by)"
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirm() } }}
               autoFocus
             />
-          )}
-          <button className="btn pri sm" onClick={confirm} disabled={!relType.trim()}>Hinzufügen</button>
+          ) : null}
+          <button className="btn pri sm" onClick={() => confirm()} disabled={confirming || !(fixedRelationType ?? relType.trim())}>{confirming ? 'Verknüpft…' : linkError ? 'Erneut verknüpfen' : 'Verknüpfen'}</button>
           <button className="btn gh sm" onClick={() => { setPicked(null); setRelType('') }}>Abbrechen</button>
         </div>
+        {linkError && <div className="help err">Zieldatensatz wurde angelegt oder ausgewählt, aber nicht verknüpft: {linkError}</div>}
       </div>
     )
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={pickerRef} className="relation-picker">
+      {!fixedRelationType && (relTypeTerms.length > 0 ? (
+        <select className="fld" value={relType} onChange={e => setRelType(e.target.value)} aria-label="Relationstyp">
+          <option value="">— Relationstyp wählen —</option>
+          {relTypeTerms.map(t => <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>)}
+        </select>
+      ) : (
+        <input className="fld" value={relType} onChange={e => setRelType(e.target.value)} placeholder="Relationstyp" aria-label="Relationstyp" />
+      ))}
+      <div style={{ position: 'relative' }}>
       <input
         ref={inputRef}
         className="fld"
@@ -548,20 +682,20 @@ function RelationInput({
         onChange={e => setQ(e.target.value)}
         onFocus={openSuggestions}
         placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
-        disabled={disabled || !targetType}
+        disabled={disabled || !targetType || !(fixedRelationType ?? relType.trim())}
       />
       {searching && (
         <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
           Suche…
         </div>
       )}
-      {showDrop && results.length > 0 && dropPos && (
+      {showDrop && dropPos && (
         <div ref={dropRef} style={{
           position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
           background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
         }}>
-          {results.map(r => (
+          {results.length > 0 ? results.map(r => (
             <button
               key={r.id}
               onMouseDown={e => { e.preventDefault(); pickRecord(r) }}
@@ -571,8 +705,37 @@ function RelationInput({
               <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
               <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
             </button>
-          ))}
+          )) : <div className="relation-empty">Keine passenden {TYPE_LABELS[targetType as RecordType] ?? 'Datensätze'} gefunden.</div>}
         </div>
+      )}
+      </div>
+      {allowCreate && !disabled && targetType && getTokenUser()?.role !== 'viewer' && (
+        <button
+          ref={createButtonRef}
+          type="button"
+          className="btn gh relation-create"
+          disabled={!(fixedRelationType ?? relType.trim())}
+          onClick={() => setQuickCreateOpen(true)}
+        >
+          <Plus size={13} /> {NEW_TYPE_LABELS[targetType]} anlegen
+        </button>
+      )}
+      {quickCreateOpen && targetType && (
+        <QuickCreateDialog
+          targetType={targetType}
+          targetSubtype={targetSubtype}
+          onClose={() => setQuickCreateOpen(false)}
+          onReturnFocus={() => {
+            if (createButtonRef.current?.isConnected) createButtonRef.current.focus()
+            else focusPicker()
+          }}
+          onCreated={record => {
+            const result = recordSearchResult(targetType, record)
+            restoreFocusAfterConfirm.current = true
+            setPicked(result)
+            void confirm(result)
+          }}
+        />
       )}
     </div>
   )
@@ -672,21 +835,26 @@ interface Props {
   // Context override for form-variant resolution (#275), e.g. from a workflow
   // or quick-add entry point. Not yet set by any caller in this issue's scope.
   variantHint?: string
+  quickCreate?: boolean
+  initialSubtype?: string
+  lockSubtype?: boolean
+  onCreated?: (record: AnyRecord) => void
 }
 
-export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint }: Props) {
+export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, onCreated }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
   const showIdno  = true
-  const showMedia = recordType === 'object'
+  const showMedia = recordType === 'object' && !quickCreate
   const showGeo   = recordType === 'place'
   const showProcedureFields = recordType === 'procedure'
   const showCollectionStatus = recordType === 'object'
   const user = getTokenUser()
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
+  const canManageContent = Boolean(user && user.role !== 'viewer')
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [variants, setVariants] = useState<FormVariant[]>([])
@@ -735,6 +903,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [uploadRightsName, setUploadRightsName] = useState('')
   const [uploadRightsUri, setUploadRightsUri] = useState('')
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
+  const [relTypeVocabId, setRelTypeVocabId] = useState<string | undefined>()
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -747,12 +916,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [relMeta, setRelMeta]     = useState<Record<string, Record<string, unknown>>>({})
   const [objectStatuses, setObjectStatuses] = useState<Record<string, string>>({})
   const [addTargetType, setAddTargetType] = useState<RecordType>('object')
-  const [addSearchQ, setAddSearchQ]       = useState('')
-  const [addResults, setAddResults]       = useState<SearchResult[]>([])
-  const [addSearching, setAddSearching]   = useState(false)
-  const [addSelected, setAddSelected]     = useState<SearchResult | null>(null)
-  const [addSaving, setAddSaving]         = useState(false)
   const [addProcedureOpen, setAddProcedureOpen] = useState(false)
+  const [genericAddOpen, setGenericAddOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
   const [aiBusyField, setAiBusyField] = useState<string | null>(null)
 
@@ -817,7 +982,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setTitle(isNew ? NEW_TYPE_LABELS[recordType] : '…')
     setSavedId(currentId)
     setIdno('')
-    setSubtype('')
+    setSubtype(initialSubtype ?? '')
     setLat('')
     setLon('')
     setStartDate('')
@@ -836,18 +1001,21 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setAddProcedureOpen(false)
     setCompletionDialog(null)
 
-    // Load available subtypes for this record type
-    if (subtypeKey) {
-      subtypes.list(recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
-    } else {
-      setAvailableSubtypes([])
-    }
+    // Load available subtypes before resolving a new form's schema, so the
+    // default and fixed subtype use the same schema key from the first load.
+    const subtypeListP = subtypeKey
+      ? subtypes.list(recordType).catch(() => [] as RecordSubtype[])
+      : Promise.resolve([] as RecordSubtype[])
+    subtypeListP.then(items => {
+      setAvailableSubtypes(items)
+      if (isNew) setSubtype(current => current || initialSubtype || items.find(item => item.is_default)?.name || '')
+    })
 
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
 
     loadRecP
       .then(async rec => {
-        let recSubtype: string | undefined
+        let recSubtype: string | undefined = isNew ? initialSubtype : undefined
         if (rec) {
           setStatus(rec.status as Status)
           setLoadedStatus(rec.status as Status)
@@ -876,6 +1044,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             setReferenceNumber(p.reference_number ?? '')
           }
           setTitle(extractTitle(m, (rec as { idno?: string | null }).idno ?? rec.id))
+        } else if (subtypeKey) {
+          const items = await subtypeListP
+          recSubtype = initialSubtype || items.find(item => item.is_default)?.name || undefined
         }
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
@@ -891,7 +1062,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       .finally(() => { setLoading(false); setIsDirty(false) })
 
     if (!isNew && currentId) loadRelations(currentId)
-  }, [recordId, recordType, isNew])
+  }, [recordId, recordType, isNew, initialSubtype])
 
   useEffect(() => {
     if (!isNew) return
@@ -949,66 +1120,75 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     vocabularies.list()
       .then(vocabs => {
         const rt = vocabs.find(v => v.name === 'relation_types')
-        if (rt) return vocabularies.listTerms(rt.id)
+        if (rt) {
+          setRelTypeVocabId(rt.id)
+          return vocabularies.listTerms(rt.id)
+        }
         return []
       })
       .then(setRelTypeTerms)
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    const searchOpen =
-      (showProcedureFields && addTargetType === 'object') ||
-      (showCollectionStatus && addProcedureOpen && addTargetType === 'procedure')
-    if (!searchOpen || addSearchQ.trim().length < 2) { setAddResults([]); return }
-    setAddSearching(true)
-    const timer = setTimeout(() => {
-      const q = addSearchQ.trim()
-      const request = addTargetType === 'procedure'
-        ? procedures.list({ q, page_size: 6 }).then(r => r.items.map(procedureSearchResult))
-        : searchApi.query(q, addTargetType, 6).then(r => r.items)
-      request
-        .then(setAddResults)
-        .catch(() => setAddResults([]))
-        .finally(() => setAddSearching(false))
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [addSearchQ, addTargetType, showProcedureFields, showCollectionStatus, addProcedureOpen])
-
   async function handleAddObjectRelation(result: SearchResult) {
     if (!savedId) return
-    setAddSaving(true)
-    try {
-      const created = await relationsApi.create({
-        from_type: recordType, from_id: savedId,
-        to_type: 'object', to_id: result.id,
-        relation_type: relTypeTerms[0]?.term ?? 'concerns',
-      })
-      setRels(prev => [...prev, created])
-      setRelTitles(prev => ({ ...prev, [`object/${created.to_id}`]: result.title }))
-      objects.get(result.id).then(obj => {
-        setObjectStatuses(prev => ({ ...prev, [result.id]: obj.collection_status ?? 'active' }))
-      }).catch(() => {})
-      setAddSearchQ('')
-      setAddResults([])
-    } catch (e) { alert((e as Error).message) }
-    finally { setAddSaving(false) }
+    const duplicate = rels.some(r => {
+      const isFrom = r.from_id === savedId
+      return (isFrom ? r.to_type : r.from_type) === 'object'
+        && (isFrom ? r.to_id : r.from_id) === result.id
+        && r.relation_type === 'concerns'
+    })
+    if (duplicate) throw new Error('Diese Beziehung besteht bereits.')
+    const created = await relationsApi.create({
+      from_type: recordType, from_id: savedId,
+      to_type: 'object', to_id: result.id,
+      relation_type: 'concerns',
+    })
+    setRels(prev => [...prev, created])
+    setRelTitles(prev => ({ ...prev, [`object/${created.to_id}`]: result.title }))
+    objects.get(result.id).then(obj => {
+      setObjectStatuses(prev => ({ ...prev, [result.id]: obj.collection_status ?? 'active' }))
+    }).catch(() => {})
   }
 
-  async function handleAddProcedureRelation(selected = addSelected) {
+  async function handleAddProcedureRelation(selected: SearchResult) {
     if (!selected || !savedId) return
-    setAddSaving(true)
-    try {
-      const created = await relationsApi.create({
-        from_type: recordType, from_id: savedId,
-        to_type: 'procedure', to_id: selected.id,
-        relation_type: 'concerns',
-      })
-      setRels(prev => [...prev, created])
-      setRelTitles(prev => ({ ...prev, [`procedure/${created.to_id}`]: selected.title }))
-      setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([])
-    } catch (e) { alert((e as Error).message) }
-    finally { setAddSaving(false) }
+    const duplicate = rels.some(r => {
+      const isFrom = r.from_id === savedId
+      return (isFrom ? r.to_type : r.from_type) === 'procedure'
+        && (isFrom ? r.to_id : r.from_id) === selected.id
+        && r.relation_type === 'concerns'
+    })
+    if (duplicate) throw new Error('Diese Beziehung besteht bereits.')
+    const created = await relationsApi.create({
+      from_type: recordType, from_id: savedId,
+      to_type: 'procedure', to_id: selected.id,
+      relation_type: 'concerns',
+    })
+    setRels(prev => [...prev, created])
+    setRelTitles(prev => ({ ...prev, [`procedure/${created.to_id}`]: selected.title }))
+    setAddProcedureOpen(false)
+  }
+
+  async function handleAddGenericRelation(entry: RelationEntry) {
+    if (!savedId) return
+    const duplicate = rels.some(r => {
+      const isFrom = r.from_id === savedId
+      return (isFrom ? r.to_type : r.from_type) === addTargetType
+        && (isFrom ? r.to_id : r.from_id) === entry.id
+        && r.relation_type === entry.relation_type
+    })
+    if (duplicate) throw new Error('Diese Beziehung besteht bereits.')
+    const created = await relationsApi.create({
+      from_type: recordType,
+      from_id: savedId,
+      to_type: addTargetType,
+      to_id: entry.id,
+      relation_type: entry.relation_type,
+    })
+    setRels(prev => [...prev, created])
+    setRelTitles(prev => ({ ...prev, [`${addTargetType}/${entry.id}`]: entry.label }))
+    setGenericAddOpen(false)
   }
 
   async function handleDeleteRelation(id: string) {
@@ -1163,9 +1343,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           </div>
         ) : (
           <RelationInput
-            targetType={(sf.settings?.target_type as string) ?? ''}
+            targetType={(sf.settings?.target_type as RecordType) ?? ''}
+            targetSubtype={sf.settings?.target_subtype as string | undefined}
+            relTypeVocabId={sf.settings?.relation_type_vocab as string | undefined}
             onAdd={entry => onChange(entry)}
             disabled={disabled}
+            allowCreate={!quickCreate}
           />
         )
       case 'authority':
@@ -1184,6 +1367,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   function addRelationEntry(name: string, entry: RelationEntry) {
     const cur = (values[name] as RelationEntry[] | undefined) ?? []
+    if (cur.some(item => item.id === entry.id && item.relation_type === entry.relation_type)) {
+      throw new Error('Diese Beziehung besteht bereits.')
+    }
     setValuesDirty(v => ({ ...v, [name]: [...cur, entry] }))
   }
   function removeRelationEntry(name: string, idx: number) {
@@ -1207,8 +1393,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!idno.trim()) {
       addRequired('__idno', 'ID-Nr. ist ein Pflichtfeld.')
     }
-    // subtype is required when subtypes are configured
-    if (subtypeKey && (availableSubtypes.length > 0 || showProcedureFields) && !subtype) {
+    // Entity subtype choice and fixed relation subtypes are structural in quick-create,
+    // so drafts must not bypass them.
+    const validConfiguredSubtype = availableSubtypes.some(item => item.name === subtype)
+    if (quickCreate && !showProcedureFields &&
+        ((recordType === 'entity' && availableSubtypes.length > 0) || lockSubtype) &&
+        !validConfiguredSubtype) {
+      errors.__subtype = lockSubtype ? 'Der konfigurierte Subtyp ist ungültig.' : 'Subtyp ist ein Pflichtfeld.'
+    } else if (subtypeKey && (availableSubtypes.length > 0 || showProcedureFields) && !subtype) {
       addRequired('__subtype', 'Subtyp ist ein Pflichtfeld.')
     }
     for (const f of fields) {
@@ -1465,7 +1657,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     try {
       const completingProcedure = showProcedureFields && !isNew && loadedStatus !== 'completed' && status === 'completed'
       const payload: Record<string, unknown> = {
-        status: completingProcedure ? loadedStatus : status,
+        status: quickCreate ? 'draft' : completingProcedure ? loadedStatus : status,
         metadata_: values,
       }
       if (showIdno)   payload.idno = idno || null
@@ -1484,6 +1676,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
       if (isNew) {
         const created = await (api.create as (d: typeof payload) => Promise<AnyRecord>)(payload)
+        if (quickCreate) {
+          onCreated?.(created)
+          return
+        }
         setSavedId(created.id)
         setLoadedStatus(created.status as Status)
         onSaved?.(created.id)
@@ -1704,7 +1900,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   const hasSavedId   = Boolean(savedId)
   const justCreated  = isNew && hasSavedId
-  const showTwoCol   = showMedia || !isNew
+  const showTwoCol   = !quickCreate && (showMedia || !isNew)
   const objectRels = showProcedureFields ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'object') : []
   const procedureRels = showCollectionStatus ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'procedure') : []
   const otherRels = showProcedureFields
@@ -1712,10 +1908,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : showCollectionStatus
       ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'procedure')
       : rels
-  const linkedProcedureIds = new Set(procedureRels.map(r => r.from_id === savedId ? r.to_id : r.from_id))
-  const visibleProcedureResults = addTargetType === 'procedure'
-    ? addResults.filter(r => !linkedProcedureIds.has(r.id))
-    : []
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
   const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
   const isDraftStatus = status === 'draft'
@@ -1754,11 +1946,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div className="record-toolbar">
-        <div className="record-title">{title}</div>
+    <div className={quickCreate ? 'quick-create-form' : undefined} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className={`record-toolbar${quickCreate ? ' quick-create-toolbar' : ''}`}>
+        {!quickCreate && <div className="record-title">{title}</div>}
         <div className="record-actions">
-          <div className="record-status" role="group" aria-label="Status">
+          {!quickCreate && <div className="record-status" role="group" aria-label="Status">
             {statusOptions.map(s => (
               <button key={s} onClick={() => { setStatus(s); setIsDirty(true) }}
                 aria-pressed={status === s}
@@ -1769,7 +1961,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 {statusLabels[s]}
               </button>
             ))}
-          </div>
+          </div>}
           {!isNew && recordType !== 'procedure' && loadedStatus === 'public' && (
             <a
               className="btn gh"
@@ -1782,14 +1974,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             </a>
           )}
           <button className="btn gh" onClick={() => {
+            if (quickCreate) { onBack?.(); return }
             if (isDirty && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
             onBack?.()
           }} disabled={saving}>
-            {justCreated ? 'Zur Liste' : 'Verwerfen'}
+            {quickCreate ? 'Abbrechen' : justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
           {!justCreated && (
             <button className="btn pri" onClick={handleSave} disabled={saving}>
-              {saving ? 'Speichert…' : 'Speichern'}
+              {saving ? 'Speichert…' : quickCreate ? 'Entwurf anlegen und verknüpfen' : 'Speichern'}
             </button>
           )}
         </div>
@@ -1879,7 +2072,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       className="fld"
                       value={subtype}
                       onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
-                      disabled={justCreated}
+                      disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
                       <option value="">— Vorgangstyp wählen —</option>
@@ -1900,7 +2093,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       className="fld"
                       value={subtype}
                       onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
-                      disabled={justCreated}
+                      disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
                       <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
@@ -2130,11 +2323,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               ))}
                             </div>
                             <RelationInput
-                              targetType={(f.settings?.target_type as string) ?? ''}
+                              targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
                               relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
                               onAdd={entry => addRelationEntry(f.name, entry)}
                               disabled={justCreated}
+                              allowCreate={!quickCreate}
                             />
                           </>
                         ) : (
@@ -2148,11 +2342,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             )}
                             {!val && (
                               <RelationInput
-                                targetType={(f.settings?.target_type as string) ?? ''}
+                                targetType={(f.settings?.target_type as RecordType) ?? ''}
                                 targetSubtype={f.settings?.target_subtype as string | undefined}
                                 relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
                                 onAdd={entry => setField(f.name, entry)}
                                 disabled={justCreated}
+                                allowCreate={!quickCreate}
                               />
                             )}
                           </>
@@ -2491,9 +2686,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         onClick={() => {
                           setAddTargetType('procedure')
                           setAddProcedureOpen(true)
-                          setAddSearchQ('')
-                          setAddSelected(null)
-                          setAddResults([])
                         }}
                       >
                         <Plus size={12} /> Hinzufügen
@@ -2525,39 +2717,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     )}
                     {addProcedureOpen && (
                       <div style={{ borderTop: procedureRels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: procedureRels.length > 0 ? 12 : 0 }}>
-                        <div className="field" style={{ marginBottom: 8 }}>
-                          <div className="lbl">Vorgang suchen</div>
-                          <div style={{ position: 'relative' }}>
-                            <input
-                              className="fld"
-                              value={addTargetType === 'procedure' ? addSearchQ : ''}
-                              onFocus={() => setAddTargetType('procedure')}
-                              onChange={e => { setAddTargetType('procedure'); setAddSearchQ(e.target.value) }}
-                              placeholder="Vorgang suchen…"
-                              autoFocus
-                              aria-label="Vorgang suchen"
-                            />
-                            {addTargetType === 'procedure' && addSearchQ.trim().length >= 2 && (
-                              <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', border: '1px solid var(--border-s)', borderRadius: 6, background: '#fff', boxShadow: '0 10px 24px rgba(15, 23, 42, .12)', maxHeight: 180, overflowY: 'auto' }}>
-                                {addSearching ? (
-                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Suche…</div>
-                                ) : visibleProcedureResults.length > 0 ? (
-                                  visibleProcedureResults.map(r => (
-                                    <button key={r.id} className="btn gh" style={{ width: '100%', justifyContent: 'flex-start', border: 0, borderRadius: 0, borderBottom: '1px solid var(--border-s)', padding: '8px 10px', fontSize: 12 }} onClick={() => handleAddProcedureRelation(r)} disabled={addSaving}>
-                                      {r.title}
-                                    </button>
-                                  ))
-                                ) : addResults.length > 0 ? (
-                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Alle Treffer sind bereits verknüpft.</div>
-                                ) : (
-                                  <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-3)' }}>Keine Ergebnisse.</div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <RelationInput
+                          targetType="procedure"
+                          fixedRelationType="concerns"
+                          onAdd={entry => handleAddProcedureRelation({ id: entry.id, title: entry.label, record_type: 'procedure', status: 'draft', score: null })}
+                        />
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn gh sm" onClick={() => { setAddProcedureOpen(false); setAddSearchQ(''); setAddSelected(null); setAddResults([]) }}>
+                          <button className="btn gh sm" onClick={() => setAddProcedureOpen(false)}>
                             Abbrechen
                           </button>
                         </div>
@@ -2599,23 +2765,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     )}
                     <div className="field" style={{ marginBottom: 0 }}>
                       <div className="lbl">Objekt hinzufügen</div>
-                      <input
-                        className="fld"
-                        value={addTargetType === 'object' ? addSearchQ : ''}
-                        onFocus={() => setAddTargetType('object')}
-                        onChange={e => { setAddTargetType('object'); setAddSearchQ(e.target.value) }}
-                        placeholder="Suchbegriff (mind. 2 Zeichen)…"
+                      <RelationInput
+                        targetType="object"
+                        fixedRelationType="concerns"
+                        onAdd={entry => handleAddObjectRelation({ id: entry.id, title: entry.label, record_type: 'object', status: 'draft', score: null })}
                       />
-                      {addTargetType === 'object' && addSearching && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Suche…</div>}
-                      {addTargetType === 'object' && addResults.length > 0 && !addSearching && (
-                        <div style={{ border: '1px solid var(--border-s)', borderRadius: 4, marginTop: 4, maxHeight: 160, overflowY: 'auto' }}>
-                          {addResults.map(r => (
-                            <button key={r.id} className="btn gh" style={{ width: '100%', justifyContent: 'flex-start', borderRadius: 0, border: 0, borderBottom: '1px solid var(--border-s)', fontSize: 12 }} onClick={() => handleAddObjectRelation(r)} disabled={addSaving}>
-                              {r.title}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -2627,6 +2781,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     <span>Beziehungen</span>
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}
                     <div className="grow" />
+                    {canManageContent && !genericAddOpen && savedId && (
+                      <button className="btn sm gh" onClick={() => setGenericAddOpen(true)}><Plus size={12} /> Beziehung hinzufügen</button>
+                    )}
                   </div>
                   <div className="bd">
                     {otherRels.length > 0 && (
@@ -2690,6 +2847,27 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     )}
                     {otherRels.length === 0 && (
                       <div className="empty" style={{ padding: '16px 0' }}>Noch keine Relationen.</div>
+                    )}
+                    {genericAddOpen && (
+                      <div className="generic-relation-picker">
+                        <div className="lbl">1&nbsp; Zieltyp</div>
+                        <select
+                          className="fld"
+                          value={addTargetType}
+                          onChange={e => setAddTargetType(e.target.value as RecordType)}
+                          aria-label="Zieltyp"
+                        >
+                          {(Object.keys(TYPE_LABELS) as RecordType[]).map(type => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
+                        </select>
+                        <div className="lbl" style={{ marginTop: 10 }}>2–3&nbsp; Relationstyp und Datensatz</div>
+                        <RelationInput
+                          key={addTargetType}
+                          targetType={addTargetType}
+                          relTypeVocabId={relTypeVocabId}
+                          onAdd={handleAddGenericRelation}
+                        />
+                        <button className="btn gh sm" onClick={() => setGenericAddOpen(false)}>Abbrechen</button>
+                      </div>
                     )}
                   </div>
                 </div>

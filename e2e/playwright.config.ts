@@ -18,7 +18,7 @@ export default defineConfig({
         ? 'alembic -c migrations/alembic.ini upgrade head && DEBUG=true python -m uvicorn katalon.main:app --host 127.0.0.1 --port 8000'
         : 'docker compose -f docker-compose.yml -f docker-compose.dev.yml up api',
       cwd: isCI ? '../backend' : '..',
-      url: 'http://localhost:8000/openapi.json',
+      url: 'http://localhost:8000/api/openapi.json',
       timeout: 120_000,
       reuseExistingServer: !isCI,
     },

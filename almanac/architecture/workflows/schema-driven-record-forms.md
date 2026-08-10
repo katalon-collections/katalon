@@ -1,6 +1,6 @@
 ---
 title: "Schema Driven Record Forms"
-summary: "Admin record forms use the same React workflow for objects, entities, places, occurrences, and procedures, loading field definitions and record state before validating and saving metadata."
+summary: "Admin record forms use one schema-driven React workflow for full editing and draft quick creation across objects, entities, places, occurrences, and procedures."
 topics: [architecture, workflows, frontend, records, schema]
 sources:
   - id: screen-form
@@ -45,6 +45,9 @@ sources:
   - id: form-variants-tests
     type: file
     path: backend/tests/test_form_variants_validation.py
+  - id: relations-api
+    type: file
+    path: backend/src/katalon/api/v1/relations.py
   - id: changelog
     type: file
     path: CHANGELOG.md
@@ -74,13 +77,21 @@ Admins can configure multiple named form variants per record type and optional s
 
 Form variants must include every required field path that could block saving. The backend validates create and update requests by loading active top-level field definitions (`parent_id IS NULL`), rejecting unknown `field_names`, rejecting omitted required top-level fields, and treating a group as required when any active child field under that group is required [@form-variants-api] [@form-variants-tests]. The admin variant editor mirrors that invariant by preselecting required fields and groups for new variants and disabling their checkboxes with a "Pflicht" marker [@form-variants-screen]. This keeps `validate_metadata` from requiring a field or group child that the selected variant has hidden from the editor [@schema-service].
 
-## Feedback-Tracked Form Gaps
+## Embedded Field Behaviors
 
-Current forms render group sub-fields, relation fields, authority fields, and AI settings [@screen-form]. Authority reaches group child fields through the shared keyboard-accessible `AuthorityInput` [@schema-screen] [@screen-form] [@authority-input]. Eligible group child fields can also carry the existing `ai_config`: each rendered group instance gets its own AI action, sends that instance and its index as context, confirms before replacing a non-empty value, and writes the suggestion only into the local form state [@schema-screen] [@screen-form]. The relation side panel and schema relation inputs search and select existing records; they do not create the related record inline before linking it [@screen-form].
+Current forms render group sub-fields, relation fields, authority fields, and AI settings [@screen-form]. Authority reaches group child fields through the shared keyboard-accessible `AuthorityInput` [@schema-screen] [@screen-form] [@authority-input]. Eligible group child fields can also carry the existing `ai_config`: each rendered group instance gets its own AI action, sends that instance and its index as context, confirms before replacing a non-empty value, and writes the suggestion only into the local form state [@schema-screen] [@screen-form].
+
+Schema relation inputs use the shared relation picker for top-level, repeatable, and group sub-fields. The field definition fixes the target record type and can also set `target_subtype`; the picker applies that subtype to search and to inline creation [@screen-form] [@admin-client]. Choosing an existing record or creating a new one writes `{id, label, relation_type}` only to the source form's local metadata. The backend mirrors it into the relation table when that source record is later saved [@screen-form] [@relations-api].
+
+## Draft Quick Creation (#277)
+
+The relation picker can create any of the five record types in a native modal dialog without unmounting the source form. The dialog renders `ScreenForm` in quick-create mode, so it retains the target type's scalar fields, schema fields, subtype selector, and active form variant. It always creates a `draft`; status controls, media, audit history, snapshots, relation panels, and nested quick creation are omitted [@screen-form].
+
+A configured `target_subtype` is preselected and locked. Otherwise the form selects the default subtype when one exists and leaves the subtype selector available. Procedure quick creation uses the six fixed procedure types rather than record subtypes [@screen-form]. The dialog keeps its own dirty state for discard confirmation, and closing it restores focus without changing the source form [@screen-form].
 
 ## Validation And Save
 
-Validation runs before each save. `ScreenForm` treats missing `idno`, missing required subtype, and missing required metadata as warnings while the record is still a draft, but as errors for non-draft statuses [@screen-form]. It also validates date, number, text regex, repeatable values, and required group children on the client [@screen-form].
+Validation runs before each save. Ordinary draft forms treat missing `idno`, subtype, and required metadata as warnings, while non-draft statuses treat them as errors. Quick creation adds a structural check for an Entity subtype and for any locked `target_subtype` [@screen-form]. The form also validates date, number, text regex, repeatable values, and required group children on the client [@screen-form].
 
 The save payload always sends `status` and `metadata_`, then adds the scalars relevant to the active record type [@screen-form]. New records call `create`; existing records call `update` with the loaded `version`, which the API client sends as `If-Match` [@screen-form] [@admin-client]. The backend object, entity, and procedure endpoints then prepare and validate metadata, increment `version` on updates, synchronize schema relations, write audit entries, and re-index records [@objects-api] [@entities-api] [@procedures-api].
 
@@ -88,7 +99,7 @@ If the backend reports an optimistic-locking conflict, the form fetches the curr
 
 ## Related Panels
 
-Existing records load both incoming and outgoing generic relations, fetch display titles for related records, and let users add or remove relations from the form side panel [@screen-form]. Procedure forms can add related objects; object forms can show linked procedures and add procedure relations [@screen-form].
+Existing records load both incoming and outgoing generic relations, fetch display titles for related records, and let users add or remove relations from the form side panel [@screen-form]. Its add flow first chooses one of the five target types, then a relation type and target record. A newly created draft is linked immediately through the relation API; if linking fails, the picker keeps the draft selected and offers a retry [@screen-form] [@relations-api]. Procedure forms can add related objects, and object forms can add procedures through the same picker with the fixed relation type `concerns` [@screen-form].
 
 Snapshots and audit history are part of the same editing surface. The form loads snapshot lists and audit entries for saved records, can create and restore snapshots through the record API module, and can show audit entries without leaving the edit screen [@screen-form] [@admin-client]. Those persistence details are covered in [Audit And Snapshots](audit-and-snapshots).
 

@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-10
+
+### Added
+- Verknüpfte Objects, Entities, Places, Occurrences und Procedures lassen sich direkt aus Relationsfeldern und dem allgemeinen Beziehungen-Panel als Entwurf anlegen und automatisch verknüpfen (#277).
+- Schema-gesteuerte Schnellanlage mit Formularvarianten, konfigurierbaren beziehungsweise festen Subtypen, responsivem Dialog und Fokus-Rückgabe.
+- Playwright-Abdeckung für Draft-Anlage, gleichartige Object-Relation, Tastaturfokus und mobile Bedienung.
+
+### Changed
+- Cataloger können die für neue Datensätze benötigten Subtypen und ID-Nr.-Vorschläge lesen; schreibende Endpunkte bleiben durch `manage_content` geschützt.
+- Backend-Integrationstests isolieren Rate-Limit-Zähler und Elasticsearch-Startup, sodass die Suite ohne externes Elasticsearch reproduzierbar läuft.
+
+### Fixed
+- Playwright wartet auf den tatsächlichen OpenAPI-Endpunkt `/api/openapi.json`.
+
 ## [0.7.8] - 2026-08-06
 
 ### Fixed

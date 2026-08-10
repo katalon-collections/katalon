@@ -35,7 +35,7 @@ Katalon's test surface is strongest around backend services and API contracts, l
 
 `backend/tests/` contains unit-style and service/API tests for AI, authority adapters, banners, Cantaloupe integration, cleanup tasks, enqueue behavior, first-run initialization, health, identifier services, importer service, media tasks and uploads, OAI-PMH, optimistic locking, pages, PIDs, rate limiting, relations, schema service, search visibility, security policies, subtypes, users, vocabulary import, XML format, and XML security [@backend-tests].
 
-The integration subset lives under `backend/tests/integration/` and covers auth, objects, procedures, schema container fields, and vocabulary term fields [@backend-tests]. Integration fixtures start a PostGIS testcontainer, run Alembic migrations against it, replace Celery's broker/backend with in-memory settings, reload app/config/database modules per test app, skip Cantaloupe health, and provide authenticated `httpx` clients [@integration-conftest].
+The integration subset lives under `backend/tests/integration/` and covers auth, objects, procedures, schema container fields, and vocabulary term fields [@backend-tests]. Integration fixtures start a PostGIS testcontainer, run Alembic migrations against it, replace Celery's broker/backend with in-memory settings, reload app/config/database modules per test app, reset SlowAPI's process-global counters, skip Cantaloupe health and Elasticsearch index setup, and provide authenticated `httpx` clients [@integration-conftest]. This keeps test isolation independent of request order and does not require external Cantaloupe or Elasticsearch services.
 
 ## Backend CI
 
