@@ -15,6 +15,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] URL-Layout gewählt (Subdomain oder Subpfad, → Abschnitt 4)
 - [ ] TLS-Zertifikate ausgestellt
 - [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `KATALON_BASE_URL`, `CORS_ORIGINS`
+- [ ] `MEDIA_ROOT`-Host-Verzeichnis existiert und gehört UID/GID `1000` (`mkdir -p /srv/katalon/media && chown -R 1000:1000 /srv/katalon/media`) — `api`- und `worker`-Container laufen als nicht-root User `app` (UID 1000)
 - [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
 - [ ] `docker-compose.prod.yml` VITE-Build-Argumente auf eigene URLs gesetzt
 - [ ] Wikidata-Adapter: `WIKIDATA_USER_AGENT` setzen oder `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL` vollständig pflegen (Wikidata-Policy erfordert identifizierbaren User-Agent)
@@ -414,6 +415,14 @@ Prüfe, ob das Volume `media_data` vom API-Container schreibbar ist:
 
 ```bash
 docker compose exec api ls -la /var/lib/katalon/media/
+```
+
+`api` und `worker` laufen als nicht-root User `app` (UID 1000). Ist das
+Host-Verzeichnis hinter `MEDIA_ROOT` nicht für UID 1000 schreibbar, schlagen
+Uploads mit `PermissionError` fehl:
+
+```bash
+sudo chown -R 1000:1000 "${MEDIA_ROOT:-/srv/katalon/media}"
 ```
 
 ### Images nach Update nicht aktuell
