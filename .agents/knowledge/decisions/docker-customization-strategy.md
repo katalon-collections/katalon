@@ -8,12 +8,11 @@ timestamp: 2026-05-08T17:50:29Z
 
 # Kontext
 
-CollectiveAccess löst Instanz-Anpassung über PHP-Theme-Overlays,
-InvenioRDM über Python-Entry-Points. Katalons Docker-first
-Deployment-Modell (siehe [Tech-Stack](tech-stack.md)) braucht dafür
-einen eigenen Mechanismus, weil Docker-Updates atomar sind — eigene
-Anpassungen müssen ein Image-Update überleben können, ohne dass Nutzer
-ihr eigenes Image bauen müssen (Issue #105).
+Katalons Docker-first Deployment-Modell (siehe [Tech-Stack](tech-stack.md))
+braucht einen eigenen Mechanismus für Instanz-Anpassung, weil
+Docker-Updates atomar sind — eigene Anpassungen müssen ein
+Image-Update überleben können, ohne dass Nutzer ihr eigenes Image
+bauen müssen (Issue #105).
 
 # Entscheidung
 

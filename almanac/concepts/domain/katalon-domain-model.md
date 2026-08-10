@@ -17,7 +17,7 @@ sources:
     path: docs/00_architektur.md
 ---
 
-Katalon is a GLAM metadata management system for institutions that need configurable collection records rather than a fixed library or repository schema. It takes the configurable metadata idea associated with CollectiveAccess and reworks it as a Python and React system with a REST API, two frontends, PostgreSQL/PostGIS storage, Elasticsearch search, and IIIF media delivery [@concept]. The rest of the wiki uses this page as the domain frame for [Primary Record Types](primary-record-types), [System Overview](../../architecture/system/system-overview), and the [Technology Stack](../../decisions/platform/technology-stack).
+Katalon is a GLAM metadata management system for institutions that need configurable collection records rather than a fixed library or repository schema. It implements configuration-over-coding metadata as a Python and React system with a REST API, two frontends, PostgreSQL/PostGIS storage, Elasticsearch search, and IIIF media delivery [@concept]. The rest of the wiki uses this page as the domain frame for [Primary Record Types](primary-record-types), [System Overview](../../architecture/system/system-overview), and the [Technology Stack](../../decisions/platform/technology-stack).
 
 ## What Katalon Models
 
@@ -25,11 +25,11 @@ Katalon models collection knowledge for galleries, libraries, archives, and muse
 
 The system is explicitly not a classic library system and does not adopt MARC, copy circulation, or Z39.50 as its model. It is also not an institutional repository centered on deposit workflows, embargoes, and DOI minting [@concept]. That boundary keeps the domain vocabulary focused on collection objects and the contextual records around them.
 
-## CollectiveAccess Lineage
+## Design Direction
 
-CollectiveAccess is the main product ancestor in the repository documentation. Katalon keeps the useful part: configuration over coding for heterogeneous collection metadata [@readme]. It rejects the parts that make CollectiveAccess hard to maintain in this project context: monolithic PHP, XML-heavy configuration, and missing modern API and Python integration [@concept].
+Katalon's core commitment is configuration over coding for heterogeneous collection metadata [@readme]: schema changes happen through the UI, not through config files or code changes [@concept].
 
-That lineage explains why Katalon has a broad record vocabulary instead of one generic item table. The domain needs physical or digital artefacts, actors, places, and abstract events or works to remain distinct enough for users and queries, while still allowing configurable fields and relations across them [@concept].
+That commitment explains why Katalon has a broad record vocabulary instead of one generic item table. The domain needs physical or digital artefacts, actors, places, and abstract events or works to remain distinct enough for users and queries, while still allowing configurable fields and relations across them [@concept].
 
 ## Headless Shape
 

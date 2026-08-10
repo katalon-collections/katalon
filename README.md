@@ -4,15 +4,15 @@
 
 Turn-key Open-Source Metadata Management System (MMS) für den GLAM-Sektor — Galerien, Bibliotheken, Archive, Museen.
 
-Katalon ist ein moderner Python/React-Rewrite der Kernfunktionalitäten von [CollectiveAccess](https://collectiveaccess.org). Es vereint die bewährte Flexibilität dynamischer Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
+Katalon verbindet flexible, dynamische Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
 
 ---
 
 ## Was ist Katalon?
 
-Sammlungsverantwortliche stehen vor der Herausforderung, heterogene Bestände mit individuellen Metadatenfeldern zu erfassen, zu verknüpfen und der Öffentlichkeit zugänglich zu machen. Etablierte Systeme wie CollectiveAccess haben bewiesen, dass *Configuration over Coding* der richtige Ansatz ist — leiden aber unter monolithischer Legacy-Architektur, komplexer XML-Konfiguration und fehlender API für moderne Frontends.
+Sammlungsverantwortliche stehen vor der Herausforderung, heterogene Bestände mit individuellen Metadatenfeldern zu erfassen, zu verknüpfen und der Öffentlichkeit zugänglich zu machen. Katalon setzt dabei auf *Configuration over Coding*: Schemata werden konfiguriert statt programmiert.
 
-Katalon überführt diese Flexibilität in eine moderne Stack:
+Katalon baut auf einem modernen Stack:
 
 - **Dynamische Schemata** — Jedes Feld pro Typ konfigurierbar, wiederholbar, mehrsprachig
 - **Kontrollierte Vokabulare** — Hierarchische Begriffssysteme mit Import aus CSV/JSON

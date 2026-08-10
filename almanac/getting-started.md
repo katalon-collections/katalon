@@ -18,7 +18,7 @@ Katalon is an open-source metadata management system for GLAM collections. The p
 
 ## First Reading Path
 
-Read [Katalon Domain Model](concepts/domain/katalon-domain-model) first when the task involves product meaning, record vocabulary, or CollectiveAccess comparisons. Katalon is built around configurable metadata for collection objects, people or organizations, places, and occurrences, with Procedures as a separate process type for loans, acquisition, and conservation [@concept].
+Read [Katalon Domain Model](concepts/domain/katalon-domain-model) first when the task involves product meaning or record vocabulary. Katalon is built around configurable metadata for collection objects, people or organizations, places, and occurrences, with Procedures as a separate process type for loans, acquisition, and conservation [@concept].
 
 Read [System Overview](architecture/system/system-overview) next when the task touches runtime shape. The deployed system uses a FastAPI backend, PostgreSQL/PostGIS, Elasticsearch, Redis and Celery, Cantaloupe, nginx, and two React/Vite frontends [@readme].
 

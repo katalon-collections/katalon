@@ -8,10 +8,10 @@ timestamp: 2026-07-09T00:00:00Z
 
 # Kontext
 
-CollectiveAccess modelliert Bestandsobjekte über ein generisches
-Intrinsic-/Attribute-System mit einer zentralen Tabelle und viel
-XML-Konfiguration. Katalon ersetzt das durch vier fachlich getrennte
-primäre Typen.
+Ein generisches Intrinsic-/Attribute-System mit einer zentralen Tabelle
+für alle Bestandsobjekte macht Datenbank-Constraints und Abfragen
+unnötig kompliziert. Katalon setzt stattdessen auf vier fachlich
+getrennte primäre Typen.
 
 # Entscheidung
 

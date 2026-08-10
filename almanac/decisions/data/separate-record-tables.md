@@ -18,7 +18,7 @@ Katalon intentionally stores its four primary inventory families in four tables:
 
 ## Context
 
-Katalon replaces a CollectiveAccess-style model with many configurable attributes and high setup complexity [@decision]. The product still needs dynamic metadata, but it also needs clear domain families for artefacts, people and organizations, places, and works or events [@data-doc]. A single generic table would make those families uniform in storage, but it would hide differences that the system already treats as meaningful.
+A single generic records table with many configurable attributes brings high setup complexity [@decision]. The product still needs dynamic metadata, but it also needs clear domain families for artefacts, people and organizations, places, and works or events [@data-doc]. A single generic table would make those families uniform in storage, but it would hide differences that the system already treats as meaningful.
 
 Places are the clearest pressure against a generic table. The current `Place` model has a PostGIS `POINT` geometry column with SRID 4326 and a GiST index, while the other inventory types do not [@models]. That is hard to model cleanly when every record is only a row in one table with all domain detail buried in attributes.
 

@@ -39,11 +39,12 @@ Do not write pages that restate nearby code.
 
 ## Maintenance Boundary
 
-During ordinary implementation work, agents use this wiki as a context source
-and keep `almanac/` read-only. Wiki source changes belong to explicit
-CodeAlmanac maintenance workflows such as Ingest and Garden, which are defined
-as wiki-update operations rather than application implementation work
-[@ingest-manual] [@garden-manual].
+Before implementation work, agents use this wiki as a context source and check
+planned changes against the relevant pages [@claude]. After implementation work
+changes documented behavior, workflows, or architecture, agents update the
+affected `almanac/` pages and verify them against the actual code [@claude].
+Explicit CodeAlmanac maintenance workflows such as Ingest and Garden can also
+edit wiki source as their main task [@ingest-manual] [@garden-manual].
 
 Architecture decisions made during normal development are recorded first in
 `.agents/knowledge/decisions/` under the project instruction process, not by

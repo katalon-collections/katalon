@@ -6,6 +6,24 @@ sources:
   - id: agents
     type: file
     path: AGENTS.md
+  - id: backend-pyproject
+    type: file
+    path: backend/pyproject.toml
+  - id: compose
+    type: file
+    path: docker-compose.yml
+  - id: dev-compose
+    type: file
+    path: docker-compose.dev.yml
+  - id: prod-compose
+    type: file
+    path: docker-compose.prod.yml
+  - id: admin-package
+    type: file
+    path: frontend/admin/package.json
+  - id: portal-package
+    type: file
+    path: frontend/portal/package.json
   - id: gotcha-vite
     type: file
     path: .agents/knowledge/gotchas/vite-base-path.md
@@ -17,7 +35,7 @@ sources:
     path: .agents/knowledge/gotchas/pytest-secrets-key.md
 ---
 
-Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
+Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
 
 ## Ports And Stack Choice
 
@@ -51,3 +69,9 @@ The CI backend workflow sets the same environment variable globally, but local s
 ## Database Volumes
 
 Do not run `docker compose down -v`, delete database volumes, or recreate database storage as a repair shortcut without explicit approval [@agents]. The required sequence for database problems is to read container logs, identify the root cause, present options, and act only after approval [@agents].
+
+## Code-Level Rebranding
+
+A code-level rename from `katalon` is not a text-only documentation pass. The name is embedded in the Python package and CLI entry point, Compose commands and defaults, container media paths, database defaults, environment variable names, and frontend package names [@backend-pyproject] [@compose] [@dev-compose] [@prod-compose] [@admin-package] [@portal-package].
+
+Before such a rename, separate source-code/package changes from deployed-state migration. Existing database names, Compose volumes, host media paths, `.env` values, and any production backup paths may be live state; do not fold them into a blind search-and-replace or volume reset [@compose] [@agents].

@@ -24,7 +24,7 @@ Katalon uses a fixed platform stack instead of selecting infrastructure per feat
 
 ## Context
 
-Katalon is a Python and React rewrite of CollectiveAccess for GLAM metadata management. The project context names the problems being replaced: a PHP monolith, XML configuration, no clean API for modern frontends, and weak Python/data-science integration [@agents]. The README repeats the same product direction and presents Katalon as an API-backed MMS with dynamic schemas, controlled vocabularies, entity relations, IIIF, search, and theming [@readme].
+Katalon is a Python and React metadata management system for GLAM collections. The project context sets its design goals: schema configuration through the UI instead of config files, a clean API for modern frontends, and native Python/data-science integration [@agents]. The README repeats the same product direction and presents Katalon as an API-backed MMS with dynamic schemas, controlled vocabularies, entity relations, IIIF, search, and theming [@readme].
 
 The stack decision was made as a package at project start, not as a series of unrelated component decisions [@decision]. That matters because each choice constrains the others. Dynamic fields need JSONB storage, places need PostGIS, rich public discovery needs Elasticsearch, media delivery needs IIIF infrastructure, and two different user surfaces need separate frontends.
 

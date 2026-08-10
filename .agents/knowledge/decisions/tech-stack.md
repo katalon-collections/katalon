@@ -8,11 +8,10 @@ timestamp: 2026-07-09T00:00:00Z
 
 # Kontext
 
-Katalon ist ein Python/React-Rewrite von CollectiveAccess (PHP-Monolith,
-XML-Konfiguration, keine saubere API, keine Python/Datenscience-
-Integration). Der Stack wurde als zusammenhängendes Paket am
-Projektstart entschieden, nicht Komponente für Komponente einzeln
-debattiert.
+Katalon braucht dynamische Schema-Konfiguration über eine Oberfläche,
+eine saubere REST-API und Python/Datenscience-Integration. Der Stack
+wurde als zusammenhängendes Paket am Projektstart entschieden, nicht
+Komponente für Komponente einzeln debattiert.
 
 # Entscheidung
 

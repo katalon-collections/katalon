@@ -2,14 +2,13 @@
 
 ## Was ist dieses Projekt?
 
-Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galleries, Libraries, Archives, Museums). Es ist ein moderner Python/React-Rewrite der Kernfunktionalitäten von **CollectiveAccess** (PHP-Monolith mit XML-Konfiguration).
+Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galleries, Libraries, Archives, Museums), gebaut mit Python/FastAPI-Backend und React-Frontends.
 
-**Kernproblem von CollectiveAccess, das gelöst wird:**
+**Design-Ziele:**
 
-- Monolithisches PHP, schwer wartbar
-- XML-Konfiguration mit hoher Einstiegshürde
-- Keine saubere API für moderne Frontends
-- Keine Python/Datenscience-Integration
+- Schema-Konfiguration über die Oberfläche statt über Konfigurationsdateien
+- Saubere REST-API für moderne Frontends und Integrationen
+- Native Python/Datenscience-Integration
 
 ## Dateien in diesem Verzeichnis
 

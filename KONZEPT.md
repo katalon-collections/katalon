@@ -9,14 +9,7 @@
 
 Katalon ist eine **Sammlungsdatenbank** für Galerien, Bibliotheken, Archive und Museen (GLAM). Das Kernversprechen: frei konfigurierbare Metadaten für physische und digitale Sammlungsobjekte, Personen, Orte und Ereignisse — mit einem öffentlichen Discovery-Portal und einer sauberen REST-API.
 
-Der direkte Vorläufer ist **CollectiveAccess**, das über Jahrzehnte bewiesen hat, dass ein flexibles Metadatenschema (*Configuration over Coding*) der richtige Ansatz ist. Dennoch leidet es unter massiver Legacy-Last:
-
-- Monolithische PHP-Architektur, schwer wartbar und erweiterbar
-- Komplexe XML-Konfigurationen mit hoher Einstiegshürde
-- Schlechte API – keine moderne Frontend-Integration möglich
-- Keine native Python/Datenscience-Integration
-
-**Katalon** überführt die Flexibilität in Python + React: dynamische Schemata, kontrollierte Vokabulare, Entitätsrelationen – aber mit einer sauberen REST-API, zwei React-Frontends und einer modernen Deployment-Infrastruktur.
+**Katalon** setzt auf *Configuration over Coding*: dynamische Schemata, kontrollierte Vokabulare, Entitätsrelationen, umgesetzt in Python + React mit einer sauberen REST-API, zwei React-Frontends und einer modernen Deployment-Infrastruktur.
 
 ### Was Katalon nicht ist
 
@@ -96,7 +89,7 @@ Vorgänge werden als separater fünfter Typ geführt und decken Leihverkehr, Erw
 
 ### Zur Herkunft des Begriffs „Occurrence"
 
-„Occurrence" ist dem System **CollectiveAccess** entlehnt, wo es als Sammelbegriff für alles gilt, das kein Objekt, keine Entität und kein Ort ist. Es ist kein Industriestandard — der internationale Referenzrahmen **CIDOC-CRM** (ISO 21127) nennt das entsprechende Konzept *E5 Event*, kommerzielle Systeme wie Axiell/EMu verwenden ebenfalls „Event".
+„Occurrence" ist als Sammelbegriff für alles gewählt, das kein Objekt, keine Entität und kein Ort ist. Es ist kein Industriestandard — der internationale Referenzrahmen **CIDOC-CRM** (ISO 21127) nennt das entsprechende Konzept *E5 Event*, kommerzielle Systeme wie Axiell/EMu verwenden ebenfalls „Event".
 
 „Event" wäre intuitiver, aber zu eng: Eine Ausstellung ist ein Ereignis, ein abstraktes Werk im Sinne der *Functional Requirements for Bibliographic Records* (FRBR) — also „Beethovens 9. Sinfonie" als intellektuelle Schöpfung unabhängig von Aufnahmen oder Noten — ist keins. Dafür kennt CIDOC-CRM eine eigene Klasse (*E28 Conceptual Object*). Katalon fasst beides unter Occurrence zusammen.
 

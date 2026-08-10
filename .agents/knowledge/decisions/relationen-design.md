@@ -8,9 +8,9 @@ timestamp: 2026-06-26T00:00:00Z
 
 # Kontext
 
-CollectiveAccess bindet Relationen oft an feste Stellen in der
-Eingabemaske. Für Katalon standen zwei Optionen zur Wahl (Issue #159,
-weiterentwickelt in einer späteren Session zur CollectiveAccess-
+Relationen fest an Stellen in der Eingabemaske zu binden schränkt die
+Verknüpfbarkeit unnötig ein. Für Katalon standen zwei Optionen zur
+Wahl (Issue #159, weiterentwickelt in einer späteren Session zur
 Relationsschnittstelle):
 
 - **Option A**: Relationen nur dort möglich, wo die Feldkonfiguration
@@ -51,4 +51,4 @@ Einklang mit der Schema-Engine-Philosophie des Projekts.
 # Citations
 
 [1] GitHub Issue #159 "feat: relation field — entity/type picker with vocabulary-based relation types"
-[2] Session-Entscheidung 2026-06-26: "CollectiveAccess Relation Interface Design: Flexibility-First Approach"
+[2] Session-Entscheidung 2026-06-26: "Relation Interface Design: Flexibility-First Approach"
