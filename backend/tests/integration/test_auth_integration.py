@@ -1,5 +1,7 @@
 import pytest
 
+from katalon.core.limiter import limiter
+
 
 @pytest.mark.asyncio
 async def test_login_returns_jwt_and_allows_me(async_client) -> None:
@@ -62,3 +64,21 @@ async def test_refresh_token_cannot_access_protected_endpoint(async_client) -> N
     me = await async_client.get("/v1/users/me", headers={"Authorization": f"Bearer {refresh_token}"})
 
     assert me.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limited_after_threshold(async_client) -> None:
+    limiter.reset()
+
+    for _ in range(10):
+        response = await async_client.post(
+            "/v1/auth/token",
+            data={"username": "admin@katalon.dev", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+
+    response = await async_client.post(
+        "/v1/auth/token",
+        data={"username": "admin@katalon.dev", "password": "wrong-password"},
+    )
+    assert response.status_code == 429

@@ -3,13 +3,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
+from katalon.core.limiter import limiter
 from katalon.core.models import User
 from katalon.core.schemas import RefreshTokenRequest, Token
 from katalon.database import get_db
@@ -72,7 +73,10 @@ def issue_token_pair(user: User) -> Token:
         401: {"description": "Invalid credentials"},
     },
 )
-async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep) -> Token:
+@limiter.limit("10/minute")
+async def login(
+    request: Request, form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
+) -> Token:
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(form.password, user.hashed_password):
@@ -94,7 +98,8 @@ async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
         401: {"description": "Invalid or expired refresh token"},
     },
 )
-async def refresh_token(data: RefreshTokenRequest, db: DBDep) -> Token:
+@limiter.limit("20/minute")
+async def refresh_token(request: Request, data: RefreshTokenRequest, db: DBDep) -> Token:
     try:
         payload = jwt.decode(data.refresh_token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
