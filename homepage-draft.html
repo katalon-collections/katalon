@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Katalon: Bestandsverwaltung für Museen, Archive und Sammlungen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<style>
+  header.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem var(--pico-spacing);
+    border-bottom: 1px solid var(--pico-muted-border-color);
+  }
+  header.site-header .logo { font-size: 1.4rem; font-weight: bold; margin: 0; }
+  header.site-header nav ul { display: flex; gap: 1.5rem; margin: 0; list-style: none; }
+  header.site-header nav a { text-decoration: none; }
+
+  #hero { text-align: center; padding: 4rem 0 3rem; }
+  #hero h1 { font-size: 2.2rem; max-width: 40rem; margin: 0 auto 1rem; }
+  #hero p { max-width: 36rem; margin: 0 auto 1.5rem; font-size: 1.1rem; }
+  .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1.5rem;
+  }
+  .feature-grid article { margin: 0; }
+  .feature-grid h3 { margin-bottom: 0.4rem; }
+
+  dl.types-list {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 0.5rem 1rem;
+  }
+  dl.types-list dt { font-weight: bold; }
+  dl.types-list dd { margin: 0; }
+
+  section { padding: 3rem 0; }
+  section#tech { background: var(--pico-card-background-color); border-radius: var(--pico-border-radius); padding: 2rem; }
+
+  footer.site-footer {
+    text-align: center;
+    padding: 2rem 0;
+    border-top: 1px solid var(--pico-muted-border-color);
+    color: var(--pico-muted-color);
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <p class="logo">Katalon</p>
+  <nav>
+    <ul>
+      <li><a href="#funktionen">Funktionen</a></li>
+      <li><a href="#bestandstypen">Datenmodell</a></li>
+      <li><a href="#roadmap">Stand</a></li>
+      <li><a href="#start">Selbst hosten</a></li>
+      <li><a href="https://github.com/karkraeg/katalon">GitHub</a></li>
+    </ul>
+  </nav>
+  <a role="button" href="#demo">Demo ansehen</a>
+</header>
+
+<main class="container">
+
+  <!-- HERO -->
+  <section id="hero">
+    <h1>Sammlungen erfassen, verknüpfen und veröffentlichen, ohne sich mit XML-Dateien herumzuschlagen</h1>
+    <p>
+      Katalon ist eine offene Software für Museen, Archive und Sammlungen.
+      Objekte, Personen, Orte und Werke erfassen, mit Normdaten verknüpfen,
+      mit IIIF-Bildern versehen und im eigenen Online-Portal veröffentlichen.
+      Schemata legst du in der Oberfläche fest, nicht in Konfigurationsdateien.
+    </p>
+    <div class="hero-cta">
+      <a role="button" href="#demo">Live-Demo ansehen</a>
+      <a role="button" class="secondary" href="https://github.com/karkraeg/katalon">Quellcode auf GitHub</a>
+    </div>
+  </section>
+
+  <!-- PROBLEM -->
+  <section id="problem">
+    <h2>Warum Katalon</h2>
+    <p>
+      Sammlungen wachsen, Anforderungen ändern sich: neue Objektarten, neue
+      Felder, neue Verknüpfungen. Katalon bildet das direkt in der Oberfläche
+      ab, ohne Konfigurationsdateien und ohne Entwicklerhilfe für jede
+      Anpassung.
+    </p>
+    <ul>
+      <li>Neue Felder und Kategorien selbst anlegen, ohne Entwicklerhilfe</li>
+      <li>Bilder direkt im Browser zoomen, ohne separate Software</li>
+      <li>Bestehende Daten aus Excel, CSV oder XML importieren, mit Vorschau vor dem Import</li>
+    </ul>
+  </section>
+
+  <!-- DATENMODELL -->
+  <section id="bestandstypen">
+    <h2>Fünf Bestandstypen, ein System</h2>
+    <p>
+      Jeder Datensatz gehört zu einem von fünf Typen. Welche Felder er trägt,
+      legst du selbst fest.
+    </p>
+    <dl class="types-list">
+      <dt>Objekt</dt>
+      <dd>Fotos, Dokumente, Gemälde, digitale Artefakte</dd>
+      <dt>Person/Institution</dt>
+      <dd>Personen und Organisationen, verknüpft mit Normdaten wie GND</dd>
+      <dt>Ort</dt>
+      <dd>Geografische Orte mit Kartenanzeige im Portal</dd>
+      <dt>Werk/Ereignis</dt>
+      <dd>Werke, Ereignisse und Konzepte</dd>
+      <dt>Vorgang</dt>
+      <dd>Leihverkehr, Erwerbung, Restaurierung</dd>
+    </dl>
+    <p>
+      Alle fünf Typen lassen sich beliebig miteinander verknüpfen, jede
+      Verknüpfung kann eigene Angaben tragen, etwa eine Rolle oder ein Datum.
+    </p>
+  </section>
+
+  <!-- KERNFUNKTIONEN -->
+  <section id="funktionen">
+    <h2>Was Katalon mitbringt</h2>
+    <div class="feature-grid">
+
+      <article>
+        <h3>Eigene Felder anlegen</h3>
+        <p>Text, Zahl, Datum, Ort, Vokabular, Normdaten, Verknüpfung, verschachtelte
+        Gruppen. Reihenfolge per Drag-and-Drop, Pflichtfelder und mehrsprachige
+        Beschriftungen frei wählbar.</p>
+      </article>
+
+      <article>
+        <h3>Verknüpfungen</h3>
+        <p>Jeder Datensatz lässt sich mit jedem anderen verbinden, mit eigenen
+        Angaben zur Beziehung und passender Bezeichnung in beide Richtungen.</p>
+      </article>
+
+      <article>
+        <h3>Normdaten</h3>
+        <p>Direkter Abgleich mit GND, Geonames, VIAF, Wikidata, Getty TGN und
+        Iconclass. Weitere Quellen lassen sich als Plugin nachrüsten.</p>
+      </article>
+
+      <article>
+        <h3>Bilder zoomen</h3>
+        <p>Eingebauter IIIF-Bildserver: Objektfotos im Browser bis in Detailschärfe
+        vergrößern, ohne zusätzliche Software.</p>
+      </article>
+
+      <article>
+        <h3>Suche und Filter</h3>
+        <p>Volltextsuche mit Filtern, die du selbst festlegst. Neue Datensätze
+        sind sofort auffindbar.</p>
+      </article>
+
+      <article>
+        <h3>Import und Export</h3>
+        <p>Bestehende Daten aus CSV, Excel oder XML übernehmen, mit Vorschau und
+        Fehlerprüfung vor dem eigentlichen Import. Export über OAI-PMH.</p>
+      </article>
+
+      <article>
+        <h3>Rechte und Rollen</h3>
+        <p>Admin, Bearbeitung, nur Lesen. Jede Änderung an einem Datensatz wird
+        protokolliert und lässt sich nachvollziehen.</p>
+      </article>
+
+      <article>
+        <h3>Eigenes Erscheinungsbild</h3>
+        <p>Farben, Logo und Institutionsname im Portal anpassen, ohne dass
+        jemand die Software neu bauen muss.</p>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- DEMO -->
+  <section id="demo">
+    <h2>Demo</h2>
+    <p><!-- TODO: Screenshot/Screencast einfügen (Admin-Formular, Portal-Suche, IIIF-Viewer) --></p>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap">
+    <h2>Stand des Projekts</h2>
+    <p>
+      Kernfunktionen sind fertig: Datenmodell, eigene Felder, Rechte und Rollen,
+      Bilder und IIIF, Admin-Oberfläche, Suche, öffentliches Portal, Normdaten,
+      Import und OAI-PMH. In Arbeit: Absicherung für den Produktivbetrieb und
+      eine tiefere Verzahnung verknüpfter Datensätze in der Suche.
+    </p>
+    <p><a href="https://github.com/karkraeg/katalon/blob/main/.agents/IMPLEMENTIERUNGSPLAN.md">Vollständiger Phasenplan auf GitHub</a></p>
+  </section>
+
+  <!-- SELF-HOSTING -->
+  <section id="start">
+    <h2>Selbst hosten</h2>
+    <p>Katalon läuft über Docker Compose auf eigener Infrastruktur.</p>
+    <pre><code>git clone https://github.com/karkraeg/katalon.git
+cd katalon
+docker compose up -d</code></pre>
+    <p>Setup und Konfiguration: <a href="#">Dokumentation</a></p>
+  </section>
+
+  <!-- TECH STACK, für IT-Verantwortliche -->
+  <section id="tech">
+    <h2>Für IT-Verantwortliche</h2>
+    <p>Python-Backend (FastAPI), PostgreSQL mit PostGIS, Elasticsearch für die
+    Suche, Cantaloupe als IIIF-Bildserver, React-Oberflächen. Deployment über
+    Docker Compose, läuft auf eigener oder gehosteter Infrastruktur.</p>
+  </section>
+
+  <!-- COMMUNITY -->
+  <section id="community">
+    <h2>Mitmachen</h2>
+    <p>
+      Katalon ist Open Source. Fragen, Fehlermeldungen und Beiträge laufen über
+      GitHub.
+    </p>
+    <a href="https://github.com/karkraeg/katalon">Zum Repository</a>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Katalon. Lizenz: <!-- TODO: Lizenz eintragen, z. B. AGPL-3.0 --> [Lizenz]. Quellcode auf GitHub.</p>
+</footer>
+
+</body>
+</html>
