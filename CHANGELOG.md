@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-08-11
+
+### Changed
+- Almanac-Testing-Seiten aktualisiert (SHA-gepinnte GitHub Actions, Dependabot, Cantaloupe im E2E-Workflow) — dokumentiert bereits gemergten Stand aus 3d5dca7.
+
 ## [0.10.1] - 2026-08-11
 
 ### Fixed
