@@ -446,7 +446,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               set('name', e.target.value)
             }} disabled={!isNew} />
           </div>
-          <div className="field">
+          <div className="field" data-tour="field-type-select">
             <div className="lbl">Feldtyp</div>
             <select className="fld" value={form.field_type} onChange={e => set('field_type', e.target.value)}>
               {fieldTypes.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
@@ -1000,6 +1000,7 @@ export function ScreenSchema() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
+  const [dragId, setDragId] = useState<string | null>(null)
 
   const activeFieldIdRef = useRef<string | null>(null)
   activeFieldIdRef.current = activeFieldId
@@ -1161,6 +1162,43 @@ export function ScreenSchema() {
     }
   }
 
+  async function handleReorder(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return
+    const from = fields.findIndex(f => f.id === draggedId)
+    const to = fields.findIndex(f => f.id === targetId)
+    if (from === -1 || to === -1) return
+    const reordered = [...fields]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    setFields(reordered)
+    const changed = reordered.filter((f, i) => f.sort_order !== i)
+    try {
+      await Promise.all(changed.map(f => {
+        const newOrder = reordered.indexOf(f)
+        return schema.update(f.id, {
+          target_type: f.target_type,
+          target_subtype: f.target_subtype,
+          name: f.name,
+          label: f.label,
+          field_type: f.field_type,
+          is_required: f.is_required,
+          is_repeatable: f.is_repeatable,
+          is_searchable: f.is_searchable,
+          sort_order: newOrder,
+          settings: f.settings,
+          show_in_detail: f.show_in_detail,
+          show_in_list: f.show_in_list,
+          is_facet: f.is_facet,
+          parent_id: f.parent_id ?? null,
+        })
+      }))
+      loadFields()
+    } catch (e) {
+      alert((e as Error).message)
+      loadFields()
+    }
+  }
+
   async function handleDelete() {
     if (!activeFieldId || !window.confirm('Feld wirklich löschen?')) return
     setSaving(true)
@@ -1272,7 +1310,19 @@ export function ScreenSchema() {
                   {fields.map(f => {
                     const fieldLabel = getLabel(f, f.name)
                     return (
-                      <div key={f.id} className="field-row">
+                      <div
+                        key={f.id}
+                        className={`field-row${dragId === f.id ? ' dragging' : ''}`}
+                        draggable
+                        onDragStart={() => setDragId(f.id)}
+                        onDragEnd={() => setDragId(null)}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => {
+                          e.preventDefault()
+                          if (dragId) handleReorder(dragId, f.id)
+                          setDragId(null)
+                        }}
+                      >
                         <button className="field-row-main" onClick={() => openExisting(f)}>
                           <span className="gp" aria-hidden="true"><Grip size={14} /></span>
                           <span className="nm">{fieldLabel}</span>

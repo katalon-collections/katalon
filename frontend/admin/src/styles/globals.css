@@ -265,6 +265,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .schema-detail { overflow-y: auto; padding: 18px 24px 60px; }
 .field-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; margin-bottom: 6px; cursor: grab; }
 .field-row:hover { border-color: var(--fg-5); background: var(--panel-2); }
+.field-row.dragging { opacity: .4; }
 .field-row-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .field-row .gp { color: var(--fg-4); }
 .field-row .nm { font-weight: 500; font-size: 13px; flex: 1; }

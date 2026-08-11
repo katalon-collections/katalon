@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-11
+
+### Added
+- Felder im Schema-Editor per Drag & Drop umsortieren.
+
 ## [0.8.0] - 2026-08-10
 
 ### Added
