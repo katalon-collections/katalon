@@ -27,6 +27,9 @@ sources:
   - id: e2e-ci
     type: file
     path: .github/workflows/e2e.yml
+  - id: dependabot
+    type: file
+    path: .github/dependabot.yml
 ---
 
 Use this guide when validating Katalon changes before handing work back or before a commit. The backend has a pytest suite with separate integration tests, the Admin and Portal apps have TypeScript/Vite build checks, and the Playwright suite exercises a small set of Admin browser flows [@backend-project] [@admin-package] [@portal-package] [@e2e-tests]. The successful outcome is a check set matched to the changed surface, with known gaps recorded rather than assumed away.
@@ -51,7 +54,7 @@ pytest tests --ignore=tests/integration
 pytest tests/integration
 ```
 
-The backend GitHub workflow uses that same split: unit tests run first, integration tests run after them with Redis as a service [@backend-ci].
+The backend GitHub workflow uses that same split: unit tests run first, integration tests run after them with Redis as a service [@backend-ci]. Its third-party GitHub Actions are pinned to full commit SHAs with version comments; Dependabot is configured to open weekly `github-actions` updates so the pins do not have to be refreshed by hand [@backend-ci] [@dependabot].
 
 ## Check Frontend Builds
 
@@ -87,7 +90,7 @@ npm run test
 
 The Playwright config starts `docker compose up -d api` from the repository root and starts the Admin dev server on `127.0.0.1:5173`; its default `baseURL` is `http://localhost:5173`, unless `E2E_BASE_URL` is set [@e2e-config]. Existing E2E specs cover Admin login, object creation, image upload, and shared helpers [@e2e-tests].
 
-The E2E GitHub workflow is manual dispatch, not automatic on every push or pull request. It provisions PostGIS and Redis services, installs backend, Admin, and E2E dependencies, installs Chromium, then runs `npm run test` from `e2e` with database, Redis, media, and secrets environment variables [@e2e-ci].
+The E2E GitHub workflow is manual dispatch, not automatic on every push or pull request. It provisions PostGIS, Redis, and Cantaloupe services, installs backend, Admin, and E2E dependencies, installs Chromium, then runs `npm run test` from `e2e` with database, Redis, Cantaloupe, media, and secrets environment variables [@e2e-ci].
 
 ## Match Checks To Risk
 
