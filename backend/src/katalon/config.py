@@ -1,5 +1,8 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import json
+from typing import Annotated
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -47,12 +50,33 @@ class Settings(BaseSettings):
     ai_request_timeout_seconds: int = 60
 
     debug: bool = False
-    cors_origins: list[str] = [
+    # NoDecode: docker-compose/dotenv strippen Quotes in Umgebungswerten, wodurch
+    # das Default-JSON-Parsing von pydantic-settings scheitert. Stattdessen hier
+    # tolerant parsen: JSON-Array, gemangelte Variante ohne Quotes, oder
+    # kommagetrennte Liste.
+    cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        raw = v.strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                return [str(o).strip() for o in parsed if str(o).strip()]
+        return [o.strip().strip("[]") for o in raw.split(",") if o.strip().strip("[]")]
 
 
 

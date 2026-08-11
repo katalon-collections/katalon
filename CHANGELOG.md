@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-08-11
+
+### Added
+- Vokabular-Import-UI: Hilfetext erklärt hierarchischen Import (`parent_term` akzeptiert ID oder Label des Elternterms) und die Slug-Ableitung aus dem Label. (#256)
+
+### Fixed
+- Admin: Vokabular-Import-Dialog blockierte CSVs ohne gemappte ID-Spalte — jetzt reicht auch eine Label-Spalte (ID wird slugifiziert, siehe #259).
+- Backend: `CORS_ORIGINS` aus der Umgebung scheiterte am JSON-Parsing von pydantic-settings, sobald docker-compose/dotenv Quotes im Wert strippen — Container startete nicht mehr. `cors_origins` nutzt jetzt `NoDecode` + toleranten Validator (JSON-Array, Quote-lose Variante oder kommagetrennt).
+
 ## [0.10.3] - 2026-08-11
 
 ### Added

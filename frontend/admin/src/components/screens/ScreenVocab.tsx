@@ -372,11 +372,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
 
   const isCsvImport = importFile ? /\.(csv|tsv)$/i.test(importFile.name) : false
   const hasTermMapping = Object.values(mapping).includes('term')
+  const hasLabelMapping = Object.values(mapping).some(v => v.startsWith('label:'))
 
   async function runVocabularyImport(dryRun: boolean) {
     if (!activeVocab || !importFile) return
-    if (isCsvImport && !hasTermMapping) {
-      setImportFeedback("Bitte mindestens eine Spalte auf 'ID' mappen.")
+    if (isCsvImport && !hasTermMapping && !hasLabelMapping) {
+      setImportFeedback("Bitte mindestens eine Spalte auf 'ID' oder 'Label' mappen. Ohne ID-Spalte wird die ID aus dem Label abgeleitet.")
       return
     }
     setImportBusy(true)
@@ -484,6 +485,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
               <div className="card" style={{ marginBottom: 12 }}>
                 <div className="bd">
                   <div style={{ fontWeight: 600, marginBottom: 8 }}>Vokabular-Import (CSV/JSON)</div>
+                  <div className="help" style={{ marginBottom: 8 }}>
+                    Hierarchische Listen: eine Spalte auf „Parent-ID" mappen — Inhalt ist die ID oder das Label des Elternterms (z.&nbsp;B. „Kopierschutz"). Ohne gemappte ID-Spalte wird die ID automatisch aus dem Label abgeleitet (z.&nbsp;B. „Kopierschutz DRM" → „kopierschutz-drm").
+                  </div>
                   <div
                     onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
                     onDragLeave={() => setIsDragging(false)}
