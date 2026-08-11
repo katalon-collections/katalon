@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-08-11
+
+### Added
+- Vokabular-Import: `term` ist jetzt optional — fehlt die Term-ID, wird sie aus dem Label slugifiziert (Umlaute `ä→ae` etc.). `parent_term` akzeptiert auch das Label des Elternterms und löst es auf den generierten Slug auf. (#259)
+
+### Fixed
+- Admin: `relType`-State im Relation-Input wird bei Wechsel der Typkombination (`relTypeVocabId`/`fromType`/`targetType`) zurückgesetzt statt sich auf den Remount-Key der Aufrufstelle zu verlassen. (#292)
+
 ## [0.10.2] - 2026-08-11
 
 ### Changed

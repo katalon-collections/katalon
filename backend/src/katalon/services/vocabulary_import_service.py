@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -26,6 +28,21 @@ class ImportTerm:
 
 def _norm(value: str | None) -> str:
     return (value or "").strip()
+
+
+def _slugify(value: str) -> str:
+    """Term-ID aus einem Label ableiten: deutsche Umlaute mappen, Rest ASCII, '-'-getrennt."""
+    value = value.strip().lower()
+    for src, dst in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+        value = value.replace(src, dst)
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+
+
+def _term_from_label(label: dict[str, str]) -> str:
+    """Slug aus Default-Sprache, sonst erstes vorhandenes Label."""
+    source = label.get(DEFAULT_LABEL_LANGUAGE) or next(iter(label.values()), "")
+    return _slugify(source)
 
 
 def _parse_mapping(mapping_raw: str | None) -> dict[str, str]:
@@ -117,6 +134,9 @@ def parse_csv_terms(
                 if lang:
                     inverse_label[lang] = source_val
 
+        if not term and label:
+            term = _term_from_label(label)
+
         if not term:
             errors.append({"row": i, "message": "Pflichtfeld 'term' fehlt oder ist leer"})
             continue
@@ -160,9 +180,6 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
             errors.append({"row": None, "message": "Eintrag ist kein Objekt"})
             return
         term = _norm(str(node.get("term", "")))
-        if not term:
-            errors.append({"row": None, "message": "Pflichtfeld 'term' fehlt"})
-            return
 
         raw_label = node.get("label", {})
         label: dict[str, str] = {}
@@ -170,6 +187,13 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
             label = {str(k): _norm(str(v)) for k, v in raw_label.items() if _norm(str(v))}
         elif isinstance(raw_label, str) and _norm(raw_label):
             label = {DEFAULT_LABEL_LANGUAGE: _norm(raw_label)}
+
+        if not term and label:
+            term = _term_from_label(label)
+
+        if not term:
+            errors.append({"row": None, "message": "Pflichtfeld 'term' fehlt"})
+            return
 
         this_parent = _norm(str(node.get("parent_term", ""))) or parent_term
         raw_inverse = node.get("inverse_label", {})
@@ -223,13 +247,19 @@ async def import_vocabulary_terms(
     valid_terms: list[ImportTerm] = []
     for item in terms:
         if item.parent_term and item.parent_term not in combined_term_names:
-            errors.append(
-                {
-                    "row": item.row,
-                    "message": f"Unbekannter parent_term '{item.parent_term}' für '{item.term}'",
-                }
-            )
-            continue
+            # Fallback: parent_term kann das Label des Elternterms enthalten, dessen
+            # Term-ID per Slug generiert wurde (#259)
+            slugged = _slugify(item.parent_term)
+            if slugged and slugged in combined_term_names:
+                item.parent_term = slugged
+            else:
+                errors.append(
+                    {
+                        "row": item.row,
+                        "message": f"Unbekannter parent_term '{item.parent_term}' für '{item.term}'",
+                    }
+                )
+                continue
         valid_terms.append(item)
 
     existing_terms_set = set(existing_by_term)

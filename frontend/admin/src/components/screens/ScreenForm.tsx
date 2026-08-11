@@ -551,6 +551,9 @@ function RelationInput({
       .then(setRelTypeTerms).catch(() => {})
   }, [relTypeVocabId, fromType, targetType])
 
+  // Stale relType vermeiden: bei Wechsel der Typkombination Auswahl zurücksetzen (#292)
+  useEffect(() => { setRelType('') }, [relTypeVocabId, fromType, targetType])
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (inputRef.current?.contains(e.target as Node) || dropRef.current?.contains(e.target as Node)) return

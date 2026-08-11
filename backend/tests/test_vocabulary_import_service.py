@@ -25,15 +25,53 @@ def test_parse_csv_terms_with_mapping_and_parent() -> None:
     assert terms[1].parent_term == "foto"
 
 
-def test_parse_csv_terms_requires_term() -> None:
-    content = b"label_de\nOhne Term\n"
-    mapping = {"label_de": "label:de"}
+def test_parse_csv_terms_requires_term_or_label() -> None:
+    content = b"col_a\nOhne Mapping\n"
+    mapping = {"col_a": "external_id"}
 
     terms, errors = parse_csv_terms(content, mapping)
 
     assert terms == []
     assert errors[0]["row"] == 2
     assert "term" in errors[0]["message"]
+
+
+def test_parse_csv_terms_slugifies_term_from_label() -> None:
+    content = (
+        b"bezeichnung;oberbegriff\n"
+        b"Kopierschutz;\n"
+        b"Kopierschutz DRM;Kopierschutz\n"
+        b"Wasserzeichen/Markierung;Kopierschutz\n"
+    )
+    mapping = {"bezeichnung": "label:de", "oberbegriff": "parent_term"}
+
+    terms, errors = parse_csv_terms(content, mapping)
+
+    assert errors == []
+    assert [t.term for t in terms] == [
+        "kopierschutz",
+        "kopierschutz-drm",
+        "wasserzeichen-markierung",
+    ]
+    assert terms[1].parent_term == "Kopierschutz"
+    assert terms[0].label == {"de": "Kopierschutz"}
+
+
+def test_parse_json_terms_slugifies_term_from_label() -> None:
+    content = b"""
+    [
+      {"label": {"de": "Kopierschutz"}, "children": [
+        {"label": "Kopierschutz DRM"}
+      ]}
+    ]
+    """
+
+    terms, errors = parse_json_terms(content)
+
+    assert errors == []
+    assert {t.term for t in terms} == {"kopierschutz", "kopierschutz-drm"}
+    child = [t for t in terms if t.term == "kopierschutz-drm"][0]
+    assert child.parent_term == "kopierschutz"
 
 
 def test_parse_csv_terms_trims_whitespace_in_headers_and_values() -> None:
