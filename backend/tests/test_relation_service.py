@@ -3,7 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from katalon.core.models import VocabularyTerm
 from katalon.services.relation_service import count_relations, delete_relations
+from katalon.services.relation_type_service import validate_relation_type_applicability
 
 
 def _make_db(scalar_value: int = 0) -> AsyncMock:
@@ -57,3 +59,35 @@ async def test_delete_relations_all_types() -> None:
         rid = uuid.uuid4()
         await delete_relations(db, record_type, rid)
         db.execute.assert_awaited_once()
+
+
+def _make_terms_db(terms: list[VocabularyTerm]) -> AsyncMock:
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = terms
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=result)
+    return db
+
+
+@pytest.mark.asyncio
+async def test_validate_relation_type_no_term_is_unrestricted() -> None:
+    db = _make_terms_db([])
+    error = await validate_relation_type_applicability(db, "object", "place", "depicts")
+    assert error is None
+
+
+@pytest.mark.asyncio
+async def test_validate_relation_type_allows_matching_pair() -> None:
+    term = VocabularyTerm(applies_from=["object"], applies_to=["entity"])
+    db = _make_terms_db([term])
+    error = await validate_relation_type_applicability(db, "object", "entity", "published_by")
+    assert error is None
+
+
+@pytest.mark.asyncio
+async def test_validate_relation_type_rejects_wrong_pair() -> None:
+    term = VocabularyTerm(applies_from=["object"], applies_to=["entity"])
+    db = _make_terms_db([term])
+    error = await validate_relation_type_applicability(db, "object", "place", "published_by")
+    assert error is not None
+    assert "published_by" in error

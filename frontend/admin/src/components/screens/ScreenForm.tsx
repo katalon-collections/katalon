@@ -509,6 +509,7 @@ function RelationInput({
   targetSubtype,
   relTypeVocabId,
   fixedRelationType,
+  fromType,
   onAdd,
   disabled,
   allowCreate = true,
@@ -517,6 +518,7 @@ function RelationInput({
   targetSubtype?: string
   relTypeVocabId?: string
   fixedRelationType?: string
+  fromType?: RecordType
   onAdd: (entry: RelationEntry) => void | Promise<void>
   disabled?: boolean
   allowCreate?: boolean
@@ -545,8 +547,9 @@ function RelationInput({
 
   useEffect(() => {
     if (!relTypeVocabId) { setRelTypeTerms([]); return }
-    vocabularies.listTerms(relTypeVocabId).then(setRelTypeTerms).catch(() => {})
-  }, [relTypeVocabId])
+    vocabularies.listTerms(relTypeVocabId, { from_type: fromType, to_type: targetType || undefined })
+      .then(setRelTypeTerms).catch(() => {})
+  }, [relTypeVocabId, fromType, targetType])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -648,6 +651,8 @@ function RelationInput({
                 <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
               ))}
             </select>
+          ) : !fixedRelationType && relTypeVocabId ? (
+            <div className="help err" style={{ flex: 1 }}>Für diese Kombination ist kein Relationstyp konfiguriert.</div>
           ) : !fixedRelationType ? (
             <input className="fld" style={{ flex: 1 }} value={relType}
               onChange={e => setRelType(e.target.value)}
@@ -671,6 +676,8 @@ function RelationInput({
           <option value="">— Relationstyp wählen —</option>
           {relTypeTerms.map(t => <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>)}
         </select>
+      ) : relTypeVocabId ? (
+        <div className="help err">Für diese Kombination ist kein Relationstyp konfiguriert.</div>
       ) : (
         <input className="fld" value={relType} onChange={e => setRelType(e.target.value)} placeholder="Relationstyp" aria-label="Relationstyp" />
       ))}
@@ -1346,6 +1353,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             targetType={(sf.settings?.target_type as RecordType) ?? ''}
             targetSubtype={sf.settings?.target_subtype as string | undefined}
             relTypeVocabId={sf.settings?.relation_type_vocab as string | undefined}
+            fromType={recordType}
             onAdd={entry => onChange(entry)}
             disabled={disabled}
             allowCreate={!quickCreate}
@@ -2326,6 +2334,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
                               relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                              fromType={recordType}
                               onAdd={entry => addRelationEntry(f.name, entry)}
                               disabled={justCreated}
                               allowCreate={!quickCreate}
@@ -2345,6 +2354,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 targetType={(f.settings?.target_type as RecordType) ?? ''}
                                 targetSubtype={f.settings?.target_subtype as string | undefined}
                                 relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                                fromType={recordType}
                                 onAdd={entry => setField(f.name, entry)}
                                 disabled={justCreated}
                                 allowCreate={!quickCreate}

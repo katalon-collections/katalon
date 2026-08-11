@@ -12,6 +12,12 @@ sources:
   - id: relation-api
     type: file
     path: backend/src/katalon/api/v1/relations.py
+  - id: relation-type-service
+    type: file
+    path: backend/src/katalon/services/relation_type_service.py
+  - id: vocab-api
+    type: file
+    path: backend/src/katalon/api/v1/vocabularies.py
   - id: relation-list
     type: file
     path: frontend/portal/src/components/RelationsList.tsx
@@ -54,6 +60,10 @@ This also defines the save boundary for inline creation. A schema relation field
 ## Relation Types And Inverse Labels
 
 Relation fields can point at a relation-type vocabulary through `settings.relation_type_vocab` [@schema-screen]. Relation-type vocabularies are ordinary vocabularies with `kind == "relation"`, and vocabulary terms include `inverse_label` JSONB for labels shown from the opposite direction [@models]. The relation itself stores only the relation type code; label resolution happens outside the relation row.
+
+Relation-type vocabularies can narrow a term to allowed source and target record types with `VocabularyTerm.applies_from` and `VocabularyTerm.applies_to`, where an empty list means unrestricted for that side [@models]. The vocabulary terms endpoint applies the same rule when called with `from_type` and `to_type`, and the relation API validates create and update requests against relation vocabulary terms before writing the row [@vocab-api] [@relation-api] [@relation-type-service]. If no relation vocabulary term exists for a relation type, the service treats that code as unrestricted, preserving legacy free-text relation types and imported relation rows [@relation-type-service].
+
+The Admin relation picker passes the current source record type and chosen target type into the vocabulary endpoint before showing relation-type choices [@screen-form] [@admin-client]. That keeps the dropdown from offering known-disallowed relation types, while the server remains the final authority and returns HTTP 422 for a relation vocabulary term that does not apply to the requested pair [@relation-api] [@relation-type-service].
 
 The portal relation list receives a `resolveLabel` callback and passes it the relation type plus direction flag, so the display layer can choose the forward or inverse label for the current record [@relation-list]. The same component computes the other endpoint from the current record ID and navigates to a type-specific portal path [@relation-list].
 

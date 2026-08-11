@@ -133,6 +133,8 @@ export interface VocabularyTerm {
   inverse_label: Record<string, string>
   metadata_: Record<string, unknown>
   parent_id: string | null
+  applies_from: string[]
+  applies_to: string[]
 }
 
 export interface Relation {

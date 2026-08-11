@@ -11,6 +11,7 @@ from katalon.services.relation_service import (
     lock_objects,
     procedure_object_pair,
 )
+from katalon.services.relation_type_service import validate_relation_type_applicability
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 
@@ -44,6 +45,7 @@ async def list_relations(
     responses={
         403: {"description": "Insufficient permissions"},
         409: {"description": "Object is already in an active loan-out procedure"},
+        422: {"description": "Relation type not allowed for this type pair"},
     },
 )
 async def create_relation(
@@ -69,6 +71,11 @@ async def create_relation(
                     status_code=409,
                     detail="Objekt ist bereits in einem aktiven Ausleihvorgang.",
                 )
+    applicability_error = await validate_relation_type_applicability(
+        db, data.from_type, data.to_type, data.relation_type
+    )
+    if applicability_error:
+        raise HTTPException(status_code=422, detail=applicability_error)
     rel = Relation(
         from_type=data.from_type, from_id=data.from_id,
         to_type=data.to_type, to_id=data.to_id,
@@ -86,6 +93,7 @@ async def create_relation(
     responses={
         403: {"description": "Insufficient permissions"},
         404: {"description": "Relation not found"},
+        422: {"description": "Relation type not allowed for this type pair"},
     },
 )
 async def update_relation(
@@ -96,6 +104,11 @@ async def update_relation(
     if not rel:
         raise HTTPException(status_code=404, detail="Relation nicht gefunden")
     if data.relation_type is not None:
+        applicability_error = await validate_relation_type_applicability(
+            db, rel.from_type, rel.to_type, data.relation_type
+        )
+        if applicability_error:
+            raise HTTPException(status_code=422, detail=applicability_error)
         rel.relation_type = data.relation_type
     if data.metadata_ is not None:
         rel.metadata_ = data.metadata_

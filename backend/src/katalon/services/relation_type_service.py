@@ -24,3 +24,28 @@ async def sync_relation_type_terms(db: AsyncSession, vocab: Vocabulary) -> None:
                 inverse_label={},
             )
         )
+
+
+async def validate_relation_type_applicability(
+    db: AsyncSession, from_type: str, to_type: str, relation_type: str
+) -> str | None:
+    """Return an error message if the relation type is not allowed for this type pair.
+
+    Terms missing from relation vocabularies and terms without
+    applies_from/applies_to constraints stay unrestricted.
+    """
+    result = await db.execute(
+        select(VocabularyTerm)
+        .join(Vocabulary, Vocabulary.id == VocabularyTerm.vocabulary_id)
+        .where(Vocabulary.kind == "relation", VocabularyTerm.term == relation_type)
+    )
+    terms = list(result.scalars().all())
+    if not terms:
+        return None
+    for term in terms:
+        if term.applies_from and from_type not in term.applies_from:
+            continue
+        if term.applies_to and to_type not in term.applies_to:
+            continue
+        return None
+    return f"Relationstyp '{relation_type}' ist für {from_type} → {to_type} nicht erlaubt."

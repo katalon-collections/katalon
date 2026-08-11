@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-11
+
+### Added
+- Relationstyp-Vokabulareinträge können auf Quell-/Ziel-Record-Typen eingeschränkt werden (`applies_from`/`applies_to`); Vokabular-Endpunkt filtert danach, Relation-API validiert serverseitig (422 bei unzulässiger Kombination).
+
 ## [0.9.0] - 2026-08-11
 
 ### Added

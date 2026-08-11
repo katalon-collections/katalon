@@ -12,6 +12,12 @@ sources:
   - id: relation-type-service
     type: file
     path: backend/src/katalon/services/relation_type_service.py
+  - id: relation-api
+    type: file
+    path: backend/src/katalon/api/v1/relations.py
+  - id: vocab-api
+    type: file
+    path: backend/src/katalon/api/v1/vocabularies.py
   - id: data-doc
     type: file
     path: docs/01_datenmodell.md
@@ -29,7 +35,7 @@ The recorded decision compares a field-gated relation model with a flexibility-f
 
 Katalon uses one relation table. The `Relation` model stores `from_type`, `from_id`, `to_type`, `to_id`, `relation_type`, JSONB `metadata`, `is_schema_derived`, and `created_at`, with indexes on the source and target endpoint pairs [@models]. Endpoint references are type strings plus UUIDs instead of normal foreign keys to one fixed target table, because the model must connect multiple record families.
 
-Relation type governance uses vocabularies. The decision records `target_type`, optional `target_subtype`, and `relation_type_vocab` as the relation field settings that constrain form behavior [@decision]. In the current model, vocabularies have a `kind` field and vocabulary terms have multilingual labels plus `inverse_label`, so relation-type vocabularies can display different labels depending on direction [@models]. See [Vocabularies](../../concepts/metadata/vocabularies) for the controlled-list side of this design.
+Relation type governance uses vocabularies. The decision records `target_type`, optional `target_subtype`, and `relation_type_vocab` as the relation field settings that constrain form behavior [@decision]. In the current model, vocabularies have a `kind` field and vocabulary terms have multilingual labels plus `inverse_label`, so relation-type vocabularies can display different labels depending on direction [@models]. Relation-type terms can also carry `applies_from` and `applies_to` record-type lists; the vocabulary endpoint filters selectable terms by those lists, and the relation API validates create/update requests through the shared relation-type service before writing [@models] [@vocab-api] [@relation-api] [@relation-type-service]. See [Vocabularies](../../concepts/metadata/vocabularies) for the controlled-list side of this design.
 
 Existing raw relation type codes are not thrown away when relation vocabularies are introduced. `sync_relation_type_terms` reads distinct `Relation.relation_type` values, compares them with existing terms in a vocabulary, and creates missing `VocabularyTerm` rows with simple German and English labels [@relation-type-service]. That keeps historical relation data usable while moving display and governance toward vocabulary terms.
 
@@ -37,6 +43,6 @@ Existing raw relation type codes are not thrown away when relation vocabularies 
 
 The model maximizes cross-record flexibility. Any supported source type can point at any supported target type without adding a pair-specific table, and relation metadata can store role, date range, or other edge-specific facts on the link itself [@models] [@data-doc].
 
-The tradeoff is semantic discipline. Because the database table accepts string type names and string relation codes, correctness depends on service validation, form settings, and well-maintained relation-type vocabularies rather than on a dense network of foreign-key tables. The recorded decision explicitly accepts that governance shift because hard field gates would block common GLAM linking patterns [@decision].
+The tradeoff is semantic discipline. Because the database table accepts string type names and string relation codes, correctness depends on service validation, form settings, and well-maintained relation-type vocabularies rather than on a dense network of foreign-key tables. Pair-specific relation-type applicability is enforced in services and API behavior, not as pair-specific database tables or foreign keys [@relation-api] [@relation-type-service]. The recorded decision explicitly accepts that governance shift because hard field gates would block common GLAM linking patterns [@decision].
 
 Maintainers should avoid adding special-purpose relation tables unless a new workflow has constraints that cannot be expressed as a typed relation plus metadata. Even then, the generic table remains the graph surface other code expects.

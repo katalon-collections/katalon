@@ -92,6 +92,8 @@ async def list_terms(
     vocab_id: uuid.UUID,
     db: DBDep,
     q: str | None = Query(None, description="Search term (filters by term or label)"),
+    from_type: str | None = Query(None, description="Only terms allowed for this source record type"),
+    to_type: str | None = Query(None, description="Only terms allowed for this target record type"),
 ) -> list[VocabularyTerm]:
     stmt = (
         select(VocabularyTerm)
@@ -103,6 +105,16 @@ async def list_terms(
         stmt = stmt.where(
             (VocabularyTerm.term.ilike(pattern))
             | (text("label::text ILIKE :pattern").bindparams(pattern=pattern))
+        )
+    if from_type:
+        stmt = stmt.where(
+            (VocabularyTerm.applies_from == text("'[]'::jsonb"))
+            | (VocabularyTerm.applies_from.contains([from_type]))
+        )
+    if to_type:
+        stmt = stmt.where(
+            (VocabularyTerm.applies_to == text("'[]'::jsonb"))
+            | (VocabularyTerm.applies_to.contains([to_type]))
         )
     result = await db.execute(stmt)
     return list(result.scalars().all())

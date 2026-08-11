@@ -1,9 +1,40 @@
 import { Fragment, useState, useEffect, useCallback } from 'react'
 import { schema, vocabularies } from '../../api/client'
-import type { FieldDefinition, Vocabulary, VocabularyTerm } from '../../types'
+import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
+
+const RECORD_TYPE_LABELS: Record<RecordType, string> = {
+  object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
+}
+const RECORD_TYPES = Object.keys(RECORD_TYPE_LABELS) as RecordType[]
+
+function AppliesCheckboxes({ value, onChange }: { value: RecordType[]; onChange: (v: RecordType[]) => void }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 12 }}>
+      {RECORD_TYPES.map(rt => (
+        <label key={rt} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={value.includes(rt)}
+            onChange={e => onChange(e.target.checked ? [...value, rt] : value.filter(v => v !== rt))}
+          />
+          {RECORD_TYPE_LABELS[rt]}
+        </label>
+      ))}
+      <span style={{ color: 'var(--fg-3)' }}>(keine Auswahl = alle)</span>
+    </div>
+  )
+}
+
+function appliesLabel(t: VocabularyTerm): string {
+  const from = (t.applies_from ?? []) as RecordType[]
+  const to = (t.applies_to ?? []) as RecordType[]
+  if (from.length === 0 && to.length === 0) return 'alle'
+  const fmt = (arr: RecordType[]) => arr.length === 0 ? 'alle' : arr.map(r => RECORD_TYPE_LABELS[r]).join(', ')
+  return `${fmt(from)} → ${fmt(to)}`
+}
 
 function fieldLabel(field: FieldDefinition): string {
   return field.label.de || field.label.en || field.name
@@ -121,6 +152,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [newTermTerm, setNewTermTerm] = useState('')
   const [newTermLabelDe, setNewTermLabelDe] = useState('')
   const [newTermInverseLabelDe, setNewTermInverseLabelDe] = useState('')
+  const [newTermAppliesFrom, setNewTermAppliesFrom] = useState<RecordType[]>([])
+  const [newTermAppliesTo, setNewTermAppliesTo] = useState<RecordType[]>([])
   const [savingTerm, setSavingTerm] = useState(false)
   const [newTermMetadata, setNewTermMetadata] = useState<Record<string, unknown>>({})
 
@@ -129,6 +162,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [editTermTerm, setEditTermTerm] = useState('')
   const [editTermLabelDe, setEditTermLabelDe] = useState('')
   const [editTermInverseLabelDe, setEditTermInverseLabelDe] = useState('')
+  const [editTermAppliesFrom, setEditTermAppliesFrom] = useState<RecordType[]>([])
+  const [editTermAppliesTo, setEditTermAppliesTo] = useState<RecordType[]>([])
   const [savingEditTerm, setSavingEditTerm] = useState(false)
   const [editTermMetadata, setEditTermMetadata] = useState<Record<string, unknown>>({})
   const [termFields, setTermFields] = useState<FieldDefinition[]>([])
@@ -275,10 +310,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         inverse_label: vocab?.kind === 'relation' && newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
         metadata_: newTermMetadata,
         parent_id: null,
+        applies_from: vocab?.kind === 'relation' ? newTermAppliesFrom : [],
+        applies_to: vocab?.kind === 'relation' ? newTermAppliesTo : [],
       })
       setNewTermTerm('')
       setNewTermLabelDe('')
       setNewTermInverseLabelDe('')
+      setNewTermAppliesFrom([])
+      setNewTermAppliesTo([])
       setNewTermMetadata({})
       setShowNewTerm(false)
       loadTerms()
@@ -294,6 +333,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermTerm(t.term)
     setEditTermLabelDe(t.label.de ?? '')
     setEditTermInverseLabelDe(t.inverse_label?.de ?? '')
+    setEditTermAppliesFrom((t.applies_from ?? []) as RecordType[])
+    setEditTermAppliesTo((t.applies_to ?? []) as RecordType[])
     setEditTermMetadata({ ...(t.metadata_ ?? {}) })
   }
 
@@ -307,6 +348,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         inverse_label: vocab?.kind === 'relation' && editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
         metadata_: editTermMetadata,
         parent_id: t.parent_id,
+        applies_from: vocab?.kind === 'relation' ? editTermAppliesFrom : [],
+        applies_to: vocab?.kind === 'relation' ? editTermAppliesTo : [],
       })
       setEditTermId(null)
       loadTerms()
@@ -543,6 +586,18 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         </div>
                       )}
                     </div>
+                    {vocab.kind === 'relation' && (
+                      <div className="fg-2" style={{ marginTop: 8 }}>
+                        <div className="field">
+                          <div className="lbl">Quelltypen</div>
+                          <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
+                        </div>
+                        <div className="field">
+                          <div className="lbl">Zieltypen</div>
+                          <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
+                        </div>
+                      </div>
+                    )}
                     <CustomFieldsEditor fields={termFields} value={newTermMetadata} onChange={setNewTermMetadata} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                       <button className="btn pri" onClick={createTerm} disabled={savingTerm}>Anlegen</button>
@@ -559,14 +614,15 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       <th>ID</th>
                       <th>Label DE</th>
                       {vocab.kind === 'relation' && <th>Gegenrichtung DE</th>}
+                      {vocab.kind === 'relation' && <th>Typen</th>}
                       <th>Übergeordnet</th>
                       <th className="col-act" />
                     </tr>
                   </thead>
                   <tbody>
-                    {termsLoading && <tr><td colSpan={vocab.kind === 'relation' ? 5 : 4} className="empty">Lade…</td></tr>}
+                    {termsLoading && <tr><td colSpan={vocab.kind === 'relation' ? 6 : 4} className="empty">Lade…</td></tr>}
                     {!termsLoading && terms.length === 0 && (
-                      <tr><td colSpan={vocab.kind === 'relation' ? 5 : 4} className="empty">Keine Terme.</td></tr>
+                      <tr><td colSpan={vocab.kind === 'relation' ? 6 : 4} className="empty">Keine Terme.</td></tr>
                     )}
                     {!termsLoading && terms.map(t => (
                       editTermId === t.id ? (
@@ -575,6 +631,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <td><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ maxWidth: 160 }} /></td>
                             <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
                             {vocab.kind === 'relation' && <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>}
+                            {vocab.kind === 'relation' && <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>{appliesLabel(t)}</td>}
                             <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>
                             <td className="col-act">
                               <div className="row-actions">
@@ -584,7 +641,19 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             </td>
                           </tr>
                           <tr>
-                            <td colSpan={vocab.kind === 'relation' ? 5 : 4} style={{ background: 'var(--panel)' }}>
+                            <td colSpan={vocab.kind === 'relation' ? 6 : 4} style={{ background: 'var(--panel)' }}>
+                              {vocab.kind === 'relation' && (
+                                <div className="fg-2" style={{ marginBottom: 8 }}>
+                                  <div className="field">
+                                    <div className="lbl">Quelltypen</div>
+                                    <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
+                                  </div>
+                                  <div className="field">
+                                    <div className="lbl">Zieltypen</div>
+                                    <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
+                                  </div>
+                                </div>
+                              )}
                               <CustomFieldsEditor fields={termFields} value={editTermMetadata} onChange={setEditTermMetadata} />
                             </td>
                           </tr>
@@ -597,6 +666,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t)}</td>}
                           <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
                           <td className="col-act">
                             <div className="row-actions">

@@ -321,7 +321,13 @@ export const metadataMappings = {
 export const vocabularies = {
   list:       () => req<Vocabulary[]>('/v1/vocabularies'),
   create:     (data: Omit<Vocabulary, 'id'>) => req<Vocabulary>('/v1/vocabularies', { method: 'POST', body: JSON.stringify(data) }),
-  listTerms:  (vocabId: string) => req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms`),
+  listTerms:  (vocabId: string, filter?: { from_type?: string; to_type?: string }) => {
+    const params = new URLSearchParams()
+    if (filter?.from_type) params.set('from_type', filter.from_type)
+    if (filter?.to_type) params.set('to_type', filter.to_type)
+    const qs = params.toString()
+    return req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms${qs ? `?${qs}` : ''}`)
+  },
   searchTerms: (vocabId: string, q: string) => req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms?q=${encodeURIComponent(q)}`),
   createTerm: (vocabId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/${vocabId}/terms`, { method: 'POST', body: JSON.stringify(data) }),
   updateTerm: (termId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}`, { method: 'PUT', body: JSON.stringify(data) }),

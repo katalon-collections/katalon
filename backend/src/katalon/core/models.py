@@ -315,6 +315,10 @@ class VocabularyTerm(Base):
     term: Mapped[str] = mapped_column(String(256))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
     inverse_label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    # For relation vocabularies: record types this term may connect.
+    # Empty list = unrestricted. Only meaningful when vocabulary.kind == "relation".
+    applies_from: Mapped[list] = mapped_column(JSONB, default=list)
+    applies_to: Mapped[list] = mapped_column(JSONB, default=list)
     # Values for vocabulary_term field definitions.
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(

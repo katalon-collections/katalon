@@ -15,9 +15,18 @@ sources:
   - id: schema-api
     type: file
     path: backend/src/katalon/api/v1/schema_admin.py
+  - id: schemas
+    type: file
+    path: backend/src/katalon/core/schemas.py
   - id: relation-type-service
     type: file
     path: backend/src/katalon/services/relation_type_service.py
+  - id: screen-vocab
+    type: file
+    path: frontend/admin/src/components/screens/ScreenVocab.tsx
+  - id: vocab-applies-migration
+    type: file
+    path: backend/migrations/versions/0029_vocab_term_applies.py
   - id: vocab-decision
     type: file
     path: .agents/knowledge/decisions/vocabulary-custom-fields.md
@@ -35,7 +44,11 @@ The `is_hierarchical` flag records whether a vocabulary is intended as a hierarc
 
 The `kind` field separates ordinary controlled terms from relation-type vocabularies [@models]. Schema fields of type `vocab` and `vocab_free` expect a vocabulary with `kind == "term"`, while relation fields can point `settings.relation_type_vocab` at a vocabulary with `kind == "relation"` [@schema-api]. The relation-type sync service scans existing relation rows and adds missing relation type codes as vocabulary terms, preserving existing codes when the default relation-type vocabulary is initialized or refreshed [@relation-type-service].
 
-Inverse labels belong on vocabulary terms. They give relation-type vocabularies a place to store the display label used when a relation is read from the opposite direction [@models]. This is why relation vocabularies are connected to [generic relations](../relations/generic-relations) rather than being plain dropdown lists.
+Inverse labels belong on vocabulary terms. They give relation-type vocabularies a place to store the display label used when a relation is read from the opposite direction [@models]. Relation-type terms can also restrict the record-type pairs they apply to through `applies_from` and `applies_to`; an empty list means unrestricted for that side, and the create/update schema rejects values outside `object`, `entity`, `place`, `occurrence`, and `procedure` [@models] [@schemas].
+
+The terms endpoint can filter by `from_type` and `to_type`, returning terms whose side-specific list is empty or contains the requested record type [@vocab-api]. The Admin vocabulary screen exposes the same contract only for vocabularies with `kind == "relation"` by showing source and target record-type checkbox groups and a compact type-pair summary in the term table [@screen-vocab]. Existing relation terms remain unrestricted after migration because `0029_vocab_term_applies` adds both JSONB columns with `[]` as the non-null server default [@vocab-applies-migration].
+
+This is why relation vocabularies are connected to [generic relations](../relations/generic-relations) rather than being plain dropdown lists.
 
 ## Imports
 

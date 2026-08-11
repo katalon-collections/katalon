@@ -126,6 +126,9 @@ class VocabularyRead(VocabularyCreate):
     id: uuid.UUID
 
 
+RECORD_TYPES = ("object", "entity", "place", "occurrence", "procedure")
+
+
 class VocabularyTermCreate(BaseModel):
     vocabulary_id: uuid.UUID
     term: str
@@ -133,6 +136,16 @@ class VocabularyTermCreate(BaseModel):
     inverse_label: dict = {}
     metadata_: dict = {}
     parent_id: uuid.UUID | None = None
+    applies_from: list[str] = []
+    applies_to: list[str] = []
+
+    @field_validator("applies_from", "applies_to")
+    @classmethod
+    def _validate_applies(cls, v: list[str]) -> list[str]:
+        invalid = [t for t in v if t not in RECORD_TYPES]
+        if invalid:
+            raise ValueError(f"Ungültige Record-Typen: {invalid}")
+        return v
 
 
 class VocabularyTermRead(VocabularyTermCreate):
