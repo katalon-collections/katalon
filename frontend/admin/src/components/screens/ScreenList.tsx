@@ -259,7 +259,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
           <div className="sub">{data.total.toLocaleString('de')} Datensätze</div>
         </div>
         <div className="right">
-          <button className="btn pri" onClick={() => onOpen?.('new')}>
+          <button className="btn pri" onClick={() => onOpen?.('new')} data-tour="new-record-button">
             <Plus size={13} /> Neu anlegen
           </button>
         </div>
