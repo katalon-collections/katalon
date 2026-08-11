@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-11
+
+### Fixed
+- Fehlendes `data-tour`-Attribut am "Neu anlegen"-Button ergänzt, das für einen Onboarding-Tour-Schritt benötigt wird.
+
 ## [0.10.0] - 2026-08-11
 
 ### Added
