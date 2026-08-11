@@ -278,6 +278,7 @@ class UserRead(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
+    onboarding_completed_at: datetime | None = None
 
 
 class UserUpdate(BaseModel):
@@ -311,6 +312,10 @@ class PasswordChange(BaseModel):
 class EmailChange(BaseModel):
     new_email: EmailStr
     current_password: str
+
+
+class OnboardingUpdate(BaseModel):
+    completed: bool
 
 
 # ---------------------------------------------------------------------------

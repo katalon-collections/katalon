@@ -156,6 +156,7 @@ export const auth = {
 }
 
 export const users = {
+  me: () => req<UserRead>('/v1/users/me'),
   list: () => req<UserRead[]>('/v1/users'),
   create: (data: { email: string; password: string; role: string }) =>
     req<UserRead>('/v1/users', { method: 'POST', body: JSON.stringify(data) }),
@@ -166,6 +167,8 @@ export const users = {
     req<void>('/v1/users/me/password', { method: 'PUT', body: JSON.stringify({ current_password, new_password }) }),
   changeOwnEmail: (new_email: string, current_password: string) =>
     req<UserRead>('/v1/users/me/email', { method: 'PUT', body: JSON.stringify({ new_email, current_password }) }),
+  setOwnOnboarding: (completed: boolean) =>
+    req<UserRead>('/v1/users/me/onboarding', { method: 'PUT', body: JSON.stringify({ completed }) }),
 }
 
 // Objects

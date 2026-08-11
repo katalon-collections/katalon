@@ -164,6 +164,18 @@ Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen z
 
 - Wenn ich Fehler berichte, schau immer in die Logs der entsprechenden Container statt Annahmen zu treffen.
 
+## Admin-Onboarding-Tour testen
+
+Auto-Trigger läuft für Rolle `admin` **und** `superuser` (nicht nur `superuser` — Bug in erster Version, siehe [[feedback_onboarding_tour_role]]), wenn `users.onboarding_completed_at` NULL ist. Zum erneuten Testen Flag zurücksetzen:
+
+```
+docker compose exec db psql -U katalon -d katalon -c "UPDATE users SET onboarding_completed_at = NULL WHERE email='<email>';"
+```
+
+Danach Seite in `http://localhost/admin/` neu laden (kein Logout nötig). Manueller Start/Restart jederzeit über Hilfe-Icon (?) im Header. Nach Frontend-Änderungen an Tour-Code (`frontend/admin/src/tour/steps.ts`, `frontend/admin/src/components/tour/Tour.tsx`) Container neu bauen: `docker compose build admin && docker compose up -d admin`.
+
+Details/Architektur: `almanac/architecture/workflows/admin-onboarding-tour.md`.
+
 ## Python/uv Hinweise
 
 - Backend-Python-Kommandos immer aus `backend/` ausführen. Im Repo-Root existiert auch eine `.venv`; von dort gestartete Backend-Tests können im falschen Interpreter landen und dann Dependencies wie `jinja2` "verlieren".

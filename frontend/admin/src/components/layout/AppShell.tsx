@@ -18,7 +18,8 @@ import { ScreenBanners } from '../screens/ScreenBanners'
 import { ScreenFormVariants } from '../screens/ScreenFormVariants'
 import { BannerBar } from '../ui/BannerBar'
 import { ImportStatusBanner } from '../ui/ImportStatusBanner'
-import { BASE, req } from '../../api/client'
+import { Tour, type TourVariant } from '../tour/Tour'
+import { BASE, req, users } from '../../api/client'
 import type { PortalConfigRead } from '../../types'
 
 type Crumb = { label: string; route?: string }
@@ -85,6 +86,7 @@ export function AppShell() {
   const init = hashToState(window.location.hash)
   const [route, setRoute] = useState(init.route)
   const [editId, setEditId] = useState<string | null>(init.editId)
+  const [activeTour, setActiveTour] = useState<TourVariant | null>(null)
 
   useEffect(() => {
     onUnauthorized(() => setLoggedIn(false))
@@ -97,6 +99,15 @@ export function AppShell() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!loggedIn) return
+    const user = getTokenUser()
+    if (user?.role !== 'superuser' && user?.role !== 'admin') return
+    users.me()
+      .then(me => { if (!me.onboarding_completed_at) setActiveTour('basic') })
+      .catch(() => {})
+  }, [loggedIn])
 
   useEffect(() => {
     function onPop() {
@@ -165,7 +176,7 @@ export function AppShell() {
       case 'import':            return <ScreenImporter />
       case 'audit':             return <ScreenAudit />
       case 'users':             return <ScreenUsers />
-      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} />
+      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
   }
@@ -195,6 +206,7 @@ export function AppShell() {
           {renderScreen()}
         </main>
       </div>
+      <Tour variant={activeTour} route={route} navigate={navigate} onDone={() => setActiveTour(null)} />
     </div>
   )
 }

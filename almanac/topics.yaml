@@ -63,6 +63,10 @@ topics:
     title: Admin
     description: Authenticated admin application behavior and navigation.
     parents: [frontend]
+  - slug: onboarding
+    title: Onboarding
+    description: First-login guidance and restartable setup tours.
+    parents: [admin]
   - slug: portal
     title: Portal
     description: Public portal routing, search, detail pages, and theming.

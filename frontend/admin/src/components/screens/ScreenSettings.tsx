@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { req, BASE, apiKeys, users, schema, adminConfig } from '../../api/client'
 import type { AdminConfigRead } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead } from '../../types'
+import type { TourVariant } from '../tour/Tour'
 
 interface Props {
   onNavigate?: (route: string) => void
   isAdmin: boolean
+  onStartTour?: (variant: TourVariant) => void
 }
 
 type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki'
@@ -22,7 +24,7 @@ const RECORD_TYPES = [
 // Profil section
 // ---------------------------------------------------------------------------
 
-function SectionProfil() {
+function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) => void }) {
   const [pwdCurrent, setPwdCurrent] = useState('')
   const [pwdNew, setPwdNew] = useState('')
   const [pwdConfirm, setPwdConfirm] = useState('')
@@ -184,6 +186,21 @@ function SectionProfil() {
           </div>
         </div>
       </div>
+
+      {onStartTour && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">Geführte Tour</div>
+          <div className="bd">
+            <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+              Die Einführungstour zeigt die wichtigsten Einrichtungsschritte. Jederzeit erneut startbar.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn gh" onClick={() => onStartTour('basic')}>Einstiegs-Tour starten</button>
+              <button className="btn gh" onClick={() => onStartTour('advanced')}>Erweiterte Tour starten</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -899,7 +916,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
 ]
 
-export function ScreenSettings({ isAdmin }: Props) {
+export function ScreenSettings({ isAdmin, onStartTour }: Props) {
   const [section, setSection] = useState<Section>('profil')
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
   const [loading, setLoading] = useState(isAdmin)
@@ -935,7 +952,7 @@ export function ScreenSettings({ isAdmin }: Props) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 680 }}>
           {loading && <div className="empty">Lade…</div>}
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
-          {!loading && section === 'profil' && <SectionProfil />}
+          {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}

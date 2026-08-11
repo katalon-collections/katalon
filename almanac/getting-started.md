@@ -38,6 +38,8 @@ Read [Importer Pipeline](architecture/workflows/importer-pipeline) for CSV, Exce
 
 Read [Authority Sources](concepts/integrations/authority-sources) before changing authority adapters or authority-backed fields, and read [OAI And Export Mappings](architecture/workflows/oai-and-export-mappings) before changing OAI-PMH output or metadata export mappings.
 
+Read [Admin Onboarding Tour](architecture/workflows/admin-onboarding-tour) before changing the first-login guided tour, its step targets, or `data-tour` attributes on Admin screens.
+
 ## Frontend And Public Access
 
 For Admin tasks, pair [Admin Shell And API Client](architecture/frontend/admin-shell-and-api-client) with [Admin Routes](reference/frontend/admin-routes). For Portal tasks, pair [Portal Routing And Theming](architecture/frontend/portal-routing-and-theming), [Portal Search And Facets](architecture/workflows/portal-search-and-facets), and [Portal Routes](reference/frontend/portal-routes).

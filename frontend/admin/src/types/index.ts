@@ -215,6 +215,7 @@ export interface UserRead {
   role: string
   is_active: boolean
   created_at: string
+  onboarding_completed_at: string | null
 }
 
 export interface ApiKey {

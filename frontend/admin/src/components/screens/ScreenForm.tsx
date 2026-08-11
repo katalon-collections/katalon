@@ -1950,7 +1950,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       <div className={`record-toolbar${quickCreate ? ' quick-create-toolbar' : ''}`}>
         {!quickCreate && <div className="record-title">{title}</div>}
         <div className="record-actions">
-          {!quickCreate && <div className="record-status" role="group" aria-label="Status">
+          {!quickCreate && <div className="record-status" role="group" aria-label="Status" data-tour="record-status">
             {statusOptions.map(s => (
               <button key={s} onClick={() => { setStatus(s); setIsDirty(true) }}
                 aria-pressed={status === s}
@@ -2537,7 +2537,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           {showTwoCol && (
             <div>
               {showMedia && (
-                <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card" style={{ marginBottom: 14 }} data-tour="media-section">
                   <div className="hd">
                     <span>Medien</span>
                     {mediaFiles.length > 0 && <span className="sub">{mediaFiles.length} Datei{mediaFiles.length !== 1 ? 'en' : ''}</span>}
@@ -2776,7 +2776,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {!isNew && (
-                <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card" style={{ marginBottom: 14 }} data-tour="relations-section">
                   <div className="hd">
                     <span>Beziehungen</span>
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}

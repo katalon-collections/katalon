@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-11
+
+### Added
+- Geführte Onboarding-Tour für Admin-Erstanmeldung (Rolle `admin`/`superuser`), jederzeit über Hilfe-Icon startbar, Fortschritt über `users.onboarding_completed_at` gespeichert.
+
 ## [0.8.1] - 2026-08-11
 
 ### Added

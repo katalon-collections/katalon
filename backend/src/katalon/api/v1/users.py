@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
@@ -6,7 +7,14 @@ from sqlalchemy import select
 from katalon.api.v1.auth import hash_password, verify_password
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import User
-from katalon.core.schemas import EmailChange, PasswordChange, UserCreate, UserRead, UserUpdate
+from katalon.core.schemas import (
+    EmailChange,
+    OnboardingUpdate,
+    PasswordChange,
+    UserCreate,
+    UserRead,
+    UserUpdate,
+)
 from katalon.services.audit_service import log_change
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -103,6 +111,21 @@ async def change_own_email(data: EmailChange, db: DBDep, current_user: CurrentUs
         action="update",
         changed_fields={"email": {"old": old_email, "new": current_user.email}},
     )
+    return current_user
+
+
+@router.put(
+    "/me/onboarding",
+    response_model=UserRead,
+    summary="Mark the current user's onboarding tour as completed or reset it",
+)
+async def update_own_onboarding(
+    data: OnboardingUpdate, db: DBDep, current_user: CurrentUser
+) -> User:
+    current_user.onboarding_completed_at = (
+        datetime.now(UTC).replace(tzinfo=None) if data.completed else None
+    )
+    await db.flush()
     return current_user
 
 

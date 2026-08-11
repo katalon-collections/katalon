@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { /* Bell, Help, */ Search } from '../ui/Icons'
+import { /* Bell, */ Search } from '../ui/Icons'
 import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
@@ -134,8 +134,7 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNaviga
           </div>
         )}
       </div>
-      {/* Hilfe und Benachrichtigungen ausgeblendet bis Implementierung (Issue #46) */}
-      {/* <button className="ib" title="Hilfe"><Help size={15} /></button> */}
+      {/* Benachrichtigungen ausgeblendet bis Implementierung (Issue #46) */}
       {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
       <div ref={userMenuRef} style={{ position: 'relative' }}>
         <button className="btn gh sm user-menu-trigger" onClick={() => setUserMenuOpen(v => !v)}>

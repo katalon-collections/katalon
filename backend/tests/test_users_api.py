@@ -66,6 +66,32 @@ async def test_change_own_password_writes_audit_log(override_deps) -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_own_onboarding_completed(override_deps) -> None:
+    _, user = override_deps
+    assert user.onboarding_completed_at is None
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put("/v1/users/me/onboarding", json={"completed": True})
+
+    assert response.status_code == 200
+    assert response.json()["onboarding_completed_at"] is not None
+    assert user.onboarding_completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_reset_own_onboarding(override_deps) -> None:
+    _, user = override_deps
+    user.onboarding_completed_at = datetime.now()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put("/v1/users/me/onboarding", json={"completed": False})
+
+    assert response.status_code == 200
+    assert response.json()["onboarding_completed_at"] is None
+    assert user.onboarding_completed_at is None
+
+
+@pytest.mark.asyncio
 async def test_change_own_email_requires_current_password(override_deps) -> None:
     session, _ = override_deps
     session.execute = AsyncMock(return_value=_mock_result(None))

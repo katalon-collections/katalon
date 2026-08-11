@@ -73,6 +73,7 @@ export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open 
               key={it.id}
               className={`sb-it${route === it.id || (it.routes ?? []).includes(route) ? ' active' : ''}`}
               onClick={() => setRoute(it.id!)}
+              data-tour={`nav-${it.id}`}
             >
               {it.Icon && <it.Icon className="ic" size={15} />}
               <span>{it.label}</span>

@@ -505,6 +505,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="viewer")  # superuser/admin/editor/viewer
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
 
     api_keys: Mapped[list["ApiKey"]] = relationship(
         back_populates="user",
