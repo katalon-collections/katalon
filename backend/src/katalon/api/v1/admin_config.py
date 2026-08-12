@@ -1,11 +1,12 @@
-from datetime import datetime
+import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import AdminConfig, AppSecret
+from katalon.core.models import AdminConfig, AIUsageEvent, AppSecret
 from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, set_secret
 
 router = APIRouter(prefix="/admin/config", tags=["admin"])
@@ -14,6 +15,11 @@ router = APIRouter(prefix="/admin/config", tags=["admin"])
 class SecretStatus(BaseModel):
     has_key: bool
     updated_at: datetime | None = None
+
+
+class AIUsageRead(BaseModel):
+    daily_user_tokens: int
+    monthly_global_tokens: int
 
 
 class AdminConfigRead(BaseModel):
@@ -30,6 +36,7 @@ class AdminConfigRead(BaseModel):
     ai_daily_user_token_limit: int
     ai_monthly_global_token_limit: int
     ai_secret: SecretStatus
+    ai_usage: AIUsageRead
 
     class Config:
         from_attributes = True
@@ -66,8 +73,20 @@ async def _get_or_create(db: DBDep) -> AdminConfig:
     return config
 
 
-async def _to_read(db: DBDep, config: AdminConfig) -> AdminConfigRead:
+async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminConfigRead:
     secret_obj = await db.scalar(select(AppSecret).where(AppSecret.key == AI_API_KEY_SECRET))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    daily_user_tokens = await db.scalar(
+        select(func.coalesce(func.sum(AIUsageEvent.input_tokens + AIUsageEvent.output_tokens), 0)).where(
+            AIUsageEvent.user_id == user_id,
+            AIUsageEvent.created_at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
+        )
+    ) or 0
+    monthly_global_tokens = await db.scalar(
+        select(func.coalesce(func.sum(AIUsageEvent.input_tokens + AIUsageEvent.output_tokens), 0)).where(
+            AIUsageEvent.created_at >= now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+        )
+    ) or 0
     return AdminConfigRead(
         idno_schemas=config.idno_schemas or {},
         idno_patterns=config.idno_patterns or {},
@@ -85,6 +104,10 @@ async def _to_read(db: DBDep, config: AdminConfig) -> AdminConfigRead:
             has_key=secret_obj is not None,
             updated_at=secret_obj.updated_at if secret_obj is not None else None,
         ),
+        ai_usage=AIUsageRead(
+            daily_user_tokens=daily_user_tokens,
+            monthly_global_tokens=monthly_global_tokens,
+        ),
     )
 
 
@@ -94,8 +117,8 @@ async def _to_read(db: DBDep, config: AdminConfig) -> AdminConfigRead:
     summary="Get the admin configuration",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def get_admin_config(db: DBDep, _=require_role("admin")) -> AdminConfigRead:
-    return await _to_read(db, await _get_or_create(db))
+async def get_admin_config(db: DBDep, current_user = require_role("admin")) -> AdminConfigRead:
+    return await _to_read(db, await _get_or_create(db), current_user.id)
 
 
 @router.put(
@@ -105,7 +128,7 @@ async def get_admin_config(db: DBDep, _=require_role("admin")) -> AdminConfigRea
     responses={403: {"description": "Insufficient permissions"}},
 )
 async def update_admin_config(
-    data: AdminConfigUpdate, db: DBDep, _=require_role("admin")
+    data: AdminConfigUpdate, db: DBDep, current_user = require_role("admin")
 ) -> AdminConfigRead:
     config = await _get_or_create(db)
     if data.idno_schemas is not None:
@@ -133,7 +156,7 @@ async def update_admin_config(
     if data.ai_monthly_global_token_limit is not None:
         config.ai_monthly_global_token_limit = data.ai_monthly_global_token_limit
     await db.flush()
-    return await _to_read(db, config)
+    return await _to_read(db, config, current_user.id)
 
 
 class AdminSecretWrite(BaseModel):

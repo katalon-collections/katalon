@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-08-12
+
+### Fixed
+- KI-Einstellungen zeigen den bisherigen Tagesverbrauch des angemeldeten Benutzers und den globalen Monatsverbrauch direkt neben den Limits. (#254)
+
 ## [0.10.6] - 2026-08-12
 
 ### Fixed

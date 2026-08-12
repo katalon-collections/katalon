@@ -731,6 +731,10 @@ export interface AdminConfigRead {
     has_key: boolean
     updated_at: string | null
   }
+  ai_usage: {
+    daily_user_tokens: number
+    monthly_global_tokens: number
+  }
 }
 
 export const adminConfig = {

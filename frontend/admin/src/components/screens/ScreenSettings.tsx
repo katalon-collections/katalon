@@ -885,10 +885,12 @@ function SectionAI() {
             <div className="field">
               <div className="lbl">Tageslimit pro Benutzer</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_daily_user_token_limit} onChange={e => set('ai_daily_user_token_limit', Number(e.target.value))} />
+              <div className="sub">Ihr Verbrauch heute: {cfg.ai_usage.daily_user_tokens.toLocaleString()} Tokens</div>
             </div>
             <div className="field">
               <div className="lbl">Monatslimit global</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_monthly_global_token_limit} onChange={e => set('ai_monthly_global_token_limit', Number(e.target.value))} />
+              <div className="sub">Globaler Verbrauch diesen Monat: {cfg.ai_usage.monthly_global_tokens.toLocaleString()} Tokens</div>
             </div>
           </div>
         </div>
