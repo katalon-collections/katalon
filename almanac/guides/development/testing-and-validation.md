@@ -67,7 +67,7 @@ npm run lint
 npm run build
 ```
 
-The Admin package defines `lint` as `eslint src --ext .ts,.tsx` and `build` as `tsc && vite build` [@admin-package]. Run Portal build from `frontend/portal`:
+The Admin package defines `lint` as `eslint src` and `build` as `tsc && vite build` [@admin-package]. Run Portal build from `frontend/portal`:
 
 ```bash
 cd frontend/portal

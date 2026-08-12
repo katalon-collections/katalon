@@ -32,7 +32,7 @@ The domain pages explain the record vocabulary that most backend, frontend, impo
 
 ## Runtime Workflow Cluster
 
-Use the workflow pages when a task crosses API routes, services, workers, and frontends. [Record CRUD And Publishing](architecture/workflows/record-crud-and-publishing) is the safest entry point for primary-record lifecycle work, and [Schema Driven Record Forms](architecture/workflows/schema-driven-record-forms) connects that backend shape to Admin form behavior.
+Use the [Workflow Architecture](architecture/workflows) hub when a task crosses API routes, services, workers, and frontends. [Record CRUD And Publishing](architecture/workflows/record-crud-and-publishing) is the safest entry point for primary-record lifecycle work, and [Schema Driven Record Forms](architecture/workflows/schema-driven-record-forms) connects that backend shape to Admin form behavior.
 
 Read [Importer Pipeline](architecture/workflows/importer-pipeline) for CSV, Excel, XML, dry-run, vocabulary reconciliation, and Celery-backed import work. Read [Media And IIIF](architecture/workflows/media-and-iiif) for object media uploads, batch media import, Cantaloupe processing, and portal IIIF viewing. Read [Search And Indexing](architecture/workflows/search-and-indexing) before changing Elasticsearch document construction, visibility filters, relation denormalization, or reindex repair paths.
 
@@ -50,8 +50,10 @@ Treat current code as runtime truth, and use ordinary repository documentation a
 
 Before implementation work, read the relevant CodeAlmanac pages and check the planned change for contradictions. The project instructions also require checking likely UX objections against `PRODUCT.md` and `DESIGN.md`, including accessibility, error states, responsive behavior, and operation impact, before changing even technically driven features [@agents].
 
+When a task is really a design choice, check the [Decisions](decisions) index before changing data shape, routing, importer scope, search behavior, deployment customization, or concurrency behavior.
+
 After implementation work changes documented behavior, workflow, or architecture, update the affected `almanac/` pages and verify those pages against current code instead of preserving stale synthesis [@agents].
 
 Never delete database volumes or run destructive Compose volume commands without explicit approval. The project instructions require log inspection and option presentation first because database volume deletion is irreversible [@agents].
 
-For production work, read [Production Deployment](guides/operations/production-deployment), [Admin Deploy Verification](guides/operations/admin-deploy-verification), [Environment And Secrets](reference/operations/environment-and-secrets), and [Known Gotchas](reference/operations/known-gotchas) before changing compose, nginx, Vite base paths, startup settings, or data recovery procedures.
+For production work, start with the [Operations](guides/operations) hub, then follow [Production Deployment](guides/operations/production-deployment), [Admin Deploy Verification](guides/operations/admin-deploy-verification), [Environment And Secrets](reference/operations/environment-and-secrets), and [Known Gotchas](reference/operations/known-gotchas) before changing compose, nginx, Vite base paths, startup settings, or data recovery procedures.

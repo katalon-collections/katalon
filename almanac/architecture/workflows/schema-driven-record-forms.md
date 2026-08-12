@@ -95,7 +95,7 @@ Validation runs before each save. Ordinary draft forms treat missing `idno`, sub
 
 The save payload always sends `status` and `metadata_`, then adds the scalars relevant to the active record type [@screen-form]. New records call `create`; existing records call `update` with the loaded `version`, which the API client sends as `If-Match` [@screen-form] [@admin-client]. The backend object, entity, and procedure endpoints then prepare and validate metadata, increment `version` on updates, synchronize schema relations, write audit entries, and re-index records [@objects-api] [@entities-api] [@procedures-api].
 
-If the backend reports an optimistic-locking conflict, the form fetches the current server record and performs a metadata-only three-way merge using loaded base values, server values, and the user's current values [@screen-form]. Fields changed only on one side are merged automatically; fields changed on both sides are shown in a conflict dialog and then committed with the server's newer version [@screen-form].
+If the backend reports an optimistic-locking conflict, the form fetches the current server record and performs a metadata-only three-way merge using loaded base values, server values, and the user's current values [@screen-form]. Fields changed only on one side are merged automatically; fields changed on both sides are shown in a conflict dialog and then committed with the server's newer version [@screen-form]. The reason this stays metadata-field scoped is recorded in [Optimistic Locking](../../decisions/workflows/optimistic-locking).
 
 ## Related Panels
 

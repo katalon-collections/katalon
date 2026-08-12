@@ -21,6 +21,7 @@ project context that future agents should not rediscover from scratch.
 
 Start with [Getting Started](getting-started) for task-oriented reading paths
 through the Katalon domain, runtime, development, and operations pages.
+Use `almanac/manual/` only when maintaining wiki source.
 
 ## Notability Bar
 
