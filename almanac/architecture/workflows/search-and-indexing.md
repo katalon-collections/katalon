@@ -20,7 +20,7 @@ sources:
     path: backend/tests/test_search_visibility.py
 ---
 
-Katalon's search workflow turns Objects, Entities, Places, Occurrences, and Procedures into Elasticsearch documents that the REST search API, portal search, OAI-PMH, and maintenance jobs can query. The builder uses record metadata, schema flags, and relation titles; it also has a linked-record path for inherited relation fields, but current Admin-saved relation settings use `target_type` while the builder reads `relation_target_type` [@search-service]. Celery tasks write or rebuild documents in Elasticsearch [@index-tasks]. Anonymous visibility is enforced both in normal record queries and in Elasticsearch search filters, so public search excludes non-public records and inactive collection objects [@visibility] [@visibility-tests].
+Katalon's search workflow turns Objects, Entities, Places, Occurrences, and Procedures into Elasticsearch documents that the REST search API, portal search, OAI-PMH, and maintenance jobs can query. The builder uses record metadata, schema flags, relation titles, and configured inherited relation fields. Celery tasks write or rebuild documents in Elasticsearch [@search-service] [@index-tasks]. Anonymous visibility is enforced both in normal record queries and in Elasticsearch search filters, so public search excludes non-public records and inactive collection objects [@visibility] [@visibility-tests].
 
 ## Document Shape
 
@@ -32,7 +32,7 @@ Facet data is opt-in. Fields marked `is_facet` are copied into keyword-safe `fac
 
 The index includes relation titles because search and portal facets need names without joining back to PostgreSQL. `_load_relation_titles()` reads relations in both directions for a record and resolves linked Entity, Place, and Occurrence titles into `related_entities`, `related_places`, and `related_occurrences` arrays [@search-service]. Elasticsearch maps those arrays as keyword fields and always aggregates them for relation facets [@elasticsearch].
 
-Relation fields can also inherit selected metadata from linked records once schema settings and indexer settings use the same target-type key. During document building, `build_index_doc()` reads relation-type field definitions, looks for `settings.inherited_fields` and `settings.relation_target_type`, and embeds the selected values under `linked_<type>s` entries when that config is present [@search-service]. After a record is indexed, `cascade_reindex_task` reindexes records that link to it, so a changed linked record can update documents that inherit its fields at one hop [@index-tasks]. This is the runtime side of [Inherited Fields In Elasticsearch](../../decisions/search/inherited-fields-in-elasticsearch).
+Relation fields can inherit selected metadata from linked records. During document building, `build_index_doc()` reads relation-type field definitions, looks for `settings.target_type` and `settings.inherited_fields`, embeds the selected values under `linked_<type>s`, and adds keyword-safe `facet_inherited_<type>_<field>` values for portal filtering [@search-service]. After a record is indexed, `cascade_reindex_task` reindexes records that link to it, so a changed linked record can update documents that inherit its fields at one hop [@index-tasks]. The type-specific and full reindex tasks use the same document builder. This is the runtime side of [Inherited Fields In Elasticsearch](../../decisions/search/inherited-fields-in-elasticsearch).
 
 ## Query Execution
 

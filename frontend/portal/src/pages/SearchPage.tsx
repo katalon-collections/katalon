@@ -7,6 +7,11 @@ const TYPE_LABELS: Record<string, string> = {
   object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
 }
 
+function facetLabel(field: string): string {
+  const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_(.+)$/)
+  return inherited ? `Verknüpft: ${TYPE_LABELS[inherited[1]] ?? inherited[1]} – ${inherited[2]}` : field
+}
+
 export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -195,7 +200,7 @@ export function SearchPage() {
             return (
               <FacetPanel
                 key={field}
-                label={field}
+                label={facetLabel(field)}
                 buckets={buckets}
                 active={metaFilters[field] ?? ''}
                 onSelect={v => setMetaFilter(field, v)}

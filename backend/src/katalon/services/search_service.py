@@ -114,6 +114,11 @@ def _normalize_for_index(val: Any) -> Any:
     return val
 
 
+def inherited_facet_name(target_type: str, field_name: str) -> str:
+    """Return the portal facet key for an inherited relation field."""
+    return f"inherited_{target_type}_{field_name}"
+
+
 def _build_doc(
     record_type: str,
     record: Any,
@@ -122,6 +127,7 @@ def _build_doc(
     facet_fields: set[str] | None = None,
     group_fields: set[str] | None = None,
     linked_data: dict[str, list[dict]] | None = None,
+    inherited_facets: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
@@ -175,6 +181,8 @@ def _build_doc(
         doc.update(rel_data)
     if linked_data:
         doc.update(linked_data)
+    if inherited_facets:
+        doc.update(inherited_facets)
     return doc
 
 
@@ -183,7 +191,7 @@ async def _load_linked_data(
     record_id: UUID,
     db: Any,
     inherited_config: dict[str, list[str]],
-) -> dict[str, list[dict]]:
+) -> tuple[dict[str, list[dict]], dict[str, list[str]]]:
     """Load inherited fields from linked records for ES denormalization.
 
     inherited_config maps target_type -> list of field names to embed.
@@ -197,6 +205,7 @@ async def _load_linked_data(
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
     result: dict[str, list[dict]] = {}
+    facets: dict[str, list[str]] = {}
 
     stmt = select(Relation).where(
         and_(Relation.from_type == record_type, Relation.from_id == record_id)
@@ -224,7 +233,16 @@ async def _load_linked_data(
             "inherited": inherited,
         })
 
-    return result
+        for field_name, value in inherited.items():
+            facet_value = _extract_facet_value(value)
+            if facet_value is None:
+                continue
+            facet_key = f"facet_{inherited_facet_name(rel.to_type, field_name)}"
+            facets.setdefault(facet_key, []).extend(
+                facet_value if isinstance(facet_value, list) else [facet_value]
+            )
+
+    return result, facets
 
 
 async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> dict[str, list[str]]:
@@ -304,16 +322,22 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
             if r.field_type == "relation":
                 s = r.settings or {}
                 ifields = s.get("inherited_fields") or []
-                target = s.get("relation_target_type", "")
+                target = s.get("target_type") or s.get("relation_target_type", "")
                 if ifields and target:
                     existing = inherited_config.get(target, [])
                     inherited_config[target] = list(set(existing + ifields))
 
     linked_data: dict[str, list[dict]] = {}
+    inherited_facets: dict[str, list[str]] = {}
     if inherited_config and db is not None:
-        linked_data = await _load_linked_data(record_type, record.id, db, inherited_config)
+        linked_data, inherited_facets = await _load_linked_data(
+            record_type, record.id, db, inherited_config
+        )
 
-    return _build_doc(record_type, record, rel_data, searchable_fields, facet_fields, group_fields, linked_data)
+    return _build_doc(
+        record_type, record, rel_data, searchable_fields, facet_fields, group_fields,
+        linked_data, inherited_facets,
+    )
 
 
 async def index_record(record_type: str, record: Any, db: Any = None) -> None:

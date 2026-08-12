@@ -403,6 +403,19 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
   const fields = fieldsByType[activeType] ?? []
   const selected = facetFields[activeType] ?? []
+  const inheritedFacetFields = fields
+    .filter(f => f.field_type === 'relation')
+    .flatMap(relation => {
+      const targetType = relation.settings?.target_type as string | undefined
+      const inherited = relation.settings?.inherited_fields as string[] | undefined
+      if (!targetType || !inherited?.length) return []
+      const targetLabel = RECORD_TYPES.find(type => type.key === targetType)?.label ?? targetType
+      return inherited.map(name => {
+        const targetField = (fieldsByType[targetType] ?? []).find(field => field.name === name)
+        const label = targetField?.label?.de || targetField?.label?.en || name
+        return { name: `inherited_${targetType}_${name}`, label: `${targetLabel}: ${label}` }
+      })
+    })
 
   return (
     <div>
@@ -435,7 +448,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
       {loadingFields ? (
         <div className="empty">Lade Felder…</div>
-      ) : fields.length === 0 ? (
+      ) : fields.length === 0 && inheritedFacetFields.length === 0 ? (
         <div className="empty">Keine Felder für diesen Typ definiert.</div>
       ) : (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -452,6 +465,25 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
               </label>
             ))}
+            {inheritedFacetFields.length > 0 && (
+              <>
+                <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
+                  Felder verknüpfter Datensätze
+                </div>
+                {inheritedFacetFields.map(f => (
+                  <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      className="ck"
+                      checked={selected.includes(f.name)}
+                      onChange={() => toggle(activeType, f.name)}
+                    />
+                    <span style={{ flex: 1 }}>{f.label}</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+                  </label>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}

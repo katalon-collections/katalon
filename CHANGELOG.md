@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.12] - 2026-08-12
+
+### Added
+- Verknüpfte, im Schema ausgewählte Felder können im Portal als Facetten verwendet werden; deren Werte werden beim Indexieren und Reindexieren als Keyword-Facetten übernommen. (#213)
+
 ## [0.10.11] - 2026-08-12
 
 ### Fixed

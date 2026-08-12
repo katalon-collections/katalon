@@ -151,7 +151,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
 
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import reindex_type
-    from katalon.services.search_service import _build_doc
+    from katalon.services.search_service import build_index_doc
 
     _MODEL_MAP: dict = {
         "object": Object,
@@ -164,30 +164,14 @@ def bulk_reindex_type_task(target_type: str) -> dict:
     AsyncSessionLocal, engine = _make_session()
 
     async def _do() -> dict:
-        from katalon.core.models import FieldDefinition
-        from katalon.services.search_service import _load_relation_titles
-
         model = _MODEL_MAP.get(target_type)
         if model is None:
             return {"status": "error", "detail": f"Unknown type: {target_type}"}
         async with AsyncSessionLocal() as session:
-            # Load facet fields for this type
-            fd_result = await session.execute(
-                select(FieldDefinition.name).where(
-                    FieldDefinition.target_type == target_type,
-                    FieldDefinition.is_facet.is_(True),
-                    FieldDefinition.is_deleted.is_(False),
-                )
-            )
-            facet_fields = set(fd_result.scalars().all())
-
             result = await session.execute(select(model))
             records = []
             for rec in result.scalars().all():
-                rel_data = None
-                if target_type == "object":
-                    rel_data = await _load_relation_titles(target_type, rec.id, session)
-                doc = _build_doc(target_type, rec, rel_data, facet_fields=facet_fields)
+                doc = await build_index_doc(target_type, rec, session)
                 records.append((str(rec.id), doc))
         count = await reindex_type(target_type, records)
         return {"status": "ok", "indexed": count, "target_type": target_type}
