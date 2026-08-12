@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.9] - 2026-08-12
+
+### Fixed
+- E2E: Cantaloupe-Mount wird im GitHub-Runner mit `sudo` für den Backend-Prozess beschreibbar gemacht. (#221)
+
 ## [0.10.8] - 2026-08-12
 
 ### Fixed

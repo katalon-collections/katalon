@@ -63,7 +63,7 @@ jobs:
           node-version: '20'
 
       - name: Prepare media directory
-        run: chmod 777 /tmp/katalon-media
+        run: sudo chmod 777 /tmp/katalon-media
 
       - name: Install backend dependencies
         working-directory: backend
