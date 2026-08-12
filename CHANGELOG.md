@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.10] - 2026-08-12
+
+### Added
+- Relationstyp-Editor zeigt live, für welche Quell-/Zieltypen ein Term gilt, einschließlich Erklärung für leere Auswahlen. (#291)
+
 ## [0.10.9] - 2026-08-12
 
 ### Fixed

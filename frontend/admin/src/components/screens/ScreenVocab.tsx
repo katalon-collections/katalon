@@ -28,12 +28,21 @@ function AppliesCheckboxes({ value, onChange }: { value: RecordType[]; onChange:
   )
 }
 
-function appliesLabel(t: VocabularyTerm): string {
+function appliesLabel(t: Pick<VocabularyTerm, 'applies_from' | 'applies_to'>): string {
   const from = (t.applies_from ?? []) as RecordType[]
   const to = (t.applies_to ?? []) as RecordType[]
   if (from.length === 0 && to.length === 0) return 'alle'
   const fmt = (arr: RecordType[]) => arr.length === 0 ? 'alle' : arr.map(r => RECORD_TYPE_LABELS[r]).join(', ')
   return `${fmt(from)} → ${fmt(to)}`
+}
+
+function AppliesPreview({ from, to }: { from: RecordType[]; to: RecordType[] }) {
+  return (
+    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-3)' }} aria-live="polite">
+      Gilt für: <strong>{appliesLabel({ applies_from: from, applies_to: to })}</strong>
+      <div>Keine Auswahl in beiden Feldern gilt für alle Kombinationen; Objekt ohne Zieltyp gilt für Objekt → alle.</div>
+    </div>
+  )
 }
 
 function fieldLabel(field: FieldDefinition): string {
@@ -601,6 +610,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
                         </div>
                       </div>
+                      <AppliesPreview from={newTermAppliesFrom} to={newTermAppliesTo} />
                     )}
                     <CustomFieldsEditor fields={termFields} value={newTermMetadata} onChange={setNewTermMetadata} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -657,6 +667,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                     <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
                                   </div>
                                 </div>
+                                <AppliesPreview from={editTermAppliesFrom} to={editTermAppliesTo} />
                               )}
                               <CustomFieldsEditor fields={termFields} value={editTermMetadata} onChange={setEditTermMetadata} />
                             </td>
