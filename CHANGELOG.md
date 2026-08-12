@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.11] - 2026-08-12
+
+### Fixed
+- Relationstyp-Constraint-Vorschau korrekt als JSX-Fragment gruppiert, damit die Admin-App wieder kompiliert. (#291)
+
 ## [0.10.10] - 2026-08-12
 
 ### Added

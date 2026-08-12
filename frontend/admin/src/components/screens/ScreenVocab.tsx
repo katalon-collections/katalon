@@ -600,17 +600,19 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       )}
                     </div>
                     {vocab.kind === 'relation' && (
-                      <div className="fg-2" style={{ marginTop: 8 }}>
-                        <div className="field">
-                          <div className="lbl">Quelltypen</div>
-                          <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
+                      <>
+                        <div className="fg-2" style={{ marginTop: 8 }}>
+                          <div className="field">
+                            <div className="lbl">Quelltypen</div>
+                            <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
+                          </div>
+                          <div className="field">
+                            <div className="lbl">Zieltypen</div>
+                            <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
+                          </div>
                         </div>
-                        <div className="field">
-                          <div className="lbl">Zieltypen</div>
-                          <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
-                        </div>
-                      </div>
-                      <AppliesPreview from={newTermAppliesFrom} to={newTermAppliesTo} />
+                        <AppliesPreview from={newTermAppliesFrom} to={newTermAppliesTo} />
+                      </>
                     )}
                     <CustomFieldsEditor fields={termFields} value={newTermMetadata} onChange={setNewTermMetadata} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -657,17 +659,19 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <tr>
                             <td colSpan={vocab.kind === 'relation' ? 6 : 4} style={{ background: 'var(--panel)' }}>
                               {vocab.kind === 'relation' && (
-                                <div className="fg-2" style={{ marginBottom: 8 }}>
-                                  <div className="field">
-                                    <div className="lbl">Quelltypen</div>
-                                    <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
+                                <>
+                                  <div className="fg-2" style={{ marginBottom: 8 }}>
+                                    <div className="field">
+                                      <div className="lbl">Quelltypen</div>
+                                      <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
+                                    </div>
+                                    <div className="field">
+                                      <div className="lbl">Zieltypen</div>
+                                      <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
+                                    </div>
                                   </div>
-                                  <div className="field">
-                                    <div className="lbl">Zieltypen</div>
-                                    <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
-                                  </div>
-                                </div>
-                                <AppliesPreview from={editTermAppliesFrom} to={editTermAppliesTo} />
+                                  <AppliesPreview from={editTermAppliesFrom} to={editTermAppliesTo} />
+                                </>
                               )}
                               <CustomFieldsEditor fields={termFields} value={editTermMetadata} onChange={setEditTermMetadata} />
                             </td>
