@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-08-12
+
+### Fixed
+- Admin: `package-lock.json` mit den deklarierten Abhängigkeiten synchronisiert, damit der E2E-Workflow `npm ci` ausführen kann. (#221)
+
 ## [0.10.4] - 2026-08-11
 
 ### Added
