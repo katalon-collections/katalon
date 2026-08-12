@@ -20,6 +20,24 @@ async function setRelationType(page: Page, value: string) {
   return value
 }
 
+async function createRelationType(page: Page): Promise<void> {
+  const token = await page.evaluate(() => localStorage.getItem('katalon_token'))
+  const headers = { Authorization: `Bearer ${token}` }
+  const vocabularies = await page.request.get('/v1/vocabularies', { headers })
+  expect(vocabularies.ok()).toBeTruthy()
+  const vocabulary = (await vocabularies.json()).find((item: { name: string }) => item.name === 'relation_types')
+  expect(vocabulary).toBeTruthy()
+  const created = await page.request.post(`/v1/vocabularies/${vocabulary.id}/terms`, {
+    headers,
+    data: {
+      vocabulary_id: vocabulary.id,
+      term: `e2e-related-${Date.now()}`,
+      label: { de: 'E2E-Beziehung' },
+    },
+  })
+  expect(created.ok()).toBeTruthy()
+}
+
 async function selectSubtypeWhenRequired(dialog: Locator) {
   const subtype = dialog.locator('.field').filter({ hasText: /Objekt-Typ/ }).locator('select')
   if (await subtype.count()) {
@@ -36,6 +54,8 @@ test('generic relations picker quick-creates and links an object draft accessibl
   const targetIdno = `E2E-REL-TARGET-${Date.now()}`
 
   await loginAsAdmin(page)
+  await createRelationType(page)
+  await page.reload()
   await page.getByRole('button', { name: 'Neu anlegen' }).click()
   await page.getByPlaceholder('z.B. FOT.1958.0412').fill(sourceIdno)
   await page.getByRole('button', { name: 'Speichern', exact: true }).click()

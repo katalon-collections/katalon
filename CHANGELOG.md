@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-08-12
+
+### Fixed
+- E2E: Der CI-Runner erhält Schreibrechte auf das Cantaloupe-Medienverzeichnis; der Relations-Test legt seinen benötigten Relationstyp isoliert als Testdaten an. (#221)
+
 ## [0.10.7] - 2026-08-12
 
 ### Fixed

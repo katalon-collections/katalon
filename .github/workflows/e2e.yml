@@ -62,6 +62,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Prepare media directory
+        run: chmod 777 /tmp/katalon-media
+
       - name: Install backend dependencies
         working-directory: backend
         run: python -m pip install -e .[dev]
