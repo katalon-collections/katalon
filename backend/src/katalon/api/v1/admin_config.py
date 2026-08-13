@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from katalon.core.models import AdminConfig, AIUsageEvent, AppSecret
 from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, set_secret
 
 router = APIRouter(prefix="/admin/config", tags=["admin"])
+CHANGELOG_PATHS = (Path("/app/CHANGELOG.md"), Path(__file__).resolve().parents[5] / "CHANGELOG.md")
 
 
 def _rights_holder_or_none(value: dict | None) -> dict | None:
@@ -30,6 +32,10 @@ class SecretStatus(BaseModel):
 class AIUsageRead(BaseModel):
     daily_user_tokens: int
     monthly_global_tokens: int
+
+
+class ChangelogRead(BaseModel):
+    content: str
 
 
 class AdminConfigRead(BaseModel):
@@ -135,6 +141,21 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
 )
 async def get_admin_config(db: DBDep, current_user = require_role("admin")) -> AdminConfigRead:
     return await _to_read(db, await _get_or_create(db), current_user.id)
+
+
+@router.get(
+    "/changelog",
+    response_model=ChangelogRead,
+    summary="Get the application changelog",
+    responses={403: {"description": "Insufficient permissions"}},
+)
+async def get_changelog(_=require_role("admin")) -> ChangelogRead:
+    for path in CHANGELOG_PATHS:
+        try:
+            return ChangelogRead(content=path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+    raise HTTPException(status_code=503, detail="Changelog ist nicht verfügbar")
 
 
 @router.put(

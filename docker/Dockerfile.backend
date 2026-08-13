@@ -6,10 +6,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-COPY src/ src/
-COPY migrations/ migrations/
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY backend/pyproject.toml .
+COPY backend/src/ src/
+COPY backend/migrations/ migrations/
+COPY backend/docker-entrypoint.sh /docker-entrypoint.sh
+COPY CHANGELOG.md .
 RUN chmod +x /docker-entrypoint.sh
 RUN pip install --no-cache-dir uv && uv pip install --system .
 

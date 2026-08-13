@@ -741,6 +741,7 @@ export interface AdminConfigRead {
 
 export const adminConfig = {
   get: () => req<AdminConfigRead>('/v1/admin/config'),
+  changelog: () => req<{ content: string }>('/v1/admin/config/changelog'),
   update: (data: Partial<AdminConfigRead>) =>
     req<AdminConfigRead>('/v1/admin/config', { method: 'PUT', body: JSON.stringify(data) }),
   setAiSecret: (api_key: string) =>

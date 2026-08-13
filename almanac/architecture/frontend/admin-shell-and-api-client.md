@@ -12,6 +12,12 @@ sources:
   - id: api-client
     type: file
     path: frontend/admin/src/api/client.ts
+  - id: admin-config-api
+    type: file
+    path: backend/src/katalon/api/v1/admin_config.py
+  - id: changelog
+    type: file
+    path: CHANGELOG.md
   - id: vite-config
     type: file
     path: frontend/admin/vite.config.ts
@@ -40,3 +46,5 @@ The admin API client keeps access and refresh tokens in `localStorage`, exposes 
 `req<T>` is the shared JSON request wrapper. It adds `Content-Type: application/json`, converts `401` into a session-expired error, converts delete conflicts into `ConflictError`, and converts stale optimistic-locking saves into `VersionConflictError` when the backend returns `detail.error == "version_conflict"` [@api-client]. The record modules then expose typed methods for list, get, audit, create, update, delete, publish or complete, snapshots, media, relations, static pages, banners, importer, OAI sets, API keys, settings, PID registration, and AI completion [@api-client].
 
 The client sends `If-Match` only when a loaded record version is available, so ordinary scripts or older callers that omit the version keep working while forms can detect concurrent edits [@api-client]. That same conflict surface is used by [Schema Driven Record Forms](../workflows/schema-driven-record-forms), while backend update behavior is covered by [Audit And Snapshots](../workflows/audit-and-snapshots) [@api-client].
+
+Admin settings also expose the version notes through the authenticated `/v1/admin/config/changelog` endpoint. The endpoint reads the `CHANGELOG.md` bundled into the API image, so the notes shown after a deployment match that image's version [@admin-config-api] [@changelog].

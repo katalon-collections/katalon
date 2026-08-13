@@ -10,7 +10,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien' | 'gefahrenbereich'
+type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien' | 'changelog' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -1052,6 +1052,24 @@ function SectionMediaRights() {
 // Main component
 // ---------------------------------------------------------------------------
 
+function SectionChangelog() {
+  const [content, setContent] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminConfig.changelog()
+      .then(result => setContent(result.content))
+      .catch((e: Error) => setError(e.message))
+  }, [])
+
+  if (error) return <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>
+  if (content === null) return <div className="empty">Lade…</div>
+  return <div>
+    <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>Änderungen dieser Katalon-Version.</p>
+    <pre className="card" style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', font: 'inherit', lineHeight: 1.5 }}>{content}</pre>
+  </div>
+}
+
 const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
@@ -1060,6 +1078,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
+  { id: 'changelog', label: 'Versionshinweise', adminOnly: true },
   { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true },
 ]
 
@@ -1106,6 +1125,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
+          {!loading && isAdmin && section === 'changelog' && <SectionChangelog />}
           {!loading && isAdmin && section === 'gefahrenbereich' && <SectionDangerZone />}
         </div>
       </div>

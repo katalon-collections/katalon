@@ -111,11 +111,11 @@ export const advancedTourSteps: TourStep[] = [
     content: 'Massenimport aus Excel/CSV/XML mit Dry-Run und Feld-Mapping.',
   },
   {
-    route: 'settings',
-    target: '[data-tour="nav-settings"]',
+    route: 'schema',
+    target: '[data-tour="nav-schema"]',
     placement: 'right',
     title: 'Normdaten-Anbindung',
-    content: 'GND/Geonames als externe Normdatenquellen einbinden — Autovervollständigung bei Entitäten und Orten.',
+    content: 'GND/Geonames als Feldtyp "Normdaten (Authority)" im Schema-Editor einbinden — Autovervollständigung bei Entitäten und Orten.',
   },
   {
     route: 'schema',
