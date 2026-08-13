@@ -9,7 +9,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import or_, select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary
+from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services import authority_service
 from katalon.services.subtype_service import ensure_subtype_exists
@@ -88,20 +88,21 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
             detail=f"Vokabular muss vom Typ '{expected_kind}' sein.",
         )
     fixed_relation_type = data.settings.get("fixed_relation_type")
-    if fixed_relation_type:
-        from katalon.core.models import VocabularyTerm
-
-        term = await db.scalar(
-            select(VocabularyTerm).where(
-                VocabularyTerm.vocabulary_id == vocab.id,
-                VocabularyTerm.term == fixed_relation_type,
-            )
+    if data.field_type == "relation":
+        target_type = data.settings.get("target_type")
+        matching_terms = select(VocabularyTerm.id).where(
+            VocabularyTerm.vocabulary_id == vocab.id,
+            (VocabularyTerm.applies_from == []) | VocabularyTerm.applies_from.contains([data.target_type]),
+            (VocabularyTerm.applies_to == []) | VocabularyTerm.applies_to.contains([target_type]),
         )
-        if term is None:
-            raise HTTPException(
-                status_code=422,
-                detail="Fester Relationstyp gehört nicht zum gewählten Vokabular.",
-            )
+        if fixed_relation_type:
+            matching_terms = matching_terms.where(VocabularyTerm.term == fixed_relation_type)
+        if await db.scalar(matching_terms.limit(1)) is None:
+            if fixed_relation_type:
+                detail = "Der feste Relationstyp ist für Quell- und Zieltyp nicht erlaubt."
+            else:
+                detail = "Das Relationstyp-Vokabular enthält keinen Typ für diese Quell- und Zieltypkombination."
+            raise HTTPException(status_code=422, detail=detail)
 
 
 def _fd_read(f: FieldDefinition, children: list[FieldDefinitionRead] | None = None) -> FieldDefinitionRead:

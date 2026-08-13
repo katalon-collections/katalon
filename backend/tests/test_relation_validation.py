@@ -3,7 +3,10 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import HTTPException
 
+from katalon.api.v1.schema_admin import _validate_field_settings
+from katalon.core.schemas import FieldDefinitionCreate
 from katalon.services.schema_service import (
     _validate_fixed_relation_type,
     _validate_relation_structure,
@@ -104,6 +107,23 @@ def test_structure_label_none() -> None:
 def test_fixed_relation_type_rejects_other_type() -> None:
     entry = {"id": str(uuid.uuid4()), "label": "Max", "relation_type": "publisher"}
     assert _validate_fixed_relation_type(entry, "author", {"fixed_relation_type": "has_author"})
+
+
+@pytest.mark.asyncio
+async def test_relation_field_rejects_vocab_without_matching_type_pair() -> None:
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=MagicMock(kind="relation", id=uuid.uuid4()))
+    db.scalar = AsyncMock(return_value=None)
+    field = FieldDefinitionCreate(
+        target_type="object",
+        name="author",
+        label={"de": "Autor:in"},
+        field_type="relation",
+        settings={"target_type": "entity", "relation_type_vocab": str(uuid.uuid4())},
+    )
+
+    with pytest.raises(HTTPException, match="keinen Typ"):
+        await _validate_field_settings(db, field)
 
 
 # ---------------------------------------------------------------------------

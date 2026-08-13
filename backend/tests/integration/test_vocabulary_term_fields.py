@@ -78,6 +78,19 @@ async def test_vocabulary_kind_limits_schema_usage(
     )
     relation_vocab = relation_response.json()
 
+    term_response = await async_client.post(
+        f"/v1/vocabularies/{relation_vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": relation_vocab["id"],
+            "term": "has_author",
+            "label": {"de": "hat Autor"},
+            "applies_from": ["object"],
+            "applies_to": ["entity"],
+        },
+    )
+    assert term_response.status_code == 201, term_response.text
+
     invalid = await async_client.post(
         "/v1/schema",
         headers=auth_headers,

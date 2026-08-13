@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.14] - 2026-08-13
+
+### Fixed
+- Relationsfelder akzeptieren ein Relationstyp-Vokabular nur noch, wenn es für den konfigurierten Quell- und Zieltyp mindestens einen zulässigen Term enthält.
+
 ## [0.10.13] - 2026-08-13
 
 ### Added
