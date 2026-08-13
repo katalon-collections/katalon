@@ -38,6 +38,7 @@ type SubFieldFormState = {
   validation_regex: string
   vocabulary_id: string
   relation_target_type: string
+  relation_type_vocab: string
   authority_source: string
   ai_enabled: boolean
   ai_mode: 'text' | 'vision'
@@ -168,7 +169,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -297,6 +298,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       validation_regex: (sf.settings?.validation_regex as string) ?? '',
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
       relation_target_type: (sf.settings?.target_type as string) ?? 'entity',
+      relation_type_vocab: (sf.settings?.relation_type_vocab as string) ?? '',
       authority_source: (sf.settings?.source as string) ?? '',
       ai_enabled: Boolean((sf.settings?.ai_config as Record<string, unknown> | undefined)?.enabled),
       ai_mode: (((sf.settings?.ai_config as Record<string, unknown> | undefined)?.mode as 'text' | 'vision' | undefined) ?? 'text'),
@@ -311,6 +313,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   async function handleSubFieldSave() {
     if (!subFieldForm || !fieldId) return
     if (!subFieldForm.name.trim()) { setSubFieldError('Interner Name darf nicht leer sein.'); return }
+    if (subFieldForm.field_type === 'relation' && !subFieldForm.relation_type_vocab) {
+      setSubFieldError('Bitte ein Relationstyp-Vokabular wählen.')
+      return
+    }
     if (subFieldForm.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === subFieldForm.authority_source)) {
       setSubFieldError('Bitte eine aktive Normdaten-Quelle wählen.')
       return
@@ -333,7 +339,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       settings: {
         ...(subFieldForm.validation_regex.trim() ? { validation_regex: subFieldForm.validation_regex.trim() } : {}),
         ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
-        ...(subFieldForm.field_type === 'relation' ? { target_type: subFieldForm.relation_target_type } : {}),
+        ...(subFieldForm.field_type === 'relation' ? {
+          target_type: subFieldForm.relation_target_type,
+          relation_type_vocab: subFieldForm.relation_type_vocab,
+        } : {}),
         ...(subFieldForm.field_type === 'authority' ? { source: subFieldForm.authority_source } : {}),
         ...(subFieldForm.ai_enabled ? {
           ai_config: {
@@ -639,7 +648,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               </div>
             </div>
             <div className="field">
-              <div className="lbl">Relationstyp-Vokabular <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — Dropdown in Erfassungsmaske)</span></div>
+              <div className="lbl">Relationstyp-Vokabular <span className="req">*</span></div>
               <select className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
                 <option value="">— Vokabular wählen —</option>
                 {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -837,15 +846,24 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
         </div>
       )}
       {sf.field_type === 'relation' && (
-        <div className="field">
-          <div className="lbl">Ziel-Typ</div>
-          <select className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
-            <option value="object">Objekte</option>
-            <option value="entity">Entitäten</option>
-            <option value="place">Orte</option>
-            <option value="occurrence">Occurrences</option>
-          </select>
-        </div>
+        <>
+          <div className="field">
+            <div className="lbl">Ziel-Typ</div>
+            <select className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
+              <option value="object">Objekte</option>
+              <option value="entity">Entitäten</option>
+              <option value="place">Orte</option>
+              <option value="occurrence">Occurrences</option>
+            </select>
+          </div>
+          <div className="field">
+            <div className="lbl">Relationstyp-Vokabular <span className="req">*</span></div>
+            <select className="fld" value={sf.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
+              <option value="">— Vokabular wählen —</option>
+              {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </div>
+        </>
       )}
       {sf.field_type === 'authority' && (
         <div className="field">
@@ -1112,6 +1130,10 @@ export function ScreenSchema() {
       setSaveError('Interner Name darf nicht leer sein.')
       return
     }
+    if (form.field_type === 'relation' && !form.relation_type_vocab) {
+      setSaveError('Bitte ein Relationstyp-Vokabular wählen.')
+      return
+    }
     if (form.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === form.authority_source)) {
       setSaveError('Bitte eine aktive Normdaten-Quelle wählen.')
       return
@@ -1138,7 +1160,7 @@ export function ScreenSchema() {
         ...(form.field_type === 'relation' ? {
           target_type: form.relation_target_type,
           ...(form.relation_target_subtype.trim() ? { target_subtype: form.relation_target_subtype.trim() } : {}),
-          ...(form.relation_type_vocab ? { relation_type_vocab: form.relation_type_vocab } : {}),
+          relation_type_vocab: form.relation_type_vocab,
           ...(form.relation_type_vocab && form.fixed_relation_type ? { fixed_relation_type: form.fixed_relation_type } : {}),
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
         } : {}),

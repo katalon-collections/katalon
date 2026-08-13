@@ -71,10 +71,10 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
     if data.field_type == "relation":
         vocab_id = data.settings.get("relation_type_vocab")
         expected_kind = "relation"
-        if data.settings.get("fixed_relation_type") and not vocab_id:
+        if not vocab_id:
             raise HTTPException(
                 status_code=422,
-                detail="Ein fester Relationstyp benötigt ein Relationstyp-Vokabular.",
+                detail="Ein Relationsfeld benötigt ein Relationstyp-Vokabular.",
             )
     if not vocab_id:
         return

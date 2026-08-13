@@ -132,6 +132,20 @@ async def test_relation_field_rejects_vocab_without_matching_type_pair() -> None
 
 
 @pytest.mark.asyncio
+async def test_relation_field_requires_relation_type_vocabulary() -> None:
+    field = FieldDefinitionCreate(
+        target_type="object",
+        name="author",
+        label={"de": "Autor:in"},
+        field_type="relation",
+        settings={"target_type": "entity"},
+    )
+
+    with pytest.raises(HTTPException, match="benötigt ein Relationstyp-Vokabular"):
+        await _validate_field_settings(AsyncMock(), field)
+
+
+@pytest.mark.asyncio
 async def test_target_no_target_type_setting_skips_db() -> None:
     db = AsyncMock()
     entry = {"id": str(uuid.uuid4()), "label": "X"}
