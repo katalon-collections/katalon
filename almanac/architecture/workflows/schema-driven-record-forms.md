@@ -87,7 +87,7 @@ Schema relation inputs use the shared relation picker for top-level, repeatable,
 
 The relation picker can create any of the five record types in a native modal dialog without unmounting the source form. The dialog renders `ScreenForm` in quick-create mode, so it retains the target type's scalar fields, schema fields, subtype selector, and active form variant. It always creates a `draft`; status controls, media, audit history, snapshots, relation panels, and nested quick creation are omitted [@screen-form].
 
-A configured `target_subtype` is preselected and locked. Otherwise the form selects the default subtype when one exists and leaves the subtype selector available. Procedure quick creation uses the six fixed procedure types rather than record subtypes [@screen-form]. The dialog keeps its own dirty state for discard confirmation, and closing it restores focus without changing the source form [@screen-form].
+A configured `target_subtype` is preselected and locked. Otherwise the form selects the default subtype when one exists and leaves the subtype selector available. Procedure quick creation uses the configured Procedure subtypes, including the six protected system subtypes and locally configured types [@screen-form]. The dialog keeps its own dirty state for discard confirmation, and closing it restores focus without changing the source form [@screen-form].
 
 ## Validation And Save
 
@@ -101,6 +101,6 @@ If the backend reports an optimistic-locking conflict, the form fetches the curr
 
 Existing records load both incoming and outgoing generic relations, fetch display titles for related records, and let users add or remove relations from the form side panel [@screen-form]. Its add flow first chooses one of the five target types, then a relation type and target record. A newly created draft is linked immediately through the relation API; if linking fails, the picker keeps the draft selected and offers a retry [@screen-form] [@relations-api]. Procedure forms can add related objects, and object forms can add procedures through the same picker with the fixed relation type `concerns` [@screen-form].
 
-Snapshots and audit history are part of the same editing surface. The form loads snapshot lists and audit entries for saved records, can create and restore snapshots through the record API module, and can show audit entries without leaving the edit screen [@screen-form] [@admin-client]. Those persistence details are covered in [Audit And Snapshots](audit-and-snapshots).
+For saved collection records, snapshots and audit history are part of the same editing surface. Procedure forms show audit history only: they do not load, create, or restore snapshots [@screen-form] [@admin-client]. Those persistence details are covered in [Audit And Snapshots](audit-and-snapshots).
 
 When a procedure is moved to `completed`, the form saves ordinary procedure changes first and then calls the procedure completion endpoint. If linked objects exist and the procedure type has a suggested collection status, the user chooses whether completion should update those objects [@screen-form] [@procedures-api]. That makes procedure completion a workflow step rather than a plain status edit.

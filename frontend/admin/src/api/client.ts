@@ -266,11 +266,6 @@ export const procedures = {
       method: 'POST',
       body: JSON.stringify({ collection_status: collection_status ?? null }),
     }),
-  snapshots: {
-    list:    (id: string) => req<Snapshot[]>(`/v1/procedures/${id}/snapshots`),
-    create:  (id: string, label: string) => req<Snapshot>(`/v1/procedures/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string, version?: number) => req<Procedure>(`/v1/procedures/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
-  },
 }
 
 export interface SchemaImportResult {

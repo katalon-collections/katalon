@@ -101,14 +101,6 @@ const MEDIA_LICENSES = [
 ] as const
 const PROCEDURE_STATUSES: ProcedureStatus[] = ['draft', 'active', 'completed', 'cancelled']
 const PROCEDURE_STATUS_LABELS: Record<ProcedureStatus, string> = { draft: 'Entwurf', active: 'Aktiv', completed: 'Abgeschlossen', cancelled: 'Abgebrochen' }
-const PROCEDURE_TYPES = [
-  { id: 'loan_out', label: 'Ausleihe ausgehend' },
-  { id: 'loan_in', label: 'Ausleihe eingehend' },
-  { id: 'acquisition', label: 'Erwerbung' },
-  { id: 'conservation', label: 'Restaurierung' },
-  { id: 'object_entry', label: 'Objekteingang' },
-  { id: 'deaccession', label: 'Deakzession' },
-]
 const PROCEDURE_COMPLETION_STATUS: Record<string, string | null> = {
   loan_out: 'active',
   loan_in: 'returned',
@@ -180,7 +172,7 @@ function recordSearchResult(recordType: RecordType, record: AnyRecord): SearchRe
 }
 
 async function searchRecords(targetType: RecordType, q: string, targetSubtype?: string): Promise<SearchResult[]> {
-  if (!targetSubtype && targetType !== 'procedure') {
+  if (!targetSubtype) {
     return (await searchApi.query(q, targetType, 8)).items
   }
   switch (targetType) {
@@ -918,12 +910,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
+  const snapshotsApi = recordType === 'object' ? objects.snapshots
+    : recordType === 'entity' ? entities.snapshots
+    : recordType === 'place' ? places.snapshots
+    : recordType === 'occurrence' ? occurrences.snapshots
+    : null
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
   const showIdno  = true
   const showMedia = recordType === 'object' && !quickCreate
   const showGeo   = recordType === 'place'
   const showProcedureFields = recordType === 'procedure'
+  const showSnapshotsForRecord = recordType !== 'procedure'
   const showCollectionStatus = recordType === 'object'
   const user = getTokenUser()
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
@@ -1011,8 +1009,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
 
   const loadSnapshots = useCallback((id: string) => {
-    api.snapshots.list(id).then(setSnapshots).catch(() => {})
-  }, [api])
+    snapshotsApi?.list(id).then(setSnapshots).catch(() => {})
+  }, [snapshotsApi])
 
   const loadAudit = useCallback((id: string) => {
     setAuditLoading(true)
@@ -1174,8 +1172,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }, [savedId, showMedia, hasPendingMedia])
 
   useEffect(() => {
-    if (savedId) loadSnapshots(savedId)
-  }, [savedId, loadSnapshots])
+    if (savedId && showSnapshotsForRecord) loadSnapshots(savedId)
+  }, [savedId, showSnapshotsForRecord, loadSnapshots])
 
   useEffect(() => {
     if (!showMedia) return
@@ -1476,11 +1474,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     // Entity subtype choice and fixed relation subtypes are structural in quick-create,
     // so drafts must not bypass them.
     const validConfiguredSubtype = availableSubtypes.some(item => item.name === subtype)
-    if (quickCreate && !showProcedureFields &&
+    if (quickCreate &&
         ((recordType === 'entity' && availableSubtypes.length > 0) || lockSubtype) &&
         !validConfiguredSubtype) {
       errors.__subtype = lockSubtype ? 'Der konfigurierte Subtyp ist ungültig.' : 'Subtyp ist ein Pflichtfeld.'
-    } else if (subtypeKey && (availableSubtypes.length > 0 || showProcedureFields) && !subtype) {
+    } else if (subtypeKey && availableSubtypes.length > 0 && !subtype) {
       addRequired('__subtype', 'Subtyp ist ein Pflichtfeld.')
     }
     for (const f of fields) {
@@ -2185,9 +2183,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </div>
                 )}
 
-                {showProcedureFields && (
+                {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">Vorgangstyp</div>
+                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'}</div>
                     <select
                       className="fld"
                       value={subtype}
@@ -2195,28 +2193,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
-                      <option value="">— Vorgangstyp wählen —</option>
-                      {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
-                    {(fieldErrors['__subtype'] || fieldWarnings['__subtype']) && (
-                      <div style={{ fontSize: 11, color: fieldErrors['__subtype'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
-                        {fieldErrors['__subtype'] ?? fieldWarnings['__subtype']}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {subtypeKey && !showProcedureFields && availableSubtypes.length > 0 && (
-                  <div className="field">
-                    <div className="lbl">{recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'}</div>
-                    <select
-                      className="fld"
-                      value={subtype}
-                      onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
-                      disabled={justCreated || lockSubtype}
-                      style={getFeedbackStyle('__subtype')}
-                    >
-                      <option value="">— {recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
+                      <option value="">— {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
@@ -2922,7 +2899,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </div>
               )}
 
-              {!isNew && savedId && (
+              {!isNew && savedId && showSnapshotsForRecord && (
                 <div className="card">
                   <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowSnapshots(s => !s)}>
                     <span>Versionen ({snapshots.length})</span>
@@ -2945,7 +2922,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             if (!snapLabel.trim() || !savedId) return
                             setSnapCreating(true)
                             try {
-                              const snap = await api.snapshots.create(savedId, snapLabel.trim())
+                              if (!snapshotsApi) return
+                              const snap = await snapshotsApi.create(savedId, snapLabel.trim())
                               setSnapshots(s => [snap, ...s])
                               setSnapLabel('')
                             } finally {
@@ -2972,7 +2950,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               if (!savedId || !window.confirm(`Version „${snap.label}" wiederherstellen?`)) return
                               setSnapRestoring(snap.id)
                               try {
-                                const restored = await api.snapshots.restore(savedId, snap.id, version ?? undefined)
+                                if (!snapshotsApi) return
+                                const restored = await snapshotsApi.restore(savedId, snap.id, version ?? undefined)
                                 setStatus(restored.status as Status)
                                 setIdno(restored.idno ?? '')
                                 setValues(restored.metadata_ as Record<string, unknown>)

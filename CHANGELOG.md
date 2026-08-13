@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.29] - 2026-08-13
+
+### Added
+- Vorgänge verwenden konfigurierbare Subtypen. Die sechs bisherigen Vorgangstypen bleiben als geschützte Systemtypen erhalten; eigene Typen können Felder, Formularvarianten und Listenfilter nutzen. (#255)
+
+### Changed
+- Vorgänge haben keine Snapshots mehr; Beziehungen bleiben über den generischen Relationsgraphen verfügbar.
+
 ## [0.10.28] - 2026-08-13
 
 ### Added

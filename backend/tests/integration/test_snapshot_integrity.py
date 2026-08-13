@@ -9,10 +9,9 @@ import pytest
         ("entities", None, None),
         ("places", None, None),
         ("occurrences", None, None),
-        ("procedures", "procedure_type", "acquisition"),
     ],
 )
-async def test_snapshot_restore_requires_if_match_for_all_record_types(
+async def test_snapshot_restore_requires_if_match_for_collection_record_types(
     async_client,
     auth_headers,
     route: str,

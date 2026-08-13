@@ -25,7 +25,7 @@ Ein **Vorgang** (intern: *Procedure*) beschreibt einen zeitlich begrenzten, zust
 - ein **Start- und Enddatum** (inkl. Rückgabefrist bei Leihe)
 - eine **Referenznummer** (für interne und externe Korrespondenz)
 - **freie Metadatenfelder** (wie alle anderen Katalon-Typen)
-- **Verknüpfungen** zu Objekten, Entitäten und Orten über das bestehende Relationssystem
+- **Verknüpfungen** zu Objekten, Entitäten, Orten und anderen Vorgängen über das bestehende Relationssystem
 
 Vorgänge sind **keine Ereignisse** im FRBR-Sinne. Ein Konzert ist ein Ereignis; der Leihvertrag für das ausgestellte Instrument ist ein Vorgang.
 
@@ -42,7 +42,9 @@ Vorgänge sind **keine Ereignisse** im FRBR-Sinne. Ein Konzert ist ein Ereignis;
 | `object_entry` | Eingangsprüfung | Ersterfassung / Eingangsprotokoll |
 | `deaccession` | Deakzession | Verkauf, Abgang, Aussonderung |
 
-Alle Typen nutzen dieselbe technische Grundlage; was sichtbar ist und welche Felder relevant sind, bestimmt der Typ.
+Diese sechs Systemtypen werden als Vorgangs-Subtypen angelegt. Sie dürfen nicht gelöscht, umbenannt oder in einen anderen Primärtyp verschoben werden, damit die fachlichen Regeln für ausgehende Leihgaben erhalten bleiben.
+
+Admins können daneben eigene Vorgangs-Subtypen anlegen. Für jeden Subtyp lassen sich im bestehenden Schema-Editor eigene Metadatenfelder und im Editor für Formularvarianten eigene Formularvarianten konfigurieren. Eigene Typen haben keine impliziten fachlichen Automatismen.
 
 ---
 
@@ -165,7 +167,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 - **Automatische Statusübergänge** (z. B. Objekt wird automatisch „zurückgegeben" wenn Rückgabedatum verstrichen): Bewusste Entscheidung für manuelle Kontrolle
 - **Automatische Referenznummernvergabe**: Generierung nach institutionsspezifischer Logik ist zu divers; Feld ist Freitext
 - **Per-Objekt strukturierte Zusatzfelder auf Vorgangs-Relationen** (z. B. individuelle Versicherungswerte pro Objekt innerhalb einer Mehrfach-Leihgabe): Post-MVP
-- **Subtyp-Feinschliff im generischen Schema-Editor** für Vorgänge: Issue #255
+- **Fachliche Automatismen für eigene Vorgangstypen**: Nur der geschützte Systemtyp `loan_out` sperrt parallele aktive Ausleihen. Ein Objektstatus wird beim Abschluss nur vorgeschlagen, wenn ein Systemtyp dafür eine Zuordnung hat; bei eigenen Typen bleibt die Entscheidung vollständig manuell.
 
 ---
 
@@ -182,10 +184,12 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 
 - Neue Datenbanktabelle `procedures` mit Pflichtfeldern und freiem `metadata_`-JSONB
 - Sammlungsstatus auf `objects` als nicht-konfigurierbares Systemfeld
-- Eigenes Admin-Panel „Objekte im Vorgang" auf Basis des bestehenden Relationssystems; Entitäten und Orte bleiben im allgemeinen Beziehungsblock
+- Eigene Vorgangs-Subtypen, Schemafelder und Formularvarianten nutzen dieselben Konfigurationswege wie die anderen Datensatztypen; die sechs Systemtypen bleiben gegen Löschen, Umbenennen und Verschieben geschützt
+- Beziehungen zu Objekten, Entitäten, Orten und anderen Vorgängen nutzen den bestehenden generischen Beziehungsgraphen; es gibt keine Vorgangs-spezifische Join-Tabelle
 - Admin-Listenfilter für Vorgangstyp, Status, Fälligkeit und Referenznummer
 - Öffentliche Suche über Elasticsearch respektiert `collection_status=active`
 - Vollständiges Audit Log bei jedem Statuswechsel
+- Keine Snapshots für Vorgänge. Bereits vorhandene Vorgangs-Snapshot-Zeilen bleiben zur Datenwahrung in der Datenbank, sind aber über API und Admin-UI nicht mehr zugänglich.
 - Neue Admin-Screens: Vorgangsliste, Vorgangs-Formular
 - Kein neues Datenbankvolumen nötig, keine Architekturänderung
 
@@ -219,5 +223,4 @@ curl -X POST https://deine-domain.de/v1/search/reindex
 Phase 14 ist umgesetzt. Offen bleiben nur die zurückgestellten Folgepunkte:
 
 - strukturierte Zusatzfelder auf Vorgangs-Relationen (#239)
-- Subtyp-Feinschliff für Vorgänge (#255)
 - Dateianhänge, automatische Statusübergänge, Auto-Referenznummern

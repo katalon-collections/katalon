@@ -18,15 +18,6 @@ const PROCEDURE_TABS = [
   { id: 'completed', label: 'Abgeschlossen' },
   { id: 'cancelled', label: 'Abgebrochen' },
 ]
-const PROCEDURE_TYPES = [
-  { id: 'loan_out', label: 'Ausleihe ausgehend' },
-  { id: 'loan_in', label: 'Ausleihe eingehend' },
-  { id: 'acquisition', label: 'Erwerbung' },
-  { id: 'conservation', label: 'Restaurierung' },
-  { id: 'object_entry', label: 'Objekteingang' },
-  { id: 'deaccession', label: 'Deakzession' },
-]
-
 const PAGE_SIZE = 50
 
 const TYPE_LABELS: Record<RecordType, string> = {
@@ -97,7 +88,6 @@ export function ScreenList({ recordType, onOpen }: Props) {
 
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
-  const [procedureType, setProcedureType] = useState('')
   const [subtypeFilter, setSubtypeFilter] = useState('')
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const [dueBefore, setDueBefore] = useState('')
@@ -126,7 +116,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }, [recordType, subtypeFilter])
 
   useEffect(() => {
-    if (!subtypeKey || recordType === 'procedure') {
+    if (!subtypeKey) {
       setAvailableSubtypes([])
       return
     }
@@ -137,7 +127,6 @@ export function ScreenList({ recordType, onOpen }: Props) {
     setTab('all')
     setQ('')
     setSubtypeFilter('')
-    setProcedureType('')
     setDueBefore('')
     setReferenceNumber('')
     setPage(1)
@@ -163,7 +152,6 @@ export function ScreenList({ recordType, onOpen }: Props) {
     if (debouncedQ) params.q = debouncedQ
     if (subtypeKey && subtypeFilter) params[subtypeKey] = subtypeFilter
     if (recordType === 'procedure') {
-      if (procedureType) params.procedure_type = procedureType
       if (dueBefore) params.due_before = dueBefore
       if (referenceNumber) params.reference_number = referenceNumber
     }
@@ -184,7 +172,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       .finally(() => {
         if (requestSeq === requestSeqRef.current) setLoading(false)
       })
-  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, procedureType, dueBefore, referenceNumber, api, recordType])
+  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, api, recordType])
 
   useEffect(() => { load() }, [load])
 
@@ -313,10 +301,6 @@ export function ScreenList({ recordType, onOpen }: Props) {
         )}
         {recordType === 'procedure' && (
           <>
-            <select aria-label="Vorgangstyp" className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>
-              <option value="">Alle Vorgangstypen</option>
-              {PROCEDURE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
             <input aria-label="Fällig bis" className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
             <input aria-label="Referenznummer" className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
             <button className="btn gh" onClick={handleOverdue}>Überfällig</button>

@@ -169,7 +169,7 @@ Wiederholbares Feld in JSONB:
 
 ## Subtypes (Untertypen)
 
-Entity und Occurrence haben ein Subtyp-Feld (`entity_type` bzw. `occurrence_type`). Subtypen sind frei gewählte Zeichenketten — es gibt keine vordefinierte Liste.
+Object, Entity, Place, Occurrence und Procedure haben ein Subtyp-Feld. Subtypen werden in der Administration mit stabilem internem Namen und mehrsprachigem Label konfiguriert.
 
 **Typische Subtypen:**
 
@@ -177,19 +177,22 @@ Entity und Occurrence haben ein Subtyp-Feld (`entity_type` bzw. `occurrence_type
 |---|---|
 | Entity | `person`, `organisation`, `koerperschaft` |
 | Occurrence | `work`, `event`, `concept`, `publication` |
+| Procedure | `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry`, `deaccession` sowie eigene Vorgangstypen |
 
-Felddefinitionen können subtyp-spezifisch sein: Ein Feld mit `target_subtype = "person"` erscheint nur bei Entitäten vom Subtyp `person`, nicht bei Organisationen. Felder ohne `target_subtype` gelten für alle Subtypen des jeweiligen Primärtyps.
+Felddefinitionen können subtyp-spezifisch sein: Ein Feld mit `target_subtype = "person"` erscheint nur bei Entitäten vom Subtyp `person`, nicht bei Organisationen. Felder ohne `target_subtype` gelten für alle Subtypen des jeweiligen Primärtyps. Dasselbe gilt für Vorgänge: Felder und Formularvarianten können etwa für `acquisition` oder einen eigenen Vorgangstyp gelten.
+
+Die sechs genannten Vorgangstypen sind geschützte Systemtypen: Sie dürfen nicht gelöscht, umbenannt oder in einen anderen Primärtyp verschoben werden. Eigene Vorgangstypen können daneben frei angelegt und wie andere Subtypen verwaltet werden.
 
 ---
 
 ## Relationen
 
-Alle vier Primärtypen können miteinander verknüpft werden. Relationen sind gerichtet (von → zu) und tragen einen Relationstyp sowie optional freie Metadaten.
+Alle vier Primärtypen und Vorgänge können miteinander verknüpft werden. Relationen sind gerichtet (von → zu) und tragen einen Relationstyp sowie optional freie Metadaten.
 
 ```sql
 relations (
     id            UUID,
-    from_type     VARCHAR,   -- object / entity / place / occurrence
+    from_type     VARCHAR,   -- object / entity / place / occurrence / procedure
     from_id       UUID,
     to_type       VARCHAR,
     to_id         UUID,
@@ -205,6 +208,8 @@ relations (
 - Object → Occurrence: `ist_exemplar_von` (z.B. Druck eines Werks)
 - Entity → Entity: `ist_mitglied_von` (Person → Organisation)
 - Occurrence → Place: `hat_stattgefunden_in` (Ereignis → Ort)
+- Procedure → Object: `concerns` (Vorgang betrifft ein Objekt)
+- Procedure → Entity: `involves` (z. B. verleihende oder empfangende Institution)
 
 Der Relationstyp ist eine freie Zeichenkette. Relationstyp-Vokabulare liefern
 kontrollierte Werte und Gegenrichtungslabels. Ein Schema-Relationsfeld kann
@@ -282,7 +287,7 @@ Snapshots speichern einen benannten Zustand eines Datensatzes. Sie werden manuel
 ```sql
 record_snapshots (
     id          UUID,
-    record_type VARCHAR,    -- object / entity / place / occurrence
+    record_type VARCHAR,    -- object / entity / place / occurrence; keine procedures
     record_id   UUID,
     label       VARCHAR,    -- z.B. "Abgabe ans Museum 2024-03"
     snapshot    JSONB,      -- vollständiger Datensatz-Zustand zum Zeitpunkt
@@ -291,7 +296,7 @@ record_snapshots (
 )
 ```
 
-Snapshots sind unveränderlich. Sie ersetzen keine vollständige Versionskontrolle, sind aber als Meilenstein-Dokumentation geeignet.
+Snapshots sind unveränderlich. Sie ersetzen keine vollständige Versionskontrolle, sind aber als Meilenstein-Dokumentation geeignet. Vorgänge haben keine Snapshots; vorhandene historische Snapshot-Zeilen für Vorgänge werden nicht gelöscht, aber nicht mehr über API oder Admin-UI angeboten.
 
 ---
 

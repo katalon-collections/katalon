@@ -9,6 +9,7 @@ const PRIMARY_TYPES = [
   { id: 'entity',     label: 'Entitäten' },
   { id: 'place',      label: 'Orte' },
   { id: 'occurrence', label: 'Occurrences' },
+  { id: 'procedure',  label: 'Vorgänge' },
 ]
 
 interface FormState {
@@ -120,7 +121,7 @@ export function ScreenSubtype() {
       <div className="ph">
         <div>
           <h1>Subtypen</h1>
-          <div className="sub">Subtypen für die vier Primärtypen verwalten</div>
+          <div className="sub">Subtypen für Bestandsdaten und Vorgänge verwalten</div>
         </div>
         <div className="right">
           <button className="btn pri" onClick={openNew}><Plus size={13} /> Neuer Subtyp</button>

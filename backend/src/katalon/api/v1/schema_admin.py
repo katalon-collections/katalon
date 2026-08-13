@@ -15,7 +15,6 @@ from katalon.services import authority_service
 from katalon.services.subtype_service import ensure_subtype_exists
 
 SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure", "vocabulary_term"}
-PROCEDURE_TYPES = {"loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession"}
 VOCABULARY_TERM_FIELD_TYPES = {"text", "number", "boolean", "authority"}
 
 
@@ -34,10 +33,6 @@ async def _ensure_schema_subtype_exists(db: DBDep, target_type: str, subtype: st
             raise HTTPException(status_code=422, detail="Ungültige Vokabular-ID.") from exc
         if not await db.get(Vocabulary, vocab_id):
             raise HTTPException(status_code=422, detail="Vokabular nicht gefunden.")
-        return
-    if target_type == "procedure":
-        if subtype is not None and subtype not in PROCEDURE_TYPES:
-            raise HTTPException(status_code=422, detail=f"Ungültiger Vorgangstyp '{subtype}'.")
         return
     await ensure_subtype_exists(db, target_type, subtype)
 

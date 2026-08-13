@@ -165,6 +165,101 @@ async def test_procedure_validation_uses_procedure_type_schema(async_client, aut
     assert ok_response.status_code == 201, ok_response.text
 
 
+async def test_procedure_subtypes_are_configurable_and_system_types_are_protected(
+    async_client, auth_headers
+) -> None:
+    subtypes_response = await async_client.get(
+        "/v1/record-subtypes?primary_type=procedure", headers=auth_headers
+    )
+    assert subtypes_response.status_code == 200, subtypes_response.text
+    system_subtypes = {subtype["name"]: subtype for subtype in subtypes_response.json()}
+    assert {"loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession"} <= set(
+        system_subtypes
+    )
+
+    loan_out = system_subtypes["loan_out"]
+    protected_update = await async_client.put(
+        f"/v1/record-subtypes/{loan_out['id']}",
+        headers=auth_headers,
+        json={**loan_out, "name": "outgoing_loan"},
+    )
+    assert protected_update.status_code == 409
+
+    custom_type = f"custom_procedure_{uuid.uuid4().hex[:8]}"
+    created_subtype = await async_client.post(
+        "/v1/record-subtypes",
+        headers=auth_headers,
+        json={
+            "primary_type": "procedure",
+            "name": custom_type,
+            "label": {"de": "Eigener Vorgang"},
+        },
+    )
+    assert created_subtype.status_code == 201, created_subtype.text
+
+    field_name = f"custom_procedure_note_{uuid.uuid4().hex[:8]}"
+    created_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "procedure",
+            "target_subtype": custom_type,
+            "name": field_name,
+            "label": {"de": "Notiz"},
+            "field_type": "text",
+            "is_required": True,
+        },
+    )
+    assert created_field.status_code == 201, created_field.text
+
+    variant = await async_client.post(
+        "/v1/form-variants",
+        headers=auth_headers,
+        json={
+            "target_type": "procedure",
+            "target_subtype": custom_type,
+            "name": "Eigene Erfassung",
+            "field_names": ["label", field_name],
+        },
+    )
+    assert variant.status_code == 201, variant.text
+
+    missing_required = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+            "procedure_type": custom_type,
+            "status": "active",
+            "metadata_": {"label": "Eigener Vorgang"},
+        },
+    )
+    assert missing_required.status_code == 422
+
+    created_procedure = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PRO-{uuid.uuid4().hex[:12]}",
+            "procedure_type": custom_type,
+            "status": "active",
+            "metadata_": {"label": "Eigener Vorgang", field_name: "vorhanden"},
+        },
+    )
+    assert created_procedure.status_code == 201, created_procedure.text
+
+    delete_in_use = await async_client.delete(
+        f"/v1/record-subtypes/{created_subtype.json()['id']}", headers=auth_headers
+    )
+    assert delete_in_use.status_code == 409
+
+
+async def test_procedures_do_not_expose_snapshot_routes(app) -> None:
+    paths = app.openapi()["paths"]
+    assert "/v1/procedures/{procedure_id}/snapshots" not in paths
+    assert "/v1/procedures/{procedure_id}/snapshots/{snapshot_id}/restore" not in paths
+
+
 async def test_concurrent_active_loan_relations_allow_one_winner(
     async_client, auth_headers
 ) -> None:

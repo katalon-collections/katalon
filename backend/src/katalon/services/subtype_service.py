@@ -4,15 +4,19 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import Entity, Object, Occurrence, Place, RecordSubtype
+from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, RecordSubtype
 
-PRIMARY_TYPES = {"object", "entity", "place", "occurrence"}
+PRIMARY_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+SYSTEM_PROCEDURE_TYPES = frozenset({
+    "loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession",
+})
 
 _TYPE_MODEL_FIELD = {
     "object": (Object, "object_type"),
     "entity": (Entity, "entity_type"),
     "place": (Place, "place_type"),
     "occurrence": (Occurrence, "occurrence_type"),
+    "procedure": (Procedure, "procedure_type"),
 }
 
 

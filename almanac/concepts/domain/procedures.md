@@ -17,15 +17,15 @@ sources:
     path: docs/konzept-vorgaenge.md
 ---
 
-Procedures are Katalon's records for time-bounded collection processes, not another kind of inventory entity. They cover outgoing and incoming loans, acquisition, conservation, object entry, and deaccession, with their own dates, reference number, status, dynamic metadata, snapshots, audit log, search indexing, and relations to other records [@procedures-api]. Procedures connect to [Primary Record Types](primary-record-types) through [Generic Relations](../relations/generic-relations), and their backend behavior is part of [Record CRUD And Publishing](../../architecture/workflows/record-crud-and-publishing).
+Procedures are Katalon's records for time-bounded collection processes, not another kind of inventory entity. They cover outgoing and incoming loans, acquisition, conservation, object entry, deaccession, and configured local workflow types, with their own dates, reference number, status, dynamic metadata, audit log, search indexing, and relations to other records [@procedures-api]. Procedures connect to [Primary Record Types](primary-record-types) through [Generic Relations](../relations/generic-relations), and their backend behavior is part of [Record CRUD And Publishing](../../architecture/workflows/record-crud-and-publishing).
 
 ## What A Procedure Represents
 
 The procedure concept document defines a Vorgang as a time-limited, state-changing process affecting one or more objects. It separates a loan contract, acquisition process, or conservation treatment from domain concepts such as an exhibition or work [@procedure-concept]. In code, the `Procedure` model has `procedure_type`, publication or workflow `status`, `start_date`, `end_date`, `due_date`, `reference_number`, JSONB `metadata`, `search_vector`, timestamps, and version [@models].
 
-The allowed procedure types in the API are `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry`, and `deaccession`. The allowed statuses are `draft`, `active`, `completed`, and `cancelled` [@procedures-api].
+Procedure types are configured `RecordSubtype` rows under primary type `procedure`. Migration `0034_procedure_record_subtypes.py` creates the system types `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry`, and `deaccession`; admins can create additional procedure subtypes. The API accepts only a configured subtype. Procedure statuses remain `draft`, `active`, `completed`, and `cancelled` [@procedures-api].
 
-Freely configurable Procedure subtype refinement is documented as deferred work, but it is not the current runtime model; the API still uses the six fixed `procedure_type` values above [@procedure-concept] [@procedures-api].
+The six system types cannot be deleted, renamed, or moved to another primary type. This preserves the stable names used by procedure-specific business rules; additional procedure subtypes have no implicit workflow rule.
 
 ## Dynamic Metadata With Procedure Subtypes
 
@@ -49,4 +49,4 @@ The API allows collection status values `active`, `pending`, `on_loan_in`, `on_l
 
 Procedure CRUD follows the same operational shape as other record APIs. Create and update write audit log entries and attempt Elasticsearch indexing; update uses `If-Match` optimistic locking through `check_version`; delete blocks when relations exist unless `force=true`, then removes relation rows before deleting the Procedure [@procedures-api].
 
-Procedures also support snapshots and audit-log reads. The API can create snapshots from the current `ProcedureRead` representation, list snapshots for one Procedure, restore selected fields from a snapshot, and list audit entries for the Procedure [@procedures-api]. That makes Procedures first-class process records without turning them into public collection concepts.
+Procedures support audit-log reads, but not snapshots. The procedure snapshot endpoints and form controls are absent; historical `record_snapshots` rows with `record_type = "procedure"` are retained rather than purged, but are inaccessible through the API and admin UI [@procedures-api].

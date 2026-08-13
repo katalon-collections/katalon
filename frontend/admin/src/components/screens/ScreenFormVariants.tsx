@@ -61,7 +61,6 @@ export function ScreenFormVariants() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (activeType === 'procedure') { setSubtypesList([]); return }
     subtypes.list(activeType).then(list => setSubtypesList(list)).catch(() => setSubtypesList([]))
   }, [activeType])
 

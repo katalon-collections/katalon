@@ -7,6 +7,7 @@ from katalon.core.dependencies import DBDep, require_admin_or_editor, require_ro
 from katalon.core.models import RecordSubtype
 from katalon.core.schemas import RecordSubtypeCreate, RecordSubtypeRead
 from katalon.services.subtype_service import (
+    SYSTEM_PROCEDURE_TYPES,
     normalize_subtype_name,
     subtype_has_assigned_records,
     validate_primary_type,
@@ -107,6 +108,9 @@ async def update_record_subtype(
     subtype = result.scalar_one_or_none()
     if subtype is None:
         raise HTTPException(status_code=404, detail="Subtyp nicht gefunden.")
+    if subtype.primary_type == "procedure" and subtype.name in SYSTEM_PROCEDURE_TYPES:
+        if data.primary_type != "procedure" or name != subtype.name:
+            raise HTTPException(status_code=409, detail="System-Vorgangstyp kann nicht umbenannt oder verschoben werden.")
 
     existing_result = await db.execute(
         select(RecordSubtype).where(
@@ -146,6 +150,8 @@ async def delete_record_subtype(subtype_id: uuid.UUID, db: DBDep) -> None:
     subtype = result.scalar_one_or_none()
     if subtype is None:
         raise HTTPException(status_code=404, detail="Subtyp nicht gefunden.")
+    if subtype.primary_type == "procedure" and subtype.name in SYSTEM_PROCEDURE_TYPES:
+        raise HTTPException(status_code=409, detail="System-Vorgangstyp kann nicht gelöscht werden.")
 
     if await subtype_has_assigned_records(db, subtype.primary_type, subtype.name):
         raise HTTPException(

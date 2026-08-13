@@ -4,18 +4,15 @@ from datetime import date
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
-from sqlalchemy.orm.attributes import flag_modified
 
-from katalon.core.concurrency import check_version, flush_record, require_version
+from katalon.core.concurrency import check_version, flush_record
 from katalon.core.dependencies import DBDep, require_record_permission
-from katalon.core.models import AdminConfig, Object, Procedure, RecordSnapshot
+from katalon.core.models import AdminConfig, Object, Procedure
 from katalon.core.schemas import (
     AuditLogRead,
     ProcedureComplete,
     ProcedureCreate,
     ProcedureRead,
-    SnapshotCreate,
-    SnapshotRead,
 )
 from katalon.services import search_service
 from katalon.services.audit_service import log_change
@@ -33,18 +30,11 @@ from katalon.services.relation_service import (
     sync_schema_relations,
 )
 from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.subtype_service import ensure_subtype_exists
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
 logger = logging.getLogger(__name__)
 
-PROCEDURE_TYPES = {
-    "loan_out",
-    "loan_in",
-    "acquisition",
-    "conservation",
-    "object_entry",
-    "deaccession",
-}
 PROCEDURE_STATUSES = {"draft", "active", "completed", "cancelled"}
 COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
 
@@ -59,8 +49,7 @@ async def _validate_procedure(
         if data.status == "draft":
             return
         raise HTTPException(status_code=422, detail="Vorgangstyp ist erforderlich.")
-    if procedure_type not in PROCEDURE_TYPES:
-        raise HTTPException(status_code=422, detail="Ungültiger Vorgangstyp.")
+    await ensure_subtype_exists(db, "procedure", procedure_type)
     if data.status not in PROCEDURE_STATUSES:
         raise HTTPException(status_code=422, detail="Ungültiger Vorgangsstatus.")
     errors = await validate_metadata(
@@ -446,130 +435,6 @@ async def delete_procedure(
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
     enqueue(cleanup_relation_refs, "procedure", str(procedure_id))
-
-
-@router.post(
-    "/{procedure_id}/snapshots",
-    response_model=SnapshotRead,
-    status_code=201,
-    summary="Create a snapshot of a procedure's current state",
-    responses={
-        404: {"description": "Procedure not found"},
-        403: {"description": "Insufficient permissions"},
-    },
-)
-async def create_snapshot(
-    procedure_id: uuid.UUID,
-    data: SnapshotCreate,
-    db: DBDep,
-    current_user=require_record_permission("procedure", "update"),
-) -> RecordSnapshot:
-    proc = (
-        await db.execute(select(Procedure).where(Procedure.id == procedure_id))
-    ).scalar_one_or_none()
-    if not proc:
-        raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
-    snap = RecordSnapshot(
-        record_type="procedure",
-        record_id=proc.id,
-        label=data.label,
-        snapshot=ProcedureRead.model_validate(proc).model_dump(mode="json"),
-        created_by=current_user.id,
-    )
-    db.add(snap)
-    await db.flush()
-    return snap
-
-
-@router.get(
-    "/{procedure_id}/snapshots",
-    response_model=list[SnapshotRead],
-    summary="List snapshots for a procedure",
-)
-async def list_snapshots(procedure_id: uuid.UUID, db: DBDep) -> list[RecordSnapshot]:
-    result = await db.execute(
-        select(RecordSnapshot)
-        .where(RecordSnapshot.record_type == "procedure", RecordSnapshot.record_id == procedure_id)
-        .order_by(RecordSnapshot.created_at.desc())
-    )
-    return list(result.scalars().all())
-
-
-@router.post(
-    "/{procedure_id}/snapshots/{snapshot_id}/restore",
-    response_model=ProcedureRead,
-    summary="Restore a procedure from a snapshot",
-    responses={
-        404: {"description": "Snapshot or procedure not found"},
-        403: {"description": "Insufficient permissions"},
-        409: {"description": "Version conflict or active loan conflict"},
-        428: {"description": "If-Match header required"},
-    },
-)
-async def restore_snapshot(
-    procedure_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
-    db: DBDep,
-    current_user=require_record_permission("procedure", "update"),
-    if_match: int | None = Header(None, alias="If-Match"),
-) -> Procedure:
-    snap = (
-        await db.execute(
-            select(RecordSnapshot).where(
-                RecordSnapshot.id == snapshot_id,
-                RecordSnapshot.record_type == "procedure",
-                RecordSnapshot.record_id == procedure_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if not snap:
-        raise HTTPException(status_code=404, detail="Snapshot nicht gefunden")
-    proc = (
-        await db.execute(select(Procedure).where(Procedure.id == procedure_id))
-    ).scalar_one_or_none()
-    if not proc:
-        raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
-    require_version(proc.version, if_match)
-
-    target_type = snap.snapshot.get("procedure_type", proc.procedure_type)
-    target_status = snap.snapshot.get("status", proc.status)
-    if target_type == "loan_out" and target_status == "active":
-        object_ids = await procedure_object_ids(db, procedure_id)
-        await lock_objects(db, object_ids)
-        for object_id in object_ids:
-            existing = await get_active_loan_out_for_object(
-                db, object_id, exclude_procedure_id=procedure_id
-            )
-            if existing:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Objekt ist bereits in einem aktiven Ausleihvorgang.",
-                )
-
-    for key in ("idno", "procedure_type", "status", "reference_number", "metadata_"):
-        if key in snap.snapshot:
-            setattr(proc, key, snap.snapshot[key])
-    for key in ("start_date", "end_date", "due_date"):
-        if key in snap.snapshot:
-            value = snap.snapshot[key]
-            setattr(proc, key, date.fromisoformat(value) if value else None)
-    flag_modified(proc, "metadata_")
-    await flush_record(db, proc)
-    await sync_schema_relations(db, "procedure", proc.id, proc.metadata_)
-    await log_change(
-        db,
-        record_type="procedure",
-        record_id=proc.id,
-        user_id=current_user.id,
-        action="restore",
-        changed_fields={"snapshot_id": str(snapshot_id)},
-    )
-    await db.commit()
-    try:
-        await search_service.index_record("procedure", proc, db)
-    except Exception:
-        logger.warning("ES index/remove failed", exc_info=True)
-    return proc
 
 
 @router.get(

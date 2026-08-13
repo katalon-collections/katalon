@@ -5,11 +5,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
-from katalon.api.v1.schema_admin import (
-    PROCEDURE_TYPES,
-    SCHEMA_TARGET_TYPES,
-    _ensure_schema_subtype_exists,
-)
+from katalon.api.v1.schema_admin import SCHEMA_TARGET_TYPES, _ensure_schema_subtype_exists
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FieldDefinition, FormVariant, FormVariantRoleDefault
 from katalon.core.schemas import FormVariantCreate, FormVariantRead
@@ -131,11 +127,7 @@ async def list_form_variants(
 )
 async def create_form_variant(data: FormVariantCreate, db: DBDep) -> FormVariant:
     _validate_target_type(data.target_type)
-    if data.target_type == "procedure":
-        if data.target_subtype is not None and data.target_subtype not in PROCEDURE_TYPES:
-            raise HTTPException(status_code=422, detail=f"Ungültiger Vorgangstyp '{data.target_subtype}'.")
-    else:
-        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_names(db, data.target_type, data.target_subtype, data.field_names)
 
     variant = FormVariant(**data.model_dump())
@@ -161,11 +153,7 @@ async def update_form_variant(variant_id: uuid.UUID, data: FormVariantCreate, db
         raise HTTPException(status_code=404, detail="Formularvariante nicht gefunden.")
 
     _validate_target_type(data.target_type)
-    if data.target_type == "procedure":
-        if data.target_subtype is not None and data.target_subtype not in PROCEDURE_TYPES:
-            raise HTTPException(status_code=422, detail=f"Ungültiger Vorgangstyp '{data.target_subtype}'.")
-    else:
-        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_names(db, data.target_type, data.target_subtype, data.field_names)
 
     for field, value in data.model_dump().items():

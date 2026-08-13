@@ -34,7 +34,7 @@ Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann
 | `is_required` | Nein | Wenn gesetzt, muss das Feld beim Speichern eines Datensatzes befüllt sein. |
 | `is_repeatable` | Nein | Wenn gesetzt, können mehrere Werte pro Datensatz gespeichert werden. |
 | `sort_order` | Nein | Numerische Sortierreihenfolge im Formular. Kleinere Zahlen erscheinen zuerst. |
-| `target_subtype` | Nein | Wenn gesetzt, gilt das Feld nur für den angegebenen Subtyp (nur bei Entity und Occurrence relevant). |
+| `target_subtype` | Nein | Wenn gesetzt, gilt das Feld nur für den angegebenen Subtyp. |
 | `settings` | Nein | Feldtyp-spezifische Optionen als JSON-Objekt (siehe unten). |
 
 ---
@@ -234,18 +234,19 @@ Beispiele:
 
 ## Subtyp-Felder
 
-Bei Entity und Occurrence kann ein Feld an einen bestimmten Subtyp gebunden werden.
+Bei Object, Entity, Place, Occurrence und Vorgang kann ein Feld an einen bestimmten Subtyp gebunden werden.
 
 - **Feld ohne `target_subtype`**: Erscheint für alle Datensätze dieses Primärtyps, unabhängig vom Subtyp.
 - **Feld mit `target_subtype = "person"`**: Erscheint nur bei Entitäten vom Subtyp `person`.
+- **Feld mit `target_subtype = "acquisition"`**: Erscheint nur bei Vorgängen vom Typ `acquisition`.
 
 **Anwendungsfall:**
 
 Eine Entität kann eine Person oder eine Organisation sein. Für Personen braucht man Geburtsdatum und Sterbeort, für Organisationen Gründungsjahr und Rechtsform. Durch Subtyp-Felder lässt sich das Formular entsprechend steuern.
 
-In der Admin-UI erscheint das Subtyp-Eingabefeld nur bei den Primärtypen Entity und Occurrence. Wenn das Subtyp-Eingabefeld leer gelassen wird, gilt das Feld für alle Subtypen.
+In der Admin-UI kann für jeden Datensatztyp ein vorhandener Subtyp gewählt werden. Wenn das Subtyp-Eingabefeld leer gelassen wird, gilt das Feld für alle Subtypen.
 
-Subtyp-Werte sind frei wählbare Zeichenketten. Es gibt keine systemseitige Validierung der Subtyp-Bezeichnungen.
+Subtypen werden in der Subtyp-Verwaltung angelegt und serverseitig validiert. Bei Vorgängen sind `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry` und `deaccession` geschützte Systemtypen: Sie können nicht gelöscht, umbenannt oder verschoben werden. Eigene Vorgangstypen können zusätzlich angelegt und für Felder sowie Formularvarianten verwendet werden.
 
 ---
 
