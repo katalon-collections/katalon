@@ -186,7 +186,7 @@ export const objects = {
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/objects/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/objects/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string) => req<KatalonObject>(`/v1/objects/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+    restore: (id: string, snapId: string, version?: number) => req<KatalonObject>(`/v1/objects/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
   },
 }
 
@@ -205,7 +205,7 @@ export const entities = {
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/entities/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/entities/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string) => req<Entity>(`/v1/entities/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+    restore: (id: string, snapId: string, version?: number) => req<Entity>(`/v1/entities/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
   },
 }
 
@@ -224,7 +224,7 @@ export const places = {
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/places/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/places/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string) => req<Place>(`/v1/places/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+    restore: (id: string, snapId: string, version?: number) => req<Place>(`/v1/places/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
   },
 }
 
@@ -243,7 +243,7 @@ export const occurrences = {
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/occurrences/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/occurrences/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string) => req<Occurrence>(`/v1/occurrences/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+    restore: (id: string, snapId: string, version?: number) => req<Occurrence>(`/v1/occurrences/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
   },
 }
 
@@ -266,7 +266,7 @@ export const procedures = {
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/procedures/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/procedures/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
-    restore: (id: string, snapId: string) => req<Procedure>(`/v1/procedures/${id}/snapshots/${snapId}/restore`, { method: 'POST' }),
+    restore: (id: string, snapId: string, version?: number) => req<Procedure>(`/v1/procedures/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
   },
 }
 

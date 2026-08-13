@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.20] - 2026-08-13
+
+### Fixed
+- Manuelle Snapshots werden mit der aktuellen Datensatzversion wiederhergestellt.
+
 ## [0.10.19] - 2026-08-13
 
 ### Fixed
