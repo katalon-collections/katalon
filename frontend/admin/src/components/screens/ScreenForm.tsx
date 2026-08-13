@@ -2593,9 +2593,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           </div>
 
           {showTwoCol && (
-            <div>
+            <div className="form-side">
               {showMedia && (
-                <div className="card" style={{ marginBottom: 14 }} data-tour="media-section">
+                <div className="card media-card" style={{ marginBottom: 14 }} data-tour="media-section">
                   <div className="hd">
                     <span>Medien</span>
                     {mediaFiles.length > 0 && <span className="sub">{mediaFiles.length} Datei{mediaFiles.length !== 1 ? 'en' : ''}</span>}
@@ -2645,16 +2645,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               value={f.media_type ?? ''}
                               onChange={e => handleSetMediaType(f.id, e.target.value || null)}
                             >
-                              <option value="">— Typ —</option>
+                              <option value="">Typ: —</option>
                               {mediaTypeTerms.map(t => (
-                                <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
+                                <option key={t.id} value={t.term}>Typ: {getLabel(t, t.term)}</option>
                               ))}
                             </select>
                             <div style={{ borderTop: '1px solid var(--border-s)' }}>
-                              <button type="button" onClick={() => setOpenRightsMediaId(current => current === f.id ? null : f.id)} style={{ width: '100%', padding: '5px 8px', border: 0, background: 'none', textAlign: 'left', fontSize: 10, color: 'var(--fg-3)' }}>
+                              <button type="button" onClick={() => setOpenRightsMediaId(current => current === f.id ? null : f.id)} style={{ width: '100%', padding: '5px 8px', border: 0, background: 'none', textAlign: 'left', fontSize: 10, color: 'var(--fg)' }}>
                                 Rechteangaben {openRightsMediaId === f.id ? '⌃' : '⌄'}
                               </button>
-                              {(f.license_uri || f.rights_holder?.name) && <div style={{ padding: '0 8px 5px', fontSize: 10, color: 'var(--fg-3)' }}>{[f.license_uri, f.rights_holder?.name].filter(Boolean).join(' · ')}</div>}
+                              {(f.license_uri || f.rights_holder?.name) && <div style={{ padding: '0 8px 5px', fontSize: 10, color: 'var(--fg)' }}>{[f.license_uri, f.rights_holder?.name].filter(Boolean).join(' · ')}</div>}
                               {openRightsMediaId === f.id && <div style={{ padding: '0 6px 6px', display: 'grid', gap: 4 }}>
                                 <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.license_uri ?? ''} data-media-rights="license_uri" list="media-license-options" placeholder="Lizenz-URI" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
                                 <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.name ?? ''} data-media-rights="rights_holder_name" placeholder="Rechteinhaber" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
@@ -2705,9 +2705,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {showCollectionStatus && !isNew && (
-                <div className="card" style={{ marginBottom: 14, overflow: addProcedureOpen ? 'visible' : undefined }}>
+                <div className="card procedure-card" style={{ marginBottom: 14, overflow: addProcedureOpen ? 'visible' : undefined }}>
                   <div className="hd">
-                    <span>Vorgänge</span>
+                    <span>Verknüpfte Vorgänge</span>
                     {procedureRels.length > 0 && <span className="sub">{procedureRels.length}</span>}
                     <div className="grow" />
                     {!addProcedureOpen && hasSavedId && (
@@ -2806,7 +2806,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {!isNew && (
-                <div className="card" style={{ marginBottom: 14 }} data-tour="relations-section">
+                <div className="card relations-card" style={{ marginBottom: 14 }} data-tour="relations-section">
                   <div className="hd">
                     <span>Beziehungen</span>
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}

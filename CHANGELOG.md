@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.18] - 2026-08-13
+
+### Changed
+- Medien nutzen die volle Formularbreite; Beziehungen stehen vor verknüpften Vorgängen.
+
 ## [0.10.17] - 2026-08-13
 
 ### Changed
