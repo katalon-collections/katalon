@@ -727,6 +727,8 @@ export interface AdminConfigRead {
   ai_max_output_tokens: number
   ai_daily_user_token_limit: number
   ai_monthly_global_token_limit: number
+  media_default_license_uri: string | null
+  media_default_rights_holder: { name: string; uri?: string } | null
   ai_secret: {
     has_key: boolean
     updated_at: string | null

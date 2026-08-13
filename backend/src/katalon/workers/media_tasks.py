@@ -69,7 +69,7 @@ def generate_iiif_tiles(self, media_file_id: str) -> dict:
 async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict:
     from katalon.config import settings
     from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
-    from katalon.core.models import MediaFile, Object, Vocabulary, VocabularyTerm
+    from katalon.core.models import AdminConfig, MediaFile, Object, Vocabulary, VocabularyTerm
     from katalon.services.media_batch_import_service import (
         folder_or_filename_object_id,
         normalize_filename,
@@ -123,6 +123,7 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
     processed = 0
 
     async with _worker_session()() as session:
+        config = await session.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
         vocab_result = await session.execute(select(Vocabulary).where(Vocabulary.name == "media_types"))
         vocab = vocab_result.scalar_one_or_none()
         media_terms: set[str] = set()
@@ -208,6 +209,8 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 status="pending",
                 is_primary=existing is None,
                 media_type=media_type,
+                license_uri=config.media_default_license_uri if config else None,
+                rights_holder=config.media_default_rights_holder if config else None,
             )
             session.add(media)
             await session.flush()

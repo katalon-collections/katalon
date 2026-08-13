@@ -14,7 +14,7 @@ from sqlalchemy import select
 from katalon.config import settings
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
 from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
-from katalon.core.models import MediaFile, Object
+from katalon.core.models import AdminConfig, MediaFile, Object
 from katalon.core.visibility import ensure_publicly_visible
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
@@ -93,6 +93,7 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     actual_mime = verified_image_mime(dest_path)
 
     existing = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
+    config = await db.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
     media = MediaFile(
         id=file_id,
         object_id=object_id,
@@ -101,6 +102,8 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         file_path=str(dest_path),
         status="pending",
         is_primary=len(existing) == 0,
+        license_uri=config.media_default_license_uri if config else None,
+        rights_holder=config.media_default_rights_holder if config else None,
     )
     db.add(media)
     await db.commit()  # commit before Celery dispatch so the worker can find the row

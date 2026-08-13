@@ -564,6 +564,8 @@ class AdminConfig(Base):
     ai_max_output_tokens: Mapped[int] = mapped_column(Integer, default=800)
     ai_daily_user_token_limit: Mapped[int] = mapped_column(Integer, default=50000)
     ai_monthly_global_token_limit: Mapped[int] = mapped_column(Integer, default=1000000)
+    media_default_license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    media_default_rights_holder: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

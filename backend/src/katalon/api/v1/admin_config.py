@@ -12,6 +12,16 @@ from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, se
 router = APIRouter(prefix="/admin/config", tags=["admin"])
 
 
+def _rights_holder_or_none(value: dict | None) -> dict | None:
+    if not value:
+        return None
+    name = str(value.get("name", "")).strip()
+    uri = str(value.get("uri", "")).strip()
+    if not name:
+        return None
+    return {"name": name, **({"uri": uri} if uri else {})}
+
+
 class SecretStatus(BaseModel):
     has_key: bool
     updated_at: datetime | None = None
@@ -35,6 +45,8 @@ class AdminConfigRead(BaseModel):
     ai_max_output_tokens: int
     ai_daily_user_token_limit: int
     ai_monthly_global_token_limit: int
+    media_default_license_uri: str | None
+    media_default_rights_holder: dict | None
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
 
@@ -55,6 +67,8 @@ class AdminConfigUpdate(BaseModel):
     ai_max_output_tokens: int | None = Field(default=None, ge=1, le=32768)
     ai_daily_user_token_limit: int | None = Field(default=None, ge=1)
     ai_monthly_global_token_limit: int | None = Field(default=None, ge=1)
+    media_default_license_uri: str | None = None
+    media_default_rights_holder: dict | None = None
 
 
 async def _get_or_create(db: DBDep) -> AdminConfig:
@@ -100,6 +114,8 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         ai_max_output_tokens=config.ai_max_output_tokens,
         ai_daily_user_token_limit=config.ai_daily_user_token_limit,
         ai_monthly_global_token_limit=config.ai_monthly_global_token_limit,
+        media_default_license_uri=config.media_default_license_uri,
+        media_default_rights_holder=config.media_default_rights_holder,
         ai_secret=SecretStatus(
             has_key=secret_obj is not None,
             updated_at=secret_obj.updated_at if secret_obj is not None else None,
@@ -155,6 +171,10 @@ async def update_admin_config(
         config.ai_daily_user_token_limit = data.ai_daily_user_token_limit
     if data.ai_monthly_global_token_limit is not None:
         config.ai_monthly_global_token_limit = data.ai_monthly_global_token_limit
+    if "media_default_license_uri" in data.model_fields_set:
+        config.media_default_license_uri = data.media_default_license_uri.strip() if data.media_default_license_uri else None
+    if "media_default_rights_holder" in data.model_fields_set:
+        config.media_default_rights_holder = _rights_holder_or_none(data.media_default_rights_holder)
     await db.flush()
     return await _to_read(db, config, current_user.id)
 

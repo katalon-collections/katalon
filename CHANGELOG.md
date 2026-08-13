@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.17] - 2026-08-13
+
+### Changed
+- Medienrechte werden pro Datei nach dem Upload bearbeitet; Instanz-Defaults werden beim Einzel- und Batch-Upload kopiert.
+
 ## [0.10.16] - 2026-08-13
 
 ### Fixed

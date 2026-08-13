@@ -34,6 +34,10 @@ Katalon's media workflow is object-only: media endpoints live under `/objects/{o
 
 The created `MediaFile` starts with `status="pending"` and becomes primary when it is the object's first media file [@media-api]. The API commits before queueing `generate_iiif_tiles`, so the worker can load the row from its own database session [@media-api]. This is the queue boundary also covered by [Celery And Worker Queues](../backend/celery-and-worker-queues).
 
+## Rights Per Media File
+
+License URI and rights holder belong to each `MediaFile`. Administrators may set instance defaults; single and batch uploads copy them into each new file, so later default changes do not alter existing files. The admin form keeps these optional fields in the file's collapsible `Rechteangaben` section; present values are summarized while collapsed [@media-api] [@screen-form] [@admin-config].
+
 ## Cantaloupe And Manifests
 
 The media worker loads the `MediaFile`, derives the stored filename, and calls Cantaloupe's `/iiif/3/{filename}/info.json` endpoint to trigger lazy image processing and read dimensions [@media-tasks] [@cantaloupe]. Cantaloupe 4xx responses are treated as permanent errors and mark the media row `error`; other fetch failures return missing dimensions, so the worker still stores a manifest and marks the row `ready` unless an unexpected exception escapes into Celery retry handling [@media-tasks] [@cantaloupe].

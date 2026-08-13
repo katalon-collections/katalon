@@ -10,7 +10,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki'
+type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -937,6 +937,38 @@ function SectionAI() {
   )
 }
 
+function SectionMediaRights() {
+  const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { adminConfig.get().then(setCfg).catch((e: Error) => setError(e.message)) }, [])
+
+  async function save() {
+    if (!cfg) return
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      setCfg(await adminConfig.update({
+        media_default_license_uri: cfg.media_default_license_uri,
+        media_default_rights_holder: cfg.media_default_rights_holder,
+      }))
+      setSaved(true)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  if (!cfg) return <div className="empty">{error ?? 'Lade…'}</div>
+  const holder = cfg.media_default_rights_holder ?? { name: '', uri: '' }
+  return <div>
+    <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>Diese Angaben werden beim Upload auf jede neue Mediendatei kopiert. Spätere Änderungen gelten nur für neue Uploads.</p>
+    <div className="field"><div className="lbl">Standardlizenz</div><input className="fld" value={cfg.media_default_license_uri ?? ''} placeholder="Lizenz-URI" onChange={e => setCfg({ ...cfg, media_default_license_uri: e.target.value || null })} /></div>
+    <div className="field"><div className="lbl">Standard-Rechteinhaber</div><input className="fld" value={holder.name} placeholder="Name" onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, name: e.target.value } })} /><input className="fld" style={{ marginTop: 4 }} value={holder.uri ?? ''} placeholder="URI (optional)" onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, uri: e.target.value || undefined } })} /></div>
+    {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
+    <button className="btn pri" onClick={save} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>{saved && <span style={{ marginLeft: 8, fontSize: 12, color: '#166534' }}>Gespeichert.</span>}
+  </div>
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -947,6 +979,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'facetten', label: 'Facetten', adminOnly: true },
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
   { id: 'ki',       label: 'KI', adminOnly: true },
+  { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
 ]
 
@@ -991,6 +1024,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
+          {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
         </div>
       </div>

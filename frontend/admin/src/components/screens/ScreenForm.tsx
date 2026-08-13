@@ -41,8 +41,6 @@ function getFieldAiConfig(field: FieldDefinition): { enabled: boolean; mode: 'te
 
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
-const PROCEDURE_STATUSES: ProcedureStatus[] = ['draft', 'active', 'completed', 'cancelled']
-const PROCEDURE_STATUS_LABELS: Record<ProcedureStatus, string> = { draft: 'Entwurf', active: 'Aktiv', completed: 'Abgeschlossen', cancelled: 'Abgebrochen' }
 const MEDIA_LICENSES = [
   ['https://creativecommons.org/publicdomain/zero/1.0/', 'CC0 1.0'],
   ['https://creativecommons.org/publicdomain/mark/1.0/', 'Public Domain Mark 1.0'],
@@ -50,6 +48,8 @@ const MEDIA_LICENSES = [
   ['https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0'],
   ['https://rightsstatements.org/vocab/InC/1.0/', 'In Copyright'],
 ] as const
+const PROCEDURE_STATUSES: ProcedureStatus[] = ['draft', 'active', 'completed', 'cancelled']
+const PROCEDURE_STATUS_LABELS: Record<ProcedureStatus, string> = { draft: 'Entwurf', active: 'Aktiv', completed: 'Abgeschlossen', cancelled: 'Abgebrochen' }
 const PROCEDURE_TYPES = [
   { id: 'loan_out', label: 'Ausleihe ausgehend' },
   { id: 'loan_in', label: 'Ausleihe eingehend' },
@@ -909,9 +909,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [uploadError, setUploadError]   = useState<string | null>(null)
   const [dragOver, setDragOver]         = useState(false)
   const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
-  const [uploadLicenseUri, setUploadLicenseUri] = useState('')
-  const [uploadRightsName, setUploadRightsName] = useState('')
-  const [uploadRightsUri, setUploadRightsUri] = useState('')
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const [relTypeVocabId, setRelTypeVocabId] = useState<string | undefined>()
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
@@ -923,19 +920,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
-  const [relMeta, setRelMeta]     = useState<Record<string, Record<string, unknown>>>({})
   const [objectStatuses, setObjectStatuses] = useState<Record<string, string>>({})
   const [addTargetType, setAddTargetType] = useState<RecordType>('object')
   const [addProcedureOpen, setAddProcedureOpen] = useState(false)
   const [genericAddOpen, setGenericAddOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
   const [aiBusyField, setAiBusyField] = useState<string | null>(null)
+  const [openRightsMediaId, setOpenRightsMediaId] = useState<string | null>(null)
   const [highlightedField, setHighlightedField] = useState<string | null>(null)
 
   function jumpToField(name: string) {
     document.getElementById(`field-${name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     setHighlightedField(name)
-    window.setTimeout(() => setHighlightedField(current => current === name ? null : current), 2000)
+    window.setTimeout(() => setHighlightedField(current => current === name ? null : current), 3000)
   }
 
   // Warn on browser tab close / reload
@@ -948,6 +945,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const loadMedia = useCallback((id: string) => {
     media.list(id).then(setMediaFiles).catch(() => {})
   }, [])
+
 
   const loadSnapshots = useCallback((id: string) => {
     api.snapshots.list(id).then(setSnapshots).catch(() => {})
@@ -967,7 +965,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       const loaded = [...fromRels, ...toRels]
       setRels(loaded)
       const titleMap: Record<string, string> = {}
-      const metaMap: Record<string, Record<string, unknown>> = {}
       const statusMap: Record<string, string> = {}
       await Promise.all(loaded.map(async r => {
         const isFrom = r.from_id === id
@@ -976,9 +973,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         const key = `${targetType}/${targetId}`
         try {
           const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
-          const m = rec.metadata_ as Record<string, unknown>
-          titleMap[key] = extractTitle(m, (rec as { idno?: string | null }).idno ?? targetId.slice(0, 8) + '…')
-          metaMap[key] = m
+          titleMap[key] = extractTitle(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno ?? targetId.slice(0, 8) + '…')
           if (targetType === 'object') {
             statusMap[targetId] = (rec as { collection_status?: string | null }).collection_status ?? 'active'
           }
@@ -987,7 +982,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
       }))
       setRelTitles(titleMap)
-      setRelMeta(metaMap)
       setObjectStatuses(statusMap)
     } catch {
       // silently ignore
@@ -1013,7 +1007,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setMediaFiles([])
     setRels([])
     setRelTitles({})
-    setRelMeta({})
     setObjectStatuses({})
     setAddProcedureOpen(false)
     setCompletionDialog(null)
@@ -1846,15 +1839,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     try {
       const uploaded = await media.upload(savedId, file)
       setMediaFiles(prev => [...prev, uploaded])
-      try {
-        const updated = await media.patch(savedId, uploaded.id, {
-          license_uri: uploadLicenseUri.trim() || null,
-          rights_holder: buildRightsHolder(uploadRightsName.trim(), uploadRightsUri.trim()),
-        })
-        setMediaFiles(prev => prev.map(f => f.id === uploaded.id ? updated : f))
-      } catch (e) {
-        setUploadError(`Upload erfolgreich, Rechte konnten nicht gespeichert werden: ${(e as Error).message}`)
-      }
     } catch (e) {
       setUploadError((e as Error).message)
     } finally {
@@ -1970,11 +1954,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     const targetType = isFrom ? r.to_type : r.from_type
     const targetId = isFrom ? r.to_id : r.from_id
     const targetKey = `${targetType}/${targetId}`
-    const inheritedFieldNames = fields
-      .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType
-        && (!(f.settings?.fixed_relation_type as string | undefined) || (f.settings?.fixed_relation_type as string) === r.relation_type))
-      .flatMap(f => (f.settings?.inherited_fields as string[]) ?? [])
-    const inheritedMeta = relMeta[targetKey]
     const sourceField = r.metadata_?.source_field as string | undefined
     const sourceLabel = sourceField ? getLabel(fields.find(f => f.name === sourceField), sourceField) : undefined
     return (
@@ -1987,9 +1966,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               <button
                 type="button"
                 onClick={() => jumpToField(sourceField)}
-                style={{ display: 'block', fontSize: 10, color: 'var(--accent)' }}
+                style={{ display: 'block', padding: 0, border: 0, background: 'none', fontSize: 11, color: 'var(--accent)', textDecoration: 'underline' }}
               >
-                Feld: {sourceLabel}
+                Zum Feld: {sourceLabel}
               </button>
             ) : (
               <span style={{ display: 'block', fontSize: 10, color: 'var(--fg-4)' }}>
@@ -2004,17 +1983,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             </a>
           </span>
         </div>
-        {inheritedMeta && inheritedFieldNames.length > 0 && (
-          <div style={{ padding: '3px 0 5px', borderBottom: '1px solid var(--border-s)', display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
-            {inheritedFieldNames.map(fname => {
-              const val = inheritedMeta[fname]
-              if (val == null) return null
-              const first = Array.isArray(val) ? val[0] : val
-              const text = typeof first === 'string' ? first : (typeof first === 'object' && first !== null ? String((first as Record<string, unknown>).value ?? '') : '')
-              return text ? <span key={fname} style={{ fontSize: 11, color: 'var(--fg-3)' }}>{fname}: {text}</span> : null
-            })}
-          </div>
-        )}
       </div>
     )
   }
@@ -2262,7 +2230,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     : undefined
 
                   return (
-                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0, transition: 'box-shadow .2s, background .2s', boxShadow: highlightedField === f.name ? '0 0 0 3px var(--accent)' : undefined, background: highlightedField === f.name ? 'var(--accent-soft)' : undefined }}>
+                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: '6px 8px', margin: '0 -8px', borderRadius: 4, transition: 'background .2s', background: highlightedField === f.name ? 'rgba(30, 58, 138, .10)' : undefined }}>
                       <div className="lbl">
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
@@ -2682,32 +2650,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
                               ))}
                             </select>
-                            <div style={{ padding: 6, display: 'grid', gap: 4, borderTop: '1px solid var(--border-s)' }}>
-                              <input
-                                className="fld"
-                                style={{ fontSize: 10, padding: '3px 5px' }}
-                                defaultValue={f.license_uri ?? ''}
-                                data-media-rights="license_uri"
-                                list="media-license-options"
-                                placeholder="Lizenz-URI"
-                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
-                              />
-                              <input
-                                className="fld"
-                                style={{ fontSize: 10, padding: '3px 5px' }}
-                                defaultValue={f.rights_holder?.name ?? ''}
-                                data-media-rights="rights_holder_name"
-                                placeholder="Rechteinhaber"
-                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
-                              />
-                              <input
-                                className="fld"
-                                style={{ fontSize: 10, padding: '3px 5px' }}
-                                defaultValue={f.rights_holder?.uri ?? ''}
-                                data-media-rights="rights_holder_uri"
-                                placeholder="Rechteinhaber-URI"
-                                onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))}
-                              />
+                            <div style={{ borderTop: '1px solid var(--border-s)' }}>
+                              <button type="button" onClick={() => setOpenRightsMediaId(current => current === f.id ? null : f.id)} style={{ width: '100%', padding: '5px 8px', border: 0, background: 'none', textAlign: 'left', fontSize: 10, color: 'var(--fg-3)' }}>
+                                Rechteangaben {openRightsMediaId === f.id ? '⌃' : '⌄'}
+                              </button>
+                              {(f.license_uri || f.rights_holder?.name) && <div style={{ padding: '0 8px 5px', fontSize: 10, color: 'var(--fg-3)' }}>{[f.license_uri, f.rights_holder?.name].filter(Boolean).join(' · ')}</div>}
+                              {openRightsMediaId === f.id && <div style={{ padding: '0 6px 6px', display: 'grid', gap: 4 }}>
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.license_uri ?? ''} data-media-rights="license_uri" list="media-license-options" placeholder="Lizenz-URI" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.name ?? ''} data-media-rights="rights_holder_name" placeholder="Rechteinhaber" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.uri ?? ''} data-media-rights="rights_holder_uri" placeholder="Rechteinhaber-URI" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                              </div>}
                             </div>
                           </div>
                         ))}
@@ -2719,18 +2671,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <datalist id="media-license-options">
                         {MEDIA_LICENSES.map(([uri, label]) => <option key={uri} value={uri}>{label}</option>)}
                       </datalist>
-                      <div className="fg-2" style={{ marginBottom: 10 }}>
-                        <div className="field">
-                          <div className="lbl">Lizenz für neue Uploads <span className="h">optional</span></div>
-                          <input className="fld" list="media-license-options" value={uploadLicenseUri} onChange={e => setUploadLicenseUri(e.target.value)} placeholder="Lizenz-URI wählen oder eingeben" />
-                          {!uploadLicenseUri && <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>Keine Lizenz angegeben. Upload bleibt möglich.</div>}
-                        </div>
-                        <div className="field">
-                          <div className="lbl">Rechteinhaber für neue Uploads <span className="h">optional</span></div>
-                          <input className="fld" value={uploadRightsName} onChange={e => setUploadRightsName(e.target.value)} placeholder="Name" />
-                          <input className="fld" value={uploadRightsUri} onChange={e => setUploadRightsUri(e.target.value)} placeholder="URI (optional)" style={{ marginTop: 4 }} />
-                        </div>
-                      </div>
                       <div
                         className="dz"
                         style={{ padding: '20px 16px', opacity: uploading ? 0.5 : 1, border: dragOver ? '2px dashed var(--accent)' : undefined }}
