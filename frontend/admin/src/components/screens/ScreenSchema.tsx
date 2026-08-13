@@ -1028,9 +1028,21 @@ fields:
   )
 }
 
-export function ScreenSchema() {
-  const [activeType, setActiveType] = useState('object')
-  const [activeSubtype, setActiveSubtype] = useState('')
+const TYPE_IDS = TYPES.map(t => t.id)
+
+function parseInitial(editId?: string | null): { type: string; subtype: string } {
+  if (!editId) return { type: 'object', subtype: '' }
+  const [type, subtype = ''] = editId.split('.')
+  return TYPE_IDS.includes(type) ? { type, subtype } : { type: 'object', subtype: '' }
+}
+
+type Props = { initialPath?: string | null; onPathChange?: (path: string) => void }
+
+export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
+  const initial = parseInitial(initialPath)
+  const [activeType, setActiveType] = useState(initial.type)
+  const [activeSubtype, setActiveSubtype] = useState(initial.subtype)
+  const skipResetRef = useRef(true)
   const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
@@ -1099,6 +1111,7 @@ export function ScreenSchema() {
   }, [loadFields])
 
   useEffect(() => {
+    if (skipResetRef.current) { skipResetRef.current = false; return }
     setActiveSubtype('')
     setActiveFieldId(null)
     setIsNew(false)
@@ -1280,7 +1293,7 @@ export function ScreenSchema() {
           <button
             key={t.id}
             className={`tab${activeType === t.id ? ' active' : ''}`}
-            onClick={() => setActiveType(t.id)}
+            onClick={() => { setActiveType(t.id); onPathChange?.(t.id) }}
           >
             {t.label}
           </button>
@@ -1297,7 +1310,7 @@ export function ScreenSchema() {
               <button
                 key={s.id}
                 className={`panel-it${activeSubtype === s.name ? ' active' : ''}`}
-                onClick={() => setActiveSubtype(s.name)}
+                onClick={() => { setActiveSubtype(s.name); onPathChange?.(s.name ? `${activeType}.${s.name}` : activeType) }}
               >
                 <span>{s.label?.de || s.name || 'Alle / Global'}</span>
                 {s.name && <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>}

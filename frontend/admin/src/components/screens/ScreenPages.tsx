@@ -29,7 +29,9 @@ function pageToForm(p: StaticPage): FormState {
   }
 }
 
-export function ScreenPages() {
+type Props = { initialSlug?: string | null; onSlugChange?: (slug: string | null) => void }
+
+export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
   const [pages, setPages] = useState<StaticPage[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
@@ -48,6 +50,12 @@ export function ScreenPages() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!initialSlug || activeSlug) return
+    const p = pages.find(p => p.slug === initialSlug)
+    if (p) openPage(p)
+  }, [pages, initialSlug])
+
   function openNew() {
     setIsNew(true)
     setActiveSlug(null)
@@ -60,12 +68,14 @@ export function ScreenPages() {
     setActiveSlug(p.slug)
     setForm(pageToForm(p))
     setError(null)
+    onSlugChange?.(p.slug)
   }
 
   function close() {
     setActiveSlug(null)
     setIsNew(false)
     setForm(null)
+    onSlugChange?.(null)
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {

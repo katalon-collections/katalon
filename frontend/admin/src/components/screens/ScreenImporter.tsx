@@ -27,8 +27,10 @@ function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
   )
 }
 
-export function ScreenImporter() {
-  const [activeTab, setActiveTab] = useState<'metadata' | 'media'>('metadata')
+type Props = { initialTab?: string | null; onTabChange?: (tab: 'metadata' | 'media') => void }
+
+export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
+  const [activeTab, setActiveTab] = useState<'metadata' | 'media'>(initialTab === 'media' ? 'media' : 'metadata')
 
   const {
     state, needsReupload, dispatch, fields, availableSubtypes,
@@ -60,7 +62,7 @@ export function ScreenImporter() {
         {IMPORTER_TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id as 'metadata' | 'media')}
+            onClick={() => { setActiveTab(t.id as 'metadata' | 'media'); onTabChange?.(t.id as 'metadata' | 'media') }}
             style={{
               padding: '10px 20px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none',
               borderBottom: activeTab === t.id ? '2px solid var(--accent)' : '2px solid transparent',

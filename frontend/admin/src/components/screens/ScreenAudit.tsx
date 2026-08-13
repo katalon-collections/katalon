@@ -21,9 +21,13 @@ function userDisplay(entry: AuditEntry) {
   return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '—')
 }
 
-export function ScreenAudit() {
+const ACTIONS = ['all', 'create', 'update', 'delete', 'publish']
+
+type Props = { initialFilter?: string | null; onFilterChange?: (filter: string) => void }
+
+export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
   const [entries, setEntries] = useState<AuditEntry[]>([])
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState(initialFilter && ACTIONS.includes(initialFilter) ? initialFilter : 'all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,8 +49,8 @@ export function ScreenAudit() {
       </div>
 
       <div className="toolbar">
-        {['all', 'create', 'update', 'delete', 'publish'].map(a => (
-          <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => setFilter(a)}>
+        {ACTIONS.map(a => (
+          <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => { setFilter(a); onFilterChange?.(a) }}>
             {a === 'all' ? 'Alle' : ACTION_LABELS[a]}
           </button>
         ))}

@@ -1082,8 +1082,16 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true },
 ]
 
+const SECTION_IDS = NAV.map(n => n.id)
+
+function initialSection(): Section {
+  const slash = window.location.hash.indexOf('/')
+  const requested = slash === -1 ? null : window.location.hash.slice(slash + 1)
+  return (requested && SECTION_IDS.includes(requested as Section)) ? requested as Section : 'profil'
+}
+
 export function ScreenSettings({ isAdmin, onStartTour }: Props) {
-  const [section, setSection] = useState<Section>('profil')
+  const [section, setSection] = useState<Section>(initialSection)
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
   const [loading, setLoading] = useState(isAdmin)
   const [error, setError] = useState<string | null>(null)
@@ -1108,7 +1116,10 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
         {/* Sidebar nav */}
         <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border-s)', overflowY: 'auto', paddingTop: 8 }}>
           {navItems.map(n => (
-            <button key={n.id} className={`panel-it${section === n.id ? ' active' : ''}`} onClick={() => setSection(n.id)}>
+            <button key={n.id} className={`panel-it${section === n.id ? ' active' : ''}`} onClick={() => {
+              setSection(n.id)
+              window.history.replaceState(null, '', `#settings/${n.id}`)
+            }}>
               {n.label}
             </button>
           ))}

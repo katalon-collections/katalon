@@ -38,8 +38,12 @@ function subtypeToForm(s: RecordSubtype): FormState {
   }
 }
 
-export function ScreenSubtype() {
-  const [activeType, setActiveType] = useState('object')
+const TYPE_IDS = PRIMARY_TYPES.map(t => t.id)
+
+type Props = { initialType?: string | null; onTypeChange?: (type: string) => void }
+
+export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
+  const [activeType, setActiveType] = useState(initialType && TYPE_IDS.includes(initialType) ? initialType : 'object')
   const [items, setItems] = useState<RecordSubtype[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -136,7 +140,7 @@ export function ScreenSubtype() {
           <button
             key={t.id}
             className={`tab${activeType === t.id ? ' active' : ''}`}
-            onClick={() => { setActiveType(t.id); setShowForm(false) }}
+            onClick={() => { setActiveType(t.id); setShowForm(false); onTypeChange?.(t.id) }}
           >
             {t.label}
           </button>

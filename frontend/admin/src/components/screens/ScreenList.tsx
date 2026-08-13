@@ -80,13 +80,17 @@ function getFieldValue(metadata: Record<string, unknown>, fieldName: string): st
 interface Props {
   recordType: RecordType
   onOpen?: (id: string) => void
+  initialTab?: string | null
+  onTabChange?: (tab: string) => void
 }
 
-export function ScreenList({ recordType, onOpen }: Props) {
+export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Props) {
   const api = getApi(recordType)
   const subtypeKey = SUBTYPE_KEYS[recordType]
+  const tabIds = (recordType === 'procedure' ? PROCEDURE_TABS : TABS).map(t => t.id)
 
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState(initialTab && tabIds.includes(initialTab) ? initialTab : 'all')
+  const skipResetRef = useRef(true)
   const [q, setQ] = useState('')
   const [subtypeFilter, setSubtypeFilter] = useState('')
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
@@ -124,6 +128,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
   }, [recordType, subtypeKey])
 
   useEffect(() => {
+    if (skipResetRef.current) { skipResetRef.current = false; return }
     setTab('all')
     setQ('')
     setSubtypeFilter('')
@@ -176,12 +181,13 @@ export function ScreenList({ recordType, onOpen }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  function handleTabChange(id: string) { setTab(id); setPage(1) }
+  function handleTabChange(id: string) { setTab(id); setPage(1); onTabChange?.(id) }
   function handleSearch(v: string) { setQ(v); setPage(1) }
   function handleOverdue() {
     setTab('active')
     setDueBefore(new Date().toISOString().slice(0, 10))
     setPage(1)
+    onTabChange?.('active')
   }
 
   async function handleDelete(id: string) {

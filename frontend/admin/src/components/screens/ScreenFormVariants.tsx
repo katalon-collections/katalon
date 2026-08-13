@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { formVariants, schema, subtypes } from '../../api/client'
 import type { FormVariantData } from '../../api/client'
 import type { FieldDefinition, FormVariant } from '../../types'
@@ -47,9 +47,21 @@ const inp: React.CSSProperties = {
   outline: 'none', boxSizing: 'border-box',
 }
 
-export function ScreenFormVariants() {
-  const [activeType, setActiveType] = useState('object')
-  const [activeSubtype, setActiveSubtype] = useState('')
+const TYPE_IDS = TYPES.map(t => t.id)
+
+function parseInitial(path?: string | null): { type: string; subtype: string } {
+  if (!path) return { type: 'object', subtype: '' }
+  const [type, subtype = ''] = path.split('.')
+  return TYPE_IDS.includes(type) ? { type, subtype } : { type: 'object', subtype: '' }
+}
+
+type Props = { initialPath?: string | null; onPathChange?: (path: string) => void }
+
+export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
+  const initial = parseInitial(initialPath)
+  const [activeType, setActiveType] = useState(initial.type)
+  const [activeSubtype, setActiveSubtype] = useState(initial.subtype)
+  const skipResetRef = useRef(true)
   const [subtypesList, setSubtypesList] = useState<{ name: string; label: Record<string, string> }[]>([])
   const [availableFields, setAvailableFields] = useState<FieldDefinition[]>([])
   const [variants, setVariants] = useState<FormVariant[]>([])
@@ -65,6 +77,7 @@ export function ScreenFormVariants() {
   }, [activeType])
 
   useEffect(() => {
+    if (skipResetRef.current) { skipResetRef.current = false; return }
     setActiveSubtype('')
     setEditId(null)
     setIsNew(false)
@@ -192,7 +205,7 @@ export function ScreenFormVariants() {
 
       <div className="tabs">
         {TYPES.map(t => (
-          <button key={t.id} className={`tab${activeType === t.id ? ' active' : ''}`} onClick={() => setActiveType(t.id)}>
+          <button key={t.id} className={`tab${activeType === t.id ? ' active' : ''}`} onClick={() => { setActiveType(t.id); onPathChange?.(t.id) }}>
             {t.label}
           </button>
         ))}
@@ -200,7 +213,7 @@ export function ScreenFormVariants() {
 
       {subtypesList.length > 0 && (
         <div style={{ margin: '14px 0' }}>
-          <select style={{ ...inp, maxWidth: 260 }} value={activeSubtype} onChange={e => setActiveSubtype(e.target.value)}>
+          <select style={{ ...inp, maxWidth: 260 }} value={activeSubtype} onChange={e => { setActiveSubtype(e.target.value); onPathChange?.(e.target.value ? `${activeType}.${e.target.value}` : activeType) }}>
             <option value="">Alle / Global</option>
             {subtypesList.map(s => <option key={s.name} value={s.name}>{s.label?.de || s.name}</option>)}
           </select>

@@ -156,25 +156,25 @@ export function AppShell() {
 
   function renderScreen() {
     switch (route) {
-      case 'list':              return <ScreenList recordType="object"     onOpen={(id) => navigate('form', id)} />
+      case 'list':              return <ScreenList recordType="object"     onOpen={(id) => navigate('form', id)} initialTab={editId} onTabChange={(t) => navigate('list', t)} />
       case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => navigate('list')} onSaved={(id) => navigate('form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
-      case 'entities-list':     return <ScreenList recordType="entity"     onOpen={(id) => navigate('entities-form', id)} />
+      case 'entities-list':     return <ScreenList recordType="entity"     onOpen={(id) => navigate('entities-form', id)} initialTab={editId} onTabChange={(t) => navigate('entities-list', t)} />
       case 'entities-form':     return <ScreenForm recordType="entity"     recordId={editId ?? undefined} onBack={() => navigate('entities-list')} onSaved={(id) => navigate('entities-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
-      case 'places-list':       return <ScreenList recordType="place"      onOpen={(id) => navigate('places-form', id)} />
+      case 'places-list':       return <ScreenList recordType="place"      onOpen={(id) => navigate('places-form', id)} initialTab={editId} onTabChange={(t) => navigate('places-list', t)} />
       case 'places-form':       return <ScreenForm recordType="place"      recordId={editId ?? undefined} onBack={() => navigate('places-list')} onSaved={(id) => navigate('places-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
-      case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} />
+      case 'occurrences-list':  return <ScreenList recordType="occurrence" onOpen={(id) => navigate('occurrences-form', id)} initialTab={editId} onTabChange={(t) => navigate('occurrences-list', t)} />
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
-      case 'procedures-list':   return <ScreenList recordType="procedure" onOpen={(id) => navigate('procedures-form', id)} />
+      case 'procedures-list':   return <ScreenList recordType="procedure" onOpen={(id) => navigate('procedures-form', id)} initialTab={editId} onTabChange={(t) => navigate('procedures-list', t)} />
       case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
-      case 'subtypes':          return isAdmin ? <ScreenSubtype /> : <Placeholder label="Kein Zugriff" />
-      case 'schema':            return <ScreenSchema />
-      case 'form-variants':     return isAdmin ? <ScreenFormVariants /> : <Placeholder label="Kein Zugriff" />
+      case 'subtypes':          return isAdmin ? <ScreenSubtype initialType={editId} onTypeChange={(t) => navigate('subtypes', t)} /> : <Placeholder label="Kein Zugriff" />
+      case 'schema':            return <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} />
+      case 'form-variants':     return isAdmin ? <ScreenFormVariants initialPath={editId} onPathChange={(p) => navigate('form-variants', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'vocab':             return <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} />
-      case 'pages':             return <ScreenPages />
+      case 'pages':             return <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
-      case 'import':            return <ScreenImporter />
-      case 'audit':             return <ScreenAudit />
+      case 'import':            return <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} />
+      case 'audit':             return <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} />
       case 'users':             return <ScreenUsers />
       case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />

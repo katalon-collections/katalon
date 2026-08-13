@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-08-13
+
+### Added
+- Admin-Screens mit internen Tabs/Filtern (Einstellungen, Audit-Log, statische Seiten, Subtypen, Importer, Schema-Editor, Formularvarianten, Datensatzlisten) sind per URL-Hash direkt verlinkbar, z. B. `#settings/medien` oder `#schema/object.foto`.
+
 ## [0.11.0] - 2026-08-13
 
 ### Added
