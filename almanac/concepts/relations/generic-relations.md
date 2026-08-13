@@ -55,7 +55,7 @@ Schema relation fields are stored in record metadata but mirrored into the relat
 
 This mirror keeps form-oriented metadata and graph-oriented relation queries aligned. A cataloguer can work through a field configured by the [schema engine](../metadata/schema-engine), while portal and workflow code can read from `relations` without re-parsing every record's JSONB metadata.
 
-This also defines the save boundary for inline creation. A schema relation field keeps the selected draft in the source form's local metadata until the source record is saved and `sync_schema_relations` runs. The general relationships panel works on an already saved source record and writes its relation row immediately [@screen-form] [@relation-service].
+This also defines the save boundary for inline creation. A schema relation field keeps the selected draft in the source form's local metadata until the source record is saved and `sync_schema_relations` runs. This quick-create action is also available inside a quick-create form for every primary target type. The general relationships panel works on an already saved source record and writes its relation row immediately [@screen-form] [@relation-service].
 
 ## Relation Types And Inverse Labels
 

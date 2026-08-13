@@ -63,7 +63,7 @@ Production Elasticsearch uses a fixed `ES_JAVA_OPTS=-Xms1g -Xmx1g` and a `2g` me
 
 ## IIIF And Routing Overrides
 
-`docker-compose.cantaloupe.yml` is a narrow IIIF override. It forces filesystem lookup settings, sets Cantaloupe's public base URI to `http://localhost:8182`, and points both API and worker at Cantaloupe on the Compose network [@compose-cantaloupe].
+`docker-compose.cantaloupe.yml` is a narrow IIIF override. It forces filesystem lookup settings, sets Cantaloupe's public base URI to `http://localhost`, and points API and worker at Cantaloupe internally on `http://cantaloupe:8182`; public manifests use nginx's `http://localhost/iiif/...` route [@compose-cantaloupe].
 
 `docker-compose.traefik.yml` is an alternative production routing layer for Traefik. It removes nginx's published ports, switches nginx back to `docker/nginx.conf`, attaches nginx to the external `traefik-public` network, and adds Traefik labels for host `katalon.kraegelin.dev`, `websecure`, TLS, LetsEncrypt, and backend service port `80` [@compose-traefik].
 

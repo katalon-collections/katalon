@@ -64,7 +64,7 @@ On first startup with no existing admin or superuser and a usable `KATALON_BASE_
 | `ELASTICSEARCH_URL` | `http://localhost:9200` in settings, `http://elasticsearch:9200` in Compose | Search indexing and health checks [@config] [@compose] |
 | `ES_INDEX_NAME` | `katalon_records` | Elasticsearch record index name [@config] [@env-example] |
 | `CANTALOUPE_URL` | `http://localhost:8182` in settings, `http://cantaloupe:8182` in Compose | Internal IIIF image server URL [@config] [@compose] |
-| `CANTALOUPE_PUBLIC_URL` | empty or `http://localhost` fallback in Compose | Public IIIF URL used in manifests when set [@config] [@compose] |
+| `CANTALOUPE_PUBLIC_URL` | `http://localhost` locally; instance URL in production | Public IIIF base used in manifests. It must be browser-reachable and must not use the internal Cantaloupe port [@config] [@compose] |
 | `MEDIA_ROOT` | `/var/lib/katalon/media` in settings and containers | Media storage path inside containers; host path is mounted from env [@config] [@compose] |
 | `MAX_UPLOAD_SIZE_MB` | `100` in settings, `200` in Compose and example env | Upload size limit [@config] [@compose] [@env-example] |
 | `OAI_ADMIN_EMAIL` | `admin@katalon.dev` | OAI-PMH admin email setting [@config] |

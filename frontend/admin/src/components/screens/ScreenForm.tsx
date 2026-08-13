@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { createPortal } from 'react-dom'
 import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
@@ -456,6 +457,7 @@ function QuickCreateDialog({
   onReturnFocus?: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
   const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
@@ -469,16 +471,16 @@ function QuickCreateDialog({
     requestAnimationFrame(() => onReturnFocus?.())
   }
 
-  return (
+  return createPortal(
     <dialog
       ref={dialogRef}
       className="quick-create-dialog"
-      aria-labelledby="quick-create-title"
+      aria-labelledby={titleId}
       onCancel={e => { e.preventDefault(); close() }}
     >
       <div className="quick-create-head">
         <div>
-          <h2 id="quick-create-title">{NEW_TYPE_LABELS[targetType]} anlegen</h2>
+          <h2 id={titleId}>{NEW_TYPE_LABELS[targetType]} anlegen</h2>
           {context && <div className="quick-create-context">{context}</div>}
         </div>
         <button className="btn ico gh quick-create-close" onClick={close} aria-label="Schnellanlage schließen"><X size={16} /></button>
@@ -501,6 +503,7 @@ function QuickCreateDialog({
         }}
       />
     </dialog>
+    , document.body,
   )
 }
 
@@ -563,19 +566,25 @@ function RelationInput({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  const updateDropPosition = useCallback(() => {
+    if (!inputRef.current) return
+    const r = inputRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+    setDropPos({
+      top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+      left: r.left, width: r.width,
+      maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+    })
+  }, [])
+
   useEffect(() => {
-    if (showDrop && inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      const spaceAbove = r.top - 8
-      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
-      setDropPos({
-        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
-        left: r.left, width: r.width,
-        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
-      })
-    }
-  }, [showDrop])
+    if (!showDrop) return
+    updateDropPosition()
+    window.addEventListener('resize', updateDropPosition)
+    return () => window.removeEventListener('resize', updateDropPosition)
+  }, [showDrop, updateDropPosition])
 
   useEffect(() => {
     clearTimeout(timer.current)
@@ -715,21 +724,25 @@ function RelationInput({
               <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
               <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
             </button>
-          )) : <div className="relation-empty">Keine passenden {TYPE_LABELS[targetType as RecordType] ?? 'Datensätze'} gefunden.</div>}
+          )) : (
+            <div className="relation-empty">
+              {allowCreate && !disabled && targetType && getTokenUser()?.role !== 'viewer' && (
+                <button
+                  ref={createButtonRef}
+                  type="button"
+                  className="relation-create-option"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => setQuickCreateOpen(true)}
+                >
+                  {NEW_TYPE_LABELS[targetType as RecordType]} „{q.trim()}“ anlegen
+                </button>
+              )}
+              <div>Keine passenden {TYPE_LABELS[targetType as RecordType] ?? 'Datensätze'} gefunden.</div>
+            </div>
+          )}
         </div>
       )}
       </div>
-      {allowCreate && !disabled && targetType && getTokenUser()?.role !== 'viewer' && (
-        <button
-          ref={createButtonRef}
-          type="button"
-          className="btn gh relation-create"
-          disabled={!(fixedRelationType ?? relType.trim())}
-          onClick={() => setQuickCreateOpen(true)}
-        >
-          <Plus size={13} /> {NEW_TYPE_LABELS[targetType]} anlegen
-        </button>
-      )}
       {quickCreateOpen && targetType && (
         <QuickCreateDialog
           targetType={targetType}
@@ -1366,7 +1379,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             fromType={recordType}
             onAdd={entry => onChange(entry)}
             disabled={disabled}
-            allowCreate={!quickCreate}
           />
         )
       case 'authority':
@@ -2372,7 +2384,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
                                   <span style={{ flex: 1 }}>{entry.label}</span>
                                   <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
-                                  <button className="btn sm gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated}>Entfernen</button>
+                                  <button className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
                                 </div>
                               ))}
                             </div>
@@ -2384,7 +2396,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               fromType={recordType}
                               onAdd={entry => addRelationEntry(f.name, entry)}
                               disabled={justCreated}
-                              allowCreate={!quickCreate}
                             />
                           </>
                         ) : (
@@ -2393,7 +2404,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
                                 <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
                                 <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{(val as RelationEntry).relation_type}</span>
-                                <button className="btn sm gh" onClick={() => setField(f.name, undefined)} disabled={justCreated}>Entfernen</button>
+                                <button className="btn sm ico gh" onClick={() => setField(f.name, undefined)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
                               </div>
                             )}
                             {!val && (
@@ -2405,7 +2416,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 fromType={recordType}
                                 onAdd={entry => setField(f.name, entry)}
                                 disabled={justCreated}
-                                allowCreate={!quickCreate}
                               />
                             )}
                           </>
