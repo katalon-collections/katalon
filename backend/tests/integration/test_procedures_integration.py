@@ -9,7 +9,6 @@ async def test_procedure_crud_and_active_loan_out_guard(async_client, auth_heade
         json={
             "idno": f"OBJ-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {"label": "Loan object"},
         },
     )
@@ -175,7 +174,6 @@ async def test_concurrent_active_loan_relations_allow_one_winner(
         json={
             "idno": f"OBJ-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {},
         },
     )

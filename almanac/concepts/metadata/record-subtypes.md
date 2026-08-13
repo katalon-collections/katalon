@@ -47,7 +47,7 @@ Record subtypes are configured labels and internal names under Katalon's four pr
 
 `RecordSubtype` rows are unique by `(primary_type, name)` [@models]. The migration that introduced the table also added `object_type` and `place_type` columns, making object and place subtype storage match the existing entity and occurrence type columns in the ORM model [@migration] [@models]. Procedures are not managed through `record_subtypes`; they have their own fixed `procedure_type` values in schema validation [@schema-api].
 
-Katalon creates default subtype rows at startup for object `objekt`, entity `person`, place `geographikum`, and occurrence `werk` when those rows are missing [@main]. These defaults give every primary type at least one browseable subtype without hard-coding a field schema for that subtype.
+No subtype is created automatically. A record without a configured subtype stores `NULL` in its type column and uses the primary-type schema only. Once subtypes are configured, new records must select one (except drafts), so subtype-specific fields have an explicit scope.
 
 ## Admin Lifecycle
 
@@ -65,7 +65,7 @@ The schema API verifies that a non-null subtype exists before creating or updati
 
 A relation field's optional `target_subtype` narrows target searches through the corresponding object, entity, place, or occurrence list filter. The same subtype is preselected and locked in the quick-create form [@screen-form] [@admin-client]. Without a fixed subtype, the form selects the configured default when present. Entity quick creation requires a valid configured subtype if no default exists [@screen-form].
 
-The general relationships panel does not constrain the subtype. Users choose it in the target form, while procedures continue to use their six fixed `procedure_type` values [@screen-form].
+The general relationships panel does not constrain the subtype. Users choose it in the target form, while procedures continue to use their six fixed `procedure_type` values [@screen-form]. Record lists expose a subtype filter only when subtypes are configured; selecting one also loads its subtype-specific list columns.
 
 ## Related Pages
 

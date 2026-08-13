@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { objects, entities, places, occurrences, procedures, schema, ConflictError } from '../../api/client'
-import type { AnyRecord, FieldDefinition, Page, RecordType } from '../../types'
+import { objects, entities, places, occurrences, procedures, schema, subtypes, ConflictError } from '../../api/client'
+import type { AnyRecord, FieldDefinition, Page, RecordSubtype, RecordType } from '../../types'
+import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Plus, Search, Trash } from '../ui/Icons'
 
@@ -97,6 +98,8 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
   const [procedureType, setProcedureType] = useState('')
+  const [subtypeFilter, setSubtypeFilter] = useState('')
+  const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const [dueBefore, setDueBefore] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
   const [page, setPage] = useState(1)
@@ -110,9 +113,9 @@ export function ScreenList({ recordType, onOpen }: Props) {
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
 
-  // Load field definitions with show_in_list for this type
+  // List columns include subtype-specific fields when a subtype is selected.
   useEffect(() => {
-    schema.list(recordType)
+    schema.list(recordType, subtypeFilter || undefined)
       .then(fields => {
         const visible = fields
           .filter(f => f.show_in_list)
@@ -120,11 +123,20 @@ export function ScreenList({ recordType, onOpen }: Props) {
         setListFields(visible)
       })
       .catch(() => setListFields([]))
-  }, [recordType])
+  }, [recordType, subtypeFilter])
+
+  useEffect(() => {
+    if (!subtypeKey || recordType === 'procedure') {
+      setAvailableSubtypes([])
+      return
+    }
+    subtypes.list(recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
+  }, [recordType, subtypeKey])
 
   useEffect(() => {
     setTab('all')
     setQ('')
+    setSubtypeFilter('')
     setProcedureType('')
     setDueBefore('')
     setReferenceNumber('')
@@ -149,6 +161,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       status: tab === 'all' ? undefined : tab,
     }
     if (debouncedQ) params.q = debouncedQ
+    if (subtypeKey && subtypeFilter) params[subtypeKey] = subtypeFilter
     if (recordType === 'procedure') {
       if (procedureType) params.procedure_type = procedureType
       if (dueBefore) params.due_before = dueBefore
@@ -171,7 +184,7 @@ export function ScreenList({ recordType, onOpen }: Props) {
       .finally(() => {
         if (requestSeq === requestSeqRef.current) setLoading(false)
       })
-  }, [page, tab, debouncedQ, procedureType, dueBefore, referenceNumber, api, recordType])
+  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, procedureType, dueBefore, referenceNumber, api, recordType])
 
   useEffect(() => { load() }, [load])
 
@@ -284,6 +297,20 @@ export function ScreenList({ recordType, onOpen }: Props) {
             onChange={e => handleSearch(e.target.value)}
           />
         </div>
+        {availableSubtypes.length > 0 && (
+          <select
+            aria-label="Subtyp filtern"
+            className="fld"
+            style={{ maxWidth: 210 }}
+            value={subtypeFilter}
+            onChange={e => { setSubtypeFilter(e.target.value); setPage(1) }}
+          >
+            <option value="">Alle Typen</option>
+            {availableSubtypes.map(subtype => (
+              <option key={subtype.id} value={subtype.name}>{getLabel(subtype, subtype.name)}</option>
+            ))}
+          </select>
+        )}
         {recordType === 'procedure' && (
           <>
             <select aria-label="Vorgangstyp" className="fld" style={{ maxWidth: 190 }} value={procedureType} onChange={e => { setProcedureType(e.target.value); setPage(1) }}>

@@ -53,7 +53,6 @@ from katalon.core.models import (
     AdminConfig,
     FieldDefinition,
     PortalConfig,
-    RecordSubtype,
     User,
     Vocabulary,
     VocabularyTerm,
@@ -307,36 +306,6 @@ async def _ensure_label_fields() -> None:
         await db.commit()
 
 
-_DEFAULT_RECORD_SUBTYPES = [
-    # (primary_type, name, label_de, label_en)
-    ("object",     "objekt",       "Objekt",       "Object"),
-    ("entity",     "person",       "Person",       "Person"),
-    ("place",      "geographikum", "Geographikum", "Geographic"),
-    ("occurrence", "werk",         "Werk",         "Work"),
-]
-
-
-async def _ensure_record_subtypes() -> None:
-    """Ensure every primary type has at least one default subtype."""
-    async with AsyncSessionLocal() as db:
-        for primary_type, name, label_de, label_en in _DEFAULT_RECORD_SUBTYPES:
-            result = await db.execute(
-                select(RecordSubtype).where(
-                    RecordSubtype.primary_type == primary_type,
-                    RecordSubtype.name == name,
-                )
-            )
-            if result.scalar_one_or_none() is None:
-                db.add(
-                    RecordSubtype(
-                        primary_type=primary_type,
-                        name=name,
-                        label={"de": label_de, "en": label_en},
-                    )
-                )
-        await db.commit()
-
-
 _DEFAULT_SECRETS = {
     "dev-secret-key-change-in-production",
     "change-me-in-production",
@@ -384,7 +353,6 @@ async def lifespan(app: FastAPI):
     await _ensure_admin()
     await _ensure_media_types_vocab()
     await _ensure_relation_types_vocab()
-    await _ensure_record_subtypes()
     await _ensure_portal_config()
     await _ensure_admin_config()
     await _ensure_authority_sources()

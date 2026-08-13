@@ -180,7 +180,7 @@ class ObjectRead(ObjectCreate):
 
 class EntityCreate(RecordBase):
     idno: str | None = None
-    entity_type: str
+    entity_type: str | None = None
 
 
 class EntityRead(EntityCreate):
@@ -206,7 +206,7 @@ class PlaceRead(PlaceCreate):
 
 class OccurrenceCreate(RecordBase):
     idno: str | None = None
-    occurrence_type: str
+    occurrence_type: str | None = None
 
 
 class OccurrenceRead(OccurrenceCreate):

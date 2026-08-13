@@ -19,7 +19,6 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
         json={
             "idno": idno,
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {"label": "Integration object"},
         },
     )
@@ -40,7 +39,6 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
         json={
             "idno": idno,
             "status": "public",
-            "object_type": "objekt",
             "metadata_": {"label": "Updated integration object"},
         },
     )
@@ -77,7 +75,6 @@ async def test_object_draft_allows_missing_required_fields(async_client, auth_he
         json={
             "idno": f"OBJ-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {"label": "Draft object"},
         },
     )
@@ -89,7 +86,6 @@ async def test_object_draft_allows_missing_required_fields(async_client, auth_he
         json={
             "idno": f"OBJ-{uuid.uuid4().hex[:12]}",
             "status": "public",
-            "object_type": "objekt",
             "metadata_": {"label": "Public object"},
         },
     )
@@ -107,7 +103,6 @@ async def test_concurrent_object_writes_only_allow_one_winner(
         json={
             "idno": f"RACE-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {},
         },
     )
@@ -149,7 +144,6 @@ async def test_import_savepoint_isolates_stale_row_from_batch(
         json={
             "idno": f"IMPORT-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "metadata_": {},
         },
     )
@@ -178,7 +172,7 @@ async def test_import_savepoint_isolates_stale_row_from_batch(
 
         # Row 2 of the same batch: a brand-new insert must still succeed on the
         # same session/transaction after the savepoint rollback.
-        second = Object(idno=f"IMPORT2-{uuid.uuid4().hex[:12]}", status="draft", object_type="objekt", metadata_={})
+        second = Object(idno=f"IMPORT2-{uuid.uuid4().hex[:12]}", status="draft", metadata_={})
         batch_session.add(second)
         async with batch_session.begin_nested():
             await batch_session.flush()
@@ -198,7 +192,6 @@ async def test_snapshot_restore_requires_current_version_and_writes_audit(
         json={
             "idno": f"SNAP-{uuid.uuid4().hex[:12]}",
             "status": "draft",
-            "object_type": "objekt",
             "collection_status": "active",
             "metadata_": {"label": "before"},
         },
@@ -218,7 +211,6 @@ async def test_snapshot_restore_requires_current_version_and_writes_audit(
         json={
             "idno": record["idno"],
             "status": "draft",
-            "object_type": "objekt",
             "collection_status": "pending",
             "metadata_": {"label": "after"},
         },
@@ -253,7 +245,6 @@ async def test_concurrent_duplicate_idno_returns_client_error(async_client, auth
     payload = {
         "idno": idno,
         "status": "draft",
-        "object_type": "objekt",
         "metadata_": {},
     }
     responses = await asyncio.gather(

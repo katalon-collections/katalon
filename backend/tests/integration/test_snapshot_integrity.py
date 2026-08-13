@@ -6,9 +6,9 @@ import pytest
 @pytest.mark.parametrize(
     ("route", "type_field", "type_value"),
     [
-        ("entities", "entity_type", "person"),
-        ("places", "place_type", "geographikum"),
-        ("occurrences", "occurrence_type", "werk"),
+        ("entities", None, None),
+        ("places", None, None),
+        ("occurrences", None, None),
         ("procedures", "procedure_type", "acquisition"),
     ],
 )
@@ -16,18 +16,20 @@ async def test_snapshot_restore_requires_if_match_for_all_record_types(
     async_client,
     auth_headers,
     route: str,
-    type_field: str,
-    type_value: str,
+    type_field: str | None,
+    type_value: str | None,
 ) -> None:
+    payload = {
+        "idno": f"SNAP-{uuid.uuid4().hex[:12]}",
+        "status": "draft",
+        "metadata_": {},
+    }
+    if type_field and type_value:
+        payload[type_field] = type_value
     created = await async_client.post(
         f"/v1/{route}",
         headers=auth_headers,
-        json={
-            "idno": f"SNAP-{uuid.uuid4().hex[:12]}",
-            "status": "draft",
-            type_field: type_value,
-            "metadata_": {},
-        },
+        json=payload,
     )
     assert created.status_code == 201, created.text
     record = created.json()

@@ -61,7 +61,7 @@ class Entity(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
-    entity_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
@@ -103,7 +103,7 @@ class Occurrence(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
-    occurrence_type: Mapped[str] = mapped_column(String(64), index=True)
+    occurrence_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
