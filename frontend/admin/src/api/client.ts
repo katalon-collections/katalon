@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -169,6 +169,9 @@ export const users = {
     req<UserRead>('/v1/users/me/email', { method: 'PUT', body: JSON.stringify({ new_email, current_password }) }),
   setOwnOnboarding: (completed: boolean) =>
     req<UserRead>('/v1/users/me/onboarding', { method: 'PUT', body: JSON.stringify({ completed }) }),
+  permissions: () => req<RolePermission[]>('/v1/users/permissions'),
+  updatePermissions: (role: RolePermission['role'], permissions: RolePermission[]) =>
+    req<RolePermission[]>(`/v1/users/permissions/${role}`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
 }
 
 // Objects
@@ -287,6 +290,8 @@ export const schema = {
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/schema/${id}`, { method: 'DELETE' }),
+  resetSummary: (targetType: string) => req<{ deletable_fields: number }>(`/v1/schema/${targetType}/reset-summary`),
+  reset: (targetType: string) => req<{ deletable_fields: number, deleted_fields: number }>(`/v1/schema/${targetType}/reset`, { method: 'POST' }),
   import: async (file: File, opts: { dryRun?: boolean; overwrite?: boolean } = {}): Promise<SchemaImportResult> => {
     const formData = new FormData()
     formData.append('file', file)

@@ -2,15 +2,17 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from katalon.api.v1.auth import hash_password, verify_password
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
-from katalon.core.models import User
+from katalon.core.models import RolePermission, User
 from katalon.core.schemas import (
     EmailChange,
     OnboardingUpdate,
     PasswordChange,
+    RolePermissionRead,
+    RolePermissionUpdate,
     UserCreate,
     UserRead,
     UserUpdate,
@@ -20,6 +22,7 @@ from katalon.services.audit_service import log_change
 router = APIRouter(prefix="/users", tags=["users"])
 
 _VALID_ROLES = {"admin", "superuser", "editor", "cataloger", "viewer"}
+_CONFIGURABLE_ROLES = {"editor", "cataloger", "viewer"}
 
 
 @router.get(
@@ -65,6 +68,41 @@ async def create_user(data: UserCreate, db: DBDep) -> User:
 @router.get("/me", response_model=UserRead, summary="Get the current authenticated user")
 async def get_me(current_user: CurrentUser) -> User:
     return current_user
+
+
+@router.get(
+    "/permissions",
+    response_model=list[RolePermissionRead],
+    dependencies=[require_role("admin")],
+    summary="List configured record permissions",
+)
+async def list_role_permissions(db: DBDep) -> list[RolePermission]:
+    result = await db.execute(select(RolePermission).order_by(
+        RolePermission.role, RolePermission.record_type, RolePermission.action
+    ))
+    return list(result.scalars().all())
+
+
+@router.put(
+    "/permissions/{role}",
+    response_model=list[RolePermissionRead],
+    dependencies=[require_role("admin")],
+    summary="Replace the record permissions for one fixed role",
+)
+async def update_role_permissions(
+    role: str, data: RolePermissionUpdate, db: DBDep
+) -> list[RolePermission]:
+    if role not in _CONFIGURABLE_ROLES:
+        raise HTTPException(status_code=422, detail="Diese Rolle kann nicht konfiguriert werden.")
+    if any(permission.role != role for permission in data.permissions):
+        raise HTTPException(status_code=422, detail="Berechtigungen müssen zur Rolle passen.")
+    await db.execute(delete(RolePermission).where(RolePermission.role == role))
+    permissions = [
+        RolePermission(role=role, record_type=permission.record_type, action=permission.action)
+        for permission in data.permissions
+    ]
+    db.add_all(permissions)
+    return permissions
 
 
 @router.put(

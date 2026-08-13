@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.core.dependencies import DBDep, require_admin_or_editor
+from katalon.core.dependencies import DBDep, require_record_permission
 from katalon.core.models import AdminConfig, Object, Procedure, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -118,6 +118,7 @@ async def _idno(data: ProcedureCreate, db: DBDep) -> str | None:
 )
 async def list_procedures(
     db: DBDep,
+    _=require_record_permission("procedure", "read"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     procedure_type: str | None = None,
@@ -167,7 +168,7 @@ async def list_procedures(
 async def create_procedure(
     data: ProcedureCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "create"),
 ) -> Procedure:
     procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
@@ -223,7 +224,7 @@ async def complete_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureComplete,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "update"),
 ) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
@@ -294,7 +295,7 @@ async def complete_procedure(
         404: {"description": "Procedure not found"},
     },
 )
-async def get_procedure(procedure_id: uuid.UUID, db: DBDep) -> Procedure:
+async def get_procedure(procedure_id: uuid.UUID, db: DBDep, _=require_record_permission("procedure", "read")) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
     ).scalar_one_or_none()
@@ -324,7 +325,7 @@ async def update_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Procedure:
     proc = (
@@ -406,7 +407,7 @@ async def update_procedure(
 async def delete_procedure(
     procedure_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "delete"),
     force: bool = Query(False),
 ) -> None:
     proc = (
@@ -461,7 +462,7 @@ async def create_snapshot(
     procedure_id: uuid.UUID,
     data: SnapshotCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "update"),
 ) -> RecordSnapshot:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
@@ -509,7 +510,7 @@ async def restore_snapshot(
     procedure_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("procedure", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Procedure:
     snap = (

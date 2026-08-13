@@ -7,7 +7,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.dependencies import (
+    DBDep,
+    OptionalCurrentUser,
+    has_record_permission,
+    require_record_permission,
+)
 from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -43,6 +48,10 @@ router = APIRouter(prefix="/objects", tags=["objects"])
 COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
 
 
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+    return user if user and await has_record_permission(db, user, "object", "read") else None
+
+
 @router.get(
     "",
     response_model=dict,
@@ -60,7 +69,7 @@ async def list_objects(
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
-    query = apply_public_visibility(query, Object, current_user)
+    query = apply_public_visibility(query, Object, await _visibility_user(db, current_user))
     if object_type:
         query = query.where(Object.object_type == object_type)
     if q:
@@ -92,7 +101,7 @@ async def list_objects(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_object(data: ObjectCreate, db: DBDep, current_user=require_admin_or_editor()) -> Object:
+async def create_object(data: ObjectCreate, db: DBDep, current_user=require_record_permission("object", "create")) -> Object:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("object") if cfg else None
@@ -167,7 +176,7 @@ async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
+    ensure_publicly_visible(obj, await _visibility_user(db, current_user), "Objekt nicht gefunden")
     return obj
 
 
@@ -187,7 +196,7 @@ async def update_object(
     object_id: uuid.UUID,
     data: ObjectCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("object", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     result = await db.execute(select(Object).where(Object.id == object_id))
@@ -275,7 +284,7 @@ async def update_object(
 async def publish_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("object", "update"),
 ) -> dict:
     """Publish an object after validating required fields."""
     ok, errors = await can_publish(db, "object", str(object_id))
@@ -299,7 +308,7 @@ async def publish_object(
 async def delete_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("object", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Object).where(Object.id == object_id))
@@ -344,7 +353,7 @@ async def delete_object(
     },
 )
 async def create_snapshot(
-    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
+    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("object", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
@@ -446,7 +455,7 @@ async def restore_snapshot(
     object_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("object", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     snap_result = await db.execute(

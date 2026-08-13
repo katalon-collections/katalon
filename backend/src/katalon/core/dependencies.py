@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.models import ApiKey, User
+from katalon.core.models import ApiKey, RolePermission, User
 from katalon.core.schemas import TokenData
 from katalon.database import get_db
 
@@ -131,6 +131,29 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
     "admin": {"manage_content", "manage_config", "manage_users"},
     "superuser": {"manage_content", "manage_config", "manage_users"},
 }
+
+
+async def has_record_permission(
+    db: AsyncSession, user: User, record_type: str, action: str
+) -> bool:
+    if user.role in {"admin", "superuser"}:
+        return True
+    result = await db.execute(
+        select(RolePermission.id).where(
+            RolePermission.role == user.role,
+            RolePermission.record_type == record_type,
+            RolePermission.action == action,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+def require_record_permission(record_type: str, action: str):
+    async def _check(db: DBDep, current_user: CurrentUser) -> User:
+        if not await has_record_permission(db, current_user, record_type, action):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return current_user
+    return Depends(_check)
 
 
 def has_capability(user: User, capability: str) -> bool:

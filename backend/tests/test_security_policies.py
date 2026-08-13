@@ -168,12 +168,20 @@ async def test_viewer_cannot_use_mutating_admin_or_content_routes(
     json_body: dict,
 ) -> None:
     viewer = User(id=uuid.uuid4(), email="viewer@example.org", hashed_password="x", role="viewer")
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_one_result(None))
+
+    async def override_db():
+        yield session
+
     app.dependency_overrides[get_current_user] = lambda: viewer
+    app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await getattr(client, method)(path, json=json_body)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 403
 

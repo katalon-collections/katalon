@@ -6,7 +6,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.dependencies import (
+    DBDep,
+    OptionalCurrentUser,
+    has_record_permission,
+    require_record_permission,
+)
 from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
@@ -35,6 +40,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/places", tags=["places"])
 
 
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+    return user if user and await has_record_permission(db, user, "place", "read") else None
+
+
 @router.get(
     "",
     response_model=dict,
@@ -54,7 +63,7 @@ async def list_places(
         query = query.where(Place.place_type == place_type)
     if status:
         query = query.where(Place.status == status)
-    query = apply_public_visibility(query, Place, current_user)
+    query = apply_public_visibility(query, Place, await _visibility_user(db, current_user))
     if q:
         query = query.where(Place.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
@@ -74,7 +83,7 @@ async def list_places(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_place(data: PlaceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Place:
+async def create_place(data: PlaceCreate, db: DBDep, current_user=require_record_permission("place", "create")) -> Place:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("place") if cfg else None
@@ -147,7 +156,7 @@ async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurren
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
-    ensure_publicly_visible(place, current_user, "Ort nicht gefunden")
+    ensure_publicly_visible(place, await _visibility_user(db, current_user), "Ort nicht gefunden")
     return place
 
 
@@ -167,7 +176,7 @@ async def update_place(
     place_id: uuid.UUID,
     data: PlaceCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("place", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -235,7 +244,7 @@ async def update_place(
 async def publish_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("place", "update"),
 ) -> dict:
     """Publish a place after validating required fields."""
     ok, errors = await can_publish(db, "place", str(place_id))
@@ -259,7 +268,7 @@ async def publish_place(
 async def delete_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("place", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -304,7 +313,7 @@ async def delete_place(
     },
 )
 async def create_snapshot(
-    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
+    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("place", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
@@ -356,7 +365,7 @@ async def restore_snapshot(
     place_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("place", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Place:
     snap_result = await db.execute(

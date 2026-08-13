@@ -270,6 +270,9 @@ class RelationRead(RelationCreate):
 # Auth
 # ---------------------------------------------------------------------------
 
+PermissionAction = Literal["read", "create", "update", "delete"]
+PermissionRole = Literal["admin", "editor", "cataloger", "viewer"]
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
@@ -292,6 +295,18 @@ class UserRead(BaseModel):
     is_active: bool
     created_at: datetime
     onboarding_completed_at: datetime | None = None
+
+
+class RolePermissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: PermissionRole
+    record_type: Literal["object", "entity", "place", "occurrence", "procedure"]
+    action: PermissionAction
+
+
+class RolePermissionUpdate(BaseModel):
+    permissions: list[RolePermissionRead]
 
 
 class UserUpdate(BaseModel):

@@ -6,7 +6,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.dependencies import (
+    DBDep,
+    OptionalCurrentUser,
+    has_record_permission,
+    require_record_permission,
+)
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -41,6 +46,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+    return user if user and await has_record_permission(db, user, "entity", "read") else None
+
+
 @router.get(
     "",
     response_model=dict,
@@ -60,7 +69,7 @@ async def list_entities(
         query = query.where(Entity.entity_type == entity_type)
     if status:
         query = query.where(Entity.status == status)
-    query = apply_public_visibility(query, Entity, current_user)
+    query = apply_public_visibility(query, Entity, await _visibility_user(db, current_user))
     if q:
         query = query.where(Entity.search_vector.match(q))
 
@@ -81,7 +90,7 @@ async def list_entities(
         403: {"description": "Insufficient permissions"},
     },
 )
-async def create_entity(data: EntityCreate, db: DBDep, current_user=require_admin_or_editor()) -> Entity:
+async def create_entity(data: EntityCreate, db: DBDep, current_user=require_record_permission("entity", "create")) -> Entity:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("entity") if cfg else None
@@ -146,7 +155,7 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    ensure_publicly_visible(entity, current_user, "Entität nicht gefunden")
+    ensure_publicly_visible(entity, await _visibility_user(db, current_user), "Entität nicht gefunden")
     return entity
 
 
@@ -166,7 +175,7 @@ async def update_entity(
     entity_id: uuid.UUID,
     data: EntityCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("entity", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -232,7 +241,7 @@ async def update_entity(
 async def publish_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("entity", "update"),
 ) -> dict:
     """Publish an entity after validating required fields."""
     ok, errors = await can_publish(db, "entity", str(entity_id))
@@ -256,7 +265,7 @@ async def publish_entity(
 async def delete_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("entity", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -301,7 +310,7 @@ async def delete_entity(
     },
 )
 async def create_snapshot(
-    entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
+    entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("entity", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -353,7 +362,7 @@ async def restore_snapshot(
     entity_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("entity", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Entity:
     snap_result = await db.execute(

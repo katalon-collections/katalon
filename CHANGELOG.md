@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.28] - 2026-08-13
+
+### Added
+- Konfigurierbare CRUD-Rechte für feste Rollen je Primärtyp, mit serverseitiger Durchsetzung und Rollenmatrix in der Benutzerverwaltung. (#276)
+
 ## [0.10.27] - 2026-08-13
 
 ### Fixed

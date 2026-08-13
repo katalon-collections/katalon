@@ -517,6 +517,19 @@ class User(Base):
     )
 
 
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    role: Mapped[str] = mapped_column(String(32), index=True)
+    record_type: Mapped[str] = mapped_column(String(32), index=True)
+    action: Mapped[str] = mapped_column(String(16))
+
+    __table_args__ = (
+        UniqueConstraint("role", "record_type", "action", name="uq_role_permission"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # API Keys
 # ---------------------------------------------------------------------------

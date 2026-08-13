@@ -18,6 +18,9 @@ sources:
   - id: users
     type: file
     path: backend/src/katalon/api/v1/users.py
+  - id: models
+    type: file
+    path: backend/src/katalon/core/models.py
   - id: api-keys
     type: file
     path: backend/src/katalon/api/v1/api_keys.py
@@ -55,7 +58,7 @@ User management accepts only `admin`, `superuser`, `editor`, `cataloger`, and `v
 
 The user endpoints enforce admin-only access for listing, creating, reading arbitrary users, updating users, deleting users, and admin API-key management [@users]. Self-service endpoints allow the current user to read their own user record, change password, change email, and manage their own API keys [@users] [@api-keys].
 
-Granular read, write, and delete permissions by record type, form, or action are not part of the current capability map; the dependency layer only exposes the coarse capabilities described above [@dependencies].
+The fixed editorial roles `editor`, `cataloger`, and `viewer` have a persistent permission matrix for `read`, `create`, `update`, and `delete` across objects, entities, places, occurrences, and procedures. Admin and superuser retain unrestricted access. The backend enforces configured write rights and limits internal, non-published records to roles with read access; public portal visibility remains governed by publication status rather than the matrix [@dependencies] [@users] [@models].
 
 ## Stored Secrets And Rate Limits
 

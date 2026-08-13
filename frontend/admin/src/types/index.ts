@@ -221,6 +221,12 @@ export interface UserRead {
   onboarding_completed_at: string | null
 }
 
+export interface RolePermission {
+  role: 'admin' | 'editor' | 'cataloger' | 'viewer'
+  record_type: 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
+  action: 'read' | 'create' | 'update' | 'delete'
+}
+
 export interface ApiKey {
   id: string
   user_id: string

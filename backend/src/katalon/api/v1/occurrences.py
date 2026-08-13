@@ -6,7 +6,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.dependencies import (
+    DBDep,
+    OptionalCurrentUser,
+    has_record_permission,
+    require_record_permission,
+)
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
 from katalon.core.schemas import (
     AuditLogRead,
@@ -41,6 +46,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
 
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+    return user if user and await has_record_permission(db, user, "occurrence", "read") else None
+
+
 @router.get(
     "",
     response_model=dict,
@@ -60,7 +69,7 @@ async def list_occurrences(
         query = query.where(Occurrence.occurrence_type == occurrence_type)
     if status:
         query = query.where(Occurrence.status == status)
-    query = apply_public_visibility(query, Occurrence, current_user)
+    query = apply_public_visibility(query, Occurrence, await _visibility_user(db, current_user))
     if q:
         query = query.where(Occurrence.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
@@ -81,7 +90,7 @@ async def list_occurrences(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=require_admin_or_editor()) -> Occurrence:
+async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=require_record_permission("occurrence", "create")) -> Occurrence:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("occurrence") if cfg else None
@@ -146,7 +155,7 @@ async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCur
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
-    ensure_publicly_visible(occ, current_user, "Occurrence nicht gefunden")
+    ensure_publicly_visible(occ, await _visibility_user(db, current_user), "Occurrence nicht gefunden")
     return occ
 
 
@@ -166,7 +175,7 @@ async def update_occurrence(
     occ_id: uuid.UUID,
     data: OccurrenceCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("occurrence", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -231,7 +240,7 @@ async def update_occurrence(
 async def publish_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("occurrence", "update"),
 ) -> dict:
     """Publish an occurrence after validating required fields."""
     ok, errors = await can_publish(db, "occurrence", str(occ_id))
@@ -255,7 +264,7 @@ async def publish_occurrence(
 async def delete_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("occurrence", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -300,7 +309,7 @@ async def delete_occurrence(
     },
 )
 async def create_snapshot(
-    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_admin_or_editor()
+    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("occurrence", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
@@ -352,7 +361,7 @@ async def restore_snapshot(
     occ_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user=require_record_permission("occurrence", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     snap_result = await db.execute(
