@@ -3,7 +3,7 @@ import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import { ChevD, Edit, Plus, Tag, Trash, X } from '../ui/Icons'
+import { ChevD, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
 
 const RECORD_TYPE_LABELS: Record<RecordType, string> = {
   object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
@@ -41,6 +41,41 @@ function AppliesPreview({ from, to }: { from: RecordType[]; to: RecordType[] }) 
     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-3)' }} aria-live="polite">
       Gilt für: <strong>{appliesLabel({ applies_from: from, applies_to: to })}</strong>
       <div>Keine Auswahl in beiden Feldern gilt für alle Kombinationen; Objekt ohne Zieltyp gilt für Objekt → alle.</div>
+    </div>
+  )
+}
+
+function typePreview(types: RecordType[]): string {
+  return types.length === 0 ? 'alle Typen' : types.map(type => RECORD_TYPE_LABELS[type]).join(', ')
+}
+
+function RelationTypeHelp({ label, inverseLabel, from, to }: {
+  label: string
+  inverseLabel: string
+  from: RecordType[]
+  to: RecordType[]
+}) {
+  const source = typePreview(from)
+  const target = typePreview(to)
+  return (
+    <div
+      style={{ marginTop: 8, padding: '8px 10px', background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}
+    >
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--fg)' }}>
+        <Help size={14} aria-hidden="true" />
+        <strong>So wird der Relationstyp verwendet</strong>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        <strong>Quelle</strong> ist der Ausgangsdatensatz, <strong>Ziel</strong> der verknüpfte Datensatz. Das Label gilt von Quelle → Ziel; die Gegenrichtung zeigt dieselbe Verbindung vom Ziel aus.
+      </div>
+      <div style={{ marginTop: 4 }}>
+        Beispiel: <em>„ist Teil von“</em> für Objekt → Occurrence; als Gegenrichtung <em>„hat Teil“</em> für Occurrence → Objekt.
+      </div>
+      <div style={{ marginTop: 6, color: 'var(--fg)' }}>
+        <strong>Ihre Vorschau:</strong> {source} — <em>{label || 'Label'}</em> → {target}
+        <br />
+        {target} — <em>{inverseLabel || 'Gegenrichtung'}</em> → {source}
+      </div>
     </div>
   )
 }
@@ -225,7 +260,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       headers.reduce<Record<string, string>>((acc, header) => {
         const normalized = header.toLowerCase()
         if (normalized === 'term') acc[header] = 'term'
-        else if (normalized === 'parent_term' || normalized === 'parent') acc[header] = 'parent_term'
+        else if ((normalized === 'parent_term' || normalized === 'parent') && vocabs.find(v => v.id === activeVocab)?.kind !== 'relation') acc[header] = 'parent_term'
         else if (normalized === 'label_de' || normalized === 'de') acc[header] = 'label:de'
         else if (normalized === 'label_en' || normalized === 'en') acc[header] = 'label:en'
         else acc[header] = ''
@@ -291,7 +326,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     try {
       const v = await vocabularies.create({
         name: newVocabName.trim(),
-        is_hierarchical: newVocabHierarchical,
+        is_hierarchical: newVocabKind === 'relation' ? false : newVocabHierarchical,
         kind: newVocabKind,
       })
       setVocabs(prev => [...prev, v])
@@ -409,6 +444,10 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }
 
   const vocab = vocabs.find(v => v.id === activeVocab)
+  const csvTargets = vocab?.kind === 'relation'
+    ? CSV_TARGETS.filter(target => target.value !== 'parent_term')
+    : CSV_TARGETS
+  const tableColumnCount = vocab?.kind === 'relation' ? 5 : 4
 
   if (loading) {
     return (
@@ -444,12 +483,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   <option value="relation">Relationsvokabular</option>
                 </select>
               </div>
-              <div className="field" style={{ paddingTop: 20 }}>
+              {newVocabKind === 'term' && <div className="field" style={{ paddingTop: 20 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={newVocabHierarchical} onChange={e => setNewVocabHierarchical(e.target.checked)} />
                   <span style={{ fontSize: 13 }}>Hierarchisch</span>
                 </label>
-              </div>
+              </div>}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button className="btn pri" onClick={createVocab} disabled={savingVocab}>Anlegen</button>
@@ -495,7 +534,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 <div className="bd">
                   <div style={{ fontWeight: 600, marginBottom: 8 }}>Vokabular-Import (CSV/JSON)</div>
                   <div className="help" style={{ marginBottom: 8 }}>
-                    Hierarchische Listen: eine Spalte auf „Parent-ID" mappen — Inhalt ist die ID oder das Label des Elternterms (z.&nbsp;B. „Kopierschutz"). Ohne gemappte ID-Spalte wird die ID automatisch aus dem Label abgeleitet (z.&nbsp;B. „Kopierschutz DRM" → „kopierschutz-drm").
+                    {vocab.kind === 'relation'
+                      ? 'Relationstypen sind flach. Ohne ID-Spalte wird die ID automatisch aus dem Label abgeleitet.'
+                      : 'Hierarchische Listen: eine Spalte auf „Parent-ID" mappen — Inhalt ist die ID oder das Label des Elternterms (z. B. „Kopierschutz"). Ohne gemappte ID-Spalte wird die ID automatisch aus dem Label abgeleitet (z. B. „Kopierschutz DRM" → „kopierschutz-drm").'}
                   </div>
                   <div
                     onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
@@ -537,7 +578,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                               value={mapping[header] ?? ''}
                               onChange={e => setMapping(prev => ({ ...prev, [header]: e.target.value }))}
                             >
-                              {CSV_TARGETS.map(opt => <option key={opt.value || 'ignore'} value={opt.value}>{opt.label}</option>)}
+                              {csvTargets.map(opt => <option key={opt.value || 'ignore'} value={opt.value}>{opt.label}</option>)}
                             </select>
                           </div>
                         ))}
@@ -589,25 +630,31 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         <input className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
                       </div>
                       <div className="field">
-                        <div className="lbl">Label DE</div>
+                        <div className="lbl">Label DE (Quelle → Ziel)</div>
                         <input className="fld" value={newTermLabelDe} onChange={e => setNewTermLabelDe(e.target.value)} placeholder="Anzeigetext (Hinrichtung)" />
                       </div>
                       {vocab.kind === 'relation' && (
                         <div className="field">
-                          <div className="lbl">Gegenrichtung DE</div>
+                          <div className="lbl">Gegenrichtung DE (Ziel → Quelle)</div>
                           <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
                         </div>
                       )}
                     </div>
                     {vocab.kind === 'relation' && (
                       <>
+                        <RelationTypeHelp
+                          label={newTermLabelDe}
+                          inverseLabel={newTermInverseLabelDe}
+                          from={newTermAppliesFrom}
+                          to={newTermAppliesTo}
+                        />
                         <div className="fg-2" style={{ marginTop: 8 }}>
                           <div className="field">
-                            <div className="lbl">Quelltypen</div>
+                            <div className="lbl">Quelltypen (Ausgangsdatensatz)</div>
                             <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
                           </div>
                           <div className="field">
-                            <div className="lbl">Zieltypen</div>
+                            <div className="lbl">Zieltypen (verknüpfter Datensatz)</div>
                             <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
                           </div>
                         </div>
@@ -627,28 +674,28 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>ID</th>
+                      <th style={{ minWidth: 160 }}>ID</th>
                       <th>Label DE</th>
                       {vocab.kind === 'relation' && <th>Gegenrichtung DE</th>}
                       {vocab.kind === 'relation' && <th>Typen</th>}
-                      <th>Übergeordnet</th>
+                      {vocab.kind !== 'relation' && <th>Übergeordnet</th>}
                       <th className="col-act" />
                     </tr>
                   </thead>
                   <tbody>
-                    {termsLoading && <tr><td colSpan={vocab.kind === 'relation' ? 6 : 4} className="empty">Lade…</td></tr>}
+                    {termsLoading && <tr><td colSpan={tableColumnCount} className="empty">Lade…</td></tr>}
                     {!termsLoading && terms.length === 0 && (
-                      <tr><td colSpan={vocab.kind === 'relation' ? 6 : 4} className="empty">Keine Terme.</td></tr>
+                      <tr><td colSpan={tableColumnCount} className="empty">Keine Terme.</td></tr>
                     )}
                     {!termsLoading && terms.map(t => (
                       editTermId === t.id ? (
                         <Fragment key={t.id}>
                           <tr>
-                            <td><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ maxWidth: 160 }} /></td>
+                            <td style={{ minWidth: 160, width: 160 }}><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ width: '100%' }} /></td>
                             <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
                             {vocab.kind === 'relation' && <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>}
                             {vocab.kind === 'relation' && <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>{appliesLabel(t)}</td>}
-                            <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>
+                            {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>}
                             <td className="col-act">
                               <div className="row-actions">
                                 <button className="btn sm pri" onClick={() => saveEditTerm(t)} disabled={savingEditTerm}>OK</button>
@@ -657,16 +704,22 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             </td>
                           </tr>
                           <tr>
-                            <td colSpan={vocab.kind === 'relation' ? 6 : 4} style={{ background: 'var(--panel)' }}>
+                            <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
                               {vocab.kind === 'relation' && (
                                 <>
+                                  <RelationTypeHelp
+                                    label={editTermLabelDe}
+                                    inverseLabel={editTermInverseLabelDe}
+                                    from={editTermAppliesFrom}
+                                    to={editTermAppliesTo}
+                                  />
                                   <div className="fg-2" style={{ marginBottom: 8 }}>
                                     <div className="field">
-                                      <div className="lbl">Quelltypen</div>
+                                      <div className="lbl">Quelltypen (Ausgangsdatensatz)</div>
                                       <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
                                     </div>
                                     <div className="field">
-                                      <div className="lbl">Zieltypen</div>
+                                      <div className="lbl">Zieltypen (verknüpfter Datensatz)</div>
                                       <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
                                     </div>
                                   </div>
@@ -679,14 +732,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         </Fragment>
                       ) : (
                         <tr key={t.id}>
-                          <td className="mono" style={{ maxWidth: 180 }}>{t.term}</td>
+                          <td className="mono" style={{ minWidth: 160, width: 160 }}>{t.term}</td>
                           <td style={{ maxWidth: 220 }}>
                             {getLabel(t, '—')}
                             <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>}
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t)}</td>}
-                          <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>
+                          {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>}
                           <td className="col-act">
                             <div className="row-actions">
                               <button className="btn sm ico gh" onClick={() => startEditTerm(t)}><Edit size={12} /></button>

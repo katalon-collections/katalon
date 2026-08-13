@@ -73,7 +73,10 @@ async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
     },
 )
 async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
-    vocab = Vocabulary(**data.model_dump())
+    values = data.model_dump()
+    if values["kind"] == "relation":
+        values["is_hierarchical"] = False
+    vocab = Vocabulary(**values)
     db.add(vocab)
     await db.commit()
     return vocab
@@ -205,6 +208,8 @@ async def create_term(
     vocab = await db.get(Vocabulary, vocab_id)
     if not vocab:
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    if vocab.kind == "relation" and data.parent_id:
+        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
     errors = await validate_metadata(
         db, "vocabulary_term", data.metadata_, str(vocab_id)
     )
@@ -234,6 +239,9 @@ async def update_term(
     term = result.scalar_one_or_none()
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
+    vocab = await db.get(Vocabulary, term.vocabulary_id)
+    if vocab and vocab.kind == "relation" and data.parent_id:
+        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
     errors = await validate_metadata(
         db, "vocabulary_term", data.metadata_, str(term.vocabulary_id)
     )
@@ -283,7 +291,8 @@ async def import_terms(
 ) -> dict:
     """Import vocabulary terms from CSV or JSON with optional dry-run."""
     vocab_result = await db.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
-    if vocab_result.scalar_one_or_none() is None:
+    vocab = vocab_result.scalar_one_or_none()
+    if vocab is None:
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
 
     content = await file.read()
@@ -307,6 +316,9 @@ async def import_terms(
             raise HTTPException(status_code=422, detail=f"JSON konnte nicht verarbeitet werden: {exc}") from exc
     else:
         raise HTTPException(status_code=422, detail="Nur CSV/TSV oder JSON werden unterstützt")
+
+    if vocab.kind == "relation" and any(term.parent_term for term in terms):
+        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
 
     if errors:
         return {

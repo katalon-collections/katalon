@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.16] - 2026-08-13
+
+### Fixed
+- Relationsvokabulare sind flach; Elternrelationen werden auch beim Import abgewiesen.
+- Relationstyp-IDs bleiben in der Vokabularansicht lesbar.
+
 ## [0.10.15] - 2026-08-13
 
 ### Fixed

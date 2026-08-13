@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import pytest
@@ -119,3 +120,64 @@ async def test_vocabulary_kind_limits_schema_usage(
         },
     )
     assert valid.status_code == 201, valid.text
+
+
+@pytest.mark.asyncio
+async def test_relation_vocabulary_rejects_hierarchy(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={
+            "name": f"flat-relations-{uuid.uuid4()}",
+            "is_hierarchical": True,
+            "kind": "relation",
+        },
+    )
+    assert response.status_code == 201, response.text
+    vocab = response.json()
+    assert vocab["is_hierarchical"] is False
+
+    parent = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "has_author",
+            "label": {"de": "hat Autor"},
+        },
+    )
+    assert parent.status_code == 201, parent.text
+
+    child = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "has_creator",
+            "label": {"de": "hat Urheber"},
+            "parent_id": parent.json()["id"],
+        },
+    )
+    assert child.status_code == 422
+
+    updated = await async_client.put(
+        f"/v1/vocabularies/terms/{parent.json()['id']}",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "has_author",
+            "label": {"de": "hat Autor"},
+            "parent_id": parent.json()["id"],
+        },
+    )
+    assert updated.status_code == 422
+
+    imported = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/import?dry_run=true",
+        headers=auth_headers,
+        data={"mapping": json.dumps({"term": "term", "parent": "parent_term"})},
+        files={"file": ("relation-types.csv", b"term;parent\nhas_editor;has_author\n", "text/csv")},
+    )
+    assert imported.status_code == 422

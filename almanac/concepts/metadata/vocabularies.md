@@ -32,13 +32,13 @@ sources:
     path: .agents/knowledge/decisions/vocabulary-custom-fields.md
 ---
 
-Vocabularies are Katalon's controlled lists for cataloguing values and relation labels. A `Vocabulary` has a unique name, a hierarchy flag, and a `kind` of either `term` or `relation`; each `VocabularyTerm` belongs to one vocabulary, has multilingual labels, optional inverse labels, optional parent-child structure, and JSONB metadata for term-specific custom fields [@models]. The vocabulary API exposes flat term lists, nested trees, ancestor chains, CRUD operations, and import endpoints, so vocabularies are both user-facing controlled data and configuration used by the [schema engine](schema-engine) [@vocab-api].
+Vocabularies are Katalon's controlled lists for cataloguing values and relation labels. A `Vocabulary` has a unique name, a hierarchy flag, and a `kind` of either `term` or `relation`; each `VocabularyTerm` belongs to one vocabulary, has multilingual labels, optional inverse labels, and JSONB metadata for term-specific custom fields [@models]. Term vocabularies may have a parent-child structure; relation vocabularies are always flat. The vocabulary API exposes flat term lists, nested trees, ancestor chains, CRUD operations, and import endpoints, so vocabularies are both user-facing controlled data and configuration used by the [schema engine](schema-engine) [@vocab-api].
 
 ## Terms And Hierarchies
 
 Vocabulary terms are stored as rows with `term`, `label`, `inverse_label`, `metadata`, and `parent_id` fields [@models]. The API can return terms as a flat list filtered by text search over `term` and JSON labels, or as a nested tree built from `parent_id` relationships [@vocab-api]. The ancestor endpoint walks the same in-memory term map from a selected term toward its parents, returning the root-to-parent chain [@vocab-api].
 
-The `is_hierarchical` flag records whether a vocabulary is intended as a hierarchy, but the actual hierarchy is represented by `VocabularyTerm.parent_id` [@models]. Parent links are set by direct term editing and by import, and the import service validates that referenced parent terms exist in either current database terms or imported data before writing [@import-service].
+The `is_hierarchical` flag records whether a term vocabulary is intended as a hierarchy, but the actual hierarchy is represented by `VocabularyTerm.parent_id` [@models]. Parent links are set by direct term editing and by import, and the import service validates that referenced parent terms exist in either current database terms or imported data before writing [@import-service]. Relation vocabularies reject parent links in CRUD and import requests.
 
 ## Term And Relation Kinds
 
@@ -52,7 +52,7 @@ This is why relation vocabularies are connected to [generic relations](../relati
 
 ## Imports
 
-Vocabulary imports accept CSV, TSV, or JSON. CSV and TSV require a JSON mapping from input columns to `term`, `parent_term`, `label:<lang>`, or `inverse_label:<lang>` targets; JSON can be either a list of term objects or an object with a `terms` list [@vocab-api] [@import-service]. The import service detects delimiters, tries common encodings, merges duplicate terms by key, supports nested JSON `children`, reports parent conflicts, and supports dry-run statistics before writing [@import-service].
+Vocabulary imports accept CSV, TSV, or JSON. CSV and TSV require a JSON mapping from input columns to `term`, `parent_term`, `label:<lang>`, or `inverse_label:<lang>` targets; relation vocabularies omit and reject `parent_term`. JSON can be either a list of term objects or an object with a `terms` list [@vocab-api] [@import-service]. The import service detects delimiters, tries common encodings, merges duplicate terms by key, supports nested JSON `children`, reports parent conflicts, and supports dry-run statistics before writing [@import-service].
 
 Import writes are keyed by the term code. In append mode the service counts new and updated term codes; in replace mode it deletes existing terms before recreating the imported set when `dry_run` is false [@import-service].
 
