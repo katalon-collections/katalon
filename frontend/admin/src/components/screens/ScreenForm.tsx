@@ -930,6 +930,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [genericAddOpen, setGenericAddOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
   const [aiBusyField, setAiBusyField] = useState<string | null>(null)
+  const [highlightedField, setHighlightedField] = useState<string | null>(null)
+
+  function jumpToField(name: string) {
+    document.getElementById(`field-${name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightedField(name)
+    window.setTimeout(() => setHighlightedField(current => current === name ? null : current), 2000)
+  }
 
   // Warn on browser tab close / reload
   useEffect(() => {
@@ -1976,13 +1983,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
             {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
             {relTypeLabel}
-            {schemaBound && sourceLabel && (isFrom ? (
-              <a
-                href={`#field-${sourceField}`}
+            {schemaBound && sourceLabel && sourceField && (isFrom ? (
+              <button
+                type="button"
+                onClick={() => jumpToField(sourceField)}
                 style={{ display: 'block', fontSize: 10, color: 'var(--accent)' }}
               >
                 Feld: {sourceLabel}
-              </a>
+              </button>
             ) : (
               <span style={{ display: 'block', fontSize: 10, color: 'var(--fg-4)' }}>
                 Feld im verknüpften Datensatz: {sourceLabel}
@@ -2254,7 +2262,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     : undefined
 
                   return (
-                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0 }}>
+                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0, transition: 'box-shadow .2s, background .2s', boxShadow: highlightedField === f.name ? '0 0 0 3px var(--accent)' : undefined, background: highlightedField === f.name ? 'var(--accent-soft)' : undefined }}>
                       <div className="lbl">
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}

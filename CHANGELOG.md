@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.15] - 2026-08-13
+
+### Fixed
+- Feldgebundene Beziehungen scrollen zum Formularfeld und heben es kurz hervor.
+
 ## [0.10.14] - 2026-08-13
 
 ### Fixed
