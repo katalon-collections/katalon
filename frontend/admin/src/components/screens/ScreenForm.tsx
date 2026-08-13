@@ -2369,10 +2369,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
                               {((val as RelationEntry[] | undefined) ?? []).map((entry, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 4, background: 'var(--panel)', border: '1px solid var(--border-s)', fontSize: 13 }}>
+                                <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
                                   <span style={{ flex: 1 }}>{entry.label}</span>
                                   <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
-                                  <button className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated}><X size={10} /></button>
+                                  <button className="btn sm gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated}>Entfernen</button>
                                 </div>
                               ))}
                             </div>
@@ -2390,10 +2390,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         ) : (
                           <>
                             {val && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '4px 8px', borderRadius: 4, background: 'var(--panel)', border: '1px solid var(--border-s)', fontSize: 13 }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
                                 <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
                                 <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{(val as RelationEntry).relation_type}</span>
-                                <button className="btn sm ico gh" onClick={() => setField(f.name, undefined)} disabled={justCreated}><X size={10} /></button>
+                                <button className="btn sm gh" onClick={() => setField(f.name, undefined)} disabled={justCreated}>Entfernen</button>
                               </div>
                             )}
                             {!val && (

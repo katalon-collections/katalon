@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.21] - 2026-08-13
+
+### Changed
+- Gefüllte Relationsfelder erscheinen als Chip mit sichtbarer Entfernen-Aktion.
+
 ## [0.10.20] - 2026-08-13
 
 ### Fixed
