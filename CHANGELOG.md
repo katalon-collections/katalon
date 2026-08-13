@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-13
+
+### Added
+- Vorgangstypen sind als Subtypen konfigurierbar und können eine Beschreibung ihres institutionellen Einsatzes enthalten. Die Beschreibung erscheint beim Anlegen und Bearbeiten eines Vorgangs. (#255)
+
+### Changed
+- Die sechs bisherigen Vorgangstypen sind ein löschbarer Startbestand. Solange kein Vorgang einen Typ verwendet, lassen sich Typ, zugehörige Schemafelder und Formularvarianten samt Rollen-Defaults kontrolliert entfernen.
+
+### Fixed
+- Admin zeigt textuelle 409-Fehlermeldungen der API anstatt einer irreführenden generischen Relationsmeldung.
+
 ## [0.10.30] - 2026-08-13
 
 ### Added

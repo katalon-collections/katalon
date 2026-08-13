@@ -1054,6 +1054,7 @@ export function ScreenSchema() {
           id: v.id,
           name: v.id,
           label: { de: v.name },
+          description: '',
           primary_type: 'vocabulary_term',
           sort_order: 0,
           is_default: false,

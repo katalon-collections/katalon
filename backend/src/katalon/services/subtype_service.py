@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, RecordSubtype
+from katalon.core.models import (
+    Entity,
+    FieldDefinition,
+    FormVariant,
+    FormVariantRoleDefault,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+    RecordSubtype,
+)
 
 PRIMARY_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
-SYSTEM_PROCEDURE_TYPES = frozenset({
-    "loan_out", "loan_in", "acquisition", "conservation", "object_entry", "deaccession",
-})
-
 _TYPE_MODEL_FIELD = {
     "object": (Object, "object_type"),
     "entity": (Entity, "entity_type"),
@@ -65,6 +71,40 @@ async def subtype_has_assigned_records(
         await db.execute(select(func.count()).select_from(model).where(field == subtype_name))
     ).scalar_one()
     return count > 0
+
+
+async def retire_subtype_configuration(
+    db: AsyncSession, primary_type: str, subtype_name: str
+) -> None:
+    """Retire configuration scoped to a deleted subtype without touching records."""
+    validate_primary_type(primary_type)
+    await db.execute(
+        update(FieldDefinition)
+        .where(
+            FieldDefinition.target_type == primary_type,
+            FieldDefinition.target_subtype == subtype_name,
+        )
+        .values(is_deleted=True)
+    )
+    variants = list(
+        (
+            await db.execute(
+                select(FormVariant.id).where(
+                    FormVariant.target_type == primary_type,
+                    FormVariant.target_subtype == subtype_name,
+                )
+            )
+        ).scalars()
+    )
+    if variants:
+        await db.execute(
+            update(FormVariant)
+            .where(FormVariant.id.in_(variants))
+            .values(is_deleted=True)
+        )
+        await db.execute(
+            delete(FormVariantRoleDefault).where(FormVariantRoleDefault.variant_id.in_(variants))
+        )
 
 
 async def has_any_subtypes(db: AsyncSession, primary_type: str) -> bool:

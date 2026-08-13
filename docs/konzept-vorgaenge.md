@@ -42,9 +42,9 @@ Vorgänge sind **keine Ereignisse** im FRBR-Sinne. Ein Konzert ist ein Ereignis;
 | `object_entry` | Eingangsprüfung | Ersterfassung / Eingangsprotokoll |
 | `deaccession` | Deakzession | Verkauf, Abgang, Aussonderung |
 
-Diese sechs Systemtypen werden als Vorgangs-Subtypen angelegt. Sie dürfen nicht gelöscht, umbenannt oder in einen anderen Primärtyp verschoben werden, damit die fachlichen Regeln für ausgehende Leihgaben erhalten bleiben.
+Diese sechs Typen werden als Vorgangs-Subtypen angelegt und sind ein institutionsneutraler Startbestand. Admins können sie wie eigene, unbenutzte Typen löschen. Solange Vorgänge einen Typ verwenden, blockiert Katalon dessen Löschung; beim Löschen eines unbenutzten Typs werden nur seine zugehörigen Schemafelder und Formularvarianten deaktiviert, nie Vorgänge.
 
-Admins können daneben eigene Vorgangs-Subtypen anlegen. Für jeden Subtyp lassen sich im bestehenden Schema-Editor eigene Metadatenfelder und im Editor für Formularvarianten eigene Formularvarianten konfigurieren. Eigene Typen haben keine impliziten fachlichen Automatismen.
+Admins können daneben eigene Vorgangs-Subtypen anlegen. Für jeden Subtyp lassen sich im bestehenden Schema-Editor eigene Metadatenfelder und im Editor für Formularvarianten eigene Formularvarianten konfigurieren sowie eine Beschreibung seines institutionellen Einsatzes hinterlegen. Eigene Typen haben keine impliziten fachlichen Automatismen.
 
 ---
 
@@ -167,7 +167,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 - **Automatische Statusübergänge** (z. B. Objekt wird automatisch „zurückgegeben" wenn Rückgabedatum verstrichen): Bewusste Entscheidung für manuelle Kontrolle
 - **Automatische Referenznummernvergabe**: Generierung nach institutionsspezifischer Logik ist zu divers; Feld ist Freitext
 - **Per-Objekt strukturierte Zusatzfelder auf Vorgangs-Relationen** (z. B. individuelle Versicherungswerte pro Objekt innerhalb einer Mehrfach-Leihgabe): Post-MVP
-- **Fachliche Automatismen für eigene Vorgangstypen**: Nur der geschützte Systemtyp `loan_out` sperrt parallele aktive Ausleihen. Ein Objektstatus wird beim Abschluss nur vorgeschlagen, wenn ein Systemtyp dafür eine Zuordnung hat; bei eigenen Typen bleibt die Entscheidung vollständig manuell.
+- **Fachliche Automatismen für eigene Vorgangstypen**: Nur Vorgänge mit dem technischen Typ `loan_out` sperren parallele aktive Ausleihen. Ein Objektstatus wird beim Abschluss nur vorgeschlagen, wenn ein Systemtyp dafür eine Zuordnung hat; bei eigenen Typen bleibt die Entscheidung vollständig manuell.
 
 ---
 
@@ -184,7 +184,7 @@ Um den Scope realistisch zu halten, sind folgende Funktionen bewusst ausgespart:
 
 - Neue Datenbanktabelle `procedures` mit Pflichtfeldern und freiem `metadata_`-JSONB
 - Sammlungsstatus auf `objects` als nicht-konfigurierbares Systemfeld
-- Eigene Vorgangs-Subtypen, Schemafelder und Formularvarianten nutzen dieselben Konfigurationswege wie die anderen Datensatztypen; die sechs Systemtypen bleiben gegen Löschen, Umbenennen und Verschieben geschützt
+- Eigene und standardmäßig angelegte Vorgangs-Subtypen, Schemafelder und Formularvarianten nutzen dieselben Konfigurationswege wie die anderen Datensatztypen; unbenutzte Typen lassen sich samt ihrer Konfiguration kontrolliert entfernen
 - Beziehungen zu Objekten, Entitäten, Orten und anderen Vorgängen nutzen den bestehenden generischen Beziehungsgraphen; es gibt keine Vorgangs-spezifische Join-Tabelle
 - Admin-Listenfilter für Vorgangstyp, Status, Fälligkeit und Referenznummer
 - Öffentliche Suche über Elasticsearch respektiert `collection_status=active`

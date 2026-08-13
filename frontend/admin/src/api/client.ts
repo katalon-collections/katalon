@@ -124,7 +124,7 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
       throw new VersionConflictError(typeof d.current_version === 'number' ? d.current_version : 0)
     }
     throw new ConflictError(
-      typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
+      typeof d === 'string' ? d : typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
       typeof d.related_count === 'number' ? d.related_count : 0,
     )
   }
@@ -480,10 +480,10 @@ export const subtypes = {
     const qs = primaryType ? `?primary_type=${encodeURIComponent(primaryType)}` : ''
     return req<RecordSubtype[]>(`/v1/record-subtypes${qs}`)
   },
-  create: (data: { primary_type: string; name: string; label: Record<string, string>; sort_order?: number; is_default?: boolean }) =>
-    req<RecordSubtype>('/v1/record-subtypes', { method: 'POST', body: JSON.stringify({ sort_order: 0, is_default: false, ...data }) }),
-  update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; sort_order?: number; is_default?: boolean }) =>
-    req<RecordSubtype>(`/v1/record-subtypes/${id}`, { method: 'PUT', body: JSON.stringify({ sort_order: 0, is_default: false, ...data }) }),
+  create: (data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean }) =>
+    req<RecordSubtype>('/v1/record-subtypes', { method: 'POST', body: JSON.stringify({ description: '', sort_order: 0, is_default: false, ...data }) }),
+  update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean }) =>
+    req<RecordSubtype>(`/v1/record-subtypes/${id}`, { method: 'PUT', body: JSON.stringify({ description: '', sort_order: 0, is_default: false, ...data }) }),
   delete: (id: string) => req<void>(`/v1/record-subtypes/${id}`, { method: 'DELETE' }),
 }
 

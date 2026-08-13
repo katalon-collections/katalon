@@ -181,7 +181,7 @@ Object, Entity, Place, Occurrence und Procedure haben ein Subtyp-Feld. Subtypen 
 
 Felddefinitionen können subtyp-spezifisch sein: Ein Feld mit `target_subtype = "person"` erscheint nur bei Entitäten vom Subtyp `person`, nicht bei Organisationen. Felder ohne `target_subtype` gelten für alle Subtypen des jeweiligen Primärtyps. Dasselbe gilt für Vorgänge: Felder und Formularvarianten können etwa für `acquisition` oder einen eigenen Vorgangstyp gelten.
 
-Die sechs genannten Vorgangstypen sind geschützte Systemtypen: Sie dürfen nicht gelöscht, umbenannt oder in einen anderen Primärtyp verschoben werden. Eigene Vorgangstypen können daneben frei angelegt und wie andere Subtypen verwaltet werden.
+Die sechs genannten Vorgangstypen werden als Startbestand angelegt. Wie eigene Subtypen sind sie löschbar, sobald kein Vorgang sie verwendet; dabei werden ihre subtyp-spezifischen Felddefinitionen und Formularvarianten deaktiviert. Ein Subtyp kann zudem eine Beschreibung seines institutionellen Einsatzes enthalten.
 
 ---
 

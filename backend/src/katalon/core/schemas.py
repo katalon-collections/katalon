@@ -74,6 +74,7 @@ class RecordSubtypeCreate(BaseModel):
     primary_type: str
     name: str
     label: dict = {}
+    description: str = ""
     sort_order: int = 0
     is_default: bool = False
 

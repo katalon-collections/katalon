@@ -233,6 +233,7 @@ class RecordSubtype(Base):
     primary_type: Mapped[str] = mapped_column(String(32), index=True)
     name: Mapped[str] = mapped_column(String(64))
     label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
 

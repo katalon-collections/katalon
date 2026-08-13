@@ -17,12 +17,13 @@ interface FormState {
   name: string
   label_de: string
   label_en: string
+  description: string
   sort_order: number
   is_default: boolean
 }
 
 function emptyForm(primaryType: string): FormState {
-  return { primary_type: primaryType, name: '', label_de: '', label_en: '', sort_order: 0, is_default: false }
+  return { primary_type: primaryType, name: '', label_de: '', label_en: '', description: '', sort_order: 0, is_default: false }
 }
 
 function subtypeToForm(s: RecordSubtype): FormState {
@@ -31,6 +32,7 @@ function subtypeToForm(s: RecordSubtype): FormState {
     name: s.name,
     label_de: s.label.de ?? '',
     label_en: s.label.en ?? '',
+    description: s.description ?? '',
     sort_order: s.sort_order,
     is_default: s.is_default,
   }
@@ -89,6 +91,7 @@ export function ScreenSubtype() {
         primary_type: form.primary_type,
         name: form.name.trim(),
         label: { de: form.label_de.trim(), en: form.label_en.trim() },
+        description: form.description.trim(),
         sort_order: form.sort_order,
         is_default: form.is_default,
       }
@@ -107,7 +110,7 @@ export function ScreenSubtype() {
   }
 
   async function handleDelete(s: RecordSubtype) {
-    if (!confirm(`Subtyp „${s.name}" wirklich löschen?`)) return
+    if (!confirm(`Subtyp „${s.name}" wirklich löschen? Zugehörige Schemafelder und Formularvarianten werden deaktiviert. Vorgänge oder andere Datensätze bleiben erhalten.`)) return
     try {
       await subtypes.delete(s.id)
       await load()
@@ -160,6 +163,17 @@ export function ScreenSubtype() {
                 <input className="fld" value={form.label_en} onChange={e => set('label_en', e.target.value)} />
               </div>
             </div>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <div className="lbl">Beschreibung / Einsatz</div>
+              <textarea
+                className="fld"
+                value={form.description}
+                onChange={e => set('description', e.target.value)}
+                rows={3}
+                placeholder="Wofür wird dieser Subtyp verwendet?"
+                style={{ height: 'auto', padding: '8px 10px', resize: 'vertical' }}
+              />
+            </div>
             <div className="fg-2" style={{ marginBottom: 10 }}>
               <div className="field">
                 <div className="lbl">Interner Name <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(wird nach dem Erstellen gesperrt)</span></div>
@@ -199,6 +213,7 @@ export function ScreenSubtype() {
                 <th style={{ width: '20%' }}>Name</th>
                 <th>Label DE</th>
                 <th>Label EN</th>
+                <th>Beschreibung / Einsatz</th>
                 <th style={{ width: 100, textAlign: 'center' }}>Standard</th>
                 <th style={{ width: 90, textAlign: 'right' }}>Sortierung</th>
                 <th className="col-act"></th>
@@ -210,6 +225,7 @@ export function ScreenSubtype() {
                   <td><span className="mono" style={{ fontSize: 12 }}>{s.name}</span></td>
                   <td>{getLabel(s, '—')}</td>
                   <td>{s.label.en?.trim() || '—'}</td>
+                  <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '—'}</td>
                   <td style={{ textAlign: 'center' }}>
                     {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>Standard</span>}
                   </td>

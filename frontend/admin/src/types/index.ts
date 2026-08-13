@@ -248,6 +248,7 @@ export interface RecordSubtype {
   primary_type: string
   name: string
   label: Record<string, string>
+  description: string
   sort_order: number
   is_default: boolean
 }

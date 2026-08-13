@@ -2198,6 +2198,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
                     </select>
+                    {recordType === 'procedure' && availableSubtypes.find(s => s.name === subtype)?.description.trim() && (
+                      <div style={{ color: 'var(--fg-3)', fontSize: 12, lineHeight: 1.4, marginTop: 4 }}>
+                        {availableSubtypes.find(s => s.name === subtype)?.description}
+                      </div>
+                    )}
                     {(fieldErrors['__subtype'] || fieldWarnings['__subtype']) && (
                       <div style={{ fontSize: 11, color: fieldErrors['__subtype'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
                         {fieldErrors['__subtype'] ?? fieldWarnings['__subtype']}

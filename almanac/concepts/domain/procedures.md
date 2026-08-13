@@ -23,9 +23,9 @@ Procedures are Katalon's records for time-bounded collection processes, not anot
 
 The procedure concept document defines a Vorgang as a time-limited, state-changing process affecting one or more objects. It separates a loan contract, acquisition process, or conservation treatment from domain concepts such as an exhibition or work [@procedure-concept]. In code, the `Procedure` model has `procedure_type`, publication or workflow `status`, `start_date`, `end_date`, `due_date`, `reference_number`, JSONB `metadata`, `search_vector`, timestamps, and version [@models].
 
-Procedure types are configured `RecordSubtype` rows under primary type `procedure`. Migration `0034_procedure_record_subtypes.py` creates the system types `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry`, and `deaccession`; admins can create additional procedure subtypes. The API accepts only a configured subtype. Procedure statuses remain `draft`, `active`, `completed`, and `cancelled` [@procedures-api].
+Procedure types are configured `RecordSubtype` rows under primary type `procedure`. Migration `0034_procedure_record_subtypes.py` creates the default types `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry`, and `deaccession`; admins can create additional procedure subtypes and describe their institutional use. The API accepts only a configured subtype. Procedure statuses remain `draft`, `active`, `completed`, and `cancelled` [@procedures-api].
 
-The six system types cannot be deleted, renamed, or moved to another primary type. This preserves the stable names used by procedure-specific business rules; additional procedure subtypes have no implicit workflow rule.
+Every unused Procedure type can be deleted. This retires its subtype-scoped fields, form variants, and role defaults without deleting Procedures; a type with assigned Procedures remains protected by the normal in-use check. `loan_out` is special only while records use that exact technical key: it activates the outgoing-loan invariant. Other types have no implicit workflow rule.
 
 ## Dynamic Metadata With Procedure Subtypes
 

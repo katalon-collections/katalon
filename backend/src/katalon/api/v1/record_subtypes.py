@@ -7,8 +7,8 @@ from katalon.core.dependencies import DBDep, require_admin_or_editor, require_ro
 from katalon.core.models import RecordSubtype
 from katalon.core.schemas import RecordSubtypeCreate, RecordSubtypeRead
 from katalon.services.subtype_service import (
-    SYSTEM_PROCEDURE_TYPES,
     normalize_subtype_name,
+    retire_subtype_configuration,
     subtype_has_assigned_records,
     validate_primary_type,
 )
@@ -76,6 +76,7 @@ async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordS
         primary_type=data.primary_type,
         name=name,
         label=data.label,
+        description=data.description,
         sort_order=data.sort_order,
         is_default=data.is_default,
     )
@@ -108,10 +109,6 @@ async def update_record_subtype(
     subtype = result.scalar_one_or_none()
     if subtype is None:
         raise HTTPException(status_code=404, detail="Subtyp nicht gefunden.")
-    if subtype.primary_type == "procedure" and subtype.name in SYSTEM_PROCEDURE_TYPES:
-        if data.primary_type != "procedure" or name != subtype.name:
-            raise HTTPException(status_code=409, detail="System-Vorgangstyp kann nicht umbenannt oder verschoben werden.")
-
     existing_result = await db.execute(
         select(RecordSubtype).where(
             RecordSubtype.primary_type == data.primary_type,
@@ -128,6 +125,7 @@ async def update_record_subtype(
     subtype.primary_type = data.primary_type
     subtype.name = name
     subtype.label = data.label
+    subtype.description = data.description
     subtype.sort_order = data.sort_order
     subtype.is_default = data.is_default
     await db.flush()
@@ -150,13 +148,11 @@ async def delete_record_subtype(subtype_id: uuid.UUID, db: DBDep) -> None:
     subtype = result.scalar_one_or_none()
     if subtype is None:
         raise HTTPException(status_code=404, detail="Subtyp nicht gefunden.")
-    if subtype.primary_type == "procedure" and subtype.name in SYSTEM_PROCEDURE_TYPES:
-        raise HTTPException(status_code=409, detail="System-Vorgangstyp kann nicht gelöscht werden.")
-
     if await subtype_has_assigned_records(db, subtype.primary_type, subtype.name):
         raise HTTPException(
             status_code=409,
             detail="Subtyp ist noch in Benutzung und kann nicht gelöscht werden.",
         )
 
+    await retire_subtype_configuration(db, subtype.primary_type, subtype.name)
     await db.delete(subtype)

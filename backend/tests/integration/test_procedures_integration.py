@@ -1,6 +1,10 @@
 import asyncio
 import uuid
 
+from sqlalchemy import select
+
+from katalon.core.models import FieldDefinition, FormVariant, FormVariantRoleDefault
+
 
 async def test_procedure_crud_and_active_loan_out_guard(async_client, auth_headers) -> None:
     object_response = await async_client.post(
@@ -165,7 +169,7 @@ async def test_procedure_validation_uses_procedure_type_schema(async_client, aut
     assert ok_response.status_code == 201, ok_response.text
 
 
-async def test_procedure_subtypes_are_configurable_and_system_types_are_protected(
+async def test_procedure_subtypes_are_configurable_and_unused_types_can_be_retired(
     async_client, auth_headers
 ) -> None:
     subtypes_response = await async_client.get(
@@ -177,14 +181,6 @@ async def test_procedure_subtypes_are_configurable_and_system_types_are_protecte
         system_subtypes
     )
 
-    loan_out = system_subtypes["loan_out"]
-    protected_update = await async_client.put(
-        f"/v1/record-subtypes/{loan_out['id']}",
-        headers=auth_headers,
-        json={**loan_out, "name": "outgoing_loan"},
-    )
-    assert protected_update.status_code == 409
-
     custom_type = f"custom_procedure_{uuid.uuid4().hex[:8]}"
     created_subtype = await async_client.post(
         "/v1/record-subtypes",
@@ -193,9 +189,11 @@ async def test_procedure_subtypes_are_configurable_and_system_types_are_protecte
             "primary_type": "procedure",
             "name": custom_type,
             "label": {"de": "Eigener Vorgang"},
+            "description": "Für einen lokalen Arbeitsablauf.",
         },
     )
     assert created_subtype.status_code == 201, created_subtype.text
+    assert created_subtype.json()["description"] == "Für einen lokalen Arbeitsablauf."
 
     field_name = f"custom_procedure_note_{uuid.uuid4().hex[:8]}"
     created_field = await async_client.post(
@@ -252,6 +250,53 @@ async def test_procedure_subtypes_are_configurable_and_system_types_are_protecte
         f"/v1/record-subtypes/{created_subtype.json()['id']}", headers=auth_headers
     )
     assert delete_in_use.status_code == 409
+
+    retired_type = system_subtypes["object_entry"]
+    field_response = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "procedure",
+            "target_subtype": "object_entry",
+            "name": f"entry_note_{uuid.uuid4().hex[:8]}",
+            "label": {"de": "Eingangsnotiz"},
+            "field_type": "text",
+        },
+    )
+    assert field_response.status_code == 201, field_response.text
+    field_id = uuid.UUID(field_response.json()["id"])
+
+    variant_response = await async_client.post(
+        "/v1/form-variants",
+        headers=auth_headers,
+        json={
+            "target_type": "procedure",
+            "target_subtype": "object_entry",
+            "name": "Eingangserfassung",
+            "field_names": ["label", field_response.json()["name"]],
+        },
+    )
+    assert variant_response.status_code == 201, variant_response.text
+    variant_id = uuid.UUID(variant_response.json()["id"])
+    default_response = await async_client.post(
+        f"/v1/form-variants/{variant_id}/role-defaults/admin", headers=auth_headers
+    )
+    assert default_response.status_code == 204
+
+    delete_unused = await async_client.delete(
+        f"/v1/record-subtypes/{retired_type['id']}", headers=auth_headers
+    )
+    assert delete_unused.status_code == 204, delete_unused.text
+
+    from katalon.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        assert (await db.get(FieldDefinition, field_id)).is_deleted is True
+        assert (await db.get(FormVariant, variant_id)).is_deleted is True
+        defaults = await db.execute(
+            select(FormVariantRoleDefault).where(FormVariantRoleDefault.variant_id == variant_id)
+        )
+        assert defaults.scalars().all() == []
 
 
 async def test_procedures_do_not_expose_snapshot_routes(app) -> None:

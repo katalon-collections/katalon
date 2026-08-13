@@ -246,7 +246,7 @@ Eine Entität kann eine Person oder eine Organisation sein. Für Personen brauch
 
 In der Admin-UI kann für jeden Datensatztyp ein vorhandener Subtyp gewählt werden. Wenn das Subtyp-Eingabefeld leer gelassen wird, gilt das Feld für alle Subtypen.
 
-Subtypen werden in der Subtyp-Verwaltung angelegt und serverseitig validiert. Bei Vorgängen sind `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry` und `deaccession` geschützte Systemtypen: Sie können nicht gelöscht, umbenannt oder verschoben werden. Eigene Vorgangstypen können zusätzlich angelegt und für Felder sowie Formularvarianten verwendet werden.
+Subtypen werden in der Subtyp-Verwaltung angelegt und serverseitig validiert. Bei Vorgängen werden `loan_out`, `loan_in`, `acquisition`, `conservation`, `object_entry` und `deaccession` als Startbestand angelegt. Wie eigene Vorgangstypen sind sie löschbar, solange kein Vorgang sie verwendet; beim Löschen werden ihre subtyp-spezifischen Felddefinitionen und Formularvarianten deaktiviert. Eigene Vorgangstypen können zusätzlich angelegt und für Felder sowie Formularvarianten verwendet werden.
 
 ---
 

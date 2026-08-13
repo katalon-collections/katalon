@@ -23,7 +23,10 @@ sources:
     path: frontend/admin/src/components/screens/ScreenSubtype.tsx
   - id: migration
     type: file
-    path: backend/migrations/versions/0013_record_subtypes_and_missing_type_columns.py
+    path: backend/migrations/versions/0035_record_subtype_description.py
+  - id: procedure-migration
+    type: file
+    path: backend/migrations/versions/0034_procedure_record_subtypes.py
   - id: main
     type: file
     path: backend/src/katalon/main.py
@@ -45,15 +48,15 @@ Record subtypes are configured labels and internal names under Katalon's four pr
 
 ## Data Model
 
-`RecordSubtype` rows are unique by `(primary_type, name)` [@models]. The migration that introduced the table also added `object_type` and `place_type` columns, making object and place subtype storage match the existing entity and occurrence type columns in the ORM model [@migration] [@models]. Migration `0034_procedure_record_subtypes.py` seeds the six built-in Procedure types as `RecordSubtype` rows, while retaining the `procedure_type` column as the selected subtype [@models].
+`RecordSubtype` rows are unique by `(primary_type, name)` and carry multilingual labels plus an optional plain-text description of their intended use [@models]. The migration that introduced the table also added `object_type` and `place_type` columns, making object and place subtype storage match the existing entity and occurrence type columns in the ORM model [@models]. Migration `0034_procedure_record_subtypes.py` seeds the six built-in Procedure types as `RecordSubtype` rows, while retaining the `procedure_type` column as the selected subtype [@procedure-migration] [@models].
 
-No subtype is created automatically. A record without a configured subtype stores `NULL` in its type column and uses the primary-type schema only. Once subtypes are configured, new records must select one (except drafts), so subtype-specific fields have an explicit scope.
+No subtype is created automatically for the four inventory primary types. Procedure starts with six seeded defaults. A record without a configured subtype stores `NULL` in its type column and uses the primary-type schema only. Once subtypes are configured, new records must select one (except drafts), so subtype-specific fields have an explicit scope.
 
 ## Admin Lifecycle
 
 The record subtype API lists subtypes, optionally filtered by primary type, and allows admins to create, update, or delete subtype definitions [@subtype-api]. Listing requires `manage_content`, while mutations remain admin-only. The ID-number suggestion used by new-record forms also requires `manage_content`, so catalogers can load both inputs needed for quick creation [@subtype-api] [@idno-api] [@dependencies]. The subtype API normalizes non-empty names, rejects unknown primary types, enforces uniqueness, and unsets other defaults for the same primary type when a subtype is marked default [@subtype-api]. Deletion is blocked when records of that primary type still use the subtype name, because `subtype_has_assigned_records` counts assigned rows through the relevant type column [@subtype-service].
 
-The admin subtype screen exposes tabs for objects, entities, places, occurrences, and procedures, then edits internal name, German and English labels, sort order, and default status [@subtype-screen]. Existing subtype internal names are disabled in the UI after creation, which matches the database's use of names as stable scope keys for records and schema fields [@subtype-screen]. The six seeded Procedure system types cannot be deleted, renamed, or moved; local Procedure subtypes remain configurable.
+The admin subtype screen exposes tabs for objects, entities, places, occurrences, and procedures, then edits internal name, German and English labels, description, sort order, and default status [@subtype-screen]. Existing subtype internal names are disabled in the UI after creation, which matches the database's use of names as stable scope keys for records and schema fields [@subtype-screen]. Any unused Procedure subtype, including a seeded default, can be deleted. Deletion is blocked while records use it and otherwise retires its subtype-scoped fields and form variants, including their role defaults [@subtype-api] [@subtype-service].
 
 ## Schema Targeting
 
