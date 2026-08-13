@@ -206,7 +206,10 @@ relations (
 - Entity → Entity: `ist_mitglied_von` (Person → Organisation)
 - Occurrence → Place: `hat_stattgefunden_in` (Ereignis → Ort)
 
-Der Relationstyp ist eine freie Zeichenkette. Empfehlung: Werte aus einem Vokabular verwenden, um Konsistenz zu gewährleisten.
+Der Relationstyp ist eine freie Zeichenkette. Relationstyp-Vokabulare liefern
+kontrollierte Werte und Gegenrichtungslabels. Ein Schema-Relationsfeld kann
+einen dieser Werte fest vorgeben oder die Auswahl aus dem Vokabular erlauben;
+freie Beziehungen in der Beziehungen-Karte verwenden denselben Graphen.
 
 ---
 

@@ -71,6 +71,11 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
     if data.field_type == "relation":
         vocab_id = data.settings.get("relation_type_vocab")
         expected_kind = "relation"
+        if data.settings.get("fixed_relation_type") and not vocab_id:
+            raise HTTPException(
+                status_code=422,
+                detail="Ein fester Relationstyp benötigt ein Relationstyp-Vokabular.",
+            )
     if not vocab_id:
         return
     try:
@@ -82,6 +87,21 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
             status_code=422,
             detail=f"Vokabular muss vom Typ '{expected_kind}' sein.",
         )
+    fixed_relation_type = data.settings.get("fixed_relation_type")
+    if fixed_relation_type:
+        from katalon.core.models import VocabularyTerm
+
+        term = await db.scalar(
+            select(VocabularyTerm).where(
+                VocabularyTerm.vocabulary_id == vocab.id,
+                VocabularyTerm.term == fixed_relation_type,
+            )
+        )
+        if term is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Fester Relationstyp gehört nicht zum gewählten Vokabular.",
+            )
 
 
 def _fd_read(f: FieldDefinition, children: list[FieldDefinitionRead] | None = None) -> FieldDefinitionRead:
@@ -246,10 +266,15 @@ async def update_field(
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
     old_is_facet = field.is_facet
+    old_settings = field.settings or {}
     for k, v in data.model_dump().items():
         setattr(field, k, v)
     await db.flush()
-    if field.is_facet != old_is_facet:
+    inherited_settings_changed = field.field_type == "relation" and any(
+        old_settings.get(key) != field.settings.get(key)
+        for key in ("target_type", "fixed_relation_type", "inherited_fields")
+    )
+    if field.is_facet != old_is_facet or inherited_settings_changed:
         _enqueue_reindex(field.target_type)
     return _fd_read(field)
 

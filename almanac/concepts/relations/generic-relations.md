@@ -1,6 +1,6 @@
 ---
 title: "Generic Relations"
-summary: "Generic relations store typed links between records in one relation table, including manual links, schema-derived links, relation metadata, and inverse display labels."
+summary: "Generic relations store typed links between records in one relation table; schema fields maintain structured edges while the relationship card adds free extras."
 topics: [concepts, relations, records, metadata]
 sources:
   - id: models
@@ -45,7 +45,7 @@ The relation API lists relations with optional endpoint filters, creates manual 
 
 ## Admin Picker And Inline Creation
 
-The relationships panel on every saved record accepts object, entity, place, occurrence, or procedure as its target type, including the source record's own type. After choosing the target type, the user chooses a relation type and either selects a search result or opens the schema-driven quick-create dialog [@screen-form]. An exact duplicate of target id and relation type is rejected in the form, while another relation type to the same target remains valid [@screen-form]. Viewers do not see the create action; the create and relation endpoints enforce the same restriction on the server [@screen-form] [@relation-api] [@dependencies].
+The relationships card on every saved record is the complete, bidirectional graph overview. It groups field-bound edges separately and directs their editing back to the matching schema field. Its add action is for free relationships to other primary record types, including the source record's own type. After choosing the target type, the user chooses a relation type and either selects a search result or opens the schema-driven quick-create dialog [@screen-form]. An exact duplicate of target id and relation type is rejected in the form, while another relation type to the same target remains valid [@screen-form]. Viewers do not see the create action; the create and relation endpoints enforce the same restriction on the server [@screen-form] [@relation-api] [@dependencies].
 
 Quick creation first saves the target as a draft through its ordinary record endpoint. The relationships panel then creates the relation row immediately. If that second request fails, the new draft remains selected and the picker offers `Erneut verknüpfen` instead of deleting the draft [@screen-form] [@admin-client].
 
@@ -59,7 +59,7 @@ This also defines the save boundary for inline creation. A schema relation field
 
 ## Relation Types And Inverse Labels
 
-Relation fields can point at a relation-type vocabulary through `settings.relation_type_vocab` [@schema-screen]. Relation-type vocabularies are ordinary vocabularies with `kind == "relation"`, and vocabulary terms include `inverse_label` JSONB for labels shown from the opposite direction [@models]. The relation itself stores only the relation type code; label resolution happens outside the relation row.
+Relation fields can point at a relation-type vocabulary through `settings.relation_type_vocab` and can optionally select one fixed term from it [@schema-screen]. A fixed type makes the field the unambiguous editor for that semantic relationship; without one, the form offers the vocabulary choices. Relation-type vocabularies are ordinary vocabularies with `kind == "relation"`, and vocabulary terms include `inverse_label` JSONB for labels shown from the opposite direction [@models]. The relation itself stores only the relation type code; label resolution happens outside the relation row.
 
 Relation-type vocabularies can narrow a term to allowed source and target record types with `VocabularyTerm.applies_from` and `VocabularyTerm.applies_to`, where an empty list means unrestricted for that side [@models]. The vocabulary terms endpoint applies the same rule when called with `from_type` and `to_type`, and the relation API validates create and update requests against relation vocabulary terms before writing the row [@vocab-api] [@relation-api] [@relation-type-service]. If no relation vocabulary term exists for a relation type, the service treats that code as unrestricted, preserving legacy free-text relation types and imported relation rows [@relation-type-service].
 

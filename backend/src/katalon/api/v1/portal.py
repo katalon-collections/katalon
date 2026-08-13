@@ -80,7 +80,7 @@ async def _get_or_create(db: DBDep) -> PortalConfig:
     response_model=PortalConfigRead,
     summary="Get the public portal configuration",
 )
-async def get_portal_config(db: DBDep) -> PortalConfig:
+async def get_portal_config(db: DBDep) -> PortalConfigRead:
     from katalon.core.models import FieldDefinition
 
     config = await _get_or_create(db)
@@ -94,8 +94,17 @@ async def get_portal_config(db: DBDep) -> PortalConfig:
     facet_fields: dict[str, list[str]] = {"object": [], "entity": [], "place": [], "occurrence": []}
     for row in facet_result.all():
         facet_fields.setdefault(row.target_type, []).append(row.name)
-    config.facet_fields = facet_fields
-    return config
+    # Direct facets are derived from the schema. Inherited facets deliberately
+    # remain an explicit portal choice because they do not have their own
+    # FieldDefinition row.
+    saved = config.facet_fields or {}
+    for target_type, names in saved.items():
+        facet_fields.setdefault(target_type, []).extend(
+            name for name in names if name.startswith("inherited_")
+        )
+    result = PortalConfigRead.model_validate(config)
+    result.facet_fields = facet_fields
+    return result
 
 
 @router.put(

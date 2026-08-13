@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_admin_or_editor
-from katalon.core.models import Procedure, Relation
+from katalon.core.models import FieldDefinition, Procedure, Relation
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
 from katalon.services.relation_service import (
     get_active_loan_out_for_object,
@@ -53,6 +53,20 @@ async def create_relation(
     db: DBDep,
     current_user=require_admin_or_editor(),
 ) -> Relation:
+    bound_field = await db.scalar(
+        select(FieldDefinition.id).where(
+            FieldDefinition.target_type == data.from_type,
+            FieldDefinition.field_type == "relation",
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.settings["target_type"].astext == data.to_type,
+            FieldDefinition.settings["fixed_relation_type"].astext == data.relation_type,
+        )
+    )
+    if bound_field is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Diese feldgebundene Beziehung wird im zugehörigen Formularfeld gepflegt.",
+        )
     pair = procedure_object_pair(data.from_type, data.from_id, data.to_type, data.to_id)
     if pair:
         procedure_id, object_id = pair

@@ -145,6 +145,7 @@ export interface Relation {
   to_id: string
   relation_type: string
   metadata_: Record<string, unknown>
+  is_schema_derived: boolean
   created_at: string
 }
 

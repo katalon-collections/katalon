@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from katalon.services.schema_service import (
+    _validate_fixed_relation_type,
     _validate_relation_structure,
     _validate_relation_target,
     validate_metadata,
@@ -98,6 +99,11 @@ def test_structure_label_none() -> None:
     err = _validate_relation_structure({"id": str(uuid.uuid4())}, "photographer")
     assert err is not None
     assert "label" in err
+
+
+def test_fixed_relation_type_rejects_other_type() -> None:
+    entry = {"id": str(uuid.uuid4()), "label": "Max", "relation_type": "publisher"}
+    assert _validate_fixed_relation_type(entry, "author", {"fixed_relation_type": "has_author"})
 
 
 # ---------------------------------------------------------------------------

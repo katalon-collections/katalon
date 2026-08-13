@@ -16,7 +16,7 @@ Katalon baut auf einem modernen Stack:
 
 - **Dynamische Schemata** — Jedes Feld pro Typ konfigurierbar, wiederholbar, mehrsprachig
 - **Kontrollierte Vokabulare** — Hierarchische Begriffssysteme mit Import aus CSV/JSON
-- **Entitätsrelationen** — Beliebige Verknüpfungen zwischen Objekten, Personen, Orten und Werken
+- **Typisierte Relationen** — Fachlich benannte Formularfelder und freie Zusatzbeziehungen im gemeinsamen Beziehungsgraphen
 - **IIIF als first-class citizen** — Hochauflösender Deep-Zoom für Digitalisate
 - **Volltextsuche**
 - **Facettierte Suche über alle Bestände**
@@ -110,6 +110,19 @@ Felder pro Typ definierbar mit:
 - Pflichtfeld
 - Mehrsprachige Labels
 - Feldspezifische Einstellungen
+
+### Beziehungen und verknüpfte Suche
+
+Fachlich benannte Beziehungen wie „Autor:in“ oder „Aufnahmeort“ werden als
+Relationsfelder im Schema konfiguriert. Sie können einen Zieltyp, ein
+Relationstyp-Vokabular und optional einen festen Relationstyp festlegen.
+Die Beziehungen-Karte zeigt den vollständigen Graphen und erfasst nur weitere,
+freie Beziehungen zu anderen Haupttypen.
+
+Ausgewählte Felder verknüpfter Records können in Elasticsearch eingebettet und
+im Portal als Facetten aktiviert werden. Ein festgelegter Relationstyp begrenzt
+die Suche auf diese fachliche Beziehung; ohne ihn werden alle Beziehungen zum
+gewählten Zieltyp berücksichtigt.
 
 ### Vokabulare
 

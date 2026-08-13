@@ -92,6 +92,7 @@ type FieldFormState = {
   relation_target_type: string
   relation_target_subtype: string
   relation_type_vocab: string
+  fixed_relation_type: string
   inherited_fields: string[]
   default_value: unknown
   is_locked: boolean
@@ -105,7 +106,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -129,6 +130,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     relation_target_type: (f.settings?.target_type as string) ?? 'entity',
     relation_target_subtype: (f.settings?.target_subtype as string) ?? '',
     relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
+    fixed_relation_type: (f.settings?.fixed_relation_type as string) ?? '',
     inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
     default_value: f.settings?.default_value ?? '',
     is_locked: Boolean(f.settings?.is_locked),
@@ -400,6 +402,18 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
     schema.list(form.relation_target_type).then(setTargetTypeFields).catch(() => setTargetTypeFields([]))
   }, [form.field_type, form.relation_target_type])
 
+  const [relationTypeTerms, setRelationTypeTerms] = useState<VocabularyTerm[]>([])
+  useEffect(() => {
+    if (form.field_type !== 'relation' || !form.relation_type_vocab) {
+      setRelationTypeTerms([])
+      return
+    }
+    vocabularies.listTerms(form.relation_type_vocab, {
+      from_type: form.target_type,
+      to_type: form.relation_target_type,
+    }).then(setRelationTypeTerms).catch(() => setRelationTypeTerms([]))
+  }, [form.field_type, form.relation_type_vocab, form.relation_target_type, form.target_type])
+
   const isVocabularyTerm = form.target_type === 'vocabulary_term'
   const fieldTypes = isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES
   const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
@@ -626,11 +640,20 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             </div>
             <div className="field">
               <div className="lbl">Relationstyp-Vokabular <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — Dropdown in Erfassungsmaske)</span></div>
-              <select className="fld" value={form.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
+              <select className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
                 <option value="">— Vokabular wählen —</option>
                 {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
+            {form.relation_type_vocab && (
+              <div className="field">
+                <div className="lbl">Fester Relationstyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — sonst im Formular wählbar)</span></div>
+                <select className="fld" value={form.fixed_relation_type} onChange={e => set('fixed_relation_type', e.target.value)}>
+                  <option value="">— Alle Typen dieses Vokabulars —</option>
+                  {relationTypeTerms.map(term => <option key={term.id} value={term.term}>{getLabel(term, term.term)}</option>)}
+                </select>
+              </div>
+            )}
             {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
               <div className="field">
                 <div className="lbl">Felder des Zieldatensatzes mit anzeigen <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — z.B. Land bei Ortsverknüpfung)</span></div>
@@ -1116,6 +1139,7 @@ export function ScreenSchema() {
           target_type: form.relation_target_type,
           ...(form.relation_target_subtype.trim() ? { target_subtype: form.relation_target_subtype.trim() } : {}),
           ...(form.relation_type_vocab ? { relation_type_vocab: form.relation_type_vocab } : {}),
+          ...(form.relation_type_vocab && form.fixed_relation_type ? { fixed_relation_type: form.fixed_relation_type } : {}),
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
         } : {}),
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),

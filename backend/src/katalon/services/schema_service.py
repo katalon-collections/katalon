@@ -73,6 +73,13 @@ def _validate_relation_structure(value: object, field_name: str) -> str | None:
     return None
 
 
+def _validate_fixed_relation_type(value: dict, field_name: str, settings: dict) -> str | None:
+    fixed = settings.get("fixed_relation_type")
+    if fixed and value.get("relation_type") != fixed:
+        return f"Feld '{field_name}': Relationstyp muss '{fixed}' sein."
+    return None
+
+
 def _validate_authority_value(value: object, settings: dict, field_name: str) -> str | None:
     """Validate one authority entry against the field's configured source."""
     if not isinstance(value, dict) or not all(
@@ -171,6 +178,10 @@ async def validate_metadata(
                         if struct_err:
                             errors.append(struct_err.replace(f"Feld '{field_path}'", indexed_prefix, 1))
                             continue
+                        type_err = _validate_fixed_relation_type(sv, field_path, sf.settings)
+                        if type_err:
+                            errors.append(type_err.replace(f"Feld '{field_path}'", indexed_prefix, 1))
+                            continue
                         target_err = await _validate_relation_target(
                             sv, field_path, sf.settings, db
                         )
@@ -211,6 +222,10 @@ async def validate_metadata(
                 struct_err = _validate_relation_structure(item, field.name)
                 if struct_err:
                     errors.append(struct_err)
+                    continue
+                type_err = _validate_fixed_relation_type(item, field.name, field.settings)
+                if type_err:
+                    errors.append(type_err)
                     continue
                 target_err = await _validate_relation_target(item, field.name, field.settings, db)
                 if target_err:

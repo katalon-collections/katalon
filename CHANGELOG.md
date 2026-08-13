@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.13] - 2026-08-13
+
+### Added
+- Relationsfelder können einen optionalen festen Relationstyp aus ihrem Vokabular festlegen. Feldgebundene und freie Beziehungen sind in der Admin-Karte getrennt; eingebettete Suchfelder berücksichtigen den festen Typ optional. (#213)
+
+### Fixed
+- Verknüpfte Portal-Facetten bleiben gespeichert; Änderungen der Einbettungs-Konfiguration reindizieren den Quelltyp automatisch.
+
 ## [0.10.12] - 2026-08-12
 
 ### Added

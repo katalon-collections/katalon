@@ -190,7 +190,7 @@ async def _load_linked_data(
     record_type: str,
     record_id: UUID,
     db: Any,
-    inherited_config: dict[str, list[str]],
+    inherited_config: dict[tuple[str, str | None], list[str]],
 ) -> tuple[dict[str, list[dict]], dict[str, list[str]]]:
     """Load inherited fields from linked records for ES denormalization.
 
@@ -213,7 +213,10 @@ async def _load_linked_data(
     relations = (await db.execute(stmt)).scalars().all()
 
     for rel in relations:
-        fields = inherited_config.get(rel.to_type)
+        fields = list({
+            *inherited_config.get((rel.to_type, None), []),
+            *inherited_config.get((rel.to_type, rel.relation_type), []),
+        })
         if not fields:
             continue
         model = _MODEL_MAP.get(rel.to_type)
@@ -299,7 +302,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     searchable_fields: set[str] | None = None
     facet_fields: set[str] | None = None
     group_fields: set[str] | None = None
-    inherited_config: dict[str, list[str]] = {}
+    inherited_config: dict[tuple[str, str | None], list[str]] = {}
     if db is not None:
         result = await db.execute(
             select(
@@ -324,8 +327,9 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
                 ifields = s.get("inherited_fields") or []
                 target = s.get("target_type") or s.get("relation_target_type", "")
                 if ifields and target:
-                    existing = inherited_config.get(target, [])
-                    inherited_config[target] = list(set(existing + ifields))
+                    key = (target, s.get("fixed_relation_type"))
+                    existing = inherited_config.get(key, [])
+                    inherited_config[key] = list(set(existing + ifields))
 
     linked_data: dict[str, list[dict]] = {}
     inherited_facets: dict[str, list[str]] = {}

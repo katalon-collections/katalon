@@ -1,12 +1,18 @@
 ---
 type: Decision
-title: Relationen — flexibel statt feldgebunden, vokabular-typisiert
-description: Relation-Felder erlauben Verknüpfung zwischen allen vier Bestandstypen überall im Formular, gefiltert über eine konfigurierbare relation-type-Vokabular statt starrer Feldkonfiguration.
+title: Relationen — flexibel statt feldgebunden, vokabular-typisiert (abgelöst)
+description: Abgelöst durch die Trennung von strukturierten Schema-Relationsfeldern und freien Zusatzbeziehungen.
 tags: [relationen, datenmodell, ui]
 timestamp: 2026-06-26T00:00:00Z
 ---
 
 # Kontext
+
+> **Status: abgelöst.** Die Entscheidung wurde durch
+> [Relationen — strukturierte Felder und freie Zusatzbeziehungen](relationen-strukturierte-und-freie-beziehungen.md)
+> ersetzt. Die generische Relationstabelle und die Vokabular-Governance bleiben
+> bestehen; abgelöst ist nur die Annahme, dass beide Eingabewege dieselbe
+> Bearbeitungsrolle haben.
 
 Relationen fest an Stellen in der Eingabemaske zu binden schränkt die
 Verknüpfbarkeit unnötig ein. Für Katalon standen zwei Optionen zur

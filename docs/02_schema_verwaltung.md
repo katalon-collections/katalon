@@ -180,6 +180,24 @@ Beispiele:
 - Vorlage → Object (ein anderes Objekt)
 - Exemplar von → Occurrence (ein bibliografisches Werk)
 
+Relationsfelder sind für fachlich benannte Beziehungen im Erfassungsformular
+bestimmt, etwa „Autor:in“ oder „Aufnahmeort“. Sie können einen Zieltyp, ein
+Relationstyp-Vokabular und optional einen festen Relationstyp festlegen. Ohne
+festen Typ kann die Person, die katalogisiert, einen passenden Typ aus dem
+Vokabular wählen. Mit festem Typ wird genau diese Semantik verwendet.
+
+Die Beziehungen-Karte eines gespeicherten Datensatzes ist keine zweite
+Bearbeitungsoberfläche für solche Felder: Sie zeigt den vollständigen
+Beziehungsgraphen und fügt nur weitere, freie Beziehungen zu anderen
+Haupttypen hinzu. So bleibt eine fachlich konfigurierte Beziehung im zugehörigen
+Formularfeld bearbeitbar, während zusätzliche Graph-Beziehungen weiterhin
+möglich sind.
+
+Für die Portalsuche kann ein Relationsfeld ausgewählte Felder seines Zieltyps
+in den Suchindex übernehmen. Ein fester Relationstyp beschränkt diese Werte auf
+die entsprechende Beziehung; ohne festen Typ werden Werte aller Beziehungen
+zum gewählten Zieltyp übernommen.
+
 ---
 
 ### `geo` – Geografische Koordinaten

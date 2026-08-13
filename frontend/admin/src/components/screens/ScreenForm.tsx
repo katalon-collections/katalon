@@ -1182,6 +1182,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   async function handleAddGenericRelation(entry: RelationEntry) {
     if (!savedId) return
+    const field = fields.find(f => f.field_type === 'relation'
+      && f.settings?.target_type === addTargetType
+      && f.settings?.fixed_relation_type === entry.relation_type)
+    if (field) {
+      throw new Error(`Diese Beziehung wird im Feld „${getLabel(field, field.name)}“ gepflegt.`)
+    }
     const duplicate = rels.some(r => {
       const isFrom = r.from_id === savedId
       return (isFrom ? r.to_type : r.from_type) === addTargetType
@@ -1356,6 +1362,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             targetType={(sf.settings?.target_type as RecordType) ?? ''}
             targetSubtype={sf.settings?.target_subtype as string | undefined}
             relTypeVocabId={sf.settings?.relation_type_vocab as string | undefined}
+            fixedRelationType={sf.settings?.fixed_relation_type as string | undefined}
             fromType={recordType}
             onAdd={entry => onChange(entry)}
             disabled={disabled}
@@ -1919,6 +1926,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : showCollectionStatus
       ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'procedure')
       : rels
+  const schemaRels = otherRels.filter(r => r.is_schema_derived)
+  const freeRels = otherRels.filter(r => !r.is_schema_derived)
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
   const statusLabels: Record<string, string> = recordType === 'procedure' ? PROCEDURE_STATUS_LABELS : STATUS_LABELS
   const isDraftStatus = status === 'draft'
@@ -1942,6 +1951,64 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (fieldErrors[name]) return { borderColor: '#dc2626', background: '#fef2f2' }
     if (fieldWarnings[name]) return { borderColor: '#f59e0b', background: '#fffbeb' }
     return undefined
+  }
+
+  function renderRelation(r: Relation, schemaBound = false) {
+    const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
+    const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
+    const isFrom = r.from_id === savedId
+    const relTypeLabel = relTypeTerm
+      ? (isFrom ? getLabel(relTypeTerm, r.relation_type) : (relTypeTerm.inverse_label?.de ?? relTypeTerm.inverse_label?.en ?? getLabel(relTypeTerm, r.relation_type)))
+      : r.relation_type
+    const targetType = isFrom ? r.to_type : r.from_type
+    const targetId = isFrom ? r.to_id : r.from_id
+    const targetKey = `${targetType}/${targetId}`
+    const inheritedFieldNames = fields
+      .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType
+        && (!(f.settings?.fixed_relation_type as string | undefined) || (f.settings?.fixed_relation_type as string) === r.relation_type))
+      .flatMap(f => (f.settings?.inherited_fields as string[]) ?? [])
+    const inheritedMeta = relMeta[targetKey]
+    const sourceField = r.metadata_?.source_field as string | undefined
+    const sourceLabel = sourceField ? getLabel(fields.find(f => f.name === sourceField), sourceField) : undefined
+    return (
+      <div key={r.id}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+          <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
+            {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
+            {relTypeLabel}
+            {schemaBound && sourceLabel && (isFrom ? (
+              <a
+                href={`#field-${sourceField}`}
+                style={{ display: 'block', fontSize: 10, color: 'var(--accent)' }}
+              >
+                Feld: {sourceLabel}
+              </a>
+            ) : (
+              <span style={{ display: 'block', fontSize: 10, color: 'var(--fg-4)' }}>
+                Feld im verknüpften Datensatz: {sourceLabel}
+              </span>
+            ))}
+          </span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
+            <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
+            <a href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`} onClick={e => { e.preventDefault(); navigateToRecord(targetType, targetId) }} style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+              {relTitles[targetKey] ?? targetId.slice(0, 8) + '…'}
+            </a>
+          </span>
+        </div>
+        {inheritedMeta && inheritedFieldNames.length > 0 && (
+          <div style={{ padding: '3px 0 5px', borderBottom: '1px solid var(--border-s)', display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
+            {inheritedFieldNames.map(fname => {
+              const val = inheritedMeta[fname]
+              if (val == null) return null
+              const first = Array.isArray(val) ? val[0] : val
+              const text = typeof first === 'string' ? first : (typeof first === 'object' && first !== null ? String((first as Record<string, unknown>).value ?? '') : '')
+              return text ? <span key={fname} style={{ fontSize: 11, color: 'var(--fg-3)' }}>{fname}: {text}</span> : null
+            })}
+          </div>
+        )}
+      </div>
+    )
   }
 
   // Form variants (#275): a variant filters+reorders the already-loaded field
@@ -2187,7 +2254,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     : undefined
 
                   return (
-                    <fieldset key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0 }}>
+                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: 0, margin: 0 }}>
                       <div className="lbl">
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
@@ -2337,6 +2404,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
                               relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                              fixedRelationType={f.settings?.fixed_relation_type as string | undefined}
                               fromType={recordType}
                               onAdd={entry => addRelationEntry(f.name, entry)}
                               disabled={justCreated}
@@ -2357,6 +2425,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 targetType={(f.settings?.target_type as RecordType) ?? ''}
                                 targetSubtype={f.settings?.target_subtype as string | undefined}
                                 relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                                fixedRelationType={f.settings?.fixed_relation_type as string | undefined}
                                 fromType={recordType}
                                 onAdd={entry => setField(f.name, entry)}
                                 disabled={justCreated}
@@ -2795,68 +2864,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}
                     <div className="grow" />
                     {canManageContent && !genericAddOpen && savedId && (
-                      <button className="btn sm gh" onClick={() => setGenericAddOpen(true)}><Plus size={12} /> Beziehung hinzufügen</button>
+                      <button className="btn sm gh" onClick={() => setGenericAddOpen(true)}><Plus size={12} /> Freie Beziehung zu anderen Haupttypen hinzufügen</button>
                     )}
                   </div>
                   <div className="bd">
-                    {otherRels.length > 0 && (
-                      <div style={{ marginBottom: 0 }}>
-                        {otherRels.map(r => {
-                          const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
-                          const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
-                          const isFrom = r.from_id === savedId
-                          const relTypeLabel = relTypeTerm
-                            ? (isFrom
-                              ? getLabel(relTypeTerm, r.relation_type)
-                              : (relTypeTerm.inverse_label?.de ?? relTypeTerm.inverse_label?.en ?? getLabel(relTypeTerm, r.relation_type)))
-                            : r.relation_type
-                          const targetType = isFrom ? r.to_type : r.from_type
-                          const targetId = isFrom ? r.to_id : r.from_id
-                          const targetKey = `${targetType}/${targetId}`
-                          const inheritedFieldNames = fields
-                            .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType)
-                            .flatMap(f => (f.settings?.inherited_fields as string[]) ?? [])
-                          const inheritedMeta = relMeta[targetKey]
-                          return (
-                            <div key={r.id}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
-                                <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
-                                  {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
-                                  {relTypeLabel}
-                                </span>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
-                                  <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
-                                  <a
-                                    href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`}
-                                    onClick={e => { e.preventDefault(); navigateToRecord(targetType, targetId) }}
-                                    style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
-                                    onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-                                    onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-                                  >
-                                    {relTitles[targetKey] ?? targetId.slice(0, 8) + '…'}
-                                  </a>
-                                </span>
-                              </div>
-                              {inheritedMeta && inheritedFieldNames.length > 0 && (
-                                <div style={{ padding: '3px 0 5px', borderBottom: '1px solid var(--border-s)', display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
-                                  {inheritedFieldNames.map(fname => {
-                                    const val = inheritedMeta[fname]
-                                    if (val == null) return null
-                                    let text: string | null = null
-                                    if (typeof val === 'string') text = val || null
-                                    else if (Array.isArray(val) && val.length > 0) {
-                                      const first = val[0]
-                                      text = typeof first === 'string' ? first : (typeof first === 'object' && first !== null ? String((first as Record<string,unknown>).value ?? '') || null : null)
-                                    }
-                                    if (!text) return null
-                                    return <span key={fname} style={{ fontSize: 11, color: 'var(--fg-3)' }}>{fname}: {text}</span>
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
+                    {schemaRels.length > 0 && (
+                      <section style={{ marginBottom: freeRels.length ? 14 : 0 }}>
+                        <div className="lbl">Feldgebundene Beziehungen</div>
+                        <div className="help" style={{ marginBottom: 6 }}>Diese Beziehungen werden in den entsprechenden Formularfeldern gepflegt.</div>
+                        {schemaRels.map(r => renderRelation(r, true))}
+                      </section>
+                    )}
+                    {freeRels.length > 0 && (
+                      <section>
+                        {schemaRels.length > 0 && <div className="lbl">Weitere Beziehungen</div>}
+                        {freeRels.map(r => renderRelation(r))}
+                      </section>
                     )}
                     {otherRels.length === 0 && (
                       <div className="empty" style={{ padding: '16px 0' }}>Noch keine Relationen.</div>

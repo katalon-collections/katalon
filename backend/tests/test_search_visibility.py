@@ -100,6 +100,71 @@ async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
 
 
 @pytest.mark.asyncio
+async def test_index_doc_limits_inherited_fields_to_fixed_relation_type() -> None:
+    object_id = uuid.uuid4()
+    occurrence_id = uuid.uuid4()
+    obj = Object(
+        id=object_id, idno="OBJ-1", status="public", collection_status="active", metadata_={}
+    )
+    occurrence = Occurrence(
+        id=occurrence_id,
+        idno="OCC-1",
+        occurrence_type="work",
+        status="public",
+        metadata_={"publication_year": "1905"},
+    )
+    relation = Relation(
+        id=uuid.uuid4(),
+        from_type="object",
+        from_id=object_id,
+        to_type="occurrence",
+        to_id=occurrence_id,
+        relation_type="is_author",
+    )
+
+    class Result:
+        def __init__(self, values: list[object]):
+            self.values = values
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self.values
+
+    class DB:
+        def __init__(self):
+            self.results = [
+                Result([relation]),
+                Result([
+                    SimpleNamespace(
+                        name="author",
+                        is_searchable=True,
+                        is_facet=False,
+                        field_type="relation",
+                        settings={
+                            "target_type": "occurrence",
+                            "fixed_relation_type": "has_author",
+                            "inherited_fields": ["publication_year"],
+                        },
+                    )
+                ]),
+                Result([relation]),
+            ]
+
+        async def execute(self, _statement):
+            return self.results.pop(0)
+
+        async def get(self, _model, _record_id):
+            return occurrence
+
+    doc = await build_index_doc("object", obj, DB())
+
+    assert "linked_occurrences" not in doc
+    assert "facet_inherited_occurrence_publication_year" not in doc
+
+
+@pytest.mark.asyncio
 async def test_reindex_type_accepts_procedure(monkeypatch) -> None:
     calls: list[str] = []
 
