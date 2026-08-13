@@ -1,0 +1,17 @@
+# Manuell gepflegte Release-Metadaten für katalon-cli (Issue #286).
+# Nur ändern wenn sich das jeweilige Ding tatsächlich ändert:
+#
+# compose_revision            – hochzählen, wenn sich Service-Topologie/Ports/Volumes
+#                                in der katalon-cli compose.yaml.j2-Struktur ändern
+#                                (neuer Service, andere Ports, anderes Volume-Layout).
+# minimum_installer_version   – hochzählen, wenn dieses Release ein Feature der
+#                                katalon-cli voraussetzt, das ältere CLI-Versionen
+#                                nicht haben (z.B. neues Compose-Template-Feld).
+# requires                    – Fremdservice-Versionsanforderungen, ändert sich selten.
+
+compose_revision = 1
+minimum_installer_version = "0.1.0"
+
+[requires]
+postgres = ">=16"
+elasticsearch = ">=8.15,<9"
