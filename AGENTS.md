@@ -233,6 +233,12 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 
 **Pflege**: Nach jeder Session, in der eine architektonisch relevante Entscheidung getroffen wird (neue Komponente, Trade-off zwischen Ansätzen, Abweichung von einem bestehenden Muster) — nicht bei reinen Bugfixes oder Feature-Implementierungen ohne Designfrage — ein neues Konzept unter `.agents/knowledge/decisions/` anlegen (Format wie bestehende Dateien: YAML-Frontmatter mit `type: Decision`, Sections Kontext/Entscheidung/Begründung/Citations) und in `decisions/index.md` verlinken.
 
+## Anwender-Doku (`docs/`) — Pflege
+
+`docs/` ist Übergangskopie, primär gepflegt in `karkraeg/katalon-docs` (siehe README "Dokumentation"). Nur zwei Dateien sind echte Bedienungsanleitung für Admin-UI-Nutzer (Kuratoren/Sachbearbeiter): `02_schema_verwaltung.md`, `03_csv_import.md`. Diese verlinkt die Admin-UI direkt (Hilfe-Icon in `Topbar.tsx`, `ROUTE_DOCS`-Mapping). Rest der Dateien ist technisch/Dev/Architektur und nicht für Admin-Endnutzer gedacht.
+
+**Nachpflegepflicht**: Seit MVP sind viele Features dazugekommen, die in den Docs (noch) nicht abgebildet sind (u. a. Procedure-Typ/Vorgänge, Formularvarianten, Subtypen, Onboarding-Tour, granulare Rollen, katalon-cli für Deployment, Deep-Linking). Bei Feature-Arbeit, die eine der beiden Nutzer-Doku-Dateien betrifft, oder bei größeren Feature-Batches: betroffene `docs/`-Seite(n) aktualisieren bzw. Lücke benennen. Bei neuen Bedienungs-relevanten Features prüfen, ob eine neue Nutzer-Doku-Seite + `ROUTE_DOCS`-Eintrag nötig ist.
+
 ## CodeAlmanac
 
 Vor jeder Umsetzung die relevanten CodeAlmanac-Seiten konsultieren und den Plan auf Widersprüche prüfen. Zusätzlich mögliche UX-Einwände gegen `PRODUCT.md` und `DESIGN.md` prüfen und vor der Umsetzung benennen; auch technisch getriebene Features auf Auswirkungen für Bedienung, Accessibility, Fehlerzustände und Responsive-Verhalten prüfen.
@@ -286,6 +292,16 @@ Dazu bei jedem Commit:
 
 **Minor-Bump** (`0.1.x` → `0.2.0`): neue Features oder abgeschlossene Phase → kurz informieren, Karl entscheidet.
 **Major-Bump** (`0.x.y` → `1.0.0`): erster öffentlicher Release → explizite Absprache.
+
+Jeder `git push origin vX.Y.Z` löst `.github/workflows/release-metadata.yml` aus: generiert `katalon-release.json` (via `scripts/gen_release_metadata.py`) und hängt es als Asset an den GitHub-Release. Das ist die Metadatenquelle, die `katalon-cli` für Updates/Kompatibilitätschecks konsumiert.
+
+## Production-Installation (katalon-cli)
+
+Production-Instanzen werden nicht aus diesem Repo geklont/gebaut, sondern über die separate CLI `katalon-cli` (`github.com/karkraeg/katalon-cli`, `uv tool install katalon-cli`) installiert/aktualisiert — sie pullt gepinnte Release-Images statt Source-Checkout. `install.sh` und `docker-compose.dev.yml` bleiben unverändert für lokale Entwicklung.
+
+`release-meta.toml` in diesem Repo (compose_revision, minimum_installer_version, requires) manuell pflegen, wenn sich Compose-Topologie oder CLI-Anforderungen ändern — siehe Kommentar in der Datei.
+
+Details/Architektur: `almanac/decisions/operations/katalon-cli-distribution.md`, GitHub-Issue [#286](https://github.com/karkraeg/Katalon/issues/286).
 
 ## Nächster logischer Schritt
 
