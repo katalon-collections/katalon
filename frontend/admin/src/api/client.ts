@@ -285,8 +285,8 @@ export const schema = {
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/schema/${id}`, { method: 'DELETE' }),
-  resetSummary: (targetType: string) => req<{ deletable_fields: number }>(`/v1/schema/${targetType}/reset-summary`),
-  reset: (targetType: string) => req<{ deletable_fields: number, deleted_fields: number }>(`/v1/schema/${targetType}/reset`, { method: 'POST' }),
+  resetSummary: (targetType: string, subtype?: string) => req<{ deletable_fields: number }>(`/v1/schema/${targetType}/reset-summary${subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''}`),
+  reset: (targetType: string, subtype?: string) => req<{ deletable_fields: number, deleted_fields: number }>(`/v1/schema/${targetType}/reset${subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''}`, { method: 'POST' }),
   import: async (file: File, opts: { dryRun?: boolean; overwrite?: boolean } = {}): Promise<SchemaImportResult> => {
     const formData = new FormData()
     formData.append('file', file)

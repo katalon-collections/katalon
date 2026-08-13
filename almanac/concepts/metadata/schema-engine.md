@@ -34,6 +34,8 @@ A field definition names one metadata field and binds it to a `target_type`. The
 
 Runtime behavior is stricter than a plain JSON editor. The schema API rejects unknown target types, verifies subtype references, blocks nested group fields, validates authority and vocabulary settings, and prevents deletion of the system `label` field [@schema-api]. Deletion is a soft delete through `is_deleted`, so old JSONB values can remain stored while the field disappears from normal schema reads [@schema-api].
 
+Admins can reset a whole primary-type schema or a single subtype schema from the Settings danger zone. The reset soft-deletes active custom field definitions in the selected scope, including group sub-fields, then queues one reindex; it retains the system `label` field and never removes existing record metadata. Recreating a field with the same technical name makes retained values editable again [@schema-api] [@schema-screen].
+
 ## Values In Metadata
 
 Primary records keep cataloguing data in a JSONB column named `metadata` on their ORM tables, exposed in Python as `metadata_` [@models]. `validate_metadata` loads active top-level fields for the record type and optional subtype, checks required values, repeatability, text regexes, PID structures, relation structures, relation target existence, authority entry shape and source matching, group instances, and vocabulary-term field constraints [@schema-service] [@schema-service-tests]. `prepare_metadata` applies configured defaults for text, vocab, vocab-free, date, and number fields, and it preserves or removes locked fields depending on editor permissions [@schema-service].

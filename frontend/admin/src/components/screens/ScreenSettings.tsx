@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE, apiKeys, users, schema, adminConfig } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, subtypes, adminConfig } from '../../api/client'
 import type { AdminConfigRead } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead } from '../../types'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien'
+type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -346,6 +346,85 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
         {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Danger zone section
+// ---------------------------------------------------------------------------
+
+function SectionDangerZone() {
+  const [activeType, setActiveType] = useState<(typeof RECORD_TYPES)[number]['key']>('object')
+  const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
+  const [activeSubtype, setActiveSubtype] = useState('')
+  const [summary, setSummary] = useState<number | null>(null)
+  const [confirmation, setConfirmation] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const active = RECORD_TYPES.find(type => type.key === activeType)!
+  const selectedSubtype = subtypesList.find(subtype => subtype.name === activeSubtype)
+  const expectedConfirmation = (selectedSubtype?.label?.de || active.label).toUpperCase()
+
+  useEffect(() => {
+    setActiveSubtype('')
+    subtypes.list(activeType).then(setSubtypesList).catch(() => setSubtypesList([]))
+  }, [activeType])
+
+  useEffect(() => {
+    setSummary(null); setConfirmation(''); setError(null); setSuccess(null)
+    schema.resetSummary(activeType, activeSubtype || undefined)
+      .then(result => setSummary(result.deletable_fields))
+      .catch((e: Error) => setError(e.message))
+  }, [activeType, activeSubtype])
+
+  async function handleReset() {
+    if (confirmation !== expectedConfirmation) return
+    setResetting(true); setError(null); setSuccess(null)
+    try {
+      const result = await schema.reset(activeType, activeSubtype || undefined)
+      setSummary(0); setConfirmation('')
+      setSuccess(`${result.deleted_fields} Felddefinitionen wurden ausgeblendet.`)
+    } catch (e) { setError((e as Error).message) }
+    finally { setResetting(false) }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ borderColor: '#fca5a5' }}>
+        <div className="hd" style={{ color: '#b91c1c' }}>Gefahrenbereich</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+            Blendet Felddefinitionen aus, löscht aber keine Datensätze oder Metadaten. Für eine spätere Bearbeitung das Feld im Schema-Editor mit demselben technischen Namen wieder anlegen; die gespeicherten Werte werden dann wieder angezeigt. Das Systemfeld <code>label</code> bleibt erhalten.
+          </p>
+          <div className="field">
+            <div className="lbl">Bestandstyp</div>
+            <select className="fld" value={activeType} onChange={e => setActiveType(e.target.value as typeof activeType)}>
+              {RECORD_TYPES.map(type => <option key={type.key} value={type.key}>{type.label}</option>)}
+            </select>
+          </div>
+          {subtypesList.length > 0 && <div className="field">
+            <div className="lbl">Geltungsbereich</div>
+            <select className="fld" value={activeSubtype} onChange={e => setActiveSubtype(e.target.value)}>
+              <option value="">Gesamtes {active.label}-Schema</option>
+              {subtypesList.map(subtype => <option key={subtype.id} value={subtype.name}>Nur Subtyp: {subtype.label?.de || subtype.name}</option>)}
+            </select>
+          </div>}
+          <p style={{ fontSize: 13, marginBottom: 16 }}>
+            {summary === null ? 'Prüfe Felddefinitionen…' : `${summary} Felddefinitionen werden ausgeblendet.`}
+          </p>
+          <div className="field">
+            <div className="lbl">Zur Bestätigung <code>{expectedConfirmation}</code> eingeben</div>
+            <input className="fld" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" />
+          </div>
+          {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
+          {success && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{success}</div>}
+          <button className="btn dn" onClick={handleReset} disabled={resetting || summary === 0 || confirmation !== expectedConfirmation}>
+            {resetting ? 'Setze zurück…' : `${selectedSubtype ? `${selectedSubtype.label?.de || selectedSubtype.name}-Subschema` : `${active.label}-Schema`} zurücksetzen`}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -981,6 +1060,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
+  { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true },
 ]
 
 export function ScreenSettings({ isAdmin, onStartTour }: Props) {
@@ -1026,6 +1106,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
+          {!loading && isAdmin && section === 'gefahrenbereich' && <SectionDangerZone />}
         </div>
       </div>
     </div>

@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.30] - 2026-08-13
+
+### Added
+- Einstellungen bieten einen bestätigungspflichtigen Schema-Reset je Datensatztyp oder Subtyp; Metadaten bleiben erhalten und werden bei erneut angelegtem Feld gleichen technischen Namens wieder sichtbar.
+
+### Fixed
+- Die Aktion für freie Beziehungen bleibt in der schmalen Formularseitenleiste vollständig lesbar.
+
 ## [0.10.29] - 2026-08-13
 
 ### Added

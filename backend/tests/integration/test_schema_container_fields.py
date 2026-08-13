@@ -168,6 +168,56 @@ async def test_list_schema_embeds_children(async_client: AsyncClient, auth_heade
 
 
 @pytest.mark.asyncio
+async def test_reset_schema_soft_deletes_all_custom_fields(async_client: AsyncClient, auth_headers: dict) -> None:
+    field_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "place", "name": "reset_test_field", "label": {"de": "Reset-Test"},
+            "field_type": "text", "is_required": False, "is_repeatable": False, "settings": {},
+        },
+    )
+    assert field_r.status_code == 201, field_r.text
+
+    summary_r = await async_client.get("/v1/schema/place/reset-summary", headers=auth_headers)
+    assert summary_r.status_code == 200, summary_r.text
+    assert summary_r.json()["deletable_fields"] >= 1
+
+    reset_r = await async_client.post("/v1/schema/place/reset", headers=auth_headers)
+    assert reset_r.status_code == 200, reset_r.text
+    assert reset_r.json()["deleted_fields"] >= 1
+
+    fields_r = await async_client.get("/v1/schema/place", headers=auth_headers)
+    assert fields_r.status_code == 200, fields_r.text
+    assert all(field["name"] != "reset_test_field" for field in fields_r.json())
+    assert any(field["name"] == "label" for field in fields_r.json())
+
+
+@pytest.mark.asyncio
+async def test_reset_schema_only_soft_deletes_selected_subtype(async_client: AsyncClient, auth_headers: dict) -> None:
+    for name, subtype in (("reset_conservation", "conservation"), ("reset_acquisition", "acquisition")):
+        field_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "procedure", "target_subtype": subtype, "name": name,
+                "label": {"de": name}, "field_type": "text", "is_required": False,
+                "is_repeatable": False, "settings": {},
+            },
+        )
+        assert field_r.status_code == 201, field_r.text
+
+    reset_r = await async_client.post(
+        "/v1/schema/procedure/reset?subtype=conservation", headers=auth_headers
+    )
+    assert reset_r.status_code == 200, reset_r.text
+
+    fields_r = await async_client.get("/v1/schema/procedure?subtype=acquisition", headers=auth_headers)
+    assert fields_r.status_code == 200, fields_r.text
+    assert any(field["name"] == "reset_acquisition" for field in fields_r.json())
+
+
+@pytest.mark.asyncio
 async def test_nested_group_rejected(async_client: AsyncClient, auth_headers: dict) -> None:
     # Create a group field
     group_r = await async_client.post(

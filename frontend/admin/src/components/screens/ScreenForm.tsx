@@ -2852,12 +2852,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   <div className="hd">
                     <span>Beziehungen</span>
                     {otherRels.length > 0 && <span className="sub">{otherRels.length}</span>}
-                    <div className="grow" />
-                    {canManageContent && !genericAddOpen && savedId && (
-                      <button className="btn sm gh" onClick={() => setGenericAddOpen(true)}><Plus size={12} /> Freie Beziehung zu anderen Haupttypen hinzufügen</button>
-                    )}
                   </div>
                   <div className="bd">
+                    {canManageContent && !genericAddOpen && savedId && (
+                      <button className="btn sm gh" style={{ marginBottom: 12 }} onClick={() => setGenericAddOpen(true)}><Plus size={12} /> Freie Beziehung zu anderen Haupttypen hinzufügen</button>
+                    )}
                     {schemaRels.length > 0 && (
                       <section style={{ marginBottom: freeRels.length ? 14 : 0 }}>
                         <div className="lbl">Feldgebundene Beziehungen</div>

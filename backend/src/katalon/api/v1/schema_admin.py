@@ -5,8 +5,8 @@ from collections import defaultdict
 import yaml
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import func, or_, select, update
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy import or_, select
 
 from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
@@ -126,6 +126,14 @@ class ImportResult(BaseModel):
     fields: list[FieldDefinitionRead]
 
 
+class SchemaResetSummary(BaseModel):
+    deletable_fields: int
+
+
+class SchemaResetResult(SchemaResetSummary):
+    deleted_fields: int
+
+
 async def _embed_children(
     db: DBDep, target_type: str, top_fields: list[FieldDefinition]
 ) -> list[FieldDefinitionRead]:
@@ -178,6 +186,61 @@ async def list_fields(
     result = await db.execute(q.order_by(FieldDefinition.sort_order))
     top_fields = list(result.scalars().all())
     return await _embed_children(db, target_type, top_fields)
+
+
+@router.get(
+    "/{target_type}/reset-summary",
+    response_model=SchemaResetSummary,
+    dependencies=[require_role("admin")],
+    summary="Count field definitions that a schema reset would soft-delete",
+)
+async def schema_reset_summary(
+    target_type: str, db: DBDep, subtype: str | None = Query(default=None)
+) -> SchemaResetSummary:
+    _validate_schema_target_type(target_type)
+    if subtype is not None:
+        await _ensure_schema_subtype_exists(db, target_type, subtype)
+    conditions = [
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.name != "label",
+        FieldDefinition.is_deleted.is_(False),
+    ]
+    if subtype is not None:
+        conditions.append(FieldDefinition.target_subtype == subtype)
+    deletable_fields = await db.scalar(
+        select(func.count()).select_from(FieldDefinition).where(*conditions)
+    )
+    return SchemaResetSummary(deletable_fields=deletable_fields or 0)
+
+
+@router.post(
+    "/{target_type}/reset",
+    response_model=SchemaResetResult,
+    dependencies=[require_role("admin")],
+    summary="Soft-delete all custom field definitions for a target type",
+)
+async def reset_schema(
+    target_type: str, db: DBDep, subtype: str | None = Query(default=None)
+) -> SchemaResetResult:
+    _validate_schema_target_type(target_type)
+    if subtype is not None:
+        await _ensure_schema_subtype_exists(db, target_type, subtype)
+    conditions = [
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.name != "label",
+        FieldDefinition.is_deleted.is_(False),
+    ]
+    if subtype is not None:
+        conditions.append(FieldDefinition.target_subtype == subtype)
+    result = await db.execute(
+        update(FieldDefinition)
+        .where(*conditions)
+        .values(is_deleted=True)
+    )
+    deleted_fields = result.rowcount or 0
+    await db.flush()
+    _enqueue_reindex(target_type)
+    return SchemaResetResult(deletable_fields=deleted_fields, deleted_fields=deleted_fields)
 
 
 async def _validate_parent(db: DBDep, parent_id: uuid.UUID, field_type: str) -> None:
