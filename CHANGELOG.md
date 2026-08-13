@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.19] - 2026-08-13
+
+### Fixed
+- Medienkarte bleibt im rechten Formularbereich; Medienkacheln nutzen dessen volle Breite.
+
 ## [0.10.18] - 2026-08-13
 
 ### Changed

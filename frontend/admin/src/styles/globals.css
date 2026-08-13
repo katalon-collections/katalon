@@ -216,14 +216,12 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .upload-control { color: var(--accent); cursor: pointer; font-size: 12px; }
 .form-single { max-width: 680px; padding: 20px 24px; }
 .form-grid { display: grid; grid-template-columns: 1fr 340px; gap: 18px; padding: 18px 24px 80px; align-items: start; }
-.form-side { display: contents; }
-.form-grid > div:first-child { grid-column: 1; grid-row: 1 / span 2; }
-.relations-card { grid-column: 2; grid-row: 1; }
-.procedure-card { grid-column: 2; grid-row: 2; }
-.media-card { grid-column: 1 / -1; grid-row: 3; }
+.form-side { display: flex; flex-direction: column; }
+.media-card { order: 0; }
+.relations-card { order: 1; }
+.procedure-card { order: 2; }
 @media (max-width: 1180px) {
   .form-grid { grid-template-columns: 1fr; }
-  .form-grid > div:first-child, .relations-card, .procedure-card, .media-card { grid-column: auto; grid-row: auto; }
 }
 .fg-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .fg-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }

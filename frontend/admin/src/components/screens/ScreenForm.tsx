@@ -2602,7 +2602,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </div>
                   <div className="bd">
                     {mediaFiles.length > 0 && (
-                      <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+                      <div style={{ marginBottom: 12, display: 'grid', gap: 10 }}>
                         {mediaFiles.map(f => (
                           <div key={f.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)', background: 'var(--bg-s)' }}>
                             <a href={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1', overflow: 'hidden' }}>
@@ -2907,10 +2907,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               if (!savedId || !window.confirm(`Version „${snap.label}" wiederherstellen?`)) return
                               setSnapRestoring(snap.id)
                               try {
-                                const restored = await api.snapshots.restore(savedId, snap.id)
+                                const restored = await api.snapshots.restore(savedId, snap.id, version ?? undefined)
                                 setStatus(restored.status as Status)
                                 setIdno(restored.idno ?? '')
                                 setValues(restored.metadata_ as Record<string, unknown>)
+                                setVersion(restored.version)
+                                if (showCollectionStatus) {
+                                  setCollectionStatus((restored as { collection_status?: string | null }).collection_status ?? 'active')
+                                }
+                                setBaseValues(restored.metadata_ as Record<string, unknown>)
+                                setIsDirty(false)
+                              } catch (e) {
+                                setError((e as Error).message)
                               } finally {
                                 setSnapRestoring(null)
                               }
