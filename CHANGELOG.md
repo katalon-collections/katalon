@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.27] - 2026-08-13
+
+### Fixed
+- Relationsfelder zeigen den Relationstyp als Dropdown rechts neben der Suche; Datensätze lassen sich bereits vor der Typauswahl suchen.
+
 ## [0.10.26] - 2026-08-13
 
 ### Fixed

@@ -733,65 +733,65 @@ function RelationInput({
 
   return (
     <div ref={pickerRef} className="relation-picker">
-      {!fixedRelationType && (relTypeTerms.length > 0 ? (
-        <select className="fld" value={relType} onChange={e => setRelType(e.target.value)} aria-label="Relationstyp">
-          <option value="">— Relationstyp wählen —</option>
-          {relTypeTerms.map(t => <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>)}
-        </select>
-      ) : relTypeVocabId ? (
-        <div className="help err">Für diese Kombination ist kein Relationstyp konfiguriert.</div>
-      ) : (
-        <input className="fld" value={relType} onChange={e => setRelType(e.target.value)} placeholder="Relationstyp" aria-label="Relationstyp" />
-      ))}
-      <div style={{ position: 'relative' }}>
-      <input
-        ref={inputRef}
-        className="fld"
-        value={q}
-        onChange={e => setQ(e.target.value)}
-        onFocus={openSuggestions}
-        placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
-        disabled={disabled || !targetType || !(fixedRelationType ?? relType.trim())}
-      />
-      {searching && (
-        <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
-          Suche…
-        </div>
-      )}
-      {showDrop && dropPos && (
-        <div ref={dropRef} style={{
-          position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
-          background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
-          boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
-        }}>
-          {results.length > 0 ? results.map(r => (
-            <button
-              key={r.id}
-              onMouseDown={e => { e.preventDefault(); pickRecord(r) }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)', background: 'none', cursor: 'pointer' }}
-              className="authority-hit"
-            >
-              <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
-              <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
-            </button>
-          )) : (
-            <div className="relation-empty">
-              {allowCreate && !disabled && targetType && getTokenUser()?.role !== 'viewer' && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+        <div style={{ position: 'relative', flex: '1 1 280px' }}>
+          <input
+            ref={inputRef}
+            className="fld"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onFocus={openSuggestions}
+            placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
+            disabled={disabled || !targetType}
+          />
+          {searching && (
+            <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
+              Suche…
+            </div>
+          )}
+          {showDrop && dropPos && (
+            <div ref={dropRef} style={{
+              position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999,
+              background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
+              boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
+            }}>
+              {results.length > 0 ? results.map(r => (
                 <button
-                  ref={createButtonRef}
-                  type="button"
-                  className="relation-create-option"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => setQuickCreateOpen(true)}
+                  key={r.id}
+                  onMouseDown={e => { e.preventDefault(); pickRecord(r) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)', background: 'none', cursor: 'pointer' }}
+                  className="authority-hit"
                 >
-                  {NEW_TYPE_LABELS[targetType as RecordType]} „{q.trim()}“ anlegen
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
                 </button>
+              )) : (
+                <div className="relation-empty">
+                  {allowCreate && !disabled && targetType && getTokenUser()?.role !== 'viewer' && (
+                    <button
+                      ref={createButtonRef}
+                      type="button"
+                      className="relation-create-option"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => setQuickCreateOpen(true)}
+                    >
+                      {NEW_TYPE_LABELS[targetType as RecordType]} „{q.trim()}“ anlegen
+                    </button>
+                  )}
+                  <div>Keine passenden {TYPE_LABELS[targetType as RecordType] ?? 'Datensätze'} gefunden.</div>
+                </div>
               )}
-              <div>Keine passenden {TYPE_LABELS[targetType as RecordType] ?? 'Datensätze'} gefunden.</div>
             </div>
           )}
         </div>
-      )}
+        {!fixedRelationType && (relTypeTerms.length > 0 ? (
+          <select className="fld" style={{ flex: '0 1 240px' }} value={relType} onChange={e => setRelType(e.target.value)} aria-label="Relationstyp">
+            <option value="">— Relationstyp wählen —</option>
+            {relTypeTerms.map(t => <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>)}
+          </select>
+        ) : relTypeVocabId ? (
+          <div className="help err" style={{ flex: '0 1 240px' }}>Für diese Kombination ist kein Relationstyp konfiguriert.</div>
+        ) : null)}
       </div>
       {quickCreateOpen && targetType && (
         <QuickCreateDialog
@@ -1424,7 +1424,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           <RelationInput
             targetType={(sf.settings?.target_type as RecordType) ?? ''}
             targetSubtype={sf.settings?.target_subtype as string | undefined}
-            relTypeVocabId={sf.settings?.relation_type_vocab as string | undefined}
+            relTypeVocabId={(sf.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
             fixedRelationType={sf.settings?.fixed_relation_type as string | undefined}
             fromType={recordType}
             onAdd={entry => onChange(entry)}
@@ -2445,7 +2445,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <RelationInput
                               targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
-                              relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                              relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
                               fixedRelationType={f.settings?.fixed_relation_type as string | undefined}
                               fromType={recordType}
                               onAdd={entry => addRelationEntry(f.name, entry)}
@@ -2465,7 +2465,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               <RelationInput
                                 targetType={(f.settings?.target_type as RecordType) ?? ''}
                                 targetSubtype={f.settings?.target_subtype as string | undefined}
-                                relTypeVocabId={f.settings?.relation_type_vocab as string | undefined}
+                                relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
                                 fixedRelationType={f.settings?.fixed_relation_type as string | undefined}
                                 fromType={recordType}
                                 onAdd={entry => setField(f.name, entry)}
