@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.10.26] - 2026-08-13
+
+### Fixed
+- Datumsfelder normalisieren europäische Eingaben, bieten einen Kalender und weisen ungültige Kalenderdaten ab.
+
 ## [0.10.25] - 2026-08-13
 
 ### Changed

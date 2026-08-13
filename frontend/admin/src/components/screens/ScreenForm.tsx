@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
 import type { MediaFile } from '../../api/client'
@@ -6,7 +6,57 @@ import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
-import { AlertCircle, ChevD, Plus, Upload, X, Trash, Image, Lightning } from '../ui/Icons'
+import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Image, Lightning } from '../ui/Icons'
+
+function normalizeDateInput(value: string): string {
+  const trimmed = value.trim()
+  const european = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed)
+  if (!european) return trimmed
+  const [, day, month, year] = european
+  const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  const parsed = new Date(`${iso}T00:00:00Z`)
+  return parsed.getUTCFullYear() === Number(year) &&
+    parsed.getUTCMonth() + 1 === Number(month) &&
+    parsed.getUTCDate() === Number(day)
+    ? iso
+    : trimmed
+}
+
+function isValidDateInput(value: string): boolean {
+  const normalized = normalizeDateInput(value)
+  if (/^\d{4}$/.test(normalized)) return true
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(normalized)) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false
+  const parsed = new Date(`${normalized}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === normalized
+}
+
+function DateInput({ value, onChange, onBlur, disabled, style }: {
+  value: string
+  onChange: (value: string) => void
+  onBlur?: () => void
+  disabled?: boolean
+  style?: CSSProperties
+}) {
+  const pickerRef = useRef<HTMLInputElement>(null)
+  const normalized = normalizeDateInput(value)
+  const pickerValue = /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      <input className="fld" type="text" value={value}
+        onChange={e => onChange(e.target.value)}
+        onBlur={() => { onChange(normalizeDateInput(value)); onBlur?.() }}
+        placeholder="TT.MM.JJJJ oder JJJJ-MM-TT" disabled={disabled} style={{ flex: 1, ...style }} />
+      <button type="button" className="btn sm ico gh" title="Datum aus Kalender auswählen"
+        disabled={disabled} onClick={() => pickerRef.current?.showPicker()}>
+        <Calendar size={14} />
+      </button>
+      <input ref={pickerRef} type="date" value={pickerValue} disabled={disabled}
+        onChange={e => onChange(e.target.value)} aria-label="Datum aus Kalender auswählen"
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} />
+    </div>
+  )
+}
 
 function extractTitle(m: Record<string, unknown>, fallback: string): string {
   for (const key of ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']) {
@@ -1345,7 +1395,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       case 'number':
         return <input className="fld" type="number" step="any" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
       case 'date':
-        return <input className="fld" type="text" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder="YYYY, YYYY-MM oder YYYY-MM-DD" />
+        return <DateInput value={(val as string) ?? ''} onChange={onChange} disabled={disabled} />
       case 'vocab':
         return (
           <VocabInput
@@ -1473,6 +1523,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 // invalid regex on backend, ignore
               }
             }
+            if (sf.field_type === 'date' && typeof sv === 'string' && sv && !isValidDateInput(sv)) {
+              errors[`${f.name}.${sf.name}:${idx}`] =
+                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): Ungültiges Datum.`
+            }
             if (!isEmptyValue(sv) && sf.field_type === 'authority') {
               const entry = typeof sv === 'object' && sv !== null && !Array.isArray(sv)
                 ? sv as Partial<AuthorityEntry>
@@ -1500,8 +1554,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         for (let i = 0; i < arr.length; i++) {
           const item = arr[i]
           if (f.field_type === 'date' && typeof item === 'string' && item) {
-            if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(item)) {
-              errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+            if (!isValidDateInput(item)) {
+              errors[f.name] = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ'
               break
             }
           }
@@ -1529,8 +1583,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       // Non-repeatable field validation
       if (f.field_type === 'date') {
         const v = val as string
-        if (v && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)) {
-          errors[f.name] = 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD'
+        if (v && !isValidDateInput(v)) {
+          errors[f.name] = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ'
         }
       }
       if (f.field_type === 'number') {
@@ -1567,8 +1621,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (val === undefined || val === null || val === '') return null
     if (field.field_type === 'date') {
       const v = val as string
-      if (v && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(v)) {
-        return { level: 'error', message: 'Ungültiges Datum. Erlaubte Formate: YYYY, YYYY-MM, YYYY-MM-DD' }
+      if (v && !isValidDateInput(v)) {
+        return { level: 'error', message: 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ' }
       }
     }
     if (field.field_type === 'number') {
@@ -2516,12 +2570,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         <>
                           {(vals ?? []).map((v, i) => (
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                              <input className="fld" value={v}
-                                type={f.field_type === 'number' ? 'number' : 'text'}
-                                step={f.field_type === 'number' ? 'any' : undefined}
-                                onChange={e => updateRepeat(f.name, i, e.target.value)}
-                                placeholder={getLabel(f, f.name)}
-                                disabled={justCreated} />
+                              {f.field_type === 'date' ? (
+                                <DateInput value={String(v)} onChange={value => updateRepeat(f.name, i, value)} disabled={justCreated} />
+                              ) : (
+                                <input className="fld" value={v}
+                                  type={f.field_type === 'number' ? 'number' : 'text'}
+                                  step={f.field_type === 'number' ? 'any' : undefined}
+                                  onChange={e => updateRepeat(f.name, i, e.target.value)}
+                                  placeholder={getLabel(f, f.name)}
+                                  disabled={justCreated} />
+                              )}
                               <button className="btn sm ico gh" onClick={() => removeRepeat(f.name, i)} disabled={justCreated}><X size={12} /></button>
                             </div>
                           ))}
@@ -2538,15 +2596,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
                       ) : f.field_type === 'date' ? (
-                        <input className="fld"
-                          type="text"
-                          value={(val as string) ?? ''}
-                          onChange={e => {
-                            setField(f.name, e.target.value)
+                        <DateInput value={(val as string) ?? ''}
+                          onChange={value => {
+                            setField(f.name, value)
                             clearFieldFeedback(f.name)
                           }}
                           onBlur={() => handleFieldBlur(f)}
-                          placeholder="YYYY, YYYY-MM oder YYYY-MM-DD"
                           disabled={justCreated}
                           style={getFeedbackStyle(f.name)} />
                       ) : f.field_type === 'number' ? (

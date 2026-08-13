@@ -102,6 +102,15 @@ async def test_optional_field_absent_no_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_date_field_requires_a_real_calendar_date() -> None:
+    field = make_field("birth_date", field_type="date")
+
+    assert await validate_metadata(mock_db(field), "entity", {"birth_date": "1987-08-10"}) == []
+    assert await validate_metadata(mock_db(field), "entity", {"birth_date": "1987-08-46"})
+    assert await validate_metadata(mock_db(field), "entity", {"birth_date": "1987-13"})
+
+
+@pytest.mark.asyncio
 async def test_multiple_fields_multiple_errors() -> None:
     db = mock_db(
         make_field("title", is_required=True),

@@ -3,11 +3,28 @@ from __future__ import annotations
 import re
 import uuid
 from copy import deepcopy
+from datetime import date
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import FieldDefinition
+
+
+def _is_valid_date(value: object) -> bool:
+    """Accept ISO years, year-months, and real calendar dates."""
+    if not isinstance(value, str):
+        return False
+    if re.fullmatch(r"\d{4}", value):
+        return True
+    month = re.fullmatch(r"(\d{4})-(\d{2})", value)
+    if month:
+        return 1 <= int(month.group(2)) <= 12
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", value))
 
 
 async def get_field_definitions(
@@ -171,6 +188,10 @@ async def validate_metadata(
                                     )
                             except re.error:
                                 pass
+                    if sv is not None and sf.field_type == "date" and not _is_valid_date(sv):
+                        errors.append(
+                            f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."
+                        )
                     if sv is not None and sf.field_type == "relation":
                         struct_err = _validate_relation_structure(
                             sv, field_path
@@ -247,6 +268,16 @@ async def validate_metadata(
                 authority_err = _validate_authority_value(item, field.settings, field.name)
                 if authority_err:
                     errors.append(authority_err)
+            continue
+
+        if field.field_type == "date":
+            items = value if field.is_repeatable and isinstance(value, list) else [value]
+            for item in items:
+                if not _is_valid_date(item):
+                    errors.append(
+                        f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."
+                    )
+                    break
             continue
 
         if record_type == "vocabulary_term":
