@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-08-14
+
+### Changed
+- CodeAlmanac für KI-Feldvorschläge, OAI-/Vocabulary-LOD-Grenzen und die Distribution per katalon-cli aktualisiert.
+
 ## [0.11.3] - 2026-08-14
 
 ### Changed

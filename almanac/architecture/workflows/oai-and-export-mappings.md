@@ -24,6 +24,9 @@ sources:
   - id: schema-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenSchema.tsx
+  - id: issue-268
+    type: web
+    url: https://github.com/karkraeg/Katalon/issues/268
 ---
 
 Katalon's OAI-PMH workflow exposes public indexed records at `/oai` and currently disseminates the `oai_dc` metadata format. The HTTP handler dispatches OAI verbs, queries Elasticsearch with public-record filters, loads optional OAI set definitions, and passes hits to XML serializers [@oai-api]. Export mappings connect `field_definitions` to Dublin Core target paths, so an installation can map schema fields to `dc:title`, `dc:creator`, and other OAI-DC elements without changing the OAI handler [@mapping-service] [@mapping-doc]. The endpoint uses Elasticsearch as its read model, so [Search And Indexing](search-and-indexing) is part of the export path.
@@ -57,3 +60,5 @@ When a mapping index has entries for a hit's record type, `_hit_to_oai_record()`
 ## Consequences For Future Formats
 
 Adding another export format is not only a serializer change. The current docs call out the need to register the format in `ListMetadataFormats`, centralize prefix validation, and choose the serializer from a prefix-to-function registry before formats such as LIDO can be active [@oai-doc]. Until that registry exists, export mappings may be format-neutral in storage, but runtime OAI dissemination is intentionally limited to `oai_dc` [@oai-api] [@mapping-service].
+
+This page is about record export through OAI-PMH. Vocabulary Linked Open Data is a separate track: Katalon has REST JSON for vocabularies, but no SKOS/JSON-LD vocabulary publication surface yet [@issue-268]. The current minimal plan for that track starts with public vocabulary boundaries, dereferenceable term URLs, SKOS output, and persisted authority match URIs before any SPARQL endpoint or broad record-RDF mapping [@issue-268].

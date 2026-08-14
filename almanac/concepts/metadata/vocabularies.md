@@ -30,6 +30,9 @@ sources:
   - id: vocab-decision
     type: file
     path: .agents/knowledge/decisions/vocabulary-custom-fields.md
+  - id: issue-268
+    type: web
+    url: https://github.com/karkraeg/Katalon/issues/268
 ---
 
 Vocabularies are Katalon's controlled lists for cataloguing values and relation labels. A `Vocabulary` has a unique name, a hierarchy flag, and a `kind` of either `term` or `relation`; each `VocabularyTerm` belongs to one vocabulary, has multilingual labels, optional inverse labels, and JSONB metadata for term-specific custom fields [@models]. Term vocabularies may have a parent-child structure; relation vocabularies are always flat. The vocabulary API exposes flat term lists, nested trees, ancestor chains, CRUD operations, and import endpoints, so vocabularies are both user-facing controlled data and configuration used by the [schema engine](schema-engine) [@vocab-api].
@@ -62,6 +65,12 @@ Vocabulary terms participate in the schema system through `FieldDefinition.targe
 
 Term custom fields are intentionally narrower than record fields. The current schema API allows only `text`, `number`, `boolean`, and `authority` for vocabulary terms, which keeps vocabulary metadata useful for authority enrichment without pulling full record-form behavior into term editing [@schema-api].
 
+## LOD Boundary
+
+Vocabularies currently publish REST JSON, not Linked Open Data. The vocabulary and term models do not carry a per-vocabulary public/private publication flag, a stable dereferenceable term URL, or SKOS fields such as `skos:Concept`, `skos:inScheme`, `skos:prefLabel`, `skos:broader`, or `skos:exactMatch` [@models] [@vocab-api]. Authority hits can include provider-specific URI data in `extra`, but the reusable authority input writes only `{source, external_id, label}` into field values, so external authority URIs are not automatically durable term links [@screen-vocab].
+
+Issue #268 records the minimal Linked Open Data direction: add an explicit publication boundary for vocabularies, mint stable URLs for public vocabularies and terms, return JSON-LD/SKOS for those resources, and persist usable authority URIs for match links before considering larger SPARQL, graph UI, CIDOC-CRM, or record-RDF work [@issue-268].
+
 ## Related Pages
 
-Read [schema engine](schema-engine) for field definitions that point at vocabularies, [authority sources](../integrations/authority-sources) for authority values stored in term metadata, and [generic relations](../relations/generic-relations) for relation-type vocabularies.
+Read [schema engine](schema-engine) for field definitions that point at vocabularies, [authority sources](../integrations/authority-sources) for authority values stored in term metadata, [OAI And Export Mappings](../../architecture/workflows/oai-and-export-mappings) for the current OAI-DC export boundary, and [generic relations](../relations/generic-relations) for relation-type vocabularies.

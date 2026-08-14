@@ -4,11 +4,11 @@ summary: "Production installs use a separate Python CLI (katalon-cli) that pulls
 topics: [decisions, operations, deployment, installer]
 sources:
   - id: issue
-    type: file
-    path: https://github.com/karkraeg/Katalon/issues/286
+    type: web
+    url: https://github.com/karkraeg/Katalon/issues/286
   - id: cli-repo
-    type: file
-    path: https://github.com/karkraeg/katalon-cli
+    type: web
+    url: https://github.com/karkraeg/katalon-cli
   - id: release-script
     type: file
     path: scripts/gen_release_metadata.py

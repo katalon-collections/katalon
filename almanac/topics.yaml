@@ -35,6 +35,10 @@ topics:
     title: Metadata
     description: Dynamic fields, JSONB metadata, mappings, and display/search flags.
     parents: [concepts]
+  - slug: ai
+    title: AI
+    description: Schema-configured AI suggestions and OpenAI-compatible provider calls.
+    parents: [metadata, integrations]
   - slug: schema
     title: Schema
     description: Field definitions, subtypes, form generation, and validation.

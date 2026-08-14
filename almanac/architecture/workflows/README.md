@@ -10,6 +10,8 @@ Katalon's workflow pages explain behavior that is spread across API routers, ser
 
 Start with [Record CRUD And Publishing](record-crud-and-publishing) when the task changes object, entity, place, occurrence, or procedure lifecycle behavior. Pair it with [Schema Driven Record Forms](schema-driven-record-forms) for Admin editing, quick creation, form variants, relation-field behavior, optimistic conflict handling, audit panels, media panels, and procedure completion.
 
+Use [AI Field Completion](ai-field-completion) when changing schema-configured KI buttons, the `/v1/ai/complete` proxy, OpenAI-compatible provider settings, group-subfield AI context, token limits, or the proposed-value overwrite flow.
+
 Read [Audit And Snapshots](audit-and-snapshots) when the change touches record history, snapshots, restore behavior, version columns, or the distinction between audit entries and snapshot storage.
 
 ## Search, Public Access, And Export
