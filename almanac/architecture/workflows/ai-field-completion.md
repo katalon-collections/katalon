@@ -30,9 +30,6 @@ sources:
   - id: ai-tests
     type: file
     path: backend/tests/test_ai_service.py
-  - id: issue-114
-    type: web
-    url: https://github.com/karkraeg/Katalon/issues/114
 ---
 
 AI field completion is a form workflow, not an autonomous enrichment job. An admin enables `settings.ai_config` on a field definition or group child field, the record form shows a "KI" action for that field, and the backend returns a suggestion without writing record metadata itself [@screen-schema] [@screen-form] [@ai-api]. This keeps the write in the normal [schema driven record forms](schema-driven-record-forms) save path while letting the AI service own prompt construction, provider calls, coercion, audit logging, and token accounting [@ai-service].

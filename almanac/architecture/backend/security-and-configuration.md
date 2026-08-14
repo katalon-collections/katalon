@@ -24,6 +24,9 @@ sources:
   - id: api-keys
     type: file
     path: backend/src/katalon/api/v1/api_keys.py
+  - id: portal-public
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
   - id: secrets
     type: file
     path: backend/src/katalon/services/secret_service.py
@@ -33,6 +36,8 @@ sources:
 ---
 
 Katalon's backend security boundary is built from configuration validation, first-run admin creation, JWT authentication, API-key authentication, role and capability checks, encrypted application secrets, and SlowAPI rate limiting. Settings are loaded through Pydantic `BaseSettings` from environment and `.env`, including database, Redis, Elasticsearch, Cantaloupe, JWT, media, CORS, admin, OAI, authority, DNB URN, Telegram, and AI settings [@config]. FastAPI startup refuses insecure production defaults before mounting useful runtime behavior [@app].
+
+The general `/v1` working API is authenticated: its routers are mounted with `get_current_user`, apart from login and token-refresh routes below `/v1/auth`. The unauthenticated exception is the deliberately narrow `/portal/v1` read model for published Portal content; it excludes Procedures and exposes explicit public response projections rather than internal API schemas [@app] [@portal-public].
 
 ## Configuration Inputs
 

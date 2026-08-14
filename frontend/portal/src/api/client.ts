@@ -1,4 +1,5 @@
 export const BASE = import.meta.env.VITE_API_URL ?? ''
+export const PORTAL_API = '/portal/v1'
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
@@ -41,8 +42,6 @@ export interface Relation {
   from_type: string; from_id: string
   to_type: string; to_id: string
   relation_type: string
-  metadata_: Record<string, unknown>
-  created_at: string
 }
 
 export interface StaticPageSummary {
@@ -92,7 +91,7 @@ export async function fetchRecordTitle(type: string, id: string): Promise<string
 export async function fetchRecord(type: string, id: string): Promise<{ title: string | null; metadata: Record<string, unknown> }> {
   const endpoint = TYPE_ENDPOINT[type] ?? `${type}s`
   try {
-    const res = await fetch(`${BASE}/v1/${endpoint}/${id}`)
+    const res = await fetch(`${BASE}${PORTAL_API}/${endpoint}/${id}`)
     if (!res.ok) return { title: null, metadata: {} }
     const rec = await res.json() as { metadata_?: Record<string, unknown>; idno?: string | null; id: string }
     const m = rec.metadata_ ?? {}
@@ -112,38 +111,38 @@ export const api = {
           .filter(([, v]) => v != null)
           .map(([k, v]) => [k, String(v)])
       ).toString()
-      return get<Page<ObjectSummary>>(`/v1/objects?${qs}`)
+      return get<Page<ObjectSummary>>(`${PORTAL_API}/objects?${qs}`)
     },
-    get: (id: string) => get<ObjectSummary>(`/v1/objects/${id}`),
-    media: (id: string) => get<MediaFile[]>(`/v1/objects/${id}/media`),
+    get: (id: string) => get<ObjectSummary>(`${PORTAL_API}/objects/${id}`),
+    media: (id: string) => get<MediaFile[]>(`${PORTAL_API}/objects/${id}/media`),
   },
   entities: {
-    get: (id: string) => get<EntitySummary>(`/v1/entities/${id}`),
+    get: (id: string) => get<EntitySummary>(`${PORTAL_API}/entities/${id}`),
   },
   places: {
-    get: (id: string) => get<PlaceSummary>(`/v1/places/${id}`),
+    get: (id: string) => get<PlaceSummary>(`${PORTAL_API}/places/${id}`),
   },
   occurrences: {
-    get: (id: string) => get<OccurrenceSummary>(`/v1/occurrences/${id}`),
+    get: (id: string) => get<OccurrenceSummary>(`${PORTAL_API}/occurrences/${id}`),
   },
   relations: {
     forRecord: (type: string, id: string) =>
-      get<Relation[]>(`/v1/relations?from_type=${type}&from_id=${id}&limit=50`)
+      get<Relation[]>(`${PORTAL_API}/relations?from_type=${type}&from_id=${id}&limit=50`)
         .then(async fromRels => {
-          const toRels = await get<Relation[]>(`/v1/relations?to_type=${type}&to_id=${id}&limit=50`)
+          const toRels = await get<Relation[]>(`${PORTAL_API}/relations?to_type=${type}&to_id=${id}&limit=50`)
           return [...fromRels, ...toRels]
         }),
   },
   portal: {
-    config: () => get<PortalConfig>('/v1/portal/config'),
+    config: () => get<PortalConfig>(`${PORTAL_API}/portal/config`),
   },
   pages: {
-    list: () => get<StaticPageSummary[]>('/v1/pages'),
-    get:  (slug: string) => get<StaticPageSummary>(`/v1/pages/${slug}`),
+    list: () => get<StaticPageSummary[]>(`${PORTAL_API}/pages`),
+    get:  (slug: string) => get<StaticPageSummary>(`${PORTAL_API}/pages/${slug}`),
   },
   vocabularies: {
-    list: () => get<VocabSummary[]>('/v1/vocabularies'),
-    terms: (id: string) => get<VocabTerm[]>(`/v1/vocabularies/${id}/terms`),
+    list: () => get<VocabSummary[]>(`${PORTAL_API}/vocabularies`),
+    terms: (id: string) => get<VocabTerm[]>(`${PORTAL_API}/vocabularies/${id}/terms`),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; [key: string]: string | number | undefined }) => {
@@ -152,7 +151,7 @@ export const api = {
           .filter(([, v]) => v != null)
           .map(([k, v]) => [k, String(v)])
       ).toString()
-      return get<SearchResponse>(`/v1/search?${qs}`)
+      return get<SearchResponse>(`${PORTAL_API}/search?${qs}`)
     },
   },
 }
@@ -165,5 +164,5 @@ export interface BannerItem {
 }
 
 export const banners = {
-  activePortal: () => get<BannerItem[]>('/v1/banners/active/portal'),
+  activePortal: () => get<BannerItem[]>(`${PORTAL_API}/banners/active/portal`),
 }

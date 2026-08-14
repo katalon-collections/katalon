@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, fetchRecord, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
+import { api, BASE, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
@@ -27,7 +27,7 @@ function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles
   if (mediaFiles.length === 1) {
     return (
       <img
-        src={`${BASE}/v1/objects/${objectId}/media/${mediaFiles[0].id}/file`}
+        src={`${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaFiles[0].id}/file`}
         alt=""
         style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -39,7 +39,7 @@ function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles
       {mediaFiles.map(f => (
         <img
           key={f.id}
-          src={`${BASE}/v1/objects/${objectId}/media/${f.id}/file`}
+          src={`${BASE}${PORTAL_API}/objects/${objectId}/media/${f.id}/file`}
           alt=""
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#0f172a' }}
           onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -116,11 +116,11 @@ export function ObjectDetailPage() {
   const readyMedia = mediaFiles.filter(f => f.status === 'ready')
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
 
-  const manifestUrl = `${window.location.origin}/v1/objects/${obj.id}/iiif/manifest`
+  const manifestUrl = `${BASE || window.location.origin}${PORTAL_API}/objects/${obj.id}/iiif/manifest`
   const showViewer = readyMedia.length > 0 && !viewerError
 
   const description = String(m.description ?? '')
-  const ogImage = primaryMedia ? `${BASE}/v1/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
+  const ogImage = primaryMedia ? `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
 
   const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
 

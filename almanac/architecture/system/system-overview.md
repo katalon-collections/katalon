@@ -21,13 +21,13 @@ Katalon is an API-first metadata management system split into a FastAPI backend,
 
 ## Runtime Boundary
 
-The FastAPI process owns the HTTP API and mounts versioned business routers under `/v1`, while OAI-PMH is mounted outside that prefix and health checks live at `/health` [@app]. This makes the backend the central coordination point: frontends call it, workers share its database models and settings, and health checks use it to report readiness.
+The FastAPI process owns the HTTP API and mounts the authenticated working API under `/v1`, a separate anonymous Portal read model under `/portal/v1`, OAI-PMH outside those prefixes, and health checks at `/health` [@app]. This makes the backend the central coordination point: frontends call it, workers share its database models and settings, and health checks use it to report readiness.
 
 The Compose stack keeps external concerns in separate services. PostgreSQL/PostGIS is the primary database, Elasticsearch stores search indexes, Redis is both Celery broker and result backend, and Cantaloupe reads the media directory as an image source [@compose]. The worker and beat services use the same backend image lineage and settings as the API, but run Celery commands instead of serving HTTP [@compose].
 
 ## Edge Routing
 
-nginx is the public routing layer for the production-like stack. `/api/` is rewritten to the API without the `/api` prefix, `/v1/` is passed directly to the API, `/iiif/` is proxied to Cantaloupe, `/admin/` is rewritten to the Admin container, and all remaining paths go to Portal [@nginx]. That routing explains why the user-facing system has one main origin even though Admin, Portal, API, and Cantaloupe are separate services.
+nginx is the public routing layer for the production-like stack. `/api/` is rewritten to the API without the `/api` prefix; `/v1/` and `/portal/v1/` are proxied to the API; `/iiif/` is proxied to Cantaloupe; `/admin/` is rewritten to the Admin container; and all remaining paths go to Portal [@nginx]. That routing explains why the user-facing system has one main origin even though Admin, Portal, API, and Cantaloupe are separate services.
 
 This route split also fixes the boundary between frontend assets and backend data. Admin is served below `/admin/`, Portal owns `/`, and both reach backend endpoints through nginx rather than direct container ports [@nginx]. For exact operational port rules, use the ports and routing reference when available.
 

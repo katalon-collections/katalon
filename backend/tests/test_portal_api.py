@@ -1,0 +1,263 @@
+import uuid
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from katalon.api.v1.portal import PortalConfigRead
+from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, Relation
+from katalon.database import get_db
+from katalon.main import app
+
+
+def _result(*, total: int | None = None, items: list[object] | None = None) -> MagicMock:
+    result = MagicMock()
+    if total is not None:
+        result.scalar_one.return_value = total
+    result.scalars.return_value.all.return_value = items or []
+    return result
+
+
+@pytest.mark.asyncio
+async def test_v1_reads_require_a_token() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/v1/objects")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_portal_lists_only_public_objects() -> None:
+    statements: list[str] = []
+    public_object = Object(
+        id=uuid.uuid4(),
+        idno="OBJ-1",
+        status="public",
+        collection_status="active",
+        metadata_={},
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        version=1,
+    )
+    session = AsyncMock()
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return _result(total=1) if len(statements) == 1 else _result(items=[public_object])
+
+    session.execute.side_effect = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/objects")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [str(public_object.id)]
+    assert "objects.status IN" in statements[0]
+    assert "objects.collection_status" in statements[0]
+    item = response.json()["items"][0]
+    assert "version" not in item
+    assert "search_vector" not in item
+
+
+@pytest.mark.parametrize(
+    ("path", "record"),
+    [
+        ("objects", Object(idno="OBJ-1", collection_status="active")),
+        ("entities", Entity(idno="ENT-1", entity_type="person")),
+        ("places", Place(idno="PLC-1", place_type="city")),
+        ("occurrences", Occurrence(idno="OCC-1", occurrence_type="event")),
+    ],
+)
+@pytest.mark.asyncio
+async def test_portal_record_responses_exclude_internal_orm_fields(path: str, record: object) -> None:
+    record.id = uuid.uuid4()
+    record.status = "public"
+    record.metadata_ = {}
+    record.search_vector = "internal search data"
+    record.created_at = datetime.now()
+    record.updated_at = datetime.now()
+    record.version = 99
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = record
+    session.execute.return_value = result
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/{path}/{record.id}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "version" not in body
+    assert "search_vector" not in body
+
+
+@pytest.mark.asyncio
+async def test_portal_never_returns_procedures_or_their_relations() -> None:
+    session = AsyncMock()
+    statements: list[str] = []
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return _result(items=[])
+
+    session.execute.side_effect = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            procedures = await client.get("/portal/v1/procedures")
+            relations = await client.get("/portal/v1/relations")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert procedures.status_code == 404
+    assert relations.status_code == 200
+    assert relations.json() == []
+    assert "relations.from_type = :from_type_1" in statements[0]
+    assert "relations.to_type = :to_type_1" in statements[0]
+
+
+@pytest.mark.asyncio
+async def test_portal_relations_use_public_endpoints_before_limit() -> None:
+    relation = Relation(
+        id=uuid.uuid4(),
+        from_type="object",
+        from_id=uuid.uuid4(),
+        to_type="entity",
+        to_id=uuid.uuid4(),
+        relation_type="depicts",
+        metadata_={"internal": "never public"},
+    )
+    session = AsyncMock()
+    statements: list[str] = []
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return _result(items=[relation])
+
+    session.execute.side_effect = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/relations?limit=1")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "metadata_" not in response.json()[0]
+    assert "EXISTS" in statements[0]
+    assert statements[0].index("EXISTS") < statements[0].index("LIMIT")
+
+
+@pytest.mark.asyncio
+async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
+    field = FieldDefinition(
+        id=uuid.uuid4(),
+        target_type="object",
+        name="material",
+        label={"de": "Material"},
+        field_type="text",
+        settings={"hint": "visible"},
+        show_in_detail=True,
+        is_deleted=False,
+        is_required=True,
+        is_repeatable=True,
+        is_searchable=True,
+        sort_order=1,
+    )
+    session = AsyncMock()
+    session.execute.return_value = _result(items=[field])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/schema/object")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json() == [{
+        "name": "material", "label": {"de": "Material"}, "field_type": "text",
+        "settings": {"hint": "visible"}, "show_in_detail": True,
+    }]
+
+
+@pytest.mark.asyncio
+async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
+    config = PortalConfigRead(
+        site_title="Katalon", site_subtitle="", hero_text="", featured_object_ids=[],
+        facet_fields={}, accent_color="#1e3a8a", logo_url="/v1/portal/logo/file",
+        placeholder_image_url="", color_tokens={},
+    )
+    monkeypatch.setattr("katalon.api.v1.portal_public.portal.get_portal_config", AsyncMock(return_value=config))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/portal/v1/portal/config")
+
+    assert response.status_code == 200
+    assert response.json()["logo_url"] == "/portal/v1/portal/logo/file"
+
+
+@pytest.mark.asyncio
+async def test_portal_has_no_feedback_write_endpoint() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/portal/v1/feedback", json={})
+        authenticated_api = await client.post("/v1/feedback", json={})
+
+    assert response.status_code == 404
+    assert authenticated_api.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_portal_search_rejects_procedures(monkeypatch) -> None:
+    search = AsyncMock()
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/portal/v1/search?type=procedure")
+
+    assert response.status_code == 422
+    search.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeypatch) -> None:
+    captured: dict = {}
+
+    async def search(**kwargs):
+        captured.update(kwargs)
+        return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/portal/v1/search")
+
+    assert response.status_code == 200
+    assert captured["record_type"] is None
+    assert captured["record_types"] == ("object", "entity", "place", "occurrence")
+    assert captured["status"] == "public"

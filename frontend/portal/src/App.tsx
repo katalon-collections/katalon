@@ -3,7 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
-import { api, type StaticPageSummary } from './api/client'
+import { api, BASE, PORTAL_API, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { ObjectDetailPage } from './pages/ObjectDetailPage'
@@ -13,7 +13,6 @@ import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
-import { FeedbackButton } from './components/FeedbackButton'
 
 const TYPE_LABELS: Record<string, string> = {
   object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
@@ -43,7 +42,7 @@ function Header() {
     const timer = setTimeout(() => {
       const qs = new URLSearchParams({ q: q.trim(), page_size: '5' })
       if (currentType) qs.set('type', currentType)
-      fetch(`${import.meta.env.VITE_API_URL ?? ''}/v1/search?${qs.toString()}`)
+      fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`)
         .then(r => r.json())
         .then((result: { items: Array<{ id: string; record_type: string; title: string }> }) => {
           setSuggestions(result.items ?? [])
@@ -185,7 +184,6 @@ function AppInner() {
         </Routes>
       </main>
       <Footer />
-      <FeedbackButton />
     </>
   )
 }

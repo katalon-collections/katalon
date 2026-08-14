@@ -6,7 +6,7 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -36,6 +36,7 @@ from katalon.api.v1 import (
     pids,
     places,
     portal,
+    portal_public,
     procedures,
     record_subtypes,
     relations,
@@ -48,6 +49,7 @@ from katalon.api.v1 import (
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
+from katalon.core.dependencies import get_current_user
 from katalon.core.limiter import limiter
 from katalon.core.models import (
     AdminConfig,
@@ -393,43 +395,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(admin_config.router, prefix="/v1")
-app.include_router(ai.router, prefix="/v1")
-app.include_router(index_health.router, prefix="/v1")
-app.include_router(idno.router, prefix="/v1")
+_authenticated = [Depends(get_current_user)]
+
+app.include_router(admin_config.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(ai.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(index_health.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(idno.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(auth.router, prefix="/v1")
-app.include_router(banners.router, prefix="/v1")
-app.include_router(users.router, prefix="/v1")
-app.include_router(objects.router, prefix="/v1")
-app.include_router(schema_admin.router, prefix="/v1")
-app.include_router(record_subtypes.router, prefix="/v1")
-app.include_router(form_variants.router, prefix="/v1")
-app.include_router(vocabularies.router, prefix="/v1")
-app.include_router(audit.router, prefix="/v1")
-app.include_router(entities.router, prefix="/v1")
-app.include_router(places.router, prefix="/v1")
-app.include_router(occurrences.router, prefix="/v1")
-app.include_router(procedures.router, prefix="/v1")
-app.include_router(relations.router, prefix="/v1")
-app.include_router(media.router, prefix="/v1")
-app.include_router(media.batch_router, prefix="/v1")
-app.include_router(theme.router, prefix="/v1")
-app.include_router(portal.router, prefix="/v1")
-app.include_router(pages.router, prefix="/v1")
-app.include_router(search.router, prefix="/v1")
-app.include_router(authority.router, prefix="/v1")
-app.include_router(pids.router, prefix="/v1")
-app.include_router(importer.router, prefix="/v1")
-app.include_router(metadata_mappings.router, prefix="/v1")
+app.include_router(banners.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(users.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(objects.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(schema_admin.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(record_subtypes.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(form_variants.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(vocabularies.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(audit.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(entities.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(places.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(occurrences.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(procedures.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(relations.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(media.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(media.batch_router, prefix="/v1", dependencies=_authenticated)
+app.include_router(theme.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(portal.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(pages.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(search.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(authority.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(pids.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(importer.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(metadata_mappings.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(oai.router, prefix="")
-app.include_router(oai_sets.router, prefix="/v1")
-app.include_router(feedback.router, prefix="/v1")
-app.include_router(api_keys_router, prefix="/v1")
+app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(feedback.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(api_keys_router, prefix="/v1", dependencies=_authenticated)
+app.include_router(portal_public.router, prefix="/portal/v1")
 
 # Mock URN registrar is a test/dev fixture only — never expose its writable
 # in-memory endpoints in production.
 if settings.debug:
-    app.include_router(dnb_urn_mock.router, prefix="/v1")
+    app.include_router(dnb_urn_mock.router, prefix="/v1", dependencies=_authenticated)
 
 
 @app.get("/health", tags=["system"])

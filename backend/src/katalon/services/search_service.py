@@ -368,6 +368,7 @@ async def search(
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
+    record_types: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -376,6 +377,7 @@ async def search(
         facet_fields=facet_fields,
         rel_filters=rel_filters,
         active_objects_only=active_objects_only,
+        record_types=record_types,
     )
 
     hits = raw.get("hits", {})

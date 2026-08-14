@@ -15,7 +15,7 @@ async def test_search_rate_limit_allows_under_limit() -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # First few requests should succeed
             for _ in range(3):
-                r = await client.get("/v1/search?q=test")
+                r = await client.get("/portal/v1/search?q=test")
                 assert r.status_code == 200
 
 

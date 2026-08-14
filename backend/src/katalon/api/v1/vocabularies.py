@@ -62,6 +62,19 @@ async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
     return list(result.scalars().all())
 
 
+@router.get(
+    "/{vocab_id}",
+    response_model=VocabularyRead,
+    summary="Get a single vocabulary",
+    responses={404: {"description": "Vocabulary not found"}},
+)
+async def get_vocabulary(vocab_id: uuid.UUID, db: DBDep) -> Vocabulary:
+    vocab = await db.get(Vocabulary, vocab_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    return vocab
+
+
 @router.post(
     "",
     response_model=VocabularyRead,
@@ -121,6 +134,19 @@ async def list_terms(
         )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+@router.get(
+    "/{vocab_id}/terms/{term_id}",
+    response_model=VocabularyTermRead,
+    summary="Get a single vocabulary term",
+    responses={404: {"description": "Term not found"}},
+)
+async def get_term(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> VocabularyTerm:
+    term = await db.get(VocabularyTerm, term_id)
+    if not term or term.vocabulary_id != vocab_id:
+        raise HTTPException(status_code=404, detail="Term nicht gefunden")
+    return term
 
 
 # ---------------------------------------------------------------------------

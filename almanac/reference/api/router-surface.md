@@ -1,6 +1,6 @@
 ---
 title: "Router Surface"
-summary: "Lookup map for Katalon's mounted FastAPI routers, public paths, dev-only mock routes, and the OAI-PMH prefix exception."
+summary: "Lookup map for Katalon's authenticated `/v1` routers, anonymous portal read model, public paths, dev-only mock routes, and the OAI-PMH prefix exception."
 topics: [reference, api, routers]
 sources:
   - id: app
@@ -12,9 +12,12 @@ sources:
   - id: api-keys
     type: file
     path: backend/src/katalon/api/v1/api_keys.py
+  - id: portal-public
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
 ---
 
-Katalon's API router surface is mounted in `backend/src/katalon/main.py`. Most routers from `backend/src/katalon/api/v1/` are included with the global `/v1` prefix, OAI-PMH is included with no global prefix so it is served at `/oai`, and the DNB URN mock router is included only when `settings.debug` is true [@app] [@api-dir]. This page is a lookup map for prefixes and exceptions; startup behavior around these mounts is covered by [API Application Startup](../../architecture/backend/api-application-startup).
+Katalon's API router surface is mounted in `backend/src/katalon/main.py`. The working API under `/v1` requires a current user (JWT or API key), except for the authentication routes themselves. The anonymous, read-only Portal projection is separately mounted at `/portal/v1`; OAI-PMH is included with no global prefix so it is served at `/oai`; and the DNB URN mock router is included only when `settings.debug` is true [@app] [@api-dir] [@portal-public]. This page is a lookup map for prefixes and exceptions; startup behavior around these mounts is covered by [API Application Startup](../../architecture/backend/api-application-startup).
 
 ## Application-Level Paths
 
@@ -27,7 +30,7 @@ Katalon's API router surface is mounted in `backend/src/katalon/main.py`. Most r
 
 ## `/v1` Routers
 
-These routers are included with `prefix="/v1"` in `main.py`; each route also applies its module-level `APIRouter` prefix unless noted [@app] [@api-dir].
+These routers are included with `prefix="/v1"` in `main.py` and a `get_current_user` dependency; only `/v1/auth` is mounted without that dependency. Each router also applies its module-level `APIRouter` prefix unless noted [@app] [@api-dir].
 
 | Effective prefix | Module | Tag or surface |
 | --- | --- | --- |
@@ -61,6 +64,14 @@ These routers are included with `prefix="/v1"` in `main.py`; each route also app
 | `/v1/metadata-mappings` | `metadata_mappings.py` | Import and export mapping configuration [@api-dir]. |
 | `/v1/oai-sets` | `oai_sets.py` | OAI-PMH set configuration [@api-dir]. |
 | `/v1/feedback` | `feedback.py` | User feedback endpoints [@api-dir]. |
+
+## `/portal/v1` Anonymous Read Model
+
+`portal_public.py` is mounted separately at `/portal/v1` with no authentication dependency. It serves only read paths the React Portal needs: Objects, Entities, Places, Occurrences, their visible relations and object media, portal search, portal field definitions, relation-type vocabulary terms, portal configuration and logo, published pages, active portal banners, and theme data [@app] [@portal-public].
+
+Procedures have no `/portal/v1` route. Relation results require both endpoints to be visible inventory records, so a relation to a Procedure is not exposed [@portal-public]. Portal response models are explicit projections rather than shared ORM/API schemas; they omit internal fields such as record versions and search vectors, and relation projections omit relation metadata [@portal-public].
+
+The authenticated `/v1` representations provide navigational `_links`: records link to themselves and relations (Objects additionally link to media); vocabularies link to themselves, terms, and trees; vocabulary terms link to themselves, their vocabulary, ancestors, and where applicable their parent; media link to their Object, file, and — when present — license URI [@api-dir]. The public Portal projections provide the same relative `_links` under `/portal/v1`, pointing at the anonymous read-model endpoints rather than the authenticated `/v1` paths [@portal-public].
 
 ## API Key Routes
 

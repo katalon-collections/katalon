@@ -385,7 +385,7 @@ async def create_snapshot(
         404: {"description": "Object or IIIF manifest not found"},
     },
 )
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, portal_only: bool = False) -> dict:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
 
@@ -393,7 +393,7 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> di
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    if obj.status not in ("public", "published"):
+    if obj.status not in ("public", "published") or (portal_only and obj.collection_status != "active"):
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
     media_result = await db.execute(

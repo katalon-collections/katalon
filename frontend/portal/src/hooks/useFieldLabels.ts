@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BASE } from '../api/client'
+import { BASE, PORTAL_API } from '../api/client'
 
 export interface FieldDefinition {
   id: string
@@ -13,7 +13,7 @@ export function useFieldLabels(targetType: string) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${BASE}/v1/schema/${targetType}`)
+    fetch(`${BASE}${PORTAL_API}/schema/${targetType}`)
       .then(r => r.ok ? r.json() : [])
       .then((fields: FieldDefinition[]) => {
         if (cancelled) return

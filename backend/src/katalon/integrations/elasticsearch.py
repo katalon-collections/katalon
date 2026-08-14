@@ -154,6 +154,7 @@ async def search_documents(
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
+    record_types: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -179,6 +180,8 @@ async def search_documents(
 
     if record_type:
         filters.append({"term": {"record_type": record_type}})
+    elif record_types:
+        filters.append({"terms": {"record_type": list(record_types)}})
     if status:
         filters.append({"term": {"status": status}})
     for field, value in (extra_filters or {}).items():

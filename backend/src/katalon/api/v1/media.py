@@ -3,6 +3,7 @@ import shutil
 import uuid
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import aiofiles
 from celery.result import AsyncResult
@@ -25,7 +26,23 @@ batch_router = APIRouter(prefix="/media", tags=["media"])
 ALLOWED_MIME = ALLOWED_IMAGE_MIME
 
 
+def _is_absolute_http_url(value: str) -> bool:
+    if any(ord(char) < 32 for char in value):
+        return False
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in {"http", "https"} and parsed.hostname is not None
+    except ValueError:
+        return False
+
+
 def _serialize(f: MediaFile) -> dict:
+    links = {
+        "object": {"href": f"/v1/objects/{f.object_id}"},
+        "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
+    }
+    if f.license_uri and _is_absolute_http_url(f.license_uri):
+        links["license"] = {"href": f.license_uri}
     return {
         "id": str(f.id),
         "filename": f.filename,
@@ -36,6 +53,7 @@ def _serialize(f: MediaFile) -> dict:
         "license_uri": f.license_uri,
         "rights_holder": f.rights_holder,
         "created_at": f.created_at.isoformat(),
+        "_links": links,
     }
 
 
@@ -51,7 +69,10 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
-    result = await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))
+    query = select(MediaFile).where(MediaFile.object_id == object_id)
+    if current_user is None:
+        query = query.where(MediaFile.status == "ready")
+    result = await db.execute(query)
     return [_serialize(f) for f in result.scalars().all()]
 
 
@@ -169,7 +190,10 @@ async def serve_media_file(
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
-    result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
+    query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
+    if current_user is None:
+        query = query.where(MediaFile.status == "ready")
+    result = await db.execute(query)
     media = result.scalar_one_or_none()
     if not media or not Path(media.file_path).exists():
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")

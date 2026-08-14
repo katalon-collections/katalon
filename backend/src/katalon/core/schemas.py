@@ -1,8 +1,8 @@
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -126,6 +126,16 @@ class VocabularyRead(VocabularyCreate):
 
     id: uuid.UUID
 
+    @computed_field(alias="_links")
+    @property
+    def links(self) -> dict[str, dict[str, str]]:
+        base = f"/v1/vocabularies/{self.id}"
+        return {
+            "self": {"href": base},
+            "terms": {"href": f"{base}/terms"},
+            "tree": {"href": f"{base}/tree"},
+        }
+
 
 RECORD_TYPES = ("object", "entity", "place", "occurrence", "procedure")
 
@@ -154,6 +164,21 @@ class VocabularyTermRead(VocabularyTermCreate):
 
     id: uuid.UUID
 
+    @computed_field(alias="_links")
+    @property
+    def links(self) -> dict[str, dict[str, str]]:
+        base = f"/v1/vocabularies/{self.vocabulary_id}/terms/{self.id}"
+        links = {
+            "self": {"href": base},
+            "vocabulary": {"href": f"/v1/vocabularies/{self.vocabulary_id}"},
+            "ancestors": {"href": f"{base}/ancestors"},
+        }
+        if self.parent_id:
+            links["parent"] = {
+                "href": f"/v1/vocabularies/{self.vocabulary_id}/terms/{self.parent_id}"
+            }
+        return links
+
 
 # ---------------------------------------------------------------------------
 # Primary record types (shared base)
@@ -172,11 +197,33 @@ class ObjectCreate(RecordBase):
     collection_status: str = "active"
 
 
-class ObjectRead(ObjectCreate):
+class RecordRead(RecordBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     version: int
+
+    _api_path: ClassVar[str]
+    _record_type: ClassVar[str]
+
+    @computed_field(alias="_links")
+    @property
+    def links(self) -> dict[str, dict[str, str]]:
+        base = f"/v1/{self._api_path}/{self.id}"
+        links = {
+            "self": {"href": base},
+            "relations": {
+                "href": f"/v1/relations?from_type={self._record_type}&from_id={self.id}"
+            },
+        }
+        if self._record_type == "object":
+            links["media"] = {"href": f"{base}/media"}
+        return links
+
+
+class ObjectRead(ObjectCreate, RecordRead):
+    _api_path: ClassVar[str] = "objects"
+    _record_type: ClassVar[str] = "object"
 
 
 class EntityCreate(RecordBase):
@@ -184,11 +231,9 @@ class EntityCreate(RecordBase):
     entity_type: str | None = None
 
 
-class EntityRead(EntityCreate):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-    version: int
+class EntityRead(EntityCreate, RecordRead):
+    _api_path: ClassVar[str] = "entities"
+    _record_type: ClassVar[str] = "entity"
 
 
 class PlaceCreate(RecordBase):
@@ -198,11 +243,9 @@ class PlaceCreate(RecordBase):
     lon: float | None = None
 
 
-class PlaceRead(PlaceCreate):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-    version: int
+class PlaceRead(PlaceCreate, RecordRead):
+    _api_path: ClassVar[str] = "places"
+    _record_type: ClassVar[str] = "place"
 
 
 class OccurrenceCreate(RecordBase):
@@ -210,11 +253,9 @@ class OccurrenceCreate(RecordBase):
     occurrence_type: str | None = None
 
 
-class OccurrenceRead(OccurrenceCreate):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-    version: int
+class OccurrenceRead(OccurrenceCreate, RecordRead):
+    _api_path: ClassVar[str] = "occurrences"
+    _record_type: ClassVar[str] = "occurrence"
 
 
 class ProcedureCreate(BaseModel):

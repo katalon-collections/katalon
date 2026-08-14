@@ -73,10 +73,7 @@ async def test_form_lookup_routes_require_manage_content(
 @pytest.mark.parametrize(
     ("path", "status_column"),
     [
-        ("/v1/objects", "objects.status"),
-        ("/v1/entities", "entities.status"),
-        ("/v1/places", "places.status"),
-        ("/v1/occurrences", "occurrences.status"),
+        ("/portal/v1/objects", "objects.status"),
     ],
 )
 @pytest.mark.asyncio
@@ -125,7 +122,7 @@ async def test_anonymous_object_lists_keep_active_collection_visibility() -> Non
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/v1/objects")
+            response = await client.get("/portal/v1/objects")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -198,7 +195,7 @@ async def test_anonymous_media_list_hides_draft_object() -> None:
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get(f"/v1/objects/{obj.id}/media")
+            response = await client.get(f"/portal/v1/objects/{obj.id}/media")
     finally:
         app.dependency_overrides.pop(get_db, None)
 

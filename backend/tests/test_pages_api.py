@@ -40,7 +40,7 @@ def empty_db():
 @pytest.mark.asyncio
 async def test_list_pages_public_returns_200(empty_db) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        r = await client.get("/v1/pages")
+        r = await client.get("/portal/v1/pages")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -48,14 +48,14 @@ async def test_list_pages_public_returns_200(empty_db) -> None:
 @pytest.mark.asyncio
 async def test_get_page_not_found_returns_404(empty_db) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        r = await client.get("/v1/pages/nonexistent-slug")
+        r = await client.get("/portal/v1/pages/nonexistent-slug")
     assert r.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_get_page_slug_with_special_chars_404(empty_db) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        r = await client.get("/v1/pages/does-not-exist-123")
+        r = await client.get("/portal/v1/pages/does-not-exist-123")
     assert r.status_code == 404
 
 

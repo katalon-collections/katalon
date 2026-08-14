@@ -51,16 +51,3 @@ async def _deliver(payload: FeedbackPayload) -> None:
 )
 async def send_feedback(payload: FeedbackPayload, current_user: CurrentUser) -> None:
     await _deliver(payload)
-
-
-@router.post(
-    "/public",
-    status_code=204,
-    summary="Send in-app feedback message to Telegram (public, unauthenticated)",
-    responses={
-        502: {"description": "Telegram delivery failed"},
-        503: {"description": "Feedback not configured"},
-    },
-)
-async def send_feedback_public(payload: FeedbackPayload) -> None:
-    await _deliver(payload)

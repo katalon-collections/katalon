@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-08-14
+
+### Added
+- Anonymer Portal-Read-Model unter `/portal/v1` (nur veröffentlichte Objects, Entities, Places, Occurrences; keine Vorgänge).
+- `_links`-Navigation in den JSON-Antworten der privaten `/v1`- und öffentlichen `/portal/v1`-API (Records, Medien, Vokabulare, Terms).
+- Einzel-Endpunkte für Vokabular und Term in `/v1` und `/portal/v1`.
+
+### Changed
+- Die Arbeits-API unter `/v1` verlangt jetzt ein Token (JWT oder API-Key); zuvor waren Lesezugriffe anonym möglich.
+- Portal-Client nutzt `/portal/v1` statt `/v1`.
+
+### Removed
+- Anonymer Feedback-Schreibendpunkt; `/v1/feedback` bleibt tokenpflichtig erhalten.
+
+### Security
+- Portal-Antworten nutzen explizite öffentliche Projektionen: interne Felder (Version, Search-Vector), Relations-Metadaten, unfertige Medien und Vorgänge bleiben verborgen.
+- `/portal/v1` ist in allen Nginx-Konfigurationen vor dem SPA-Fallback zum Backend geroutet.
+
 ## [0.11.4] - 2026-08-14
 
 ### Changed

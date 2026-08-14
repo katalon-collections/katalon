@@ -9,6 +9,9 @@ sources:
   - id: vocab-api
     type: file
     path: backend/src/katalon/api/v1/vocabularies.py
+  - id: portal-public-api
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
   - id: import-service
     type: file
     path: backend/src/katalon/services/vocabulary_import_service.py
@@ -35,7 +38,9 @@ sources:
     url: https://github.com/karkraeg/Katalon/issues/268
 ---
 
-Vocabularies are Katalon's controlled lists for cataloguing values and relation labels. A `Vocabulary` has a unique name, a hierarchy flag, and a `kind` of either `term` or `relation`; each `VocabularyTerm` belongs to one vocabulary, has multilingual labels, optional inverse labels, and JSONB metadata for term-specific custom fields [@models]. Term vocabularies may have a parent-child structure; relation vocabularies are always flat. The vocabulary API exposes flat term lists, nested trees, ancestor chains, CRUD operations, and import endpoints, so vocabularies are both user-facing controlled data and configuration used by the [schema engine](schema-engine) [@vocab-api].
+Vocabularies are Katalon's controlled lists for cataloguing values and relation labels. A `Vocabulary` has a unique name, a hierarchy flag, and a `kind` of either `term` or `relation`; each `VocabularyTerm` belongs to one vocabulary, has multilingual labels, optional inverse labels, and JSONB metadata for term-specific custom fields [@models]. Term vocabularies may have a parent-child structure; relation vocabularies are always flat. The authenticated vocabulary API exposes flat term lists, single vocabularies and terms, nested trees, ancestor chains, CRUD operations, and import endpoints, so vocabularies are both user-facing controlled data and configuration used by the [schema engine](schema-engine) [@vocab-api].
+
+Authenticated vocabulary responses include relative `_links`: a vocabulary links to itself, its terms, and its tree; a term links to itself, its vocabulary, ancestors, and its parent when one exists. These are REST navigation links, not stable Linked Open Data identities [@schemas]. The anonymous Portal read model only exposes the `relation_types` vocabulary and its terms, returning the same relative `_links` under `/portal/v1` (self and terms for a vocabulary; self, vocabulary, and parent for a term) [@portal-public-api].
 
 ## Terms And Hierarchies
 

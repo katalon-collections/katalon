@@ -24,9 +24,12 @@ sources:
   - id: banners-api
     type: file
     path: backend/src/katalon/api/v1/banners.py
+  - id: portal-public-api
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
 ---
 
-The public portal is a React Router application for collection discovery, record detail pages, static content, and site-level presentation settings. Its entry component defines browser routes for home, search, object detail, entity detail, place detail, occurrence detail, and static pages; it also mounts the header, footer, banner bar, feedback button, and runtime theme loading in one app frame [@portal-app]. The portal API client is intentionally lighter than the admin client: it performs public `GET` requests against `/v1` endpoints and exposes typed readers for records, media, relations, portal config, pages, vocabularies, search, and active portal banners [@portal-client].
+The public portal is a React Router application for collection discovery, record detail pages, static content, and site-level presentation settings. Its entry component defines browser routes for home, search, object detail, entity detail, place detail, occurrence detail, and static pages; it also mounts the header, footer, banner bar, and runtime theme loading in one app frame [@portal-app]. The portal API client is intentionally lighter than the admin client: it performs anonymous `GET` requests against the dedicated `/portal/v1` read model and exposes typed readers for records, media, relations, portal config, pages, vocabularies, search, and active portal banners [@portal-client] [@portal-public-api].
 
 ## Browser Routes
 
@@ -36,7 +39,9 @@ The header provides type-scoped navigation links and a debounced autocomplete se
 
 ## Public API Surface
 
-The portal client has one shared `get<T>` helper and no token lifecycle, so every exported call assumes public-read semantics [@portal-client]. Its record functions read object lists and detail records, object media, individual entity/place/occurrence records, two-way relation lists, portal config, static pages, vocabularies, Elasticsearch-backed search, and active portal banners [@portal-client].
+The portal client has one shared `get<T>` helper and no token lifecycle, so every exported call assumes public-read semantics [@portal-client]. It calls `/portal/v1`, rather than the authenticated `/v1` work API. Its record functions read object lists and detail records, object media, individual entity/place/occurrence records, two-way relation lists, portal config, static pages, the relation-type vocabulary, Elasticsearch-backed search, and active portal banners [@portal-client] [@portal-public-api].
+
+The backend confines this anonymous surface to the four inventory record families. It has no Procedure endpoint, and it returns relations only where both endpoints are visible inventory records. Its response models are public projections: they omit record versions and search vectors; relation responses omit relation metadata; and public responses return their own `/portal/v1` `_links` instead of the authenticated `/v1` links [@portal-public-api].
 
 Backend portal config is stored as the singleton `portal_config` row with defaults for title, subtitle, hero text, featured object ids, facet fields, accent color, logo URL, placeholder image URL, and extra CSS color tokens [@portal-api]. `GET /v1/portal/config` builds `facet_fields` dynamically from non-deleted `field_definitions` with `is_facet`, while `PUT /v1/portal/config` and logo upload require an admin role [@portal-api]. This makes search facets an effect of schema configuration rather than a separate portal-only list [@portal-api].
 
@@ -44,7 +49,7 @@ Static pages have a public list and public by-slug read path that only return `i
 
 ## Runtime Theme Layers
 
-The portal loads `/v1/theme` at startup and passes the manifest to `applyTheme`; failure falls back to default tokens [@theme-loader] [@theme-inject]. `applyTheme` merges default CSS tokens with manifest tokens, injects an optional body-font stylesheet, updates the favicon under `/themes/<file>`, and can set `document.title` from the theme name [@theme-inject].
+The portal loads `/portal/v1/theme` at startup and passes the manifest to `applyTheme`; failure falls back to default tokens [@theme-loader] [@theme-inject] [@portal-client]. `applyTheme` merges default CSS tokens with manifest tokens, injects an optional body-font stylesheet, updates the favicon under `/themes/<file>`, and can set `document.title` from the theme name [@theme-inject].
 
 After the base theme loads, `AppInner` reads portal config and applies `color_tokens` and `accent_color` directly to `document.documentElement` [@portal-app]. The resulting order is default theme tokens, theme manifest tokens, then portal-config overrides; that gives operators a persistent configuration layer without rebuilding the frontend [@portal-app] [@theme-inject].
 

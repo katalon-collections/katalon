@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, BASE, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
+import { api, BASE, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -64,7 +64,7 @@ export function SearchPage() {
         .filter(([, v]) => v != null)
         .map(([k, v]) => [k, String(v)])
     ).toString()
-    fetch(`${import.meta.env.VITE_API_URL ?? ''}/v1/search?${qs}`)
+    fetch(`${BASE}${PORTAL_API}/search?${qs}`)
       .then(r => r.json())
       .then(async (result: SearchResponse) => {
         setData(result)
@@ -79,7 +79,7 @@ export function SearchPage() {
                   const ready = media.filter((m: MediaFile) => m.status === 'ready')
                   const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
                   if (primary) {
-                    thumbMap[r.id] = `${BASE}/v1/objects/${r.id}/media/${primary.id}/file`
+                    thumbMap[r.id] = `${BASE}${PORTAL_API}/objects/${r.id}/media/${primary.id}/file`
                   }
                 })
                 .catch(() => {})

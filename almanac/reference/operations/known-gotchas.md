@@ -18,6 +18,12 @@ sources:
   - id: prod-compose
     type: file
     path: docker-compose.prod.yml
+  - id: nginx
+    type: file
+    path: docker/nginx.conf
+  - id: portal-client
+    type: file
+    path: frontend/portal/src/api/client.ts
   - id: admin-package
     type: file
     path: frontend/admin/package.json
@@ -35,11 +41,13 @@ sources:
     path: .agents/knowledge/gotchas/pytest-secrets-key.md
 ---
 
-Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
+Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, reload nginx and frontend containers after route-prefix changes, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
 
 ## Ports And Stack Choice
 
 Root project instructions define the current port rule: `http://localhost/admin/` and `http://localhost/` are the normal production-like browser targets through the outer nginx on port `80`; direct `http://localhost:3000` and `http://localhost:3001` hit the Admin and Portal containers and are for container debugging only; `http://localhost:4000` and `http://localhost:4001` belong to the development Compose stack [@agents].
+
+The Portal public API prefix is `/portal/v1` in the frontend client, and outer nginx only proxies that surface through the slash-terminated `location /portal/v1/` block [@portal-client] [@nginx]. After changing this route, recreate or reload the affected nginx/Portal containers before testing through `http://localhost/`; otherwise the browser can still see the old route table or old frontend bundle. Test a concrete endpoint such as `http://localhost/portal/v1/objects`, not bare `/portal/v1`.
 
 ## Admin Asset Base Path
 

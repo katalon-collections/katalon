@@ -18,6 +18,9 @@ sources:
   - id: nginx
     type: file
     path: docker/nginx.conf
+  - id: portal-nginx
+    type: file
+    path: docker/nginx.portal.conf
   - id: admin-dockerfile
     type: file
     path: docker/Dockerfile.admin
@@ -30,9 +33,15 @@ sources:
   - id: portal-vite
     type: file
     path: frontend/portal/vite.config.ts
+  - id: app
+    type: file
+    path: backend/src/katalon/main.py
+  - id: portal-client
+    type: file
+    path: frontend/portal/src/api/client.ts
 ---
 
-Katalon has three relevant routing surfaces: the production-like Compose stack on nginx port 80, direct container ports for built frontend images, and the dev-compose Vite ports. The production-like stack routes `/admin/` to the Admin container, `/` to the Portal container, `/v1/` to the API, `/api/` to the API after stripping `/api`, and `/iiif/` to Cantaloupe [@nginx]. The main deployment gotcha is the Admin build base path: `docker/Dockerfile.admin` builds Vite with `VITE_BASE_PATH=/admin/`, and AGENTS marks that value as deployment-critical because wrong asset paths can make the Admin UI load a blank shell through nginx [@admin-dockerfile] [@agents].
+Katalon has three relevant routing surfaces: the production-like Compose stack on nginx port 80, direct container ports for built frontend images, and the dev-compose Vite ports. The production-like stack routes `/admin/` to the Admin container, `/` to the Portal container, `/v1/` and `/portal/v1/` to the API, `/api/` to the API after stripping `/api`, and `/iiif/` to Cantaloupe [@nginx]. The main deployment gotcha is the Admin build base path: `docker/Dockerfile.admin` builds Vite with `VITE_BASE_PATH=/admin/`, and AGENTS marks that value as deployment-critical because wrong asset paths can make the Admin UI load a blank shell through nginx [@admin-dockerfile] [@agents].
 
 ## Production-Like Compose
 
@@ -41,6 +50,7 @@ Katalon has three relevant routing surfaces: the production-like Compose stack o
 | Portal | `http://localhost/` | outer nginx `location /` to `portal` |
 | Admin | `http://localhost/admin/` | outer nginx `location /admin/` to `admin` after path rewrite |
 | API routes | `http://localhost/v1/...` | outer nginx `location /v1/` to `api:8000` |
+| Portal public API | `http://localhost/portal/v1/...` | outer nginx `location /portal/v1/` to `api:8000` |
 | API docs | `http://localhost/api/docs` | outer nginx strips `/api/` before proxying |
 | IIIF | `http://localhost/iiif/...` | outer nginx `location /iiif/` to `cantaloupe:8182` |
 | API direct port | `http://localhost:8000` | Compose `api` port mapping |
@@ -48,6 +58,8 @@ Katalon has three relevant routing surfaces: the production-like Compose stack o
 | Portal direct port | `http://localhost:3001` | Compose `portal` port mapping to container port 80 |
 
 The base Compose file publishes `api` on `8000:8000`, `admin` on `3000:80`, `portal` on `3001:80`, and outer `nginx` on `80:80` [@compose]. For normal browser checks without an explicit dev-stack target, AGENTS says to use `http://localhost/admin/` and `http://localhost/` instead of direct frontend container ports [@agents].
+
+FastAPI mounts the anonymous Portal read model at `/portal/v1`, and the Portal client uses `/portal/v1` as its API prefix [@app] [@portal-client]. Both outer nginx and the Portal container nginx define slash-terminated `location /portal/v1/` proxies [@nginx] [@portal-nginx]. Operational checks should therefore hit a real child endpoint such as `http://localhost/portal/v1/objects`; `http://localhost/portal/v1` without the trailing slash is not the API index and can fall through to the Portal SPA route.
 
 ## Dev Compose
 
