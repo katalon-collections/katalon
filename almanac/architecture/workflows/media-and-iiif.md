@@ -18,6 +18,12 @@ sources:
   - id: batch-service
     type: file
     path: backend/src/katalon/services/media_batch_import_service.py
+  - id: admin-config
+    type: file
+    path: backend/src/katalon/api/v1/admin_config.py
+  - id: screen-form
+    type: file
+    path: frontend/admin/src/components/screens/ScreenForm.tsx
   - id: iiif-viewer
     type: file
     path: frontend/portal/src/components/IIIFViewer.tsx

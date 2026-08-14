@@ -43,4 +43,4 @@ Tests cover two startup-adjacent contracts. `Settings` requires a valid `katalon
 
 ## Related Pages
 
-This startup path sits inside the [System Overview](../system/system-overview) and shares its security boundary with [Security And Configuration](security-and-configuration). For the mounted endpoint families, use [Router Surface](../../reference/api/router-surface).
+This startup path sits inside the [System Overview](../system/system-overview), shares its security boundary with [Security And Configuration](security-and-configuration), and inherits its health-check policy from [Deep Health Check](../../decisions/operations/deep-health-check). For the mounted endpoint families, use [Router Surface](../../reference/api/router-surface).

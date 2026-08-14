@@ -28,4 +28,4 @@ Katalon's decision pages record choices that future changes must account for bef
 
 ## Operations
 
-[Broker Tolerant Enqueue](operations/broker-tolerant-enqueue) records why task enqueue failures should not break core writes when Redis is unavailable. [Docker Customization Strategy](operations/docker-customization-strategy) records how instance-specific compose and deployment customization stays out of the base stack.
+[Deep Health Check](operations/deep-health-check) records why `/health` checks database and Elasticsearch in one Docker Compose readiness endpoint. [Broker Tolerant Enqueue](operations/broker-tolerant-enqueue) records why task enqueue failures should not break core writes when Redis is unavailable. [Docker Customization Strategy](operations/docker-customization-strategy) records how instance-specific compose and deployment customization stays out of the base stack. [katalon-cli Distribution](operations/katalon-cli-distribution) records why production installs use a separate CLI pulling pinned release images instead of a source-repo checkout.

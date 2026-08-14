@@ -48,9 +48,9 @@ Record subtypes are configured labels and internal names under Katalon's four pr
 
 ## Data Model
 
-`RecordSubtype` rows are unique by `(primary_type, name)` and carry multilingual labels plus an optional plain-text description of their intended use [@models]. The migration that introduced the table also added `object_type` and `place_type` columns, making object and place subtype storage match the existing entity and occurrence type columns in the ORM model [@models]. Migration `0034_procedure_record_subtypes.py` seeds the six built-in Procedure types as `RecordSubtype` rows, while retaining the `procedure_type` column as the selected subtype [@procedure-migration] [@models].
+`RecordSubtype` rows are unique by `(primary_type, name)` and carry multilingual labels plus an optional plain-text description of their intended use [@models] [@migration]. The migration that introduced the table also added `object_type` and `place_type` columns, making object and place subtype storage match the existing entity and occurrence type columns in the ORM model [@models]. Migration `0034_procedure_record_subtypes.py` seeds the six built-in Procedure types as `RecordSubtype` rows, while retaining the `procedure_type` column as the selected subtype [@procedure-migration] [@models].
 
-No subtype is created automatically for the four inventory primary types. Procedure starts with six seeded defaults. A record without a configured subtype stores `NULL` in its type column and uses the primary-type schema only. Once subtypes are configured, new records must select one (except drafts), so subtype-specific fields have an explicit scope.
+No subtype is created automatically for the four inventory primary types during application startup [@main]. Procedure starts with six seeded defaults. A record without a configured subtype stores `NULL` in its type column and uses the primary-type schema only. Once subtypes are configured, new records must select one (except drafts), so subtype-specific fields have an explicit scope.
 
 ## Admin Lifecycle
 
