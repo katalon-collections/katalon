@@ -1,12 +1,16 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from PIL import Image
 
 from katalon.services.ai_service import (
     _build_messages,
     _coerce_value,
+    _enforce_input_token_limit,
     _extract_content,
+    _prepare_vision_image,
     _strip_code_fences,
 )
 
@@ -75,3 +79,30 @@ def test_group_ai_uses_only_requested_instance() -> None:
     assert '"group_context": {"name": "Rückseite"}' in prompt
     assert '"current_value": "Alt hinten"' in prompt
     assert "Vorderseite" not in prompt
+
+
+def test_vision_image_is_resized_to_1024px_jpeg(tmp_path) -> None:
+    path = tmp_path / "primary.png"
+    Image.new("RGB", (2048, 1024), "red").save(path)
+
+    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(file_path=str(path)))
+
+    assert mime_type == "image/jpeg"
+    with Image.open(BytesIO(image_bytes)) as image:
+        assert image.size == (1024, 512)
+
+
+def test_vision_image_with_alpha_remains_png(tmp_path) -> None:
+    path = tmp_path / "primary.png"
+    Image.new("RGBA", (2048, 1024), (255, 0, 0, 128)).save(path)
+
+    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(file_path=str(path)))
+
+    assert mime_type == "image/png"
+    with Image.open(BytesIO(image_bytes)) as image:
+        assert image.size == (1024, 512)
+
+
+def test_input_token_limit_is_enforced() -> None:
+    with pytest.raises(HTTPException, match="Input-Token-Limit"):
+        _enforce_input_token_limit(101, 100)

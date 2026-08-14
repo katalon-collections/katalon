@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import math
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import httpx
 from fastapi import HTTPException
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +30,7 @@ from katalon.services.audit_service import log_change
 from katalon.services.secret_service import AI_API_KEY_SECRET, get_secret
 
 TEXTISH_FIELD_TYPES = {"text", "richtext", "vocab_free", "date", "number", "boolean"}
+AI_IMAGE_MAX_DIMENSION = 1024
 MODEL_MAP: dict[str, type] = {
     "object": Object,
     "entity": Entity,
@@ -60,7 +62,24 @@ def _extract_content(message_content: Any) -> str:
 
 
 def _estimate_tokens(payload: Any) -> int:
-    return max(1, math.ceil(len(json.dumps(payload, ensure_ascii=False)) / 4))
+    def without_image_data(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: without_image_data(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [without_image_data(item) for item in value]
+        if isinstance(value, str) and value.startswith("data:image/"):
+            return "[image]"
+        return value
+
+    return max(1, math.ceil(len(json.dumps(without_image_data(payload), ensure_ascii=False)) / 4))
+
+
+def _enforce_input_token_limit(estimated_input_tokens: int, limit: int) -> None:
+    if estimated_input_tokens > limit:
+        raise HTTPException(
+            status_code=422,
+            detail=f"KI-Anfrage überschreitet das Input-Token-Limit ({limit}).",
+        )
 
 
 async def get_admin_ai_config(db: AsyncSession) -> AdminConfig:
@@ -79,6 +98,7 @@ async def ensure_ai_allowed(db: AsyncSession, user_id: uuid.UUID, estimated_inpu
     api_key = await get_secret(db, AI_API_KEY_SECRET)
     if not api_key:
         raise HTTPException(status_code=409, detail="Kein KI-API-Key konfiguriert.")
+    _enforce_input_token_limit(estimated_input_tokens, config.ai_max_input_tokens)
 
     now = datetime.now(UTC).replace(tzinfo=None)
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -137,6 +157,21 @@ def _serialize_field_context(field: FieldDefinition, record: Any, include_fields
     return context
 
 
+def _prepare_vision_image(media: MediaFile) -> tuple[bytes, str]:
+    try:
+        with Image.open(media.file_path) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail((AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            if "A" in image.getbands() or "transparency" in image.info:
+                image.save(output, format="PNG", optimize=True)
+                return output.getvalue(), "image/png"
+            image.convert("RGB").save(output, format="JPEG", quality=85, optimize=True)
+            return output.getvalue(), "image/jpeg"
+    except (FileNotFoundError, UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(status_code=422, detail="Primärmedium kann nicht für Vision-KI verarbeitet werden.") from exc
+
+
 def _build_messages(
     field: FieldDefinition,
     record: Any,
@@ -188,7 +223,7 @@ def _build_messages(
     if ai_config.get("mode") == "vision":
         if media is None:
             raise HTTPException(status_code=422, detail="Für Vision-KI wird ein Primärmedium benötigt.")
-        file_bytes = Path(media.file_path).read_bytes()
+        file_bytes, mime_type = _prepare_vision_image(media)
         b64 = base64.b64encode(file_bytes).decode("ascii")
         return [
             {
@@ -199,7 +234,7 @@ def _build_messages(
                 "role": "user",
                 "content": [
                     {"type": "text", "text": user_text},
-                    {"type": "image_url", "image_url": {"url": f"data:{media.mime_type};base64,{b64}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
                 ],
             },
         ]

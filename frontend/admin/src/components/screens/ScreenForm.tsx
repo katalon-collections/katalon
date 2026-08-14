@@ -90,6 +90,58 @@ function getFieldAiConfig(field: FieldDefinition): { enabled: boolean; mode: 'te
   }
 }
 
+type AiProposal = {
+  field: FieldDefinition
+  currentValue: unknown
+  suggestedValue: unknown
+  group?: { name: string; index: number }
+}
+
+function aiValueToText(value: unknown): string {
+  return Array.isArray(value) ? value.map(item => String(item)).join('\n') : String(value ?? '')
+}
+
+function aiTextToValue(field: FieldDefinition, value: string): unknown {
+  const coerce = (item: string): string | number | boolean => {
+    if (field.field_type === 'number') {
+      const parsed = Number(item)
+      return Number.isNaN(parsed) ? item : parsed
+    }
+    if (field.field_type === 'boolean') return item.trim().toLowerCase() === 'true'
+    return item
+  }
+  return field.is_repeatable ? value.split('\n').map(item => item.trim()).filter(Boolean).map(coerce) : coerce(value)
+}
+
+function AiProposalDialog({ proposal, onCancel, onApply }: {
+  proposal: AiProposal
+  onCancel: () => void
+  onApply: (value: unknown) => void
+}) {
+  const [suggestion, setSuggestion] = useState(() => aiValueToText(proposal.suggestedValue))
+  const label = getLabel(proposal.field, proposal.field.name)
+  return (
+    <dialog open onCancel={event => { event.preventDefault(); onCancel() }} aria-labelledby="ai-proposal-title"
+      style={{ position: 'fixed', inset: 0, margin: 'auto', width: 680, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 64px)', overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 0, background: 'var(--bg)', color: 'var(--fg)', boxShadow: '0 24px 80px rgba(0,0,0,.24)', zIndex: 25 }}>
+      <div id="ai-proposal-title" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>KI-Vorschlag für {label}</div>
+      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <label className="field" style={{ margin: 0 }}>
+          <span className="lbl">Aktueller Wert</span>
+          <textarea className="fld" value={aiValueToText(proposal.currentValue)} readOnly rows={8} />
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          <span className="lbl">KI-Vorschlag</span>
+          <textarea className="fld" value={suggestion} onChange={event => setSuggestion(event.target.value)} rows={8} autoFocus />
+        </label>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-s)' }}>
+        <button className="btn gh" onClick={onCancel}>Verwerfen</button>
+        <button className="btn pri" onClick={() => onApply(aiTextToValue(proposal.field, suggestion))}>Übernehmen</button>
+      </div>
+    </dialog>
+  )
+}
+
 const STATUSES: Status[] = ['draft', 'internal', 'public']
 const STATUS_LABELS: Record<Status, string> = { draft: 'Entwurf', internal: 'Intern', public: 'Öffentlich' }
 const MEDIA_LICENSES = [
@@ -987,6 +1039,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [genericAddOpen, setGenericAddOpen] = useState(false)
   const [completionDialog, setCompletionDialog] = useState<{ count: number; status: string } | null>(null)
   const [aiBusyField, setAiBusyField] = useState<string | null>(null)
+  const [aiProposal, setAiProposal] = useState<AiProposal | null>(null)
   const [openRightsMediaId, setOpenRightsMediaId] = useState<string | null>(null)
   const [highlightedField, setHighlightedField] = useState<string | null>(null)
 
@@ -1667,9 +1720,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!aiConfig || !targetId) return
     const currentValue = values[field.name]
     const hasValue = !isEmptyValue(currentValue)
-    if (hasValue && !window.confirm(`Vorhandenen Wert in "${getLabel(field, field.name)}" durch KI-Vorschlag ersetzen?`)) {
-      return
-    }
     setAiBusyField(field.name)
     setError(null)
     try {
@@ -1678,8 +1728,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         record_type: recordType,
         record_id: targetId,
       })
-      setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
-      clearFieldFeedback(field.name)
+      if (hasValue) setAiProposal({ field, currentValue, suggestedValue: result.value })
+      else {
+        setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
+        clearFieldFeedback(field.name)
+      }
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -1696,9 +1749,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!aiConfig || !targetId) return
     const instance = ((values[group.name] as GroupInstance[] | undefined) ?? [])[groupIndex]
     const currentValue = instance?.[field.name]
-    if (!isEmptyValue(currentValue) && !window.confirm(`Vorhandenen Wert in "${getLabel(field, field.name)}" durch KI-Vorschlag ersetzen?`)) {
-      return
-    }
     const busyKey = `${group.name}:${groupIndex}:${field.name}`
     setAiBusyField(busyKey)
     setError(null)
@@ -1710,7 +1760,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         group_index: groupIndex,
         group_instance: instance,
       })
-      updateGroupSubField(group.name, groupIndex, field.name, result.value)
+      if (isEmptyValue(currentValue)) updateGroupSubField(group.name, groupIndex, field.name, result.value)
+      else setAiProposal({ field, currentValue, suggestedValue: result.value, group: { name: group.name, index: groupIndex } })
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -2128,6 +2179,21 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             <button className="btn pri" onClick={() => completeProcedure(completionDialog.status)} disabled={saving}>Status setzen</button>
           </div>
         </dialog>
+      )}
+
+      {aiProposal && (
+        <AiProposalDialog
+          proposal={aiProposal}
+          onCancel={() => setAiProposal(null)}
+          onApply={value => {
+            if (aiProposal.group) updateGroupSubField(aiProposal.group.name, aiProposal.group.index, aiProposal.field.name, value)
+            else {
+              setValuesDirty(previous => ({ ...previous, [aiProposal.field.name]: value }))
+              clearFieldFeedback(aiProposal.field.name)
+            }
+            setAiProposal(null)
+          }}
+        />
       )}
 
       {conflict && (

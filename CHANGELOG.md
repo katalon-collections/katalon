@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-08-14
+
+### Changed
+- KI-Feldvorschläge zeigen bei vorhandenen Werten einen editierbaren Vergleichsdialog; Vision-Bilder werden auf maximal 1024 px begrenzt und das Input-Token-Limit vor dem Provider-Aufruf geprüft. (#114)
+
 ## [0.11.2] - 2026-08-14
 
 ### Added
