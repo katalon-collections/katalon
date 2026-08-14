@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-08-14
+
+### Added
+- Kontextsensitives Hilfe-Icon in der Admin-Topbar, das je nach Screen auf die passende Anwenderdoku-Seite verlinkt (`ROUTE_DOCS`-Mapping).
+
+### Changed
+- Anwenderdoku (`docs/`) an aktuellen Stand nachgezogen: neue Seiten für Formularvarianten und Subtypen, Architektur-Doku um Deep-Linking, Onboarding-Tour, granulare Rollenrechte und aktuelle Admin-Screen-Liste ergänzt, Produktionsdoku um katalon-cli als empfohlenen Installationsweg ergänzt.
+
 ## [0.11.1] - 2026-08-13
 
 ### Added

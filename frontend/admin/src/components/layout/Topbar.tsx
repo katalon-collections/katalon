@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { /* Bell, */ Search } from '../ui/Icons'
+import { /* Bell, */ Search, Help } from '../ui/Icons'
 import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
@@ -7,15 +7,29 @@ const TYPE_LABELS: Record<string, string> = {
   object: 'Obj', entity: 'Ent', place: 'Ort', occurrence: 'Occ', procedure: 'Vor',
 }
 
+const DOCS_BASE = 'https://github.com/karkraeg/katalon-docs/blob/main'
+const DOCS_ROOT = 'https://github.com/karkraeg/katalon-docs'
+// TODO: form-variants/subtypes docs sind noch nicht ins katalon-docs-Repo migriert,
+// deshalb übergangsweise Blob-Link ins Hauptrepo statt DOCS_BASE. Nach Migration auf DOCS_BASE umstellen.
+const MAIN_REPO_DOCS = 'https://github.com/karkraeg/Katalon/blob/main/docs'
+
+const ROUTE_DOCS: Record<string, string> = {
+  schema: `${DOCS_BASE}/02_schema_verwaltung.md`,
+  import: `${DOCS_BASE}/03_csv_import.md`,
+  'form-variants': `${MAIN_REPO_DOCS}/11_formularvarianten.md`,
+  subtypes: `${MAIN_REPO_DOCS}/12_subtypen.md`,
+}
+
 interface Props {
   crumbs: Array<{ label: string; route?: string }>
+  route?: string
   onNavigate?: (route: string, id?: string) => void
   currentUser?: { email: string; role: string } | null
   onLogout?: () => void
   onOpenNavigation?: () => void
 }
 
-export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNavigation }: Props) {
+export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpenNavigation }: Props) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
@@ -136,6 +150,16 @@ export function Topbar({ crumbs, onNavigate, currentUser, onLogout, onOpenNaviga
       </div>
       {/* Benachrichtigungen ausgeblendet bis Implementierung (Issue #46) */}
       {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
+      <a
+        className="ib"
+        title="Hilfe zu diesem Screen"
+        aria-label="Hilfe zu diesem Screen"
+        href={(route && ROUTE_DOCS[route]) || DOCS_ROOT}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Help size={15} />
+      </a>
       <div ref={userMenuRef} style={{ position: 'relative' }}>
         <button className="btn gh sm user-menu-trigger" onClick={() => setUserMenuOpen(v => !v)}>
           <span>{currentUser?.email || 'Benutzer'}</span> ▾

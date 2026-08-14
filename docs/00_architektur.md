@@ -154,6 +154,15 @@ Rollen: `superuser` · `admin` · `editor` · `cataloger` · `viewer`
 - `editor`/`cataloger`: Darf Inhalte bearbeiten, wenn Endpoints `require_admin_or_editor()` verwenden.
 - `viewer`: Lesender Zugriff.
 
+### Capabilities und granulare Rollenrechte
+
+Neben der Rolle selbst kennt Katalon zwei Berechtigungsebenen:
+
+1. **Capabilities** (`ROLE_CAPABILITIES` in `dependencies.py`): feste Zuordnung von Rolle zu grob gefassten Fähigkeiten `manage_content`, `manage_config`, `manage_users`. `admin` und `superuser` haben alle drei, `editor`/`cataloger` nur `manage_content`, `viewer` keine. Endpoints prüfen sie über `require_capability(...)`; diese Zuordnung ist im Code fest und nicht über die Admin-UI konfigurierbar.
+2. **Granulare Rollenrechte** (`role_permissions`-Tabelle, Modell `RolePermission`): pro Rolle, Datensatztyp (`object`/`entity`/`place`/`occurrence`/`procedure`) und Aktion (`create`/`update`/`delete` o. ä.) einzeln togglebar. `admin` und `superuser` umgehen diese Prüfung immer (`has_record_permission`); für `editor`, `cataloger` und `viewer` legt die Matrix fest, welche Aktion auf welchem Datensatztyp erlaubt ist. Admins konfigurieren diese Matrix in der Admin-UI unter **Verwaltung → Benutzer**, Abschnitt „Rollenrechte“ — ohne Codeänderung oder Neustart.
+
+Die Capabilities entscheiden also über den Zugriff auf ganze Admin-Bereiche (Konfiguration, Benutzerverwaltung), die granulare Matrix darüber, welche der content-tragenden Rollen welche CRUD-Aktion auf welchem der fünf Datensatztypen ausführen darf.
+
 ## Auth-Flow
 
 ```
@@ -193,19 +202,25 @@ src/
     │   ├── Sidebar.tsx        # Linke Navigation
     │   └── Topbar.tsx         # Breadcrumb, Logout
     └── screens/               # Ein Screen = eine Ansicht
-        ├── ScreenList.tsx     # Listenansicht (alle 4 Typen)
-        ├── ScreenForm.tsx     # Formular (alle 4 Typen, dynamisch)
-        ├── ScreenSchema.tsx   # Schema-Editor
-        ├── ScreenVocab.tsx    # Vokabular-Editor
-        ├── ScreenSettings.tsx # Portal-Konfiguration (Admin)
-        ├── ScreenUsers.tsx    # Benutzerverwaltung
-        ├── ScreenPages.tsx    # Statische Seiten
-        ├── ScreenOAISets.tsx  # OAI-Sets-Verwaltung
-        ├── ScreenImporter.tsx # CSV-Import
-        └── ScreenAudit.tsx    # Audit-Log
+        ├── ScreenList.tsx         # Listenansicht (alle 5 Typen inkl. Vorgänge)
+        ├── ScreenForm.tsx         # Formular (alle 5 Typen, dynamisch)
+        ├── ScreenSchema.tsx       # Schema-Editor
+        ├── ScreenSubtype.tsx      # Subtypen-Verwaltung
+        ├── ScreenFormVariants.tsx # Formularvarianten-Verwaltung
+        ├── ScreenVocab.tsx        # Vokabular-Editor
+        ├── ScreenBanners.tsx      # Portal-Banner
+        ├── ScreenSettings.tsx     # Portal-Konfiguration (Admin)
+        ├── ScreenUsers.tsx        # Benutzerverwaltung, Rollenrechte
+        ├── ScreenPages.tsx        # Statische Seiten
+        ├── ScreenOAISets.tsx      # OAI-Sets-Verwaltung
+        ├── ScreenImporter.tsx     # CSV-Import
+        ├── ScreenAudit.tsx        # Audit-Log
+        └── ScreenLogin.tsx        # Login
 ```
 
-Navigation ist **hash-basiert** (`#list`, `#schema`, `#settings` etc.) — kein React-Router.
+Navigation ist **hash-basiert** (`#list`, `#schema`, `#settings` etc.) — kein React-Router. Der Hash kodiert zusätzlich Tab-/Filter-/Auswahlzustand einzelner Screens (z. B. `#form-variants/objects.person` für Typ `objects`, Subtyp `person`), sodass sich jede Konfigurationsansicht direkt per URL teilen und über Browser-Vor/Zurück ansteuern lässt (Deep-Linking).
+
+Beim ersten Login mit Rolle `admin` oder `superuser` startet automatisch eine Onboarding-Tour (react-joyride), sofern `users.onboarding_completed_at` noch nicht gesetzt ist. Manueller Start jederzeit über das Hilfe-Icon in der `Topbar`, das zugleich als Sprungmarke zur passenden Seite der Anwenderdokumentation dient (`ROUTE_DOCS`-Mapping in `Topbar.tsx`). Details zur Tour: `almanac/architecture/workflows/admin-onboarding-tour.md`.
 
 ### Portal (`frontend/portal/`)
 ```

@@ -195,6 +195,7 @@ export function AppShell() {
       <div className="main">
         <Topbar
           crumbs={crumbs}
+          route={route}
           onNavigate={(r, id) => safeNavigate(r, id)}
           currentUser={currentUser}
           onLogout={handleLogout}
