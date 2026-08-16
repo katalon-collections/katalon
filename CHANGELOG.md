@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-08-16
+
+### Added
+- Tests: Multi-Page-Roundtrip für OAI-PMH ResumptionToken; Snapshot-Restore-Inhaltsprüfung für alle Primärtypen (Issue #301).
+
 ## [0.11.5] - 2026-08-14
 
 ### Added

@@ -162,6 +162,47 @@ def test_list_records_last_page_empty_token() -> None:
     assert rt.text is None or rt.text == ""
 
 
+def _mock_hit_n(n: int) -> dict:
+    hit = _mock_hit()
+    hit["_id"] = f"550e8400-e29b-41d4-a716-4466554400{n:02d}"
+    hit["_source"]["idno"] = f"TEST-{n:03d}"
+    return hit
+
+
+def test_list_records_resumption_token_roundtrip_across_pages() -> None:
+    total = 5
+    page_size = 2
+    all_hits = [_mock_hit_n(n) for n in range(total)]
+
+    seen_ids: list[str] = []
+    offset = 0
+    token: str | None = ""
+    pages = 0
+    while token is not None:
+        page_hits = all_hits[offset : offset + page_size]
+        xml = oaipmh_service.list_records(
+            page_hits, total=total, offset=offset, set_spec=None,
+            from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+        )
+        root = ET.fromstring(xml.split("\n", 1)[-1] if xml.startswith("<?") else xml)
+        seen_ids.extend(
+            e.text
+            for e in root.findall(".//{http://www.openarchives.org/OAI/2.0/}identifier")
+        )
+        rt = root.find(".//{http://www.openarchives.org/OAI/2.0/}resumptionToken")
+        assert rt is not None
+        token = rt.text
+        pages += 1
+        if token:
+            decoded = oaipmh_service.decode_token(token)
+            offset = decoded["offset"]
+        assert pages <= total  # guard against infinite loop on a broken pagination contract
+
+    assert len(seen_ids) == total
+    assert len(set(seen_ids)) == total
+    assert pages == 3  # ceil(5 / 2)
+
+
 def test_list_identifiers_with_resumption_token() -> None:
     hit = _mock_hit()
     xml = oaipmh_service.list_identifiers(
