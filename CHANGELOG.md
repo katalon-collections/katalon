@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-08-17
+
+### Added
+- Importer: Auto-Mapping-Heuristik für CSV/Excel-Spalten (exakter Treffer → Synonym-Tabelle → Levenshtein-Fuzzy-Match, Issue #199).
+
 ## [0.11.7] - 2026-08-17
 
 ### Changed

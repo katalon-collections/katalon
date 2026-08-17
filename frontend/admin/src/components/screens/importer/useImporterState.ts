@@ -11,6 +11,80 @@ import {
   type ProfileApplyResult,
 } from './types'
 import { applyProfile, buildProfile, downloadProfile } from './profileUtils'
+// ── Auto-Mapping-Heuristik (Issue #199) ──────────────────────────────────────
+
+// Statische Synonym-Tabelle: kanonischer Feldname → gängige CSV-/DC-Aliasnamen.
+const FIELD_SYNONYMS: Record<string, string[]> = {
+  title: ['titel', 'dc:title', 'name', 'bezeichnung', 'objektbezeichnung'],
+  description: ['beschreibung', 'dc:description', 'notes', 'anmerkung', 'notizen'],
+  creator: ['autor', 'author', 'dc:creator', 'urheber', 'hersteller', 'künstler'],
+  date: ['datum', 'dc:date', 'jahr', 'year', 'entstehungsjahr', 'datierung'],
+  type: ['typ', 'dc:type', 'art', 'gattung', 'objekttyp'],
+  identifier: ['id', 'idno', 'dc:identifier', 'signatur', 'inventarnummer', 'inventar-nr'],
+  rights: ['lizenz', 'license', 'dc:rights', 'rechte', 'rechteinhaber'],
+  medium: ['material', 'technik', 'werkstoff', 'medium'],
+  location: ['ort', 'place', 'dc:coverage', 'standort'],
+  subject: ['schlagwort', 'dc:subject', 'keyword', 'thema'],
+  language: ['sprache', 'dc:language'],
+  publisher: ['verlag', 'dc:publisher', 'herausgeber'],
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  let prev = Array.from({ length: n + 1 }, (_, i) => i)
+  let curr = new Array<number>(n + 1).fill(0)
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  return prev[n]
+}
+
+function normalizedSimilarity(a: string, b: string): number {
+  const maxLen = Math.max(a.length, b.length)
+  if (maxLen === 0) return 1
+  return 1 - levenshteinDistance(a, b) / maxLen
+}
+
+function suggestTargetForColumn(col: string, fields: FieldDefinition[]): string | null {
+  const lowerCol = col.trim().toLowerCase()
+  const normalized = lowerCol.replace(/[\s-]+/g, '_')
+
+  // 1. Exakter Treffer: interner Name oder DE-Label
+  for (const f of fields) {
+    if (f.name === normalized) return f.name
+    const labelDe = (f.label.de ?? '').toLowerCase()
+    if (labelDe && labelDe === lowerCol) return f.name
+  }
+
+  // 2. Synonym-Tabelle
+  for (const f of fields) {
+    const aliases = FIELD_SYNONYMS[f.name] ?? []
+    if (aliases.includes(lowerCol) || aliases.includes(normalized)) return f.name
+  }
+
+  // 3. Fuzzy (Levenshtein) gegen internen Namen und DE-Label
+  let best: { name: string; score: number } | null = null
+  for (const f of fields) {
+    const labelDe = f.label.de
+    const candidates = labelDe ? [f.name, labelDe.toLowerCase()] : [f.name]
+    for (const raw of candidates) {
+      const cand = raw.replace(/[\s-]+/g, '_')
+      const score = normalizedSimilarity(normalized, cand)
+      if (score > (best?.score ?? -1)) best = { name: f.name, score }
+    }
+  }
+  return best && best.score >= 0.8 ? best.name : null
+}
+
 
 // ── Persistence helpers ───────────────────────────────────────────────────────
 
@@ -295,12 +369,11 @@ export function useImporterState(): ImporterStateAndHandlers {
         return
       }
 
-      // CSV/Excel: auto-map obvious column names
+      // CSV/Excel: Auto-Mapping (exakt → Synonym → Levenshtein, #199)
       const autoMap: Record<string, MappingEntry> = {}
       for (const col of (result.headers ?? [])) {
-        const norm = col.toLowerCase().replace(/[\s-]/g, '_')
-        const match = fields.find(f => f.name === norm || f.label.de?.toLowerCase() === col.toLowerCase())
-        if (match) autoMap[col] = { target: match.name }
+        const target = suggestTargetForColumn(col, fields)
+        if (target) autoMap[col] = { target }
       }
       dispatch({ type: 'UPLOADED', payload: result })
       dispatch({ type: 'MAPPING_CHANGED', payload: autoMap })
