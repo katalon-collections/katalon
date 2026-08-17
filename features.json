@@ -2,8 +2,8 @@
   "$schema": "./features.schema.json",
   "meta": {
     "title": "Katalon – Feature List",
-    "version": "0.7.0",
-    "generated": "2026-08-04",
+    "version": "1.0.0",
+    "generated": "2026-08-17",
     "description": "Vollständige Feature-Liste für das Katalon Metadata Management System, gruppiert nach Domänen von High-Level bis Low-Level."
   },
   "domains": [
@@ -46,7 +46,7 @@
               "id": "records.types.procedure",
               "name": "Procedure – Vorgänge (Leihverkehr, Erwerbung, Restaurierung)",
               "status": "done",
-              "details": ["procedure_type (loan_in/loan_out/acquisition/conservation)", "reference_number", "Datumsfelder (scheduled_date, completed_date, due_date)", "Completion-Workflow", "Validierung: keine zweite aktive loan_out pro Objekt"]
+              "details": ["Konfigurierbare Subtypen (#255)", "procedure_type (loan_in/loan_out/acquisition/conservation als löschbarer Startbestand)", "reference_number", "Datumsfelder (scheduled_date, completed_date, due_date)", "Completion-Workflow", "Validierung: keine zweite aktive loan_out pro Objekt", "Beschreibung pro Vorgangstyp (erscheint beim Anlegen/Bearbeiten)"]
             }
           ]
         },
@@ -136,7 +136,7 @@
               "id": "schema.definitions.properties",
               "name": "Feldeigenschaften",
               "status": "done",
-              "details": ["is_required", "is_repeatable", "is_searchable", "is_facet", "show_in_detail", "sort_order", "settings (feldtyp-spezifisch)", "default_value", "admin_only (nur Admins editierbar)"]
+              "details": ["is_required", "is_repeatable", "is_searchable", "is_facet", "show_in_detail", "sort_order", "settings (feldtyp-spezifisch)", "default_value", "admin_only (nur Admins editierbar)", "is_translatable (übersetzbare Text-/Rich-Text-Felder)"]
             },
             {
               "id": "schema.definitions.labels",
@@ -157,7 +157,7 @@
           "name": "Containerfelder (verschachtelte Metadatengruppen)",
           "level": "mid",
           "status": "done",
-          "details": ["field_type = 'group'", "parent_id (self-referential FK, CASCADE DELETE)", "Sub-Felder inline im Schema-Editor", "Wiederholbare Gruppen", "Rekursive Validierung", "ES-Indexierung als nested-Typ", "Relations-Subfelder in Gruppen"]
+          "details": ["field_type = 'group'", "parent_id (self-referential FK, CASCADE DELETE)", "Sub-Felder inline im Schema-Editor", "Wiederholbare Gruppen", "Rekursive Validierung", "ES-Indexierung als nested-Typ", "Relations-Subfelder in Gruppen", "Authority-Subfelder in Gruppen", "KI-Vorschläge für Gruppen-Subfelder"]
         },
         {
           "id": "schema.mds",
@@ -165,6 +165,13 @@
           "level": "mid",
           "status": "done",
           "details": ["admin_only-Flag für Felder", "default_value für Felder"]
+        },
+        {
+          "id": "schema.reset",
+          "name": "Schema-Reset (pro Typ/Subtyp)",
+          "level": "low",
+          "status": "done",
+          "details": ["Bestätigungspflichtig in den Einstellungen", "Metadaten bleiben erhalten", "Wieder sichtbar bei gleichem technischem Namen"]
         }
       ]
     },
@@ -245,6 +252,13 @@
           "level": "low",
           "status": "done",
           "details": ["Kein Redirect zur Liste", "Direkt weiterbearbeiten möglich"]
+        },
+        {
+          "id": "input.quickcreate",
+          "name": "Schnellanlage aus Relationsfeldern (0.8.0)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Verknüpfte Records als Entwurf direkt aus Relationsfeldern/Beziehungen-Panel anlegen", "Automatische Verknüpfung nach Anlage", "Schema-gesteuert mit Formularvarianten", "Fester bzw. konfigurierbarer Subtyp", "Responsiver Dialog mit Fokus-Rückgabe"]
         }
       ]
     },
@@ -319,11 +333,18 @@
           "details": ["Vorschaubilder in zugehörigen Objekten", "Gegenrichtungslabels in Inline-Karten", "Relation-Facetten beim Objekt-Browsing (ES-denormalisiert)"]
         },
         {
+          "id": "relations.types",
+          "name": "Relationstyp-Einschränkungen",
+          "level": "mid",
+          "status": "done",
+          "details": ["Relationstyp-Vokabular auf Quell-/Ziel-Record-Typen einschränkbar (applies_from/applies_to)", "Serverseitige Validierung (422 bei unzulässiger Kombination)", "Optionaler fester Relationstyp pro Relationsfeld (#213)"]
+        },
+        {
           "id": "relations.inherited",
-          "name": "Inherited Fields (ES-Denormalisierung)",
-          "level": "low",
-          "status": "planned",
-          "details": ["Felder verlinkter Records im ES-Index einbetten", "Suchtbar und facettierbar", "Kaskaden-Reindex bei Änderung, max. 1 Ebene", "Issue #213"]
+          "name": "Inherited Fields (verlinkte Felder als Facetten)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Ausgewählte Felder verlinkter Records im ES-Index einbetten", "Als Keyword-Facetten im Portal nutzbar", "Reindex bei Änderung der Einbettungs-Konfiguration", "Optionaler fester Relationstyp begrenzt die Suche", "Issue #213"]
         }
       ]
     },
@@ -401,7 +422,7 @@
           "name": "Vokabular-Import (CSV)",
           "level": "mid",
           "status": "done",
-          "details": ["UTF-8/cp1252/latin-1-Erkennung", "Term + Label + Hierarchie + external_id", "Normdaten-Spalte mit Source-Auswahl"]
+          "details": ["UTF-8/cp1252/latin-1-Erkennung", "Term + Label + Hierarchie + external_id", "term optional (Slug aus Label, ä→ae)", "parent_term akzeptiert ID oder Label", "Normdaten-Spalte mit Source-Auswahl"]
         }
       ]
     },
@@ -460,6 +481,13 @@
               "details": ["Clover IIIF Viewer", "Deep Zoom", "End-to-End mit Cantaloupe-Tiles"]
             }
           ]
+        },
+        {
+          "id": "media.formats",
+          "name": "Medienformate über Bilder hinaus (1.0.0)",
+          "level": "mid",
+          "status": "done",
+          "details": ["PDF, Audio (MP3/WAV/OGG), Video (MP4/WebM), 3D (GLB/GLTF)", "Nicht-Bild-Dateien überspringen Cantaloupe/IIIF und sind sofort ready", "Viewer-Dispatch: PDF nativ, Audio/Video HTML5-Player, 3D über @google/model-viewer", "MIME-Fallback für .glb/.gltf", "_links.thumbnail/IIIF nur für Bilder", "Admin-Medien-Lightbox + Kategorie-Thumbnails"]
         }
       ]
     },
@@ -545,6 +573,13 @@
               "details": ["Admin-Screen für sichtbare Felder und Facetten", "portal_config-DB-Tabelle", "Phase 8.1"]
             }
           ]
+        },
+        {
+          "id": "search.portal_api",
+          "name": "Anonymer Portal-Read-Model (/portal/v1)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Nur veröffentlichte Objects/Entities/Places/Occurrences (keine Vorgänge)", "_links-Navigation in /v1 und /portal/v1", "Einzel-Endpunkte für Vokabular und Term", "Explizite öffentliche Projektionen (interne Felder, Relations-Metadaten, unfertige Medien verborgen)", "Portal-Client nutzt /portal/v1"]
         }
       ]
     },
@@ -609,7 +644,7 @@
           "level": "low",
           "status": "planned",
           "children": [
-            {"id": "import.open.automap", "name": "Auto-Mapping-Heuristik (Levenshtein + Synonyme)", "status": "planned", "details": ["#199"]},
+            {"id": "import.open.automap", "name": "Auto-Mapping-Heuristik (Levenshtein + Synonyme)", "status": "done", "details": ["Exakter Treffer → Synonym-Tabelle → Levenshtein-Fuzzy-Match", "#199"]},
             {"id": "import.open.preview", "name": "10-Zeilen-Vorschau-Import mit Rollback", "status": "planned", "details": ["#201"]},
             {"id": "import.open.diff", "name": "Diff-Preview bei Upsert", "status": "planned", "details": ["#202"]},
             {"id": "import.open.streaming", "name": "Streaming-Upload > 10 MB", "status": "planned", "details": ["#204"]}
@@ -711,7 +746,13 @@
               "id": "rights.roles.guard",
               "name": "Endpoint-Guards",
               "status": "done",
-              "details": ["CurrentUser/require_role-Dependency", "Schreibende Endpoints auth-geschützt"]
+              "details": ["CurrentUser/require_role-Dependency", "Schreibende Endpoints auth-geschützt", "/v1 tokenpflichtig (JWT oder API-Key), anonyme Reads nur über /portal/v1"]
+            },
+            {
+              "id": "rights.roles.crud",
+              "name": "Granulare CRUD-Rechte je Primärtyp",
+              "status": "done",
+              "details": ["Konfigurierbare CRUD-Rechte für feste Rollen je Typ (#276)", "Serverseitige Durchsetzung", "Rollenmatrix in der Benutzerverwaltung (#user-roles)"]
             }
           ]
         },
@@ -843,7 +884,14 @@
           "name": "KI-Unterstützung (AI)",
           "level": "low",
           "status": "done",
-          "details": ["Konfigurierbare Basis-URL, Modell, API-Key", "Verschlüsselte Secrets", "Feldvorschläge im Formular", "Vocab-/Relations-Feld-Vorschläge bei Fokus"]
+          "details": ["Konfigurierbare Basis-URL, Modell, API-Key", "Verschlüsselte Secrets", "Feldvorschläge im Formular", "Vocab-/Relations-Feld-Vorschläge bei Fokus", "Editierbarer Vergleichsdialog bei vorhandenen Werten", "Vision-Bilder max. 1024 px + Token-Limit-Prüfung", "Tages-/Monatsverbrauchs-Anzeige in Einstellungen"]
+        },
+        {
+          "id": "customization.languages",
+          "name": "Mehrsprachigkeit (1.0.0)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Konfigurierbare Sprachliste (Admin → Einstellungen → Sprachen)", "Mehrsprachige Labels (Schema, Subtypen, Formularvarianten, Vokabulare)", "is_translatable für Text-/Rich-Text-Felder", "Sprach-Editor pro konfigurierter Sprache", "Portal: Sprachumschalter + dependency-freies i18n mit Fallback-Kette"]
         }
       ]
     },
@@ -908,13 +956,22 @@
             {"id": "admin.screens.subtype", "name": "ScreenSubtype – Subtyp-Verwaltung", "status": "done"},
             {"id": "admin.screens.vocab", "name": "ScreenVocab – Vokabular-Verwaltung", "status": "done"},
             {"id": "admin.screens.users", "name": "ScreenUsers – Benutzerverwaltung", "status": "done"},
-            {"id": "admin.screens.settings", "name": "ScreenSettings – Einstellungen", "status": "done", "details": ["ID-Schemata", "Portal-Farben/Logo", "Portal-Facettenkonfiguration", "KI-Einstellungen"]},
+            {"id": "admin.screens.settings", "name": "ScreenSettings – Einstellungen", "status": "done", "details": ["ID-Schemata", "Portal-Farben/Logo", "Portal-Facettenkonfiguration", "Sprachen", "KI-Einstellungen", "Versionshinweise", "Schema-Reset"]},
             {"id": "admin.screens.importer", "name": "ScreenImporter – Import-Wizard", "status": "done"},
             {"id": "admin.screens.pages", "name": "ScreenPages – Statische Seiten", "status": "done"},
             {"id": "admin.screens.banners", "name": "ScreenBanners – Wartungsbanner", "status": "done"},
             {"id": "admin.screens.audit", "name": "ScreenAudit – Audit Log (global)", "status": "done"},
-            {"id": "admin.screens.oai", "name": "ScreenOAISets – OAI-Sets", "status": "done"}
+            {"id": "admin.screens.oai", "name": "ScreenOAISets – OAI-Sets", "status": "done"},
+            {"id": "admin.screens.roles", "name": "ScreenUserRoles – Rollenrechte-Matrix (#user-roles)", "status": "done"},
+            {"id": "admin.screens.variants", "name": "ScreenFormVariants – Formularvarianten", "status": "done"}
           ]
+        },
+        {
+          "id": "admin.onboarding",
+          "name": "Onboarding-Tour",
+          "level": "mid",
+          "status": "done",
+          "details": ["Geführte Tour bei Admin-Erstanmeldung (admin/superuser)", "Jederzeit über Hilfe-Icon startbar", "Fortschritt via users.onboarding_completed_at"]
         },
         {
           "id": "admin.layout",
@@ -938,6 +995,12 @@
               "id": "admin.layout.topbar",
               "name": "Topbar mit globaler Suche und Benutzeraktionen",
               "status": "done"
+            },
+            {
+              "id": "admin.layout.deeplinks",
+              "name": "Deep-Linking per URL-Hash",
+              "status": "done",
+              "details": ["Screens mit internen Tabs/Filtern direkt verlinkbar (#settings/medien, #schema/object.foto)", "Kontextsensitives Hilfe-Icon (ROUTE_DOCS)"]
             }
           ]
         },
@@ -1041,6 +1104,13 @@
             {"id": "infra.docker.dev", "name": "Dev Stack (docker-compose.dev.yml)", "status": "done", "details": ["Hot Reload für Admin/Portal", "Healthchecks mit depends_on"]},
             {"id": "infra.docker.override", "name": "docker-compose.override.yml Pattern", "status": "done", "details": ["Traefik-Integration als Overlay", "Customization ohne Image-Rebuild"]}
           ]
+        },
+        {
+          "id": "infra.cli_distribution",
+          "name": "katalon-cli Distribution",
+          "level": "mid",
+          "status": "done",
+          "details": ["Produktions-Installation über separate CLI (uv tool install katalon-cli)", "Pinned Release-Images statt Source-Checkout", "release-meta.toml + katalon-release.json als Metadatenquelle"]
         }
       ]
     }
