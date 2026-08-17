@@ -32,6 +32,19 @@ Unique Selling Points:
 
 ---
 
+## Prinzipien
+
+1. **Datenintegrität und Sicherheit von Metadaten und Medien**
+2. **User Experience: Simplizität und Flexibilität.** Kuratorinnen und Sachbearbeiter konfigurieren Schemata über die Oberfläche, nicht über Config-Dateien oder Code. Die Software passt sich an die Sammlung an und nicht umgekehrt.
+3. **Techstack.** Moderne, etablierte und gut gewartete Technologien. Performance und Angriffsresistenz. Eine Portalansicht kommt direkt mit. Mit überschaubarem Aufwand zu Installieren und Betreiben.
+4. **Kostenlos, einfach anpassbar, Import selbst machbar.** Katalon ist Open Source, keine Lizenzkosten. Institutionen mit kleinem Budget importieren ihre Bestände selbst (Smart Importer, Dry-Run-Vorschau) statt einen Dienstleister zu beauftragen.
+5. **Kein Lock-in.** REST-API mit OpenAPI-Spec, OAI-PMH, ein dokumentiertes, einfaches Datenmodell. Institutionen nehmen ihre Daten jederzeit mit.
+6. **Standardkonformität.** Anschluss an GLAM-Standards (IIIF, Dublin Core, ggf. LIDO/EAD) statt proprietärer Formate. Nutzung von Normdaten.
+7. **Barrierefreiheit.** Das öffentliche Portal ist für alle nutzbar.
+8. **Anpassbar.** Falls doch eine Speziallösung oder ein eigenes Portal genutzt werden soll.
+
+---
+
 ## Schnellstart
 
 ```bash
@@ -182,65 +195,6 @@ Wichtige Endpunkte:
 - URN-Vergabe ist per Umgebungsvariablen konfigurierbar (`DNB_URN_*` in `.env.example`).
 - URN-Registrierung ist derzeit auf den Record-Typ **`object`** eingeschränkt.
 - Für lokale Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
-
-### Vokabular-Import (CSV/JSON)
-
-Endpoint: `POST /v1/vocabularies/{vocab_id}/import?dry_run=true|false&strategy=append|replace`  
-Request: `multipart/form-data` mit `file` und optional `mapping` (nur CSV/TSV).
-
-#### Welche Felder sind nötig?
-
-- **Kein `id` erforderlich** (IDs werden intern erzeugt).
-- **Kein `title` erforderlich**.
-- Pflicht ist nur der **Term-Schlüssel** (`term`), also der interne Begriff.
-- Optional:
-  - `label:<sprache>` (z. B. `label:de`, `label:en`) für Anzeigenamen/Übersetzungen
-  - `parent_term` für Hierarchie
-  - `external_id` als externe Kennung im Importdatensatz
-
-#### CSV/TSV
-
-CSV braucht ein Mapping-Feld (`mapping` als JSON), z. B.:
-
-```json
-{
-  "begriff": "term",
-  "anzeige_de": "label:de",
-  "anzeige_en": "label:en",
-  "oberbegriff": "parent_term",
-  "gnd_id": "external_id"
-}
-```
-
-Beispiel-CSV:
-
-```csv
-begriff;anzeige_de;anzeige_en;oberbegriff;gnd_id
-kunst;Kunst;Art;;
-malerei;Malerei;Painting;kunst;4065684-4
-```
-
-#### JSON (auch hierarchisch)
-
-Unterstützt flache Listen oder verschachtelte `children`:
-
-```json
-[
-  {
-    "term": "kunst",
-    "label": {"de": "Kunst", "en": "Art"},
-    "children": [
-      {"term": "malerei", "label": {"de": "Malerei", "en": "Painting"}}
-    ]
-  }
-]
-```
-
-#### Dry-Run und Strategie
-
-- `dry_run=true`: prüft Datei, schreibt nichts in die DB (Vorschau + Fehlerliste).
-- `strategy=append`: vorhandene Terme bleiben, gleiche `term`-Werte werden aktualisiert.
-- `strategy=replace`: vorhandene Terme des Vokabulars werden ersetzt.
 
 ## Admin-UI
 

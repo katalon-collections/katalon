@@ -130,25 +130,6 @@ Adapter werden in DB registriert. Erste Adapter: GND, Geonames.
 authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 ```
 
-## Phasenplan (MVP = Phasen 0–6)
-
-| Phase | Status | Meilenstein                                                    |
-|-------|--------|----------------------------------------------------------------|
-| 0–1   | ✅      | Infra (Docker Compose, alle Services) + Core-DB (ORM, Alembic) |
-| 2     | ✅      | Schema-Engine (field_definitions, repeatable, Vokabulare)      |
-| 3     | ✅      | CRUD alle 4 Typen + generische Relationen mit Metadaten        |
-| 4     | ✅      | Auth (FastAPI-Users, JWT, Rollen) + Audit Log                  |
-| 5     | ✅      | Media & IIIF (Upload, Celery, Cantaloupe, Manifest) ← MVP-API  |
-| 6     | ✅      | Admin-UI (React: Schema, CRUD, Medien) ← MVP komplett          |
-| 7     | ✅      | Elasticsearch + Versionierung (Snapshots)                      |
-| 8     | ✅      | Public-Portal (React: Suche, Facetten, IIIF-Viewer)            |
-| 9     | ✅      | Authority-Plugin-System + Adapter GND/Geonames                 |
-| 10    | ✅      | Smart Importer (Excel/CSV/XML ETL, Dry Run)                    |
-| 11    | ✅      | OAI-PMH                                                        |
-| 12    | ⚠️      | Hardening                                                      |
-| 13    | ⚠️      | Inherited Fields (ES-Denormalisierung)                         |
-| 14    | ✅      | Procedure-Typ (Leihverkehr, Erwerbung, Restaurierung)          |
-
 ## Nicht im Scope
 
 - Video/Audio-Transcoding
@@ -156,25 +137,9 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 - Typ-Hierarchien (Post-MVP)
 - Sets (Nice-to-have, Post-MVP)
 
-## User-Profil
-
-Karl kennt sich gut mit Python und React aus. Keine grundlegenden Erklärungen zu diesen Technologien nötig. Er kennt CollectiveAccess-Konzepte (dynamische Schemata, Vokabulare, Entitätsrelationen).
-
 ## Debugging
 
 - Wenn ich Fehler berichte, schau immer in die Logs der entsprechenden Container statt Annahmen zu treffen.
-
-## Admin-Onboarding-Tour testen
-
-Auto-Trigger läuft für Rolle `admin` **und** `superuser` (nicht nur `superuser` — Bug in erster Version, siehe [[feedback_onboarding_tour_role]]), wenn `users.onboarding_completed_at` NULL ist. Zum erneuten Testen Flag zurücksetzen:
-
-```
-docker compose exec db psql -U katalon -d katalon -c "UPDATE users SET onboarding_completed_at = NULL WHERE email='<email>';"
-```
-
-Danach Seite in `http://localhost/admin/` neu laden (kein Logout nötig). Manueller Start/Restart jederzeit über Hilfe-Icon (?) im Header. Nach Frontend-Änderungen an Tour-Code (`frontend/admin/src/tour/steps.ts`, `frontend/admin/src/components/tour/Tour.tsx`) Container neu bauen: `docker compose build admin && docker compose up -d admin`.
-
-Details/Architektur: `almanac/architecture/workflows/admin-onboarding-tour.md`.
 
 ## Python/uv Hinweise
 
