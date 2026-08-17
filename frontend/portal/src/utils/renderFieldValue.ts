@@ -36,11 +36,20 @@ export function pidUrl(value: unknown): string | undefined {
 export function renderFieldValue(value: unknown): string | null {
   if (value == null) return null
 
-  // Authority entry: {source, external_id, label}
+  // Authority entry {source, external_id, label} / translatable field {lang: text}
   if (typeof value === 'object' && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>
     if (typeof obj.label === 'string' && obj.label) return obj.label
     if (typeof obj.value === 'string' && obj.value) return obj.value
+    // Translatable field: prefer de → en → first non-empty language value.
+    for (const lang of ['de', 'en']) {
+      const v = obj[lang]
+      if (typeof v === 'string' && v.trim()) return v
+    }
+    for (const key of Object.keys(obj)) {
+      const v = obj[key]
+      if (typeof v === 'string' && v.trim()) return v
+    }
     return null
   }
 

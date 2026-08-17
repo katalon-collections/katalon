@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from katalon.config import settings
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
-from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
+from katalon.core.media_validation import ALLOWED_MEDIA_MIME, media_category, resolve_upload_mime, verified_image_mime
 from katalon.core.models import AdminConfig, MediaFile, Object
 from katalon.core.visibility import ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
@@ -24,7 +24,7 @@ from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_
 router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
 batch_router = APIRouter(prefix="/media", tags=["media"])
 
-ALLOWED_MIME = ALLOWED_IMAGE_MIME
+ALLOWED_MIME = ALLOWED_MEDIA_MIME
 
 
 def _is_absolute_http_url(value: str) -> bool:
@@ -42,7 +42,7 @@ def _serialize(f: MediaFile) -> dict:
         "object": {"href": f"/v1/objects/{f.object_id}"},
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
     }
-    if f.status == "ready":
+    if f.status == "ready" and media_category(f.mime_type) == "image":
         identifier = Path(f.file_path).name
         links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
     if f.license_uri and _is_absolute_http_url(f.license_uri):
@@ -51,6 +51,7 @@ def _serialize(f: MediaFile) -> dict:
         "id": str(f.id),
         "filename": f.filename,
         "mime_type": f.mime_type,
+        "category": media_category(f.mime_type),
         "status": f.status,
         "is_primary": f.is_primary,
         "media_type": f.media_type,
@@ -96,7 +97,8 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     if not obj_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
 
-    if file.content_type not in ALLOWED_MIME:
+    resolved_mime = resolve_upload_mime(file.content_type, file.filename or "")
+    if resolved_mime is None:
         raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
 
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
@@ -115,7 +117,8 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
                 raise HTTPException(status_code=413, detail="Datei zu groß")
             await out.write(chunk)
 
-    actual_mime = verified_image_mime(dest_path)
+    category = media_category(resolved_mime)
+    actual_mime = verified_image_mime(dest_path) if category == "image" else resolved_mime
 
     existing = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
     config = await db.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
@@ -125,7 +128,7 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         filename=file.filename or dest_path.name,
         mime_type=actual_mime,
         file_path=str(dest_path),
-        status="pending",
+        status="pending" if category == "image" else "ready",
         is_primary=len(existing) == 0,
         license_uri=config.media_default_license_uri if config else None,
         rights_holder=config.media_default_rights_holder if config else None,
@@ -133,8 +136,9 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     db.add(media)
     await db.commit()  # commit before Celery dispatch so the worker can find the row
 
-    from katalon.workers.enqueue import enqueue
-    enqueue(generate_iiif_tiles, str(file_id))
+    if category == "image":
+        from katalon.workers.enqueue import enqueue
+        enqueue(generate_iiif_tiles, str(file_id))
 
     return _serialize(media)
 

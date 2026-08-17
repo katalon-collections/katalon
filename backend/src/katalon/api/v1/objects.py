@@ -401,7 +401,9 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
         .where(MediaFile.object_id == object_id, MediaFile.status == "ready")
         .order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
     )
-    media_files = media_result.scalars().all()
+    from katalon.core.media_validation import media_category
+
+    media_files = [m for m in media_result.scalars().all() if media_category(m.mime_type) == "image"]
     if not media_files:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 

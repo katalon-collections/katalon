@@ -11,6 +11,7 @@ const DEFAULT: PortalConfig = {
   logo_url: '',
   placeholder_image_url: '',
   color_tokens: {},
+  supported_languages: ['de', 'en'],
 }
 
 // Module-level cache so multiple components share one fetch per page load

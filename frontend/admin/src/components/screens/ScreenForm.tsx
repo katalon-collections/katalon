@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, BASE, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
-import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Image, Lightning } from '../ui/Icons'
+import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Image, Lightning, File, Music, Video, FileText, Box } from '../ui/Icons'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
+import { TranslatableInput } from '../ui/TranslatableInput'
+import { MediaLightbox } from '../MediaLightbox'
 
 function normalizeDateInput(value: string): string {
   const trimmed = value.trim()
@@ -965,6 +968,35 @@ interface Props {
   onCreated?: (record: AnyRecord) => void
 }
 
+function VideoThumb({ objectId, mediaId }: { objectId: string; mediaId: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl: string | null = null
+    authorizedFetch(`/v1/objects/${objectId}/media/${mediaId}/file`)
+      .then(res => { if (!res.ok) throw new Error(); return res.blob() })
+      .then(blob => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [objectId, mediaId])
+
+  if (!url) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Video size={20} style={{ color: 'var(--fg-3)' }} />
+      </div>
+    )
+  }
+  return <video src={url} muted preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+}
+
 export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
@@ -1001,6 +1033,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [dueDate, setDueDate] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
   const [values, setValues]   = useState<Record<string, unknown>>({})
+  const languages = useSupportedLanguages()
   // Optimistic locking (#272): version loaded with the record + the metadata as
   // loaded (base), so a save conflict can be resolved field-by-field.
   const [version, setVersion] = useState<number | null>(null)
@@ -1028,6 +1061,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [uploading, setUploading]       = useState(false)
   const [uploadError, setUploadError]   = useState<string | null>(null)
   const [dragOver, setDragOver]         = useState(false)
+  const [lightboxMedia, setLightboxMedia] = useState<MediaFile | null>(null)
   const [mediaTypeTerms, setMediaTypeTerms] = useState<VocabularyTerm[]>([])
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const [relTypeVocabId, setRelTypeVocabId] = useState<string | undefined>()
@@ -1362,6 +1396,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   function updateRepeat(name: string, idx: number, val: string) {
     const cur = [...((values[name] as string[]) ?? [])]
     cur[idx] = val
+    setValuesDirty(v => ({ ...v, [name]: cur }))
+  }
+  function updateTranslatable(name: string, lang: string, val: string) {
+    const cur = { ...((values[name] as Record<string, string>) ?? {}) }
+    cur[lang] = val
+    setValuesDirty(v => ({ ...v, [name]: cur }))
+  }
+  function removeTranslatable(name: string, lang: string) {
+    const cur = { ...((values[name] as Record<string, string>) ?? {}) }
+    delete cur[lang]
     setValuesDirty(v => ({ ...v, [name]: cur }))
   }
 
@@ -2364,7 +2408,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {f.is_required && <span className="req">*</span>}
                         {repeatable && <span className="h">wiederholbar</span>}
                         {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
-                        {getFieldAiConfig(f) && (
+                        {getFieldAiConfig(f) && !f.is_translatable && (
                           <button
                             type="button"
                             className="btn sm gh"
@@ -2378,7 +2422,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         )}
                       </div>
 
-                      {f.field_type === 'vocab' ? (
+                      {f.is_translatable ? (
+                        <TranslatableInput
+                          languages={languages}
+                          value={(val as Record<string, string> | undefined) ?? {}}
+                          onChange={(lang, v) => updateTranslatable(f.name, lang, v)}
+                          onRemove={lang => removeTranslatable(f.name, lang)}
+                          richtext={f.field_type === 'richtext'}
+                          labels={f.label}
+                          placeholder={getLabel(f, f.name)}
+                          disabled={justCreated}
+                          style={getFeedbackStyle(f.name)}
+                        />
+                      ) : f.field_type === 'vocab' ? (
                         repeatable ? (
                           <>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
@@ -2732,27 +2788,44 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <div style={{ marginBottom: 12, display: 'grid', gap: 10 }}>
                         {mediaFiles.map(f => (
                           <div key={f.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)', background: 'var(--bg-s)' }}>
-                            <a href={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1', overflow: 'hidden' }}>
-                              {f.status !== 'error' && f._links?.thumbnail ? (
+                            <button type="button" onClick={() => setLightboxMedia(f)} style={{ display: 'block', width: '100%', overflow: 'hidden', padding: 0, border: 0, cursor: 'zoom-in', background: 'transparent', ...(f.category !== 'audio' ? { aspectRatio: '1' } : {}) }}>
+                              {f.status === 'error' ? (
+                                <div style={{ width: '100%', aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <AlertCircle size={18} style={{ color: '#dc2626' }} />
+                                  <span style={{ fontSize: 9, color: '#dc2626' }}>Fehler</span>
+                                </div>
+                              ) : f._links?.thumbnail ? (
                                 <img
                                   src={f._links.thumbnail.href}
                                   alt={f.filename}
                                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                                 />
-                              ) : null}
-                              {f.status === 'error' && (
-                                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                                  <AlertCircle size={18} style={{ color: '#dc2626' }} />
-                                  <span style={{ fontSize: 9, color: '#dc2626' }}>Fehler</span>
+                              ) : f.category === 'video' ? (
+                                <div style={{ width: '100%', aspectRatio: '1' }}>
+                                  <VideoThumb objectId={savedId!} mediaId={f.id} />
+                                </div>
+                              ) : f.category === 'audio' ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px' }}>
+                                  <Music size={16} style={{ color: 'var(--fg-3)' }} />
+                                  <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>Audio</span>
+                                </div>
+                              ) : f.category === 'pdf' ? (
+                                <div style={{ width: '100%', aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <FileText size={20} style={{ color: 'var(--fg-3)' }} />
+                                  <span style={{ fontSize: 9, color: 'var(--fg-3)' }}>PDF</span>
+                                </div>
+                              ) : f.category === 'model' ? (
+                                <div style={{ width: '100%', aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <Box size={20} style={{ color: 'var(--fg-3)' }} />
+                                  <span style={{ fontSize: 9, color: 'var(--fg-3)' }}>3D</span>
+                                </div>
+                              ) : (
+                                <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <File size={20} style={{ color: 'var(--fg-3)' }} />
                                 </div>
                               )}
-                              {f.status !== 'ready' && f.status !== 'pending' && f.status !== 'error' && (
-                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Image size={20} style={{ color: 'var(--fg-3)' }} />
-                                </div>
-                              )}
-                            </a>
+                            </button>
                             <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'space-between' }}>
                               <span style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={f.filename}>{f.filename}</span>
                               <button
@@ -2815,7 +2888,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
                             <label className="upload-control">
                               &nbsp;auswählen
-                              <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp" onChange={onFileChange} />
+                              <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp,application/pdf,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,model/gltf-binary,.glb" onChange={onFileChange} />
                             </label>
                           </>
                         )}
@@ -3094,6 +3167,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           )}
         </div>
       </div>
+      {lightboxMedia && savedId && (
+        <MediaLightbox objectId={savedId} media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
+      )}
     </div>
   )
 }

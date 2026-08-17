@@ -75,6 +75,7 @@ export interface FieldDefinition {
   field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'authority' | 'group'
   is_required: boolean
   is_repeatable: boolean
+  is_translatable: boolean
   sort_order: number
   settings: Record<string, unknown>
   show_in_detail: boolean

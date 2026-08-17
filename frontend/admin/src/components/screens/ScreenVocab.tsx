@@ -4,6 +4,8 @@ import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '..
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { ChevD, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
+import { LabelEditor } from '../ui/LabelEditor'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const RECORD_TYPE_LABELS: Record<RecordType, string> = {
   object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
@@ -194,8 +196,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   // new term form
   const [showNewTerm, setShowNewTerm] = useState(false)
   const [newTermTerm, setNewTermTerm] = useState('')
-  const [newTermLabelDe, setNewTermLabelDe] = useState('')
-  const [newTermInverseLabelDe, setNewTermInverseLabelDe] = useState('')
+  const [newTermLabel, setNewTermLabel] = useState<Record<string, string>>({})
+  const [newTermInverseLabel, setNewTermInverseLabel] = useState<Record<string, string>>({})
   const [newTermAppliesFrom, setNewTermAppliesFrom] = useState<RecordType[]>([])
   const [newTermAppliesTo, setNewTermAppliesTo] = useState<RecordType[]>([])
   const [savingTerm, setSavingTerm] = useState(false)
@@ -204,8 +206,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   // edit term inline
   const [editTermId, setEditTermId] = useState<string | null>(null)
   const [editTermTerm, setEditTermTerm] = useState('')
-  const [editTermLabelDe, setEditTermLabelDe] = useState('')
-  const [editTermInverseLabelDe, setEditTermInverseLabelDe] = useState('')
+  const [editTermLabel, setEditTermLabel] = useState<Record<string, string>>({})
+  const [editTermInverseLabel, setEditTermInverseLabel] = useState<Record<string, string>>({})
   const [editTermAppliesFrom, setEditTermAppliesFrom] = useState<RecordType[]>([])
   const [editTermAppliesTo, setEditTermAppliesTo] = useState<RecordType[]>([])
   const [savingEditTerm, setSavingEditTerm] = useState(false)
@@ -216,6 +218,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [importStrategy, setImportStrategy] = useState<'append' | 'replace'>('append')
   const [importBusy, setImportBusy] = useState(false)
+  const languages = useSupportedLanguages()
   const [importFeedback, setImportFeedback] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<null | {
     created: number
@@ -350,16 +353,16 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       await vocabularies.createTerm(activeVocab, {
         vocabulary_id: activeVocab,
         term: newTermTerm.trim(),
-        label: { de: newTermLabelDe.trim() },
-        inverse_label: vocab?.kind === 'relation' && newTermInverseLabelDe.trim() ? { de: newTermInverseLabelDe.trim() } : {},
+        label: newTermLabel,
+        inverse_label: vocab?.kind === 'relation' ? newTermInverseLabel : {},
         metadata_: newTermMetadata,
         parent_id: null,
         applies_from: vocab?.kind === 'relation' ? newTermAppliesFrom : [],
         applies_to: vocab?.kind === 'relation' ? newTermAppliesTo : [],
       })
       setNewTermTerm('')
-      setNewTermLabelDe('')
-      setNewTermInverseLabelDe('')
+      setNewTermLabel({})
+      setNewTermInverseLabel({})
       setNewTermAppliesFrom([])
       setNewTermAppliesTo([])
       setNewTermMetadata({})
@@ -375,8 +378,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   function startEditTerm(t: VocabularyTerm) {
     setEditTermId(t.id)
     setEditTermTerm(t.term)
-    setEditTermLabelDe(t.label.de ?? '')
-    setEditTermInverseLabelDe(t.inverse_label?.de ?? '')
+    setEditTermLabel(t.label ?? {})
+    setEditTermInverseLabel(t.inverse_label ?? {})
     setEditTermAppliesFrom((t.applies_from ?? []) as RecordType[])
     setEditTermAppliesTo((t.applies_to ?? []) as RecordType[])
     setEditTermMetadata({ ...(t.metadata_ ?? {}) })
@@ -388,8 +391,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       await vocabularies.updateTerm(t.id, {
         vocabulary_id: activeVocab!,
         term: editTermTerm.trim(),
-        label: { de: editTermLabelDe.trim() },
-        inverse_label: vocab?.kind === 'relation' && editTermInverseLabelDe.trim() ? { de: editTermInverseLabelDe.trim() } : {},
+        label: editTermLabel,
+        inverse_label: vocab?.kind === 'relation' ? editTermInverseLabel : {},
         metadata_: editTermMetadata,
         parent_id: t.parent_id,
         applies_from: vocab?.kind === 'relation' ? editTermAppliesFrom : [],
@@ -629,22 +632,25 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         <div className="lbl">ID (intern)</div>
                         <input className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
                       </div>
-                      <div className="field">
-                        <div className="lbl">Label DE (Quelle → Ziel)</div>
-                        <input className="fld" value={newTermLabelDe} onChange={e => setNewTermLabelDe(e.target.value)} placeholder="Anzeigetext (Hinrichtung)" />
-                      </div>
+                      <LabelEditor
+                        languages={languages}
+                        value={newTermLabel}
+                        onChange={(lang, val) => setNewTermLabel({ ...newTermLabel, [lang]: val })}
+                      />
                       {vocab.kind === 'relation' && (
-                        <div className="field">
-                          <div className="lbl">Gegenrichtung DE (Ziel → Quelle)</div>
-                          <input className="fld" value={newTermInverseLabelDe} onChange={e => setNewTermInverseLabelDe(e.target.value)} placeholder="Anzeigetext (Rückrichtung, optional)" />
-                        </div>
+                        <LabelEditor
+                          languages={languages}
+                          value={newTermInverseLabel}
+                          onChange={(lang, val) => setNewTermInverseLabel({ ...newTermInverseLabel, [lang]: val })}
+                          labelPrefix="Gegenrichtung"
+                        />
                       )}
                     </div>
                     {vocab.kind === 'relation' && (
                       <>
                         <RelationTypeHelp
-                          label={newTermLabelDe}
-                          inverseLabel={newTermInverseLabelDe}
+                          label={getLabel({ label: newTermLabel }, '')}
+                          inverseLabel={getLabel({ label: newTermInverseLabel }, '')}
                           from={newTermAppliesFrom}
                           to={newTermAppliesTo}
                         />
@@ -675,8 +681,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   <thead>
                     <tr>
                       <th style={{ minWidth: 160 }}>ID</th>
-                      <th>Label DE</th>
-                      {vocab.kind === 'relation' && <th>Gegenrichtung DE</th>}
+                      <th>Label</th>
+                      {vocab.kind === 'relation' && <th>Gegenrichtung</th>}
                       {vocab.kind === 'relation' && <th>Typen</th>}
                       {vocab.kind !== 'relation' && <th>Übergeordnet</th>}
                       <th className="col-act" />
@@ -692,8 +698,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         <Fragment key={t.id}>
                           <tr>
                             <td style={{ minWidth: 160, width: 160 }}><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ width: '100%' }} /></td>
-                            <td><input className="fld" value={editTermLabelDe} onChange={e => setEditTermLabelDe(e.target.value)} style={{ maxWidth: 200 }} /></td>
-                            {vocab.kind === 'relation' && <td><input className="fld" value={editTermInverseLabelDe} onChange={e => setEditTermInverseLabelDe(e.target.value)} style={{ maxWidth: 200 }} placeholder="Gegenrichtung" /></td>}
+                            <td><LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} /></td>
+                            {vocab.kind === 'relation' && <td><LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix="Gegenrichtung" /></td>}
                             {vocab.kind === 'relation' && <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>{appliesLabel(t)}</td>}
                             {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>}
                             <td className="col-act">
@@ -708,8 +714,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                               {vocab.kind === 'relation' && (
                                 <>
                                   <RelationTypeHelp
-                                    label={editTermLabelDe}
-                                    inverseLabel={editTermInverseLabelDe}
+                                    label={getLabel({ label: editTermLabel }, '')}
+                                    inverseLabel={getLabel({ label: editTermInverseLabel }, '')}
                                     from={editTermAppliesFrom}
                                     to={editTermAppliesTo}
                                   />
@@ -737,7 +743,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             {getLabel(t, '—')}
                             <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{t.inverse_label?.de ?? '—'}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: t.inverse_label }, '—')}</td>}
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t)}</td>}
                           {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>}
                           <td className="col-act">

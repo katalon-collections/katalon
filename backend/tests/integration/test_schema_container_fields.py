@@ -254,3 +254,54 @@ async def test_nested_group_rejected(async_client: AsyncClient, auth_headers: di
         },
     )
     assert nested_r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_translatable_field_constraints(async_client: AsyncClient, auth_headers: dict) -> None:
+    ok = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "test_translatable_field",
+            "label": {"de": "Beschreibung"},
+            "field_type": "text",
+            "is_repeatable": False,
+            "is_translatable": True,
+            "settings": {},
+        },
+    )
+    assert ok.status_code == 201, ok.text
+    field_id = ok.json()["id"]
+
+    try:
+        repeatable = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "name": "test_translatable_repeatable",
+                "label": {"de": "Titel"},
+                "field_type": "text",
+                "is_repeatable": True,
+                "is_translatable": True,
+                "settings": {},
+            },
+        )
+        assert repeatable.status_code == 422, repeatable.text
+
+        number = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "name": "test_translatable_number",
+                "label": {"de": "Anzahl"},
+                "field_type": "number",
+                "is_translatable": True,
+                "settings": {},
+            },
+        )
+        assert number.status_code == 422, number.text
+    finally:
+        await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)

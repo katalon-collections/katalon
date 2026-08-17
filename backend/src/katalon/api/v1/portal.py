@@ -48,6 +48,7 @@ class PortalConfigRead(BaseModel):
     logo_url: str
     placeholder_image_url: str
     color_tokens: dict
+    supported_languages: list[str] = ["de", "en"]
 
     class Config:
         from_attributes = True
@@ -81,7 +82,7 @@ async def _get_or_create(db: DBDep) -> PortalConfig:
     summary="Get the public portal configuration",
 )
 async def get_portal_config(db: DBDep) -> PortalConfigRead:
-    from katalon.core.models import FieldDefinition
+    from katalon.core.models import AdminConfig, FieldDefinition
 
     config = await _get_or_create(db)
     # Build facet_fields dynamically from field_definitions.is_facet
@@ -104,6 +105,10 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
         )
     result = PortalConfigRead.model_validate(config)
     result.facet_fields = facet_fields
+    lang_config = (await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))).scalar_one_or_none()
+    result.supported_languages = (
+        lang_config.supported_languages if lang_config and lang_config.supported_languages else ["de", "en"]
+    )
     return result
 
 

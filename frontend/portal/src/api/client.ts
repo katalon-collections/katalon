@@ -33,7 +33,7 @@ export interface OccurrenceSummary {
 }
 
 export interface MediaFile {
-  id: string; filename: string; mime_type: string
+  id: string; filename: string; mime_type: string; category: string
   status: string; is_primary: boolean; created_at: string
 }
 
@@ -63,6 +63,7 @@ export interface PortalConfig {
   logo_url: string
   placeholder_image_url: string
   color_tokens: Record<string, string>
+  supported_languages: string[]
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

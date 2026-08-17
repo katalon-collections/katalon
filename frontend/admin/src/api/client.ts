@@ -72,7 +72,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return _refreshPromise
 }
 
-async function authorizedFetch(path: string, init: RequestInit = {}, allowRefresh = true): Promise<Response> {
+export async function authorizedFetch(path: string, init: RequestInit = {}, allowRefresh = true): Promise<Response> {
   const headers = buildHeaders(init.headers)
   if (_token) headers['Authorization'] = `Bearer ${_token}`
   const res = await fetch(resolveUrl(path), { ...init, headers })
@@ -357,6 +357,7 @@ export interface MediaFile {
   id: string
   filename: string
   mime_type: string
+  category: string
   status: string
   is_primary: boolean
   media_type: string | null
@@ -721,6 +722,7 @@ export interface AdminConfigRead {
   reconciliation_enabled: boolean
   reconciliation_threshold: number
   reconciliation_id_diff_enabled: boolean
+  supported_languages: string[]
   ai_enabled: boolean
   ai_base_url: string | null
   ai_model: string | null

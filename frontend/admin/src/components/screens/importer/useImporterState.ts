@@ -304,7 +304,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
         label: { de: p.label_de, en: p.label_en },
         field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false, is_repeatable: p.is_repeatable, sort_order: 9999,
+        is_required: false, is_repeatable: p.is_repeatable, is_translatable: false, sort_order: 9999,
         settings: {}, target_subtype: null,
         show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
       }))
@@ -321,7 +321,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
         label: { de: p.label_de, en: p.label_en },
         field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false, is_repeatable: p.is_repeatable, sort_order: 9999,
+        is_required: false, is_repeatable: p.is_repeatable, is_translatable: false, sort_order: 9999,
         settings: {}, target_subtype: null,
         show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
       })))

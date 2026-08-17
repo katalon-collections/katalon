@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.13] - 2026-08-17
+
+### Added
+- Medienformate über Bilder hinaus: PDF, Audio (MP3/WAV/OGG), Video (MP4/WebM) und 3D-Modelle (GLB/GLTF) sind jetzt als Medien-Dateien hochladbar. Nicht-Bild-Dateien überspringen die Cantaloupe/IIIF-Pipeline und sind sofort `ready`; Bilder bleiben unverändert auf dem IIIF-Pfad.
+- Portal: neuer Viewer-Dispatch nach MIME-Kategorie – PDF im nativen Browser-Viewer, Audio/Video als HTML5-Player, 3D-Modelle über `@google/model-viewer` (lazy geladen, eigener Chunk).
+- Backend: `_links.thumbnail` und IIIF-Manifest werden nur noch für Bild-Dateien erzeugt; MIME-Fallback für `.glb`/`.gltf` (Browser senden oft leeren Content-Type).
+- Portal: Thumbnail-Streifen unter dem primären Medium (gleichgroße Thumbnails, Klick wechselt das große Display); sekundäre Nicht-Bild-Medien werden als Player mit Dateiname angezeigt.
+- Admin: Medien-Lightbox (Klick aufs Medium öffnet Overlay-Viewer statt neuem Tab; auth-geschützte Datei wird als Blob geladen und als Object-URL abgespielt) plus Kategorie-Thumbnails (Video-Frame-Vorschau, kompaktes Audio, PDF-/3D-Icon).
+- Backend: `category` jetzt auch im öffentlichen Portal-Endpoint `PortalMediaRead` (zuvor droppte Pydantic das Feld, wodurch das Portal Audio/Video nicht als Nicht-Bild erkannte).
+
 ## [0.11.12] - 2026-08-17
 
 ### Fixed

@@ -6,6 +6,7 @@ import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
+import { MediaViewer, MediaThumb } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
@@ -61,6 +62,7 @@ export function ObjectDetailPage() {
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [viewerError, setViewerError] = useState(false)
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('object')
   const resolveRelationType = useRelationTypeLabels()
   const backSearch = useBackToSearch()
@@ -112,15 +114,19 @@ export function ObjectDetailPage() {
 
   const m = obj.metadata_ as Record<string, unknown>
   const title = String(m.title ?? m.name ?? obj.idno ?? obj.id)
-
   const readyMedia = mediaFiles.filter(f => f.status === 'ready')
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
+  const selectedMedia = readyMedia.find(f => f.id === selectedMediaId) ?? primaryMedia
+  const category = selectedMedia?.category ?? 'image'
+  const imageMedia = readyMedia.filter(f => (f.category ?? 'image') === 'image')
 
   const manifestUrl = `${BASE || window.location.origin}${PORTAL_API}/objects/${obj.id}/iiif/manifest`
   const showViewer = readyMedia.length > 0 && !viewerError
 
   const description = String(m.description ?? '')
-  const ogImage = primaryMedia ? `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primaryMedia.id}/file` : ''
+  const primaryImage = readyMedia.find(f => f.is_primary && (f.category ?? 'image') === 'image')
+    ?? readyMedia.find(f => (f.category ?? 'image') === 'image')
+  const ogImage = primaryImage ? `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primaryImage.id}/file` : ''
 
   const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
 
@@ -134,7 +140,7 @@ export function ObjectDetailPage() {
         <meta property="og:url" content={window.location.href} />
         <meta property="og:type" content="article" />
         {ogImage && <meta property="og:image" content={ogImage} />}
-        {readyMedia.length > 0 && (
+        {imageMedia.length > 0 && (
           <link rel="alternate" type="application/ld+json" href={manifestUrl} />
         )}
       </Helmet>
@@ -159,7 +165,9 @@ export function ObjectDetailPage() {
 
       <div className="detail-layout">
         <div>
-          {showViewer ? (
+          {category !== 'image' && selectedMedia ? (
+            <MediaViewer objectId={obj.id} media={selectedMedia} />
+          ) : showViewer ? (
             <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
           ) : readyMedia.length > 0 ? (
             <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
@@ -172,6 +180,20 @@ export function ObjectDetailPage() {
           ) : (
             <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
               Kein Bild verfügbar
+            </div>
+          )}
+
+          {readyMedia.length > 1 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>
+              {readyMedia.map(m => (
+                <MediaThumb
+                  key={m.id}
+                  objectId={obj.id}
+                  media={m}
+                  active={m.id === selectedMedia?.id}
+                  onSelect={() => setSelectedMediaId(m.id)}
+                />
+              ))}
             </div>
           )}
 
@@ -213,11 +235,11 @@ export function ObjectDetailPage() {
             return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {readyMedia.length > 0 && (
+            {imageMedia.length > 0 && (
               <>
                 <a href={manifestUrl} target="_blank" rel="noreferrer"
                    style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                  IIIF Manifest ({readyMedia.length} {readyMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
+                  IIIF Manifest ({imageMedia.length} {imageMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
                 </a>
                 <button
                   onClick={() => navigator.clipboard.writeText(manifestUrl)}

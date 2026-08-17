@@ -47,6 +47,23 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
             detail="Dieser Feldtyp ist für Vokabularterme nicht erlaubt.",
         )
 
+    if data.is_translatable:
+        if data.is_repeatable:
+            raise HTTPException(
+                status_code=422,
+                detail="Übersetzbare Felder können nicht wiederholbar sein.",
+            )
+        if data.field_type not in {"text", "richtext"}:
+            raise HTTPException(
+                status_code=422,
+                detail="Nur Text- und Rich-Text-Felder können übersetzbar sein.",
+            )
+        if data.parent_id:
+            raise HTTPException(
+                status_code=422,
+                detail="Unterfelder von Containerfeldern können nicht übersetzbar sein.",
+            )
+
     if data.field_type == "authority":
         source = data.settings.get("source")
         db_sources = list((await db.execute(select(AuthoritySource))).scalars().all())

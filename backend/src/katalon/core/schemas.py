@@ -26,6 +26,7 @@ class FieldDefinitionCreate(BaseModel):
     field_type: str
     is_required: bool = False
     is_repeatable: bool = False
+    is_translatable: bool = False
     is_searchable: bool = True
     sort_order: int = 0
     settings: dict = {}

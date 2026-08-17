@@ -1026,7 +1026,7 @@ wheels = [
 
 [[package]]
 name = "katalon"
-version = "0.11.5"
+version = "0.11.13"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

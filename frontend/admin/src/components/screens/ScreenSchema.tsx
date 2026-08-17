@@ -4,6 +4,8 @@ import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Grip, Plus, Trash } from '../ui/Icons'
+import { LabelEditor } from '../ui/LabelEditor'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const TYPES = [
   { id: 'object',      label: 'Objekte',     key: 'object' },
@@ -30,8 +32,7 @@ type SubFieldType = typeof SUB_FIELD_TYPES[number]
 type SubFieldFormState = {
   id?: string
   name: string
-  label_de: string
-  label_en: string
+  label: Record<string, string>
   field_type: SubFieldType
   is_required: boolean
   sort_order: number
@@ -77,11 +78,11 @@ type FieldFormState = {
   target_type: string
   target_subtype: string
   name: string
-  label_de: string
-  label_en: string
+  label: Record<string, string>
   field_type: string
   is_required: boolean
   is_repeatable: boolean
+  is_translatable: boolean
   sort_order: number
   validation_regex: string
   authority_source: string
@@ -107,7 +108,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, is_repeatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -115,11 +116,11 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     target_type: f.target_type,
     target_subtype: f.target_subtype ?? '',
     name: f.name,
-    label_de: f.label.de ?? '',
-    label_en: f.label.en ?? '',
+    label: { ...f.label },
     field_type: f.field_type,
     is_required: f.is_required,
     is_repeatable: f.is_repeatable,
+    is_translatable: f.is_translatable ?? false,
     sort_order: f.sort_order,
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
@@ -169,7 +170,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label_de: '', label_en: '', field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { name: '', label: {}, field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -267,6 +268,8 @@ function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | n
 
 function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
+  const languages = useSupportedLanguages()
+  const primaryLang = languages[0] ?? 'de'
 
   // Sub-field editing state (only relevant when form.field_type === 'group')
   const [subFieldEditing, setSubFieldEditing] = useState<'new' | string | null>(null)
@@ -290,8 +293,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
     setSubFieldForm({
       id: sf.id,
       name: sf.name,
-      label_de: sf.label.de ?? '',
-      label_en: sf.label.en ?? '',
+      label: { ...sf.label },
       field_type: sf.field_type as SubFieldType,
       is_required: sf.is_required,
       sort_order: sf.sort_order,
@@ -327,10 +329,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       target_type: form.target_type,
       target_subtype: form.target_subtype || null,
       name: subFieldForm.name,
-      label: { de: subFieldForm.label_de, en: subFieldForm.label_en },
+      label: subFieldForm.label,
       field_type: subFieldForm.field_type,
       is_required: subFieldForm.is_required,
       is_repeatable: false,
+      is_translatable: false,
       sort_order: subFieldForm.sort_order,
       show_in_detail: true,
       show_in_list: true,
@@ -437,7 +440,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
       <div className="hd">
-        <span>{isNew ? 'Neues Feld' : (form.label_de || form.name)}</span>
+        <span>{isNew ? 'Neues Feld' : (getLabel({ label: form.label }, form.name))}</span>
         {!isNew && <span className="sub">{form.name}</span>}
         <div className="grow" />
         <button className="btn sm" onClick={onClose}>Schließen</button>
@@ -445,21 +448,18 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       <div className="bd">
         {error && <div style={{ marginBottom: 10, color: '#b91c1c', fontSize: 13 }}>{error}</div>}
         <div className="fg-2">
-          <div className="field">
-            <div className="lbl">Label DE</div>
-            <input className="fld" value={form.label_de} onChange={e => {
-              const newLabel = e.target.value
-              if (isNew && !nameManuallyEdited) {
-                onChange({ ...form, label_de: newLabel, name: toSlug(newLabel) })
+          <LabelEditor
+            languages={languages}
+            value={form.label}
+            onChange={(lang, val) => {
+              const nextLabel = { ...form.label, [lang]: val }
+              if (isNew && !nameManuallyEdited && lang === primaryLang) {
+                onChange({ ...form, label: nextLabel, name: toSlug(val) })
               } else {
-                set('label_de', newLabel)
+                onChange({ ...form, label: nextLabel })
               }
-            }} />
-          </div>
-          <div className="field">
-            <div className="lbl">Label EN</div>
-            <input className="fld" value={form.label_en} onChange={e => set('label_en', e.target.value)} />
-          </div>
+            }}
+          />
         </div>
         <div className="fg-2">
           <div className="field">
@@ -501,6 +501,15 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <input type="checkbox" className="ck" checked={form.is_repeatable} onChange={e => set('is_repeatable', e.target.checked)} />
               <span style={{ fontSize: 13 }}>Wiederholbar</span>
             </label>
+            {!isVocabularyTerm && (form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" className="ck" checked={form.is_translatable} onChange={e => set('is_translatable', e.target.checked)} />
+                <span style={{ fontSize: 13 }}>Mehrsprachig</span>
+              </label>
+            )}
+            {!isVocabularyTerm && !((form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable) && (
+              <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>Dieser Feldtyp ist nicht übersetzbar (nur Text/Rich-Text, nicht wiederholbar).</span>
+            )}
             {!isVocabularyTerm && (
               <>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -731,7 +740,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)' }}>
-                    <span style={{ flex: 1, fontWeight: 500 }}>{sf.label.de || sf.name}</span>
+                    <span style={{ flex: 1, fontWeight: 500 }}>{getLabel(sf, sf.name)}</span>
                     <span className="key" style={{ fontSize: 11 }}>{sf.name}</span>
                     <span className="typ">{FIELD_TYPE_LABELS[sf.field_type] ?? sf.field_type}</span>
                     {sf.is_required && <span className="req-mark">Pflicht</span>}
@@ -794,23 +803,25 @@ interface SubFieldFormPanelProps {
 
 function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
+  const languages = useSupportedLanguages()
+  const primaryLang = languages[0] ?? 'de'
   const aiEligible = ['text', 'vocab_free', 'date', 'number', 'boolean'].includes(sf.field_type)
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, background: 'var(--panel)' }}>
       {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       <div className="fg-2">
-        <div className="field">
-          <div className="lbl">Label DE</div>
-          <input className="fld" value={sf.label_de} onChange={e => {
-            const v = e.target.value
-            if (!nameManual) onChange({ ...sf, label_de: v, name: toSlug(v) })
-            else set('label_de', v)
-          }} />
-        </div>
-        <div className="field">
-          <div className="lbl">Label EN</div>
-          <input className="fld" value={sf.label_en} onChange={e => set('label_en', e.target.value)} />
-        </div>
+        <LabelEditor
+          languages={languages}
+          value={sf.label}
+          onChange={(lang, val) => {
+            const nextLabel = { ...sf.label, [lang]: val }
+            if (!nameManual && lang === primaryLang) {
+              onChange({ ...sf, label: nextLabel, name: toSlug(val) })
+            } else {
+              onChange({ ...sf, label: nextLabel })
+            }
+          }}
+        />
       </div>
       <div className="fg-2">
         <div className="field">
@@ -1158,10 +1169,11 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       target_type: form.target_type,
       target_subtype: form.target_subtype.trim() || null,
       name: form.name,
-      label: { de: form.label_de, en: form.label_en },
+      label: form.label,
       field_type: form.field_type as FieldDefinition['field_type'],
       is_required: form.is_required,
       is_repeatable: form.is_repeatable,
+      is_translatable: form.is_translatable,
       sort_order: form.sort_order,
       show_in_detail: form.show_in_detail,
       show_in_list: form.show_in_list ?? true,
@@ -1243,6 +1255,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           field_type: f.field_type,
           is_required: f.is_required,
           is_repeatable: f.is_repeatable,
+          is_translatable: f.is_translatable,
           is_searchable: f.is_searchable,
           sort_order: newOrder,
           settings: f.settings,

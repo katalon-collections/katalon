@@ -270,6 +270,15 @@ async def validate_metadata(
                     errors.append(authority_err)
             continue
 
+        if field.is_translatable:
+            if not isinstance(value, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+            ):
+                errors.append(
+                    f"Feld '{field.name}': Übersetzbarer Wert muss ein Objekt {{sprache: text}} sein."
+                )
+            continue
+
         if field.field_type == "date":
             items = value if field.is_repeatable and isinstance(value, list) else [value]
             for item in items:

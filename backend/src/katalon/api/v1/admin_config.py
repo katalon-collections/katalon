@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import DBDep, require_role
@@ -44,6 +44,7 @@ class AdminConfigRead(BaseModel):
     reconciliation_enabled: bool
     reconciliation_threshold: int
     reconciliation_id_diff_enabled: bool
+    supported_languages: list[str]
     ai_enabled: bool
     ai_base_url: str | None
     ai_model: str | None
@@ -66,6 +67,7 @@ class AdminConfigUpdate(BaseModel):
     reconciliation_enabled: bool | None = None
     reconciliation_threshold: int | None = None
     reconciliation_id_diff_enabled: bool | None = None
+    supported_languages: list[str] | None = None
     ai_enabled: bool | None = None
     ai_base_url: str | None = None
     ai_model: str | None = None
@@ -75,6 +77,20 @@ class AdminConfigUpdate(BaseModel):
     ai_monthly_global_token_limit: int | None = Field(default=None, ge=1)
     media_default_license_uri: str | None = None
     media_default_rights_holder: dict | None = None
+
+    @field_validator("supported_languages")
+    @classmethod
+    def _validate_supported_languages(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        cleaned: list[str] = []
+        for lang in value:
+            code = str(lang).strip().lower()
+            if code and code not in cleaned:
+                cleaned.append(code)
+        if not cleaned:
+            raise ValueError("supported_languages darf nicht leer sein.")
+        return cleaned
 
 
 async def _get_or_create(db: DBDep) -> AdminConfig:
@@ -113,6 +129,7 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         reconciliation_enabled=config.reconciliation_enabled,
         reconciliation_threshold=config.reconciliation_threshold,
         reconciliation_id_diff_enabled=config.reconciliation_id_diff_enabled,
+        supported_languages=config.supported_languages or ["de", "en"],
         ai_enabled=config.ai_enabled,
         ai_base_url=config.ai_base_url,
         ai_model=config.ai_model,
@@ -178,6 +195,8 @@ async def update_admin_config(
         config.reconciliation_threshold = data.reconciliation_threshold
     if data.reconciliation_id_diff_enabled is not None:
         config.reconciliation_id_diff_enabled = data.reconciliation_id_diff_enabled
+    if data.supported_languages is not None:
+        config.supported_languages = data.supported_languages
     if data.ai_enabled is not None:
         config.ai_enabled = data.ai_enabled
     if data.ai_base_url is not None:

@@ -6,12 +6,20 @@ import pytest
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 
 
-def make_field(name: str, *, is_required: bool = False, is_repeatable: bool = False, field_type: str = "text") -> MagicMock:
+def make_field(
+    name: str,
+    *,
+    is_required: bool = False,
+    is_repeatable: bool = False,
+    field_type: str = "text",
+    is_translatable: bool = False,
+) -> MagicMock:
     f = MagicMock()
     f.name = name
     f.is_required = is_required
     f.is_repeatable = is_repeatable
     f.field_type = field_type
+    f.is_translatable = is_translatable
     f.settings = {}
     f.id = uuid.uuid4()
     return f
@@ -132,6 +140,29 @@ async def test_valid_complex_metadata() -> None:
         "tags": ["zürich", "nacht", "strasse"],
     })
     assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_translatable_field_accepts_lang_dict() -> None:
+    db = mock_db(make_field("description", is_translatable=True))
+    errors = await validate_metadata(db, "object", {"description": {"de": "Hallo", "en": "Hello"}})
+    assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_translatable_field_rejects_plain_string() -> None:
+    db = mock_db(make_field("description", is_translatable=True))
+    errors = await validate_metadata(db, "object", {"description": "Hallo"})
+    assert len(errors) == 1
+    assert "Übersetzbarer Wert" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_translatable_field_rejects_non_string_value() -> None:
+    db = mock_db(make_field("description", is_translatable=True))
+    errors = await validate_metadata(db, "object", {"description": {"de": 123}})
+    assert len(errors) == 1
+
 
 
 # ---------------------------------------------------------------------------

@@ -161,6 +161,7 @@ class FieldDefinition(Base):
     field_type: Mapped[str] = mapped_column(String(32))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
     is_repeatable: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_translatable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_searchable: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -571,6 +572,8 @@ class AdminConfig(Base):
     reconciliation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     reconciliation_threshold: Mapped[int] = mapped_column(Integer, default=5)
     reconciliation_id_diff_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Ordered content languages; first entry is the primary/fallback language.
+    supported_languages: Mapped[list] = mapped_column(JSONB, default=list)
     ai_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     ai_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ai_model: Mapped[str | None] = mapped_column(String(256), nullable=True)

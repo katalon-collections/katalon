@@ -3,6 +3,8 @@ import { formVariants, schema, subtypes } from '../../api/client'
 import type { FormVariantData } from '../../api/client'
 import type { FieldDefinition, FormVariant } from '../../types'
 import { Edit, Plus, Trash } from '../ui/Icons'
+import { LabelEditor } from '../ui/LabelEditor'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const TYPES = [
   { id: 'object', label: 'Objekte' },
@@ -19,10 +21,10 @@ const ROLES: Record<string, string> = {
   viewer: 'Betrachter',
 }
 
-type FormState = FormVariantData & { label_de: string }
+type FormState = FormVariantData & { label: Record<string, string> }
 
 function emptyForm(targetType: string, subtype: string): FormState {
-  return { target_type: targetType, target_subtype: subtype || null, name: '', label_de: '', field_names: [], is_default_global: false, sort_order: 0 }
+  return { target_type: targetType, target_subtype: subtype || null, name: '', label: {}, field_names: [], is_default_global: false, sort_order: 0 }
 }
 
 function variantToForm(v: FormVariant): FormState {
@@ -30,7 +32,7 @@ function variantToForm(v: FormVariant): FormState {
     target_type: v.target_type,
     target_subtype: v.target_subtype,
     name: v.name,
-    label_de: v.label.de ?? '',
+    label: { ...v.label },
     field_names: v.field_names,
     is_default_global: v.is_default_global,
     sort_order: v.sort_order,
@@ -66,6 +68,7 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
   const [availableFields, setAvailableFields] = useState<FieldDefinition[]>([])
   const [variants, setVariants] = useState<FormVariant[]>([])
   const [loading, setLoading] = useState(true)
+  const languages = useSupportedLanguages()
   const [editId, setEditId] = useState<string | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [form, setForm] = useState<FormState | null>(null)
@@ -130,7 +133,7 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
       target_type: form.target_type,
       target_subtype: form.target_subtype || null,
       name: form.name,
-      label: { de: form.label_de },
+      label: form.label,
       field_names: form.field_names,
       is_default_global: form.is_default_global,
       sort_order: form.sort_order,
@@ -234,6 +237,16 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Sortierung</label>
               <input type="number" style={inp} value={form.sort_order} onChange={e => setForm(f => f ? { ...f, sort_order: Number(e.target.value) } : f)} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--fg-2)' }}>Anzeigename</label>
+            <div className="fg-2" style={{ gap: 10 }}>
+              <LabelEditor
+                languages={languages}
+                value={form.label}
+                onChange={(lang, val) => setForm(f => f ? { ...f, label: { ...f.label, [lang]: val } } : f)}
+              />
             </div>
           </div>
 

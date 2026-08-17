@@ -10,7 +10,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'suche' | 'idno' | 'ki' | 'medien' | 'changelog' | 'gefahrenbereich'
+type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'changelog' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -1070,10 +1070,59 @@ function SectionChangelog() {
   </div>
 }
 
+function SectionLanguages() {
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminConfig.get()
+      .then(cfg => setInput((cfg.supported_languages ?? ['de', 'en']).join(', ')))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    const parsed = Array.from(new Set(
+      input.split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+    ))
+    if (parsed.length === 0) { setError('Mindestens eine Sprache erforderlich.'); return }
+    setSaving(true); setError(null); setSaved(false)
+    try {
+      await adminConfig.update({ supported_languages: parsed })
+      setInput(parsed.join(', '))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+  return (
+    <div className="card">
+      <div className="hd">Sprachen für Metadaten</div>
+      <div className="bd">
+        <div className="field">
+          <div className="lbl">Unterstützte Sprachen (ISO-639-1-Codes, kommagetrennt)</div>
+          <input className="fld mono" value={input} onChange={e => setInput(e.target.value)} placeholder="de, en, fr" />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+            Erste Sprache ist die Primärsprache (Fallback). Gilt für Feld-Labels und übersetzbare Feldwerte.
+          </div>
+        </div>
+        {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
+        {saved && <div style={{ fontSize: 13, color: '#166534', marginBottom: 8 }}>Gespeichert.</div>}
+        <button className="btn pri" onClick={save} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+      </div>
+    </div>
+  )
+}
+
 const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
+  { id: 'sprachen', label: 'Sprachen', adminOnly: true },
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
   { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
@@ -1132,6 +1181,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && section === 'sprachen' && <SectionLanguages />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}

@@ -112,6 +112,7 @@ class PortalMediaRead(BaseModel):
     object_id: uuid.UUID
     filename: str
     mime_type: str
+    category: str
     status: str
     is_primary: bool
     media_type: str | None

@@ -12,6 +12,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   logo_url: '',
   placeholder_image_url: '',
   color_tokens: {},
+  supported_languages: ['de', 'en'],
 }
 
 export function HomePage() {

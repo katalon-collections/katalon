@@ -3,6 +3,8 @@ import { subtypes } from '../../api/client'
 import type { RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Plus, Trash, X } from '../ui/Icons'
+import { LabelEditor } from '../ui/LabelEditor'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const PRIMARY_TYPES = [
   { id: 'object',     label: 'Objekte' },
@@ -15,23 +17,21 @@ const PRIMARY_TYPES = [
 interface FormState {
   primary_type: string
   name: string
-  label_de: string
-  label_en: string
+  label: Record<string, string>
   description: string
   sort_order: number
   is_default: boolean
 }
 
 function emptyForm(primaryType: string): FormState {
-  return { primary_type: primaryType, name: '', label_de: '', label_en: '', description: '', sort_order: 0, is_default: false }
+  return { primary_type: primaryType, name: '', label: {}, description: '', sort_order: 0, is_default: false }
 }
 
 function subtypeToForm(s: RecordSubtype): FormState {
   return {
     primary_type: s.primary_type,
     name: s.name,
-    label_de: s.label.de ?? '',
-    label_en: s.label.en ?? '',
+    label: { ...s.label },
     description: s.description ?? '',
     sort_order: s.sort_order,
     is_default: s.is_default,
@@ -52,6 +52,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm('object'))
   const [saving, setSaving] = useState(false)
+  const languages = useSupportedLanguages()
   const [formError, setFormError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -94,7 +95,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
       const payload = {
         primary_type: form.primary_type,
         name: form.name.trim(),
-        label: { de: form.label_de.trim(), en: form.label_en.trim() },
+        label: form.label,
         description: form.description.trim(),
         sort_order: form.sort_order,
         is_default: form.is_default,
@@ -158,14 +159,11 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
             </div>
             {formError && <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 10 }}>{formError}</div>}
             <div className="fg-2" style={{ marginBottom: 10 }}>
-              <div className="field">
-                <div className="lbl">Label DE</div>
-                <input className="fld" value={form.label_de} onChange={e => set('label_de', e.target.value)} />
-              </div>
-              <div className="field">
-                <div className="lbl">Label EN</div>
-                <input className="fld" value={form.label_en} onChange={e => set('label_en', e.target.value)} />
-              </div>
+              <LabelEditor
+                languages={languages}
+                value={form.label}
+                onChange={(lang, val) => set('label', { ...form.label, [lang]: val })}
+              />
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
               <div className="lbl">Beschreibung / Einsatz</div>
@@ -215,8 +213,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
             <thead>
               <tr>
                 <th style={{ width: '20%' }}>Name</th>
-                <th>Label DE</th>
-                <th>Label EN</th>
+                <th>Label</th>
                 <th>Beschreibung / Einsatz</th>
                 <th style={{ width: 100, textAlign: 'center' }}>Standard</th>
                 <th style={{ width: 90, textAlign: 'right' }}>Sortierung</th>
@@ -228,7 +225,6 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                 <tr key={s.id}>
                   <td><span className="mono" style={{ fontSize: 12 }}>{s.name}</span></td>
                   <td>{getLabel(s, '—')}</td>
-                  <td>{s.label.en?.trim() || '—'}</td>
                   <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '—'}</td>
                   <td style={{ textAlign: 'center' }}>
                     {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>Standard</span>}
