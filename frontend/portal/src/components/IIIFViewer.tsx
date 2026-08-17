@@ -40,7 +40,7 @@ export function IIIFViewer({ manifestUrl, onError }: Props) {
   if (!manifest) return null
 
   return (
-    <div style={{ borderRadius: 10, overflow: 'hidden' }}>
+    <div style={{ borderRadius: 10, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
       <Viewer
         iiifContent={manifest}
         options={options}

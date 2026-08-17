@@ -68,7 +68,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
 
           return (
             <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
                 <span style={{
                   color: 'var(--fg-3)',
                   fontSize: 11,
@@ -82,7 +82,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
                 <a
                   href="#"
                   onClick={e => { e.preventDefault(); navigate(path) }}
-                  style={{ color: 'var(--accent)', textDecoration: 'none' }}
+                  style={{ color: 'var(--accent)', textDecoration: 'none', overflowWrap: 'anywhere', minWidth: 0 }}
                 >
                   {targetLabel}
                 </a>

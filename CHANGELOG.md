@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.11] - 2026-08-17
+
+### Fixed
+- Portal: Mobile-Overflow behoben (#303) – globaler `overflow-x: hidden`-Schutz gegen Grid-Intrinsic-Sizing-Overflow, `min-width: 0` auf `.detail-layout`/`.search-layout`-Grid-Kindern, IIIF-Viewer-Wrapper mit `width: 100%` begrenzt, `RelationsList`-Zeilen brechen jetzt um, Card-/Result-Titel mit `overflow-wrap: anywhere` gegen lange unbrochene Strings abgesichert.
+
 ## [0.11.10] - 2026-08-17
 
 ### Added
