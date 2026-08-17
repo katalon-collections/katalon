@@ -93,7 +93,7 @@ function Header() {
         <Link to="/search?q=&type=occurrence">Werke</Link>
       </nav>
       <div className="sp" />
-      <div ref={wrapRef} style={{ position: 'relative' }}>
+      <div ref={wrapRef} className={`search-wrap${location.pathname === '/' ? ' is-home' : ''}`} style={{ position: 'relative' }}>
         <form className="search-bar" onSubmit={submit}>
           <input
             ref={inputRef}

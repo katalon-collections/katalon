@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.12] - 2026-08-17
+
+### Fixed
+- Admin: Medien-Thumbnails im Objektformular blieben leer (401), weil `<img>` gegen den authentifizierten `/v1/objects/{id}/media/{id}/file`-Endpoint lud – Bearer-Token liegt in `localStorage`, `<img>` sendet keinen `Authorization`-Header. Backend liefert jetzt `_links.thumbnail` (öffentliche, unauthentifizierte Cantaloupe-IIIF-URL) im Media-Serializer, Admin-Frontend nutzt diese für die Vorschau.
+- Admin: Statischen "Stage"-Badge aus dem Sidebar-Header entfernt.
+- Portal (mobil): Header-Suchfeld nutzte fälschlich die `hero-search`-Klasse (`margin: 0 auto`), wodurch es als Flex-Item zentriert statt gestreckt wurde – eigenes Styling statt Klassen-Wiederverwendung. Wrapper-Div des Header-Suchfelds hatte zudem keine Breite gesetzt, wodurch `width: 100%` auf das innere Formular wirkungslos blieb.
+- Portal (mobil): Mobile Breakpoint-Overrides für `.container`/`.site-header` nutzten die `padding`-Shorthand und überschrieben damit das vertikale Padding aus dem vorherigen Breakpoint vollständig (vor allem bei ≤480px) – auf `padding-left`/`padding-right` umgestellt, damit sich Breakpoints nicht gegenseitig stompen.
+- Portal (mobil): Header-Suchfeld doppelte sich mit dem Hero-Suchfeld auf der Startseite – Header-Suche wird auf `/` mobil ausgeblendet, bleibt auf allen anderen Seiten sichtbar.
+- Portal (mobil): "Suche verfeinern"-Formular auf der Suchergebnisseite hatte zu wenig Abstand zum Header und Eingabefeld/Button nebeneinander statt korrekt proportioniert.
+
 ## [0.11.11] - 2026-08-17
 
 ### Fixed

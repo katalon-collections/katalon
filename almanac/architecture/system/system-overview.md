@@ -27,7 +27,7 @@ The Compose stack keeps external concerns in separate services. PostgreSQL/PostG
 
 ## Edge Routing
 
-nginx is the public routing layer for the production-like stack. `/api/` is rewritten to the API without the `/api` prefix; `/v1/` and `/portal/v1/` are proxied to the API; `/iiif/` is proxied to Cantaloupe; `/admin/` is rewritten to the Admin container; and all remaining paths go to Portal [@nginx]. That routing explains why the user-facing system has one main origin even though Admin, Portal, API, and Cantaloupe are separate services.
+nginx is the public routing layer for the production-like stack. `/api/`, `/v1/`, and `/portal/v1/` are proxied to the API with their path prefixes intact; `/iiif/` is proxied to Cantaloupe; `/admin/` is rewritten to the Admin container; and all remaining paths go to Portal [@nginx]. That routing explains why the user-facing system has one main origin even though Admin, Portal, API, and Cantaloupe are separate services.
 
 This route split also fixes the boundary between frontend assets and backend data. Admin is served below `/admin/`, Portal owns `/`, and both reach backend endpoints through nginx rather than direct container ports [@nginx]. For exact operational port rules, use the ports and routing reference when available.
 

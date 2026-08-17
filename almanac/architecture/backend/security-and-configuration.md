@@ -18,6 +18,15 @@ sources:
   - id: users
     type: file
     path: backend/src/katalon/api/v1/users.py
+  - id: schema-api
+    type: file
+    path: backend/src/katalon/api/v1/schema_admin.py
+  - id: vocab-api
+    type: file
+    path: backend/src/katalon/api/v1/vocabularies.py
+  - id: pages-api
+    type: file
+    path: backend/src/katalon/api/v1/pages.py
   - id: models
     type: file
     path: backend/src/katalon/core/models.py
@@ -62,6 +71,8 @@ Authenticated dependencies try `X-API-Key` before Bearer tokens [@dependencies].
 User management accepts only `admin`, `superuser`, `editor`, `cataloger`, and `viewer` roles [@users]. The dependency layer maps roles to capabilities: viewers have none, catalogers and editors can manage content, admins and superusers can manage content, configuration, and users [@dependencies]. `require_role()` also lets `superuser` bypass role checks and lets higher editorial roles satisfy lower content roles [@dependencies].
 
 The user endpoints enforce admin-only access for listing, creating, reading arbitrary users, updating users, deleting users, and admin API-key management [@users]. Self-service endpoints allow the current user to read their own user record, change password, change email, and manage their own API keys [@users] [@api-keys].
+
+Configuration routers are still authenticated even when selected reads are not admin-only. Schema field reads and published static-page reads can be used by logged-in editorial users, while schema resets/imports and field mutations require `admin`; vocabulary mutations require `admin`; and static-page draft listing plus page create/update/delete use `require_admin()` [@app] [@schema-api] [@vocab-api] [@pages-api].
 
 The fixed editorial roles `editor`, `cataloger`, and `viewer` have a persistent permission matrix for `read`, `create`, `update`, and `delete` across objects, entities, places, occurrences, and procedures. Admin and superuser retain unrestricted access. The backend enforces configured write rights and limits internal, non-published records to roles with read access; public portal visibility remains governed by publication status rather than the matrix [@dependencies] [@users] [@models].
 

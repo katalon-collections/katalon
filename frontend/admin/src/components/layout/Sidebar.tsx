@@ -56,7 +56,6 @@ export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open 
       <div className="sb-brand">
         <div className="logo">K</div>
         <div className="sb-name">{appTitle}</div>
-        <div className="sb-env">Stage</div>
         <button className="sb-close" aria-label="Navigation schließen" onClick={onClose}>×</button>
       </div>
 

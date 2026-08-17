@@ -6,6 +6,9 @@ sources:
   - id: portal-app
     type: file
     path: frontend/portal/src/App.tsx
+  - id: portal-styles
+    type: file
+    path: frontend/portal/src/styles.css
   - id: portal-client
     type: file
     path: frontend/portal/src/api/client.ts
@@ -35,7 +38,7 @@ The public portal is a React Router application for collection discovery, record
 
 `App` wraps the portal in `HelmetProvider` and `BrowserRouter`, then `AppInner` renders routes for `/`, `/search`, `/objects/:id`, `/entities/:id`, `/places/:id`, `/occurrences/:id`, and `/page/:slug` [@portal-app]. Unlike the admin shell, portal routes are path-based because public URLs need stable, shareable record and page addresses [@portal-app].
 
-The header provides type-scoped navigation links and a debounced autocomplete search. It preserves the current `type` query parameter when the user searches from a scoped page and maps search hits to the corresponding detail URL based on `record_type` [@portal-app]. The footer fetches published static page summaries and links each published slug under `/page/<slug>` [@portal-app] [@pages-api].
+The header provides type-scoped navigation links and a debounced autocomplete search. It preserves the current `type` query parameter when the user searches from a scoped page and maps search hits to the corresponding detail URL based on `record_type` [@portal-app]. On mobile, the search input's relative-positioned wrapper, not only the form, expands to the full header width so the autocomplete dropdown keeps the same alignment boundary [@portal-app] [@portal-styles]. The footer fetches published static page summaries and links each published slug under `/page/<slug>` [@portal-app] [@pages-api].
 
 ## Public API Surface
 

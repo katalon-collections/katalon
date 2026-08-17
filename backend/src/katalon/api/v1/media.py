@@ -17,6 +17,7 @@ from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_
 from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
 from katalon.core.models import AdminConfig, MediaFile, Object
 from katalon.core.visibility import ensure_publicly_visible
+from katalon.integrations.cantaloupe import public_iiif_base
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
@@ -41,6 +42,9 @@ def _serialize(f: MediaFile) -> dict:
         "object": {"href": f"/v1/objects/{f.object_id}"},
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
     }
+    if f.status == "ready":
+        identifier = Path(f.file_path).name
+        links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
     if f.license_uri and _is_absolute_http_url(f.license_uri):
         links["license"] = {"href": f.license_uri}
     return {

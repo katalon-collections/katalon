@@ -58,8 +58,10 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
   )
 }
 
+const TITLE_FIELD_NAMES = ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']
+
 function extractTitle(m: Record<string, unknown>, fallback: string): string {
-  for (const key of ['label', 'title', 'titel', 'name', 'display_name', 'place_name', 'bezeichnung']) {
+  for (const key of TITLE_FIELD_NAMES) {
     const val = m[key]
     if (!val) continue
     if (typeof val === 'string') return val
@@ -539,6 +541,7 @@ function QuickCreateDialog({
   targetType,
   targetSubtype,
   context,
+  initialLabel,
   onCreated,
   onClose,
   onReturnFocus,
@@ -546,6 +549,7 @@ function QuickCreateDialog({
   targetType: RecordType
   targetSubtype?: string
   context?: string
+  initialLabel?: string
   onCreated: (record: AnyRecord) => void
   onClose: () => void
   onReturnFocus?: () => void
@@ -586,6 +590,7 @@ function QuickCreateDialog({
         quickCreate
         initialSubtype={targetSubtype}
         lockSubtype={Boolean(targetSubtype)}
+        initialLabel={initialLabel}
         onDirtyChange={setDirty}
         onBack={close}
         onCreated={record => {
@@ -841,6 +846,7 @@ function RelationInput({
         <QuickCreateDialog
           targetType={targetType}
           targetSubtype={targetSubtype}
+          initialLabel={q.trim()}
           onClose={() => setQuickCreateOpen(false)}
           onReturnFocus={() => {
             if (createButtonRef.current?.isConnected) createButtonRef.current.focus()
@@ -955,10 +961,11 @@ interface Props {
   quickCreate?: boolean
   initialSubtype?: string
   lockSubtype?: boolean
+  initialLabel?: string
   onCreated?: (record: AnyRecord) => void
 }
 
-export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, onCreated }: Props) {
+export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
@@ -1174,7 +1181,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
-        if (!rec) setValues(defaultsFor(fieldDefs))
+        if (!rec) {
+          const defaults = defaultsFor(fieldDefs)
+          if (initialLabel) {
+            const labelField = fieldDefs.find(f => f.field_type === 'text' && TITLE_FIELD_NAMES.includes(f.name))
+            if (labelField) defaults[labelField.name] = labelField.is_repeatable ? [initialLabel] : initialLabel
+          }
+          setValues(defaults)
+        }
 
         const variantList = await formVariants.list(recordType, recSubtype).catch(() => [])
         setVariants(variantList)
@@ -2719,9 +2733,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {mediaFiles.map(f => (
                           <div key={f.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)', background: 'var(--bg-s)' }}>
                             <a href={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1', overflow: 'hidden' }}>
-                              {f.status !== 'error' ? (
+                              {f.status !== 'error' && f._links?.thumbnail ? (
                                 <img
-                                  src={`${BASE}/v1/objects/${savedId}/media/${f.id}/file`}
+                                  src={f._links.thumbnail.href}
                                   alt={f.filename}
                                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}

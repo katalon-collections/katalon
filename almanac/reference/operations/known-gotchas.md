@@ -21,6 +21,9 @@ sources:
   - id: nginx
     type: file
     path: docker/nginx.conf
+  - id: app
+    type: file
+    path: backend/src/katalon/main.py
   - id: portal-client
     type: file
     path: frontend/portal/src/api/client.ts
@@ -47,7 +50,7 @@ Katalon's durable operational gotchas are mostly about choosing the right runtim
 
 Root project instructions define the current port rule: `http://localhost/admin/` and `http://localhost/` are the normal production-like browser targets through the outer nginx on port `80`; direct `http://localhost:3000` and `http://localhost:3001` hit the Admin and Portal containers and are for container debugging only; `http://localhost:4000` and `http://localhost:4001` belong to the development Compose stack [@agents].
 
-The Portal public API prefix is `/portal/v1` in the frontend client, and outer nginx only proxies that surface through the slash-terminated `location /portal/v1/` block [@portal-client] [@nginx]. After changing this route, recreate or reload the affected nginx/Portal containers before testing through `http://localhost/`; otherwise the browser can still see the old route table or old frontend bundle. Test a concrete endpoint such as `http://localhost/portal/v1/objects`, not bare `/portal/v1`.
+The Portal public API prefix is `/portal/v1` in the frontend client, and outer nginx only proxies that surface through the slash-terminated `location /portal/v1/` block [@portal-client] [@nginx]. FastAPI's documentation routes are configured with the `/api` prefix, so outer nginx must not strip `/api/` before proxying; otherwise `/api/docs`, `/api/redoc`, and `/api/openapi.json` return 404 through nginx even though the FastAPI app has those paths registered [@app] [@nginx]. After changing these routes, recreate or reload the affected nginx/Portal containers before testing through `http://localhost/`; otherwise the browser can still see the old route table or old frontend bundle. Test concrete endpoints such as `http://localhost/portal/v1/objects` and `http://localhost/api/docs`, not bare `/portal/v1`.
 
 ## Admin Asset Base Path
 

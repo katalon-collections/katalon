@@ -363,6 +363,7 @@ export interface MediaFile {
   license_uri: string | null
   rights_holder: { name: string; uri?: string } | null
   created_at: string
+  _links?: { thumbnail?: { href: string } }
 }
 
 export interface MediaBatchStatus {

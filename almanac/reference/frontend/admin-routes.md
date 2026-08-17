@@ -12,6 +12,9 @@ sources:
   - id: topbar
     type: file
     path: frontend/admin/src/components/layout/Topbar.tsx
+  - id: user-roles-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenUserRoles.tsx
 ---
 
 Admin routes are hash routes owned by `AppShell`, not browser paths. The shell parses `window.location.hash`, stores the route and optional edit id in React state, and renders one screen component from a `switch` over that route [@app-shell]. The sidebar is the visible navigation surface for most routes, groups admin-only configuration and user-management entries by role, and marks both list and form routes active through each item route set [@sidebar].
@@ -49,19 +52,20 @@ List screens receive an `onOpen` callback that navigates to the matching form ro
 | Hash route | Screen | Access in render | Sidebar access |
 |---|---|---|---|
 | `#subtypes` | `ScreenSubtype` | admin or superuser | admin or superuser |
-| `#schema` | `ScreenSchema` | any logged-in user | admin or superuser |
+| `#schema` | `ScreenSchema` | admin or superuser | admin or superuser |
 | `#form-variants` | `ScreenFormVariants` | admin or superuser | admin or superuser |
-| `#vocab` | `ScreenVocab` | any logged-in user | admin or superuser |
-| `#vocab/<name>` | `ScreenVocab` | any logged-in user | admin or superuser |
-| `#pages` | `ScreenPages` | any logged-in user | admin or superuser |
+| `#vocab` | `ScreenVocab` | admin or superuser | admin or superuser |
+| `#vocab/<name>` | `ScreenVocab` | admin or superuser | admin or superuser |
+| `#pages` | `ScreenPages` | admin or superuser | admin or superuser |
 | `#oai-sets` | `ScreenOAISets` | admin or superuser | admin or superuser |
 | `#banners` | `ScreenBanners` | admin or superuser | admin or superuser |
 | `#import` | `ScreenImporter` | any logged-in user | any logged-in user |
 | `#audit` | `ScreenAudit` | any logged-in user | any logged-in user |
-| `#users` | `ScreenUsers` | any logged-in user | admin or superuser |
+| `#users` | `ScreenUsers` | admin or superuser | admin or superuser |
+| `#user-roles` | `ScreenUserRoles` | admin or superuser | not in sidebar; opened from `#users` |
 | `#settings` | `ScreenSettings` | any logged-in user, with `isAdmin` prop | admin or superuser |
 
-`AppShell` computes `isAdmin` from the decoded token role and uses it directly for `banners`, `subtypes`, and `oai-sets`; unauthorized users see a placeholder for those routes [@app-shell]. `Sidebar` separately hides configuration and management navigation items unless the current role is `admin` or `superuser` [@sidebar]. The shell and API-client responsibilities around login, route rendering, banners, and unauthorized handling are described in [Admin Shell And API Client](../../architecture/frontend/admin-shell-and-api-client).
+`AppShell` computes `isAdmin` from the decoded token role and uses it directly for `banners`, `subtypes`, `schema`, `form-variants`, `vocab`, `pages`, `oai-sets`, `users`, and `user-roles`; unauthorized users see a placeholder for those routes [@app-shell]. `Sidebar` separately hides configuration and management navigation items unless the current role is `admin` or `superuser` [@sidebar]. The `#user-roles` screen is a separate roles-rights matrix opened from the user-management screen, not a primary sidebar item [@app-shell] [@user-roles-screen]. The shell and API-client responsibilities around login, route rendering, banners, and unauthorized handling are described in [Admin Shell And API Client](../../architecture/frontend/admin-shell-and-api-client).
 
 ## Navigation Guards
 

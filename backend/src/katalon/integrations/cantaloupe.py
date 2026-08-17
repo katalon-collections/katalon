@@ -5,8 +5,11 @@ import httpx
 from katalon.config import settings
 
 
-def _public_base() -> str:
+def public_iiif_base() -> str:
     return settings.cantaloupe_public_url or settings.cantaloupe_url
+
+
+_public_base = public_iiif_base
 
 
 class CantaloupeError(Exception):

@@ -162,11 +162,10 @@ export function SearchPage() {
 
   return (
     <div className="container page">
-      <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+      <form onSubmit={submit} className="refine-search" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input
           aria-label="Suche verfeinern"
-          className="hero-search"
-          style={{ flex: 1, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 14px', fontSize: 14, outline: 'none', color: 'var(--fg)' }}
+          style={{ flex: 1, width: '100%', boxSizing: 'border-box', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 14px', fontSize: 14, outline: 'none', color: 'var(--fg)' }}
           value={localQ}
           onChange={e => setLocalQ(e.target.value)}
           placeholder="Suche verfeinern…"
