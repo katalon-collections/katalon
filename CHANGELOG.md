@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-08-17
+
+### Fixed
+- nginx: `location /api/` schnitt den `/api/`-Präfix vor dem Proxying ab (`rewrite ^/api/(.*)$ /$1 break;`), obwohl die App `docs_url`/`redoc_url`/`openapi_url` mit vollem `/api/...`-Pfad registriert. `/api/docs`, `/api/redoc` und `/api/openapi.json` lieferten dadurch 404 über den äußeren nginx (Compose-Basisstack, `docker/nginx.conf`). Rewrite entfernt, Verhalten jetzt analog zu `location /v1/`.
+
 ## [0.11.8] - 2026-08-17
 
 ### Added
