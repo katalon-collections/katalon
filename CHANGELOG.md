@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.10] - 2026-08-17
+
+### Added
+- Admin: Rollenrechte-Matrix aus `#users` in eigene Unterseite `#user-roles` ausgelagert.
+
+### Fixed
+- Admin: `#schema`, `#vocab`, `#pages`, `#users` waren im Sidebar für nicht-Admin-Rollen ausgeblendet, aber via direkter Hash-Navigation erreichbar (AppShell fehlte `isAdmin`-Gate). Backend-Endpunkte waren bereits korrekt serverseitig auf admin/superuser beschränkt.
+
 ## [0.11.9] - 2026-08-17
 
 ### Fixed

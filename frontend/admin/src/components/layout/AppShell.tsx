@@ -11,6 +11,7 @@ import { ScreenForm } from '../screens/ScreenForm'
 import { ScreenLogin } from '../screens/ScreenLogin'
 import { ScreenSettings } from '../screens/ScreenSettings'
 import { ScreenUsers } from '../screens/ScreenUsers'
+import { ScreenUserRoles } from '../screens/ScreenUserRoles'
 import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
@@ -45,6 +46,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   import:             [{ label: 'Katalon' }, { label: 'Importer' }],
   audit:              [{ label: 'Katalon' }, { label: 'Audit-Log' }],
   users:              [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer' }],
+  'user-roles':       [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer', route: 'users' }, { label: 'Rollenrechte' }],
   settings:           [{ label: 'Katalon' }, { label: 'Einstellungen' }],
 }
 
@@ -168,14 +170,15 @@ export function AppShell() {
       case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype initialType={editId} onTypeChange={(t) => navigate('subtypes', t)} /> : <Placeholder label="Kein Zugriff" />
-      case 'schema':            return <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} />
+      case 'schema':            return isAdmin ? <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'form-variants':     return isAdmin ? <ScreenFormVariants initialPath={editId} onPathChange={(p) => navigate('form-variants', p)} /> : <Placeholder label="Kein Zugriff" />
-      case 'vocab':             return <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} />
-      case 'pages':             return <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} />
+      case 'vocab':             return isAdmin ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
+      case 'pages':             return isAdmin ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} />
       case 'audit':             return <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} />
-      case 'users':             return <ScreenUsers />
+      case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
+      case 'user-roles':        return isAdmin ? <ScreenUserRoles /> : <Placeholder label="Kein Zugriff" />
       case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
