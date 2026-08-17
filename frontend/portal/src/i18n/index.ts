@@ -63,6 +63,16 @@ export function typeLabel(type: string): string {
   return v ?? type
 }
 
+export function entityTypeLabel(type: string): string {
+  const v = MESSAGES[currentLocale]?.[`entityType.${type}`] ?? MESSAGES[FALLBACK_LOCALE]?.[`entityType.${type}`]
+  return v ?? type
+}
+
+export function occurrenceTypeLabel(type: string): string {
+  const v = MESSAGES[currentLocale]?.[`occurrenceType.${type}`] ?? MESSAGES[FALLBACK_LOCALE]?.[`occurrenceType.${type}`]
+  return v ?? type
+}
+
 const subscribe = (cb: () => void) => {
   listeners.add(cb)
   return () => {

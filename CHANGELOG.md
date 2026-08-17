@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [0.11.13] - 2026-08-17
+## [1.0.0] - 2026-08-17
 
 ### Added
 - Medienformate über Bilder hinaus: PDF, Audio (MP3/WAV/OGG), Video (MP4/WebM) und 3D-Modelle (GLB/GLTF) sind jetzt als Medien-Dateien hochladbar. Nicht-Bild-Dateien überspringen die Cantaloupe/IIIF-Pipeline und sind sofort `ready`; Bilder bleiben unverändert auf dem IIIF-Pfad.
@@ -14,6 +14,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 - Portal: Thumbnail-Streifen unter dem primären Medium (gleichgroße Thumbnails, Klick wechselt das große Display); sekundäre Nicht-Bild-Medien werden als Player mit Dateiname angezeigt.
 - Admin: Medien-Lightbox (Klick aufs Medium öffnet Overlay-Viewer statt neuem Tab; auth-geschützte Datei wird als Blob geladen und als Object-URL abgespielt) plus Kategorie-Thumbnails (Video-Frame-Vorschau, kompaktes Audio, PDF-/3D-Icon).
 - Backend: `category` jetzt auch im öffentlichen Portal-Endpoint `PortalMediaRead` (zuvor droppte Pydantic das Feld, wodurch das Portal Audio/Video nicht als Nicht-Bild erkannte).
+- Mehrsprachigkeit: konfigurierbare Sprachliste (Admin → Einstellungen → Sprachen), mehrsprachige Labels (Schema, Subtypen, Formularvarianten, Vokabulare) und übersetzbare Text-/Rich-Text-Felder (`is_translatable`).
+- Admin: Sprach-Editor pro konfigurierter Sprache; übersetzbare Felder zeigen die Primärsprache plus „+ XY"-Button zum Hinzufügen weiterer Sprachen.
+- Portal: Sprachumschalter und dependency-freies i18n; übersetzbare Feldwerte und Labels werden in der aktiven Sprache angezeigt (Fallback Primärsprache → Deutsch → erste belegte Sprache).
+- Migration `0036`: `field_definitions.is_translatable` und `admin_config.supported_languages`.
 
 ## [0.11.12] - 2026-08-17
 

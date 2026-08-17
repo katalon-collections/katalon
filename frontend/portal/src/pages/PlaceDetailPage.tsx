@@ -8,6 +8,7 @@ import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
+import { useI18n } from '../i18n'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -60,7 +61,8 @@ export function PlaceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('place')
-  const resolveRelationType = useRelationTypeLabels()
+  const { t, locale } = useI18n()
+  const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
 
   useEffect(() => {
@@ -111,17 +113,17 @@ export function PlaceDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
+  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !place) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? 'Ort nicht gefunden.'}</div>
+      <div style={{ color: '#dc2626' }}>{error ?? t('error.placeNotFound')}</div>
     </div>
   )
 
   const m = place.metadata_ as Record<string, unknown>
   const title = String(m.name ?? m.title ?? m.label ?? m.place_name ?? place.id)
   const hasCoords = place.lat != null && place.lon != null
-  const description = String(m.description ?? '')
+  const description = renderFieldValue(m.description, locale) ?? ''
 
   const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
 
@@ -137,12 +139,12 @@ export function PlaceDetailPage() {
       </Helmet>
       <div className="bc">
         {backSearch ? (
-          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>{t('common.backToSearch')}</a>
         ) : (
           <>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>{t('common.home')}</a>
             <span className="sep">/</span>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>Orte</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>{t('nav.places')}</a>
           </>
         )}
         <span className="sep">/</span>
@@ -162,13 +164,13 @@ export function PlaceDetailPage() {
 
           {m.description != null && (
             <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}>
-              {String(m.description)}
+              {renderFieldValue(m.description, locale)}
             </div>
           )}
 
           {linkedObjects.length > 0 && (
             <section style={{ marginTop: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Zugehörige Objekte</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
               <div className="obj-grid">
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
@@ -210,18 +212,18 @@ export function PlaceDetailPage() {
           {visibleFields.map(f => {
             const rawValue = m[f.name]
             if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
+              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue)
+            const rendered = renderFieldValue(rawValue, locale)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'
                 ? pidUrl(rawValue)
                 : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
           {hasCoords && (
-            <MetaRow label="Koordinaten" value={`${place.lat!.toFixed(5)}, ${place.lon!.toFixed(5)}`} />
+            <MetaRow label={t('common.coordinates')} value={`${place.lat!.toFixed(5)}, ${place.lon!.toFixed(5)}`} />
           )}
         </aside>
       </div>

@@ -10,6 +10,7 @@ import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
+import { entityTypeLabel, useI18n } from '../i18n'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -23,9 +24,6 @@ function MetaRow({ label, value, href }: { label: string; value: string; href?: 
   )
 }
 
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  person: 'Person', organisation: 'Organisation', group: 'Gruppe', other: 'Sonstige',
-}
 
 export function EntityDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -39,7 +37,8 @@ export function EntityDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('entity')
-  const resolveRelationType = useRelationTypeLabels()
+  const { t, locale } = useI18n()
+  const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
 
   useEffect(() => {
@@ -90,22 +89,22 @@ export function EntityDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
+  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !entity) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? 'Entität nicht gefunden.'}</div>
+      <div style={{ color: '#dc2626' }}>{error ?? t('error.entityNotFound')}</div>
     </div>
   )
 
   const m = entity.metadata_ as Record<string, unknown>
   const title = String(m.name ?? m.title ?? m.label ?? m.display_name ?? entity.id)
-  const typeLabel = ENTITY_TYPE_LABELS[entity.entity_type] ?? entity.entity_type
-  const description = String(m.description ?? '')
+  const typeLabel = entityTypeLabel(entity.entity_type)
+  const description = renderFieldValue(m.description, locale) ?? ''
 
   const allVisibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
   const bodyFields = allVisibleFields.filter(f => {
     if (f.field_type === 'relation' || f.field_type === 'authority' || f.field_type === 'pid') return false
-    const rendered = renderFieldValue(m[f.name])
+    const rendered = renderFieldValue(m[f.name], locale)
     return rendered !== null && rendered.length > 100
   })
   const sidebarFields = allVisibleFields.filter(f => !bodyFields.includes(f))
@@ -122,12 +121,12 @@ export function EntityDetailPage() {
       </Helmet>
       <div className="bc">
         {backSearch ? (
-          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>{t('common.backToSearch')}</a>
         ) : (
           <>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>{t('common.home')}</a>
             <span className="sep">/</span>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=entity') }}>Personen &amp; Organisationen</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=entity') }}>{t('nav.entitiesLong')}</a>
           </>
         )}
         <span className="sep">/</span>
@@ -146,17 +145,17 @@ export function EntityDetailPage() {
             <div
               className="prose"
               style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(String(m.description)) as string) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(renderFieldValue(m.description, locale) ?? '') as string) }}
             />
           )}
 
           {bodyFields.map(f => {
-            const rendered = renderFieldValue(m[f.name])
+            const rendered = renderFieldValue(m[f.name], locale)
             if (!rendered) return null
             return (
               <div key={f.name} style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
-                  {f.label?.de ?? f.label?.en ?? f.name}
+                  {f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name}
                 </div>
                 <div
                   className="prose"
@@ -169,7 +168,7 @@ export function EntityDetailPage() {
 
           {linkedObjects.length > 0 && (
             <section style={{ marginTop: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Zugehörige Objekte</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
               <div className="obj-grid">
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
@@ -211,17 +210,17 @@ export function EntityDetailPage() {
           {sidebarFields.map(f => {
             const rawValue = m[f.name]
             if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
+              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue)
+            const rendered = renderFieldValue(rawValue, locale)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'
                 ? pidUrl(rawValue)
                 : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
-          <MetaRow label="Typ" value={typeLabel} />
+          <MetaRow label={t('common.type')} value={typeLabel} />
         </aside>
       </div>
     </div>

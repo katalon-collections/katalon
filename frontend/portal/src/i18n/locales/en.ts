@@ -3,6 +3,8 @@ export default {
   'nav.entities': 'People',
   'nav.places': 'Places',
   'nav.works': 'Works',
+  'nav.entitiesLong': 'People & Organisations',
+  'nav.worksLong': 'Works & Events',
 
   'type.object': 'Object',
   'type.entity': 'Person/Org',

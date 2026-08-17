@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { Relation } from '../api/client'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
+import { useI18n } from '../i18n'
 
 
 const TYPE_PATHS: Record<string, string> = {
@@ -44,13 +45,14 @@ interface Props {
 
 export function RelationsList({ relations, currentId, resolveLabel, titles = {}, metadata = {}, fieldDefs = [] }: Props) {
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   if (relations.length === 0) return null
 
   return (
     <section style={{ marginTop: 24 }}>
       <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: 'var(--fg-1)' }}>
-        Verknüpfungen
+        {t('common.relations')}
       </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {relations.map(r => {

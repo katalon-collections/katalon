@@ -2,14 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
-
-const TYPE_LABELS: Record<string, string> = {
-  object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
-}
+import { t, typeLabel, useI18n } from '../i18n'
 
 function facetLabel(field: string): string {
   const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_(.+)$/)
-  return inherited ? `Verknüpft: ${TYPE_LABELS[inherited[1]] ?? inherited[1]} – ${inherited[2]}` : field
+  return inherited ? t('search.linkedFacet', { type: typeLabel(inherited[1]), field: inherited[2] }) : field
 }
 
 export function SearchPage() {
@@ -24,6 +21,7 @@ export function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const { t } = useI18n()
 
   // Load configurable facet fields from portal config
   useEffect(() => {
@@ -141,7 +139,7 @@ export function SearchPage() {
           aria-pressed={!active}
           style={{ fontWeight: !active ? 600 : undefined }}
         >
-          <span>Alle</span>
+          <span>{t('search.all')}</span>
         </button>
         {buckets.map(b => (
           <button
@@ -152,7 +150,7 @@ export function SearchPage() {
             aria-pressed={active === b.value}
             style={{ fontWeight: active === b.value ? 600 : undefined }}
           >
-            <span>{TYPE_LABELS[b.value] ?? b.value}</span>
+            <span>{typeLabel(b.value)}</span>
             <span className="ct">{b.count}</span>
           </button>
         ))}
@@ -164,32 +162,36 @@ export function SearchPage() {
     <div className="container page">
       <form onSubmit={submit} className="refine-search" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input
-          aria-label="Suche verfeinern"
+          aria-label={t('search.refine')}
           style={{ flex: 1, width: '100%', boxSizing: 'border-box', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 14px', fontSize: 14, outline: 'none', color: 'var(--fg)' }}
           value={localQ}
           onChange={e => setLocalQ(e.target.value)}
-          placeholder="Suche verfeinern…"
+          placeholder={t('search.refine')}
         />
         <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 0, borderRadius: 6, padding: '0 18px', fontWeight: 600, fontSize: 13 }}>
-          Suchen
+          {t('search.button')}
         </button>
       </form>
       <div style={{ color: 'var(--fg-3)', fontSize: 13, marginBottom: 4 }}>
         {loading
-          ? 'Suche…'
-          : `${total} Treffer${q ? ` für „${q}"` : ''}${typeFilt ? ` · ${TYPE_LABELS[typeFilt] ?? typeFilt}` : ' · Alle Typen'}`}
+          ? t('search.searching')
+          : <>
+              {t('search.results', { count: total })}
+              {q ? t('search.resultsFor', { q }) : ''}
+              {typeFilt ? t('search.resultsType', { type: typeLabel(typeFilt) }) : t('search.resultsAllTypes')}
+            </>}
       </div>
 
       <div className="search-layout">
         <aside className="facets">
           <FacetPanel
-            label="Typ"
+            label={t('search.typeFacet')}
             buckets={typesFacet}
             active={typeFilt}
             onSelect={v => setFilter('type', v)}
           />
           <FacetPanel
-            label="Status"
+            label={t('search.statusFacet')}
             buckets={statusFacet}
             active={statusFilt}
             onSelect={v => setFilter('status', v)}
@@ -209,19 +211,19 @@ export function SearchPage() {
           {(!typeFilt || typeFilt === 'object') && (
             <>
               <FacetPanel
-                label="Personen/Org."
+                label={t('search.relatedEntities')}
                 buckets={data?.facets?.['related_entities'] ?? []}
                 active={relEntity}
                 onSelect={v => setRelFilter('rel_entity', v)}
               />
               <FacetPanel
-                label="Orte"
+                label={t('search.relatedPlaces')}
                 buckets={data?.facets?.['related_places'] ?? []}
                 active={relPlace}
                 onSelect={v => setRelFilter('rel_place', v)}
               />
               <FacetPanel
-                label="Werke/Ereignisse"
+                label={t('search.relatedOccurrences')}
                 buckets={data?.facets?.['related_occurrences'] ?? []}
                 active={relOccurrence}
                 onSelect={v => setRelFilter('rel_occurrence', v)}
@@ -231,9 +233,9 @@ export function SearchPage() {
         </aside>
 
         <div className="result-list">
-          {loading && <div style={{ padding: 24, color: 'var(--fg-3)' }}>Lade…</div>}
+          {loading && <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('common.loading')}</div>}
           {!loading && data?.items.length === 0 && (
-            <div style={{ padding: 24, color: 'var(--fg-3)' }}>Keine Ergebnisse.</div>
+            <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('search.noResultsShort')}</div>
           )}
           {!loading && data?.items.map(r => {
             const path = r.record_type === 'entity' ? `/entities/${r.id}`
@@ -250,7 +252,7 @@ export function SearchPage() {
                 <div className="body">
                   <div className="title">{r.title || r.id}</div>
                   <div className="desc">
-                    {TYPE_LABELS[r.record_type] ?? r.record_type} · {r.status ?? '—'}
+                    {typeLabel(r.record_type)} · {r.status ?? '—'}
                   </div>
                 </div>
               </Link>
@@ -260,7 +262,7 @@ export function SearchPage() {
       </div>
 
       {totalPages > 1 && (
-        <nav className="pagination" aria-label="Suchergebnisseiten">
+        <nav className="pagination" aria-label={t('search.pagination')}>
           {(() => {
             const pages: (number | '...')[] = []
             const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }

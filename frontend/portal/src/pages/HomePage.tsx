@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, BASE, PORTAL_API, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
+import { useI18n } from '../i18n'
 
 const DEFAULT_CONFIG: PortalConfig = {
   site_title: 'Sammlung',
@@ -23,6 +24,7 @@ export function HomePage() {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   useEffect(() => {
     api.portal.config()
@@ -92,12 +94,12 @@ export function HomePage() {
           {config.hero_text && <p>{config.hero_text}</p>}
           <form className="hero-search" onSubmit={search}>
             <input
-              placeholder="Suchbegriff eingeben…"
+              placeholder={t('home.searchPlaceholder')}
               value={q}
               onChange={e => setQ(e.target.value)}
               autoFocus
             />
-            <button type="submit">Suchen</button>
+            <button type="submit">{t('home.searchButton')}</button>
           </form>
         </div>
       </div>
@@ -106,7 +108,7 @@ export function HomePage() {
         {featured.length > 0 && (
           <>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 0, color: 'var(--fg-2)' }}>
-              Highlights
+              {t('home.highlights')}
             </h2>
             <div className="obj-grid">
               {featured.map(obj => (
@@ -127,16 +129,16 @@ export function HomePage() {
         )}
 
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 0, marginTop: featured.length > 0 ? 32 : 0, color: 'var(--fg-2)' }}>
-          Neueste Zugänge
+          {t('home.recent')}
         </h2>
 
         {loading && (
-          <div style={{ marginTop: 32, color: 'var(--fg-3)', fontSize: 14 }}>Lade…</div>
+          <div style={{ marginTop: 32, color: 'var(--fg-3)', fontSize: 14 }}>{t('common.loading')}</div>
         )}
 
         {!loading && recent.length === 0 && featured.length === 0 && (
           <div style={{ marginTop: 32, color: 'var(--fg-3)', fontSize: 14 }}>
-            Noch keine Objekte vorhanden.
+            {t('home.noObjects')}
           </div>
         )}
 

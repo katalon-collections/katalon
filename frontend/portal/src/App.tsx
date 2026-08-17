@@ -13,14 +13,30 @@ import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
+import { useI18n, typeLabel, setSupportedLocales } from './i18n'
+import { usePortalConfig } from './hooks/usePortalConfig'
 
-const TYPE_LABELS: Record<string, string> = {
-  object: 'Objekt', entity: 'Person/Org', place: 'Ort', occurrence: 'Werk/Ereignis',
+function LanguageSwitcher() {
+  const { locale, setLocale } = useI18n()
+  const config = usePortalConfig()
+  const langs = config.supported_languages ?? ['de', 'en']
+  if (langs.length <= 1) return null
+  return (
+    <select
+      className="lang-switcher"
+      value={locale}
+      onChange={e => setLocale(e.target.value)}
+      aria-label="Language"
+    >
+      {langs.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+    </select>
+  )
 }
 
 function Header() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t } = useI18n()
   const [q, setQ] = useState('')
   const [suggestions, setSuggestions] = useState<Array<{ id: string; record_type: string; title: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -87,58 +103,59 @@ function Header() {
     <header className="site-header">
       <Link to="/" className="logo">Katalon</Link>
       <nav>
-        <Link to="/search?q=&type=object">Objekte</Link>
-        <Link to="/search?q=&type=entity">Personen</Link>
-        <Link to="/search?q=&type=place">Orte</Link>
-        <Link to="/search?q=&type=occurrence">Werke</Link>
+        <Link to="/search?q=&type=object">{t('nav.objects')}</Link>
+        <Link to="/search?q=&type=entity">{t('nav.entities')}</Link>
+        <Link to="/search?q=&type=place">{t('nav.places')}</Link>
+        <Link to="/search?q=&type=occurrence">{t('nav.works')}</Link>
       </nav>
       <div className="sp" />
       <div ref={wrapRef} className={`search-wrap${location.pathname === '/' ? ' is-home' : ''}`} style={{ position: 'relative' }}>
         <form className="search-bar" onSubmit={submit}>
           <input
             ref={inputRef}
-            aria-label="Sammlung durchsuchen"
+            aria-label={t('search.ariaLabel')}
             aria-expanded={showSuggestions}
             aria-controls="search-suggestions"
             value={q}
             onChange={e => setQ(e.target.value)}
             onFocus={() => { if (suggestions.length) setShowSuggestions(true) }}
-            placeholder={currentType ? `Suchen in ${TYPE_LABELS[currentType] ?? currentType}…` : 'Suchen…'}
+            placeholder={currentType ? t('search.inType', { type: typeLabel(currentType) }) : t('search.placeholder')}
           />
         </form>
         {showSuggestions && (
           <div className="search-suggestions" id="search-suggestions">
             {suggestions.length === 0 && loadingSuggestions && (
-              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Suche…</div>
+              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>{t('search.searching')}</div>
             )}
             {suggestions.length === 0 && !loadingSuggestions && (
-              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>Keine Ergebnisse</div>
+              <div className="suggest-item" style={{ color: 'var(--fg-3)' }}>{t('search.noResults')}</div>
             )}
             {suggestions.map(item => (
               <Link key={`${item.record_type}-${item.id}`} className="suggest-item" to={resultPath(item)} onClick={() => setShowSuggestions(false)}>
                 <span className="suggest-title">{item.title || item.id}</span>
-                <span className="suggest-badge">{TYPE_LABELS[item.record_type] ?? item.record_type}</span>
+                <span className="suggest-badge">{typeLabel(item.record_type)}</span>
               </Link>
             ))}
             <button type="button" className="suggest-footer" onClick={() => submit()}>
-              Alle Ergebnisse anzeigen →
+              {t('search.showAll')}
             </button>
           </div>
         )}
       </div>
+      <LanguageSwitcher />
     </header>
   )
 }
 
 function Footer() {
+  const { locale } = useI18n()
   const [pages, setPages] = useState<StaticPageSummary[]>([])
   useEffect(() => { api.pages.list().then(setPages).catch(() => {}) }, [])
   return (
     <footer className="site-footer">
       Katalon · Metadata Management System
       {pages.map(p => {
-        const lang = 'de'
-        const label = (p.title as Record<string, string>)[lang] ?? Object.values(p.title)[0] ?? p.slug
+        const label = (p.title as Record<string, string>)[locale] ?? Object.values(p.title)[0] ?? p.slug
         return (
           <span key={p.slug}>
             {' · '}
@@ -157,6 +174,7 @@ function AppInner() {
     loadAndApplyTheme()
     // Apply portal config color_tokens on top of the base theme
     api.portal.config().then(c => {
+      setSupportedLocales(c.supported_languages ?? ['de', 'en'])
       const tokens = c.color_tokens ?? {}
       const root = document.documentElement
       for (const [k, v] of Object.entries(tokens)) {

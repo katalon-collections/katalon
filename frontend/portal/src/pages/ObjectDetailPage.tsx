@@ -11,6 +11,7 @@ import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
+import { useI18n } from '../i18n'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -64,7 +65,8 @@ export function ObjectDetailPage() {
   const [viewerError, setViewerError] = useState(false)
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('object')
-  const resolveRelationType = useRelationTypeLabels()
+  const { t, locale } = useI18n()
+  const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
   const portalConfig = usePortalConfig()
 
@@ -101,13 +103,13 @@ export function ObjectDetailPage() {
   }, [id])
 
   if (loading) {
-    return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
+    return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   }
 
   if (error || !obj) {
     return (
       <div className="container page">
-        <div style={{ color: '#dc2626' }}>{error ?? 'Objekt nicht gefunden.'}</div>
+        <div style={{ color: '#dc2626' }}>{error ?? t('error.objectNotFound')}</div>
       </div>
     )
   }
@@ -123,7 +125,7 @@ export function ObjectDetailPage() {
   const manifestUrl = `${BASE || window.location.origin}${PORTAL_API}/objects/${obj.id}/iiif/manifest`
   const showViewer = readyMedia.length > 0 && !viewerError
 
-  const description = String(m.description ?? '')
+  const description = renderFieldValue(m.description, locale) ?? ''
   const primaryImage = readyMedia.find(f => f.is_primary && (f.category ?? 'image') === 'image')
     ?? readyMedia.find(f => (f.category ?? 'image') === 'image')
   const ogImage = primaryImage ? `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primaryImage.id}/file` : ''
@@ -146,12 +148,12 @@ export function ObjectDetailPage() {
       </Helmet>
       <div className="bc">
         {backSearch ? (
-          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>{t('common.backToSearch')}</a>
         ) : (
           <>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>{t('common.home')}</a>
             <span className="sep">/</span>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=') }}>Suche</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=') }}>{t('common.search')}</a>
           </>
         )}
         <span className="sep">/</span>
@@ -179,7 +181,7 @@ export function ObjectDetailPage() {
             />
           ) : (
             <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
-              Kein Bild verfügbar
+              {t('object.noImage')}
             </div>
           )}
 
@@ -199,7 +201,7 @@ export function ObjectDetailPage() {
 
           {m.description != null && (
             <div style={{ marginTop: 20, fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>
-              {String(m.description)}
+              {renderFieldValue(m.description, locale)}
             </div>
           )}
 
@@ -220,26 +222,26 @@ export function ObjectDetailPage() {
         </div>
 
         <aside className="detail-meta">
-          {obj.idno && <MetaRow label="Inventar-Nr." value={obj.idno} />}
+          {obj.idno && <MetaRow label={t('common.inventoryNo')} value={obj.idno} />}
           {visibleFields.map(f => {
             const rawValue = m[f.name]
             if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
+              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue)
+            const rendered = renderFieldValue(rawValue, locale)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'
                 ? pidUrl(rawValue)
                 : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {imageMedia.length > 0 && (
               <>
                 <a href={manifestUrl} target="_blank" rel="noreferrer"
                    style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                  IIIF Manifest ({imageMedia.length} {imageMedia.length === 1 ? 'Bild' : 'Bilder'}) ↗
+                  {t('object.iiifManifest')} ({imageMedia.length} {imageMedia.length === 1 ? t('object.imageSingular') : t('object.imagePlural')}) ↗
                 </a>
                 <button
                   onClick={() => navigator.clipboard.writeText(manifestUrl)}
@@ -248,7 +250,7 @@ export function ObjectDetailPage() {
                     padding: 0, cursor: 'pointer', textAlign: 'left',
                   }}
                 >
-                  📋 Manifest-URL kopieren
+                  📋 {t('object.copyManifest')}
                 </button>
               </>
             )}

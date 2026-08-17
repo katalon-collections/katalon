@@ -33,7 +33,7 @@ export function pidUrl(value: unknown): string | undefined {
  * Converts a metadata field value to a human-readable string for display.
  * Returns null if the value is empty / should be skipped.
  */
-export function renderFieldValue(value: unknown): string | null {
+export function renderFieldValue(value: unknown, locale?: string): string | null {
   if (value == null) return null
 
   // Authority entry {source, external_id, label} / translatable field {lang: text}
@@ -41,8 +41,9 @@ export function renderFieldValue(value: unknown): string | null {
     const obj = value as Record<string, unknown>
     if (typeof obj.label === 'string' && obj.label) return obj.label
     if (typeof obj.value === 'string' && obj.value) return obj.value
-    // Translatable field: prefer de → en → first non-empty language value.
-    for (const lang of ['de', 'en']) {
+    // Translatable field: prefer active locale → de → en → first non-empty value.
+    const preferred = [locale, 'de', 'en'].filter((l, i, a): l is string => Boolean(l) && a.indexOf(l) === i)
+    for (const lang of preferred) {
       const v = obj[lang]
       if (typeof v === 'string' && v.trim()) return v
     }

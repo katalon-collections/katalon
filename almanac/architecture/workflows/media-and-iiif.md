@@ -1,6 +1,6 @@
 ---
 title: "Media And IIIF"
-summary: "Katalon's media workflow attaches image files to objects, validates and stores them, processes them through Celery and Cantaloupe, and exposes IIIF manifests to the portal."
+summary: "Katalon's media workflow attaches image and non-image files (PDF, audio, video, 3D) to objects, validates and stores them, routes images through Celery/Cantaloupe/IIIF, and dispatches portal viewers by MIME category."
 topics: [architecture, workflows, media, iiif, celery, portal]
 sources:
   - id: media-api
@@ -32,11 +32,11 @@ sources:
     path: frontend/portal/src/pages/ObjectDetailPage.tsx
 ---
 
-Katalon's media workflow is object-only: media endpoints live under `/objects/{object_id}/media`, uploads require editor or admin rights, and public reads check object visibility before listing or serving files [@media-api]. Uploaded files are stored under `settings.media_root`, validated as real images with Pillow, represented by `MediaFile` rows, and handed to Celery for IIIF processing [@media-api] [@media-validation]. Cantaloupe supplies IIIF Image API URLs and image dimensions, while the portal consumes the resulting object manifest through a Clover IIIF viewer [@cantaloupe] [@iiif-viewer].
+Katalon's media workflow is object-only: media endpoints live under `/objects/{object_id}/media`, uploads require editor or admin rights, and public reads check object visibility before listing or serving files [@media-api]. Uploaded files are stored under `settings.media_root`, validated, represented by `MediaFile` rows, and handed to Celery for IIIF processing *only when they are images* [@media-api] [@media-validation]. Cantaloupe supplies IIIF Image API URLs and image dimensions for images, while the portal dispatches its viewer by `MediaFile.category` — Clover IIIF for images, native browser viewer for PDF, HTML5 players for audio/video, and `@google/model-viewer` for 3D models [@cantaloupe] [@iiif-viewer] [@object-detail].
 
 ## Upload And Storage
 
-`upload_media()` first verifies the target Object exists, rejects MIME types outside JPEG, PNG, TIFF, and WebP, streams the upload to `media_root`, and enforces `settings.max_upload_size_mb` while writing [@media-api]. After the file is on disk, `verified_image_mime()` opens it with Pillow, calls `image.verify()`, maps the detected image format back to an allowed MIME type, and rejects invalid or unsupported image content [@media-validation].
+`upload_media()` first verifies the target Object exists, rejects unsupported MIME types, streams the upload to `media_root`, and enforces `settings.max_upload_size_mb` while writing [@media-api]. Images (JPEG, PNG, TIFF, WebP) are validated with `verified_image_mime()` via Pillow `verify()`; non-image files (PDF, MP3/WAV/OGG, MP4/WebM, GLB/GLTF) are accepted without Pillow and stored under a `category` derived from their MIME type [@media-validation].
 
 The created `MediaFile` starts with `status="pending"` and becomes primary when it is the object's first media file [@media-api]. The API commits before queueing `generate_iiif_tiles`, so the worker can load the row from its own database session [@media-api]. This is the queue boundary also covered by [Celery And Worker Queues](../backend/celery-and-worker-queues).
 
@@ -49,6 +49,12 @@ License URI and rights holder belong to each `MediaFile`. Administrators may set
 The media worker loads the `MediaFile`, derives the stored filename, and calls Cantaloupe's `/iiif/3/{filename}/info.json` endpoint to trigger lazy image processing and read dimensions [@media-tasks] [@cantaloupe]. Cantaloupe 4xx responses are treated as permanent errors and mark the media row `error`; other fetch failures return missing dimensions, so the worker still stores a manifest and marks the row `ready` unless an unexpected exception escapes into Celery retry handling [@media-tasks] [@cantaloupe].
 
 For each successful file, the worker stores a single-canvas IIIF Presentation 3.0 manifest in `media.iiif_manifest` and marks the row `ready` [@media-tasks] [@cantaloupe]. Object-level manifests are built separately with one Canvas per media item, include object label, summary, configured metadata entries, homepage, and required inventory statement when those values are available [@cantaloupe]. This split lets stored per-file manifests support processing state while public object pages can expose a multi-canvas manifest.
+
+## Non-Image Media And Viewer Dispatch
+
+Non-image files never enter the Cantaloupe/IIIF pipeline. The upload path assigns a `category` (`image`/`pdf`/`audio`/`video`/`3d`) and, because there is no tiling step, the media row is marked `ready` immediately [@media-api]. `_links.thumbnail` and the IIIF manifest are only produced for image files, so portal thumbnails and manifests skip non-image media [@media-api] [@cantaloupe].
+
+`ObjectDetailPage` picks a viewer from `selectedMedia.category`: images use the IIIF viewer, other categories render through `MediaViewer`, which chooses the native browser PDF viewer, an HTML5 `<audio>`/`<video>` element, or a lazy-loaded `@google/model-viewer` component [@object-detail]. There is deliberately no transcoding — only pre-encoded files are accepted, and presentation derivatives remain out of scope.
 
 ## Public Reads And Portal Viewer
 

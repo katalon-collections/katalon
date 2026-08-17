@@ -10,6 +10,7 @@ import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
+import { occurrenceTypeLabel, useI18n } from '../i18n'
 
 function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
   if (!value) return null
@@ -23,9 +24,6 @@ function MetaRow({ label, value, href }: { label: string; value: string; href?: 
   )
 }
 
-const OCCURRENCE_TYPE_LABELS: Record<string, string> = {
-  work: 'Werk', event: 'Ereignis', concept: 'Konzept', other: 'Sonstiges',
-}
 
 export function OccurrenceDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -39,7 +37,8 @@ export function OccurrenceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fieldDefs = useFieldDefinitions('occurrence')
-  const resolveRelationType = useRelationTypeLabels()
+  const { t, locale } = useI18n()
+  const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
 
   useEffect(() => {
@@ -90,23 +89,23 @@ export function OccurrenceDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>Lade…</div>
+  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !occurrence) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? 'Eintrag nicht gefunden.'}</div>
+      <div style={{ color: '#dc2626' }}>{error ?? t('error.occurrenceNotFound')}</div>
     </div>
   )
 
   const m = occurrence.metadata_ as Record<string, unknown>
   const title = String(m.title ?? m.name ?? m.label ?? occurrence.id)
-  const typeLabel = OCCURRENCE_TYPE_LABELS[occurrence.occurrence_type] ?? occurrence.occurrence_type
-  const description = String(m.description ?? '')
+  const typeLabel = occurrenceTypeLabel(occurrence.occurrence_type)
+  const description = renderFieldValue(m.description, locale) ?? ''
 
   const allVisibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'title' && f.name !== 'name')
   // Long text fields go into the main column (rendered with markdown); short fields into the sidebar
   const bodyFields = allVisibleFields.filter(f => {
     if (f.field_type === 'relation' || f.field_type === 'authority' || f.field_type === 'pid') return false
-    const rendered = renderFieldValue(m[f.name])
+    const rendered = renderFieldValue(m[f.name], locale)
     return rendered !== null && rendered.length > 100
   })
   const sidebarFields = allVisibleFields.filter(f => !bodyFields.includes(f))
@@ -123,12 +122,12 @@ export function OccurrenceDetailPage() {
       </Helmet>
       <div className="bc">
         {backSearch ? (
-          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>Zurück zur Suche</a>
+          <a href="#" onClick={e => { e.preventDefault(); navigate(backSearch) }}>{t('common.backToSearch')}</a>
         ) : (
           <>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>Startseite</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/') }}>{t('common.home')}</a>
             <span className="sep">/</span>
-            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=occurrence') }}>Werke &amp; Ereignisse</a>
+            <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=occurrence') }}>{t('nav.worksLong')}</a>
           </>
         )}
         <span className="sep">/</span>
@@ -147,17 +146,17 @@ export function OccurrenceDetailPage() {
             <div
               className="prose"
               style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(String(m.description)) as string) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(renderFieldValue(m.description, locale) ?? '') as string) }}
             />
           )}
 
           {bodyFields.map(f => {
-            const rendered = renderFieldValue(m[f.name])
+            const rendered = renderFieldValue(m[f.name], locale)
             if (!rendered) return null
             return (
               <div key={f.name} style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
-                  {f.label?.de ?? f.label?.en ?? f.name}
+                  {f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name}
                 </div>
                 <div
                   className="prose"
@@ -170,7 +169,7 @@ export function OccurrenceDetailPage() {
 
           {linkedObjects.length > 0 && (
             <section style={{ marginTop: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Zugehörige Objekte</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
               <div className="obj-grid">
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
@@ -212,17 +211,17 @@ export function OccurrenceDetailPage() {
           {sidebarFields.map(f => {
             const rawValue = m[f.name]
             if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
+              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue)
+            const rendered = renderFieldValue(rawValue, locale)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'
                 ? pidUrl(rawValue)
                 : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
+            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
           })}
-          <MetaRow label="Typ" value={typeLabel} />
+          <MetaRow label={t('common.type')} value={typeLabel} />
         </aside>
       </div>
     </div>

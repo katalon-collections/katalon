@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { banners, type BannerItem } from '../api/client'
+import { useI18n } from '../i18n'
 
 const COLOR_STYLES: Record<BannerItem['color'], React.CSSProperties> = {
   blue:   { background: '#dbeafe', color: '#1e40af', borderBottom: '1px solid #bfdbfe' },
@@ -13,6 +14,7 @@ const POLL_INTERVAL = 5 * 60 * 1000
 export function BannerBar() {
   const [items, setItems] = useState<BannerItem[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const { t } = useI18n()
 
   useEffect(() => {
     const load = () => banners.activePortal().then(setItems).catch(() => {})
@@ -43,7 +45,7 @@ export function BannerBar() {
           <button
             onClick={() => setDismissed(d => new Set([...d, b.id]))}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', color: 'inherit', opacity: 0.6, fontSize: 18, lineHeight: 1 }}
-            title="Schließen"
+            title={t('banner.close')}
           >
             ×
           </button>
