@@ -9,6 +9,9 @@ sources:
   - id: sidebar
     type: file
     path: frontend/admin/src/components/layout/Sidebar.tsx
+  - id: topbar
+    type: file
+    path: frontend/admin/src/components/layout/Topbar.tsx
 ---
 
 Admin routes are hash routes owned by `AppShell`, not browser paths. The shell parses `window.location.hash`, stores the route and optional edit id in React state, and renders one screen component from a `switch` over that route [@app-shell]. The sidebar is the visible navigation surface for most routes, groups admin-only configuration and user-management entries by role, and marks both list and form routes active through each item route set [@sidebar].
@@ -67,3 +70,9 @@ List screens receive an `onOpen` callback that navigates to the matching form ro
 ## Titles And Breadcrumbs
 
 `CRUMBS` defines labels and parent routes for known hash routes. The shell replaces the first breadcrumb with the configured portal site title and derives `document.title` from the active route; `settings` is titled as the admin app root, while other known routes use the current breadcrumb label plus the admin suffix [@app-shell].
+
+## Help Links
+
+`Topbar` maps only a small route set to screen-specific documentation: `schema` opens `02_schema_verwaltung.md`, `import` opens `03_csv_import.md`, `form-variants` opens `11_formularvarianten.md`, and `subtypes` opens `12_subtypen.md` [@topbar]. The first two links target the separate `katalon-docs` repository, while form variants and subtypes still target this repository's `docs/` folder until those pages are migrated [@topbar].
+
+Routes without a `ROUTE_DOCS` entry fall back to the `katalon-docs` repository root when the help icon is clicked [@topbar].

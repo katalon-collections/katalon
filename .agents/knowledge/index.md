@@ -6,7 +6,7 @@ okf_version: "0.1"
 
 Internal, dev-only knowledge base in [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) format. Not published, not deployed — browse locally via `make knowledge-site`.
 
-This is separate from `.agents/DEV.md`, `.agents/IMPLEMENTIERUNGSPLAN.md`, and `.agents/PLAN*.md`, which stay where they are as living process docs. This bundle holds durable, curated concepts — architecture decisions, playbooks — that are worth keeping stable and cross-linked.
+This is separate from `.agents/DEV.md` and `.agents/PLAN*.md`, which stay where they are as living process docs; roadmap and phase status now live in GitHub Issues (#260–#267). This bundle holds durable, curated concepts — architecture decisions, playbooks — that are worth keeping stable and cross-linked.
 
 # Sections
 

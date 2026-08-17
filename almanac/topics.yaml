@@ -23,6 +23,10 @@ topics:
     title: Development
     description: Local workflows and checks for changing Katalon.
     parents: [operations]
+  - slug: roadmap
+    title: Roadmap
+    description: GitHub roadmap umbrella issues and planning routes.
+    parents: [development]
   - slug: domain
     title: Domain
     description: Katalon's GLAM metadata-management product model.

@@ -24,6 +24,8 @@ Read [System Overview](architecture/system/system-overview) next when the task t
 
 Read [Local Workflows](guides/development/local-workflows) before running development commands. Backend Python commands are expected to run from `backend/`, and the root virtual environment can use the wrong interpreter for backend tests [@agents].
 
+Read [Project Roadmap](reference/project-roadmap) before choosing broad implementation work. Katalon's active planning surface is the GitHub roadmap umbrella set, while live sub-issue status remains in GitHub [@agents].
+
 Read [Ports And Routing](reference/operations/ports-and-routing) before browser checks. The normal production-like Compose stack routes Admin at `http://localhost/admin/` and Portal at `http://localhost/`; direct container ports are for debugging and can show a blank shell when base paths do not match [@agents].
 
 ## Domain Cluster

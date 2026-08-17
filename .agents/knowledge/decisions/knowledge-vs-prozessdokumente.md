@@ -46,3 +46,10 @@ Datei zuverlässig gelesen wird, egal wie wertvoll ihr Inhalt ist.
 # Citations
 
 [1] Root `AGENTS.md`, Abschnitte "Dev Knowledge Base (OKF)", "Kontext-Dateien — Lazy Loading"
+
+# Note (2026-08-14)
+
+`IMPLEMENTIERUNGSPLAN.md` wurde durch GitHub-Issues (Roadmap-Umbrellas
+#260–#267) ersetzt und gelöscht. Die Entscheidung selbst (OKF-Bundle vs.
+Prozessdokumente, beide lazy-geladen) bleibt gültig; Roadmap/Phasenstatus
+lebt jetzt im Tracker statt in einer Datei.

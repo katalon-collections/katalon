@@ -13,7 +13,7 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 ## Dateien in diesem Verzeichnis
 
 - `KONZEPT.md` – vollständiges Konzeptdokument mit Datenmodell
-- `.agents/IMPLEMENTIERUNGSPLAN.md` – detaillierter Phasenplan
+- GitHub-Roadmap (#260–#267) – Phasenstatus und Prioritäten (ersetzt IMPLEMENTIERUNGSPLAN.md)
 - `.agents/DEV.md` – Entwickler-Setup und Workflows
 - `docs/` – Übergangskopie der technischen Dokumentation; primär gepflegt in `karkraeg/katalon-docs`
 - `e2e/` – Playwright-E2E-Tests
@@ -227,7 +227,7 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 
 ## Dev Knowledge Base (OKF)
 
-`.agents/knowledge/` ist eine dev-only [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)-Wissensbasis für Katalon selbst — architektonische Entscheidungen mit Begründung, nicht Code-Doku. Getrennt von `.agents/DEV.md`/`IMPLEMENTIERUNGSPLAN.md`/`PLAN*.md` (die bleiben lebende Prozessdokumente).
+`.agents/knowledge/` ist eine dev-only [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)-Wissensbasis für Katalon selbst — architektonische Entscheidungen mit Begründung, nicht Code-Doku. Getrennt von `.agents/DEV.md`/`PLAN*.md` (die bleiben lebende Prozessdokumente).
 
 **Nachschlagen**: Bei Architektur-/Design-Fragen ("warum ist das so gebaut?") erst `.agents/knowledge/decisions/index.md` prüfen, bevor Code-Archäologie betrieben wird. Lokale HTML-Ansicht: `make knowledge-site`.
 
@@ -249,7 +249,7 @@ Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur 
 
 Lebende Prozess-/Produkt-Dokumente bleiben an ihrem Ort (nicht Teil von `.agents/knowledge/`, siehe oben), werden aber nur bei Bedarf gelesen statt pauschal vorausgesetzt:
 
-- Frage zu Roadmap, Phasenstatus, offenen Issues, Priorität → `.agents/IMPLEMENTIERUNGSPLAN.md`
+- Frage zu Roadmap, Phasenstatus, offenen Issues, Priorität → GitHub-Issues (Roadmap-Umbrellas #260–#267)
 - Frage zu lokalem Setup, Dev-Workflow, Docker-Stack-Wahl → `.agents/DEV.md`
 - Frage zum Datenmodell im Detail (über die Kurzfassung hier hinaus) → `KONZEPT.md`
 - UI-/UX-/Produktentscheidung, Zielgruppe, Design-Prinzipien → `PRODUCT.md` + `DESIGN.md`
@@ -305,4 +305,4 @@ Details/Architektur: `almanac/decisions/operations/katalon-cli-distribution.md`,
 
 ## Nächster logischer Schritt
 
-Siehe `.agents/IMPLEMENTIERUNGSPLAN.md` und die GitHub Roadmap für aktuelle Prioritäten.
+Siehe die GitHub Roadmap (Issues #260–#267) für aktuelle Prioritäten.

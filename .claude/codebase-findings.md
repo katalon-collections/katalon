@@ -147,7 +147,7 @@ frontend/
 **Status:** Teilweise implementiert (Clover-IIIF in ObjectDetailPage)
 **Probleme:**
 - Viewer kann aufgrund von CORS/Netzwerk-Fehlern failen → `viewerError` state existiert, Fallback funktioniert
-- Cantaloupe-Tiles sind laut IMPLEMENTIERUNGSPLAN noch nicht verdrahtet
+- Cantaloupe-Tiles sind seit Phase 5 verdrahtet (Celery-Task `generate_iiif_tiles`) — Finding überholt
 - `@ts-expect-error` für `onError` Prop sollte geprüft werden
 
 ### #53 – Portal-Suche reparieren

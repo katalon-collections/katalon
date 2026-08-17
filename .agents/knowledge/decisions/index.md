@@ -10,7 +10,7 @@
 * [Importer-Plugin-Architektur](importer-multi-format-architektur.md) - SourceFormat-ABC + Registry statt formatspezifischer Funktionen
 * [Docker-Customization-Strategie](docker-customization-strategy.md) - Volume Mounts + Override-Datei statt Image-Rebuilds
 * [Beta-Release-Scope](beta-release-scope.md) - Zugänglichkeit vor Feature-Vollständigkeit
-* [Knowledge vs. Prozessdokumente](knowledge-vs-prozessdokumente.md) - OKF-Bundle bleibt getrennt von DEV.md/IMPLEMENTIERUNGSPLAN.md/KONZEPT.md/PRODUCT.md/DESIGN.md, beide lazy-geladen
+* [Knowledge vs. Prozessdokumente](knowledge-vs-prozessdokumente.md) - OKF-Bundle bleibt getrennt von DEV.md/KONZEPT.md/PRODUCT.md/DESIGN.md (Roadmap jetzt in GitHub-Issues #260–#267), beide lazy-geladen
 * [Importer Fuzzy-Vokabular-Clustering](importer-fuzzy-vocab-clustering.md) - rapidfuzz + Greedy-Clustering statt k-means, User bestätigt vor Merge (#269)
 * [Production-Readiness-Posture](production-readiness-posture.md) - tiefer /health (DB+ES, kein Redis, kein Liveness-Split), Optimistic Locking bewusst als Issue vertagt (#272, #273)
 * [Optimistic Locking](optimistic-locking.md) - version-Spalte + If-Match + 409, feldweiser 3-Wege-Merge in der Admin-UI, nur Metadaten (#272)

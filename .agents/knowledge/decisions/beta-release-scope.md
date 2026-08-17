@@ -40,5 +40,5 @@ nicht.
 
 # Citations
 
-[1] `.agents/IMPLEMENTIERUNGSPLAN.md`
+[1] `.agents/IMPLEMENTIERUNGSPLAN.md` (seit 2026-08-14 ersetzt durch GitHub-Roadmap #260–#267)
 [2] Session-Entscheidung 2026-05-25: "Beta Release Roadmap: Critical Blockers Prioritized"

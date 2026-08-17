@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-08-17
+
+### Changed
+- Almanac/Wissensbasis-Sync: Decisions-Index, Audit/Snapshot-Workflow, Admin-Routes-Referenz, Roadmap-Seite aktualisiert; `.agents/IMPLEMENTIERUNGSPLAN.md` entfernt (ersetzt durch GitHub-Roadmap).
+
 ## [0.11.6] - 2026-08-16
 
 ### Added

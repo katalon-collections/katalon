@@ -12,6 +12,9 @@ sources:
   - id: audit-api
     type: file
     path: backend/src/katalon/api/v1/audit.py
+  - id: concurrency-helper
+    type: file
+    path: backend/src/katalon/core/concurrency.py
   - id: objects-api
     type: file
     path: backend/src/katalon/api/v1/objects.py
@@ -27,9 +30,12 @@ sources:
   - id: optimistic-tests
     type: file
     path: backend/tests/test_optimistic_locking.py
+  - id: snapshot-integrity-tests
+    type: file
+    path: backend/tests/integration/test_snapshot_integrity.py
 ---
 
-Audit and snapshots are two separate persistence mechanisms around record changes. Audit entries are append-only rows in `audit_log` with a record identity, optional user id, action name, JSON `changed_fields`, and timestamp; snapshots are labeled JSON payloads in `record_snapshots` for a record identity and creator [@models]. CRUD and workflow endpoints write audit entries as changes happen, while editors create snapshots explicitly and can restore selected scalar and metadata state from those snapshots for collection records [@objects-api]. Procedures have audit entries but no snapshot API or UI.
+Audit and snapshots are two separate persistence mechanisms around record changes. Audit entries are append-only rows in `audit_log` with a record identity, optional user id, action name, JSON `changed_fields`, and timestamp; snapshots are labeled JSON payloads in `record_snapshots` for a record identity and creator [@models]. CRUD and workflow endpoints write audit entries as changes happen, while editors create snapshots explicitly and can restore selected scalar and metadata state from those snapshots for collection records through the same version boundary used for destructive state replacement [@objects-api] [@concurrency-helper]. Procedures have audit entries but no snapshot API or UI.
 
 ## Audit Model And Querying
 
@@ -47,12 +53,10 @@ Publishing writes an action named `publish` with `changed_fields` set to the new
 
 `RecordSnapshot` stores `record_type`, `record_id`, `label`, JSON `snapshot`, optional `created_by`, and `created_at` [@models]. Object snapshot creation copies idno, object type, collection status, status, and metadata [@objects-api]. Other collection record types follow the same smaller pattern for their subtype, status, and metadata fields [@entities-api] [@places-api] [@occurrences-api]. Procedures deliberately have no snapshot endpoints. Historical rows with `record_type = "procedure"` are retained rather than destructively purged, but no endpoint or form exposes them.
 
-Snapshot listing queries by the fixed record type and id and orders newest first [@objects-api]. Restoring an object snapshot copies back only keys present in the snapshot, including idno, status, object type, collection status, and metadata, then flushes the session [@objects-api].
-
-Restore endpoints do not write audit entries or increment version in the code shown here [@objects-api]. A future change that needs restore events to appear in audit history should add explicit `log_change` calls and version increments in each restore endpoint rather than relying on the snapshot row itself.
+Snapshot listing queries by the fixed record type and id and orders newest first [@objects-api]. Restoring an object snapshot requires `If-Match`, copies back only keys present in the snapshot, including idno, status, object type, collection status, and metadata, flushes the versioned record, synchronizes schema-driven relation fields, writes a `restore` audit entry with the `snapshot_id`, commits, and then tries to reindex the record in Elasticsearch [@objects-api]. Entity, place, and occurrence restore endpoints follow the same pattern for their type-specific scalar field, status, and metadata [@entities-api] [@places-api] [@occurrences-api].
 
 ## Version Boundary
 
-Primary record models carry an integer `version` column with default `1`, and update endpoints increment it after a successful optimistic-locking check [@models] [@objects-api]. The optimistic-locking tests define the core contract: missing `If-Match` skips the check, a matching version passes, and a stale version raises `409` with `{"error": "version_conflict", "current_version": <value>}` [@optimistic-tests].
+Primary record models carry an integer `version` column with default `1`, and SQLAlchemy treats that column as the mapper's version id, so successful flushes of changed collection records advance it [@models]. The optimistic-locking tests define the ordinary update contract: missing `If-Match` skips the check, a matching version passes, and a stale version raises `409` with `{"error": "version_conflict", "current_version": <value>}` [@optimistic-tests].
 
-The admin form uses that version boundary for save conflicts, but snapshots are outside the same guard in the current endpoints. That distinction is important when changing [Record CRUD And Publishing](record-crud-and-publishing): ordinary update conflicts are protected by `If-Match`, while restore behavior currently trusts the authorized caller and applies the stored JSON payload directly [@objects-api].
+Snapshot restore uses the stricter `require_version()` helper because it replaces current state from stored JSON. Missing `If-Match` raises `428`, a stale version raises `409`, and a successful restore increments the record version; integration tests cover that contract for all four collection record types and separately assert object restore writes an audit entry [@concurrency-helper] [@snapshot-integrity-tests] [@objects-api]. That distinction is important when changing [Record CRUD And Publishing](record-crud-and-publishing): ordinary updates keep compatibility for callers that omit `If-Match`, while snapshot restore requires callers to participate in the version protocol.
