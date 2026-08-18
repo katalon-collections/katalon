@@ -424,6 +424,7 @@ async def delete_procedure(
         record_id=proc.id,
         user_id=current_user.id,
         action="delete",
+        changed_fields={k: v for k, v in {"idno": proc.idno, "title": proc.reference_number}.items() if v},
     )
     await db.delete(proc)
     await flush_record(db, proc)

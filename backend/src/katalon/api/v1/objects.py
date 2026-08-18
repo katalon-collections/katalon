@@ -23,7 +23,7 @@ from katalon.core.schemas import (
 )
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
-from katalon.services.audit_service import diff_fields, log_change
+from katalon.services.audit_service import delete_label_fields, diff_fields, log_change
 from katalon.services.idno_service import (
     consume_next_idno,
     maybe_advance_counter,
@@ -332,7 +332,10 @@ async def delete_object(
     if related_count > 0:
         await delete_relations(db, "object", object_id)
 
-    await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete")
+    await log_change(
+        db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete",
+        changed_fields=delete_label_fields(obj.idno, obj.metadata_),
+    )
     await db.delete(obj)
     await flush_record(db, obj)
     try:

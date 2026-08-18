@@ -190,10 +190,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     onTabChange?.('active')
   }
 
+  function removeLocally(id: string) {
+    // Drop the row immediately instead of waiting on the re-fetch triggered
+    // by load() below — that request can be slower than the confirm-dialog
+    // round-trip the user just went through, which reads as "nothing happened".
+    setData(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id), total: Math.max(0, prev.total - 1) }))
+    setSel(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
+  }
+
   async function handleDelete(id: string) {
     if (!window.confirm(`${TYPE_SINGULAR_LABELS[recordType]} wirklich löschen?`)) return
     try {
       await api.delete(id)
+      removeLocally(id)
       load()
     } catch (e) {
       if (e instanceof ConflictError) {
@@ -203,6 +212,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         if (!confirmed) return
         try {
           await api.delete(id, true)
+          removeLocally(id)
           load()
         } catch (e2) {
           alert((e2 as Error).message)

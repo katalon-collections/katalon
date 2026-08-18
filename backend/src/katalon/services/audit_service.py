@@ -7,6 +7,50 @@ from katalon.core.models import AuditLog
 
 _MAX_DIFF_VALUE_LEN = 200
 
+# Mirrors TITLE_FIELD_NAMES in frontend/admin/src/components/screens/ScreenForm.tsx —
+# keep both lists in sync.
+TITLE_FIELD_NAMES = ["label", "title", "titel", "name", "display_name", "place_name", "bezeichnung"]
+
+
+def extract_title(md: dict | None) -> str | None:
+    if not md:
+        return None
+    for key in TITLE_FIELD_NAMES:
+        val = md.get(key)
+        if not val:
+            continue
+        if isinstance(val, str):
+            return val
+        if isinstance(val, list) and val:
+            first = val[0]
+            if isinstance(first, str):
+                return first
+            if isinstance(first, dict):
+                return first.get("value") or first.get("label") or None
+    return None
+
+
+def format_label(title: str | None, idno: str | None, fallback: str) -> str:
+    if not title:
+        return idno or fallback
+    return f"{title} ({idno})" if idno else title
+
+
+def delete_label_fields(idno: str | None, metadata: dict | None) -> dict:
+    """Snapshot idno/title into the delete audit entry's changed_fields.
+
+    The record row is gone by the time the audit log is displayed, so the
+    label shown there must survive the deletion instead of being resolved
+    from a live lookup.
+    """
+    fields: dict = {}
+    if idno:
+        fields["idno"] = idno
+    title = extract_title(metadata)
+    if title:
+        fields["title"] = title
+    return fields
+
 
 def _display_value(value: object) -> object:
     """Render a metadata value for the audit-log diff.

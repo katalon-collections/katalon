@@ -6,36 +6,9 @@ from sqlalchemy import select
 from katalon.core.dependencies import DBDep
 from katalon.core.models import AuditLog, Entity, Object, Occurrence, Place, Procedure, User
 from katalon.core.schemas import AuditLogRead
+from katalon.services.audit_service import extract_title, format_label
 
 router = APIRouter(prefix="/audit", tags=["audit"])
-
-# Mirrors TITLE_FIELD_NAMES in frontend/admin/src/components/screens/ScreenForm.tsx —
-# keep both lists in sync.
-_TITLE_FIELD_NAMES = ["label", "title", "titel", "name", "display_name", "place_name", "bezeichnung"]
-
-
-def _extract_title(md: dict | None) -> str | None:
-    if not md:
-        return None
-    for key in _TITLE_FIELD_NAMES:
-        val = md.get(key)
-        if not val:
-            continue
-        if isinstance(val, str):
-            return val
-        if isinstance(val, list) and val:
-            first = val[0]
-            if isinstance(first, str):
-                return first
-            if isinstance(first, dict):
-                return first.get("value") or first.get("label") or None
-    return None
-
-
-def _format_label(title: str | None, idno: str | None, fallback: str) -> str:
-    if not title:
-        return idno or fallback
-    return f"{title} ({idno})" if idno else title
 
 
 async def _resolve_record_labels(db, refs: list[tuple[str, uuid.UUID]]) -> dict[uuid.UUID, str]:
@@ -51,7 +24,7 @@ async def _resolve_record_labels(db, refs: list[tuple[str, uuid.UUID]]) -> dict[
             continue
         result = await db.execute(select(model.id, model.idno, model.metadata_).where(model.id.in_(by_type[record_type])))
         for id_, idno, md in result.all():
-            labels[id_] = _format_label(_extract_title(md), idno, str(id_)[:8])
+            labels[id_] = format_label(extract_title(md), idno, str(id_)[:8])
 
     if "procedure" in by_type:
         result = await db.execute(select(Procedure.id, Procedure.idno, Procedure.reference_number).where(Procedure.id.in_(by_type["procedure"])))
@@ -59,6 +32,19 @@ async def _resolve_record_labels(db, refs: list[tuple[str, uuid.UUID]]) -> dict[
             labels[id_] = idno or reference_number or str(id_)[:8]
 
     return labels
+
+
+def _delete_snapshot_label(log: AuditLog) -> str | None:
+    """For a "delete" entry, the record row is already gone — build the label
+    from the idno/title snapshotted into changed_fields at delete time instead
+    of a (necessarily empty) live lookup."""
+    if log.action != "delete":
+        return None
+    fields = log.changed_fields or {}
+    idno, title = fields.get("idno"), fields.get("title")
+    if not idno and not title:
+        return None
+    return format_label(title, idno, str(log.record_id)[:8])
 
 
 @router.get(
@@ -106,7 +92,7 @@ async def list_audit_log(
             id=log.id,
             record_type=log.record_type,
             record_id=log.record_id,
-            record_label=labels.get(log.record_id, str(log.record_id)[:8]),
+            record_label=_delete_snapshot_label(log) or labels.get(log.record_id, str(log.record_id)[:8]),
             user_id=log.user_id,
             user_name=user_email or (str(log.user_id)[:8] if log.user_id else None),
             action=log.action,

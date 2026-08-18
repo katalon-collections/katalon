@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-08-18
+
+### Fixed
+- Backend: Audit-Log-Einträge für "Gelöscht" zeigten statt Titel/ID-Nr. eine gekürzte UUID, weil das Label zur Anzeigezeit aus dem (bereits gelöschten) Datensatz nachgeladen wurde. `idno`/Titel werden jetzt beim Löschen selbst in `changed_fields` gesichert (Objekt, Entity, Place, Occurrence, Procedure) und beim Rendern des Log-Eintrags bevorzugt verwendet.
+- Admin: Objekt-/Entity-/Place-/Occurrence-/Vorgangs-Liste entfernte eine gelöschte Zeile erst nach dem Neuladen der Seite sichtbar, wenn der Re-Fetch nach dem Löschen langsamer war als der Confirm-Dialog. Die Zeile wird jetzt sofort optimistisch aus der lokalen Liste entfernt.
+
 ## [1.0.3] - 2026-08-18
 
 ### Fixed
