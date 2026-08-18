@@ -22,7 +22,7 @@ from katalon.core.schemas import (
 )
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
-from katalon.services.audit_service import log_change
+from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.idno_service import (
     consume_next_idno,
     maybe_advance_counter,
@@ -222,7 +222,7 @@ async def update_occurrence(
     await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
     await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "occurrence_type": occurrence_type, "status": data.status}})
+                     changed_fields=diff_fields(old, {"idno": idno, "occurrence_type": occurrence_type, "status": data.status, "metadata": metadata}))
     try:
         await search_service.index_record("occurrence", occ, db)
     except Exception:

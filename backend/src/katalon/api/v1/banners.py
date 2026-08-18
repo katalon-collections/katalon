@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_admin
@@ -15,6 +15,19 @@ router = APIRouter(prefix="/banners", tags=["banners"])
 VALID_COLORS = {"blue", "yellow", "red", "green"}
 
 
+def _naive(v: datetime | None) -> datetime | None:
+    """Strip tzinfo so the value fits the naive `expires_at` DB column.
+
+    The frontend sends an ISO timestamp with a 'Z'/offset suffix, which
+    Pydantic parses as timezone-aware. asyncpg rejects tz-aware datetimes
+    for a `TIMESTAMP WITHOUT TIME ZONE` column, so saving a banner with an
+    expiry date failed before this normalization.
+    """
+    if v is not None and v.tzinfo is not None:
+        return v.astimezone(UTC).replace(tzinfo=None)
+    return v
+
+
 class BannerCreate(BaseModel):
     message: str
     color: str = "blue"
@@ -22,6 +35,8 @@ class BannerCreate(BaseModel):
     show_portal: bool = True
     is_active: bool = True
     expires_at: datetime | None = None
+
+    _normalize_expires_at = field_validator("expires_at")(_naive)
 
 
 class BannerUpdate(BaseModel):
@@ -31,6 +46,8 @@ class BannerUpdate(BaseModel):
     show_portal: bool | None = None
     is_active: bool | None = None
     expires_at: datetime | None = None
+
+    _normalize_expires_at = field_validator("expires_at")(_naive)
 
 
 class BannerRead(BaseModel):

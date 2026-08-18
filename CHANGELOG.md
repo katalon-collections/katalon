@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-18
+
+### Fixed
+- Admin: Banner mit Ablaufdatum ließen sich nicht speichern – `expires_at` kam vom Frontend als timezone-aware Timestamp, die DB-Spalte ist aber naiv; asyncpg lehnte den Insert/Update ab. `expires_at` wird jetzt vor dem Speichern auf naiv normalisiert.
+- Admin: Audit-Log zeigte bei jeder Objekt-/Entity-/Place-/Occurrence-Änderung sämtliche Felder als "geändert" an, auch unveränderte (z. B. `status: draft → draft`), und Metadaten-Diffs erschienen als `[object Object]`. Neue `diff_fields()`-Hilfsfunktion loggt nur tatsächlich geänderte Felder und zeigt Objekt-/Array-Werte (Metadaten) als "geändert" statt als rohes JS-Objekt.
+- Backend: `idno` fehlte beim Objekt-Update im "neu"-Teil des Audit-Diffs (`places`/`occurrences` hatten zusätzlich `metadata` gar nicht im Diff und nutzten ungetrimmtes `idno`) – für alle vier Bestandstypen konsistent gemacht.
+
 ## [1.0.0] - 2026-08-17
 
 ### Added

@@ -16,7 +16,7 @@ from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
-from katalon.services.audit_service import log_change
+from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.idno_service import (
     consume_next_idno,
     maybe_advance_counter,
@@ -226,7 +226,7 @@ async def update_place(
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
     await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
-                     changed_fields={"old": old, "new": {"idno": data.idno, "place_type": place_type, "status": data.status}})
+                     changed_fields=diff_fields(old, {"idno": idno, "place_type": place_type, "status": data.status, "metadata": metadata}))
     try:
         await search_service.index_record("place", place, db)
     except Exception:
