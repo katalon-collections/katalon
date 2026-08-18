@@ -306,7 +306,9 @@ class Vocabulary(Base):
     is_hierarchical: Mapped[bool] = mapped_column(Boolean, default=False)
     kind: Mapped[str] = mapped_column(String(16), default="term", server_default="term")
 
-    terms: Mapped[list["VocabularyTerm"]] = relationship(back_populates="vocabulary")
+    terms: Mapped[list["VocabularyTerm"]] = relationship(
+        back_populates="vocabulary", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class VocabularyTerm(Base):

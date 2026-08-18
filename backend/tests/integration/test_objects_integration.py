@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from katalon.core.concurrency import flush_record
-from katalon.core.models import Object
+from katalon.core.models import MediaFile, Object
 
 
 @pytest.mark.asyncio
@@ -50,6 +50,43 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
 
     missing_response = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
     assert missing_response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_object_with_media_files_succeeds(async_client, auth_headers) -> None:
+    """Regression test: deleting an object cascades to its media files instead
+    of hitting media_files.object_id's NOT NULL constraint (was a 500)."""
+    create_response = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={"idno": f"INT-MEDIA-{uuid.uuid4().hex[:12]}", "status": "draft", "metadata_": {}},
+    )
+    assert create_response.status_code == 201
+    object_id = create_response.json()["id"]
+
+    from katalon.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as session:
+        session.add(
+            MediaFile(
+                object_id=uuid.UUID(object_id),
+                filename="delete-me.jpg",
+                mime_type="image/jpeg",
+                file_path="/not-needed-for-this-test.jpg",
+                status="ready",
+            )
+        )
+        await session.commit()
+
+    delete_response = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert delete_response.status_code == 204, delete_response.text
+
+    missing_response = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert missing_response.status_code == 404
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(MediaFile).where(MediaFile.object_id == uuid.UUID(object_id)))
+        assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.asyncio

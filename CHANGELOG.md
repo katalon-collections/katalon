@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-08-18
+
+### Fixed
+- Backend: derselbe Bug wie bei Objekten (siehe 1.0.2) betraf latent auch Vokabulare mit Termen – `Vocabulary.terms` hatte ebenfalls keine `cascade`/`passive_deletes`-Konfiguration, sodass ein Löschen der Vokabular-Zeile `vocabulary_terms.vocabulary_id` auf `NULL` gesetzt hätte. Aktuell gibt es zwar noch keinen Lösch-Endpunkt für ganze Vokabulare, aber die Modellkonfiguration ist jetzt konsistent mit dem DB-seitigen `ON DELETE CASCADE`.
+
+### Added
+- Backend: Integrationstest deckt jetzt ab, dass das Löschen eines Objekts mit angehängten Mediendateien tatsächlich (gegen eine echte Postgres-DB) durchläuft, statt das nur über Mocks zu simulieren – genau die Lücke, durch die der 1.0.2-Bug unbemerkt blieb.
+
 ## [1.0.2] - 2026-08-18
 
 ### Fixed
