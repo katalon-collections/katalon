@@ -129,7 +129,30 @@ cd backend && pytest tests/
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api pytest tests/
 ```
 
-### Database migrations
+### Run stress tests (Locust)
+
+Locust is included as a dev dependency. See `backend/tests/performance/README.md`
+for the full command reference.
+
+```bash
+cd backend
+
+# Against the local dev API (after `docker compose ... up`)
+KATALON_LOCUST_EMAIL=admin@example.org \
+KATALON_LOCUST_PASSWORD=<password> \
+    uv run --extra dev locust -f tests/performance/locustfile.py
+
+# Open http://localhost:8089 and start the swarm.
+```
+
+Headless smoke run (CI):
+
+```bash
+uv run --extra dev locust -f tests/performance/locustfile.py \
+    --headless -u 10 -r 2 -t 60s \
+    --host http://localhost:8000 \
+    --html /tmp/locust-report.html
+```
 
 ```bash
 # Local

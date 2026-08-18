@@ -19,7 +19,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `KATALON_BASE_URL`, `CORS_ORIGINS`
 - [ ] `MEDIA_ROOT`-Host-Verzeichnis existiert und gehört UID/GID `1000` (`mkdir -p /srv/katalon/media && chown -R 1000:1000 /srv/katalon/media`) — `api`- und `worker`-Container laufen als nicht-root User `app` (UID 1000)
 - [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
-- [ ] `docker-compose.prod.yml` VITE-Build-Argumente auf eigene URLs gesetzt
+- [ ] `.env` VITE-Build-Argumente für Admin/Portal gesetzt
 - [ ] Wikidata-Adapter: `WIKIDATA_USER_AGENT` setzen oder `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL` vollständig pflegen (Wikidata-Policy erfordert identifizierbaren User-Agent)
 - [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
 - [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
@@ -119,19 +119,13 @@ TLS-Zertifikate für beide Domains ausstellen:
 certbot certonly --standalone -d meineurl.de -d admin.meineurl.de
 ```
 
-`docker-compose.prod.yml` — VITE-Build-Argumente:
+Frontend-Build-Argumente in `.env` setzen (werden über `docker-compose.prod.yml` an die
+Build-Stages weitergereicht):
 
-```yaml
-admin:
-  build:
-    args:
-      VITE_API_URL: https://admin.meineurl.de
-      VITE_PORTAL_URL: https://meineurl.de
-
-portal:
-  build:
-    args:
-      VITE_API_URL: https://meineurl.de
+```env
+ADMIN_VITE_API_URL=https://admin.meineurl.de
+PORTAL_URL=https://meineurl.de
+PORTAL_VITE_API_URL=https://meineurl.de
 ```
 
 ---
@@ -171,19 +165,12 @@ Nur ein Zertifikat nötig:
 certbot certonly --standalone -d meineurl.de
 ```
 
-`docker-compose.prod.yml`:
+Frontend-Build-Argumente in `.env`:
 
-```yaml
-admin:
-  build:
-    args:
-      VITE_API_URL: https://meineurl.de
-      VITE_PORTAL_URL: https://meineurl.de
-
-portal:
-  build:
-    args:
-      VITE_API_URL: https://meineurl.de
+```env
+ADMIN_VITE_API_URL=https://meineurl.de
+PORTAL_URL=https://meineurl.de
+PORTAL_VITE_API_URL=https://meineurl.de
 ```
 
 ---
@@ -194,12 +181,14 @@ portal:
 nginx:
   volumes:
     - ./docker/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
-    - ./docker/certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
-    - ./docker/certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+    - ./docker/certs:/etc/nginx/certs:ro
   ports:
     - "80:80"
     - "443:443"
 ```
+
+`docker/nginx.prod.conf` erwartet `fullchain.pem` und `privkey.pem` direkt unter
+`/etc/nginx/certs/` (also `docker/certs/fullchain.pem` und `docker/certs/privkey.pem`).
 
 ## 6. Images bauen und starten
 

@@ -87,10 +87,19 @@ services:
   admin:
     restart: always
     ports: !reset []
+    build:
+      args:
+        VITE_API_URL: ${ADMIN_VITE_API_URL:-}
+        VITE_PORTAL_URL: ${PORTAL_URL:-}
+        VITE_ADMIN_FEEDBACK_ENABLED: ${VITE_ADMIN_FEEDBACK_ENABLED:-}
 
   portal:
     restart: always
     ports: !reset []
+    build:
+      args:
+        VITE_API_URL: ${PORTAL_VITE_API_URL:-}
+        VITE_PORTAL_FEEDBACK_ENABLED: ${VITE_PORTAL_FEEDBACK_ENABLED:-}
 
   nginx:
     restart: always

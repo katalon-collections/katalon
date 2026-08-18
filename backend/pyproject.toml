@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.0.5"
+version = "1.0.6"
 description = "Katalon – Metadata Management System for GLAM collections"
 requires-python = ">=3.12"
 dependencies = [
@@ -41,6 +41,7 @@ dev = [
     "ruff>=0.4.4",
     "mypy>=1.10.0",
     "testcontainers[postgres]>=4.4.0",
+    "locust>=2.29.0",
 ]
 
 [project.scripts]

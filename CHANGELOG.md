@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-08-18
+
+### Added
+- Produktions-Frontend-Builds setzen `VITE_API_URL`/`VITE_PORTAL_URL` über `.env` (via `docker-compose.prod.yml` und Docker-Build-Args), damit absolute URLs korrekt in Admin/Portal-Images eingebettet werden.
+- Performance-Tests mit Locust: `backend/tests/performance/locustfile.py` plus README; Szenarien für öffentliches Portal und authentifizierte Admin-API.
+- Statisches OpenAPI-Schema im Repository-Root (`openapi.json`) und Generator-Skript `scripts/gen_openapi.py`.
+- Neue Doku-Seite `docs/15_api_dokumentation.md` für Swagger/ReDoc/OpenAPI-Schema.
+
+### Changed
+- `docker/nginx.prod.conf`: Moderne TLS-Cipher-Suite (Mozilla Intermediate) und `ssl_prefer_server_ciphers off` hinterlegt.
+- `docs/04_produktion.md` auf `.env`-basierte VITE-Build-Argumente und das tatsächlich verwendete Zertifikats-Verzeichnis-Mount aktualisiert.
+
 ## [1.0.5] - 2026-08-18
 
 ### Added
