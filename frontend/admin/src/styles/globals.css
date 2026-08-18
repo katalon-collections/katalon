@@ -345,6 +345,12 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .evt.ic-update .ic { background: var(--accent-50); color: var(--accent); }
 .evt.ic-delete .ic { background: #fde7e7; color: #b91c1c; }
 .evt.ic-publish .ic { background: var(--st-i-bg); color: var(--st-i-fg); }
+.evt.ic-media_add .ic { background: var(--st-p-bg); color: var(--st-p-fg); }
+.evt.ic-media_update .ic { background: var(--accent-50); color: var(--accent); }
+.evt.ic-media_delete .ic { background: #fde7e7; color: #b91c1c; }
+.evt.ic-relation_add .ic { background: var(--st-p-bg); color: var(--st-p-fg); }
+.evt.ic-relation_update .ic { background: var(--accent-50); color: var(--accent); }
+.evt.ic-relation_delete .ic { background: #fde7e7; color: #b91c1c; }
 .evt .who { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--fg-3); justify-content: flex-end; }
 .evt .who .av { width: 20px; height: 20px; border-radius: 50%; background: #7f8aa6; color: #fff; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; }
 .evt .body .ti { font-size: 13px; font-weight: 500; line-height: 1.35; }

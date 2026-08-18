@@ -225,8 +225,10 @@ async def update_place(
 
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
-    await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
-                     changed_fields=diff_fields(old, {"idno": idno, "place_type": place_type, "status": data.status, "metadata": metadata}))
+    place_diff = diff_fields(old, {"idno": idno, "place_type": place_type, "status": data.status, "metadata": metadata})
+    if place_diff:
+        await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="update",
+                         changed_fields=place_diff)
     try:
         await search_service.index_record("place", place, db)
     except Exception:

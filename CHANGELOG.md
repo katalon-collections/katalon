@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-08-18
+
+### Fixed
+- Backend: Löschen eines Objekts mit angehängten Mediendateien schlug mit Internal Server Error fehl (500), sobald `force=true` verwendet wurde – SQLAlchemy versuchte beim Löschen des Objekts `media_files.object_id` auf `NULL` zu setzen statt die Zeilen per DB-seitigem `ON DELETE CASCADE` mitzulöschen, was an der `NOT NULL`-Constraint scheiterte. `Object.media_files` hat jetzt `cascade="all, delete-orphan"` und `passive_deletes=True`.
+
+### Added
+- Audit-Log erfasst jetzt auch Medien-Änderungen (Upload, Bearbeitung, Löschung) und Relations-Änderungen (Anlegen, Bearbeiten, Löschen) auf beiden verknüpften Datensätzen, inkl. lesbarem Label des jeweils anderen Datensatzes.
+- Backend: neue Relationsvokabulare erhalten automatisch einen unrestriktiven Standardterm ("ist verknüpft mit"), damit freie Relationen auch ohne vorherige Admin-Konfiguration einen nutzbaren Typ haben.
+- Backend: `diff_fields()` zeigt geänderte Metadatenfelder jetzt einzeln mit tatsächlichem Alt-/Neu-Wert (`metadata.<feld>`) statt der gesamten Metadaten als einen pauschalen "geändert"-Eintrag.
+
 ## [1.0.1] - 2026-08-18
 
 ### Fixed

@@ -221,8 +221,10 @@ async def update_occurrence(
 
     await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
-    await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
-                     changed_fields=diff_fields(old, {"idno": idno, "occurrence_type": occurrence_type, "status": data.status, "metadata": metadata}))
+    occ_diff = diff_fields(old, {"idno": idno, "occurrence_type": occurrence_type, "status": data.status, "metadata": metadata})
+    if occ_diff:
+        await log_change(db, record_type="occurrence", record_id=occ.id, user_id=current_user.id, action="update",
+                         changed_fields=occ_diff)
     try:
         await search_service.index_record("occurrence", occ, db)
     except Exception:

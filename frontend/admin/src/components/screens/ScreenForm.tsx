@@ -77,6 +77,12 @@ function extractTitle(m: Record<string, unknown>, fallback: string): string {
   return fallback
 }
 
+function formatRecordLabel(m: Record<string, unknown>, idno: string | null | undefined, fallback: string): string {
+  const label = extractTitle(m, '')
+  if (!label) return idno || fallback
+  return idno ? `${label} (${idno})` : label
+}
+
 function defaultsFor(fields: FieldDefinition[]): Record<string, unknown> {
   return Object.fromEntries(
     fields
@@ -211,7 +217,7 @@ function procedureSearchResult(proc: AnyRecord): SearchResult {
   return {
     id: proc.id,
     record_type: 'procedure',
-    title: extractTitle(proc.metadata_ as Record<string, unknown>, idno ?? proc.id.slice(0, 8) + '…'),
+    title: formatRecordLabel(proc.metadata_ as Record<string, unknown>, idno, proc.id.slice(0, 8) + '…'),
     status: proc.status,
     score: null,
   }
@@ -222,7 +228,7 @@ function recordSearchResult(recordType: RecordType, record: AnyRecord): SearchRe
   return {
     id: record.id,
     record_type: recordType,
-    title: extractTitle(record.metadata_ as Record<string, unknown>, idno ?? record.id.slice(0, 8) + '…'),
+    title: formatRecordLabel(record.metadata_ as Record<string, unknown>, idno, record.id.slice(0, 8) + '…'),
     status: record.status,
     score: null,
   }
@@ -1128,7 +1134,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         const key = `${targetType}/${targetId}`
         try {
           const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
-          titleMap[key] = extractTitle(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno ?? targetId.slice(0, 8) + '…')
+          titleMap[key] = formatRecordLabel(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno, targetId.slice(0, 8) + '…')
           if (targetType === 'object') {
             statusMap[targetId] = (rec as { collection_status?: string | null }).collection_status ?? 'active'
           }
@@ -2131,7 +2137,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     const sourceLabel = sourceField ? getLabel(fields.find(f => f.name === sourceField), sourceField) : undefined
     return (
       <div key={r.id}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: schemaBound ? '1fr 1fr' : '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
           <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
             {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
             {relTypeLabel}
@@ -2155,6 +2161,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               {relTitles[targetKey] ?? targetId.slice(0, 8) + '…'}
             </a>
           </span>
+          {!schemaBound && canManageContent && (
+            <button className="btn sm ico gh dn" title="Beziehung löschen" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
+          )}
         </div>
       </div>
     )

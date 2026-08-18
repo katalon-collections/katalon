@@ -48,7 +48,9 @@ class Object(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
-    media_files: Mapped[list["MediaFile"]] = relationship(back_populates="object")
+    media_files: Mapped[list["MediaFile"]] = relationship(
+        back_populates="object", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     __table_args__ = (
         Index("ix_objects_metadata_gin", "metadata", postgresql_using="gin"),

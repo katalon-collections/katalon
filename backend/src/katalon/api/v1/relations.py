@@ -6,12 +6,36 @@ from sqlalchemy import select
 from katalon.core.dependencies import DBDep, require_admin_or_editor
 from katalon.core.models import FieldDefinition, Procedure, Relation
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
+from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.relation_service import (
     get_active_loan_out_for_object,
     lock_objects,
     procedure_object_pair,
 )
 from katalon.services.relation_type_service import validate_relation_type_applicability
+
+_LOGGABLE_RECORD_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+
+
+async def _log_relation_change(
+    db: DBDep, rel: Relation, user_id: uuid.UUID, *, action: str, changed_fields: dict,
+) -> None:
+    """Log a relation change against both endpoints it connects, when they're auditable record types."""
+    for record_type, record_id, other_type, other_id in (
+        (rel.from_type, rel.from_id, rel.to_type, rel.to_id),
+        (rel.to_type, rel.to_id, rel.from_type, rel.from_id),
+    ):
+        if record_type not in _LOGGABLE_RECORD_TYPES:
+            continue
+        await log_change(
+            db, record_type=record_type, record_id=record_id, user_id=user_id, action=action,
+            changed_fields={
+                **changed_fields,
+                "relation_id": str(rel.id),
+                "related_record_type": other_type,
+                "related_record_id": str(other_id),
+            },
+        )
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 
@@ -97,6 +121,10 @@ async def create_relation(
     )
     db.add(rel)
     await db.flush()
+    await _log_relation_change(
+        db, rel, current_user.id, action="relation_add",
+        changed_fields={"relation_type": rel.relation_type},
+    )
     return rel
 
 
@@ -117,6 +145,7 @@ async def update_relation(
     rel = result.scalar_one_or_none()
     if not rel:
         raise HTTPException(status_code=404, detail="Relation nicht gefunden")
+    old_fields = {"relation_type": rel.relation_type, "metadata": rel.metadata_}
     if data.relation_type is not None:
         applicability_error = await validate_relation_type_applicability(
             db, rel.from_type, rel.to_type, data.relation_type
@@ -127,6 +156,9 @@ async def update_relation(
     if data.metadata_ is not None:
         rel.metadata_ = data.metadata_
     await db.flush()
+    diff = diff_fields(old_fields, {"relation_type": rel.relation_type, "metadata": rel.metadata_})
+    if diff:
+        await _log_relation_change(db, rel, current_user.id, action="relation_update", changed_fields=diff)
     return rel
 
 
@@ -148,4 +180,8 @@ async def delete_relation(
     rel = result.scalar_one_or_none()
     if not rel:
         raise HTTPException(status_code=404, detail="Relation nicht gefunden")
+    await _log_relation_change(
+        db, rel, current_user.id, action="relation_delete",
+        changed_fields={"relation_type": rel.relation_type},
+    )
     await db.delete(rel)

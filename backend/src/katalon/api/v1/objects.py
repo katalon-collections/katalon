@@ -251,23 +251,25 @@ async def update_object(
 
     await sync_schema_relations(db, "object", obj.id, metadata)
 
-    await log_change(
-        db,
-        record_type="object",
-        record_id=obj.id,
-        user_id=current_user.id,
-        action="update",
-        changed_fields=diff_fields(
-            old_fields,
-            {
-                "idno": idno,
-                "object_type": object_type,
-                "collection_status": data.collection_status,
-                "status": data.status,
-                "metadata": metadata,
-            },
-        ),
+    update_diff = diff_fields(
+        old_fields,
+        {
+            "idno": idno,
+            "object_type": object_type,
+            "collection_status": data.collection_status,
+            "status": data.status,
+            "metadata": metadata,
+        },
     )
+    if update_diff:
+        await log_change(
+            db,
+            record_type="object",
+            record_id=obj.id,
+            user_id=current_user.id,
+            action="update",
+            changed_fields=update_diff,
+        )
     try:
         await search_service.index_record("object", obj, db)
     except Exception:

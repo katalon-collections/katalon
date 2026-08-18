@@ -188,7 +188,7 @@ async def validate_metadata(
                                     )
                             except re.error:
                                 pass
-                    if sv is not None and sf.field_type == "date" and not _is_valid_date(sv):
+                    if sv is not None and sv != "" and sf.field_type == "date" and not _is_valid_date(sv):
                         errors.append(
                             f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."
                         )
@@ -282,6 +282,8 @@ async def validate_metadata(
         if field.field_type == "date":
             items = value if field.is_repeatable and isinstance(value, list) else [value]
             for item in items:
+                if item is None or item == "":
+                    continue
                 if not _is_valid_date(item):
                     errors.append(
                         f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."

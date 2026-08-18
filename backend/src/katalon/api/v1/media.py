@@ -18,6 +18,7 @@ from katalon.core.media_validation import ALLOWED_MEDIA_MIME, media_category, re
 from katalon.core.models import AdminConfig, MediaFile, Object
 from katalon.core.visibility import ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
+from katalon.services.audit_service import diff_fields, log_change
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
@@ -134,6 +135,14 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         rights_holder=config.media_default_rights_holder if config else None,
     )
     db.add(media)
+    await log_change(
+        db,
+        record_type="object",
+        record_id=object_id,
+        user_id=current_user.id,
+        action="media_add",
+        changed_fields={"filename": media.filename, "mime_type": media.mime_type},
+    )
     await db.commit()  # commit before Celery dispatch so the worker can find the row
 
     if category == "image":
@@ -167,6 +176,13 @@ async def patch_media(
     if not media:
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
 
+    old_fields = {
+        "media_type": media.media_type,
+        "license_uri": media.license_uri,
+        "rights_holder": media.rights_holder,
+        "is_primary": media.is_primary,
+    }
+
     if data.media_type is not None:
         media.media_type = data.media_type
     if "license_uri" in data.model_fields_set:
@@ -180,6 +196,19 @@ async def patch_media(
             f.is_primary = f.id == media_id
     elif data.is_primary is False:
         media.is_primary = False
+
+    diff = diff_fields(old_fields, {
+        "media_type": media.media_type,
+        "license_uri": media.license_uri,
+        "rights_holder": media.rights_holder,
+        "is_primary": media.is_primary,
+    })
+    if diff:
+        diff["filename"] = media.filename
+        await log_change(
+            db, record_type="object", record_id=object_id, user_id=current_user.id,
+            action="media_update", changed_fields=diff,
+        )
 
     await db.flush()
     return _serialize(media)
@@ -223,6 +252,14 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
     if not media:
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
     Path(media.file_path).unlink(missing_ok=True)
+    await log_change(
+        db,
+        record_type="object",
+        record_id=object_id,
+        user_id=current_user.id,
+        action="media_delete",
+        changed_fields={"filename": media.filename},
+    )
     await db.delete(media)
 
 

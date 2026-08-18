@@ -225,6 +225,20 @@ async def _ensure_relation_types_vocab() -> None:
             await db.flush()
         elif vocab.kind != "relation":
             vocab.kind = "relation"
+        has_terms = (
+            await db.execute(select(VocabularyTerm.id).where(VocabularyTerm.vocabulary_id == vocab.id).limit(1))
+        ).scalar_one_or_none()
+        if has_terms is None:
+            # Unrestricted system default so free relations always have a usable
+            # type, even before an admin configures any relation vocabulary terms.
+            db.add(
+                VocabularyTerm(
+                    vocabulary_id=vocab.id,
+                    term="related_to",
+                    label={"de": "ist verknüpft mit", "en": "is related to"},
+                    inverse_label={"de": "ist verknüpft mit", "en": "is related to"},
+                )
+            )
         await sync_relation_type_terms(db, vocab)
         await db.commit()
 

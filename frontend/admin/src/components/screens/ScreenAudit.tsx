@@ -1,16 +1,69 @@
 import { useState, useEffect } from 'react'
 import { audit } from '../../api/client'
 import type { AuditEntry } from '../../types'
-import { Check, Edit, Trash, Globe } from '../ui/Icons'
+import { Check, Edit, Trash, Globe, Upload, Link } from '../ui/Icons'
+
+const TYPE_ROUTES: Record<string, string> = {
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
+}
+
+function navigateToRecord(type: string, id: string) {
+  const route = TYPE_ROUTES[type]
+  if (!route) return
+  window.history.pushState({ route, editId: id }, '', `#${route}/${id}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+function RecordLink({ type, id, label }: { type: string; id: string; label: string }) {
+  if (!TYPE_ROUTES[type]) return <b>{label}</b>
+  return (
+    <a
+      href={`#${TYPE_ROUTES[type]}/${id}`}
+      onClick={e => { e.preventDefault(); navigateToRecord(type, id) }}
+      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer' }}
+    >
+      <b>{label}</b>
+    </a>
+  )
+}
 
 const ACTION_LABELS: Record<string, string> = {
   create: 'Angelegt', update: 'Geändert', delete: 'Gelöscht', publish: 'Veröffentlicht',
+  media_add: 'Medium angehängt', media_update: 'Medium geändert', media_delete: 'Medium entfernt',
+  relation_add: 'Relation angelegt', relation_update: 'Relation geändert', relation_delete: 'Relation gelöscht',
 }
 const ACTION_ICON: Record<string, React.ReactNode> = {
-  create:  <Check size={13} />,
-  update:  <Edit size={13} />,
-  delete:  <Trash size={13} />,
-  publish: <Globe size={13} />,
+  create:          <Check size={13} />,
+  update:          <Edit size={13} />,
+  delete:          <Trash size={13} />,
+  publish:         <Globe size={13} />,
+  media_add:       <Upload size={13} />,
+  media_update:    <Edit size={13} />,
+  media_delete:    <Trash size={13} />,
+  relation_add:    <Link size={13} />,
+  relation_update: <Link size={13} />,
+  relation_delete: <Link size={13} />,
+}
+
+type ExtraFields = {
+  filename?: string
+  relation_type?: string
+  relation_id?: string
+  related_record_type?: string
+  related_record_id?: string
+  related_record_label?: string
+}
+
+function extraLines(diff: ExtraFields): string[] {
+  const lines: string[] = []
+  if (diff.filename) lines.push(`Datei: ${diff.filename}`)
+  if (diff.relation_type) lines.push(`Beziehungstyp: ${diff.relation_type}`)
+  return lines
+}
+
+function relatedRecordSuffix(diff: ExtraFields): string | null {
+  if (!diff.related_record_type || !diff.related_record_id) return null
+  return diff.related_record_label ?? diff.related_record_id.slice(-8)
 }
 
 function fmt(iso: string) {
@@ -21,7 +74,7 @@ function userDisplay(entry: AuditEntry) {
   return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '—')
 }
 
-const ACTIONS = ['all', 'create', 'update', 'delete', 'publish']
+const ACTIONS = ['all', 'create', 'update', 'delete', 'publish', 'media', 'relation']
 
 type Props = { initialFilter?: string | null; onFilterChange?: (filter: string) => void }
 
@@ -40,7 +93,24 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
       .finally(() => setLoading(false))
   }, [])
 
-  const items = filter === 'all' ? entries : entries.filter(e => e.action === filter)
+  const filtered = filter === 'all'
+    ? entries
+    : filter === 'media' || filter === 'relation'
+      ? entries.filter(e => e.action.startsWith(`${filter}_`))
+      : entries.filter(e => e.action === filter)
+
+  // A relation change is logged once per endpoint it connects (so each record's
+  // own history shows it); in this cross-record feed that'd render as two rows
+  // for the same event, so keep only the first occurrence per relation+action.
+  const seenRelations = new Set<string>()
+  const items = filtered.filter(evt => {
+    const relationId = (evt.changed_fields as ExtraFields)?.relation_id
+    if (!relationId) return true
+    const key = `${evt.action}:${relationId}`
+    if (seenRelations.has(key)) return false
+    seenRelations.add(key)
+    return true
+  })
 
   return (
     <div className="scroll">
@@ -51,7 +121,7 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
       <div className="toolbar">
         {ACTIONS.map(a => (
           <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => { setFilter(a); onFilterChange?.(a) }}>
-            {a === 'all' ? 'Alle' : ACTION_LABELS[a]}
+            {a === 'all' ? 'Alle' : a === 'media' ? 'Medien' : a === 'relation' ? 'Relationen' : ACTION_LABELS[a]}
           </button>
         ))}
       </div>
@@ -62,16 +132,32 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
       {!loading && !error && (
         <div className="timeline">
           {items.map(evt => {
-            const diff = evt.changed_fields as { old?: Record<string, string>; new?: Record<string, string> }
+            const diff = evt.changed_fields as { old?: Record<string, string>; new?: Record<string, string> } & ExtraFields
+            const extras = extraLines(diff)
+            const relatedRecord = relatedRecordSuffix(diff)
             return (
               <div key={evt.id} className={`evt ic-${evt.action}`}>
                 <div className="when">{fmt(evt.created_at)}</div>
                 <div className="ic">{ACTION_ICON[evt.action]}</div>
                 <div className="body">
                   <div className="ti">
-                    {ACTION_LABELS[evt.action] ?? evt.action}: <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
+                    {ACTION_LABELS[evt.action] ?? evt.action}:{' '}
+                    {evt.action === 'delete'
+                      ? <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
+                      : <RecordLink type={evt.record_type} id={evt.record_id} label={evt.record_label ?? String(evt.record_id).slice(-8)} />}
+                    {relatedRecord && (
+                      <>
+                        {' '}{'↔'}{' '}
+                        {diff.related_record_type && evt.action !== 'relation_delete'
+                          ? <RecordLink type={diff.related_record_type} id={diff.related_record_id!} label={relatedRecord} />
+                          : <b>{relatedRecord}</b>}
+                      </>
+                    )}
                   </div>
                   <div className="sub">{evt.record_type} · {evt.record_id.slice(-8)}</div>
+                  {extras.length > 0 && (
+                    <div className="sub" style={{ marginTop: 2 }}>{extras.join(' · ')}</div>
+                  )}
                   {diff.old && (
                     <div className="diff">
                       {Object.entries(diff.old).map(([k, v]) => (

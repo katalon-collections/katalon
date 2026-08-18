@@ -221,8 +221,10 @@ async def update_entity(
 
     await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, metadata)
-    await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
-                     changed_fields=diff_fields(old, {"idno": idno, "entity_type": entity_type, "status": data.status, "metadata": metadata}))
+    entity_diff = diff_fields(old, {"idno": idno, "entity_type": entity_type, "status": data.status, "metadata": metadata})
+    if entity_diff:
+        await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="update",
+                         changed_fields=entity_diff)
     try:
         await search_service.index_record("entity", entity, db)
     except Exception:
