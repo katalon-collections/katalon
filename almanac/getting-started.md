@@ -46,6 +46,8 @@ Read [Admin Onboarding Tour](architecture/workflows/admin-onboarding-tour) befor
 
 For Admin tasks, pair [Admin Shell And API Client](architecture/frontend/admin-shell-and-api-client) with [Admin Routes](reference/frontend/admin-routes). For Portal tasks, pair [Portal Routing And Theming](architecture/frontend/portal-routing-and-theming), [Portal Search And Facets](architecture/workflows/portal-search-and-facets), and [Portal Routes](reference/frontend/portal-routes).
 
+For language and translation work, read [Multilingual Content](decisions/metadata/multilingual-content) before changing supported languages, Admin labels, translatable record values, or Portal locale behavior.
+
 ## Work Safely
 
 Treat current code as runtime truth, and use ordinary repository documentation as intent unless it agrees with code. This matters in Katalon because the concept document describes the long-lived product model while the SQLAlchemy models and API routers define current behavior [@concept].

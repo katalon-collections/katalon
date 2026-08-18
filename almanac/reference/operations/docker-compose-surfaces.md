@@ -15,15 +15,12 @@ sources:
   - id: compose-cantaloupe
     type: file
     path: docker-compose.cantaloupe.yml
-  - id: compose-traefik
-    type: file
-    path: docker-compose.traefik.yml
   - id: compose-override-example
     type: file
     path: docker-compose.override.yml.example
 ---
 
-Katalon's Compose surface is split into a base stack, a development override, production and routing overrides, and two small customization examples. The base stack defines the service graph for PostgreSQL/PostGIS, Redis, Elasticsearch, Cantaloupe, FastAPI, Celery workers, two Vite-built frontends, nginx, and backups; the overrides change exposure, rebuild behavior, TLS/routing, and instance-specific settings without replacing the base service model [@compose-base] [@compose-dev] [@compose-prod].
+Katalon's Compose surface is split into a base stack, a development override, a production override, a Cantaloupe override, and a local customization example. The base stack defines the service graph for PostgreSQL/PostGIS, Redis, Elasticsearch, Cantaloupe, FastAPI, Celery workers, two Vite-built frontends, nginx, and backups; the overrides change exposure, rebuild behavior, TLS/routing, and instance-specific settings without replacing the base service model [@compose-base] [@compose-dev] [@compose-prod].
 
 ## Base Stack
 
@@ -61,11 +58,9 @@ The development API uses `docker/Dockerfile.backend.dev`, bind-mounts `backend/s
 
 Production Elasticsearch uses a fixed `ES_JAVA_OPTS=-Xms1g -Xmx1g` and a `2g` memory limit; the API, worker, Cantaloupe, database, Redis, and nginx each get smaller service-specific limits [@compose-prod]. The production nginx mounts `docker/nginx.prod.conf` and `docker/certs/` read-only [@compose-prod].
 
-## IIIF And Routing Overrides
+## IIIF Override
 
 `docker-compose.cantaloupe.yml` is a narrow IIIF override. It forces filesystem lookup settings, sets Cantaloupe's public base URI to `http://localhost`, and points API and worker at Cantaloupe internally on `http://cantaloupe:8182`; public manifests use nginx's `http://localhost/iiif/...` route [@compose-cantaloupe].
-
-`docker-compose.traefik.yml` is an alternative production routing layer for Traefik. It removes nginx's published ports, switches nginx back to `docker/nginx.conf`, attaches nginx to the external `traefik-public` network, and adds Traefik labels for host `katalon.kraegelin.dev`, `websecure`, TLS, LetsEncrypt, and backend service port `80` [@compose-traefik].
 
 ## Instance Override
 

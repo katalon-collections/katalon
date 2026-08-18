@@ -9,9 +9,6 @@ sources:
   - id: concept
     type: file
     path: KONZEPT.md
-  - id: product
-    type: file
-    path: PRODUCT.md
   - id: architecture-doc
     type: file
     path: docs/00_architektur.md
@@ -21,7 +18,7 @@ Katalon is a GLAM metadata management system for institutions that need configur
 
 ## What Katalon Models
 
-Katalon models collection knowledge for galleries, libraries, archives, and museums. Its core records describe objects, people and organizations, places, works, events, concepts, and institutional processes around objects [@concept]. The product goal is not to hide specialist cataloging work; it is to let staff define, maintain, search, and publish complex collection data without changing application code for every metadata schema change [@product].
+Katalon models collection knowledge for galleries, libraries, archives, and museums. Its core records describe objects, people and organizations, places, works, events, concepts, and institutional processes around objects [@concept]. The product goal is not to hide specialist cataloging work; it is to let staff define, maintain, search, and publish complex collection data without changing application code for every metadata schema change [@readme] [@concept].
 
 The system is explicitly not a classic library system and does not adopt MARC, copy circulation, or Z39.50 as its model. It is also not an institutional repository centered on deposit workflows, embargoes, and DOI minting [@concept]. That boundary keeps the domain vocabulary focused on collection objects and the contextual records around them.
 

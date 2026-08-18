@@ -53,6 +53,65 @@ function ModelViewer({ src, alt }: { src: string; alt: string }) {
 }
 
 /**
+ * The media file endpoint serves with `Content-Disposition: attachment`,
+ * which makes a direct <iframe src> trigger a download instead of inline
+ * rendering. Fetch the blob and play it back from an object URL (mirrors the
+ * admin MediaLightbox approach) so the browser's PDF viewer renders inline.
+ */
+function PdfViewer({ src, title }: { src: string; title: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl: string | null = null
+    setUrl(null)
+    setFailed(false)
+    fetch(src)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.blob()
+      })
+      .then(blob => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src])
+
+  if (failed) {
+    return (
+      <div style={{ padding: 16, borderRadius: 10, background: '#0f172a' }}>
+        <a href={src} target="_blank" rel="noreferrer" style={{ color: '#e2e8f0' }}>
+          PDF öffnen ({title})
+        </a>
+      </div>
+    )
+  }
+  if (!url) {
+    return (
+      <div style={{ width: '100%', height: '78vh', borderRadius: 10, background: '#0f172a', display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 14 }}>
+        PDF wird geladen…
+      </div>
+    )
+  }
+  return (
+    <iframe
+      src={url}
+      title={title}
+      style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: '#0f172a' }}
+    />
+  )
+}
+
+/**
  * Native viewer dispatch for non-image media (pdf/audio/video/model).
  * Images stay on the IIIF path in ObjectDetailPage.
  */
@@ -61,13 +120,7 @@ export function MediaViewer({ objectId, media }: Props) {
 
   switch (media.category) {
     case 'pdf':
-      return (
-        <iframe
-          src={src}
-          title={media.filename}
-          style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: '#0f172a' }}
-        />
-      )
+      return <PdfViewer src={src} title={media.filename} />
     case 'audio':
       return <audio src={src} controls style={{ width: '100%' }} />
     case 'video':

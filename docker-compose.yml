@@ -39,11 +39,15 @@ services:
     image: islandora/cantaloupe:main
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
+      - cantaloupe_cache:/var/lib/cantaloupe/cache
     environment:
       - CANTALOUPE_SOURCE_STATIC=FilesystemSource
       - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
       - CANTALOUPE_BASE_URI=${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      - CANTALOUPE_CACHE_SERVER_DERIVATIVE=FilesystemCache
+      - CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED=true
+      - CANTALOUPE_FILESYSTEMCACHE_PATHNAME=/var/lib/cantaloupe/cache
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3" ]
       interval: 10s
@@ -216,3 +220,4 @@ services:
 volumes:
   db_data:
   es_data:
+  cantaloupe_cache:

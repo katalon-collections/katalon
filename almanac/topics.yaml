@@ -79,6 +79,10 @@ topics:
     title: Portal
     description: Public portal routing, search, detail pages, and theming.
     parents: [frontend]
+  - slug: i18n
+    title: I18n
+    description: Configured languages, translated labels and values, and portal locale handling.
+    parents: [frontend, metadata]
   - slug: routing
     title: Routing
     description: Browser, hash, nginx, and compose route contracts.

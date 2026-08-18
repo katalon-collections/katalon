@@ -27,6 +27,12 @@ sources:
   - id: translatable-input
     type: file
     path: frontend/admin/src/components/ui/TranslatableInput.tsx
+  - id: importer-api
+    type: file
+    path: backend/src/katalon/api/v1/importer.py
+  - id: importer-ui
+    type: file
+    path: frontend/admin/src/components/screens/importer/types.ts
 ---
 
 Katalon separates multilingual *configuration* from multilingual *content*. Labels — field names, subtypes, form variants, vocabulary terms — are JSONB dicts shaped like `{"de": "...", "en": "..."}`. Record values for translatable fields use the same lang-keyed dict shape. The set of languages is global configuration, not per-field [@decision].
@@ -48,7 +54,7 @@ Issue #6 had scoped multilingual metadata earlier but was left as a closed conce
 
 ## Consequences
 
-Labels and translatable values now share one mental model: a JSONB dict keyed by the configured languages. Migration `0036` adds the two columns (`is_translatable`, `supported_languages`) additively [@migration].
+Labels and translatable values now share one mental model: a JSONB dict keyed by the configured languages. Migration `0036` adds the two columns (`is_translatable`, `supported_languages`) additively [@migration]. Importer-created fields are the main remaining exception: the importer request and pending-field UI still expose `label_de` and `label_en`, then write only those two label keys when creating fields [@importer-api] [@importer-ui].
 
 The design is intentionally bounded. Structured field types (relation, date, number, boolean, vocabulary, authority, PID) and repeatable fields are not translatable — they are language-independent. The primary `title`/`name` field stays single-valued, so it is not marked translatable. Search still indexes all language variants together; per-language analyzers were left out.
 

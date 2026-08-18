@@ -1,7 +1,7 @@
 ---
 title: "Workflow Architecture"
 summary: "Reading path for Katalon workflows that cross backend routes, services, workers, search, and frontend screens."
-topics: [architecture, workflows, backend, frontend]
+topics: [architecture, workflows, backend, frontend, i18n]
 ---
 
 Katalon's workflow pages explain behavior that is spread across API routers, services, workers, persistence, search indexing, and React screens. Use this hub when a task crosses one file or one layer; it points to the page that owns the end-to-end flow instead of making agents reconstruct that flow from separate backend and frontend files.
@@ -11,6 +11,8 @@ Katalon's workflow pages explain behavior that is spread across API routers, ser
 Start with [Record CRUD And Publishing](record-crud-and-publishing) when the task changes object, entity, place, occurrence, or procedure lifecycle behavior. Pair it with [Schema Driven Record Forms](schema-driven-record-forms) for Admin editing, quick creation, form variants, relation-field behavior, optimistic conflict handling, audit panels, media panels, and procedure completion.
 
 Use [AI Field Completion](ai-field-completion) when changing schema-configured KI buttons, the `/v1/ai/complete` proxy, OpenAI-compatible provider settings, group-subfield AI context, token limits, or the proposed-value overwrite flow.
+
+Use [Multilingual Content](../../decisions/metadata/multilingual-content) when changing configured languages, translated labels, translatable text values, portal locale resolution, or importer field-creation labels.
 
 Read [Audit And Snapshots](audit-and-snapshots) when the change touches record history, snapshots, restore behavior, version columns, or the distinction between audit entries and snapshot storage.
 

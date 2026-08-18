@@ -27,12 +27,15 @@ sources:
   - id: iiif-viewer
     type: file
     path: frontend/portal/src/components/IIIFViewer.tsx
+  - id: media-viewer
+    type: file
+    path: frontend/portal/src/components/MediaViewer.tsx
   - id: object-detail
     type: file
     path: frontend/portal/src/pages/ObjectDetailPage.tsx
 ---
 
-Katalon's media workflow is object-only: media endpoints live under `/objects/{object_id}/media`, uploads require editor or admin rights, and public reads check object visibility before listing or serving files [@media-api]. Uploaded files are stored under `settings.media_root`, validated, represented by `MediaFile` rows, and handed to Celery for IIIF processing *only when they are images* [@media-api] [@media-validation]. Cantaloupe supplies IIIF Image API URLs and image dimensions for images, while the portal dispatches its viewer by `MediaFile.category` — Clover IIIF for images, native browser viewer for PDF, HTML5 players for audio/video, and `@google/model-viewer` for 3D models [@cantaloupe] [@iiif-viewer] [@object-detail].
+Katalon's media workflow is object-only: media endpoints live under `/objects/{object_id}/media`, uploads require editor or admin rights, and public reads check object visibility before listing or serving files [@media-api]. Uploaded files are stored under `settings.media_root`, validated, represented by `MediaFile` rows, and handed to Celery for IIIF processing *only when they are images* [@media-api] [@media-validation]. Cantaloupe supplies IIIF Image API URLs and image dimensions for images, while the portal dispatches its viewer by `MediaFile.category`: Clover IIIF for images, a blob-backed iframe for PDF, HTML5 players for audio/video, and `@google/model-viewer` for 3D models [@cantaloupe] [@iiif-viewer] [@media-viewer] [@object-detail].
 
 ## Upload And Storage
 
@@ -54,7 +57,7 @@ For each successful file, the worker stores a single-canvas IIIF Presentation 3.
 
 Non-image files never enter the Cantaloupe/IIIF pipeline. The upload path assigns a `category` (`image`/`pdf`/`audio`/`video`/`3d`) and, because there is no tiling step, the media row is marked `ready` immediately [@media-api]. `_links.thumbnail` and the IIIF manifest are only produced for image files, so portal thumbnails and manifests skip non-image media [@media-api] [@cantaloupe].
 
-`ObjectDetailPage` picks a viewer from `selectedMedia.category`: images use the IIIF viewer, other categories render through `MediaViewer`, which chooses the native browser PDF viewer, an HTML5 `<audio>`/`<video>` element, or a lazy-loaded `@google/model-viewer` component [@object-detail]. There is deliberately no transcoding — only pre-encoded files are accepted, and presentation derivatives remain out of scope.
+`ObjectDetailPage` picks a viewer from `selectedMedia.category`: images use the IIIF viewer, other categories render through `MediaViewer`, which fetches PDFs as blobs before handing them to an iframe because the file endpoint serves downloads, or chooses an HTML5 `<audio>`/`<video>` element or a lazy-loaded `@google/model-viewer` component [@object-detail] [@media-viewer]. There is deliberately no transcoding — only pre-encoded files are accepted, and presentation derivatives remain out of scope.
 
 ## Public Reads And Portal Viewer
 
