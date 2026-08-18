@@ -249,7 +249,11 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> di
 def _public_endpoint_clause(type_column, id_column):
     clauses = []
     for record_type, model in _MODELS.items():
-        conditions = [model.id == id_column, model.status.in_(PUBLIC_STATUSES)]
+        conditions = [
+            model.id == id_column,
+            model.status.in_(PUBLIC_STATUSES),
+            model.deleted_at.is_(None),
+        ]
         if model is Object:
             conditions.append(model.collection_status == "active")
         clauses.append(and_(type_column == record_type, exists(select(model.id).where(*conditions))))

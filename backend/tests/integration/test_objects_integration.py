@@ -54,8 +54,10 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
 
 @pytest.mark.asyncio
 async def test_delete_object_with_media_files_succeeds(async_client, auth_headers) -> None:
-    """Regression test: deleting an object cascades to its media files instead
-    of hitting media_files.object_id's NOT NULL constraint (was a 500)."""
+    """Regression test: deleting an object with media files doesn't 500. Delete is a
+    soft-delete now (see test_soft_delete.py) — media rows stay until the purge job
+    hard-deletes the object, at which point Object.media_files' cascade/passive_deletes
+    config avoids the media_files.object_id NOT NULL violation this test used to catch."""
     create_response = await async_client.post(
         "/v1/objects",
         headers=auth_headers,
@@ -85,8 +87,12 @@ async def test_delete_object_with_media_files_succeeds(async_client, auth_header
     assert missing_response.status_code == 404
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(MediaFile).where(MediaFile.object_id == uuid.UUID(object_id)))
-        assert result.scalar_one_or_none() is None
+        obj_result = await session.execute(select(Object).where(Object.id == uuid.UUID(object_id)))
+        obj = obj_result.scalar_one()
+        assert obj.deleted_at is not None
+
+        media_result = await session.execute(select(MediaFile).where(MediaFile.object_id == uuid.UUID(object_id)))
+        assert media_result.scalar_one_or_none() is not None
 
 
 @pytest.mark.asyncio

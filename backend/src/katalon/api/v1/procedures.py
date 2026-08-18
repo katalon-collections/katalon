@@ -35,7 +35,7 @@ from katalon.services.subtype_service import ensure_subtype_exists
 router = APIRouter(prefix="/procedures", tags=["procedures"])
 logger = logging.getLogger(__name__)
 
-PROCEDURE_STATUSES = {"draft", "active", "completed", "cancelled"}
+PROCEDURE_STATUSES = {"draft", "active", "completed", "cancelled", "archived"}
 COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
 
 
@@ -269,6 +269,43 @@ async def complete_procedure(
         },
     )
     await db.flush()
+    try:
+        await search_service.index_record("procedure", proc, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
+    return proc
+
+
+@router.post(
+    "/{procedure_id}/archive",
+    response_model=ProcedureRead,
+    summary="Archive a procedure (soft, reversible status change)",
+    responses={
+        404: {"description": "Procedure not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def archive_procedure(
+    procedure_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_record_permission("procedure", "update"),
+) -> Procedure:
+    proc = (
+        await db.execute(select(Procedure).where(Procedure.id == procedure_id))
+    ).scalar_one_or_none()
+    if not proc:
+        raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
+    old_status = proc.status
+    proc.status = "archived"
+    await flush_record(db, proc)
+    await log_change(
+        db,
+        record_type="procedure",
+        record_id=proc.id,
+        user_id=current_user.id,
+        action="update",
+        changed_fields={"old": {"status": old_status}, "new": {"status": "archived"}},
+    )
     try:
         await search_service.index_record("procedure", proc, db)
     except Exception:

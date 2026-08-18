@@ -12,6 +12,7 @@ celery_app = Celery(
         "katalon.workers.index_tasks",
         "katalon.workers.import_tasks",
         "katalon.workers.cleanup_tasks",
+        "katalon.workers.purge_tasks",
     ],
 )
 
@@ -32,5 +33,9 @@ celery_app.conf.beat_schedule = {
         "task": "katalon.reconciliation_job",
         "schedule": crontab(hour=4, minute=0, day_of_week=0),
         "kwargs": {"mode": "id_diff"},
+    },
+    "purge-soft-deleted-daily": {
+        "task": "katalon.purge_soft_deleted",
+        "schedule": crontab(hour=5, minute=0),
     },
 }

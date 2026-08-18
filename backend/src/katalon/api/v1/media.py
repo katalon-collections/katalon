@@ -14,7 +14,12 @@ from sqlalchemy import select
 
 from katalon.config import settings
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
-from katalon.core.media_validation import ALLOWED_MEDIA_MIME, media_category, resolve_upload_mime, verified_image_mime
+from katalon.core.media_validation import (
+    ALLOWED_MEDIA_MIME,
+    media_category,
+    resolve_upload_mime,
+    verified_image_mime,
+)
 from katalon.core.models import AdminConfig, MediaFile, Object
 from katalon.core.visibility import ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base

@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -12,6 +13,7 @@ from katalon.core.dependencies import (
     OptionalCurrentUser,
     has_record_permission,
     require_record_permission,
+    require_role,
 )
 from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
 from katalon.core.schemas import (
@@ -30,11 +32,7 @@ from katalon.services.idno_service import (
     validate_idno_pattern,
 )
 from katalon.services.publish_service import can_publish, publish_record
-from katalon.services.relation_service import (
-    count_relations,
-    delete_relations,
-    sync_schema_relations,
-)
+from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
@@ -329,14 +327,11 @@ async def delete_object(
             },
         )
 
-    if related_count > 0:
-        await delete_relations(db, "object", object_id)
-
+    obj.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     await log_change(
         db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete",
         changed_fields=delete_label_fields(obj.idno, obj.metadata_),
     )
-    await db.delete(obj)
     await flush_record(db, obj)
     try:
         await search_service.remove_record(obj.id)
@@ -346,6 +341,46 @@ async def delete_object(
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
     enqueue(cleanup_relation_refs, "object", str(object_id))
+
+
+@router.post(
+    "/{object_id}/restore",
+    response_model=ObjectRead,
+    summary="Restore a soft-deleted object",
+    responses={
+        404: {"description": "Object not found or not deleted"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def restore_object(
+    object_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_role("admin"),
+) -> Object:
+    result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = result.scalar_one_or_none()
+    if not obj or obj.deleted_at is None:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    obj.deleted_at = None
+    await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="undelete")
+    await flush_record(db, obj)
+    try:
+        await search_service.index_record("object", obj, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
+    return obj
+
+
+@router.get(
+    "/trash/list",
+    response_model=list[ObjectRead],
+    summary="List soft-deleted objects",
+)
+async def list_deleted_objects(db: DBDep, current_user=require_role("admin")) -> list[Object]:
+    result = await db.execute(
+        select(Object).where(Object.deleted_at.is_not(None)).order_by(Object.deleted_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 @router.post(
@@ -399,6 +434,8 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    if obj.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
     if obj.status not in ("public", "published") or (portal_only and obj.collection_status != "active"):
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 

@@ -168,7 +168,10 @@ def bulk_reindex_type_task(target_type: str) -> dict:
         if model is None:
             return {"status": "error", "detail": f"Unknown type: {target_type}"}
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(model))
+            query = select(model)
+            if hasattr(model, "deleted_at"):
+                query = query.where(model.deleted_at.is_(None))
+            result = await session.execute(query)
             records = []
             for rec in result.scalars().all():
                 doc = await build_index_doc(target_type, rec, session)
@@ -193,7 +196,7 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
     `force=True` (manual trigger) bypasses the `reconciliation_enabled` toggle —
     that toggle only governs the scheduled background runs.
     """
-    from sqlalchemy import func, select
+    from sqlalchemy import func, select, true
 
     from katalon.core.models import AdminConfig, Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import count_by_type, list_ids_by_type
@@ -215,7 +218,8 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
 
             report: dict[str, dict] = {}
             for record_type, model in _MODEL_MAP.items():
-                count_stmt = select(func.count()).select_from(model)
+                not_deleted = model.deleted_at.is_(None) if hasattr(model, "deleted_at") else true()
+                count_stmt = select(func.count()).select_from(model).where(not_deleted)
                 db_count = (await session.execute(count_stmt)).scalar_one()
                 es_count = await count_by_type(record_type)
                 delta = db_count - es_count
@@ -223,7 +227,10 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
 
                 run_id_diff = id_diff_enabled and (mode == "id_diff" or abs(delta) > threshold)
                 if run_id_diff:
-                    db_ids = set(str(r[0]) for r in (await session.execute(select(model.id))).all())
+                    db_ids = set(
+                        str(r[0])
+                        for r in (await session.execute(select(model.id).where(not_deleted))).all()
+                    )
                     es_ids = await list_ids_by_type(record_type)
                     missing = db_ids - es_ids
                     stale = es_ids - db_ids
@@ -299,7 +306,10 @@ def reindex_all_task() -> None:
                 (Occurrence, "occurrence"),
                 (Procedure, "procedure"),
             ]:
-                result = await session.execute(select(model))
+                query = select(model)
+                if hasattr(model, "deleted_at"):
+                    query = query.where(model.deleted_at.is_(None))
+                result = await session.execute(query)
                 for rec in result.scalars().all():
                     doc = await build_index_doc(rtype, rec, session)
                     await index_document(str(rec.id), {"record_type": rtype, **doc})

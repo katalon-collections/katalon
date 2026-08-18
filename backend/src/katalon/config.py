@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     media_root: str = "/var/lib/katalon/media"
     max_upload_size_mb: int = 100
+    purge_after_days: int = 30
 
     portal_theme: str | None = None
 

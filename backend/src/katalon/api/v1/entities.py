@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
@@ -11,6 +12,7 @@ from katalon.core.dependencies import (
     OptionalCurrentUser,
     has_record_permission,
     require_record_permission,
+    require_role,
 )
 from katalon.core.models import AdminConfig, Entity, RecordSnapshot
 from katalon.core.schemas import (
@@ -29,11 +31,7 @@ from katalon.services.idno_service import (
     validate_idno_pattern,
 )
 from katalon.services.publish_service import can_publish, publish_record
-from katalon.services.relation_service import (
-    count_relations,
-    delete_relations,
-    sync_schema_relations,
-)
+from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
@@ -285,14 +283,11 @@ async def delete_entity(
             },
         )
 
-    if related_count > 0:
-        await delete_relations(db, "entity", entity_id)
-
+    entity.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     await log_change(
         db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="delete",
         changed_fields=delete_label_fields(entity.idno, entity.metadata_),
     )
-    await db.delete(entity)
     await flush_record(db, entity)
     try:
         await search_service.remove_record(entity.id)
@@ -302,6 +297,46 @@ async def delete_entity(
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
     enqueue(cleanup_relation_refs, "entity", str(entity_id))
+
+
+@router.post(
+    "/{entity_id}/restore",
+    response_model=EntityRead,
+    summary="Restore a soft-deleted entity",
+    responses={
+        404: {"description": "Entity not found or not deleted"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def restore_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_role("admin"),
+) -> Entity:
+    result = await db.execute(select(Entity).where(Entity.id == entity_id))
+    entity = result.scalar_one_or_none()
+    if not entity or entity.deleted_at is None:
+        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+    entity.deleted_at = None
+    await log_change(db, record_type="entity", record_id=entity.id, user_id=current_user.id, action="undelete")
+    await flush_record(db, entity)
+    try:
+        await search_service.index_record("entity", entity, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
+    return entity
+
+
+@router.get(
+    "/trash/list",
+    response_model=list[EntityRead],
+    summary="List soft-deleted entities",
+)
+async def list_deleted_entities(db: DBDep, current_user=require_role("admin")) -> list[Entity]:
+    result = await db.execute(
+        select(Entity).where(Entity.deleted_at.is_not(None)).order_by(Entity.deleted_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 @router.post(

@@ -202,6 +202,7 @@ class RecordRead(RecordBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None = None
     version: int
 
     _api_path: ClassVar[str]

@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-08-18
+
+### Added
+- Soft-Delete für Objects/Entities/Places/Occurrences: Löschen setzt `deleted_at` statt Hard-Delete, Relationen bleiben erhalten. Neue Endpoints `POST /{type}/{id}/restore` und `GET /{type}/trash/list` (admin/superuser).
+- Konfigurierbare Purge-Retention (`purge_after_days`, Default 30) und täglicher Celery-Purge-Job: hard-deleted Records nach Ablauf der Frist inkl. Medien-Dateien auf Disk.
+- Anonyme Portal-Zugriffe auf soft-deleted, ehemals öffentliche Records liefern jetzt `410 Gone` (Tombstone-Signal) statt `404`.
+- Vorgänge (Procedures) bekommen `POST /{id}/archive` (Status-Flip auf `archived`) statt Soft-Delete – kein Portal-Auftritt, daher kein Tombstone nötig.
+- Migration `0037`: `deleted_at` auf `objects`, `entities`, `places`, `occurrences`.
+
+### Fixed
+- ES-Reconciliation-Job, Bulk-Reindex und Full-Reindex ignorierten `deleted_at` und hätten soft-deleted Records beim nächsten Lauf wieder in den Suchindex aufgenommen. Alle drei filtern jetzt korrekt.
+- IIIF-Manifest-Endpoint und Portal-Relationen-Liste prüften nur `status`, nicht `deleted_at` – beides jetzt konsistent mit dem Tombstone-Verhalten.
+
 ## [1.0.4] - 2026-08-18
 
 ### Fixed

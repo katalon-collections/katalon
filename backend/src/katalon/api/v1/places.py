@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
@@ -11,6 +12,7 @@ from katalon.core.dependencies import (
     OptionalCurrentUser,
     has_record_permission,
     require_record_permission,
+    require_role,
 )
 from katalon.core.models import AdminConfig, Place, RecordSnapshot
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
@@ -23,11 +25,7 @@ from katalon.services.idno_service import (
     validate_idno_pattern,
 )
 from katalon.services.publish_service import can_publish, publish_record
-from katalon.services.relation_service import (
-    count_relations,
-    delete_relations,
-    sync_schema_relations,
-)
+from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
@@ -288,14 +286,11 @@ async def delete_place(
             },
         )
 
-    if related_count > 0:
-        await delete_relations(db, "place", place_id)
-
+    place.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     await log_change(
         db, record_type="place", record_id=place.id, user_id=current_user.id, action="delete",
         changed_fields=delete_label_fields(place.idno, place.metadata_),
     )
-    await db.delete(place)
     await flush_record(db, place)
     try:
         await search_service.remove_record(place.id)
@@ -305,6 +300,46 @@ async def delete_place(
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
     enqueue(cleanup_relation_refs, "place", str(place_id))
+
+
+@router.post(
+    "/{place_id}/restore",
+    response_model=PlaceRead,
+    summary="Restore a soft-deleted place",
+    responses={
+        404: {"description": "Place not found or not deleted"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def restore_place(
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user=require_role("admin"),
+) -> Place:
+    result = await db.execute(select(Place).where(Place.id == place_id))
+    place = result.scalar_one_or_none()
+    if not place or place.deleted_at is None:
+        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    place.deleted_at = None
+    await log_change(db, record_type="place", record_id=place.id, user_id=current_user.id, action="undelete")
+    await flush_record(db, place)
+    try:
+        await search_service.index_record("place", place, db)
+    except Exception:
+        logger.warning("ES index/remove failed", exc_info=True)
+    return place
+
+
+@router.get(
+    "/trash/list",
+    response_model=list[PlaceRead],
+    summary="List soft-deleted places",
+)
+async def list_deleted_places(db: DBDep, current_user=require_role("admin")) -> list[Place]:
+    result = await db.execute(
+        select(Place).where(Place.deleted_at.is_not(None)).order_by(Place.deleted_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 @router.post(

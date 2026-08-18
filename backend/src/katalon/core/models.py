@@ -44,6 +44,7 @@ class Object(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __mapper_args__ = {"version_id_col": version}
@@ -69,6 +70,7 @@ class Entity(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __mapper_args__ = {"version_id_col": version}
@@ -90,6 +92,7 @@ class Place(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __mapper_args__ = {"version_id_col": version}
@@ -111,6 +114,7 @@ class Occurrence(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __mapper_args__ = {"version_id_col": version}
