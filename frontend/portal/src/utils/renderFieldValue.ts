@@ -29,12 +29,43 @@ export function pidUrl(value: unknown): string | undefined {
   return `${PID_RESOLVER_BASE}${pidValue}`
 }
 
+/** Converts a single EDTF-lite qualified date ("1900~", "1900?", "1900~?") to display text. */
+function formatQualifiedDate(value: string): string {
+  for (const [suffix, wrap] of [
+    ['~?', (d: string) => `ca. ${d} (unsicher)`],
+    ['~', (d: string) => `ca. ${d}`],
+    ['?', (d: string) => `${d} (unsicher)`],
+  ] as const) {
+    if (value.endsWith(suffix)) return wrap(value.slice(0, -suffix.length))
+  }
+  return value
+}
+
+/** Converts a canonical EDTF-lite date value (single or "START/END" range) to display text. */
+export function formatDateValue(value: string): string {
+  if (value.includes('/')) {
+    const [start, end] = value.split('/')
+    if (!start) return `vor ${formatQualifiedDate(end)}`
+    if (!end) return `nach ${formatQualifiedDate(start)}`
+    return `${formatQualifiedDate(start)}–${formatQualifiedDate(end)}`
+  }
+  return formatQualifiedDate(value)
+}
+
 /**
  * Converts a metadata field value to a human-readable string for display.
  * Returns null if the value is empty / should be skipped.
  */
-export function renderFieldValue(value: unknown, locale?: string): string | null {
+export function renderFieldValue(value: unknown, locale?: string, fieldType?: string): string | null {
   if (value == null) return null
+
+  if (fieldType === 'date') {
+    if (typeof value === 'string') return value ? formatDateValue(value) : null
+    if (Array.isArray(value)) {
+      const parts = value.filter((v): v is string => typeof v === 'string' && v !== '').map(formatDateValue)
+      return parts.length > 0 ? parts.join(', ') : null
+    }
+  }
 
   // Authority entry {source, external_id, label} / translatable field {lang: text}
   if (typeof value === 'object' && !Array.isArray(value)) {

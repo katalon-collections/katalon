@@ -149,6 +149,33 @@ async def test_date_field_accepts_bce_years() -> None:
 
 
 @pytest.mark.asyncio
+async def test_date_field_accepts_ranges_and_uncertainty() -> None:
+    """EDTF-lite: '~' = circa, '?' = unsicher, 'START/END' = Zeitraum (Seiten optional offen)."""
+    field = make_field("birth_date", field_type="date")
+
+    valid = [
+        "1900~",        # circa
+        "1900?",        # unsicher
+        "1900~?",       # beides
+        "1900/1950",    # Zeitraum
+        "1900/",        # offenes Ende (nach 1900)
+        "/1950",        # offener Anfang (vor 1950)
+        "1900~/1950?",  # Zeitraum mit Qualifiern je Seite
+    ]
+    for v in valid:
+        assert await validate_metadata(mock_db(field), "entity", {"birth_date": v}) == [], v
+
+    invalid = [
+        "1900!",
+        "/",
+        "1900/1950/2000",
+        "1900-13~",
+    ]
+    for v in invalid:
+        assert await validate_metadata(mock_db(field), "entity", {"birth_date": v}), v
+
+
+@pytest.mark.asyncio
 async def test_multiple_fields_multiple_errors() -> None:
     db = mock_db(
         make_field("title", is_required=True),

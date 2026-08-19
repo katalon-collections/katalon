@@ -105,7 +105,7 @@ export function OccurrenceDetailPage() {
   // Long text fields go into the main column (rendered with markdown); short fields into the sidebar
   const bodyFields = allVisibleFields.filter(f => {
     if (f.field_type === 'relation' || f.field_type === 'authority' || f.field_type === 'pid') return false
-    const rendered = renderFieldValue(m[f.name], locale)
+    const rendered = renderFieldValue(m[f.name], locale, f.field_type)
     return rendered !== null && rendered.length > 100
   })
   const sidebarFields = allVisibleFields.filter(f => !bodyFields.includes(f))
@@ -151,7 +151,7 @@ export function OccurrenceDetailPage() {
           )}
 
           {bodyFields.map(f => {
-            const rendered = renderFieldValue(m[f.name], locale)
+            const rendered = renderFieldValue(m[f.name], locale, f.field_type)
             if (!rendered) return null
             return (
               <div key={f.name} style={{ marginBottom: 20 }}>
@@ -213,7 +213,7 @@ export function OccurrenceDetailPage() {
             if (f.field_type === 'relation') {
               return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue, locale)
+            const rendered = renderFieldValue(rawValue, locale, f.field_type)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'

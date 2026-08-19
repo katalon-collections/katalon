@@ -11,7 +11,7 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { MediaLightbox } from '../MediaLightbox'
 
-const INVALID_DATE_MESSAGE = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, TT.MM.JJJJ oder -JJJJ (v. Chr.)'
+const INVALID_DATE_MESSAGE = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, TT.MM.JJJJ, -JJJJ (v. Chr.), "ca./um" oder "(unsicher)", oder Zeitraum ("… bis …", "vor …", "nach …")'
 
 /** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
 function isLeapYear(year: number): boolean {
@@ -22,7 +22,8 @@ function daysInMonth(year: number, month: number): number {
   return [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
 }
 
-function normalizeDateInput(value: string): string {
+/** Normalizes a single (unqualified) date: European dd.mm.yyyy → ISO, BCE year padding. */
+function normalizeBareDate(value: string): string {
   const trimmed = value.trim()
   const european = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed)
   if (european) {
@@ -42,16 +43,88 @@ function normalizeDateInput(value: string): string {
   return trimmed
 }
 
-function isValidDateInput(value: string): boolean {
-  const normalized = normalizeDateInput(value)
-  if (/^-?\d{4}$/.test(normalized)) return true
-  if (/^-?\d{4}-(0[1-9]|1[0-2])$/.test(normalized)) return true
-  const full = /^(-?\d{4})-(\d{2})-(\d{2})$/.exec(normalized)
+/**
+ * Normalizes a single date with optional uncertainty qualifier into canonical
+ * EDTF-lite form ("1900~" = circa, "1900?" = unsicher, "1900~?" = beides).
+ * Accepts German words ("ca.", "um", "(unsicher)") as well as the symbols directly.
+ */
+function normalizeQualifiedDate(value: string): string {
+  let s = value.trim()
+  let circa = false
+  let uncertain = false
+  const unsicher = /^(.*?)\s*\(\s*unsicher\s*\)$/i.exec(s)
+  if (unsicher) {
+    uncertain = true
+    s = unsicher[1].trim()
+  }
+  if (s.endsWith('?')) {
+    uncertain = true
+    s = s.slice(0, -1).trim()
+  }
+  if (s.endsWith('~')) {
+    circa = true
+    s = s.slice(0, -1).trim()
+  }
+  const ca = /^(ca\.?|um)\s+(.+)$/i.exec(s)
+  if (ca) {
+    circa = true
+    s = ca[2].trim()
+  }
+  const bare = normalizeBareDate(s)
+  const suffix = circa && uncertain ? '~?' : circa ? '~' : uncertain ? '?' : ''
+  return `${bare}${suffix}`
+}
+
+/**
+ * Normalizes date input into canonical storage form. Supports ranges via "START/END",
+ * "START bis END", "vor END" (offener Anfang) and "nach START" (offenes Ende).
+ */
+function normalizeDateInput(value: string): string {
+  const trimmed = value.trim()
+  const bis = /^(.*?)\s+bis\s+(.*)$/i.exec(trimmed)
+  if (bis) {
+    const [, left, right] = bis
+    return `${left.trim() ? normalizeQualifiedDate(left) : ''}/${right.trim() ? normalizeQualifiedDate(right) : ''}`
+  }
+  if (trimmed.split('/').length === 2) {
+    const [left, right] = trimmed.split('/')
+    return `${left.trim() ? normalizeQualifiedDate(left) : ''}/${right.trim() ? normalizeQualifiedDate(right) : ''}`
+  }
+  const vor = /^vor\s+(.+)$/i.exec(trimmed)
+  if (vor) return `/${normalizeQualifiedDate(vor[1])}`
+  const nach = /^nach\s+(.+)$/i.exec(trimmed)
+  if (nach) return `${normalizeQualifiedDate(nach[1])}/`
+  return normalizeQualifiedDate(trimmed)
+}
+
+function isValidDatePart(value: string): boolean {
+  if (/^-?\d{4}$/.test(value)) return true
+  if (/^-?\d{4}-(0[1-9]|1[0-2])$/.test(value)) return true
+  const full = /^(-?\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!full) return false
   const year = Number(full[1])
   const month = Number(full[2])
   const day = Number(full[3])
   return day >= 1 && day <= daysInMonth(year, month)
+}
+
+function isValidQualifiedDate(value: string): boolean {
+  for (const suffix of ['~?', '~', '?']) {
+    if (value.endsWith(suffix)) return isValidDatePart(value.slice(0, -suffix.length))
+  }
+  return isValidDatePart(value)
+}
+
+function isValidDateInput(value: string): boolean {
+  const normalized = normalizeDateInput(value)
+  if (normalized.includes('/')) {
+    const parts = normalized.split('/')
+    if (parts.length !== 2) return false
+    const [start, end] = parts
+    if (!start && !end) return false
+    return (start === '' || isValidQualifiedDate(start)) && (end === '' || isValidQualifiedDate(end))
+  }
+  return isValidQualifiedDate(normalized)
 }
 
 function DateInput({ value, onChange, onBlur, disabled, style }: {
@@ -63,16 +136,16 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
 }) {
   const pickerRef = useRef<HTMLInputElement>(null)
   const normalized = normalizeDateInput(value)
-  const isBce = normalized.startsWith('-')
-  const pickerValue = isBce ? '' : (/^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '')
+  const isPlainDate = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(normalized)
+  const pickerValue = /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
   return (
     <div style={{ display: 'flex', gap: 6 }}>
       <input className="fld" type="text" value={value}
         onChange={e => onChange(e.target.value)}
         onBlur={() => { onChange(normalizeDateInput(value)); onBlur?.() }}
-        placeholder="TT.MM.JJJJ, JJJJ-MM-TT oder -JJJJ (v. Chr.)" disabled={disabled} style={{ flex: 1, ...style }} />
-      <button type="button" className="btn sm ico gh" title={isBce ? 'Kalender unterstützt keine Jahre v. Chr. – Wert direkt eingeben' : 'Datum aus Kalender auswählen'}
-        disabled={disabled || isBce} onClick={() => pickerRef.current?.showPicker()}>
+        placeholder='JJJJ-MM-TT, TT.MM.JJJJ, "ca. 1900", "1900 bis 1950", "vor 1900" …' disabled={disabled} style={{ flex: 1, ...style }} />
+      <button type="button" className="btn sm ico gh" title={isPlainDate ? 'Datum aus Kalender auswählen' : 'Kalender unterstützt nur exakte Einzeldaten – Wert direkt eingeben'}
+        disabled={disabled || !isPlainDate} onClick={() => pickerRef.current?.showPicker()}>
         <Calendar size={14} />
       </button>
       <input ref={pickerRef} type="date" value={pickerValue} disabled={disabled}

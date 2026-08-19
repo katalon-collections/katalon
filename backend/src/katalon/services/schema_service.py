@@ -16,15 +16,13 @@ def _is_leap_year(year: int) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def _is_valid_date(value: object) -> bool:
-    """Accept ISO years, year-months, and real calendar dates.
+def _is_valid_date_part(value: str) -> bool:
+    """Accept ISO years, year-months, and real calendar dates (no qualifiers/range).
 
     BCE years use a leading minus with zero-padded year, e.g. "-0043" (44 v. Chr.;
     ISO 8601 year -0043 = 44 BCE due to the year-0 offset). Python's
     date.fromisoformat rejects negative years and year 0, so calendar checks run manually.
     """
-    if not isinstance(value, str):
-        return False
     if re.fullmatch(r"-?\d{4}", value):
         return True
     month = re.fullmatch(r"(-?\d{4})-(\d{2})", value)
@@ -40,6 +38,32 @@ def _is_valid_date(value: object) -> bool:
         return False
     days_in_month = [31, 29 if _is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     return day <= days_in_month[month_num - 1]
+
+
+def _is_valid_qualified_date(value: str) -> bool:
+    """Date part with optional EDTF-lite qualifier suffix: '~' (circa), '?' (unsicher), '~?' (beides)."""
+    for suffix in ("~?", "~", "?"):
+        if value.endswith(suffix):
+            return _is_valid_date_part(value[: -len(suffix)])
+    return _is_valid_date_part(value)
+
+
+def _is_valid_date(value: object) -> bool:
+    """Accept a single (optionally qualified) date, or a '/'-separated range with open ends.
+
+    Examples: "1900", "1900~" (circa), "1900?" (unsicher), "1900/1950" (Zeitraum),
+    "1900/" (nach 1900), "/1900" (vor 1900).
+    """
+    if not isinstance(value, str):
+        return False
+    if value.count("/") == 1:
+        start, end = value.split("/")
+        if not start and not end:
+            return False
+        return (start == "" or _is_valid_qualified_date(start)) and (
+            end == "" or _is_valid_qualified_date(end)
+        )
+    return _is_valid_qualified_date(value)
 
 
 async def get_field_definitions(
@@ -205,7 +229,7 @@ async def validate_metadata(
                                 pass
                     if sv is not None and sv != "" and sf.field_type == "date" and not _is_valid_date(sv):
                         errors.append(
-                            f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder -JJJJ (v. Chr.)."
+                            f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, -JJJJ (v. Chr.), mit ~ (circa) / ? (unsicher), oder Zeitraum START/ENDE."
                         )
                     if sv is not None and sf.field_type == "relation":
                         struct_err = _validate_relation_structure(
@@ -301,7 +325,7 @@ async def validate_metadata(
                     continue
                 if not _is_valid_date(item):
                     errors.append(
-                        f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder -JJJJ (v. Chr.)."
+                        f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, -JJJJ (v. Chr.), mit ~ (circa) / ? (unsicher), oder Zeitraum START/ENDE."
                     )
                     break
             continue

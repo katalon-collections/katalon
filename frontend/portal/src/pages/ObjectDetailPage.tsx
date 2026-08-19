@@ -228,7 +228,7 @@ export function ObjectDetailPage() {
             if (f.field_type === 'relation') {
               return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
             }
-            const rendered = renderFieldValue(rawValue, locale)
+            const rendered = renderFieldValue(rawValue, locale, f.field_type)
             const href = f.field_type === 'authority'
               ? authorityUrl(rawValue)
               : f.field_type === 'pid'

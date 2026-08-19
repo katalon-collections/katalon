@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-19
+
+### Added
+- Datumsfelder unterstützen Zeiträume und Unschärfe (EDTF-lite): Eingabe per Freitext wie `ca. 1900`, `um 1900`, `1900 (unsicher)`/`1900?`, `1900 bis 1950`, `vor 1900`, `nach 1900` — wird intern kanonisch als `1900~`, `1900?`, `1900/1950`, `/1900`, `1900/` gespeichert. Backend-Validierung, Admin-Formular-Parser und Portal-Anzeige (formatiert kanonische Werte zurück in Lesetext) angepasst.
+
 ## [1.1.1] - 2026-08-19
 
 ### Added
