@@ -353,7 +353,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                   <tr key={u.id}>
                     <td>{u.email}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <div className="role-cell" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <select
                           className="fld"
                           style={{ fontSize: 12, padding: '2px 6px', minWidth: 130 }}

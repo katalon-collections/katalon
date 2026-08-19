@@ -124,8 +124,8 @@ export function ScreenBanners() {
   const now = new Date().toISOString()
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 860 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+    <div className="banners-page settings-page">
+      <div className="settings-head" style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Banner</h1>
         <button
           onClick={startNew}
@@ -156,7 +156,7 @@ export function ScreenBanners() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="fg-2" style={{ marginBottom: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Farbe</label>
               <select style={{ ...inp }} value={form.color} onChange={e => set('color', e.target.value as Banner['color'])}>
@@ -181,7 +181,7 @@ export function ScreenBanners() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+          <div className="banner-form-checks">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.show_admin} onChange={e => set('show_admin', e.target.checked)} />
               Im Admin anzeigen
@@ -224,9 +224,9 @@ export function ScreenBanners() {
           {banners.map(b => {
             const expired = b.expires_at != null && b.expires_at < now
             return (
-              <div key={b.id} style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, opacity: expired || !b.is_active ? 0.5 : 1 }}>
+              <div key={b.id} className="banner-row" style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', opacity: expired || !b.is_active ? 0.5 : 1 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...colorStyle(b.color), marginBottom: 6, display: 'inline-block' }}>
+                  <div style={{ ...colorStyle(b.color), marginBottom: 6, display: 'inline-block', overflowWrap: 'anywhere' }}>
                     <Bell size={13} style={{ marginRight: 6 }} />
                     {b.message}
                   </div>
@@ -238,7 +238,7 @@ export function ScreenBanners() {
                     {!b.is_active && !expired && <span style={{ color: 'var(--fg-3)' }}>Inaktiv</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <div className="banner-actions">
                   <button
                     onClick={() => toggle(b)}
                     title={b.is_active ? 'Deaktivieren' : 'Aktivieren'}

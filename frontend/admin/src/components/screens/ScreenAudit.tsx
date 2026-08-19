@@ -74,6 +74,21 @@ function userDisplay(entry: AuditEntry) {
   return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '—')
 }
 
+function formatDiffValue(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  if (Array.isArray(v)) return v.map(formatDiffValue).join(', ')
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return String(v)
+    }
+  }
+  return String(v)
+}
+
 const ACTIONS = ['all', 'create', 'update', 'delete', 'publish', 'media', 'relation']
 
 type Props = { initialFilter?: string | null; onFilterChange?: (filter: string) => void }
@@ -161,11 +176,11 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                   {diff.old && (
                     <div className="diff">
                       {Object.entries(diff.old).map(([k, v]) => (
-                        <div key={k}>
+                        <div key={k} style={{ overflowWrap: 'anywhere' }}>
                           <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{k}: </span>
-                          <span className="rem">{String(v)}</span>
+                          <span className="rem">{formatDiffValue(v)}</span>
                           {' → '}
-                          <span className="add">{String((diff.new ?? {})[k] ?? '')}</span>
+                          <span className="add">{formatDiffValue((diff.new ?? {})[k])}</span>
                         </div>
                       ))}
                     </div>

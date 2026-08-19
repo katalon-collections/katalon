@@ -80,6 +80,17 @@ test('object list fits a 319px viewport', async ({ page }) => {
   await expectDocumentFits(page)
 })
 
+test('configuration screens fit a 375px viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 })
+  await loginAsAdmin(page)
+
+  for (const route of ['audit', 'banners', 'settings', 'users']) {
+    await page.goto(`/#${route}`)
+    await expect(page.locator('h1').first()).toBeVisible()
+    await expectDocumentFits(page)
+  }
+})
+
 test('schema uses its mobile subtype control at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 })
   await loginAsAdmin(page)

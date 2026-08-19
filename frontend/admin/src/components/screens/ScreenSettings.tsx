@@ -1161,9 +1161,9 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
         <div><h1>Einstellungen</h1><div className="sub">Account und Systemkonfiguration</div></div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div className="settings-layout">
         {/* Sidebar nav */}
-        <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border-s)', overflowY: 'auto', paddingTop: 8 }}>
+        <div className="settings-nav">
           {navItems.map(n => (
             <button key={n.id} className={`panel-it${section === n.id ? ' active' : ''}`} onClick={() => {
               setSection(n.id)
@@ -1175,7 +1175,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 680 }}>
+        <div className="settings-content">
           {loading && <div className="empty">Lade…</div>}
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}

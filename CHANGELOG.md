@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-08-19
+
+### Fixed
+- Admin mobile UI hardening:
+  - Audit-Log: diff values that are objects/arrays are now rendered as JSON strings instead of `[object Object]`; timeline stacks vertically on narrow viewports.
+  - Banner screen: page header, two-column form and banner list rows now stack on mobile.
+  - Einstellungen: sidebar navigation becomes a horizontal scrollable strip above the content on small screens.
+  - Benutzer: table cells wrap, action buttons stack, and the table gets a horizontal scroll fallback on narrow screens.
+  - Global search placeholder shortened so it no longer clips in the compact topbar.
+
 ## [1.0.6] - 2026-08-18
 
 ### Added

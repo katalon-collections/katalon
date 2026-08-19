@@ -105,7 +105,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
           aria-label="Global suchen"
           aria-expanded={open}
           aria-controls="global-search-results"
-          placeholder="Global suchen — Objekte, Entitäten, Vokabeln…"
+          placeholder="Global suchen…"
           value={q}
           onChange={e => setQ(e.target.value)}
           onFocus={() => { if (results.length > 0) setOpen(true) }}

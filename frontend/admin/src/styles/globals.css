@@ -304,6 +304,17 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin: 16px 0 24px; }
 .settings-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
+/* Banners */
+.banners-page { padding: 32px 40px; max-width: 900px; }
+.banner-row { display: flex; gap: 12px; align-items: flex-start; }
+.banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.banner-form-checks { display: flex; gap: 20px; margin-bottom: 14px; }
+
+/* Settings layout */
+.settings-layout { display: flex; flex: 1; min-height: 0; }
+.settings-nav { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border-s); overflow-y: auto; padding-top: 8px; }
+.settings-content { flex: 1; overflow-y: auto; padding: 20px 24px; max-width: 680px; }
+
 /* Static pages */
 .pages-screen { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .pages-layout { display: flex; flex: 1; min-height: 0; }
@@ -358,6 +369,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .evt .body .diff { margin-top: 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-2); display: flex; flex-direction: column; gap: 3px; }
 .evt .body .diff .add { color: var(--st-p-fg); background: #eaf6ee; padding: 1px 5px; border-radius: 3px; display: inline-block; }
 .evt .body .diff .rem { color: #b91c1c; background: #fde7e7; padding: 1px 5px; border-radius: 3px; display: inline-block; text-decoration: line-through; }
+.evt .body .diff { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
 /* Misc */
 .hover-row:hover { background: var(--panel-2); }
@@ -478,6 +490,29 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .settings-page button, .settings-page input:not([type="checkbox"]), .settings-page select { min-height: 44px; }
   .settings-page label:has(input[type="checkbox"]) { min-height: 44px; }
   .settings-intro a { overflow-wrap: anywhere; }
+  .settings-layout { flex-direction: column; }
+  .settings-nav { width: 100%; border-right: 0; border-bottom: 1px solid var(--border-s); display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px 12px; }
+  .settings-layout .panel-it { flex: 0 0 auto; border-left: 0; border-bottom: 3px solid transparent; min-height: 44px; }
+  .settings-layout .panel-it.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .settings-content { max-width: none; padding: 12px; }
+  .banners-page { padding: 12px; }
+  .banner-row { flex-direction: column; gap: 8px; }
+  .banner-actions { width: 100%; justify-content: flex-end; }
+  .banner-form-checks { flex-wrap: wrap; gap: 12px 20px; }
+  .timeline { margin: 12px; }
+  .evt { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
+  .evt .when { font-size: 11px; }
+  .evt .ic { width: 24px; height: 24px; }
+  .evt .who { justify-content: flex-start; }
+  .evt .body { min-width: 0; }
+  .users-table { padding-inline: 12px; -webkit-overflow-scrolling: touch; }
+  .users-table .tbl { min-width: max-content; }
+  .users-table .tbl td { white-space: normal; overflow: visible; text-overflow: clip; }
+  .users-table .col-act { min-width: 110px; }
+  .users-table .row-actions { flex-wrap: wrap; gap: 4px; max-width: 130px; justify-content: flex-end; }
+  .users-table .row-actions .btn { height: auto; min-height: 44px; white-space: normal; padding: 6px 8px; }
+  .users-table .role-cell { flex-wrap: wrap; }
+  .users-table th:nth-child(4), .users-table td:nth-child(4) { display: none; }
   .importer-content { padding: 12px; }
   .importer-tabs { padding-inline: 12px !important; }
   .importer-tabs button { min-height: 44px; }
