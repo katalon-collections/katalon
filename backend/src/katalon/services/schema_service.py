@@ -11,20 +11,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from katalon.core.models import FieldDefinition
 
 
+def _is_leap_year(year: int) -> bool:
+    """Proleptic Gregorian leap rule; works for BCE years (astronomical numbering, year 0 = 1 v. Chr.)."""
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+
+
 def _is_valid_date(value: object) -> bool:
-    """Accept ISO years, year-months, and real calendar dates."""
+    """Accept ISO years, year-months, and real calendar dates.
+
+    BCE years use a leading minus with zero-padded year, e.g. "-0043" (44 v. Chr.;
+    ISO 8601 year -0043 = 44 BCE due to the year-0 offset). Python's
+    date.fromisoformat rejects negative years and year 0, so calendar checks run manually.
+    """
     if not isinstance(value, str):
         return False
-    if re.fullmatch(r"\d{4}", value):
+    if re.fullmatch(r"-?\d{4}", value):
         return True
-    month = re.fullmatch(r"(\d{4})-(\d{2})", value)
+    month = re.fullmatch(r"(-?\d{4})-(\d{2})", value)
     if month:
         return 1 <= int(month.group(2)) <= 12
-    try:
-        date.fromisoformat(value)
-    except ValueError:
+    full = re.fullmatch(r"(-?\d{4})-(\d{2})-(\d{2})", value)
+    if not full:
         return False
-    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", value))
+    year = int(full.group(1))
+    month_num = int(full.group(2))
+    day = int(full.group(3))
+    if not 1 <= month_num <= 12 or not 1 <= day <= 31:
+        return False
+    days_in_month = [31, 29 if _is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    return day <= days_in_month[month_num - 1]
 
 
 async def get_field_definitions(

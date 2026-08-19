@@ -11,27 +11,47 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { MediaLightbox } from '../MediaLightbox'
 
+const INVALID_DATE_MESSAGE = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, TT.MM.JJJJ oder -JJJJ (v. Chr.)'
+
+/** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+}
+
+function daysInMonth(year: number, month: number): number {
+  return [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+}
+
 function normalizeDateInput(value: string): string {
   const trimmed = value.trim()
   const european = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed)
-  if (!european) return trimmed
-  const [, day, month, year] = european
-  const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-  const parsed = new Date(`${iso}T00:00:00Z`)
-  return parsed.getUTCFullYear() === Number(year) &&
-    parsed.getUTCMonth() + 1 === Number(month) &&
-    parsed.getUTCDate() === Number(day)
-    ? iso
-    : trimmed
+  if (european) {
+    const [, day, month, year] = european
+    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    const parsed = new Date(`${iso}T00:00:00Z`)
+    if (parsed.getUTCFullYear() === Number(year) &&
+      parsed.getUTCMonth() + 1 === Number(month) &&
+      parsed.getUTCDate() === Number(day)) {
+      return iso
+    }
+    return trimmed
+  }
+  // BCE years: pad the year to 4 digits, e.g. "-43" → "-0043" (44 v. Chr.)
+  const bce = /^-(\d{1,4})(-\d{2}(-\d{2})?)?$/.exec(trimmed)
+  if (bce) return `-${bce[1].padStart(4, '0')}${bce[2] ?? ''}`
+  return trimmed
 }
 
 function isValidDateInput(value: string): boolean {
   const normalized = normalizeDateInput(value)
-  if (/^\d{4}$/.test(normalized)) return true
-  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(normalized)) return true
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false
-  const parsed = new Date(`${normalized}T00:00:00Z`)
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === normalized
+  if (/^-?\d{4}$/.test(normalized)) return true
+  if (/^-?\d{4}-(0[1-9]|1[0-2])$/.test(normalized)) return true
+  const full = /^(-?\d{4})-(\d{2})-(\d{2})$/.exec(normalized)
+  if (!full) return false
+  const year = Number(full[1])
+  const month = Number(full[2])
+  const day = Number(full[3])
+  return day >= 1 && day <= daysInMonth(year, month)
 }
 
 function DateInput({ value, onChange, onBlur, disabled, style }: {
@@ -43,15 +63,16 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
 }) {
   const pickerRef = useRef<HTMLInputElement>(null)
   const normalized = normalizeDateInput(value)
-  const pickerValue = /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+  const isBce = normalized.startsWith('-')
+  const pickerValue = isBce ? '' : (/^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '')
   return (
     <div style={{ display: 'flex', gap: 6 }}>
       <input className="fld" type="text" value={value}
         onChange={e => onChange(e.target.value)}
         onBlur={() => { onChange(normalizeDateInput(value)); onBlur?.() }}
-        placeholder="TT.MM.JJJJ oder JJJJ-MM-TT" disabled={disabled} style={{ flex: 1, ...style }} />
-      <button type="button" className="btn sm ico gh" title="Datum aus Kalender auswählen"
-        disabled={disabled} onClick={() => pickerRef.current?.showPicker()}>
+        placeholder="TT.MM.JJJJ, JJJJ-MM-TT oder -JJJJ (v. Chr.)" disabled={disabled} style={{ flex: 1, ...style }} />
+      <button type="button" className="btn sm ico gh" title={isBce ? 'Kalender unterstützt keine Jahre v. Chr. – Wert direkt eingeben' : 'Datum aus Kalender auswählen'}
+        disabled={disabled || isBce} onClick={() => pickerRef.current?.showPicker()}>
         <Calendar size={14} />
       </button>
       <input ref={pickerRef} type="date" value={pickerValue} disabled={disabled}
@@ -1640,7 +1661,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             }
             if (sf.field_type === 'date' && typeof sv === 'string' && sv && !isValidDateInput(sv)) {
               errors[`${f.name}.${sf.name}:${idx}`] =
-                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): Ungültiges Datum.`
+                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): ${INVALID_DATE_MESSAGE}`
             }
             if (!isEmptyValue(sv) && sf.field_type === 'authority') {
               const entry = typeof sv === 'object' && sv !== null && !Array.isArray(sv)
@@ -1670,7 +1691,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           const item = arr[i]
           if (f.field_type === 'date' && typeof item === 'string' && item) {
             if (!isValidDateInput(item)) {
-              errors[f.name] = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ'
+              errors[f.name] = INVALID_DATE_MESSAGE
               break
             }
           }
@@ -1699,7 +1720,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (f.field_type === 'date') {
         const v = val as string
         if (v && !isValidDateInput(v)) {
-          errors[f.name] = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ'
+          errors[f.name] = INVALID_DATE_MESSAGE
         }
       }
       if (f.field_type === 'number') {
@@ -1737,7 +1758,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (field.field_type === 'date') {
       const v = val as string
       if (v && !isValidDateInput(v)) {
-        return { level: 'error', message: 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder TT.MM.JJJJ' }
+        return { level: 'error', message: INVALID_DATE_MESSAGE }
       }
     }
     if (field.field_type === 'number') {

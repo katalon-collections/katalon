@@ -75,17 +75,18 @@ Beispiele:
 
 ---
 
-### `date` – Datum nach EDTF
+### `date` – Datum
 
-Unterstützt den Extended Date/Time Format-Standard (EDTF). Damit lassen sich auch unscharfe oder unvollständige Datumsangaben ausdrücken.
+Akzeptiert Jahres-, Jahres-Monats- und Tagesangaben im ISO-Format. Unscharfe Angaben, Zeiträume und offene Intervalle lassen sich nicht über Syntax im Datumswert ausdrücken (kein EDTF) — dafür gibt es etablierte Muster (siehe „Cookbook: Datierungstyp" weiter unten).
 
 Beispiele für gültige Werte:
 - `1923` — nur das Jahr
 - `1923-05` — Jahr und Monat
 - `1923-05-14` — exaktes Datum
-- `1920~` — ungefähr 1920
-- `1910/1930` — Zeitraum
-- `[1920, 1930]` — eines der genannten Jahre
+- `-0043` — Jahr vor Christus (44 v. Chr.)
+- `-0043-03-15` — exaktes Datum vor Christus
+
+**Jahre vor Christus**: BCE-Jahre werden mit vorangestelltem Minuszeichen und vierstellig aufgefülltem Jahr eingegeben (`-0043` für 44 v. Chr.). Dabei gilt die ISO-8601-Jahreszählung mit Jahr 0 (1 v. Chr. = Jahr `0000`, 44 v. Chr. = Jahr `-0043`). Das eingebaute Kalender-Widget unterstützt keine Jahre v. Chr. — BCE-Werte direkt ins Textfeld eingeben.
 
 Beispiele für Felder:
 - Entstehungsdatum
@@ -244,7 +245,10 @@ Beispiele:
 
 ## Cookbook: Datierungstyp (unscharfe/qualifizierte Datierung)
 
-Das `date`-Feld unterstützt EDTF und deckt damit ungefähre Angaben, Zeiträume und offene Intervalle bereits über die Syntax ab (`1920~`, `1910/1930`, `1923?` …). Wird zusätzlich ein **strukturiertes, facettierbares** Datierungstyp-Feld gebraucht (z.B. um in der Suche nach "circa"-Datierungen zu filtern, oder um Datierungstyp unabhängig vom Datumswert auszuwerten), reicht die EDTF-Syntax allein nicht — dafür gibt es kein eigenes Feldtyp, sondern eine Kombination aus `group` + `date` + `vocab`:
+Das `date`-Feld akzeptiert nur konkrete Datumsangaben (siehe oben). Ungefähre Angaben und Zeiträume werden nicht über Syntax im Datumswert ausgedrückt (kein EDTF) — dafür gibt es zwei etablierte Muster:
+
+- **Zeitraum (von/bis)**: zwei separate `date`-Felder, z.B. `herstellungsdatum_von` / `herstellungsdatum_bis`.
+- **Qualifizierung (circa/vor/nach/exakt)**: eine Kombination aus `group` + `date` + `vocab`:
 
 1. Vokabular anlegen, z.B. `datierungstyp` mit Termen: `exakt`, `circa`, `vor`, `nach`, `undatiert`.
 2. Feld vom Typ `group` anlegen, z.B. `datierung` (Label „Datierung").
@@ -252,7 +256,7 @@ Das `date`-Feld unterstützt EDTF und deckt damit ungefähre Angaben, Zeiträume
    - `datum` (Typ `date`)
    - `typ` (Typ `vocab`, `settings.vocabulary_id` → Vokabular `datierungstyp`)
 
-Ergebnis: pro Datensatz lassen sich mehrere Datierungen mit je eigenem Typ erfassen (z.B. Entstehung „circa 1920", Erwerb „exakt 1955"), und der Typ ist als Vokabularwert facettierbar/durchsuchbar — unabhängig von der EDTF-Syntax im Datumswert.
+Ergebnis: pro Datensatz lassen sich mehrere Datierungen mit je eigenem Typ erfassen (z.B. Entstehung „circa 1920", Erwerb „exakt 1955"), und der Typ ist als Vokabularwert facettierbar/durchsuchbar — unabhängig vom Datumswert. Auch die Qualifizierung eines BCE-Datums funktioniert so: `datum = -0043`, `typ = circa` („circa 44 v. Chr.").
 
 ---
 

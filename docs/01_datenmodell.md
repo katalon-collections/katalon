@@ -134,7 +134,7 @@ OAI-PMH nutzt diese Schicht aktuell zuerst. LIDO und METS/MODS sind als spaetere
 |---|---|---|
 | `text` | Einzeiliger Freitext, optional mit Regex-Validierung | Titel, ISBN, Signatur |
 | `richtext` | Mehrzeiliger Text mit Formatierung (HTML) | Beschreibungstext, Provenienz |
-| `date` | Datum nach EDTF (auch unscharfe Angaben wie „um 1920") | Entstehungsdatum, Erwerbsdatum |
+| `date` | Datum im ISO-Format, auch Jahre v. Chr. (`-0043`) | Entstehungsdatum, Erwerbsdatum |
 | `number` | Numerischer Wert | Höhe in cm, Gewicht, Auflage |
 | `boolean` | Ja/Nein-Wert | Ist restauriert?, Ist digitalisiert? |
 | `vocab` | Auswahl aus einem kontrollierten Vokabular | Materialart, Genre, Kameratyp |

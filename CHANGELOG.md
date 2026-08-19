@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-19
+
+### Added
+- Datumsfelder unterstützen v. Chr.-Jahre (BCE): ISO-Schreibweise mit führendem Minus und vierstelligem Jahr (z. B. `-0043` = 44 v. Chr.), inkl. proleptisch-gregorianischer Schaltjahresregel (Jahr 0 = 1 v. Chr.) — Backend-Validierung und Admin-Formular (Normalisierung `TT.MM.JJJJ`).
+
+### Changed
+- `docs/01_datenmodell.md` und `docs/02_schema_verwaltung.md`: Datumsformate um BCE/Jahresangaben erweitert.
+
 ## [1.1.0] - 2026-08-19
 
 ### Added

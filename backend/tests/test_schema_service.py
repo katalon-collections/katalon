@@ -119,6 +119,36 @@ async def test_date_field_requires_a_real_calendar_date() -> None:
 
 
 @pytest.mark.asyncio
+async def test_date_field_accepts_bce_years() -> None:
+    """BCE years use signed ISO with zero-padded year; ISO year -0043 = 44 v. Chr. (year-0 offset)."""
+    field = make_field("birth_date", field_type="date")
+
+    valid = [
+        "-0043",               # 44 v. Chr., Jahr allein
+        "-0043-06",            # 44 v. Chr., Jahr+Monat
+        "-0043-06-15",         # 44 v. Chr., exaktes Datum
+        "-0001-12-31",         # 2 v. Chr.
+        "0000",                # 1 v. Chr. (Jahr 0)
+        "0000-02-29",          # Jahr 0 ist ein Schaltjahr
+        "-0004-02-29",         # -4 ist durch 4 teilbar → Schaltjahr
+        "-4000-01-01",
+    ]
+    for v in valid:
+        assert await validate_metadata(mock_db(field), "entity", {"birth_date": v}) == [], v
+
+    invalid = [
+        "-43",                 # Jahr muss 4-stellig sein
+        "--0043",
+        "-0043-13",            # Monat 13
+        "-0043-06-31",         # Juni hat 30 Tage
+        "-0043-02-29",         # 44 v. Chr. (-43) ist kein Schaltjahr
+        "-0043-06-00",         # Tag 0
+    ]
+    for v in invalid:
+        assert await validate_metadata(mock_db(field), "entity", {"birth_date": v}), v
+
+
+@pytest.mark.asyncio
 async def test_multiple_fields_multiple_errors() -> None:
     db = mock_db(
         make_field("title", is_required=True),
