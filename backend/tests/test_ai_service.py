@@ -14,7 +14,7 @@ from katalon.services.ai_service import (
     _prepare_vision_image,
     _strip_code_fences,
 )
-from katalon.services.schema_ai_service import _extract_json_object, _parse_response
+from katalon.services.schema_ai_service import SYSTEM_PROMPT, _extract_json_object, _parse_response
 
 
 def make_field(field_type: str, *, is_repeatable: bool = False) -> SimpleNamespace:
@@ -138,3 +138,70 @@ def test_parse_response_accepts_plain_and_prose_wrapped_json() -> None:
 def test_parse_response_rejects_invalid_json() -> None:
     with pytest.raises(HTTPException, match="kein gültiges JSON"):
         _parse_response("das war keine JSON-Antwort")
+
+
+def test_schema_prompt_asks_clarifying_questions() -> None:
+    assert '"proposal": null' in SYSTEM_PROMPT
+    assert "Rückfragen" in SYSTEM_PROMPT
+    assert "Antwortbeispielen" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_place_normdata_belongs_to_place_not_object() -> None:
+    assert "GND" in SYSTEM_PROMPT
+    assert "Normdaten" in SYSTEM_PROMPT
+    assert "Herstellungsort" in SYSTEM_PROMPT
+    assert "place_fields" in SYSTEM_PROMPT
+    assert "KEIN authority-Feld am Objekt" in SYSTEM_PROMPT
+    assert "Normdaten gehören an den verknüpften Datensatz" in SYSTEM_PROMPT
+    assert "target_type=\"place\"" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_embeds_ddb_field_list_as_model_knowledge() -> None:
+    assert "Objekttitel oder -benennung" in SYSTEM_PROMPT
+    assert "Inventarnummer" in SYSTEM_PROMPT
+    assert "Ereignis in der Objektgeschichte" in SYSTEM_PROMPT
+    assert "Alternativtext" in SYSTEM_PROMPT
+    assert "sta.dnb.de" in SYSTEM_PROMPT
+    assert "gnd.network" in SYSTEM_PROMPT
+    assert "KEINE" in SYSTEM_PROMPT
+    assert "Links" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_supports_relation_type_vocabularies() -> None:
+    assert "relation_type_vocab" in SYSTEM_PROMPT
+    assert 'kind="relation"' in SYSTEM_PROMPT
+    assert "fotografiert_von" in SYSTEM_PROMPT
+    assert "entstanden_in" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_avoids_soft_deleted_field_names() -> None:
+    assert "used_field_names" in SYSTEM_PROMPT
+    assert "datierung_2" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_models_companies_as_entity_relation() -> None:
+    assert "Werbefirma" in SYSTEM_PROMPT
+    assert 'target_type="entity"' in SYSTEM_PROMPT
+    assert "NICHT als Textfeld" in SYSTEM_PROMPT
+    assert "NICHT als" in SYSTEM_PROMPT
+    assert "Vokabular-Feld" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_uses_edtf_date_capabilities() -> None:
+    assert "EDTF" in SYSTEM_PROMPT
+    assert "1900/1950" in SYSTEM_PROMPT
+    assert "1920~" in SYSTEM_PROMPT
+    assert "KEINE Gruppe" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_never_proposes_title_field() -> None:
+    assert "eigenes Feld für Titel" in SYSTEM_PROMPT
+    assert "label-Feld diese Rolle" in SYSTEM_PROMPT
+
+
+def test_schema_prompt_models_events_works_as_occurrence_relation() -> None:
+    assert 'target_type="occurrence"' in SYSTEM_PROMPT
+    assert "Ereignisse" in SYSTEM_PROMPT
+    assert "FRBR" in SYSTEM_PROMPT
+    assert "Ausstellung" in SYSTEM_PROMPT
+    assert "Unterscheide Typ und Instanz" in SYSTEM_PROMPT

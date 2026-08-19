@@ -305,3 +305,34 @@ async def test_translatable_field_constraints(async_client: AsyncClient, auth_he
         assert number.status_code == 422, number.text
     finally:
         await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)
+
+
+@pytest.mark.asyncio
+async def test_recreate_soft_deleted_field_reactivates_same_id(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    payload = {
+        "target_type": "object",
+        "name": "reactivate_test_field",
+        "label": {"de": "Reaktivierung"},
+        "field_type": "text",
+        "is_required": False,
+        "is_repeatable": False,
+        "is_translatable": False,
+        "sort_order": 98,
+        "settings": {},
+    }
+    created = await async_client.post("/v1/schema", headers=auth_headers, json=payload)
+    assert created.status_code == 201, created.text
+    field_id = created.json()["id"]
+
+    deleted = await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)
+    assert deleted.status_code == 204
+
+    recreated = await async_client.post("/v1/schema", headers=auth_headers, json=payload)
+    assert recreated.status_code == 201, recreated.text
+    data = recreated.json()
+    assert data["id"] == field_id
+    assert data["name"] == payload["name"]
+
+    await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)

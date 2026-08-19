@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-19
+
+### Added
+- KI-Assistent für Felder (Admin): fragt bei unzureichenden Angaben gezielt nach statt zu raten; erklärt Normdaten-Hinweise (authority-Felder gehören an den verknüpften Datensatz — Ort/Person —, nicht ans Objekt); modelliert Personen/Firmen als Relation auf `entity`, Ereignisse/Werke als Relation auf `occurrence`, Orte als Relation auf `place`; nutzt für Zeiträume/Unschärfe das date-Feld (EDTF-lite) statt von/bis-Gruppen; schlägt kein Titel-Feld vor (Systemfeld `label` übernimmt); orientiert Vorschläge an den DDB-Erfassungsfeldern. Vorschläge: einzelne Felder vor dem Übernehmen abwählbar, ungenutzte Vokabulare werden übersprungen, URLs im Chat klickbar.
+- Schema-Verwaltung: Soft-gelöschte Felder werden beim erneuten Anlegen gleichen Namens automatisch reaktiviert (gleiche ID, Historie bleibt erhalten); doppelter Feldname liefert 409 statt 500.
+
 ## [1.1.2] - 2026-08-19
 
 ### Added

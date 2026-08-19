@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import CursorResult, func, or_, select, update
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
@@ -324,9 +325,36 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     else:
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_settings(db, data)
+    # Soft-deleted Felder blockieren ihren Namen per Unique-Constraint. Statt zu kollidieren,
+    # reaktiviere die alte Zeile (gleiche ID, gleiche Historie) und übernehme die neuen Werte.
+    reused = await db.scalar(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == data.target_type,
+            (
+                FieldDefinition.target_subtype.is_(None)
+                if data.target_subtype is None
+                else FieldDefinition.target_subtype == data.target_subtype
+            ),
+            FieldDefinition.name == data.name,
+            FieldDefinition.is_deleted.is_(True),
+        )
+    )
+    if reused is not None:
+        for key, value in data.model_dump().items():
+            setattr(reused, key, value)
+        reused.is_deleted = False
+        await db.flush()
+        _enqueue_reindex(data.target_type)
+        return _fd_read(reused)
     field = FieldDefinition(**data.model_dump())
     db.add(field)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Ein Feld mit diesem Namen existiert bereits für diesen Typ/Subtyp.",
+        ) from exc
     _enqueue_reindex(data.target_type)
     return _fd_read(field)
 
