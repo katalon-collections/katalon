@@ -40,6 +40,9 @@ function normalizeBareDate(value: string): string {
   // BCE years: pad the year to 4 digits, e.g. "-43" → "-0043" (44 v. Chr.)
   const bce = /^-(\d{1,4})(-\d{2}(-\d{2})?)?$/.exec(trimmed)
   if (bce) return `-${bce[1].padStart(4, '0')}${bce[2] ?? ''}`
+  // CE years under 1000: pad the year to 4 digits, e.g. "100" → "0100"
+  const ce = /^(\d{1,4})(-\d{2}(-\d{2})?)?$/.exec(trimmed)
+  if (ce) return `${ce[1].padStart(4, '0')}${ce[2] ?? ''}`
   return trimmed
 }
 

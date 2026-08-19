@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-19
+
+### Fixed
+- Datumsfeld (Admin): Jahre unter 1000 (z. B. `100`) wurden nicht auf 4 Stellen gepadded und dadurch als ungültig zurückgewiesen — betraf auch Zeitraum-Eingaben wie `vor 100`.
+
 ## [1.2.0] - 2026-08-19
 
 ### Added
