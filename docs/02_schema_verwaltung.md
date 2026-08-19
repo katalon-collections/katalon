@@ -232,6 +232,30 @@ Beispiele:
 
 ---
 
+### `group` – Feldgruppe
+
+Fasst mehrere Sub-Felder zu einer wiederholbaren Einheit zusammen (z.B. für strukturierte Angaben, die aus mehreren Werten bestehen). Sub-Felder werden nach dem Anlegen der Gruppe direkt darunter erfasst; erlaubt sind `text`, `date`, `number`, `boolean`, `vocab`, `vocab_free`, `relation`, `authority`.
+
+Beispiele:
+- Maßangabe (Wert + Einheit)
+- Ausstellungsbeteiligung (Ausstellung + Rolle)
+
+---
+
+## Cookbook: Datierungstyp (unscharfe/qualifizierte Datierung)
+
+Das `date`-Feld unterstützt EDTF und deckt damit ungefähre Angaben, Zeiträume und offene Intervalle bereits über die Syntax ab (`1920~`, `1910/1930`, `1923?` …). Wird zusätzlich ein **strukturiertes, facettierbares** Datierungstyp-Feld gebraucht (z.B. um in der Suche nach "circa"-Datierungen zu filtern, oder um Datierungstyp unabhängig vom Datumswert auszuwerten), reicht die EDTF-Syntax allein nicht — dafür gibt es kein eigenes Feldtyp, sondern eine Kombination aus `group` + `date` + `vocab`:
+
+1. Vokabular anlegen, z.B. `datierungstyp` mit Termen: `exakt`, `circa`, `vor`, `nach`, `undatiert`.
+2. Feld vom Typ `group` anlegen, z.B. `datierung` (Label „Datierung").
+3. Darunter zwei Sub-Felder anlegen:
+   - `datum` (Typ `date`)
+   - `typ` (Typ `vocab`, `settings.vocabulary_id` → Vokabular `datierungstyp`)
+
+Ergebnis: pro Datensatz lassen sich mehrere Datierungen mit je eigenem Typ erfassen (z.B. Entstehung „circa 1920", Erwerb „exakt 1955"), und der Typ ist als Vokabularwert facettierbar/durchsuchbar — unabhängig von der EDTF-Syntax im Datumswert.
+
+---
+
 ## Subtyp-Felder
 
 Bei Object, Entity, Place, Occurrence und Vorgang kann ein Feld an einen bestimmten Subtyp gebunden werden.
