@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-08-19
+
+### Changed
+- Audit-Log (Admin, Datensatz-Detailseite): Update-Einträge zeigen jetzt geänderte Felder mit alt/neu-Werten statt nur Aktion und Nutzer.
+
 ## [1.2.2] - 2026-08-19
 
 ### Changed

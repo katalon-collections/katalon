@@ -3263,6 +3263,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <span style={{ color: 'var(--fg-3)' }}>{new Date(evt.created_at).toLocaleString('de-CH')}</span>
                           </div>
                           <div style={{ color: 'var(--fg-2)' }}>von {evt.user_name ?? evt.user_id ?? '—'}</div>
+                          {(() => {
+                            const cf = evt.changed_fields as { old?: Record<string, unknown>; new?: Record<string, unknown> } | undefined
+                            const newVals = cf?.new
+                            if (!newVals || Object.keys(newVals).length === 0) return null
+                            const oldVals = cf?.old ?? {}
+                            return (
+                              <div style={{ marginTop: 4, display: 'grid', gap: 2 }}>
+                                {Object.keys(newVals).map(field => (
+                                  <div key={field} style={{ color: 'var(--fg-2)' }}>
+                                    <span style={{ fontWeight: 600 }}>{field}</span>
+                                    {field in oldVals && (
+                                      <>: <span style={{ textDecoration: 'line-through', color: 'var(--fg-3)' }}>{String(oldVals[field] ?? '—')}</span> → </>
+                                    )}
+                                    {!(field in oldVals) && ': '}
+                                    <span>{String(newVals[field] ?? '—')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
                       ))}
                     </div>
