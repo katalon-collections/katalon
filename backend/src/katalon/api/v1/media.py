@@ -3,6 +3,7 @@ import shutil
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -13,14 +14,18 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.config import settings
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_admin_or_editor
+from katalon.core.dependencies import (
+    DBDep,
+    OptionalCurrentUser,
+    require_admin_or_editor,
+)
 from katalon.core.media_validation import (
     ALLOWED_MEDIA_MIME,
     media_category,
     resolve_upload_mime,
     verified_image_mime,
 )
-from katalon.core.models import AdminConfig, MediaFile, Object
+from katalon.core.models import AdminConfig, MediaFile, Object, User
 from katalon.core.visibility import ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
 from katalon.services.audit_service import diff_fields, log_change
@@ -43,7 +48,7 @@ def _is_absolute_http_url(value: str) -> bool:
         return False
 
 
-def _serialize(f: MediaFile) -> dict:
+def _serialize(f: MediaFile) -> dict[str, Any]:
     links = {
         "object": {"href": f"/v1/objects/{f.object_id}"},
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
@@ -70,11 +75,11 @@ def _serialize(f: MediaFile) -> dict:
 
 @router.get(
     "",
-    response_model=list[dict],
+    response_model=list[dict[str, Any]],
     summary="List media files for an object",
     responses={404: {"description": "Object not found"}},
 )
-async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict]:
+async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict[str, Any]]:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
     if not obj:
@@ -98,7 +103,7 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
         415: {"description": "Unsupported file type"},
     },
 )
-async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user=require_admin_or_editor()) -> dict:
+async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     if not obj_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
@@ -161,12 +166,12 @@ class MediaPatch(BaseModel):
     media_type: str | None = None
     is_primary: bool | None = None
     license_uri: str | None = None
-    rights_holder: dict | None = None
+    rights_holder: dict[str, Any] | None = None
 
 
 @router.patch(
     "/{media_id}",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="Update media file metadata",
     responses={
         403: {"description": "Insufficient permissions"},
@@ -174,8 +179,8 @@ class MediaPatch(BaseModel):
     },
 )
 async def patch_media(
-    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user=require_admin_or_editor()
-) -> dict:
+    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user: User = require_admin_or_editor()
+) -> dict[str, Any]:
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
     if not media:
@@ -251,7 +256,7 @@ async def serve_media_file(
         404: {"description": "Media file not found"},
     },
 )
-async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user=require_admin_or_editor()) -> None:
+async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: User = require_admin_or_editor()) -> None:
     result = await db.execute(select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id))
     media = result.scalar_one_or_none()
     if not media:
@@ -290,7 +295,7 @@ async def start_batch_import(
     archive: UploadFile | None = File(None),
     mapping: UploadFile | None = File(None),
     files: list[UploadFile] | None = File(None),
-) -> dict:
+) -> dict[str, Any]:
     if archive is None and not files:
         raise HTTPException(status_code=422, detail="Bitte ZIP-Datei oder Bildordner hochladen")
 
@@ -350,8 +355,8 @@ async def start_batch_import(
     summary="Get the status of a batch media import task",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def batch_import_status(task_id: str) -> dict:
-    result = AsyncResult(task_id, app=celery_app)
+async def batch_import_status(task_id: str) -> dict[str, Any]:
+    result: AsyncResult[Any] = AsyncResult(task_id, app=celery_app)
     state = result.state
     meta = result.info if isinstance(result.info, dict) else None
     if state == "SUCCESS":

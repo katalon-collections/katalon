@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, Request, Security, status
@@ -72,8 +72,8 @@ async def get_current_user(
     except (JWTError, ValueError):
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == token_data.user_id))
-    user = result.scalar_one_or_none()
+    user_result = await db.execute(select(User).where(User.id == token_data.user_id))
+    user = user_result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise credentials_exception
     return user
@@ -115,8 +115,8 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
         token_type: str | None = payload.get("typ")
         if not user_id_str or token_type != "access":
             return None
-        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
-        user = result.scalar_one_or_none()
+        user_result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
+        user = user_result.scalar_one_or_none()
         return user if user and user.is_active else None
     except (JWTError, ValueError):
         return None
@@ -148,7 +148,7 @@ async def has_record_permission(
     return result.scalar_one_or_none() is not None
 
 
-def require_record_permission(record_type: str, action: str):
+def require_record_permission(record_type: str, action: str) -> Any:
     async def _check(db: DBDep, current_user: CurrentUser) -> User:
         if not await has_record_permission(db, current_user, record_type, action):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
@@ -160,7 +160,7 @@ def has_capability(user: User, capability: str) -> bool:
     return capability in ROLE_CAPABILITIES.get(user.role, set())
 
 
-def require_role(*roles: str):
+def require_role(*roles: str) -> Any:
     async def _check(current_user: CurrentUser) -> User:
         # Superuser bypasses role checks.
         if current_user.role == "superuser":
@@ -175,7 +175,7 @@ def require_role(*roles: str):
     return Depends(_check)
 
 
-def require_capability(capability: str):
+def require_capability(capability: str) -> Any:
     async def _check(current_user: CurrentUser) -> User:
         if not has_capability(current_user, capability):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
@@ -183,10 +183,10 @@ def require_capability(capability: str):
     return Depends(_check)
 
 
-def require_admin_or_editor():
+def require_admin_or_editor() -> Any:
     """Allow admin, editor, and cataloger for content operations."""
     return require_capability("manage_content")
 
 
-def require_admin():
+def require_admin() -> Any:
     return require_capability("manage_config")

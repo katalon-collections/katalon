@@ -17,7 +17,7 @@ def _worker_session() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def _process(media_file_id: uuid.UUID) -> dict:
+async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
     from katalon.core.models import MediaFile
     from katalon.integrations.cantaloupe import CantaloupeError, build_manifest, fetch_image_info
 
@@ -56,7 +56,7 @@ async def _set_error(media_file_id: uuid.UUID, detail: str) -> None:
 
 
 @celery_app.task(bind=True, max_retries=3)
-def generate_iiif_tiles(self, media_file_id: str) -> dict:
+def generate_iiif_tiles(self: Any, media_file_id: str) -> dict[str, Any]:
     try:
         return asyncio.run(_process(uuid.UUID(media_file_id)))
     except Exception as exc:
@@ -66,7 +66,7 @@ def generate_iiif_tiles(self, media_file_id: str) -> dict:
         raise self.retry(exc=exc, countdown=2 ** self.request.retries * 10)
 
 
-async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict:
+async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
     from katalon.core.models import AdminConfig, MediaFile, Object, Vocabulary, VocabularyTerm
@@ -145,14 +145,14 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             )
             rel_name = str(file_path.relative_to(images_dir))
             try:
-                object_id = uuid.UUID(object_id_raw)
+                object_uuid = uuid.UUID(object_id_raw)
             except ValueError:
                 failed += 1
                 report["errors"].append({"row": None, "message": f"Ungültige Objekt-ID für Datei {rel_name}"})
                 continue
 
             object_exists = (
-                await session.execute(select(Object.id).where(Object.id == object_id))
+                await session.execute(select(Object.id).where(Object.id == object_uuid))
             ).scalar_one_or_none()
             if object_exists is None:
                 failed += 1
@@ -198,11 +198,11 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 continue
 
             existing = (
-                await session.execute(select(MediaFile.id).where(MediaFile.object_id == object_id))
+                await session.execute(select(MediaFile.id).where(MediaFile.object_id == object_uuid))
             ).scalars().first()
             media = MediaFile(
                 id=file_id,
-                object_id=object_id,
+                object_id=object_uuid,
                 filename=file_path.name,
                 mime_type=mime,
                 file_path=str(dest_path),
@@ -230,7 +230,7 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
 
 
 @celery_app.task(name="katalon.import_media_batch", bind=True)
-def import_media_batch_task(self: Any, job_id: str, job_dir: str) -> dict:
+def import_media_batch_task(self: Any, job_id: str, job_dir: str) -> dict[str, Any]:
     try:
         result = asyncio.run(_import_media_batch(uuid.UUID(job_id), Path(job_dir), self))
         try:

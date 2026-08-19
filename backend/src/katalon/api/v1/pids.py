@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -26,7 +27,7 @@ class DnbUrnRegisterIn(BaseModel):
 class DnbUrnRegisterOut(BaseModel):
     urn: str
     resolver_url: str
-    value: dict
+    value: dict[str, Any]
 
 
 @router.post(

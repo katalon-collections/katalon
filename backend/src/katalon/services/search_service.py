@@ -6,7 +6,7 @@ from uuid import UUID
 from katalon.integrations.elasticsearch import search_documents
 
 
-def _extract_title(md: dict) -> str:
+def _extract_title(md: dict[str, Any]) -> str:
     """Extract a display title from metadata, handling both plain strings and repeatable-field lists.
 
     Checks common title field names in both English and German.
@@ -53,12 +53,12 @@ def _extract_facet_value(val: Any) -> str | list[str] | None:
 _KNOWN_ENTRY_KEYS = {"label", "value", "id", "source", "external_id"}
 
 
-def _is_group_instance(d: dict) -> bool:
+def _is_group_instance(d: dict[str, Any]) -> bool:
     """Return True if a dict looks like a group field instance (not a vocab/authority/pid entry)."""
     return not bool(_KNOWN_ENTRY_KEYS & d.keys())
 
 
-def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
+def _flatten_text(md: dict[str, Any], searchable_fields: set[str] | None = None) -> str:
     """Return a single search_text string with all (or only searchable) metadata values concatenated.
 
     If searchable_fields is provided, only keys in that set are included.
@@ -83,7 +83,7 @@ def _flatten_text(md: dict, searchable_fields: set[str] | None = None) -> str:
     return " ".join(p for p in parts if p)
 
 
-def _clean_metadata(md: dict) -> dict:
+def _clean_metadata(md: dict[str, Any]) -> dict[str, Any]:
     """Remove empty-string keys that break Elasticsearch indexing."""
     return {k: v for k, v in md.items() if k}
 
@@ -126,11 +126,11 @@ def _build_doc(
     searchable_fields: set[str] | None = None,
     facet_fields: set[str] | None = None,
     group_fields: set[str] | None = None,
-    linked_data: dict[str, list[dict]] | None = None,
+    linked_data: dict[str, list[dict[str, Any]]] | None = None,
     inherited_facets: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
-    md: dict = _clean_metadata(getattr(record, "metadata_", None) or {})
+    md: dict[str, Any] = _clean_metadata(getattr(record, "metadata_", None) or {})
 
     title = _extract_title(md)
     if not title:
@@ -191,7 +191,7 @@ async def _load_linked_data(
     record_id: UUID,
     db: Any,
     inherited_config: dict[tuple[str, str | None], list[str]],
-) -> tuple[dict[str, list[dict]], dict[str, list[str]]]:
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[str]]]:
     """Load inherited fields from linked records for ES denormalization.
 
     inherited_config maps target_type -> list of field names to embed.
@@ -204,7 +204,7 @@ async def _load_linked_data(
     _MODEL_MAP: dict[str, Any] = {
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
-    result: dict[str, list[dict]] = {}
+    result: dict[str, list[dict[str, Any]]] = {}
     facets: dict[str, list[str]] = {}
 
     stmt = select(Relation).where(
@@ -331,7 +331,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
                     existing = inherited_config.get(key, [])
                     inherited_config[key] = list(set(existing + ifields))
 
-    linked_data: dict[str, list[dict]] = {}
+    linked_data: dict[str, list[dict[str, Any]]] = {}
     inherited_facets: dict[str, list[str]] = {}
     if inherited_config and db is not None:
         linked_data, inherited_facets = await _load_linked_data(
@@ -392,7 +392,7 @@ async def search(
     ]
 
     aggs = raw.get("aggregations", {})
-    facets: dict[str, list[dict]] = {}
+    facets: dict[str, list[dict[str, Any]]] = {}
     for agg_key, agg_val in aggs.items():
         facets[agg_key] = [
             {"value": b["key"], "count": b["doc_count"]}

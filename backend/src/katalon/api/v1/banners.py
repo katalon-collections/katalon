@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import Select, select
 
 from katalon.core.dependencies import DBDep, require_admin
-from katalon.core.models import Banner
+from katalon.core.models import Banner, User
 
 router = APIRouter(prefix="/banners", tags=["banners"])
 
@@ -64,7 +64,7 @@ class BannerRead(BaseModel):
     updated_at: datetime
 
 
-def _active_filter(q: object, *, surface: str) -> object:
+def _active_filter(q: Select[tuple[Banner]], *, surface: str) -> Select[tuple[Banner]]:
     """Return banners that are active, not expired, and visible on `surface`."""
     now = datetime.now(UTC).replace(tzinfo=None)
     from sqlalchemy import or_
@@ -120,7 +120,7 @@ async def active_portal_banners(db: DBDep) -> list[Banner]:
     summary="List all banners (admin)",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def list_banners(db: DBDep, _=require_admin()) -> list[Banner]:
+async def list_banners(db: DBDep, _: User = require_admin()) -> list[Banner]:
     result = await db.execute(select(Banner).order_by(Banner.created_at.desc()))
     return list(result.scalars().all())
 
@@ -135,7 +135,7 @@ async def list_banners(db: DBDep, _=require_admin()) -> list[Banner]:
         422: {"description": "Invalid color"},
     },
 )
-async def create_banner(body: BannerCreate, db: DBDep, _=require_admin()) -> Banner:
+async def create_banner(body: BannerCreate, db: DBDep, _: User = require_admin()) -> Banner:
     if body.color not in VALID_COLORS:
         raise HTTPException(status_code=422, detail=f"Ungültige Farbe. Erlaubt: {', '.join(VALID_COLORS)}")
     banner = Banner(**body.model_dump())
@@ -155,7 +155,7 @@ async def create_banner(body: BannerCreate, db: DBDep, _=require_admin()) -> Ban
         422: {"description": "Invalid color"},
     },
 )
-async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _=require_admin()) -> Banner:
+async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _: User = require_admin()) -> Banner:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()
     if not banner:
@@ -178,7 +178,7 @@ async def update_banner(banner_id: uuid.UUID, body: BannerUpdate, db: DBDep, _=r
         404: {"description": "Banner not found"},
     },
 )
-async def delete_banner(banner_id: uuid.UUID, db: DBDep, _=require_admin()) -> None:
+async def delete_banner(banner_id: uuid.UUID, db: DBDep, _: User = require_admin()) -> None:
     result = await db.execute(select(Banner).where(Banner.id == banner_id))
     banner = result.scalar_one_or_none()
     if not banner:

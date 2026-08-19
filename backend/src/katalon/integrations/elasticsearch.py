@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 
@@ -89,7 +89,7 @@ async def reindex_type(target_type: str, records: list[tuple[str, dict[str, Any]
     )
     if not records:
         return 0
-    ops: list[dict] = []
+    ops: list[dict[str, Any]] = []
     for doc_id, body in records:
         ops.append({"index": {"_index": INDEX_NAME, "_id": doc_id}})
         ops.append(body)
@@ -158,8 +158,8 @@ async def search_documents(
 ) -> dict[str, Any]:
     es = get_es()
 
-    must: list[dict] = []
-    filters: list[dict] = []
+    must: list[dict[str, Any]] = []
+    filters: list[dict[str, Any]] = []
 
     if query:
         q = query.strip()
@@ -215,4 +215,4 @@ async def search_documents(
         index=INDEX_NAME,
         body={"query": es_query, "aggs": aggs, "from": from_, "size": size},
     )
-    return result.body
+    return cast(dict[str, Any], result.body)

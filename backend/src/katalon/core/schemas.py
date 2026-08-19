@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
@@ -22,14 +22,14 @@ class FieldDefinitionCreate(BaseModel):
     target_type: str
     target_subtype: str | None = None
     name: str
-    label: dict = {}
+    label: dict[str, Any] = {}
     field_type: str
     is_required: bool = False
     is_repeatable: bool = False
     is_translatable: bool = False
     is_searchable: bool = True
     sort_order: int = 0
-    settings: dict = {}
+    settings: dict[str, Any] = {}
     show_in_detail: bool = True
     show_in_list: bool = True
     is_facet: bool = False
@@ -51,7 +51,7 @@ class MetadataMappingCreate(BaseModel):
     field_definition_id: uuid.UUID
     format_key: str
     target_path: str
-    settings: dict = {}
+    settings: dict[str, Any] = {}
     sort_order: int = 0
     is_enabled: bool = True
 
@@ -66,7 +66,7 @@ class MetadataMappingRead(MetadataMappingCreate):
 
 class MetadataMappingUpsert(BaseModel):
     target_path: str | None = None
-    settings: dict = {}
+    settings: dict[str, Any] = {}
     sort_order: int = 0
     is_enabled: bool = True
 
@@ -74,7 +74,7 @@ class MetadataMappingUpsert(BaseModel):
 class RecordSubtypeCreate(BaseModel):
     primary_type: str
     name: str
-    label: dict = {}
+    label: dict[str, Any] = {}
     description: str = ""
     sort_order: int = 0
     is_default: bool = False
@@ -90,7 +90,7 @@ class FormVariantCreate(BaseModel):
     target_type: str
     target_subtype: str | None = None
     name: str
-    label: dict = {}
+    label: dict[str, Any] = {}
     field_names: list[str] = []
     is_default_global: bool = False
     sort_order: int = 0
@@ -128,7 +128,6 @@ class VocabularyRead(VocabularyCreate):
     id: uuid.UUID
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/v1/vocabularies/{self.id}"
         return {
@@ -144,9 +143,9 @@ RECORD_TYPES = ("object", "entity", "place", "occurrence", "procedure")
 class VocabularyTermCreate(BaseModel):
     vocabulary_id: uuid.UUID
     term: str
-    label: dict = {}
-    inverse_label: dict = {}
-    metadata_: dict = {}
+    label: dict[str, Any] = {}
+    inverse_label: dict[str, Any] = {}
+    metadata_: dict[str, Any] = {}
     parent_id: uuid.UUID | None = None
     applies_from: list[str] = []
     applies_to: list[str] = []
@@ -166,7 +165,6 @@ class VocabularyTermRead(VocabularyTermCreate):
     id: uuid.UUID
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/v1/vocabularies/{self.vocabulary_id}/terms/{self.id}"
         links = {
@@ -189,7 +187,7 @@ class RecordBase(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     status: str = "draft"
-    metadata_: dict = {}
+    metadata_: dict[str, Any] = {}
 
 
 class ObjectCreate(RecordBase):
@@ -209,7 +207,6 @@ class RecordRead(RecordBase):
     _record_type: ClassVar[str]
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/v1/{self._api_path}/{self.id}"
         links = {
@@ -270,7 +267,7 @@ class ProcedureCreate(BaseModel):
     end_date: date | None = None
     due_date: date | None = None
     reference_number: str | None = None
-    metadata_: dict = {}
+    metadata_: dict[str, Any] = {}
 
 
 class ProcedureRead(ProcedureCreate):
@@ -294,12 +291,12 @@ class RelationCreate(BaseModel):
     to_type: str
     to_id: uuid.UUID
     relation_type: str
-    metadata_: dict = {}
+    metadata_: dict[str, Any] = {}
 
 
 class RelationUpdate(BaseModel):
     relation_type: str | None = None
-    metadata_: dict | None = None
+    metadata_: dict[str, Any] | None = None
 
 
 class RelationRead(RelationCreate):
@@ -442,7 +439,7 @@ class OAISetCreate(BaseModel):
     filter_record_type: str | None = None
     filter_q: str | None = None
     filter_status: str | None = None
-    filter_metadata: dict = {}
+    filter_metadata: dict[str, Any] = {}
 
 
 class OAISetRead(OAISetCreate):
@@ -461,7 +458,7 @@ class Page(BaseModel):
     total: int
     page: int
     page_size: int
-    items: list
+    items: list[Any]
 
 
 # ---------------------------------------------------------------------------
@@ -478,7 +475,7 @@ class AuditLogRead(BaseModel):
     user_id: uuid.UUID | None
     user_name: str | None = None
     action: str
-    changed_fields: dict
+    changed_fields: dict[str, Any]
     created_at: datetime
 
 
@@ -496,6 +493,6 @@ class SnapshotRead(SnapshotCreate):
     id: uuid.UUID
     record_type: str
     record_id: uuid.UUID
-    snapshot: dict
+    snapshot: dict[str, Any]
     created_by: uuid.UUID | None
     created_at: datetime

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from katalon.workers.celery_app import celery_app
 
 
-def _run(coro: Any) -> Any:
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 

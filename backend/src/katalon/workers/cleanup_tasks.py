@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from typing import Any
 
 from katalon.workers.celery_app import celery_app
 
 
-def _run(coro: Any) -> Any:
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 
-async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:
+async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict[str, Any]:
     """Remove dangling {id: deleted_id} entries from metadata_ JSONB across primary types.
 
     Factored out of the Celery task for testability.
@@ -73,11 +74,11 @@ async def _do_cleanup(session: Any, deleted_type: str, deleted_id: str) -> dict:
 
 
 @celery_app.task(name="katalon.cleanup_relation_refs")
-def cleanup_relation_refs(deleted_type: str, deleted_id: str) -> dict:
+def cleanup_relation_refs(deleted_type: str, deleted_id: str) -> dict[str, Any]:
     """Remove dangling relation-field entries from metadata_ JSONB in primary type tables."""
     from katalon.database import AsyncSessionLocal
 
-    async def _run_cleanup() -> dict:
+    async def _run_cleanup() -> dict[str, Any]:
         from sqlalchemy.orm.exc import StaleDataError
 
         async with AsyncSessionLocal() as session:

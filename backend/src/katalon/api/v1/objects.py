@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -15,7 +16,14 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
-from katalon.core.models import AdminConfig, FieldDefinition, MediaFile, Object, RecordSnapshot
+from katalon.core.models import (
+    AdminConfig,
+    FieldDefinition,
+    MediaFile,
+    Object,
+    RecordSnapshot,
+    User,
+)
 from katalon.core.schemas import (
     AuditLogRead,
     ObjectCreate,
@@ -46,13 +54,13 @@ router = APIRouter(prefix="/objects", tags=["objects"])
 COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
 
 
-async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
     return user if user and await has_record_permission(db, user, "object", "read") else None
 
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="List objects with pagination and filters",
 )
 async def list_objects(
@@ -63,7 +71,7 @@ async def list_objects(
     status: str | None = None,
     object_type: str | None = None,
     q: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
@@ -99,7 +107,7 @@ async def list_objects(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_object(data: ObjectCreate, db: DBDep, current_user=require_record_permission("object", "create")) -> Object:
+async def create_object(data: ObjectCreate, db: DBDep, current_user: User = require_record_permission("object", "create")) -> Object:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("object") if cfg else None
@@ -194,7 +202,7 @@ async def update_object(
     object_id: uuid.UUID,
     data: ObjectCreate,
     db: DBDep,
-    current_user=require_record_permission("object", "update"),
+    current_user: User = require_record_permission("object", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     result = await db.execute(select(Object).where(Object.id == object_id))
@@ -285,8 +293,8 @@ async def update_object(
 async def publish_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("object", "update"),
-) -> dict:
+    current_user: User = require_record_permission("object", "update"),
+) -> dict[str, Any]:
     """Publish an object after validating required fields."""
     ok, errors = await can_publish(db, "object", str(object_id))
     if not ok:
@@ -309,7 +317,7 @@ async def publish_object(
 async def delete_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("object", "delete"),
+    current_user: User = require_record_permission("object", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Object).where(Object.id == object_id))
@@ -355,7 +363,7 @@ async def delete_object(
 async def restore_object(
     object_id: uuid.UUID,
     db: DBDep,
-    current_user=require_role("admin"),
+    current_user: User = require_role("admin"),
 ) -> Object:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
@@ -376,7 +384,7 @@ async def restore_object(
     response_model=list[ObjectRead],
     summary="List soft-deleted objects",
 )
-async def list_deleted_objects(db: DBDep, current_user=require_role("admin")) -> list[Object]:
+async def list_deleted_objects(db: DBDep, current_user: User = require_role("admin")) -> list[Object]:
     result = await db.execute(
         select(Object).where(Object.deleted_at.is_not(None)).order_by(Object.deleted_at.desc())
     )
@@ -394,7 +402,7 @@ async def list_deleted_objects(db: DBDep, current_user=require_role("admin")) ->
     },
 )
 async def create_snapshot(
-    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("object", "update")
+    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: User = require_record_permission("object", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
@@ -426,7 +434,7 @@ async def create_snapshot(
         404: {"description": "Object or IIIF manifest not found"},
     },
 )
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, portal_only: bool = False) -> dict:
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, portal_only: bool = False) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
 
@@ -500,7 +508,7 @@ async def restore_snapshot(
     object_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("object", "update"),
+    current_user: User = require_record_permission("object", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Object:
     snap_result = await db.execute(

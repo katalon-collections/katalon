@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-08-19
+
+### Changed
+- Backend-Typisierung: `mypy --strict` läuft jetzt fehlerfrei über die gesamte Codebasis (`src/katalon`). Dabei behoben: defekter OAI-PMH-GetRecord-Pfad (veralteter Elasticsearch-`ignore`-Parameter, der zur Laufzeit eine Exception warf), FastAPI-Startup-Crash durch `Annotated`-`Depends`-Kombination in Auth-Dependencies sowie diverse fehlende/inkorrekte Typannotationen.
+- Dev-Dependencies: `celery-types`, `types-PyYAML`, `types-aiofiles` für mypy ergänzt; `pydantic.mypy`-Plugin aktiviert.
+
 ## [1.0.7] - 2026-08-19
 
 ### Fixed

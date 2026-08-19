@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -10,7 +12,7 @@ from katalon.integrations.elasticsearch import count_by_type
 
 router = APIRouter(prefix="/admin/index-health", tags=["admin"])
 
-_MODEL_MAP: dict = {
+_MODEL_MAP: dict[str, Any] = {
     "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
 }
 

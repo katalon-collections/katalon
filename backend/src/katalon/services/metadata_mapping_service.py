@@ -67,7 +67,7 @@ async def get_mapping_index(db: AsyncSession, format_key: str) -> MappingIndex:
             FieldDefinition.sort_order,
         )
     )
-    index: MappingIndex = defaultdict(lambda: defaultdict(list))
+    index: MappingIndex = defaultdict(lambda: defaultdict(list[Any]))
     for mapping, field in result.all():
         index[field.target_type][field.name].append(mapping.target_path)
     return {record_type: dict(fields) for record_type, fields in index.items()}

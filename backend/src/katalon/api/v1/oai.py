@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
-from elasticsearch import ConnectionError, ConnectionTimeout, TransportError
+from elasticsearch import ConnectionError, ConnectionTimeout, NotFoundError, TransportError
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -33,11 +33,14 @@ async def _es_search_for_oai(
     from katalon.integrations.elasticsearch import INDEX_NAME, get_es
 
     es = get_es()
-    filters: list[dict] = []
+    filters: list[dict[str, Any]] = []
 
     if identifier:
         # GetRecord: fetch by exact ES _id, then enforce public status
-        result = await es.get(index=INDEX_NAME, id=identifier, ignore=[404])
+        try:
+            result = await es.get(index=INDEX_NAME, id=identifier)
+        except NotFoundError:
+            return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
         if result.get("found") and result.get("_source", {}).get("status") == "public":
             return {"hits": {"hits": [result], "total": {"value": 1}}, "aggregations": {}}
         return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
@@ -62,7 +65,7 @@ async def _es_search_for_oai(
         filters.append({"range": {"updated_at": date_range}})
 
     if set_def and set_def.filter_q:
-        must: list[dict] = [{"multi_match": {
+        must: list[dict[str, Any]] = [{"multi_match": {
             "query": set_def.filter_q,
             "fields": ["title^3", "search_text^2"],
             "type": "best_fields",
@@ -79,7 +82,7 @@ async def _es_search_for_oai(
         "size": PAGE_SIZE,
     }
     result = await es.search(index=INDEX_NAME, body=body)
-    return result.body
+    return cast(dict[str, Any], result.body)
 
 
 @router.get(

@@ -1,12 +1,14 @@
 import logging
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -364,7 +366,7 @@ async def _check_cantaloupe_health() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _check_production_secrets()
     await _ensure_admin()
     await _ensure_media_types_vocab()
@@ -398,8 +400,13 @@ app = FastAPI(
     openapi_tags=OPENAPI_TAGS,
 )
 
+def _rate_limit_handler(request: Request, exc: Exception) -> Response:
+    """Adapt slowapi's handler (typed for RateLimitExceeded) to Starlette's Exception signature."""
+    return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+
+
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,

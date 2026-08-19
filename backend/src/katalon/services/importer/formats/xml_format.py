@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from typing import Any
 
 from lxml import etree
 
@@ -11,7 +12,7 @@ from .base import Selector, SourceFormat, SourceRecord
 _CLARK_TAG_RE = re.compile(r"\{[^}]+\}[^{/]+|[^{/]+")
 
 
-def _clark_to_label(tag: str, nsmap: dict) -> str:
+def _clark_to_label(tag: str, nsmap: dict[str, Any]) -> str:
     """Convert Clark-notation {ns}local to prefix:local using doc nsmap."""
     if not tag.startswith("{"):
         return tag
@@ -35,7 +36,7 @@ def _rel_tag_path(child: etree._Element, elem: etree._Element) -> str:
     return "/".join(parts)
 
 
-def _tag_path_to_label(path: str, nsmap: dict) -> str:
+def _tag_path_to_label(path: str, nsmap: dict[str, Any]) -> str:
     """Convert a /‑joined Clark-notation path to a human-readable label.
 
     Splits by Clark tags rather than raw '/' so namespace URIs are not broken.
@@ -73,7 +74,7 @@ class XmlFormat(SourceFormat):
     # XML-specific: not part of SourceFormat ABC
     # ------------------------------------------------------------------
 
-    def list_element_levels(self, content: bytes, max_depth: int = 5) -> list[dict]:
+    def list_element_levels(self, content: bytes, max_depth: int = 5) -> list[dict[str, Any]]:
         """Return distinct element tags at each depth level.
 
         Used by the frontend to let the user choose which element = one record.
@@ -108,7 +109,7 @@ class XmlFormat(SourceFormat):
     # SourceFormat ABC
     # ------------------------------------------------------------------
 
-    def parse(self, content: bytes, record_xpath: str = "*") -> Iterator[SourceRecord]:  # type: ignore[override]
+    def parse(self, content: bytes, record_xpath: str = "*") -> Iterator[SourceRecord]:
         """Parse XML and yield one SourceRecord per matched element.
 
         record_xpath: Clark-notation tag like "{http://...}mods", or "*" for
@@ -131,7 +132,7 @@ class XmlFormat(SourceFormat):
                         record[path] = elem.text.strip()
             yield record
 
-    def list_selectors(self, content: bytes, record_xpath: str = "*", sample_size: int = 50) -> list[Selector]:  # type: ignore[override]
+    def list_selectors(self, content: bytes, record_xpath: str = "*", sample_size: int = 50) -> list[Selector]:
         """List all distinct tag paths across the first sample_size records."""
         root = self._parse_root(content)
         nsmap = root.nsmap

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import re
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_admin
-from katalon.core.models import StaticPage
+from katalon.core.models import StaticPage, User
 
 _SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
@@ -17,8 +18,8 @@ router = APIRouter(prefix="/pages", tags=["pages"])
 
 class PageCreate(BaseModel):
     slug: str
-    title: dict = {}
-    content: dict = {}
+    title: dict[str, Any] = {}
+    content: dict[str, Any] = {}
     is_published: bool = False
     sort_order: int = 0
 
@@ -31,8 +32,8 @@ class PageCreate(BaseModel):
 
 
 class PageUpdate(BaseModel):
-    title: dict | None = None
-    content: dict | None = None
+    title: dict[str, Any] | None = None
+    content: dict[str, Any] | None = None
     is_published: bool | None = None
     sort_order: int | None = None
 
@@ -42,8 +43,8 @@ class PageRead(BaseModel):
 
     id: uuid.UUID
     slug: str
-    title: dict
-    content: dict
+    title: dict[str, Any]
+    content: dict[str, Any]
     is_published: bool
     sort_order: int
 
@@ -62,7 +63,7 @@ async def list_pages(db: DBDep) -> list[StaticPage]:
     summary="List all static pages including unpublished",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def list_all_pages(db: DBDep, _=require_admin()) -> list[StaticPage]:
+async def list_all_pages(db: DBDep, _: User = require_admin()) -> list[StaticPage]:
     result = await db.execute(select(StaticPage).order_by(StaticPage.sort_order))
     return list(result.scalars().all())
 
@@ -93,7 +94,7 @@ async def get_page(slug: str, db: DBDep) -> StaticPage:
         409: {"description": "Slug already in use"},
     },
 )
-async def create_page(data: PageCreate, db: DBDep, _=require_admin()) -> StaticPage:
+async def create_page(data: PageCreate, db: DBDep, _: User = require_admin()) -> StaticPage:
     existing = await db.execute(select(StaticPage).where(StaticPage.slug == data.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail=f"Slug '{data.slug}' bereits vergeben")
@@ -113,7 +114,7 @@ async def create_page(data: PageCreate, db: DBDep, _=require_admin()) -> StaticP
         409: {"description": "Slug already in use"},
     },
 )
-async def update_page(slug: str, data: PageUpdate, db: DBDep, _=require_admin()) -> StaticPage:
+async def update_page(slug: str, data: PageUpdate, db: DBDep, _: User = require_admin()) -> StaticPage:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:
@@ -139,7 +140,7 @@ async def update_page(slug: str, data: PageUpdate, db: DBDep, _=require_admin())
         404: {"description": "Page not found"},
     },
 )
-async def delete_page(slug: str, db: DBDep, _=require_admin()) -> None:
+async def delete_page(slug: str, db: DBDep, _: User = require_admin()) -> None:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -10,7 +11,7 @@ class AuthorityHit:
     external_id: str
     label: str
     description: str = ""
-    extra: dict = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 class AuthoritySource(ABC):

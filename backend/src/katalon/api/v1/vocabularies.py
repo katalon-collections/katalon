@@ -1,5 +1,5 @@
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
 class VocabularyTermNode(BaseModel):
     id: uuid.UUID
     term: str
-    label: dict
+    label: dict[str, Any]
     parent_id: uuid.UUID | None
     children: list["VocabularyTermNode"] = []
 
@@ -314,7 +314,7 @@ async def import_terms(
     strategy: Literal["append", "replace"] = Query("append"),
     dry_run: bool = Query(True),
     mapping: str | None = Form(None),
-) -> dict:
+) -> dict[str, Any]:
     """Import vocabulary terms from CSV or JSON with optional dry-run."""
     vocab_result = await db.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
     vocab = vocab_result.scalar_one_or_none()

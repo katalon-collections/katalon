@@ -1,17 +1,19 @@
 import json
 import uuid
 from collections import defaultdict
+from typing import Any, cast
 
 import yaml
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import CursorResult, func, or_, select, update
 from sqlalchemy import inspect as sa_inspect
 
-from katalon.core.dependencies import DBDep, require_role
+from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services import authority_service
+from katalon.services.schema_ai_service import schema_chat
 from katalon.services.subtype_service import ensure_subtype_exists
 
 SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure", "vocabulary_term"}
@@ -156,7 +158,7 @@ async def _embed_children(
 ) -> list[FieldDefinitionRead]:
     """Load sub-fields for all group fields and embed them as children."""
     group_ids = [f.id for f in top_fields if f.field_type == "group"]
-    children_map: dict[uuid.UUID, list[FieldDefinition]] = defaultdict(list)
+    children_map: dict[uuid.UUID, list[FieldDefinition]] = defaultdict(list[Any])
     if group_ids:
         sub_result = await db.execute(
             select(FieldDefinition).where(
@@ -166,7 +168,8 @@ async def _embed_children(
             ).order_by(FieldDefinition.sort_order)
         )
         for sf in sub_result.scalars().all():
-            children_map[sf.parent_id].append(sf)
+            if sf.parent_id is not None:
+                children_map[sf.parent_id].append(sf)
 
     out: list[FieldDefinitionRead] = []
     for f in top_fields:
@@ -254,7 +257,7 @@ async def reset_schema(
         .where(*conditions)
         .values(is_deleted=True)
     )
-    deleted_fields = result.rowcount or 0
+    deleted_fields = cast("CursorResult[Any]", result).rowcount or 0
     await db.flush()
     _enqueue_reindex(target_type)
     return SchemaResetResult(deletable_fields=deleted_fields, deleted_fields=deleted_fields)
@@ -454,7 +457,7 @@ async def import_schema(
 
     target_type: str = data["target_type"]
     _validate_schema_target_type(target_type)
-    raw_fields: list = data.get("fields", [])
+    raw_fields: list[Any] = data.get("fields", [])
 
     if not isinstance(raw_fields, list):
         raise HTTPException(status_code=422, detail="'fields' muss eine Liste sein")

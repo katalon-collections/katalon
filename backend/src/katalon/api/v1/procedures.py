@@ -1,13 +1,14 @@
 import logging
 import uuid
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
 
 from katalon.core.concurrency import check_version, flush_record
 from katalon.core.dependencies import DBDep, require_record_permission
-from katalon.core.models import AdminConfig, Object, Procedure
+from katalon.core.models import AdminConfig, Object, Procedure, User
 from katalon.core.schemas import (
     AuditLogRead,
     ProcedureComplete,
@@ -102,12 +103,12 @@ async def _idno(data: ProcedureCreate, db: DBDep) -> str | None:
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="List procedures with pagination and filters",
 )
 async def list_procedures(
     db: DBDep,
-    _=require_record_permission("procedure", "read"),
+    _: User = require_record_permission("procedure", "read"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     procedure_type: str | None = None,
@@ -115,7 +116,7 @@ async def list_procedures(
     due_before: date | None = None,
     reference_number: str | None = None,
     q: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     query = select(Procedure)
     if procedure_type:
         query = query.where(Procedure.procedure_type == procedure_type)
@@ -157,7 +158,7 @@ async def list_procedures(
 async def create_procedure(
     data: ProcedureCreate,
     db: DBDep,
-    current_user=require_record_permission("procedure", "create"),
+    current_user: User = require_record_permission("procedure", "create"),
 ) -> Procedure:
     procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
@@ -213,7 +214,7 @@ async def complete_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureComplete,
     db: DBDep,
-    current_user=require_record_permission("procedure", "update"),
+    current_user: User = require_record_permission("procedure", "update"),
 ) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
@@ -288,7 +289,7 @@ async def complete_procedure(
 async def archive_procedure(
     procedure_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("procedure", "update"),
+    current_user: User = require_record_permission("procedure", "update"),
 ) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
@@ -321,7 +322,7 @@ async def archive_procedure(
         404: {"description": "Procedure not found"},
     },
 )
-async def get_procedure(procedure_id: uuid.UUID, db: DBDep, _=require_record_permission("procedure", "read")) -> Procedure:
+async def get_procedure(procedure_id: uuid.UUID, db: DBDep, _: User = require_record_permission("procedure", "read")) -> Procedure:
     proc = (
         await db.execute(select(Procedure).where(Procedure.id == procedure_id))
     ).scalar_one_or_none()
@@ -351,7 +352,7 @@ async def update_procedure(
     procedure_id: uuid.UUID,
     data: ProcedureCreate,
     db: DBDep,
-    current_user=require_record_permission("procedure", "update"),
+    current_user: User = require_record_permission("procedure", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Procedure:
     proc = (
@@ -433,7 +434,7 @@ async def update_procedure(
 async def delete_procedure(
     procedure_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("procedure", "delete"),
+    current_user: User = require_record_permission("procedure", "delete"),
     force: bool = Query(False),
 ) -> None:
     proc = (

@@ -13,16 +13,17 @@ import, record import), the broker is functionally required — those use
 """
 
 import logging
+from typing import Any, cast
 
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
 
-def enqueue(task, *args, **kwargs) -> str | None:
+def enqueue(task: Any, *args: Any, **kwargs: Any) -> str | None:
     """Enqueue a task, swallowing broker errors. Returns the task id or None."""
     try:
-        return task.delay(*args, **kwargs).id
+        return cast(str, task.delay(*args, **kwargs).id)
     except Exception:
         logger.warning(
             "Celery enqueue failed for %s (broker down?) — continuing",
@@ -32,10 +33,10 @@ def enqueue(task, *args, **kwargs) -> str | None:
         return None
 
 
-def enqueue_or_503(task, *args, **kwargs) -> str:
+def enqueue_or_503(task: Any, *args: Any, **kwargs: Any) -> str:
     """Enqueue a task whose id the caller needs; raise 503 if the broker is down."""
     try:
-        return task.delay(*args, **kwargs).id
+        return cast(str, task.delay(*args, **kwargs).id)
     except Exception as exc:
         logger.warning("Celery enqueue failed for %s", getattr(task, "name", task), exc_info=True)
         raise HTTPException(

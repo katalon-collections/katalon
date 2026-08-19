@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Coroutine
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
 
-def _run(coro: Any) -> Any:
+def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     """Run a coroutine in a fresh event loop."""
     return asyncio.run(coro)
 
 
-def _make_session():
+def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
     """Create a fresh async session with NullPool to avoid event-loop binding issues."""
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
@@ -60,7 +63,7 @@ def _log_index_failure(record_type: str, record_id: str, error: str) -> None:
     bind=True,
     max_retries=3,
 )
-def index_record_task(self, record_type: str, record_id: str, doc: dict) -> None:
+def index_record_task(self: Any, record_type: str, record_id: str, doc: dict[str, Any]) -> None:
     from katalon.integrations.elasticsearch import index_document
 
     try:
@@ -82,7 +85,7 @@ def index_record_task(self, record_type: str, record_id: str, doc: dict) -> None
 
 
 @celery_app.task(name="katalon.remove_record", bind=True, max_retries=3)
-def remove_record_task(self, record_id: str) -> None:
+def remove_record_task(self: Any, record_id: str) -> None:
     from katalon.integrations.elasticsearch import delete_document
 
     try:
@@ -101,7 +104,7 @@ def remove_record_task(self, record_id: str) -> None:
 
 
 @celery_app.task(name="katalon.cascade_reindex")
-def cascade_reindex_task(record_type: str, record_id: str) -> dict:
+def cascade_reindex_task(record_type: str, record_id: str) -> dict[str, Any]:
     """Reindex all records linking TO the given record (1-level cascade).
 
     Triggered after index_record_task succeeds. Propagates inherited field
@@ -113,13 +116,13 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict:
     from katalon.integrations.elasticsearch import index_document
     from katalon.services.search_service import build_index_doc
 
-    _MODEL_MAP: dict = {
+    _MODEL_MAP: dict[str, Any] = {
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
 
-    async def _do() -> dict:
+    async def _do() -> dict[str, Any]:
         async with AsyncSessionLocal() as session:
             stmt = select(Relation).where(
                 and_(Relation.to_type == record_type, Relation.to_id == record_id)
@@ -145,7 +148,7 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict:
 
 
 @celery_app.task(name="katalon.bulk_reindex_type")
-def bulk_reindex_type_task(target_type: str) -> dict:
+def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
     """Reindex all records of a single type (e.g. after schema changes)."""
     from sqlalchemy import select
 
@@ -153,7 +156,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
     from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import build_index_doc
 
-    _MODEL_MAP: dict = {
+    _MODEL_MAP: dict[str, Any] = {
         "object": Object,
         "entity": Entity,
         "place": Place,
@@ -163,7 +166,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
 
     AsyncSessionLocal, engine = _make_session()
 
-    async def _do() -> dict:
+    async def _do() -> dict[str, Any]:
         model = _MODEL_MAP.get(target_type)
         if model is None:
             return {"status": "error", "detail": f"Unknown type: {target_type}"}
@@ -186,7 +189,7 @@ def bulk_reindex_type_task(target_type: str) -> dict:
 
 
 @celery_app.task(name="katalon.reconciliation_job")
-def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
+def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict[str, Any]:
     """Layer 3 safety net (#214): compare DB vs. ES counts and self-heal.
 
     mode="count": fast DB-vs-ES count comparison; if the delta exceeds the
@@ -201,13 +204,13 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
     from katalon.core.models import AdminConfig, Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import count_by_type, list_ids_by_type
 
-    _MODEL_MAP: dict = {
+    _MODEL_MAP: dict[str, Any] = {
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
 
-    async def _do() -> dict:
+    async def _do() -> dict[str, Any]:
         async with AsyncSessionLocal() as session:
             cfg_stmt = select(AdminConfig).where(AdminConfig.key == "default")
             config = (await session.execute(cfg_stmt)).scalar_one_or_none()
@@ -216,14 +219,14 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict:
             threshold = config.reconciliation_threshold if config else 5
             id_diff_enabled = config.reconciliation_id_diff_enabled if config else True
 
-            report: dict[str, dict] = {}
+            report: dict[str, dict[str, Any]] = {}
             for record_type, model in _MODEL_MAP.items():
                 not_deleted = model.deleted_at.is_(None) if hasattr(model, "deleted_at") else true()
                 count_stmt = select(func.count()).select_from(model).where(not_deleted)
                 db_count = (await session.execute(count_stmt)).scalar_one()
                 es_count = await count_by_type(record_type)
                 delta = db_count - es_count
-                entry = {"db": db_count, "es": es_count, "delta": delta, "reindexed": 0}
+                entry: dict[str, Any] = {"db": db_count, "es": es_count, "delta": delta, "reindexed": 0}
 
                 run_id_diff = id_diff_enabled and (mode == "id_diff" or abs(delta) > threshold)
                 if run_id_diff:
@@ -260,7 +263,7 @@ def index_record_dispatch_task(record_type: str, record_id: str) -> None:
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.services.search_service import build_index_doc
 
-    _MODEL_MAP: dict = {
+    _MODEL_MAP: dict[str, Any] = {
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
     }
     model = _MODEL_MAP.get(record_type)
@@ -269,7 +272,7 @@ def index_record_dispatch_task(record_type: str, record_id: str) -> None:
 
     AsyncSessionLocal, engine = _make_session()
 
-    async def _do() -> dict | None:
+    async def _do() -> dict[str, Any] | None:
         async with AsyncSessionLocal() as session:
             rec = await session.get(model, _uuid_mod.UUID(record_id))
             if not rec:
@@ -299,13 +302,14 @@ def reindex_all_task() -> None:
     async def _reindex() -> None:
         await ensure_index()
         async with AsyncSessionLocal() as session:
-            for model, rtype in [
+            models: list[tuple[Any, str]] = [
                 (Object, "object"),
                 (Entity, "entity"),
                 (Place, "place"),
                 (Occurrence, "occurrence"),
                 (Procedure, "procedure"),
-            ]:
+            ]
+            for model, rtype in models:
                 query = select(model)
                 if hasattr(model, "deleted_at"):
                     query = query.where(model.deleted_at.is_(None))

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from katalon.core.dependencies import DBDep, require_admin_or_editor, require_role
-from katalon.core.models import FieldDefinition, RecordSubtype
+from katalon.core.models import FieldDefinition, RecordSubtype, User
 from katalon.core.schemas import FieldDefinitionRead
 from katalon.services import importer_service
 from katalon.services.importer import parse_file
@@ -42,7 +42,7 @@ class TransformConfig(BaseModel):
     # trim
     trim: bool = True
     # vocab_map
-    vocab_map: dict[str, str] = Field(default_factory=dict)
+    vocab_map: dict[str, str] = Field(default_factory=dict[str, Any])
     strict: bool = False
     # expression
     expression: str | None = None
@@ -50,7 +50,7 @@ class TransformConfig(BaseModel):
 
 class MappingEntry(BaseModel):
     target: str
-    transforms: list[TransformConfig] = Field(default_factory=list)
+    transforms: list[TransformConfig] = Field(default_factory=list[Any])
 
 
 class MappingRequest(BaseModel):
@@ -61,7 +61,7 @@ class MappingRequest(BaseModel):
     subtype: str | None = None
     # Fields the user will create on-the-fly. In dry-run these are merged as
     # transient (unpersisted) field defs so clustering/type-validation see them.
-    fields_to_create: list[dict[str, Any]] = Field(default_factory=list)
+    fields_to_create: list[dict[str, Any]] = Field(default_factory=list[Any])
 
 
 class ImportRequest(MappingRequest):
@@ -80,27 +80,27 @@ class XmlSelectorsRequest(BaseModel):
     record_xpath: str  # Clark-notation tag e.g. "{http://...}mods" or "*"
 
 
-def _get_redis():
+def _get_redis() -> Any:
     import redis as redis_lib
 
     from katalon.config import settings
-    return redis_lib.from_url(settings.redis_url, decode_responses=False)
+    return redis_lib.from_url(settings.redis_url, decode_responses=False)  # type: ignore[no-untyped-call]  # redis stubs untyped
 
 
-def _store_rows(r, rows: list[dict]) -> str:
+def _store_rows(r: Any, rows: list[dict[str, Any]]) -> str:
     import json
     upload_id = str(uuid.uuid4())
     r.setex(f"file_upload:{upload_id}", _UPLOAD_TTL, json.dumps(rows))
     return upload_id
 
 
-def _load_rows(upload_id: str) -> list[dict]:
+def _load_rows(upload_id: str) -> list[dict[str, Any]]:
     import json
     r = _get_redis()
     data = r.get(f"file_upload:{upload_id}")
     if data is None:
         raise HTTPException(status_code=404, detail="Upload nicht gefunden oder abgelaufen (max 1 Stunde)")
-    return json.loads(data)
+    return cast(list[dict[str, Any]], json.loads(data))
 
 
 @router.post(
@@ -112,7 +112,7 @@ def _load_rows(upload_id: str) -> list[dict]:
         422: {"description": "Unsupported file format or unparseable XML"},
     },
 )
-async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
+async def upload_file(file: UploadFile, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
         raise HTTPException(status_code=413, detail="Datei zu groß (max 100 MB)")
@@ -162,7 +162,7 @@ async def upload_file(file: UploadFile, _=require_admin_or_editor()) -> dict:
         422: {"description": "XML could not be processed"},
     },
 )
-async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) -> dict:
+async def xml_selectors(body: XmlSelectorsRequest, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     """Resolve selectors and rows for XML after the user has chosen the record element."""
     r = _get_redis()
     content = r.get(f"xml_upload:{body.upload_id}")
@@ -200,7 +200,7 @@ async def xml_selectors(body: XmlSelectorsRequest, _=require_admin_or_editor()) 
         404: {"description": "Upload not found or expired"},
     },
 )
-async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) -> dict:
+async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
 
@@ -291,10 +291,10 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
         )
         existing_set = {row[0] for row in existing_terms_result.all()}
         new_count = len([v for v in unique_values if v not in existing_set])
-        label = (fd.label or {}).get("de") or field_name
+        label_text = (fd.label or {}).get("de") or field_name
         vocab_warnings.append({
             "field": field_name,
-            "label": label,
+            "label": label_text,
             "unique_count": len(unique_values),
             "new_count": new_count,
             "high_cardinality": new_count > 100,
@@ -307,8 +307,8 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
     vocab_clusters = []
     for field_name, clusters in vocab_clusters_raw.items():
         fd = field_defs.get(field_name)
-        label = ((fd.label or {}).get("de") or field_name) if fd else field_name
-        vocab_clusters.append({"field": field_name, "label": label, "clusters": clusters})
+        label_text = ((fd.label or {}).get("de") or field_name) if fd else field_name
+        vocab_clusters.append({"field": field_name, "label": label_text, "clusters": clusters})
     dry_result["vocab_clusters"] = vocab_clusters
 
     return dry_result
@@ -324,7 +324,7 @@ async def dry_run(body: MappingRequest, db: DBDep, _=require_admin_or_editor()) 
         503: {"description": "Background task queue unavailable (broker down)"},
     },
 )
-async def run_import(body: ImportRequest, current_user=require_admin_or_editor()) -> dict:
+async def run_import(body: ImportRequest, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
     rows = _load_rows(body.upload_id)
@@ -358,7 +358,7 @@ async def run_import(body: ImportRequest, current_user=require_admin_or_editor()
         422: {"description": "Invalid record type"},
     },
 )
-async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
+async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict[str, Any]:
     """Create new field definitions on-the-fly for unmapped CSV columns.
 
     If a field was soft-deleted, it will be undeleted and updated.
@@ -438,7 +438,7 @@ async def create_fields(body: CreateFieldsRequest, db: DBDep) -> dict:
     summary="Request cancellation of a running import task",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def cancel_task(task_id: str, _=require_admin_or_editor()) -> dict:
+async def cancel_task(task_id: str, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     r = _get_redis()
     r.setex(f"cancel:{task_id}", 3600, "1")
     return {"cancelled": True}
@@ -449,11 +449,11 @@ async def cancel_task(task_id: str, _=require_admin_or_editor()) -> dict:
     summary="Get the status of an import task",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def task_status(task_id: str, _=require_admin_or_editor()) -> dict:
+async def task_status(task_id: str, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     from celery.result import AsyncResult
 
     from katalon.workers.celery_app import celery_app
-    result = AsyncResult(task_id, app=celery_app)
+    result: AsyncResult[Any] = AsyncResult(task_id, app=celery_app)
     state = result.state
     if state == "SUCCESS":
         return {"state": state, "result": result.result}

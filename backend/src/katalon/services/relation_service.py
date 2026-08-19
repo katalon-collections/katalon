@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy import delete as sa_delete
@@ -115,7 +116,7 @@ async def sync_schema_relations(
     db: AsyncSession,
     record_type: str,
     record_id: uuid.UUID,
-    metadata_: dict,
+    metadata_: dict[str, Any],
 ) -> None:
     """Mirror schema relation fields into the relations table.
 
@@ -178,7 +179,7 @@ async def sync_schema_relations(
         if not raw:
             continue
 
-        entries: list[dict]
+        entries: list[dict[str, Any]]
         if field.is_repeatable and isinstance(raw, list):
             entries = [e for e in raw if isinstance(e, dict) and e.get("id")]
         elif isinstance(raw, dict) and raw.get("id"):
@@ -203,7 +204,7 @@ async def sync_schema_relations(
         for instance in metadata_.get(group.name, []):
             if not isinstance(instance, dict):
                 continue
-            entry = instance.get(field.name)
+            entry = cast(dict[str, Any], instance.get(field.name))
             if not isinstance(entry, dict) or not entry.get("id"):
                 continue
             db.add(

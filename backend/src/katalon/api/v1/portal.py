@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -10,7 +11,7 @@ from sqlalchemy import select
 
 from katalon.config import settings
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import PortalConfig
+from katalon.core.models import PortalConfig, User
 
 _LOGO_MIME: dict[str, str] = {
     ".jpg": "image/jpeg",
@@ -47,7 +48,7 @@ class PortalConfigRead(BaseModel):
     accent_color: str
     logo_url: str
     placeholder_image_url: str
-    color_tokens: dict
+    color_tokens: dict[str, Any]
     supported_languages: list[str] = ["de", "en"]
 
     class Config:
@@ -63,7 +64,7 @@ class PortalConfigUpdate(BaseModel):
     accent_color: str | None = None
     logo_url: str | None = None
     placeholder_image_url: str | None = None
-    color_tokens: dict | None = None
+    color_tokens: dict[str, Any] | None = None
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:
@@ -119,7 +120,7 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
     responses={403: {"description": "Insufficient permissions"}},
 )
 async def update_portal_config(
-    data: PortalConfigUpdate, db: DBDep, _=require_role("admin")
+    data: PortalConfigUpdate, db: DBDep, _: User = require_role("admin")
 ) -> PortalConfig:
     config = await _get_or_create(db)
     for field, value in data.model_dump(exclude_none=True).items():
@@ -138,7 +139,7 @@ async def update_portal_config(
         403: {"description": "Insufficient permissions"},
     },
 )
-async def upload_logo(file: UploadFile, db: DBDep, _=require_role("admin")) -> PortalConfig:
+async def upload_logo(file: UploadFile, db: DBDep, _: User = require_role("admin")) -> PortalConfig:
     if file.content_type not in _LOGO_ALLOWED:
         raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
 

@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.0.7"
+version = "1.0.8"
 description = "Katalon – Metadata Management System for GLAM collections"
 requires-python = ">=3.12"
 dependencies = [
@@ -71,3 +71,11 @@ testpaths = ["tests"]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[dependency-groups]
+dev = [
+    "celery-types>=0.26.0",
+    "types-aiofiles>=25.1.0.20260518",
+    "types-pyyaml>=6.0.12.20260815",
+]

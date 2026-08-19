@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
@@ -29,7 +30,7 @@ class RegisterUrnIn(BaseModel):
     "/namespaces/name/{name}/urn-suggestion",
     summary="Suggest a mock URN for a namespace",
 )
-async def urn_suggestion(name: str) -> dict:
+async def urn_suggestion(name: str) -> dict[str, Any]:
     suffix = random.randint(1_000_000_000, 9_999_999_999)
     return {
         "suggestedUrn": f"{name}-{suffix}",
@@ -44,7 +45,7 @@ async def urn_suggestion(name: str) -> dict:
     summary="Register a mock URN with its target URLs",
     responses={400: {"description": "At least one URL is required"}},
 )
-async def register_urn(data: RegisterUrnIn) -> dict:
+async def register_urn(data: RegisterUrnIn) -> dict[str, Any]:
     if not data.urls:
         raise HTTPException(status_code=400, detail="Mindestens eine URL ist erforderlich.")
     now = _now_iso()
@@ -64,7 +65,7 @@ async def register_urn(data: RegisterUrnIn) -> dict:
     summary="List registered URLs for a mock URN",
     responses={404: {"description": "URN not found"}},
 )
-async def get_my_urls(urn: str) -> dict:
+async def get_my_urls(urn: str) -> dict[str, Any]:
     items = _registered.get(urn)
     if not items:
         raise HTTPException(status_code=404, detail="URN nicht gefunden.")

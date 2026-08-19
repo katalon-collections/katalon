@@ -94,7 +94,7 @@ def _hit_to_oai_record(
     src = hit["_source"]
     record_id = hit["_id"]
     record_type = src.get("record_type", "")
-    md: dict = src.get("metadata", {})
+    md: dict[str, Any] = src.get("metadata", {})
     record_mappings = (mapping_index or {}).get(record_type, {})
 
     oai_rec = ET.Element("record")
@@ -230,7 +230,7 @@ def list_sets(sets: list[Any], base_url: str) -> str:
 
 
 def list_records(
-    hits: list[dict],
+    hits: list[dict[str, Any]],
     total: int,
     offset: int,
     set_spec: str | None,
@@ -248,7 +248,7 @@ def list_records(
         req_attrs["from"] = from_
     if until:
         req_attrs["until"] = until
-    req = ET.SubElement(root, "request", **req_attrs)
+    req = ET.SubElement(root, "request", req_attrs)
     req.text = base_url
 
     if not hits:
@@ -270,7 +270,7 @@ def list_records(
 
 
 def list_identifiers(
-    hits: list[dict],
+    hits: list[dict[str, Any]],
     total: int,
     offset: int,
     set_spec: str | None,
@@ -287,7 +287,7 @@ def list_identifiers(
         req_attrs["from"] = from_
     if until:
         req_attrs["until"] = until
-    req = ET.SubElement(root, "request", **req_attrs)
+    req = ET.SubElement(root, "request", req_attrs)
     req.text = base_url
 
     if not hits:

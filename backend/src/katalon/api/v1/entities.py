@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
@@ -14,7 +15,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
-from katalon.core.models import AdminConfig, Entity, RecordSnapshot
+from katalon.core.models import AdminConfig, Entity, RecordSnapshot, User
 from katalon.core.schemas import (
     AuditLogRead,
     EntityCreate,
@@ -44,13 +45,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
-async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
     return user if user and await has_record_permission(db, user, "entity", "read") else None
 
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="List entities with pagination, filters and search",
 )
 async def list_entities(
@@ -61,7 +62,7 @@ async def list_entities(
     entity_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     query = select(Entity)
     if entity_type:
         query = query.where(Entity.entity_type == entity_type)
@@ -88,7 +89,7 @@ async def list_entities(
         403: {"description": "Insufficient permissions"},
     },
 )
-async def create_entity(data: EntityCreate, db: DBDep, current_user=require_record_permission("entity", "create")) -> Entity:
+async def create_entity(data: EntityCreate, db: DBDep, current_user: User = require_record_permission("entity", "create")) -> Entity:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("entity") if cfg else None
@@ -173,7 +174,7 @@ async def update_entity(
     entity_id: uuid.UUID,
     data: EntityCreate,
     db: DBDep,
-    current_user=require_record_permission("entity", "update"),
+    current_user: User = require_record_permission("entity", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -241,8 +242,8 @@ async def update_entity(
 async def publish_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("entity", "update"),
-) -> dict:
+    current_user: User = require_record_permission("entity", "update"),
+) -> dict[str, Any]:
     """Publish an entity after validating required fields."""
     ok, errors = await can_publish(db, "entity", str(entity_id))
     if not ok:
@@ -265,7 +266,7 @@ async def publish_entity(
 async def delete_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("entity", "delete"),
+    current_user: User = require_record_permission("entity", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
@@ -311,7 +312,7 @@ async def delete_entity(
 async def restore_entity(
     entity_id: uuid.UUID,
     db: DBDep,
-    current_user=require_role("admin"),
+    current_user: User = require_role("admin"),
 ) -> Entity:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -332,7 +333,7 @@ async def restore_entity(
     response_model=list[EntityRead],
     summary="List soft-deleted entities",
 )
-async def list_deleted_entities(db: DBDep, current_user=require_role("admin")) -> list[Entity]:
+async def list_deleted_entities(db: DBDep, current_user: User = require_role("admin")) -> list[Entity]:
     result = await db.execute(
         select(Entity).where(Entity.deleted_at.is_not(None)).order_by(Entity.deleted_at.desc())
     )
@@ -350,7 +351,7 @@ async def list_deleted_entities(db: DBDep, current_user=require_role("admin")) -
     },
 )
 async def create_snapshot(
-    entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("entity", "update")
+    entity_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: User = require_record_permission("entity", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -402,7 +403,7 @@ async def restore_snapshot(
     entity_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("entity", "update"),
+    current_user: User = require_record_permission("entity", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Entity:
     snap_result = await db.execute(

@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
@@ -14,7 +15,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
-from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot
+from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot, User
 from katalon.core.schemas import (
     AuditLogRead,
     OccurrenceCreate,
@@ -44,13 +45,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/occurrences", tags=["occurrences"])
 
 
-async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
     return user if user and await has_record_permission(db, user, "occurrence", "read") else None
 
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="List occurrences with pagination and filters",
 )
 async def list_occurrences(
@@ -61,7 +62,7 @@ async def list_occurrences(
     occurrence_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     query = select(Occurrence)
     if occurrence_type:
         query = query.where(Occurrence.occurrence_type == occurrence_type)
@@ -88,7 +89,7 @@ async def list_occurrences(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user=require_record_permission("occurrence", "create")) -> Occurrence:
+async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: User = require_record_permission("occurrence", "create")) -> Occurrence:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("occurrence") if cfg else None
@@ -173,7 +174,7 @@ async def update_occurrence(
     occ_id: uuid.UUID,
     data: OccurrenceCreate,
     db: DBDep,
-    current_user=require_record_permission("occurrence", "update"),
+    current_user: User = require_record_permission("occurrence", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -240,8 +241,8 @@ async def update_occurrence(
 async def publish_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("occurrence", "update"),
-) -> dict:
+    current_user: User = require_record_permission("occurrence", "update"),
+) -> dict[str, Any]:
     """Publish an occurrence after validating required fields."""
     ok, errors = await can_publish(db, "occurrence", str(occ_id))
     if not ok:
@@ -264,7 +265,7 @@ async def publish_occurrence(
 async def delete_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("occurrence", "delete"),
+    current_user: User = require_record_permission("occurrence", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
@@ -310,7 +311,7 @@ async def delete_occurrence(
 async def restore_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
-    current_user=require_role("admin"),
+    current_user: User = require_role("admin"),
 ) -> Occurrence:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
@@ -331,7 +332,7 @@ async def restore_occurrence(
     response_model=list[OccurrenceRead],
     summary="List soft-deleted occurrences",
 )
-async def list_deleted_occurrences(db: DBDep, current_user=require_role("admin")) -> list[Occurrence]:
+async def list_deleted_occurrences(db: DBDep, current_user: User = require_role("admin")) -> list[Occurrence]:
     result = await db.execute(
         select(Occurrence).where(Occurrence.deleted_at.is_not(None)).order_by(Occurrence.deleted_at.desc())
     )
@@ -349,7 +350,7 @@ async def list_deleted_occurrences(db: DBDep, current_user=require_role("admin")
     },
 )
 async def create_snapshot(
-    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("occurrence", "update")
+    occ_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: User = require_record_permission("occurrence", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
@@ -401,7 +402,7 @@ async def restore_snapshot(
     occ_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("occurrence", "update"),
+    current_user: User = require_record_permission("occurrence", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Occurrence:
     snap_result = await db.execute(

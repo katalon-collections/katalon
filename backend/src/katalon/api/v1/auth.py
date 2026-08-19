@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, cast
 
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -30,10 +30,13 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def _create_token(user_id: uuid.UUID, role: str, email: str, token_type: str, expires_delta: timedelta) -> str:
     expire = datetime.now(UTC) + expires_delta
-    return jwt.encode(
-        {"sub": str(user_id), "role": role, "email": email, "typ": token_type, "exp": expire},
-        settings.secret_key,
-        algorithm=settings.algorithm,
+    return cast(
+        str,
+        jwt.encode(
+            {"sub": str(user_id), "role": role, "email": email, "typ": token_type, "exp": expire},
+            settings.secret_key,
+            algorithm=settings.algorithm,
+        ),
     )
 
 

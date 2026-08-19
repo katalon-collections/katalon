@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from katalon.services.audit_service import log_change
 from katalon.services.schema_service import validate_metadata
 from katalon.services.search_service import index_record
 
-MODEL_MAP: dict[str, type] = {
+MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
@@ -36,7 +36,7 @@ async def can_publish(
         return False, [f"Unbekannter Typ: {record_type}"]
 
     result = await db.execute(select(model).where(model.id == record_id))
-    rec = result.scalar_one_or_none()
+    rec = cast(Object | Entity | Place | Occurrence | None, result.scalar_one_or_none())
     if rec is None:
         return False, ["Datensatz nicht gefunden"]
 
@@ -78,7 +78,7 @@ async def publish_record(
 
     model = MODEL_MAP[record_type]
     result = await db.execute(select(model).where(model.id == record_id))
-    rec = result.scalar_one_or_none()
+    rec = cast(Object | Entity | Place | Occurrence | None, result.scalar_one_or_none())
     if rec is None:
         return {"ok": False, "errors": ["Datensatz nicht gefunden"]}
 

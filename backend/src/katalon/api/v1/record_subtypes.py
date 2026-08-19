@@ -104,6 +104,7 @@ async def update_record_subtype(
 ) -> RecordSubtype:
     validate_primary_type(data.primary_type)
     name = normalize_subtype_name(data.name, allow_null=False)
+    assert name is not None  # allow_null=False raises HTTPException instead of returning None
 
     result = await db.execute(select(RecordSubtype).where(RecordSubtype.id == subtype_id))
     subtype = result.scalar_one_or_none()

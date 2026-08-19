@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -25,7 +25,7 @@ class HitOut(BaseModel):
     external_id: str
     label: str
     description: str
-    extra: dict
+    extra: dict[str, Any]
 
 
 @router.get(

@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +13,7 @@ _MAX_DIFF_VALUE_LEN = 200
 TITLE_FIELD_NAMES = ["label", "title", "titel", "name", "display_name", "place_name", "bezeichnung"]
 
 
-def extract_title(md: dict | None) -> str | None:
+def extract_title(md: dict[str, Any] | None) -> str | None:
     if not md:
         return None
     for key in TITLE_FIELD_NAMES:
@@ -36,14 +37,14 @@ def format_label(title: str | None, idno: str | None, fallback: str) -> str:
     return f"{title} ({idno})" if idno else title
 
 
-def delete_label_fields(idno: str | None, metadata: dict | None) -> dict:
+def delete_label_fields(idno: str | None, metadata: dict[str, Any] | None) -> dict[str, Any]:
     """Snapshot idno/title into the delete audit entry's changed_fields.
 
     The record row is gone by the time the audit log is displayed, so the
     label shown there must survive the deletion instead of being resolved
     from a live lookup.
     """
-    fields: dict = {}
+    fields: dict[str, Any] = {}
     if idno:
         fields["idno"] = idno
     title = extract_title(metadata)
@@ -70,7 +71,7 @@ def _display_value(value: object) -> object:
     return text
 
 
-def diff_fields(old: dict, new: dict) -> dict | None:
+def diff_fields(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any] | None:
     """Reduce old/new field dicts to only the fields that actually changed.
 
     ``metadata`` is expanded so each changed metadata field shows up as its
@@ -78,8 +79,8 @@ def diff_fields(old: dict, new: dict) -> dict | None:
     collapsing the whole metadata blob into one opaque "changed" marker.
     Returns None if nothing changed.
     """
-    changed_old: dict = {}
-    changed_new: dict = {}
+    changed_old: dict[str, Any] = {}
+    changed_new: dict[str, Any] = {}
     for key, new_value in new.items():
         old_value = old.get(key)
         if old_value == new_value:
@@ -108,7 +109,7 @@ async def log_change(
     record_id: uuid.UUID,
     user_id: uuid.UUID | None,
     action: str,
-    changed_fields: dict | None = None,
+    changed_fields: dict[str, Any] | None = None,
 ) -> None:
     entry = AuditLog(
         record_type=record_type,

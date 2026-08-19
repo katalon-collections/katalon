@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import func, select
@@ -14,7 +15,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
-from katalon.core.models import AdminConfig, Place, RecordSnapshot
+from katalon.core.models import AdminConfig, Place, RecordSnapshot, User
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
 from katalon.services import search_service
@@ -38,13 +39,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/places", tags=["places"])
 
 
-async def _visibility_user(db: DBDep, user: OptionalCurrentUser):
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
     return user if user and await has_record_permission(db, user, "place", "read") else None
 
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=dict[str, Any],
     summary="List places with pagination and filters",
 )
 async def list_places(
@@ -55,7 +56,7 @@ async def list_places(
     place_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     query = select(Place)
     if place_type:
         query = query.where(Place.place_type == place_type)
@@ -81,7 +82,7 @@ async def list_places(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_place(data: PlaceCreate, db: DBDep, current_user=require_record_permission("place", "create")) -> Place:
+async def create_place(data: PlaceCreate, db: DBDep, current_user: User = require_record_permission("place", "create")) -> Place:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("place") if cfg else None
@@ -128,7 +129,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user=require_record
     )
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
-        place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
+        place.geom = cast(str | None, WKTElement(f"POINT({data.lon} {data.lat})", srid=4326))
     db.add(place)
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
@@ -174,7 +175,7 @@ async def update_place(
     place_id: uuid.UUID,
     data: PlaceCreate,
     db: DBDep,
-    current_user=require_record_permission("place", "update"),
+    current_user: User = require_record_permission("place", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -219,7 +220,7 @@ async def update_place(
     place.metadata_ = metadata
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
-        place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
+        place.geom = cast(str | None, WKTElement(f"POINT({data.lon} {data.lat})", srid=4326))
 
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
@@ -244,8 +245,8 @@ async def update_place(
 async def publish_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("place", "update"),
-) -> dict:
+    current_user: User = require_record_permission("place", "update"),
+) -> dict[str, Any]:
     """Publish a place after validating required fields."""
     ok, errors = await can_publish(db, "place", str(place_id))
     if not ok:
@@ -268,7 +269,7 @@ async def publish_place(
 async def delete_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("place", "delete"),
+    current_user: User = require_record_permission("place", "delete"),
     force: bool = Query(False),
 ) -> None:
     result = await db.execute(select(Place).where(Place.id == place_id))
@@ -314,7 +315,7 @@ async def delete_place(
 async def restore_place(
     place_id: uuid.UUID,
     db: DBDep,
-    current_user=require_role("admin"),
+    current_user: User = require_role("admin"),
 ) -> Place:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
@@ -335,7 +336,7 @@ async def restore_place(
     response_model=list[PlaceRead],
     summary="List soft-deleted places",
 )
-async def list_deleted_places(db: DBDep, current_user=require_role("admin")) -> list[Place]:
+async def list_deleted_places(db: DBDep, current_user: User = require_role("admin")) -> list[Place]:
     result = await db.execute(
         select(Place).where(Place.deleted_at.is_not(None)).order_by(Place.deleted_at.desc())
     )
@@ -353,7 +354,7 @@ async def list_deleted_places(db: DBDep, current_user=require_role("admin")) -> 
     },
 )
 async def create_snapshot(
-    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user=require_record_permission("place", "update")
+    place_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: User = require_record_permission("place", "update")
 ) -> RecordSnapshot:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
@@ -405,7 +406,7 @@ async def restore_snapshot(
     place_id: uuid.UUID,
     snapshot_id: uuid.UUID,
     db: DBDep,
-    current_user=require_record_permission("place", "update"),
+    current_user: User = require_record_permission("place", "update"),
     if_match: int | None = Header(None, alias="If-Match"),
 ) -> Place:
     snap_result = await db.execute(

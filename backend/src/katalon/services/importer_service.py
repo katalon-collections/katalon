@@ -15,8 +15,8 @@ _JINJA_ENV = SandboxedEnvironment()
 
 
 def _is_iso_date(val: str) -> bool:
-    """Check if value looks like an ISO date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)."""
-    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?", val.strip()))
+    """Check if value looks like an ISO date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS); BCE years with leading '-' (e.g. -0043-01-01)."""
+    return bool(re.fullmatch(r"-?\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?", val.strip()))
 
 
 def _is_number(val: str) -> bool:
@@ -208,7 +208,7 @@ def _validate_types(
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
     field_defs: dict[str, Any],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Check field type constraints for all rows. Returns warning dicts (one per failing field).
 
     Collects up to 3 example failures per field for the warning message, but counts
@@ -242,7 +242,7 @@ def _validate_types(
                     issue = f"'{raw[:30]}' ist keine gültige Zahl"
             elif fd.field_type == "date":
                 if not _is_iso_date(raw):
-                    issue = f"'{raw[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD)"
+                    issue = f"'{raw[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD, für v. Chr. mit - z.B. -0043-01-01)"
             elif fd.field_type == "boolean":
                 if not _is_boolean(raw):
                     issue = f"'{raw[:30]}' ist kein gültiger Boolean"
@@ -254,7 +254,7 @@ def _validate_types(
                 if len(examples[fname]) < 3:
                     examples[fname].append((row_num, issue))
 
-    warnings: list[dict] = []
+    warnings: list[dict[str, Any]] = []
     for fname, ex in examples.items():
         fd = field_defs.get(fname)
         label = fd.label.get("de", fname) if fd and fd.label else fname
@@ -359,8 +359,8 @@ def dry_run(
     )
     missing_required = required_fields - mapped_fields
 
-    errors: list[dict] = []
-    warnings: list[dict] = []
+    errors: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
 
     if missing_required:
         warnings.append({

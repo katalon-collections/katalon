@@ -6,7 +6,7 @@ import json
 import math
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from fastapi import HTTPException
@@ -31,7 +31,7 @@ from katalon.services.secret_service import AI_API_KEY_SECRET, get_secret
 
 TEXTISH_FIELD_TYPES = {"text", "richtext", "vocab_free", "date", "number", "boolean"}
 AI_IMAGE_MAX_DIMENSION = 1024
-MODEL_MAP: dict[str, type] = {
+MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
@@ -143,8 +143,11 @@ async def _load_field(db: AsyncSession, field_definition_id: uuid.UUID) -> Field
 async def _load_primary_media(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> MediaFile | None:
     if record_type != "object":
         return None
-    return await db.scalar(
-        select(MediaFile).where(MediaFile.object_id == record_id, MediaFile.status == "ready").order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
+    return cast(
+        MediaFile | None,
+        await db.scalar(
+            select(MediaFile).where(MediaFile.object_id == record_id, MediaFile.status == "ready").order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
+        ),
     )
 
 

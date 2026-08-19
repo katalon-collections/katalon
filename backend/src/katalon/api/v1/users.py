@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, select
@@ -204,7 +205,7 @@ async def update_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
-    changed_fields: dict = {}
+    changed_fields: dict[str, Any] = {}
     if data.role is not None:
         if data.role not in _VALID_ROLES:
             raise HTTPException(status_code=422, detail=f"Ungültige Rolle. Erlaubt: {_VALID_ROLES}")

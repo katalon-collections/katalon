@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ async def register_dnb_urn_for_record(
         raise ValueError("Ungültiger record_type.")
 
     record_result = await db.execute(select(model).where(model.id == record_id))
-    record: RecordModel | None = record_result.scalar_one_or_none()
+    record = cast(RecordModel | None, record_result.scalar_one_or_none())
     if record is None:
         raise LookupError("Datensatz nicht gefunden.")
 

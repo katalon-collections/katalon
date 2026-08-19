@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from katalon.workers.celery_app import celery_app
 
 
 @celery_app.task(name="katalon.import_records", bind=True)
 def import_records_task(
-    self,
+    self: Any,
     record_type: str,
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
@@ -18,7 +18,7 @@ def import_records_task(
     auto_publish: bool = False,
     user_id: str | None = None,
     subtype: str | None = None,
-    fields_to_create: list[dict] | None = None,
+    fields_to_create: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
 
@@ -61,7 +61,7 @@ def import_records_task(
     _engine = create_async_engine(settings.database_url, poolclass=NullPool)
     AsyncSessionLocal = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
-    model_map = {
+    model_map: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
         "object": Object,
         "entity": Entity,
         "place": Place,
@@ -91,7 +91,7 @@ def import_records_task(
     import redis as redis_lib
 
     from katalon.config import settings as _settings
-    _redis = redis_lib.from_url(_settings.redis_url, decode_responses=True)
+    _redis = redis_lib.from_url(_settings.redis_url, decode_responses=True)  # type: ignore[no-untyped-call]  # redis stubs untyped
 
     def _is_cancelled() -> bool:
         return bool(_redis.get(f"cancel:{self.request.id}"))
@@ -102,8 +102,8 @@ def import_records_task(
     published = 0
     publish_failed = 0
     index_failed = 0
-    errors: list[dict] = []
-    warnings: list[dict] = []
+    errors: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
     publish_fail_reasons: list[str] = []  # first few unique reasons
 
     async def _resolve_vocab_terms(
@@ -131,9 +131,9 @@ def import_records_task(
             return records
 
         # Per-vocabulary term cache: vocab_id -> {lower_term -> {id, label}}
-        term_cache: dict[uuid.UUID, dict[str, dict]] = {}
+        term_cache: dict[uuid.UUID, dict[str, dict[str, Any]]] = {}
 
-        async def get_term(vocab_id: uuid.UUID, term_str: str) -> dict | None:
+        async def get_term(vocab_id: uuid.UUID, term_str: str) -> dict[str, Any] | None:
             if vocab_id not in term_cache:
                 res = await session.execute(
                     select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id)
@@ -251,7 +251,7 @@ def import_records_task(
                 idnos_to_lookup = [row_idno for row_idno in idnos if row_idno]
                 if idnos_to_lookup:
                     result = await session.execute(select(model).where(model.idno.in_(idnos_to_lookup)))
-                    for rec in result.scalars().all():
+                    for rec in cast(list[Object | Entity | Place | Occurrence], result.scalars().all()):
                         if rec.idno:
                             existing_by_idno[rec.idno] = rec
 

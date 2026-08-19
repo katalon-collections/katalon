@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import httpx
 
 from katalon.config import settings
@@ -61,9 +63,9 @@ class WikidataAdapter(AuthoritySource):
             data = r.json()
         entity = data.get("entities", {}).get(external_id, {})
         labels = entity.get("labels", {})
-        label = (labels.get("de") or labels.get("en") or next(iter(labels.values()), {})).get("value", "")
+        label = (labels.get("de") or labels.get("en") or next(iter(labels.values()), cast(dict[str, Any], {}))).get("value", "")
         descriptions = entity.get("descriptions", {})
-        desc = (descriptions.get("de") or descriptions.get("en") or next(iter(descriptions.values()), {})).get("value", "")
+        desc = (descriptions.get("de") or descriptions.get("en") or next(iter(descriptions.values()), cast(dict[str, Any], {}))).get("value", "")
         return AuthorityHit(
             source=self.source_id,
             external_id=external_id,

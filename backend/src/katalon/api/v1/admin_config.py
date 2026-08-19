@@ -1,20 +1,22 @@
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import DBDep, require_role
-from katalon.core.models import AdminConfig, AIUsageEvent, AppSecret
-from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, set_secret
+from katalon.core.models import AdminConfig, AIUsageEvent, AppSecret, User
+from katalon.services.ai_service import call_ai_provider, extract_message_content
+from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, get_secret, set_secret
 
 router = APIRouter(prefix="/admin/config", tags=["admin"])
 CHANGELOG_PATHS = (Path("/app/CHANGELOG.md"), Path(__file__).resolve().parents[5] / "CHANGELOG.md")
 
 
-def _rights_holder_or_none(value: dict | None) -> dict | None:
+def _rights_holder_or_none(value: dict[str, Any] | None) -> dict[str, Any] | None:
     if not value:
         return None
     name = str(value.get("name", "")).strip()
@@ -53,7 +55,7 @@ class AdminConfigRead(BaseModel):
     ai_daily_user_token_limit: int
     ai_monthly_global_token_limit: int
     media_default_license_uri: str | None
-    media_default_rights_holder: dict | None
+    media_default_rights_holder: dict[str, Any] | None
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
 
@@ -76,7 +78,7 @@ class AdminConfigUpdate(BaseModel):
     ai_daily_user_token_limit: int | None = Field(default=None, ge=1)
     ai_monthly_global_token_limit: int | None = Field(default=None, ge=1)
     media_default_license_uri: str | None = None
-    media_default_rights_holder: dict | None = None
+    media_default_rights_holder: dict[str, Any] | None = None
 
     @field_validator("supported_languages")
     @classmethod
@@ -156,7 +158,7 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
     summary="Get the admin configuration",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def get_admin_config(db: DBDep, current_user = require_role("admin")) -> AdminConfigRead:
+async def get_admin_config(db: DBDep, current_user: User = require_role("admin")) -> AdminConfigRead:
     return await _to_read(db, await _get_or_create(db), current_user.id)
 
 
@@ -166,7 +168,7 @@ async def get_admin_config(db: DBDep, current_user = require_role("admin")) -> A
     summary="Get the application changelog",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def get_changelog(_=require_role("admin")) -> ChangelogRead:
+async def get_changelog(_: User = require_role("admin")) -> ChangelogRead:
     for path in CHANGELOG_PATHS:
         try:
             return ChangelogRead(content=path.read_text(encoding="utf-8"))
@@ -182,7 +184,7 @@ async def get_changelog(_=require_role("admin")) -> ChangelogRead:
     responses={403: {"description": "Insufficient permissions"}},
 )
 async def update_admin_config(
-    data: AdminConfigUpdate, db: DBDep, current_user = require_role("admin")
+    data: AdminConfigUpdate, db: DBDep, current_user: User = require_role("admin")
 ) -> AdminConfigRead:
     config = await _get_or_create(db)
     if data.idno_schemas is not None:
@@ -233,7 +235,7 @@ class AdminSecretWrite(BaseModel):
     },
 )
 async def update_ai_secret(
-    data: AdminSecretWrite, db: DBDep, _=require_role("admin")
+    data: AdminSecretWrite, db: DBDep, _: User = require_role("admin")
 ) -> SecretStatus:
     if len(data.api_key.strip()) < 8:
         raise HTTPException(status_code=422, detail="API-Key ist zu kurz.")
@@ -247,6 +249,6 @@ async def update_ai_secret(
     summary="Remove the AI provider API key",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def remove_ai_secret(db: DBDep, _=require_role("admin")) -> SecretStatus:
+async def remove_ai_secret(db: DBDep, _: User = require_role("admin")) -> SecretStatus:
     await delete_secret(db, AI_API_KEY_SECRET)
     return SecretStatus(has_key=False, updated_at=None)

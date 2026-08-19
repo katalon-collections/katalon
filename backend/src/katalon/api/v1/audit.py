@@ -11,7 +11,7 @@ from katalon.services.audit_service import extract_title, format_label
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
-async def _resolve_record_labels(db, refs: list[tuple[str, uuid.UUID]]) -> dict[uuid.UUID, str]:
+async def _resolve_record_labels(db: DBDep, refs: list[tuple[str, uuid.UUID]]) -> dict[uuid.UUID, str]:
     """Fetch display labels ("title (idno)") for (record_type, record_id) pairs."""
     by_type: dict[str, list[uuid.UUID]] = {}
     for record_type, record_id in refs:

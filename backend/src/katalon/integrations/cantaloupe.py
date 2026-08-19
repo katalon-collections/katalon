@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import httpx
 
@@ -37,7 +38,7 @@ async def fetch_image_info(filename: str) -> tuple[int | None, int | None]:
         return None, None
 
 
-def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest: dict | None) -> dict:
+def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest: dict[str, Any] | None) -> dict[str, Any]:
     """Build a single IIIF Canvas for one media file."""
     img_base = f"{_public_base()}/iiif/3/{filename}"
     canvas_id = f"{manifest_base}/canvas/{index}"
@@ -48,7 +49,7 @@ def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest
         width = c.get("width")
         height = c.get("height")
 
-    canvas: dict = {
+    canvas: dict[str, Any] = {
         "id": canvas_id,
         "type": "Canvas",
         "items": [
@@ -88,18 +89,18 @@ def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest
 
 def build_object_manifest(
     manifest_id: str,
-    media_items: list[tuple[str, dict | None]],
-    obj: object | None = None,
-    field_defs: list | None = None,
+    media_items: list[tuple[str, dict[str, Any] | None]],
+    obj: Any | None = None,
+    field_defs: list[Any] | None = None,
     homepage_url: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build a multi-canvas IIIF Presentation 3.0 manifest for an object."""
     canvases = [
         _build_canvas(manifest_id, i, filename, stored)
         for i, (filename, stored) in enumerate(media_items, 1)
     ]
 
-    manifest: dict = {
+    manifest: dict[str, Any] = {
         "@context": "http://iiif.io/api/presentation/3/context.json",
         "id": manifest_id,
         "type": "Manifest",
@@ -107,7 +108,7 @@ def build_object_manifest(
     }
 
     if obj is not None:
-        meta = obj.metadata_ if isinstance(obj.metadata_, dict) else {}  # type: ignore[union-attr]
+        meta = obj.metadata_ if isinstance(obj.metadata_, dict) else {}
 
         # label — required by IIIF spec
         raw_title = meta.get("title") or meta.get("name") or getattr(obj, "idno", None) or str(getattr(obj, "id", ""))
@@ -157,11 +158,11 @@ def build_manifest(
     filename: str,
     width: int | None = None,
     height: int | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build a single-canvas IIIF manifest for one media file (stored per-file in DB)."""
     base = f"{_public_base()}/iiif/3"
     identifier = filename
-    canvas: dict = {
+    canvas: dict[str, Any] = {
         "id": f"{base}/{identifier}/canvas/1",
         "type": "Canvas",
         "items": [

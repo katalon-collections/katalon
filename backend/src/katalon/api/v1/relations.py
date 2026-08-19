@@ -1,10 +1,11 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from katalon.core.dependencies import DBDep, require_admin_or_editor
-from katalon.core.models import FieldDefinition, Procedure, Relation
+from katalon.core.models import FieldDefinition, Procedure, Relation, User
 from katalon.core.schemas import RelationCreate, RelationRead, RelationUpdate
 from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.relation_service import (
@@ -18,7 +19,7 @@ _LOGGABLE_RECORD_TYPES = {"object", "entity", "place", "occurrence", "procedure"
 
 
 async def _log_relation_change(
-    db: DBDep, rel: Relation, user_id: uuid.UUID, *, action: str, changed_fields: dict,
+    db: DBDep, rel: Relation, user_id: uuid.UUID, *, action: str, changed_fields: dict[str, Any],
 ) -> None:
     """Log a relation change against both endpoints it connects, when they're auditable record types."""
     for record_type, record_id, other_type, other_id in (
@@ -75,7 +76,7 @@ async def list_relations(
 async def create_relation(
     data: RelationCreate,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user: User = require_admin_or_editor(),
 ) -> Relation:
     bound_field = await db.scalar(
         select(FieldDefinition.id).where(
@@ -139,7 +140,7 @@ async def create_relation(
     },
 )
 async def update_relation(
-    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user=require_admin_or_editor()
+    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user: User = require_admin_or_editor()
 ) -> Relation:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()
@@ -174,7 +175,7 @@ async def update_relation(
 async def delete_relation(
     relation_id: uuid.UUID,
     db: DBDep,
-    current_user=require_admin_or_editor(),
+    current_user: User = require_admin_or_editor(),
 ) -> None:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()

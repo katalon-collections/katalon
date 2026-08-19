@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, computed_field
 from sqlalchemy import and_, exists, or_, select
 
@@ -23,11 +24,14 @@ from katalon.api.v1.search import SearchResponse
 from katalon.core.dependencies import DBDep
 from katalon.core.limiter import limiter
 from katalon.core.models import (
+    Banner,
     Entity,
+    FieldDefinition,
     Object,
     Occurrence,
     Place,
     Relation,
+    StaticPage,
     Vocabulary,
     VocabularyTerm,
 )
@@ -36,7 +40,12 @@ from katalon.services import search_service
 
 router = APIRouter(tags=["portal"])
 _PUBLIC_TYPES = ("object", "entity", "place", "occurrence")
-_MODELS = {"object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence}
+_MODELS: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
+    "object": Object,
+    "entity": Entity,
+    "place": Place,
+    "occurrence": Occurrence,
+}
 
 
 class PortalRecordRead(BaseModel):
@@ -47,7 +56,7 @@ class PortalRecordRead(BaseModel):
     id: uuid.UUID
     idno: str | None
     status: str
-    metadata_: dict
+    metadata_: dict[str, Any]
     created_at: datetime
     updated_at: datetime
 
@@ -55,7 +64,6 @@ class PortalRecordRead(BaseModel):
     _record_type: ClassVar[str]
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/portal/v1/{self._api_path}/{self.id}"
         links = {
@@ -117,11 +125,10 @@ class PortalMediaRead(BaseModel):
     is_primary: bool
     media_type: str | None
     license_uri: str | None
-    rights_holder: dict | None
+    rights_holder: dict[str, Any] | None
     created_at: datetime
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         links = {
             "object": {"href": f"/portal/v1/objects/{self.object_id}"},
@@ -143,9 +150,9 @@ class PortalRelationRead(BaseModel):
 
 class PortalFieldDefinitionRead(BaseModel):
     name: str
-    label: dict
+    label: dict[str, Any]
     field_type: str
-    settings: dict
+    settings: dict[str, Any]
     show_in_detail: bool
 
 
@@ -160,7 +167,6 @@ class PortalVocabularyRead(BaseModel):
     kind: str
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/portal/v1/vocabularies/{self.id}"
         return {
@@ -177,15 +183,14 @@ class PortalVocabularyTermRead(BaseModel):
     id: uuid.UUID
     vocabulary_id: uuid.UUID
     term: str
-    label: dict
-    inverse_label: dict
-    metadata_: dict
+    label: dict[str, Any]
+    inverse_label: dict[str, Any]
+    metadata_: dict[str, Any]
     parent_id: uuid.UUID | None
     applies_from: list[str]
     applies_to: list[str]
 
     @computed_field(alias="_links")
-    @property
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/portal/v1/vocabularies/{self.vocabulary_id}/terms/{self.id}"
         links = {
@@ -206,7 +211,7 @@ async def list_objects(
     page_size: int = Query(50, ge=1, le=200),
     object_type: str | None = None,
     q: str | None = None,
-) -> PortalObjectPage:
+) -> dict[str, Any]:
     return await objects.list_objects(db, None, page, page_size, None, object_type, q)
 
 
@@ -231,22 +236,22 @@ async def get_occurrence(occurrence_id: uuid.UUID, db: DBDep) -> Occurrence:
 
 
 @router.get("/objects/{object_id}/media", response_model=list[PortalMediaRead])
-async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict]:
+async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict[str, Any]]:
     items = await media.list_media(object_id, db, None)
     return [{**item, "object_id": object_id} for item in items]
 
 
 @router.get("/objects/{object_id}/media/{media_id}/file")
-async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep):
+async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> FileResponse:
     return await media.serve_media_file(object_id, media_id, db, None)
 
 
 @router.get("/objects/{object_id}/iiif/manifest")
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict:
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict[str, Any]:
     return await objects.iiif_manifest(object_id, db, request, portal_only=True)
 
 
-def _public_endpoint_clause(type_column, id_column):
+def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
     clauses = []
     for record_type, model in _MODELS.items():
         conditions = [
@@ -329,10 +334,9 @@ async def search(
 
 
 @router.get("/schema/{target_type}", response_model=list[PortalFieldDefinitionRead])
-async def list_fields(target_type: str, db: DBDep):
+async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
     if target_type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=404, detail="Schema nicht gefunden")
-    from katalon.core.models import FieldDefinition
 
     result = await db.execute(
         select(FieldDefinition).where(
@@ -394,25 +398,25 @@ async def get_portal_config(db: DBDep) -> portal.PortalConfigRead:
 
 
 @router.get("/portal/logo/file")
-async def serve_logo():
+async def serve_logo() -> FileResponse:
     return await portal.serve_logo()
 
 
 @router.get("/pages", response_model=list[pages.PageRead])
-async def list_pages(db: DBDep):
+async def list_pages(db: DBDep) -> list[StaticPage]:
     return await pages.list_pages(db)
 
 
 @router.get("/pages/{slug}", response_model=pages.PageRead)
-async def get_page(slug: str, db: DBDep):
+async def get_page(slug: str, db: DBDep) -> StaticPage:
     return await pages.get_page(slug, db)
 
 
 @router.get("/banners/active/portal", response_model=list[banners.BannerRead])
-async def active_portal_banners(db: DBDep):
+async def active_portal_banners(db: DBDep) -> list[Banner]:
     return await banners.active_portal_banners(db)
 
 
 @router.get("/theme")
-async def get_theme():
+async def get_theme() -> JSONResponse:
     return await theme.get_theme()

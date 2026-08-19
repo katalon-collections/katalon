@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from copy import deepcopy
-from datetime import date
+from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,7 @@ async def get_sub_field_definitions(
     return list(result.scalars().all())
 
 
-def _validate_pid_value(value: object, settings: dict, field_name: str) -> str | None:
+def _validate_pid_value(value: object, settings: dict[str, Any], field_name: str) -> str | None:
     """Validate a single PID dict {"value": "...", "label": "..."}. Returns error or None."""
     if not isinstance(value, dict):
         return f"Feld '{field_name}': PID muss ein Objekt {{value, label}} sein."
@@ -90,14 +90,14 @@ def _validate_relation_structure(value: object, field_name: str) -> str | None:
     return None
 
 
-def _validate_fixed_relation_type(value: dict, field_name: str, settings: dict) -> str | None:
+def _validate_fixed_relation_type(value: dict[str, Any], field_name: str, settings: dict[str, Any]) -> str | None:
     fixed = settings.get("fixed_relation_type")
     if fixed and value.get("relation_type") != fixed:
         return f"Feld '{field_name}': Relationstyp muss '{fixed}' sein."
     return None
 
 
-def _validate_authority_value(value: object, settings: dict, field_name: str) -> str | None:
+def _validate_authority_value(value: object, settings: dict[str, Any], field_name: str) -> str | None:
     """Validate one authority entry against the field's configured source."""
     if not isinstance(value, dict) or not all(
         isinstance(value.get(key), str) and value[key].strip()
@@ -112,7 +112,7 @@ def _validate_authority_value(value: object, settings: dict, field_name: str) ->
 
 
 async def _validate_relation_target(
-    value: dict, field_name: str, settings: dict, db: AsyncSession
+    value: dict[str, Any], field_name: str, settings: dict[str, Any], db: AsyncSession
 ) -> str | None:
     """Check that the referenced UUID exists in the configured target table. Returns error or None."""
     target_type = settings.get("target_type")
@@ -120,7 +120,7 @@ async def _validate_relation_target(
         return None
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
 
-    model_map = {
+    model_map: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]] = {
         "object": Object,
         "entity": Entity,
         "place": Place,
@@ -141,7 +141,7 @@ async def _validate_relation_target(
 
 
 async def validate_metadata(
-    db: AsyncSession, record_type: str, metadata: dict, target_subtype: str | None = None,
+    db: AsyncSession, record_type: str, metadata: dict[str, Any], target_subtype: str | None = None,
     *, skip_required: bool = False,
 ) -> list[str]:
     """Return list of validation error messages (empty = valid)."""
@@ -190,7 +190,7 @@ async def validate_metadata(
                                 pass
                     if sv is not None and sv != "" and sf.field_type == "date" and not _is_valid_date(sv):
                         errors.append(
-                            f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."
+                            f"{indexed_prefix}: Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder -JJJJ (v. Chr.)."
                         )
                     if sv is not None and sf.field_type == "relation":
                         struct_err = _validate_relation_structure(
@@ -286,7 +286,7 @@ async def validate_metadata(
                     continue
                 if not _is_valid_date(item):
                     errors.append(
-                        f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM oder JJJJ-MM-TT."
+                        f"Feld '{field.name}': Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT oder -JJJJ (v. Chr.)."
                     )
                     break
             continue
@@ -330,12 +330,12 @@ async def validate_metadata(
 async def prepare_metadata(
     db: AsyncSession,
     record_type: str,
-    metadata: dict,
+    metadata: dict[str, Any],
     target_subtype: str | None = None,
     *,
-    existing: dict | None = None,
+    existing: dict[str, Any] | None = None,
     can_edit_locked: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """Apply schema defaults and protect locked fields."""
     prepared = deepcopy(metadata)
     for field in await get_field_definitions(db, record_type, target_subtype):

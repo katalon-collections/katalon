@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, date, datetime
+from typing import Any
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
@@ -40,7 +41,7 @@ class Object(Base):
     object_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     collection_status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -66,7 +67,7 @@ class Entity(Base):
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -88,7 +89,7 @@ class Place(Base):
     place_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     geom: Mapped[str | None] = mapped_column(Geometry("POINT", srid=4326))
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -110,7 +111,7 @@ class Occurrence(Base):
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     occurrence_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -135,7 +136,7 @@ class Procedure(Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     reference_number: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -162,7 +163,7 @@ class FieldDefinition(Base):
     # e.g. person, organisation
     target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(128))
-    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
     # text/date/number/geo/vocab/relation/boolean/group
     field_type: Mapped[str] = mapped_column(String(32))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -170,7 +171,7 @@ class FieldDefinition(Base):
     is_translatable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_searchable: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_facet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -213,7 +214,7 @@ class MetadataMapping(Base):
     )
     format_key: Mapped[str] = mapped_column(String(64), index=True)
     target_path: Mapped[str] = mapped_column(String(256))
-    settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -239,7 +240,7 @@ class RecordSubtype(Base):
     # object/entity/place/occurrence
     primary_type: Mapped[str] = mapped_column(String(32), index=True)
     name: Mapped[str] = mapped_column(String(64))
-    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -257,9 +258,9 @@ class FormVariant(Base):
     target_type: Mapped[str] = mapped_column(String(32), index=True)
     target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(128))
-    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
     # ordered list of FieldDefinition.name for this target_type/subtype
-    field_names: Mapped[list] = mapped_column(JSONB, default=list)
+    field_names: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     is_default_global: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -323,14 +324,14 @@ class VocabularyTerm(Base):
         UUID(as_uuid=True), ForeignKey("vocabularies.id", ondelete="CASCADE"), index=True
     )
     term: Mapped[str] = mapped_column(String(256))
-    label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
-    inverse_label: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "...", "en": "..."}
+    label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
+    inverse_label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
     # For relation vocabularies: record types this term may connect.
     # Empty list = unrestricted. Only meaningful when vocabulary.kind == "relation".
-    applies_from: Mapped[list] = mapped_column(JSONB, default=list)
-    applies_to: Mapped[list] = mapped_column(JSONB, default=list)
+    applies_from: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
+    applies_to: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # Values for vocabulary_term field definitions.
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("vocabulary_terms.id", ondelete="SET NULL"), nullable=True
     )
@@ -358,7 +359,7 @@ class Relation(Base):
     to_type: Mapped[str] = mapped_column(String(32))
     to_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     relation_type: Mapped[str] = mapped_column(String(128))
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     is_schema_derived: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
@@ -383,12 +384,12 @@ class MediaFile(Base):
     filename: Mapped[str] = mapped_column(String(512))
     mime_type: Mapped[str] = mapped_column(String(128))
     file_path: Mapped[str] = mapped_column(String(1024))
-    iiif_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    iiif_manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    rights_holder: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     object: Mapped["Object"] = relationship(back_populates="media_files")
@@ -407,7 +408,7 @@ class AuditLog(Base):
     record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     action: Mapped[str] = mapped_column(String(32))  # create/update/delete/publish
-    changed_fields: Mapped[dict] = mapped_column(JSONB, default=dict)
+    changed_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
 
     __table_args__ = (
@@ -427,7 +428,7 @@ class RecordSnapshot(Base):
     record_type: Mapped[str] = mapped_column(String(32), index=True)
     record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     label: Mapped[str] = mapped_column(String(256))
-    snapshot: Mapped[dict] = mapped_column(JSONB)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
@@ -443,7 +444,7 @@ class AuthoritySource(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     label: Mapped[str] = mapped_column(String(256))
     adapter_class: Mapped[str] = mapped_column(String(256))
-    config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -457,8 +458,8 @@ class StaticPage(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     slug: Mapped[str] = mapped_column(String(128), unique=True, index=True)
-    title: Mapped[dict] = mapped_column(JSONB, default=dict)    # {"de": "...", "en": "..."}
-    content: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"de": "Markdown...", "en": "..."}
+    title: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])    # {"de": "...", "en": "..."}
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "Markdown...", "en": "..."}
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -476,13 +477,13 @@ class PortalConfig(Base):
     site_title: Mapped[str] = mapped_column(String(256), default="Katalon")
     site_subtitle: Mapped[str] = mapped_column(String(512), default="")
     hero_text: Mapped[str] = mapped_column(Text, default="")
-    featured_object_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    featured_object_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # e.g. {"object": ["creator"], "entity": []}
-    facet_fields: Mapped[dict] = mapped_column(JSONB, default=dict)
+    facet_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     accent_color: Mapped[str] = mapped_column(String(32), default="#1e3a8a")
     logo_url: Mapped[str] = mapped_column(String(512), default="")
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="")
-    color_tokens: Mapped[dict] = mapped_column(JSONB, default=dict)  # extra CSS var overrides
+    color_tokens: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # extra CSS var overrides
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
@@ -500,7 +501,7 @@ class OAISet(Base):
     filter_record_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     filter_q: Mapped[str | None] = mapped_column(Text, nullable=True)
     filter_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    filter_metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    filter_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
@@ -574,14 +575,14 @@ class AdminConfig(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True, default="default")
     # {"object": "ulb_x_{counter:05d}", ...}
-    idno_schemas: Mapped[dict] = mapped_column(JSONB, default=dict)
+    idno_schemas: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     # {"object": "^ulb_x_\\d{5}$", ...}
-    idno_patterns: Mapped[dict] = mapped_column(JSONB, default=dict)
+    idno_patterns: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     reconciliation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     reconciliation_threshold: Mapped[int] = mapped_column(Integer, default=5)
     reconciliation_id_diff_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     # Ordered content languages; first entry is the primary/fallback language.
-    supported_languages: Mapped[list] = mapped_column(JSONB, default=list)
+    supported_languages: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     ai_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     ai_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ai_model: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -590,7 +591,7 @@ class AdminConfig(Base):
     ai_daily_user_token_limit: Mapped[int] = mapped_column(Integer, default=50000)
     ai_monthly_global_token_limit: Mapped[int] = mapped_column(Integer, default=1000000)
     media_default_license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    media_default_rights_holder: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    media_default_rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
