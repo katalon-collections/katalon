@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ from katalon.services.ai_service import (
     _prepare_vision_image,
     _strip_code_fences,
 )
+from katalon.services.schema_ai_service import _extract_json_object, _parse_response
 
 
 def make_field(field_type: str, *, is_repeatable: bool = False) -> SimpleNamespace:
@@ -106,3 +108,33 @@ def test_vision_image_with_alpha_remains_png(tmp_path) -> None:
 def test_input_token_limit_is_enforced() -> None:
     with pytest.raises(HTTPException, match="Input-Token-Limit"):
         _enforce_input_token_limit(101, 100)
+
+
+def test_extract_json_object_ignores_prose_prefix_and_suffix() -> None:
+    raw = 'Hier ist mein Vorschlag: {"reply": "ok", "proposal": null}. Viel Erfolg!'
+    assert _extract_json_object(raw) == '{"reply": "ok", "proposal": null}'
+
+
+def test_extract_json_object_handles_nested_braces_and_escapes() -> None:
+    raw = (
+        '{"reply": "Enthält { und \\" } im Text", '
+        '"proposal": {"fields": [{"settings": {"regex": "a{3}"}}]}} plus Nachsatz'
+    )
+    extracted = _extract_json_object(raw)
+    parsed = json.loads(extracted)
+    assert parsed["proposal"]["fields"][0]["settings"]["regex"] == "a{3}"
+    assert not extracted.endswith("plus Nachsatz")
+
+
+def test_extract_json_object_returns_text_without_brace() -> None:
+    assert _extract_json_object("kein json hier") == "kein json hier"
+
+
+def test_parse_response_accepts_plain_and_prose_wrapped_json() -> None:
+    assert _parse_response('{"reply": "ok", "proposal": null}')["reply"] == "ok"
+    assert _parse_response('Hier: {"reply": "ok", "proposal": null} Ende')["reply"] == "ok"
+
+
+def test_parse_response_rejects_invalid_json() -> None:
+    with pytest.raises(HTTPException, match="kein gültiges JSON"):
+        _parse_response("das war keine JSON-Antwort")

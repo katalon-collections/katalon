@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-19
+
+### Added
+- KI-Assistent für die Schema-Verwaltung (Admin): Schema-Vorschläge und Felddefinitionen per Chat mit konfigurierbarem OpenAI-kompatiblem Provider generieren (Einstellungen → KI; Endpoint `/api/v1/admin/schema/ai-chat`).
+- Admin-Einstellungen: KI-Verbindungstest (`/api/v1/admin/ai-check`) und Setzen/Entfernen des KI-API-Keys als Secret.
+
 ## [1.0.8] - 2026-08-19
 
 ### Changed

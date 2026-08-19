@@ -221,6 +221,41 @@ async def update_admin_config(
     return await _to_read(db, config, current_user.id)
 
 
+class AiCheckResult(BaseModel):
+    ok: bool
+    message: str
+
+
+@router.post(
+    "/ai-check",
+    response_model=AiCheckResult,
+    summary="Test the configured AI provider connection",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "AI assistance disabled or not fully configured"},
+        502: {"description": "AI provider request failed"},
+    },
+)
+async def check_ai_connection(db: DBDep, _: User = require_role("admin")) -> AiCheckResult:
+    config = await _get_or_create(db)
+    if not config.ai_enabled:
+        raise HTTPException(status_code=409, detail="KI-Unterstützung ist deaktiviert.")
+    if not config.ai_model or not config.ai_base_url:
+        raise HTTPException(status_code=409, detail="KI-Anbindung ist nicht vollständig konfiguriert.")
+    api_key = await get_secret(db, AI_API_KEY_SECRET)
+    if not api_key:
+        raise HTTPException(status_code=409, detail="Kein KI-API-Key konfiguriert.")
+    data = await call_ai_provider(
+        config,
+        api_key,
+        [{"role": "user", "content": "Antworte ausschließlich mit dem Wort OK."}],
+        max_tokens=200,
+        temperature=0,
+    )
+    content = extract_message_content(data).strip()
+    return AiCheckResult(ok=True, message=content[:200] or "Verbindung erfolgreich.")
+
+
 class AdminSecretWrite(BaseModel):
     api_key: str
 

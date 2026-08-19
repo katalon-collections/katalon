@@ -145,6 +145,23 @@ class ImportResult(BaseModel):
     fields: list[FieldDefinitionRead]
 
 
+class SchemaAiAssistMessage(BaseModel):
+    role: str
+    content: str
+
+
+class SchemaAiAssistRequest(BaseModel):
+    target_type: str
+    target_subtype: str | None = None
+    messages: list[SchemaAiAssistMessage]
+
+
+class SchemaAiAssistResponse(BaseModel):
+    reply: str
+    proposal: dict[str, Any] | None = None
+    usage: dict[str, int]
+
+
 class SchemaResetSummary(BaseModel):
     deletable_fields: int
 
@@ -531,3 +548,32 @@ async def import_schema(
         errors=errors,
         fields=[_fd_read(f) for f in result_fields],
     )
+
+
+@router.post(
+    "/ai-assist",
+    response_model=SchemaAiAssistResponse,
+    dependencies=[require_role("admin")],
+    summary="Chat with the AI schema assistant to draft new field definitions",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        409: {"description": "AI assistance disabled or not fully configured"},
+        422: {"description": "Invalid target type/subtype or malformed AI response"},
+        429: {"description": "AI token usage limit exceeded"},
+        502: {"description": "AI provider request failed"},
+    },
+)
+async def ai_assist_schema(
+    data: SchemaAiAssistRequest, db: DBDep, current_user: CurrentUser
+) -> SchemaAiAssistResponse:
+    _validate_schema_target_type(data.target_type)
+    if data.target_subtype is not None:
+        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    result = await schema_chat(
+        db,
+        user_id=current_user.id,
+        target_type=data.target_type,
+        subtype=data.target_subtype,
+        messages=[m.model_dump() for m in data.messages],
+    )
+    return SchemaAiAssistResponse.model_validate(result)

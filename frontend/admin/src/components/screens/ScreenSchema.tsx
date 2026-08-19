@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { authority, metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
+import { adminConfig, authority, metadataMappings, schema, subtypes, vocabularies } from '../../api/client'
 import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, MetadataMapping, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { Edit, Grip, Plus, Trash } from '../ui/Icons'
+import { Edit, Grip, Lightning, Plus, Trash } from '../ui/Icons'
+import { SchemaAiAssist } from './SchemaAiAssist'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
@@ -18,7 +19,7 @@ const TYPES = [
 
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
-const FIELD_TYPE_LABELS: Record<string, string> = {
+export const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
   boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
   relation: 'Relation', geo: 'Geodaten', pid: 'PID',
@@ -1063,6 +1064,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [showAiAssist, setShowAiAssist] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(false)
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -1095,6 +1098,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
 
   useEffect(() => {
     authority.list().then(setAuthoritySources).catch(() => setAuthoritySources([]))
+    adminConfig.get().then(c => setAiEnabled(c.ai_enabled)).catch(() => setAiEnabled(false))
   }, [])
 
   const loadFields = useCallback(() => {
@@ -1293,9 +1297,22 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadFields() }} />
       )}
+      {showAiAssist && (
+        <SchemaAiAssist
+          targetType={activeType}
+          targetTypeLabel={TYPES.find(t => t.id === activeType)?.label ?? activeType}
+          targetSubtype={activeSubtype}
+          existingFieldCount={fields.length}
+          onClose={() => setShowAiAssist(false)}
+          onApplied={() => loadFields()}
+        />
+      )}
       <div className="ph">
         <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ/Subtyp</div></div>
         <div className="right">
+          {aiEnabled && (
+            <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title="KI-Assistent für Felder"><Lightning size={13} /> KI-Assistent</button>
+          )}
           <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
           <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> Neues Feld</button>
         </div>

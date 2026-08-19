@@ -61,6 +61,30 @@ def _extract_content(message_content: Any) -> str:
     raise HTTPException(status_code=502, detail="Unerwartetes Antwortformat vom KI-Provider.")
 
 
+def extract_message_content(data: dict[str, Any]) -> str:
+    """Extract the assistant's text content from a chat completion response.
+
+    Reasoning models can exhaust max_tokens on hidden reasoning before ever writing
+    to `content`, leaving it null with finish_reason="length" — give a specific,
+    actionable error for that case instead of a generic format error.
+    """
+    choice = data["choices"][0]
+    message = choice.get("message") or {}
+    content = message.get("content")
+    if content is None:
+        if choice.get("finish_reason") == "length":
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "KI-Antwort wurde ohne Inhalt abgeschnitten (Token-Limit erreicht, "
+                    "bevor das Modell antworten konnte — z. B. durch Reasoning-Overhead). "
+                    "Output-Token-Limit erhöhen oder ein anderes Modell wählen."
+                ),
+            )
+        raise HTTPException(status_code=502, detail="KI-Antwort enthält keinen Inhalt.")
+    return _extract_content(content)
+
+
 def _estimate_tokens(payload: Any) -> int:
     def without_image_data(value: Any) -> Any:
         if isinstance(value, dict):
@@ -121,6 +145,34 @@ async def ensure_ai_allowed(db: AsyncSession, user_id: uuid.UUID, estimated_inpu
     if global_tokens + estimated_input_tokens > config.ai_monthly_global_token_limit:
         raise HTTPException(status_code=429, detail="Monatslimit für KI-Tokens erreicht.")
     return config
+
+
+async def call_ai_provider(
+    config: AdminConfig,
+    api_key: str,
+    messages: list[dict[str, Any]],
+    max_tokens: int,
+    temperature: float = 0.2,
+) -> dict[str, Any]:
+    """Call the configured OpenAI-compatible chat completion endpoint."""
+    assert config.ai_base_url is not None
+    payload = {
+        "model": config.ai_model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    timeout = httpx.Timeout(settings.ai_request_timeout_seconds)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            f"{config.ai_base_url.rstrip('/')}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=payload,
+        )
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"KI-Provider-Fehler: {response.text[:400]}")
+    result: dict[str, Any] = response.json()
+    return result
 
 
 async def _load_record(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> Any:
@@ -319,23 +371,8 @@ async def complete_field(
     api_key = await get_secret(db, AI_API_KEY_SECRET)
     assert api_key is not None
 
-    payload = {
-        "model": config.ai_model,
-        "messages": messages,
-        "max_tokens": config.ai_max_output_tokens,
-        "temperature": 0.2,
-    }
-    timeout = httpx.Timeout(settings.ai_request_timeout_seconds)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(
-            f"{config.ai_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=payload,
-        )
-    if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"KI-Provider-Fehler: {response.text[:400]}")
-    data = response.json()
-    content = _extract_content(data["choices"][0]["message"]["content"])
+    data = await call_ai_provider(config, api_key, messages, config.ai_max_output_tokens)
+    content = extract_message_content(data)
     try:
         parsed = json.loads(_strip_code_fences(content))
     except json.JSONDecodeError as exc:

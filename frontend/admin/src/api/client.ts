@@ -276,6 +276,41 @@ export interface SchemaImportResult {
   fields: FieldDefinition[]
 }
 
+export interface SchemaAiChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface SchemaAiVocabularyProposal {
+  tmp_id: string
+  name: string
+  kind: 'term' | 'relation'
+  is_hierarchical: boolean
+  terms: { term: string; label: Record<string, string> }[]
+}
+
+export interface SchemaAiFieldProposal {
+  name: string
+  label: Record<string, string>
+  field_type: FieldDefinition['field_type']
+  is_required: boolean
+  is_repeatable: boolean
+  is_translatable: boolean
+  settings: Record<string, unknown>
+  children?: SchemaAiFieldProposal[]
+}
+
+export interface SchemaAiProposal {
+  vocabularies: SchemaAiVocabularyProposal[]
+  fields: SchemaAiFieldProposal[]
+}
+
+export interface SchemaAiAssistResult {
+  reply: string
+  proposal: SchemaAiProposal | null
+  usage: { input_tokens: number; output_tokens: number }
+}
+
 // Schema
 export const schema = {
   list:   (targetType: string, subtype?: string) => {
@@ -298,6 +333,11 @@ export const schema = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
+  aiAssist: (targetType: string, targetSubtype: string | null, messages: SchemaAiChatMessage[]) =>
+    req<SchemaAiAssistResult>('/v1/schema/ai-assist', {
+      method: 'POST',
+      body: JSON.stringify({ target_type: targetType, target_subtype: targetSubtype, messages }),
+    }),
 }
 
 export const metadataMappings = {
@@ -750,6 +790,7 @@ export const adminConfig = {
   setAiSecret: (api_key: string) =>
     req<AdminConfigRead['ai_secret']>('/v1/admin/config/ai-secret', { method: 'PUT', body: JSON.stringify({ api_key }) }),
   deleteAiSecret: () => req<AdminConfigRead['ai_secret']>('/v1/admin/config/ai-secret', { method: 'DELETE' }),
+  checkAi: () => req<{ ok: boolean; message: string }>('/v1/admin/config/ai-check', { method: 'POST' }),
 }
 
 export const idno = {

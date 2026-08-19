@@ -874,6 +874,8 @@ function SectionAI() {
   const [error, setError] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [secretBusy, setSecretBusy] = useState(false)
+  const [checkBusy, setCheckBusy] = useState(false)
+  const [checkResult, setCheckResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -906,6 +908,16 @@ function SectionAI() {
       setTimeout(() => setSaved(false), 2000)
     } catch (e) { setError((e as Error).message) }
     finally { setSaving(false) }
+  }
+
+  async function checkAi() {
+    setCheckBusy(true); setCheckResult(null); setError(null)
+    try {
+      const res = await adminConfig.checkAi()
+      setCheckResult(res)
+    } catch (e) {
+      setCheckResult({ ok: false, message: (e as Error).message })
+    } finally { setCheckBusy(false) }
   }
 
   async function saveSecret() {
@@ -948,10 +960,21 @@ function SectionAI() {
           <div className="field">
             <div className="lbl">Base URL</div>
             <input className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
+            <div className="sub">Ohne <code>/chat/completions</code> am Ende — wird automatisch angehängt. Für OpenRouter z.B. <code>https://openrouter.ai/api/v1</code>.</div>
           </div>
           <div className="field">
             <div className="lbl">Modell</div>
             <input className="fld mono" value={cfg.ai_model ?? ''} onChange={e => set('ai_model', e.target.value)} placeholder="gpt-4.1-mini" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button className="btn gh" onClick={checkAi} disabled={checkBusy}>
+              {checkBusy ? 'Prüft…' : 'Verbindung testen'}
+            </button>
+            {checkResult && (
+              <span style={{ fontSize: 12, color: checkResult.ok ? '#166534' : '#b91c1c' }}>
+                {checkResult.ok ? `✓ Antwort: ${checkResult.message}` : `✗ ${checkResult.message}`}
+              </span>
+            )}
           </div>
         </div>
       </div>
