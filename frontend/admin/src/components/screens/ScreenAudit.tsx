@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { audit } from '../../api/client'
 import type { AuditEntry } from '../../types'
-import { Check, Edit, Trash, Globe, Upload, Link } from '../ui/Icons'
+import { Check, Edit, Trash, Globe, Upload, Link, Lightning } from '../ui/Icons'
 
 const TYPE_ROUTES: Record<string, string> = {
   object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
@@ -31,18 +31,37 @@ const ACTION_LABELS: Record<string, string> = {
   create: 'Angelegt', update: 'Geändert', delete: 'Gelöscht', publish: 'Veröffentlicht',
   media_add: 'Medium angehängt', media_update: 'Medium geändert', media_delete: 'Medium entfernt',
   relation_add: 'Relation angelegt', relation_update: 'Relation geändert', relation_delete: 'Relation gelöscht',
+  ai_schema_assist: 'KI-Schema-Assistent verwendet',
 }
 const ACTION_ICON: Record<string, React.ReactNode> = {
-  create:          <Check size={13} />,
-  update:          <Edit size={13} />,
-  delete:          <Trash size={13} />,
-  publish:         <Globe size={13} />,
-  media_add:       <Upload size={13} />,
-  media_update:    <Edit size={13} />,
-  media_delete:    <Trash size={13} />,
-  relation_add:    <Link size={13} />,
-  relation_update: <Link size={13} />,
-  relation_delete: <Link size={13} />,
+  create:            <Check size={13} />,
+  update:            <Edit size={13} />,
+  delete:            <Trash size={13} />,
+  publish:           <Globe size={13} />,
+  media_add:         <Upload size={13} />,
+  media_update:      <Edit size={13} />,
+  media_delete:      <Trash size={13} />,
+  relation_add:      <Link size={13} />,
+  relation_update:   <Link size={13} />,
+  relation_delete:   <Link size={13} />,
+  ai_schema_assist:  <Lightning size={13} />,
+}
+
+const TYPE_SINGULAR_LABELS: Record<string, string> = {
+  object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
+}
+
+type AiSchemaAssistFields = {
+  target_type?: string
+  target_subtype?: string | null
+  model?: string
+  input_tokens?: number
+  output_tokens?: number
+}
+
+function aiSchemaAssistTitle(diff: AiSchemaAssistFields): string {
+  const typeLabel = (diff.target_type && TYPE_SINGULAR_LABELS[diff.target_type]) || diff.target_type || 'Schema'
+  return diff.target_subtype ? `${typeLabel} · ${diff.target_subtype}` : typeLabel
 }
 
 type ExtraFields = {
@@ -157,9 +176,11 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                 <div className="body">
                   <div className="ti">
                     {ACTION_LABELS[evt.action] ?? evt.action}:{' '}
-                    {evt.action === 'delete'
-                      ? <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
-                      : <RecordLink type={evt.record_type} id={evt.record_id} label={evt.record_label ?? String(evt.record_id).slice(-8)} />}
+                    {evt.action === 'ai_schema_assist'
+                      ? <b>{aiSchemaAssistTitle(diff as AiSchemaAssistFields)}</b>
+                      : evt.action === 'delete'
+                        ? <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
+                        : <RecordLink type={evt.record_type} id={evt.record_id} label={evt.record_label ?? String(evt.record_id).slice(-8)} />}
                     {relatedRecord && (
                       <>
                         {' '}{'↔'}{' '}
@@ -169,7 +190,15 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                       </>
                     )}
                   </div>
-                  <div className="sub">{evt.record_type} · {evt.record_id.slice(-8)}</div>
+                  {evt.action === 'ai_schema_assist' ? (
+                    (() => {
+                      const ai = diff as AiSchemaAssistFields
+                      const tokens = (ai.input_tokens ?? 0) + (ai.output_tokens ?? 0)
+                      return <div className="sub">{ai.model ?? '—'}{tokens > 0 ? ` · ${tokens} Tokens` : ''}</div>
+                    })()
+                  ) : (
+                    <div className="sub">{evt.record_type} · {evt.record_id.slice(-8)}</div>
+                  )}
                   {extras.length > 0 && (
                     <div className="sub" style={{ marginTop: 2 }}>{extras.join(' · ')}</div>
                   )}

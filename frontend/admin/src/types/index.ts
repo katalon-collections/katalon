@@ -157,7 +157,7 @@ export interface AuditEntry {
   record_label: string | null
   user_id: string | null
   user_name: string | null
-  action: 'create' | 'update' | 'delete' | 'publish' | 'media_add' | 'media_update' | 'media_delete' | 'relation_add' | 'relation_update' | 'relation_delete'
+  action: 'create' | 'update' | 'delete' | 'publish' | 'media_add' | 'media_update' | 'media_delete' | 'relation_add' | 'relation_update' | 'relation_delete' | 'ai_schema_assist'
   changed_fields: Record<string, unknown>
   created_at: string
 }

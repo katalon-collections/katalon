@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-08-19
+
+### Changed
+- Audit-Log (Admin): KI-Schema-Assistent-Einträge zeigen jetzt Aktionsbezeichnung, betroffenen Datensatztyp/-subtyp, Modell und Token-Anzahl statt der rohen Aktion `ai_schema_assist` und einer gehashten Schema-ID.
+
 ## [1.2.1] - 2026-08-19
 
 ### Fixed
