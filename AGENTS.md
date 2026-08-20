@@ -260,6 +260,15 @@ Dazu bei jedem Commit:
 
 Jeder `git push origin vX.Y.Z` löst `.github/workflows/release-metadata.yml` aus: generiert `katalon-release.json` (via `scripts/gen_release_metadata.py`) und hängt es als Asset an den GitHub-Release. Das ist die Metadatenquelle, die `katalon-cli` für Updates/Kompatibilitätschecks konsumiert.
 
+## GitHub-Issues — Pflege
+
+Wird ein Feature oder Bugfix umgesetzt, das ein offenes GitHub-Issue betrifft:
+
+1. Prüfen, ob das Issue durch den Commit/PR vollständig erledigt ist.
+2. Bei vollständiger Umsetzung das Issue schließen und im Kommentar den entscheidenden Commit oder PR referenzieren.
+3. Falls nur ein Teil erledigt ist: Issue aktualisieren, erledigte Checkboxen markieren und offenen Rest beschreiben.
+4. Issues nicht einfach offen stehen lassen, wenn der Code längst im Main-Branch ist.
+
 ## Production-Installation (katalon-cli)
 
 Production-Instanzen werden nicht aus diesem Repo geklont/gebaut, sondern über die separate CLI `katalon-cli` (`github.com/karkraeg/katalon-cli`, `uv tool install katalon-cli`) installiert/aktualisiert — sie pullt gepinnte Release-Images statt Source-Checkout. `install.sh` und `docker-compose.dev.yml` bleiben unverändert für lokale Entwicklung.

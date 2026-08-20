@@ -59,7 +59,7 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
-    command: celery -A katalon.workers.celery_app worker --pool=threads --loglevel=info
+    command: watchfiles --filter python "celery -A katalon.workers.celery_app worker --pool=threads --loglevel=info" /app/src
     depends_on:
       db:
         condition: service_healthy

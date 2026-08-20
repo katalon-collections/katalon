@@ -3,7 +3,7 @@
 
 .PHONY: help build build-api build-worker build-admin build-portal rebuild \
         rebuild-api rebuild-worker rebuild-admin rebuild-portal \
-        up up-dev down down-volumes clean clean-all knowledge-site
+        up up-dev dev test migrate down down-volumes clean clean-all knowledge-site certs
 
 # Compose command — override with: COMPOSE="docker-compose" make up
 COMPOSE ?= docker compose
@@ -30,6 +30,9 @@ help:
 	@echo "Deploy:"
 	@echo "  make up             Start full stack (docker compose up -d --build)"
 	@echo "  make up-dev         Start dev infrastructure (DB, Redis, ES, Cantaloupe)"
+	@echo "  make dev            Start full Docker dev stack with live reload"
+	@echo "  make test           Run backend tests in the dev stack"
+	@echo "  make migrate        Run Alembic migrations in the dev stack"
 	@echo "  make down           Stop stack"
 	@echo "  make down-volumes   Stop stack and remove volumes"
 	@echo ""
@@ -86,6 +89,15 @@ up:
 up-dev:
 	$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d db redis elasticsearch cantaloupe
 
+dev:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+test:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml exec api pytest tests/
+
+migrate:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
+
 down:
 	$(COMPOSE) down --remove-orphans
 
@@ -112,3 +124,14 @@ clean-all: down-volumes
 knowledge-site:
 	uv run .agents/tools/okf_site.py .agents/knowledge .agents/knowledge/_site
 	@echo "Open .agents/knowledge/_site/index.html"
+
+# ---------------------------------------------------------------------------
+# Dev TLS (self-signed, für https://localhost/)
+# ---------------------------------------------------------------------------
+certs:
+	@mkdir -p docker/certs
+	openssl req -x509 -nodes -newkey rsa:2048 \
+		-keyout docker/certs/localhost.key -out docker/certs/localhost.crt -days 825 \
+		-subj "/CN=localhost" \
+		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+	@echo "Zertifikat erzeugt: docker/certs/. Browser wird es als 'unsicher' melden — für lokale Dev-Nutzung ok."

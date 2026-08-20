@@ -16,7 +16,7 @@ cd /Users/karl/Coding/Katalon
 # First time: build the dev images
 docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 
-# Start everything
+# Start everything (or: make dev)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
@@ -27,20 +27,23 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 | API (FastAPI) | `uvicorn --reload` | Any `.py` file change in `backend/src/` |
 | Admin UI | Vite HMR | Any file change in `frontend/admin/src/` |
 | Portal UI | Vite HMR | Any file change in `frontend/portal/src/` |
-| Celery Worker | **Manual** | `docker compose restart worker` |
+| Celery Worker | `watchfiles` | Any `.py` file change in `backend/src/` |
 
 ### Access
 
-- **Admin UI**: <http://localhost:3000>
-- **Portal UI**: <http://localhost:3001>
-- **API**: <http://localhost:8000>
-- **API Docs**: <http://localhost:8000/api/docs>
+- **Admin UI**: <http://localhost:4000>
+- **Portal UI**: <http://localhost:4001>
+- **API** (direct, dev-only): <http://localhost:8000>
+- **API Docs** (direct, dev-only): <http://localhost:8000/api/docs>
 
-**Merksatz:** `3000/3001` gehören zum normalen/production-like Compose-Stack. `4000/4001` gehören nur zum Dev-Compose-Stack weiter unten.
+Port `8000` stays exposed only in the dev stack for direct API debugging. In the production-like stack the API is internal and reachable only via nginx at `/v1/`.
+
+**Merksatz:** `4000/4001` gehören zum Dev-Compose-Stack. `3000/3001` gehören zum normalen/production-like Compose-Stack.
 
 ### Run migrations after startup
 
 ```bash
+# Docker dev stack (or: make migrate)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
@@ -109,11 +112,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 ```
 
-- **Admin UI**: <http://localhost:3000>
-- **Portal UI**: <http://localhost:3001>
-- **API**: proxied via nginx at <http://localhost>
+- **Admin UI**: <http://localhost/admin/>
+- **Portal UI**: <http://localhost/>
+- **API**: proxied via nginx at <http://localhost/v1/>
+- **API Docs**: proxied via nginx at <http://localhost/api/docs>
 
-**Merksatz:** Für Browser-Checks ohne expliziten Dev-Hinweis zuerst `3000/3001` probieren. `4000/4001` sind kein allgemeiner Standard-Port, sondern nur Dev-Override.
+**Merksatz:** Für Browser-Checks ohne expliziten Dev-Hinweis zuerst `http://localhost/` und `http://localhost/admin/` verwenden. `3000/3001` sind nur interne Container-Ports. `4000/4001` sind Dev-Override-Ports.
 
 ---
 
@@ -125,7 +129,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 # Local
 cd backend && pytest tests/
 
-# Docker dev stack
+# Docker dev stack (or: make test)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api pytest tests/
 ```
 
@@ -158,7 +162,7 @@ uv run --extra dev locust -f tests/performance/locustfile.py \
 # Local
 cd backend && alembic upgrade head
 
-# Docker dev stack
+# Docker dev stack (or: make migrate)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
@@ -181,6 +185,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d api
 ```
 
 ### Reload Celery worker after worker code change
+
+The dev worker uses `watchfiles`, so code changes in `backend/src/` reload automatically. If you need a manual restart:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml restart worker
