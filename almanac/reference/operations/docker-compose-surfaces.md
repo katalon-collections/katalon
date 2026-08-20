@@ -40,7 +40,7 @@ Katalon's Compose surface is split into a base stack, a development override, a 
 | `nginx` | `nginx:alpine` | outer nginx container using `docker/nginx.conf`, also mounting `docker/certs/` | `80:80`, `443:443` | none |
 | `backup` | `postgis/postgis:16-3.4` | scheduled database/media backup runner | none | none |
 
-The base stack keeps database and Elasticsearch state in named volumes `db_data` and `es_data`; media is bind-mounted from `${MEDIA_ROOT:-/srv/katalon/media}` into the API, worker, Cantaloupe, and backup services [@compose-base]. The backup service also mounts `docker/backup.sh` read-only and writes to `${BACKUP_ROOT:-/srv/katalon/backups}` [@compose-base].
+The base stack keeps database and Elasticsearch state in named volumes `db_data` and `es_data`; media is bind-mounted from `${MEDIA_ROOT:-/srv/katalon/media}` into the API, worker, Cantaloupe, and backup services [@compose-base]. Cantaloupe uses `Java2dProcessor` for JPEG rendering, avoiding empty image responses from the TurboJPEG path on the supported image. The backend images copy the pinned `uv` binary from `ghcr.io/astral-sh/uv:0.12.4` and use a BuildKit cache at `/root/.cache/uv`, so dependency downloads survive invalidated project-install layers without becoming image contents [@compose-base]. The backup service also mounts `docker/backup.sh` read-only and writes to `${BACKUP_ROOT:-/srv/katalon/backups}` [@compose-base].
 
 ## Dependency Edges
 

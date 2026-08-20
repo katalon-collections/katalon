@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.15] - 2026-08-20
+
+### Added
+- Schema-Verwaltung: Felder und Gruppen-Subfelder können als intern markiert werden. Solche Werte bleiben für angemeldete Mitarbeitende sichtbar, werden aber nicht über anonyme REST-, Portal-, Such-, OAI- oder IIIF-Ausgaben veröffentlicht.
+
+### Changed
+- Docker-Backend-Builds verwenden gepinntes `uv` mit BuildKit-Cache statt `pip install uv`; bereits geladene Python-Abhängigkeiten werden bei Paketversionsänderungen wiederverwendet.
+- Cantaloupe rendert JPEGs mit Java2D statt TurboJPEG, damit IIIF-Bildantworten nicht leer bleiben.
+
 ## [1.2.13] - 2026-08-20
 
 ### Fixed

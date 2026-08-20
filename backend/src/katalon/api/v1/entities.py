@@ -31,6 +31,7 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.public_metadata_service import project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -68,14 +69,21 @@ async def list_entities(
         query = query.where(Entity.entity_type == entity_type)
     if status:
         query = query.where(Entity.status == status)
-    query = apply_public_visibility(query, Entity, await _visibility_user(db, current_user))
+    visibility_user = await _visibility_user(db, current_user)
+    query = apply_public_visibility(query, Entity, visibility_user)
     if q:
         query = query.where(Entity.search_vector.match(q))
 
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(Entity.updated_at.desc())
     items = (await db.execute(query)).scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "items": [EntityRead.model_validate(i) for i in items]}
+    response_items = [EntityRead.model_validate(i) for i in items]
+    if visibility_user is None:
+        response_items = [
+            await project_public_record(db, item, "entity", entity.entity_type)
+            for item, entity in zip(response_items, items, strict=True)
+        ]
+    return {"total": total, "page": page, "page_size": page_size, "items": response_items}
 
 
 @router.post(
@@ -149,12 +157,15 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: User = requ
         404: {"description": "Entity not found"},
     },
 )
-async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity:
+async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity | EntityRead:
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
-    ensure_publicly_visible(entity, await _visibility_user(db, current_user), "Entität nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(entity, visibility_user, "Entität nicht gefunden")
+    if visibility_user is None:
+        return await project_public_record(db, EntityRead.model_validate(entity), "entity", entity.entity_type)
     return entity
 
 

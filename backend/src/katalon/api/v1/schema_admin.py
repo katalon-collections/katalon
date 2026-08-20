@@ -390,6 +390,7 @@ async def update_field(
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
     old_is_facet = field.is_facet
+    old_is_public = field.is_public
     old_settings = field.settings or {}
     for k, v in data.model_dump().items():
         setattr(field, k, v)
@@ -398,7 +399,7 @@ async def update_field(
         old_settings.get(key) != field.settings.get(key)
         for key in ("target_type", "fixed_relation_type", "inherited_fields")
     )
-    if field.is_facet != old_is_facet or inherited_settings_changed:
+    if field.is_facet != old_is_facet or field.is_public != old_is_public or inherited_settings_changed:
         _enqueue_reindex(field.target_type)
     return _fd_read(field)
 

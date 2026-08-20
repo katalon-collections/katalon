@@ -35,7 +35,14 @@ Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann
 | `is_repeatable` | Nein | Wenn gesetzt, können mehrere Werte pro Datensatz gespeichert werden. |
 | `sort_order` | Nein | Numerische Sortierreihenfolge im Formular. Kleinere Zahlen erscheinen zuerst. |
 | `target_subtype` | Nein | Wenn gesetzt, gilt das Feld nur für den angegebenen Subtyp. |
+| `is_public` | Nein | Standardmäßig aktiv. Ist die Option **„Öffentlich über APIs ausgeben“** deaktiviert, bleibt der Wert für angemeldete Mitarbeitende sichtbar, wird aber weder im Public-Portal noch über anonyme REST-, Such-, OAI- oder IIIF-Ausgaben veröffentlicht. |
 | `settings` | Nein | Feldtyp-spezifische Optionen als JSON-Objekt (siehe unten). |
+
+## Öffentliche und interne Felder
+
+Die Sichtbarkeit eines Feldes in einer Detail- oder Listenansicht ist keine Zugriffskontrolle. Für Daten wie interne Notizen, Kontaktdaten oder noch nicht veröffentlichte Provenienzangaben muss zusätzlich **„Öffentlich über APIs ausgeben“** deaktiviert werden.
+
+Dann wird der gespeicherte Wert nicht gelöscht und bleibt in der Admin-UI sowie in authentifizierten API-Antworten verfügbar. Katalon entfernt ihn aber serverseitig aus allen anonymen Ausgabewegen: Public-Portal, öffentliche REST-Antworten, Suchindex und Facetten, OAI-PMH sowie IIIF-Manifeste. Das gilt auch für einzelne Sub-Felder einer Gruppe.
 
 ---
 

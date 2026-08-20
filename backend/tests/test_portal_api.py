@@ -39,11 +39,19 @@ async def test_portal_lists_only_public_objects() -> None:
         updated_at=datetime.now(),
         version=1,
     )
+    public_field = FieldDefinition(
+        id=uuid.uuid4(), target_type="object", name="label", label={"de": "Titel"},
+        field_type="text", is_public=True,
+    )
     session = AsyncMock()
 
     async def execute(statement):
         statements.append(str(statement))
-        return _result(total=1) if len(statements) == 1 else _result(items=[public_object])
+        if len(statements) == 1:
+            return _result(total=1)
+        if len(statements) == 2:
+            return _result(items=[public_object])
+        return _result(items=[public_field])
 
     session.execute.side_effect = execute
 
@@ -64,6 +72,36 @@ async def test_portal_lists_only_public_objects() -> None:
     item = response.json()["items"][0]
     assert "version" not in item
     assert "search_vector" not in item
+
+
+@pytest.mark.asyncio
+async def test_portal_record_omits_internal_metadata() -> None:
+    record = Object(
+        id=uuid.uuid4(), idno="OBJ-1", status="public", collection_status="active",
+        metadata_={"label": "Public", "internal_note": "Do not publish"},
+        created_at=datetime.now(), updated_at=datetime.now(), deleted_at=None, version=1,
+    )
+    fields = [
+        FieldDefinition(id=uuid.uuid4(), target_type="object", name="label", label={}, field_type="text", is_public=True),
+        FieldDefinition(id=uuid.uuid4(), target_type="object", name="internal_note", label={}, field_type="text", is_public=False),
+    ]
+    session = AsyncMock()
+    record_result = MagicMock()
+    record_result.scalar_one_or_none.return_value = record
+    session.execute.side_effect = [record_result, _result(items=[fields[0]])]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{record.id}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json()["metadata_"] == {"label": "Public"}
 
 
 @pytest.mark.parametrize(

@@ -342,6 +342,7 @@ async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
         select(FieldDefinition).where(
             FieldDefinition.target_type == target_type,
             FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
         ).order_by(FieldDefinition.sort_order)
     )
     return list(result.scalars().all())

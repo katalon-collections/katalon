@@ -77,11 +77,21 @@ async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
         def __init__(self):
             self.results = [
                 Result([relation]),
+                Result([
+                    SimpleNamespace(name="title", target_subtype=None, parent_id=None, field_type="text"),
+                    SimpleNamespace(name="publication_year", target_subtype=None, parent_id=None, field_type="text"),
+                ]),
                 Result([SimpleNamespace(
-                    name="work", is_searchable=True, is_facet=False, field_type="relation",
+                    name="work", target_subtype=None, parent_id=None, field_type="relation",
+                )]),
+                Result([SimpleNamespace(
+                    name="work", is_searchable=True, is_facet=False, is_public=True, field_type="relation",
                     settings={"target_type": "occurrence", "inherited_fields": ["publication_year"]},
                 )]),
                 Result([relation]),
+                Result([SimpleNamespace(
+                    name="publication_year", target_subtype=None, parent_id=None, field_type="text",
+                )]),
             ]
 
         async def execute(self, _statement):
@@ -137,8 +147,14 @@ async def test_index_doc_limits_inherited_fields_to_fixed_relation_type() -> Non
             self.results = [
                 Result([relation]),
                 Result([
+                    SimpleNamespace(name="publication_year", target_subtype=None, parent_id=None, field_type="text"),
+                ]),
+                Result([SimpleNamespace(
+                    name="author", target_subtype=None, parent_id=None, field_type="relation",
+                )]),
+                Result([
                     SimpleNamespace(
-                        name="author",
+                        name="author", is_public=True,
                         is_searchable=True,
                         is_facet=False,
                         field_type="relation",
@@ -150,6 +166,9 @@ async def test_index_doc_limits_inherited_fields_to_fixed_relation_type() -> Non
                     )
                 ]),
                 Result([relation]),
+                Result([SimpleNamespace(
+                    name="publication_year", target_subtype=None, parent_id=None, field_type="text",
+                )]),
             ]
 
         async def execute(self, _statement):
@@ -211,6 +230,24 @@ async def test_search_documents_keeps_only_active_public_objects(monkeypatch) ->
             "minimum_should_match": 1,
         }
     } in filters
+
+
+@pytest.mark.asyncio
+async def test_search_documents_allows_leading_wildcards(monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}})()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+
+    await elasticsearch.search_documents("*fragment", None, "public", 0, 20)
+
+    query = captured["body"]["query"]["bool"]["must"][0]["query_string"]
+    assert query["query"] == "*fragment"
+    assert query["allow_leading_wildcard"] is True
 
 
 @pytest.mark.asyncio

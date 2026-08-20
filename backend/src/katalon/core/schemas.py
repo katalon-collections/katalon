@@ -32,6 +32,7 @@ class FieldDefinitionCreate(BaseModel):
     settings: dict[str, Any] = {}
     show_in_detail: bool = True
     show_in_list: bool = True
+    is_public: bool = True
     is_facet: bool = False
     parent_id: uuid.UUID | None = None
 

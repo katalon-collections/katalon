@@ -49,6 +49,7 @@ services:
       - CANTALOUPE_CACHE_SERVER_DERIVATIVE=FilesystemCache
       - CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED=true
       - CANTALOUPE_FILESYSTEMCACHE_PATHNAME=/var/lib/cantaloupe/cache
+      - CANTALOUPE_PROCESSOR_MANUALSELECTIONSTRATEGY_JPG=Java2dProcessor
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3" ]
       interval: 10s

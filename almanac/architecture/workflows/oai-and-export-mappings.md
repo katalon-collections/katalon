@@ -29,7 +29,7 @@ sources:
     url: https://github.com/karkraeg/Katalon/issues/268
 ---
 
-Katalon's OAI-PMH workflow exposes public indexed records at `/oai` and currently disseminates the `oai_dc` metadata format. The HTTP handler dispatches OAI verbs, queries Elasticsearch with public-record filters, loads optional OAI set definitions, and passes hits to XML serializers [@oai-api]. Export mappings connect `field_definitions` to Dublin Core target paths, so an installation can map schema fields to `dc:title`, `dc:creator`, and other OAI-DC elements without changing the OAI handler [@mapping-service] [@mapping-doc]. The endpoint uses Elasticsearch as its read model, so [Search And Indexing](search-and-indexing) is part of the export path.
+Katalon's OAI-PMH workflow exposes public indexed records at `/oai` and currently disseminates the `oai_dc` metadata format. Fields marked internal (`is_public = false`) are excluded from the index and cannot be included in OAI mappings. The HTTP handler dispatches OAI verbs, queries Elasticsearch with public-record filters, loads optional OAI set definitions, and passes hits to XML serializers [@oai-api]. Export mappings connect `field_definitions` to Dublin Core target paths, so an installation can map schema fields to `dc:title`, `dc:creator`, and other OAI-DC elements without changing the OAI handler [@mapping-service] [@mapping-doc]. The endpoint uses Elasticsearch as its read model, so [Search And Indexing](search-and-indexing) is part of the export path.
 
 ## Endpoint And Verb Dispatch
 

@@ -93,6 +93,7 @@ def build_object_manifest(
     obj: Any | None = None,
     field_defs: list[Any] | None = None,
     homepage_url: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a multi-canvas IIIF Presentation 3.0 manifest for an object."""
     canvases = [
@@ -108,7 +109,7 @@ def build_object_manifest(
     }
 
     if obj is not None:
-        meta = obj.metadata_ if isinstance(obj.metadata_, dict) else {}
+        meta = metadata if metadata is not None else (obj.metadata_ if isinstance(obj.metadata_, dict) else {})
 
         # label — required by IIIF spec
         raw_title = meta.get("title") or meta.get("name") or getattr(obj, "idno", None) or str(getattr(obj, "id", ""))

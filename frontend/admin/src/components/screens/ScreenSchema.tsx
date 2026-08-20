@@ -36,6 +36,7 @@ type SubFieldFormState = {
   label: Record<string, string>
   field_type: SubFieldType
   is_required: boolean
+  is_public: boolean
   sort_order: number
   validation_regex: string
   vocabulary_id: string
@@ -89,6 +90,7 @@ type FieldFormState = {
   authority_source: string
   show_in_detail: boolean
   show_in_list: boolean
+  is_public: boolean
   is_facet: boolean
   is_searchable: boolean
   vocabulary_id: string
@@ -109,7 +111,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -127,6 +129,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     authority_source: (f.settings?.source as string) ?? 'gnd',
     show_in_detail: f.show_in_detail ?? true,
     show_in_list: f.show_in_list ?? true,
+    is_public: f.is_public ?? true,
     is_facet: f.is_facet ?? false,
     is_searchable: f.is_searchable ?? true,
     vocabulary_id: (f.settings?.vocabulary_id as string) ?? '',
@@ -171,7 +174,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label: {}, field_type: 'text', is_required: false, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { name: '', label: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function ExportMappingPanel({ fieldId, fieldType, isNew }: { fieldId: string | null; fieldType: string; isNew: boolean }) {
@@ -297,6 +300,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       label: { ...sf.label },
       field_type: sf.field_type as SubFieldType,
       is_required: sf.is_required,
+      is_public: sf.is_public ?? true,
       sort_order: sf.sort_order,
       validation_regex: (sf.settings?.validation_regex as string) ?? '',
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
@@ -338,6 +342,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       sort_order: subFieldForm.sort_order,
       show_in_detail: true,
       show_in_list: true,
+      is_public: subFieldForm.is_public,
       is_facet: false,
       is_searchable: true,
       settings: {
@@ -520,6 +525,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
                   <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Öffentlich über APIs ausgeben</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
@@ -840,6 +849,10 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" className="ck" checked={sf.is_required} onChange={e => set('is_required', e.target.checked)} />
           Pflichtfeld
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <input type="checkbox" className="ck" checked={sf.is_public} onChange={e => set('is_public', e.target.checked)} />
+          Öffentlich über APIs ausgeben
         </label>
       </div>
       {sf.field_type === 'text' && (
@@ -1181,6 +1194,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       sort_order: form.sort_order,
       show_in_detail: form.show_in_detail,
       show_in_list: form.show_in_list ?? true,
+      is_public: form.is_public,
       is_facet: form.is_facet ?? false,
       is_searchable: form.is_searchable,
       settings: {
@@ -1265,6 +1279,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           settings: f.settings,
           show_in_detail: f.show_in_detail,
           show_in_list: f.show_in_list,
+          is_public: f.is_public,
           is_facet: f.is_facet,
           parent_id: f.parent_id ?? null,
         })

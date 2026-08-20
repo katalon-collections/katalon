@@ -172,7 +172,7 @@ async def search_documents(
                 "fields": ["title^3", "search_text^2"],
                 "default_operator": "AND",
                 "lenient": True,
-                "allow_leading_wildcard": False,
+                "allow_leading_wildcard": True,
             }
         })
     else:

@@ -70,6 +70,7 @@ export function ImportStatusBanner({ currentRoute }: Props) {
   async function cancel() {
     if (!taskId) return
     await importer.cancelTask(taskId).catch(() => {})
+    dismiss()
   }
 
   if (!taskId || dismissed || currentRoute === 'import') return null

@@ -80,6 +80,7 @@ export interface FieldDefinition {
   settings: Record<string, unknown>
   show_in_detail: boolean
   show_in_list: boolean
+  is_public?: boolean
   is_facet: boolean
   is_searchable: boolean
   parent_id?: string | null

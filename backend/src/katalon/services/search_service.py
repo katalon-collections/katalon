@@ -128,9 +128,12 @@ def _build_doc(
     group_fields: set[str] | None = None,
     linked_data: dict[str, list[dict[str, Any]]] | None = None,
     inherited_facets: dict[str, list[str]] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
-    md: dict[str, Any] = _clean_metadata(getattr(record, "metadata_", None) or {})
+    md: dict[str, Any] = _clean_metadata(
+        metadata if metadata is not None else getattr(record, "metadata_", None) or {}
+    )
 
     title = _extract_title(md)
     if not title:
@@ -200,6 +203,7 @@ async def _load_linked_data(
     from sqlalchemy import and_, select
 
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, Relation
+    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     _MODEL_MAP: dict[str, Any] = {
         "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
@@ -225,7 +229,9 @@ async def _load_linked_data(
         linked_rec = await db.get(model, rel.to_id)
         if not linked_rec:
             continue
-        md = linked_rec.metadata_ or {}
+        public_fields = await load_public_fields(db, rel.to_type)
+        subtype = getattr(linked_rec, f"{rel.to_type}_type", None)
+        md = filter_public_metadata(linked_rec.metadata_ or {}, public_fields, subtype)
         inherited = {f: md[f] for f in fields if f in md}
         if not inherited:
             continue
@@ -253,6 +259,7 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
     from sqlalchemy import and_, or_, select
 
     from katalon.core.models import Entity, Occurrence, Place, Relation
+    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     TYPE_MAP: dict[str, tuple[str, Any]] = {
         "entity":     ("related_entities", Entity),
@@ -282,7 +289,9 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
         field_name, model = mapping
         rec = await db.get(model, other_id)
         if rec:
-            title = _extract_title(rec.metadata_ or {})
+            public_fields = await load_public_fields(db, other_type)
+            subtype = getattr(rec, f"{other_type}_type", None)
+            title = _extract_title(filter_public_metadata(rec.metadata_ or {}, public_fields, subtype))
             if title:
                 related[field_name].append(title)
 
@@ -294,6 +303,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     from sqlalchemy import select
 
     from katalon.core.models import FieldDefinition
+    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     rel_data: dict[str, list[str]] | None = None
     if db is not None:
@@ -303,12 +313,20 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     facet_fields: set[str] | None = None
     group_fields: set[str] | None = None
     inherited_config: dict[tuple[str, str | None], list[str]] = {}
+    public_metadata: dict[str, Any] | None = None
     if db is not None:
+        public_fields = await load_public_fields(db, record_type)
+        public_metadata = filter_public_metadata(
+            getattr(record, "metadata_", None),
+            public_fields,
+            getattr(record, f"{record_type}_type", None),
+        )
         result = await db.execute(
             select(
                 FieldDefinition.name,
                 FieldDefinition.is_searchable,
                 FieldDefinition.is_facet,
+                FieldDefinition.is_public,
                 FieldDefinition.field_type,
                 FieldDefinition.settings,
             ).where(
@@ -318,11 +336,11 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
             )
         )
         rows = result.all()
-        searchable_fields = {r.name for r in rows if r.is_searchable}
-        facet_fields = {r.name for r in rows if r.is_facet}
-        group_fields = {r.name for r in rows if r.field_type == "group"}
+        searchable_fields = {r.name for r in rows if r.is_searchable and r.is_public}
+        facet_fields = {r.name for r in rows if r.is_facet and r.is_public}
+        group_fields = {r.name for r in rows if r.field_type == "group" and r.is_public}
         for r in rows:
-            if r.field_type == "relation":
+            if r.field_type == "relation" and r.is_public:
                 s = r.settings or {}
                 ifields = s.get("inherited_fields") or []
                 target = s.get("target_type") or s.get("relation_target_type", "")
@@ -340,7 +358,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
 
     return _build_doc(
         record_type, record, rel_data, searchable_fields, facet_fields, group_fields,
-        linked_data, inherited_facets,
+        linked_data, inherited_facets, public_metadata,
     )
 
 

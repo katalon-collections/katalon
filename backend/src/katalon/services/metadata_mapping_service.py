@@ -60,6 +60,7 @@ async def get_mapping_index(db: AsyncSession, format_key: str) -> MappingIndex:
             MetadataMapping.format_key == format_key,
             MetadataMapping.is_enabled.is_(True),
             FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
         )
         .order_by(
             FieldDefinition.target_type,

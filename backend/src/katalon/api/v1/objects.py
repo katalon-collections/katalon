@@ -39,6 +39,7 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.public_metadata_service import project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -75,7 +76,8 @@ async def list_objects(
     query = select(Object)
     if status:
         query = query.where(Object.status == status)
-    query = apply_public_visibility(query, Object, await _visibility_user(db, current_user))
+    visibility_user = await _visibility_user(db, current_user)
+    query = apply_public_visibility(query, Object, visibility_user)
     if object_type:
         query = query.where(Object.object_type == object_type)
     if q:
@@ -88,11 +90,17 @@ async def list_objects(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    response_items = [ObjectRead.model_validate(i) for i in items]
+    if visibility_user is None:
+        response_items = [
+            await project_public_record(db, item, "object", obj.object_type)
+            for item, obj in zip(response_items, items, strict=True)
+        ]
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": [ObjectRead.model_validate(i) for i in items],
+        "items": response_items,
     }
 
 
@@ -177,12 +185,15 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
         404: {"description": "Object not found"},
     },
 )
-async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object:
+async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object | ObjectRead:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    ensure_publicly_visible(obj, await _visibility_user(db, current_user), "Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
+    if visibility_user is None:
+        return await project_public_record(db, ObjectRead.model_validate(obj), "object", obj.object_type)
     return obj
 
 
@@ -437,6 +448,7 @@ async def create_snapshot(
 async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, portal_only: bool = False) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
+    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
@@ -460,10 +472,17 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
 
     field_result = await db.execute(
         select(FieldDefinition)
-        .where(FieldDefinition.target_type == "object", FieldDefinition.show_in_detail == True)  # noqa: E712
+        .where(
+            FieldDefinition.target_type == "object",
+            FieldDefinition.show_in_detail == True,  # noqa: E712
+            FieldDefinition.is_public.is_(True),
+            FieldDefinition.is_deleted.is_(False),
+        )
         .order_by(FieldDefinition.sort_order)
     )
     field_defs = field_result.scalars().all()
+    public_fields = await load_public_fields(db, "object")
+    public_metadata = filter_public_metadata(obj.metadata_, public_fields, obj.object_type)
 
     media_items = [(Path(m.file_path).name, m.iiif_manifest) for m in media_files]
     portal_url = settings.katalon_base_url.rstrip("/")
@@ -476,6 +495,7 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
         obj=obj,
         field_defs=list(field_defs),
         homepage_url=homepage_url,
+        metadata=public_metadata,
     )
 
 

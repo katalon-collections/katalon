@@ -108,6 +108,10 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
             name for name in names if name.startswith("inherited_")
         )
     result = PortalConfigRead.model_validate(config)
+    # Apply defaults for null fields (existing DB rows that predate a field)
+    for field, default in _DEFAULTS.items():
+        if getattr(result, field, None) is None:
+            setattr(result, field, default)
     result.facet_fields = facet_fields
     lang_config = (await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))).scalar_one_or_none()
     result.supported_languages = (

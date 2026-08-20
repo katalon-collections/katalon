@@ -61,6 +61,8 @@ XML has a separate first step because users must choose which element represents
 
 `useImporterState()` owns the reducer state and the API calls. It persists mapping choices, the optional media selector, and import options in `localStorage`, but deliberately does not persist uploaded rows, so restored sessions require re-upload when the upload ID is gone [@importer-state]. The hook also loads field definitions and subtypes for the chosen record type, auto-maps obvious column names, and polls Celery task status every 1.5 seconds while an import task is active [@importer-state].
 
+The import API records each queued task ID in Redis for 24 hours. This distinguishes a queued Celery task from Celery's otherwise ambiguous `PENDING` state for an unknown or expired task, allowing the admin shell to remove stale import-status banners [@importer-api].
+
 The metadata upload surface uses one hidden `multiple` file input for CSV, TSV, Excel, and XML, and the admin API client appends each selected file as a repeated `file` part before calling `/v1/importer/upload` [@upload-step] [@admin-client]. Folder picking through `webkitdirectory` belongs to the media batch tab, not to metadata record imports, so multi-file XML imports should use the normal file chooser's multi-select path [@media-step] [@upload-step].
 
 ## Mapping, Transforms, And Dry Run

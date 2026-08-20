@@ -177,6 +177,8 @@ class FieldDefinition(Base):
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Controls anonymous output. Internal fields stay available to authenticated staff.
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_facet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # NULL for top-level fields; set for sub-fields of a group field

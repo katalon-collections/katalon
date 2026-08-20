@@ -25,6 +25,7 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.public_metadata_service import project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -62,13 +63,20 @@ async def list_places(
         query = query.where(Place.place_type == place_type)
     if status:
         query = query.where(Place.status == status)
-    query = apply_public_visibility(query, Place, await _visibility_user(db, current_user))
+    visibility_user = await _visibility_user(db, current_user)
+    query = apply_public_visibility(query, Place, visibility_user)
     if q:
         query = query.where(Place.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(Place.updated_at.desc())
     items = (await db.execute(query)).scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "items": [PlaceRead.model_validate(i) for i in items]}
+    response_items = [PlaceRead.model_validate(i) for i in items]
+    if visibility_user is None:
+        response_items = [
+            await project_public_record(db, item, "place", place.place_type)
+            for item, place in zip(response_items, items, strict=True)
+        ]
+    return {"total": total, "page": page, "page_size": page_size, "items": response_items}
 
 
 @router.post(
@@ -150,12 +158,15 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: User = requir
         404: {"description": "Place not found"},
     },
 )
-async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place:
+async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place | PlaceRead:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
-    ensure_publicly_visible(place, await _visibility_user(db, current_user), "Ort nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(place, visibility_user, "Ort nicht gefunden")
+    if visibility_user is None:
+        return await project_public_record(db, PlaceRead.model_validate(place), "place", place.place_type)
     return place
 
 

@@ -505,7 +505,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         for (const f of fieldsByType[key] ?? []) {
           const shouldBeFacet = selected.includes(f.name)
           if (f.is_facet !== shouldBeFacet) {
-            const { id, children, ...payload } = f
+            const { id, ...payload } = f
+            delete payload.children
             updates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
           }
         }

@@ -31,6 +31,7 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.public_metadata_service import project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -68,14 +69,20 @@ async def list_occurrences(
         query = query.where(Occurrence.occurrence_type == occurrence_type)
     if status:
         query = query.where(Occurrence.status == status)
-    query = apply_public_visibility(query, Occurrence, await _visibility_user(db, current_user))
+    visibility_user = await _visibility_user(db, current_user)
+    query = apply_public_visibility(query, Occurrence, visibility_user)
     if q:
         query = query.where(Occurrence.search_vector.match(q))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(Occurrence.updated_at.desc())
     items = (await db.execute(query)).scalars().all()
-    return {"total": total, "page": page, "page_size": page_size,
-            "items": [OccurrenceRead.model_validate(i) for i in items]}
+    response_items = [OccurrenceRead.model_validate(i) for i in items]
+    if visibility_user is None:
+        response_items = [
+            await project_public_record(db, item, "occurrence", occurrence.occurrence_type)
+            for item, occurrence in zip(response_items, items, strict=True)
+        ]
+    return {"total": total, "page": page, "page_size": page_size, "items": response_items}
 
 
 @router.post(
@@ -149,12 +156,15 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Use
         404: {"description": "Occurrence not found"},
     },
 )
-async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Occurrence:
+async def get_occurrence(occ_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Occurrence | OccurrenceRead:
     result = await db.execute(select(Occurrence).where(Occurrence.id == occ_id))
     occ = result.scalar_one_or_none()
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence nicht gefunden")
-    ensure_publicly_visible(occ, await _visibility_user(db, current_user), "Occurrence nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(occ, visibility_user, "Occurrence nicht gefunden")
+    if visibility_user is None:
+        return await project_public_record(db, OccurrenceRead.model_validate(occ), "occurrence", occ.occurrence_type)
     return occ
 
 

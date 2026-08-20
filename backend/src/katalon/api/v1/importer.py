@@ -26,6 +26,7 @@ router = APIRouter(prefix="/importer", tags=["importer"])
 # Defaults: 500 MB upload size, 4 h TTL for the staged upload in Redis.
 
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
+IMPORT_TASK_TTL_SECONDS = 24 * 60 * 60
 
 
 class TransformConfig(BaseModel):
@@ -519,6 +520,7 @@ async def run_import(body: ImportRequest, db: DBDep, current_user: User = requir
         fields_to_create=body.fields_to_create,
         media_selector=media_selector,
     )
+    _get_redis().setex(f"import_task:{task_id}", IMPORT_TASK_TTL_SECONDS, "1")
     return {"status": "queued", "task_id": task_id}
 
 
@@ -785,7 +787,10 @@ async def cancel_task(task_id: str, current_user: User = require_admin_or_editor
 @router.get(
     "/task/{task_id}",
     summary="Get the status of an import task",
-    responses={403: {"description": "Insufficient permissions"}},
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Import task not found or expired"},
+    },
 )
 async def task_status(task_id: str, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     from celery.result import AsyncResult
@@ -793,6 +798,8 @@ async def task_status(task_id: str, current_user: User = require_admin_or_editor
     from katalon.workers.celery_app import celery_app
     result: AsyncResult[Any] = AsyncResult(task_id, app=celery_app)
     state = result.state
+    if state == "PENDING" and not _get_redis().exists(f"import_task:{task_id}"):
+        raise HTTPException(status_code=404, detail="Import-Aufgabe nicht gefunden oder abgelaufen")
     if state == "SUCCESS":
         return {"state": state, "result": result.result}
     if state == "FAILURE":
