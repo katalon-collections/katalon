@@ -3,7 +3,9 @@ import type { TransformConfig, MappingEntry } from '../../api/client'
 
 interface TransformModalProps {
   csvColumn: string
+  sourceColumns: string[]
   sampleValues: string[]
+  sampleRows: Record<string, string>[]
   mappingEntry: MappingEntry
   onSave: (entry: MappingEntry) => void
   onClose: () => void
@@ -16,9 +18,10 @@ const TRANSFORM_TYPES: { id: TransformConfig['type']; label: string }[] = [
   { id: 'trim', label: 'Trim / Leerzeichen' },
   { id: 'vocab_map', label: 'Vokabular-Mapping' },
   { id: 'expression', label: 'Expression' },
+  { id: 'combine', label: 'Zusammenlegen' },
 ]
 
-function applyTransformsLocal(value: string, transforms: TransformConfig[]): string[] {
+function applyTransformsLocal(value: string, transforms: TransformConfig[], row: Record<string, string> = {}): string[] {
   let values = [value]
   for (const t of transforms) {
     const newValues: string[] = []
@@ -64,6 +67,15 @@ function applyTransformsLocal(value: string, transforms: TransformConfig[]): str
           }
           break
         }
+        case 'combine': {
+          const sources = t.sources ?? []
+          const values = sources.map(source => row[source] ?? '')
+          const template = t.template
+          newValues.push(template
+            ? template.replace(/\{(\d+)\}/g, (_, index: string) => values[Number(index)] ?? '')
+            : values.filter(Boolean).join(t.separator ?? ' '))
+          break
+        }
         case 'expression': {
           const expr = t.expression ?? ''
           let result = expr
@@ -103,14 +115,16 @@ function applyTransformsLocal(value: string, transforms: TransformConfig[]): str
   return values
 }
 
-export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, onClose }: TransformModalProps) {
+export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleRows, mappingEntry, onSave, onClose }: TransformModalProps) {
   const [transforms, setTransforms] = useState<TransformConfig[]>(mappingEntry.transforms ?? [])
   const [addingType, setAddingType] = useState<TransformConfig['type'] | ''>('')
 
-  const effectiveSamples = sampleValues.length > 0 ? sampleValues.slice(0, 3) : ['Beispielwert']
+  const effectiveRows = sampleRows.length > 0
+    ? sampleRows.slice(0, 3)
+    : sampleValues.map(value => ({ [csvColumn]: value }))
   const previews = useMemo(() => {
-    return effectiveSamples.map(v => applyTransformsLocal(v, transforms))
-  }, [effectiveSamples.join('|'), transforms])
+    return effectiveRows.map(row => applyTransformsLocal(row[csvColumn] ?? '', transforms, row))
+  }, [effectiveRows, csvColumn, transforms])
 
   function addTransform(type: TransformConfig['type']) {
     const base: TransformConfig = { type }
@@ -131,6 +145,10 @@ export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, 
       base.strict = false
     } else if (type === 'expression') {
       base.expression = '${value}'
+    } else if (type === 'combine') {
+      base.sources = [csvColumn]
+      base.separator = ' '
+      base.template = '{0}'
     }
     setTransforms(prev => [...prev, base])
     setAddingType('')
@@ -281,6 +299,25 @@ export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, 
                   </div>
                 </div>
               )}
+
+              {t.type === 'combine' && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Quellfelder auswählen. Die Reihenfolge entspricht der Quelldatei:</div>
+                  {sourceColumns.map(source => (
+                    <label key={source} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <input type="checkbox" checked={(t.sources ?? []).includes(source)} disabled={source === csvColumn}
+                        onChange={e => updateTransform(i, { sources: e.target.checked ? [...(t.sources ?? []), source] : (t.sources ?? []).filter(value => value !== source) })} />
+                      <span className="mono">{source}</span>
+                    </label>
+                  ))}
+                  <div className="field">
+                    <label className="lbl">Format</label>
+                    <input className="fld" style={{ height: 28, fontSize: 12 }} value={t.template ?? '{0}'}
+                      onChange={e => updateTransform(i, { template: e.target.value })} placeholder="{0}: {1}{2}" />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Platzhalter: {'{0}'}, {'{1}'}, {'{2}'} entsprechen der Reihenfolge.</div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -310,9 +347,9 @@ export function TransformModal({ csvColumn, sampleValues, mappingEntry, onSave, 
               </tr>
             </thead>
             <tbody>
-              {effectiveSamples.map((raw, i) => (
+              {effectiveRows.map((row, i) => (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-soft)' : undefined }}>
-                  <td style={{ padding: '3px 8px 3px 0', color: 'var(--fg-2)', fontFamily: 'monospace' }}>"{raw}"</td>
+                  <td style={{ padding: '3px 8px 3px 0', color: 'var(--fg-2)', fontFamily: 'monospace' }}>&quot;{row[csvColumn] ?? ''}&quot;</td>
                   <td style={{ padding: '3px 0', color: '#166534', fontFamily: 'monospace' }}>
                     {previews[i].length === 0 ? '(leer)' : previews[i].map(p => `"${p}"`).join(', ')}
                   </td>

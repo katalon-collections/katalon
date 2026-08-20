@@ -359,9 +359,19 @@ export function StepMapping({
       {transformModalCol && (
         <TransformModal
           csvColumn={transformModalCol}
+          sourceColumns={uploaded.headers}
           sampleValues={uploaded.preview.slice(0, 3).map(row => row[transformModalCol] ?? '').filter(v => v !== '')}
+          sampleRows={uploaded.preview.slice(0, 3)}
           mappingEntry={mapping[transformModalCol] ?? { target: '' }}
-          onSave={entry => { onMappingChange({ ...mapping, [transformModalCol]: entry }); setTransformModalCol(null) }}
+          onSave={entry => {
+            const combine = entry.transforms?.find(t => t.type === 'combine')
+            const next = { ...mapping, [transformModalCol]: entry }
+            for (const source of combine?.sources ?? []) {
+              if (source !== transformModalCol) delete next[source]
+            }
+            onMappingChange(next)
+            setTransformModalCol(null)
+          }}
           onClose={() => setTransformModalCol(null)}
         />
       )}

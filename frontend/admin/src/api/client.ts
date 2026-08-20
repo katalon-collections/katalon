@@ -649,7 +649,7 @@ export interface CreatedField {
 }
 
 export interface TransformConfig {
-  type: 'split' | 'replace' | 'regex_extract' | 'trim' | 'vocab_map' | 'expression'
+  type: 'split' | 'replace' | 'regex_extract' | 'trim' | 'vocab_map' | 'expression' | 'combine'
   // split
   delimiter?: string
   filter_empty?: boolean
@@ -667,6 +667,10 @@ export interface TransformConfig {
   strict?: boolean
   // expression
   expression?: string
+  // combine
+  sources?: string[]
+  separator?: string
+  template?: string
 }
 
 export interface MappingEntry {

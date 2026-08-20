@@ -99,6 +99,23 @@ def test_apply_mapping_with_dict_target() -> None:
     assert records[0]["title"] == "Foto 1"
 
 
+def test_apply_mapping_combines_source_columns() -> None:
+    rows = [{"measurementType": "Länge", "measurementUnit": "mm", "measurementValue": "120.0"}]
+    mapping = {
+        "measurementValue": {
+            "target": "measurements",
+            "transforms": [{
+                "type": "combine",
+                "sources": ["measurementType", "measurementValue", "measurementUnit"],
+                "template": "{0}: {1}{2}",
+            }],
+        },
+    }
+    records, idnos = apply_mapping(rows, mapping)
+    assert records[0]["measurements"] == "Länge: 120.0mm"
+    assert idnos[0] is None
+
+
 def test_apply_transforms_replace() -> None:
     from katalon.services.importer_service import apply_transforms
     result = apply_transforms("Hello World", [{"type": "replace", "search": "World", "replace": "Katalon", "case_sensitive": True}])

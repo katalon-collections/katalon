@@ -137,6 +137,15 @@ def apply_transforms(value: str, transforms: list[dict[str, Any]]) -> list[str]:
     return values
 
 
+def _combine_row_values(row: dict[str, Any], transform: dict[str, Any]) -> str:
+    sources = transform.get("sources", [])
+    values = [_row_values(row, source)[0] if _row_values(row, source) else "" for source in sources]
+    template = transform.get("template")
+    if template:
+        return re.sub(r"\{(\d+)\}", lambda match: values[int(match.group(1))] if int(match.group(1)) < len(values) else "", template)
+    return str(transform.get("separator", " ")).join(value for value in values if value)
+
+
 def apply_mapping(
     rows: list[dict[str, str]],
     mapping: dict[str, str] | dict[str, Any],
@@ -176,7 +185,12 @@ def apply_mapping(
         record: dict[str, Any] = {}
         row_idno: str | None = None
         for selector, (field_name, transforms) in normalized.items():
-            raws = _row_values(row, selector)
+            combine = next((t for t in transforms if t.get("type") == "combine"), None)
+            if combine:
+                raws = [_combine_row_values(row, combine)]
+                transforms = [t for t in transforms if t.get("type") != "combine"]
+            else:
+                raws = _row_values(row, selector)
             if not raws:
                 continue
 
