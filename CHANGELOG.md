@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.18] - 2026-08-20
+
+### Fixed
+- Docs: `docs/04_produktion.md` Option C korrigiert — für Reverse-Proxy-Deployments (Traefik, …) wird kein Self-signed-Zertifikat für Prod mehr empfohlen (`make certs` ist nur für lokale Entwicklung gedacht), sondern eine eigene nginx-Config ohne `listen 443 ssl`-Block.
+
 ## [1.2.17] - 2026-08-20
 
 ### Fixed

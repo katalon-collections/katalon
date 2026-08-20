@@ -97,18 +97,21 @@ Lege `fullchain.pem` und `privkey.pem` in `docker/certs/`.
 ### Option C: TLS wird extern terminiert (z. B. Traefik, nginx-proxy)
 
 Läuft vor dem Stack bereits ein Reverse Proxy, der TLS terminiert (Traefik-Label-Setup,
-externer nginx, …), liefert der `nginx`-Service selbst trotzdem keine echten Zertifikate
-aus — Port 443 wird dann meist gar nicht mehr veröffentlicht, nur intern per
-Docker-Netzwerk auf Port 80 erreicht.
+externer nginx, …), braucht der `nginx`-Service selbst **kein** TLS mehr — er wird dann
+nur noch intern per Docker-Netzwerk auf Port 80 angesprochen, Port 443 wird meist gar
+nicht mehr veröffentlicht.
 
-Der `listen 443 ssl`-Block in `docker/nginx.conf`/`docker/nginx.prod.conf` verlangt aber
-in jedem Fall ladbare Zertifikatsdateien unter `docker/certs/` — sonst startet nginx gar
-nicht erst (`cannot load certificate ... BIO_new_file() failed`), unabhängig davon, ob
-Port 443 extern erreichbar ist. Ein Wegwerf-Zertifikat reicht hier aus:
+`docker/nginx.conf` und `docker/nginx.prod.conf` enthalten beide einen `listen 443 ssl`-Block,
+der beim Start ladbare Zertifikate unter `docker/certs/` voraussetzt — auch wenn Port 443
+nie extern erreichbar ist (`cannot load certificate ... BIO_new_file() failed` sonst).
+Ein Self-signed-Zertifikat nur zum Booten in Produktion zu erzeugen ist kein guter Fix
+(`make certs` ist explizit für lokale Entwicklung gedacht, nicht für Prod-Container).
 
-```bash
-make certs   # erzeugt docker/certs/localhost.{crt,key}
-```
+Sauberer: eine eigene, schlanke nginx-Config **ohne** den 443-Block einbinden (identisch
+zu `docker/nginx.conf`, nur `listen 443 ssl` + die beiden `ssl_certificate*`-Zeilen
+entfernt) und im jeweiligen Compose-Overlay statt `docker/nginx.conf` mounten. Diese
+Reverse-Proxy-spezifische Config ist Teil der Instanz-Konfiguration, nicht des Repos —
+sie gehört (wie ein eigenes `docker-compose.traefik.yml`-Overlay) lokal zur Instanz.
 
 ## 4. URL-Layout wählen und nginx anpassen
 
@@ -407,10 +410,11 @@ curl "https://deine-domain.de/oai?verb=ListRecords&metadataPrefix=oai_dc"
 
 ### nginx startet nicht: "cannot load certificate ... BIO_new_file() failed"
 
-`docker/certs/` enthält keine Zertifikatsdateien. Betrifft auch Deployments hinter einem
-externen Reverse Proxy (Traefik, …), siehe [Option C](#option-c-tls-wird-extern-terminiert-z-b-traefik-nginx-proxy)
-oben — nginx braucht ladbare Zertifikate, auch wenn Port 443 nie extern erreichbar ist.
-Schnellster Fix: `make certs` ausführen, dann `docker compose ... up -d nginx`.
+`docker/certs/` enthält keine Zertifikatsdateien. Betrifft typischerweise Deployments
+hinter einem externen Reverse Proxy (Traefik, …), die weiterhin `docker/nginx.conf`
+einbinden, obwohl der 443-Block dort nie gebraucht wird — siehe
+[Option C](#option-c-tls-wird-extern-terminiert-z-b-traefik-nginx-proxy) oben. Kein
+Zertifikat für Prod erzeugen, sondern eine eigene Config ohne `listen 443 ssl` mounten.
 
 ### API startet nicht (Datenbankverbindung schlägt fehl)
 
