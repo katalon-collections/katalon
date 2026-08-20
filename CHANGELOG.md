@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.13] - 2026-08-20
+
+### Fixed
+- Portal: Doppelte Thumbnails bei Bild-Objekten entfernt – MediaThumb-Leiste unter IIIF-Viewer wird nur noch bei gemischten Medien (Bild+Nicht-Bild) angezeigt.
+
 ## [1.2.12] - 2026-08-20
 
 ### Added

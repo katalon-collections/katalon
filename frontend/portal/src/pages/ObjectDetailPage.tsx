@@ -185,7 +185,7 @@ export function ObjectDetailPage() {
             </div>
           )}
 
-          {readyMedia.length > 1 && (
+          {readyMedia.length > 1 && !(showViewer && imageMedia.length === readyMedia.length) && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>
               {readyMedia.map(m => (
                 <MediaThumb
