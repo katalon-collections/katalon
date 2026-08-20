@@ -135,8 +135,11 @@ async def test_media_batch_consumes_only_successful_reference(
 
     assert result["created"] == 1
     assert result["failed"] == 1
+    repeated_result = await _import_media_batch(uuid.uuid4(), job_dir, MagicMock())
+    assert repeated_result["created"] == 0
+    assert repeated_result["skipped"] == 1
     async with AsyncSessionLocal() as session:
-        assert await session.get(MediaImportReference, good_reference_id) is None
+        assert await session.get(MediaImportReference, good_reference_id) is not None
         assert await session.get(MediaImportReference, bad_reference_id) is not None
 
 
@@ -184,7 +187,7 @@ async def test_manual_mapping_keeps_same_filename_reference_for_other_object(
 
     assert result["created"] == 1
     async with AsyncSessionLocal() as session:
-        assert await session.get(MediaImportReference, mapped_reference_id) is None
+        assert await session.get(MediaImportReference, mapped_reference_id) is not None
         assert await session.get(MediaImportReference, other_reference_id) is not None
 
 

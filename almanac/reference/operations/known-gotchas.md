@@ -63,6 +63,26 @@ Root project instructions define the current port rule: `http://localhost/admin/
 
 The Portal public API prefix is `/portal/v1` in the frontend client, and outer nginx only proxies that surface through the slash-terminated `location /portal/v1/` block [@portal-client] [@nginx]. FastAPI's documentation routes are configured with the `/api` prefix, so outer nginx must not strip `/api/` before proxying; otherwise `/api/docs`, `/api/redoc`, and `/api/openapi.json` return 404 through nginx even though the FastAPI app has those paths registered [@app] [@nginx]. After changing these routes, recreate or reload the affected nginx/Portal containers before testing through `http://localhost/`; otherwise the browser can still see the old route table or old frontend bundle. Test concrete endpoints such as `http://localhost/portal/v1/objects` and `http://localhost/api/docs`, not bare `/portal/v1`.
 
+## Cantaloupe Derivative Cache
+
+The base Compose stack mounts the Cantaloupe derivative cache at `/var/lib/cantaloupe/cache`, and production reuses that service definition [@compose] [@prod-compose]. The current stack uses a disposable `tmpfs`, avoiding ownership problems on newly created volumes. Older deployments may still have a root-owned named volume while the Cantaloupe JVM runs as the `cantaloupe` user. In that state `info.json` and thumbnails may work, but full-size IIIF requests can return HTTP 200 with zero bytes; `cantaloupe` logs `AccessDeniedException` from `FilesystemCache`.
+
+For current deployments, recreate only Cantaloupe so the tmpfs mount takes effect:
+
+```bash
+docker compose up -d --force-recreate cantaloupe
+```
+
+For older deployments, check and repair the cache without touching the media volume:
+
+```bash
+docker compose logs cantaloupe --tail=100 | grep -E "AccessDeniedException|FilesystemCache"
+docker compose exec cantaloupe ls -ld /var/lib/cantaloupe/cache
+docker compose exec cantaloupe sh -c 'chown -R cantaloupe:cantaloupe /var/lib/cantaloupe/cache && chmod -R u+rwX /var/lib/cantaloupe/cache'
+```
+
+Verify a real IIIF derivative returns a positive byte count, not only `info.json`.
+
 ## Admin Asset Base Path
 
 Admin's production image needs `VITE_BASE_PATH=/admin/` because the outer nginx routes Admin under `/admin/` [@agents]. If that build argument or adjacent nginx/Vite routing changes, Admin can build successfully while runtime JS and CSS paths point at `/assets/` and miss the Admin container [@agents] [@gotcha-vite].

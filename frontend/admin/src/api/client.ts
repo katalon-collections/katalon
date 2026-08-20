@@ -414,6 +414,7 @@ export interface MediaBatchStatus {
     total_files: number
     planned: number
     created: number
+    skipped: number
     failed: number
     report: {
       missing_files: { row: number | null; filename: string }[]
@@ -422,7 +423,7 @@ export interface MediaBatchStatus {
       errors: { row: number | null; message: string }[]
     }
   }
-  meta?: { total: number; processed: number; created: number; failed: number }
+  meta?: { total: number; processed: number; created: number; skipped: number; failed: number }
   error?: string
 }
 

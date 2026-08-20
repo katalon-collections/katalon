@@ -416,6 +416,29 @@ Uploads mit `PermissionError` fehl:
 sudo chown -R 1000:1000 "${MEDIA_ROOT:-/srv/katalon/media}"
 ```
 
+### Große IIIF-Bilder bleiben leer, obwohl Thumbnails funktionieren
+
+Cantaloupe kann `info.json` und kleine Thumbnails ausliefern, obwohl der beschreibbare Derivat-Cache nicht korrekt angelegt wurde. Große Bildanforderungen liefern dann unter Umständen HTTP 200 mit leerem Inhalt. Der Compose-Stack verwendet für den wegwerfbaren Derivat-Cache inzwischen ein `tmpfs`; bestehende Installationen mit dem früheren Named Volume müssen den Dienst einmal neu erstellen.
+
+```bash
+docker compose up -d --force-recreate cantaloupe
+```
+
+Dadurch wird kein Datenbank- oder Medien-Volume gelöscht.
+
+
+Bei einem alten Stack, der noch das frühere Named Volume verwendet, kann der Cache alternativ repariert werden:
+
+```bash
+docker compose logs cantaloupe --tail=100 | grep -E "AccessDeniedException|FilesystemCache"
+docker compose exec cantaloupe ls -ld /var/lib/cantaloupe/cache
+docker compose exec cantaloupe sh -c 'chown -R cantaloupe:cantaloupe /var/lib/cantaloupe/cache && chmod -R u+rwX /var/lib/cantaloupe/cache'
+curl -s -o /tmp/iiif-check.jpg -w 'HTTP %{http_code}, bytes %{size_download}\n' \
+  "https://deine-domain.de/iiif/3/<media-id>.<endung>/full/max/0/default.jpg"
+```
+
+Die Daten im Medien-Volume werden dabei nicht gelöscht. Der Test muss eine positive Byte-Anzahl liefern; anschließend die betroffene Portalseite hart neu laden.
+
 ### Images nach Update nicht aktuell
 
 ```bash

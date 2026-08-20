@@ -126,14 +126,14 @@ export function StepMedia({ focusHeading = false }: Props) {
                 Läuft im Hintergrund — du kannst die Seite verlassen.
                 {mediaTaskStatus.meta && (
                   <div style={{ marginTop: 6 }}>
-                    {mediaTaskStatus.meta.processed}/{mediaTaskStatus.meta.total} verarbeitet · {mediaTaskStatus.meta.created} erstellt · {mediaTaskStatus.meta.failed} fehlgeschlagen
+                    {mediaTaskStatus.meta.processed}/{mediaTaskStatus.meta.total} verarbeitet · {mediaTaskStatus.meta.created} erstellt · {mediaTaskStatus.meta.skipped} übersprungen · {mediaTaskStatus.meta.failed} fehlgeschlagen
                   </div>
                 )}
               </div>
             )}
             {mediaTaskStatus.state === 'SUCCESS' && mediaTaskStatus.result && (
               <div style={{ display: 'grid', gap: 6 }}>
-                <div>{mediaTaskStatus.result.created} Medien importiert ({mediaTaskStatus.result.failed} Fehler)</div>
+                <div>{mediaTaskStatus.result.created} Medien importiert, {mediaTaskStatus.result.skipped} übersprungen ({mediaTaskStatus.result.failed} Fehler)</div>
                 <div>Fehlende Dateien: {mediaTaskStatus.result.report.missing_files.length}</div>
                 <div>Doppelte Dateien: {mediaTaskStatus.result.report.duplicate_files.length}</div>
                 <div>Nicht zuordenbar: {mediaTaskStatus.result.report.unmatched_files.length}</div>
