@@ -32,6 +32,20 @@ def _is_boolean(val: str) -> bool:
     return val.strip().lower() in {"true", "false", "1", "0", "ja", "nein", "yes", "no"}
 
 
+def _row_values(row: dict[str, Any], selector: str) -> list[str]:
+    """Normalize a selector's raw value to a list of non-empty strings.
+
+    XML selectors that repeat within a record come back as a list from
+    XmlFormat.parse(); CSV/Excel selectors and non-repeated XML paths are
+    plain strings. This flattens both to a uniform list.
+    """
+    val = row.get(selector, "")
+    if isinstance(val, list):
+        return [str(v).strip() for v in val if str(v).strip()]
+    s = str(val).strip()
+    return [s] if s else []
+
+
 def _guess_field_type(values: list[str]) -> str:
     """Heuristic to suggest a field type based on sample values."""
     non_empty = [v.strip() for v in values if v.strip()]
@@ -162,24 +176,24 @@ def apply_mapping(
         record: dict[str, Any] = {}
         row_idno: str | None = None
         for selector, (field_name, transforms) in normalized.items():
-            raw = row.get(selector, "").strip()
-            if not raw:
+            raws = _row_values(row, selector)
+            if not raws:
                 continue
 
             # Special handling for idno
             if field_name == "__idno__":
-                row_idno = raw
+                row_idno = raws[0]
                 continue
 
             fd = field_defs.get(field_name) if field_defs else None
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
 
-            # Apply transforms pipeline
-            if transforms:
-                parts = apply_transforms(raw, transforms)
-            else:
-                parts = [raw]
+            # Apply transforms pipeline to every occurrence (repeated XML paths
+            # yield multiple raw values), flattening the results.
+            parts: list[str] = []
+            for raw in raws:
+                parts.extend(apply_transforms(raw, transforms) if transforms else [raw])
 
             # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
@@ -230,29 +244,26 @@ def _validate_types(
             fd = field_defs.get(fname)
             if not fd:
                 continue
-            raw = row.get(selector, "").strip()
-            if not raw:
-                continue
+            for raw in _row_values(row, selector):
+                issue: str | None = None
+                if fd.field_type == "number":
+                    try:
+                        float(raw.replace(",", "."))
+                    except ValueError:
+                        issue = f"'{raw[:30]}' ist keine gültige Zahl"
+                elif fd.field_type == "date":
+                    if not _is_iso_date(raw):
+                        issue = f"'{raw[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD, für v. Chr. mit - z.B. -0043-01-01)"
+                elif fd.field_type == "boolean":
+                    if not _is_boolean(raw):
+                        issue = f"'{raw[:30]}' ist kein gültiger Boolean"
 
-            issue: str | None = None
-            if fd.field_type == "number":
-                try:
-                    float(raw.replace(",", "."))
-                except ValueError:
-                    issue = f"'{raw[:30]}' ist keine gültige Zahl"
-            elif fd.field_type == "date":
-                if not _is_iso_date(raw):
-                    issue = f"'{raw[:30]}' sieht nicht wie ein ISO-Datum aus (YYYY-MM-DD, für v. Chr. mit - z.B. -0043-01-01)"
-            elif fd.field_type == "boolean":
-                if not _is_boolean(raw):
-                    issue = f"'{raw[:30]}' ist kein gültiger Boolean"
-
-            if issue:
-                counts[fname] = counts.get(fname, 0) + 1
-                if fname not in examples:
-                    examples[fname] = []
-                if len(examples[fname]) < 3:
-                    examples[fname].append((row_num, issue))
+                if issue:
+                    counts[fname] = counts.get(fname, 0) + 1
+                    if fname not in examples:
+                        examples[fname] = []
+                    if len(examples[fname]) < 3:
+                        examples[fname].append((row_num, issue))
 
     warnings: list[dict[str, Any]] = []
     for fname, ex in examples.items():
@@ -286,13 +297,11 @@ def _collect_vocab_values(
             continue
         counts: dict[str, int] = {}
         for row in rows:
-            raw = row.get(selector, "").strip()
-            if not raw:
-                continue
-            parts = apply_transforms(raw, transforms) if transforms else [raw]
-            for p in parts:
-                if p:
-                    counts[p] = counts.get(p, 0) + 1
+            for raw in _row_values(row, selector):
+                parts = apply_transforms(raw, transforms) if transforms else [raw]
+                for p in parts:
+                    if p:
+                        counts[p] = counts.get(p, 0) + 1
         result[field_name] = counts
     return result
 
@@ -396,8 +405,7 @@ def dry_run(
                 continue
             if field_name in required_fields:
                 continue
-            raw = rows[i].get(selector, "").strip()
-            if not raw:
+            if not _row_values(rows[i], selector):
                 empty_field_counts[field_name] = empty_field_counts.get(field_name, 0) + 1
 
     # Aggregate empty-field warnings: only show if >10% of rows are empty
@@ -441,6 +449,6 @@ def suggest_field_types(headers: list[str], rows: list[dict[str, str]]) -> dict[
     """Return a map of column name -> suggested field_type for each column."""
     suggestions: dict[str, str] = {}
     for col in headers:
-        values = [row.get(col, "") for row in rows[:50]]  # sample first 50 rows
+        values = [v for row in rows[:50] for v in _row_values(row, col)]  # sample first 50 rows
         suggestions[col] = _guess_field_type(values)
     return suggestions

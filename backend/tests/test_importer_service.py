@@ -80,6 +80,18 @@ def test_apply_mapping_with_split_transform_repeatable() -> None:
     assert records[0]["languages"] == ["Deutsch", "Englisch", "Französisch"]
 
 
+def test_apply_mapping_with_xml_repeated_element_list_value() -> None:
+    """XmlFormat.parse() returns a list for repeated elements even when mapped
+    to a non-repeatable field; apply_mapping must not crash on list values.
+    Regression for AttributeError: 'list' object has no attribute 'strip'.
+    """
+    rows = [{"title": ["Foto 1", "Foto 1 (Alt)"], "idno_col": ["OBJ-1"]}]
+    mapping = {"title": "title", "idno_col": "__idno__"}
+    records, idnos = apply_mapping(rows, mapping)
+    assert records[0]["title"] == "Foto 1"
+    assert idnos[0] == "OBJ-1"
+
+
 def test_apply_mapping_with_dict_target() -> None:
     rows = [{"title": "Foto 1"}]
     mapping = {"title": {"target": "title"}}

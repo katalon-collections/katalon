@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-08-20
+
+### Fixed
+- Import (XML): Import-Lauf schlug mit `'list' object has no attribute 'strip'` fehl, sobald ein wiederholtes XML-Element auf ein nicht-wiederholbares Feld gemappt wurde. `apply_mapping()` normalisiert Selector-Werte jetzt einheitlich über `_row_values()`.
+
 ## [1.2.3] - 2026-08-19
 
 ### Changed
