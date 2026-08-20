@@ -107,3 +107,26 @@ export function renderFieldValue(value: unknown, locale?: string, fieldType?: st
   const s = String(value)
   return s || null
 }
+
+/** Pick a human-readable display title from record metadata.
+ *  Tries common label fields in order, resolves repeatable/translatable
+ *  values via renderFieldValue, and falls back to id/idno when nothing matches.
+ */
+export function recordTitle(
+  metadata: Record<string, unknown>,
+  locale?: string,
+  fallback?: string | null,
+): string {
+  const candidates = [
+    metadata.title,
+    metadata.name,
+    metadata.label,
+    metadata.display_name,
+    metadata.place_name,
+  ]
+  for (const raw of candidates) {
+    const rendered = renderFieldValue(raw, locale)
+    if (rendered) return rendered
+  }
+  return fallback ?? ''
+}

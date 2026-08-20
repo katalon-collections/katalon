@@ -9,7 +9,7 @@ import { RelationsList } from '../components/RelationsList'
 import { MediaViewer, MediaThumb } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
-import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
+import { authorityUrl, pidUrl, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
 import { useI18n } from '../i18n'
 
@@ -115,7 +115,7 @@ export function ObjectDetailPage() {
   }
 
   const m = obj.metadata_ as Record<string, unknown>
-  const title = String(m.title ?? m.name ?? obj.idno ?? obj.id)
+  const title = recordTitle(m, locale, obj.idno ?? obj.id)
   const readyMedia = mediaFiles.filter(f => f.status === 'ready')
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
   const selectedMedia = readyMedia.find(f => f.id === selectedMediaId) ?? primaryMedia

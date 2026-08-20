@@ -6,7 +6,7 @@ import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
-import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
+import { authorityUrl, pidUrl, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow } from '../components/RelationFieldRow'
 import { useI18n } from '../i18n'
 
@@ -121,7 +121,7 @@ export function PlaceDetailPage() {
   )
 
   const m = place.metadata_ as Record<string, unknown>
-  const title = String(m.name ?? m.title ?? m.label ?? m.place_name ?? place.id)
+  const title = recordTitle(m, locale, place.id)
   const hasCoords = place.lat != null && place.lon != null
   const description = renderFieldValue(m.description, locale) ?? ''
 
@@ -174,7 +174,7 @@ export function PlaceDetailPage() {
               <div className="obj-grid">
                 {linkedObjects.map(obj => {
                   const om = obj.metadata_ as Record<string, unknown>
-                  const otitle = String(om.title ?? om.name ?? obj.idno ?? obj.id)
+                  const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
                   const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
                   const isFrom = rel ? rel.from_id === place.id : true
                   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, BASE, PORTAL_API, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
+import { recordTitle } from '../utils/renderFieldValue'
 import { useI18n } from '../i18n'
 
 const DEFAULT_CONFIG: PortalConfig = {
@@ -24,7 +25,7 @@ export function HomePage() {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
 
   useEffect(() => {
     api.portal.config()
@@ -75,7 +76,7 @@ export function HomePage() {
 
   function objTitle(obj: ObjectSummary) {
     const m = obj.metadata_ as Record<string, unknown>
-    return String(m.title ?? m.name ?? obj.idno ?? obj.id)
+    return recordTitle(m, locale, obj.idno ?? obj.id)
   }
   function objSub(obj: ObjectSummary) {
     const m = obj.metadata_ as Record<string, unknown>

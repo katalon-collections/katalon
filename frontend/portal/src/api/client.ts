@@ -1,3 +1,5 @@
+import { recordTitle } from '../utils/renderFieldValue'
+
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_API = '/portal/v1'
 
@@ -96,8 +98,7 @@ export async function fetchRecord(type: string, id: string): Promise<{ title: st
     if (!res.ok) return { title: null, metadata: {} }
     const rec = await res.json() as { metadata_?: Record<string, unknown>; idno?: string | null; id: string }
     const m = rec.metadata_ ?? {}
-    const raw = m.name ?? m.title ?? m.label ?? m.display_name ?? m.place_name ?? rec.idno ?? rec.id
-    const title = typeof raw === 'string' ? raw || null : String(raw) || null
+    const title = recordTitle(m, undefined, rec.idno ?? rec.id) || null
     return { title, metadata: m }
   } catch {
     return { title: null, metadata: {} }

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-08-20
+
+### Fixed
+- Portal: Detailseiten und Startseite zeigen jetzt lesbare Labels (z. B. Objekt-`label`-Feld) statt UUID-basierter Inventarnummern als Titel. Wiederholbare/übersetzbare Feldwerte werden über `recordTitle()` korrekt aufgelöst.
+
 ## [1.2.6] - 2026-08-20
 
 ### Added
