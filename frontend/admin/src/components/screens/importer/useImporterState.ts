@@ -262,7 +262,7 @@ export interface ImporterStateAndHandlers {
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
   profileWarnings: ProfileApplyResult | null
-  handleFile: (file: File) => Promise<void>
+  handleFile: (files: File | File[]) => Promise<void>
   handleXmlRecordXpath: (clarkTag: string) => Promise<void>
   handleDryRun: () => Promise<void>
   applyVocabCluster: (field: string, canonical: string, variants: string[]) => Promise<void>
@@ -355,10 +355,10 @@ export function useImporterState(): ImporterStateAndHandlers {
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
-  async function handleFile(file: File) {
+  async function handleFile(files: File | File[]) {
     dispatch({ type: 'UPLOAD_STARTED' })
     try {
-      const raw = await importer.upload(file)
+      const raw = await importer.upload(files)
       const result = raw as UploadResult & { upload_id?: string; element_levels?: XmlElementLevel[] }
 
       if (result.source_type === 'xml' && result.upload_id) {

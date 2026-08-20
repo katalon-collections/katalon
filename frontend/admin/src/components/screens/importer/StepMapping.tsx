@@ -81,6 +81,24 @@ export function StepMapping({
     ? Object.fromEntries(xmlSelectors.map(s => [s.path, s.label]))
     : null
 
+  // Deep LIDO/XML paths share long common prefixes ("...administrativeMetadata/...") —
+  // truncating from the end hides exactly the part that differs. Show the last
+  // segments instead; the full path is still available via the title tooltip.
+  function shortSelectorLabel(full: string): string {
+    const segs = full.split('/')
+    if (segs.length <= 2) return full
+    return `…/${segs.slice(-2).join('/')}`
+  }
+
+  // Group key = the enclosing element path (attr suffix and leaf segment stripped),
+  // e.g. "lido:recordType/lido:conceptID@lido:type" and ".../lido:term" both group
+  // under "lido:recordType". Selectors come back path-sorted, so same-group rows
+  // are already adjacent — this only needs to detect the boundary.
+  function groupKey(full: string): string {
+    const segs = full.split('@')[0].split('/')
+    return segs.length > 1 ? segs.slice(0, -1).join('/') : ''
+  }
+
   return (
     <>
       {/* Profile import warnings banner */}
@@ -121,7 +139,7 @@ export function StepMapping({
         <div className="bd" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 16 }}>
             {[
-              { id: 'column', label: 'Aus Spalte zuweisen' },
+              { id: 'column', label: xmlLabelMap ? 'Aus Element zuweisen' : 'Aus Spalte zuweisen' },
               { id: 'auto',   label: 'Automatisch nach Schema vergeben' },
             ].map(opt => (
               <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
@@ -136,14 +154,27 @@ export function StepMapping({
           </div>
           {idnoStrategy === 'column' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>Spalte:</span>
+              <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{xmlLabelMap ? 'Element:' : 'Spalte:'}</span>
               <select
-                className="fld" style={{ height: 28, fontSize: 12, width: 220 }}
+                className="fld" style={{ height: 28, fontSize: 12, width: 320 }}
                 value={idnoColumn ?? ''}
                 onChange={e => onIdnoStrategyChange('column', e.target.value || null)}
               >
-                <option value="">— Spalte wählen —</option>
-                {uploaded.headers.map(h => <option key={h} value={h}>{h}</option>)}
+                <option value="">{xmlLabelMap ? '— Element wählen —' : '— Spalte wählen —'}</option>
+                {xmlLabelMap
+                  ? Object.entries(
+                      uploaded.headers.reduce<Record<string, string[]>>((groups, h) => {
+                        const label = xmlLabelMap[h] ?? h
+                        const key = groupKey(label) || label
+                        ;(groups[key] ??= []).push(h)
+                        return groups
+                      }, {})
+                    ).map(([group, cols]) => (
+                      <optgroup key={group} label={group}>
+                        {cols.map(h => <option key={h} value={h}>{shortSelectorLabel(xmlLabelMap[h] ?? h)}</option>)}
+                      </optgroup>
+                    ))
+                  : uploaded.headers.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
               {!idnoColumn && <span style={{ fontSize: 12, color: '#b91c1c' }}>Pflichtfeld</span>}
             </div>
@@ -174,14 +205,18 @@ export function StepMapping({
             </tr>
           </thead>
           <tbody>
-            {uploaded.headers.map(col => {
+            {(() => { let prevGroup: string | null = null; return uploaded.headers.flatMap(col => {
               const mapped = mapping[col]?.target ?? ''
               const transformCount = mapping[col]?.transforms?.length ?? 0
               const isIgnored = !mapped
-              const displayLabel = xmlLabelMap ? (xmlLabelMap[col] ?? col) : col
-              return (
+              const fullLabel = xmlLabelMap ? (xmlLabelMap[col] ?? col) : col
+              const displayLabel = xmlLabelMap ? shortSelectorLabel(fullLabel) : fullLabel
+              const group = xmlLabelMap ? groupKey(fullLabel) : null
+              const showGroupHeader = xmlLabelMap && group && group !== prevGroup
+              if (xmlLabelMap) prevGroup = group
+              const row = (
                 <tr key={col}>
-                  <td className="mono" style={{ maxWidth: 200 }} title={xmlLabelMap ? col : undefined}>
+                  <td className="mono" style={{ maxWidth: 200 }} title={xmlLabelMap ? fullLabel : undefined}>
                     {displayLabel}
                   </td>
                   <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>
@@ -243,7 +278,16 @@ export function StepMapping({
                   </td>
                 </tr>
               )
-            })}
+              if (!showGroupHeader) return [row]
+              return [
+                <tr key={`${col}__group`}>
+                  <td colSpan={4} style={{ background: 'var(--bg-2)', fontSize: 11, fontWeight: 600, color: 'var(--fg-3)', padding: '4px 8px' }}>
+                    {group}
+                  </td>
+                </tr>,
+                row,
+              ]
+            }) })()}
           </tbody>
         </table>
       </div>
@@ -268,7 +312,7 @@ export function StepMapping({
           <div style={{ background: 'var(--panel)', borderRadius: 10, padding: 24, width: 400, maxWidth: '90vw' }}>
             <h3 style={{ margin: '0 0 16px' }}>Neues Feld erstellen</h3>
             <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
-              Spalte: <span className="mono">{newFieldModal}</span>
+              {xmlLabelMap ? 'Element' : 'Spalte'}: <span className="mono">{xmlLabelMap ? shortSelectorLabel(xmlLabelMap[newFieldModal] ?? newFieldModal) : newFieldModal}</span>
             </div>
             <div className="field">
               <label className="lbl">Feldtyp</label>
@@ -298,7 +342,7 @@ export function StepMapping({
 
       {(missingRequired.length > 0 || idnoMissing) && (
         <div style={{ marginTop: 12, fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px' }}>
-          {idnoMissing && <div>ID-Nummer: Bitte eine Spalte auswählen oder "Automatisch" wählen.</div>}
+          {idnoMissing && <div>ID-Nummer: Bitte {xmlLabelMap ? 'ein Element' : 'eine Spalte'} auswählen oder "Automatisch" wählen.</div>}
           {missingRequired.length > 0 && <div>Pflichtfelder nicht gemappt (Import trotzdem möglich): {missingRequired.map(f => getLabel(f, f.name)).join(', ')}</div>}
         </div>
       )}

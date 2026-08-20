@@ -668,9 +668,9 @@ export interface MappingEntry {
 }
 
 export const importer = {
-  upload: async (file: File): Promise<UploadResult> => {
+  upload: async (files: File | File[]): Promise<UploadResult> => {
     const formData = new FormData()
-    formData.append('file', file)
+    for (const f of Array.isArray(files) ? files : [files]) formData.append('file', f)
     const res = await authorizedFetch('/v1/importer/upload', { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }

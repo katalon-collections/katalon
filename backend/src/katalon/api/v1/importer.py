@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Literal, cast
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -103,23 +104,62 @@ def _load_rows(upload_id: str) -> list[dict[str, Any]]:
     return cast(list[dict[str, Any]], json.loads(data))
 
 
+_XML_PROLOG_RE = re.compile(rb"^\s*<\?xml[^>]*\?>")
+_BATCH_ROOT_OPEN = b'<katalon:__batch__ xmlns:katalon="urn:katalon:import-batch">'
+_BATCH_ROOT_CLOSE = b"</katalon:__batch__>"
+
+
+def _combine_xml_files(contents: list[bytes]) -> bytes:
+    """Wrap multiple single-record XML files (e.g. one LIDO record per file) into
+    one synthetic document, so the existing element-level/record-xpath selection
+    flow works unchanged: each file's root becomes a repeated child element.
+    """
+    bodies = [_XML_PROLOG_RE.sub(b"", c).strip() for c in contents]
+    return _BATCH_ROOT_OPEN + b"".join(bodies) + _BATCH_ROOT_CLOSE
+
+
 @router.post(
     "/upload",
-    summary="Upload a file for import (CSV, TSV, Excel, or XML)",
+    summary="Upload one or more files for import (CSV, TSV, Excel, or XML)",
     responses={
         403: {"description": "Insufficient permissions"},
-        413: {"description": "File too large (max 100 MB)"},
+        413: {"description": "File too large (max 100 MB total)"},
         422: {"description": "Unsupported file format or unparseable XML"},
     },
 )
-async def upload_file(file: UploadFile, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
-    content = await file.read(MAX_SIZE + 1)
-    if len(content) > MAX_SIZE:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 100 MB)")
-    filename = file.filename or ""
+async def upload_file(
+    files: list[UploadFile] = File(alias="file"),
+    current_user: User = require_admin_or_editor(),
+) -> dict[str, Any]:
+    if not files:
+        raise HTTPException(status_code=422, detail="Keine Datei hochgeladen")
+
+    contents: list[bytes] = []
+    total_size = 0
+    for f in files:
+        c = await f.read(MAX_SIZE + 1)
+        total_size += len(c)
+        if total_size > MAX_SIZE:
+            raise HTTPException(status_code=413, detail="Dateien zu groß (max 100 MB insgesamt)")
+        contents.append(c)
+
+    xml_fmt = XmlFormat()
+
+    if len(files) > 1:
+        # Multiple files: only supported for XML (one record per file, e.g. LIDO exports)
+        for f, c in zip(files, contents, strict=True):
+            if not xml_fmt.sniff(c, f.filename or ""):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Mehrere Dateien gleichzeitig werden nur für XML unterstützt (eine Datei pro Datensatz)",
+                )
+        content = _combine_xml_files(contents)
+        filename = "batch.xml"
+    else:
+        content = contents[0]
+        filename = files[0].filename or ""
 
     # XML gets a two-step flow: upload returns element levels, user picks record element
-    xml_fmt = XmlFormat()
     if xml_fmt.sniff(content, filename):
         try:
             element_levels = xml_fmt.list_element_levels(content)
@@ -133,6 +173,12 @@ async def upload_file(file: UploadFile, current_user: User = require_admin_or_ed
             "upload_id": upload_id,
             "element_levels": element_levels,
         }
+
+    if len(files) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Mehrere Dateien gleichzeitig werden nur für XML unterstützt (eine Datei pro Datensatz)",
+        )
 
     try:
         headers, rows, _ = parse_file(filename, content)

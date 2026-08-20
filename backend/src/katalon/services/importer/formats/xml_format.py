@@ -81,7 +81,6 @@ class XmlFormat(SourceFormat):
         Returns list of {depth, tags: [{label, clark_tag}]}.
         """
         root = self._parse_root(content)
-        nsmap = root.nsmap
         levels: dict[int, dict[str, str]] = {}  # depth -> {clark_tag: label}
         for elem in root.iter():
             if not isinstance(elem.tag, str):
@@ -90,7 +89,10 @@ class XmlFormat(SourceFormat):
             if depth > max_depth:
                 continue
             clark = elem.tag
-            label = _clark_to_label(clark, nsmap)
+            # Use the element's own (inherited) nsmap, not the document root's:
+            # in a multi-file XML batch, each original file's root re-declares
+            # its own namespace prefixes that the synthetic wrapper root doesn't see.
+            label = _clark_to_label(clark, elem.nsmap)
             levels.setdefault(depth, {})[clark] = label
         return [
             {
@@ -114,6 +116,11 @@ class XmlFormat(SourceFormat):
 
         record_xpath: Clark-notation tag like "{http://...}mods", or "*" for
         direct root children.
+
+        Element attributes are exposed as separate selectors under
+        "<tag-path>@<attr-label>". A tag path or attribute that occurs more
+        than once within a record is collected as a list (order preserved);
+        single occurrences stay plain strings for backward compatibility.
         """
         root = self._parse_root(content)
         if record_xpath == "*":
@@ -122,20 +129,33 @@ class XmlFormat(SourceFormat):
             elements = [e for e in root.iter(record_xpath) if isinstance(e.tag, str)]
 
         for child in elements:
-            record: SourceRecord = {"__tree__": child}
+            values: dict[str, list[str]] = {}
             for elem in child.iter():
                 if not isinstance(elem.tag, str):
                     continue
-                if elem.text and elem.text.strip():
-                    path = _rel_tag_path(child, elem)
-                    if path and path not in record:
-                        record[path] = elem.text.strip()
+                path = _rel_tag_path(child, elem)
+                if elem.text and elem.text.strip() and path:
+                    values.setdefault(path, []).append(elem.text.strip())
+                for attr_name, attr_val in elem.attrib.items():
+                    if not attr_val or not attr_val.strip():
+                        continue
+                    # elem.nsmap (not root.nsmap): see list_element_levels for why.
+                    alabel = _clark_to_label(attr_name, elem.nsmap)
+                    apath = f"{path}@{alabel}" if path else f"@{alabel}"
+                    values.setdefault(apath, []).append(attr_val.strip())
+
+            record: SourceRecord = {"__tree__": child}
+            for path, vals in values.items():
+                record[path] = vals[0] if len(vals) == 1 else vals
             yield record
 
     def list_selectors(self, content: bytes, record_xpath: str = "*", sample_size: int = 50) -> list[Selector]:
-        """List all distinct tag paths across the first sample_size records."""
+        """List all distinct tag paths (and attribute paths) across the first sample_size records.
+
+        kind is "list" for a path that repeats within at least one sampled record,
+        "scalar" otherwise.
+        """
         root = self._parse_root(content)
-        nsmap = root.nsmap
 
         if record_xpath == "*":
             elements = list(root)[:sample_size]
@@ -144,25 +164,40 @@ class XmlFormat(SourceFormat):
 
         path_samples: dict[str, list[str]] = {}
         path_labels: dict[str, str] = {}
+        path_repeats: set[str] = set()
         for child in elements:
+            occurrences: dict[str, int] = {}
             for elem in child.iter():
                 if not isinstance(elem.tag, str):
                     continue
+                path = _rel_tag_path(child, elem)
+                if not path:
+                    continue
+                # elem.nsmap (not root.nsmap): see list_element_levels for why.
+                nsmap = elem.nsmap
+                entries: list[tuple[str, str, str]] = []
                 if elem.text and elem.text.strip():
-                    path = _rel_tag_path(child, elem)
-                    if not path:
+                    entries.append((path, _tag_path_to_label(path, nsmap), elem.text.strip()))
+                for attr_name, attr_val in elem.attrib.items():
+                    if not attr_val or not attr_val.strip():
                         continue
-                    path_labels.setdefault(path, _tag_path_to_label(path, nsmap))
-                    path_samples.setdefault(path, [])
-                    if len(path_samples[path]) < 3:
-                        path_samples[path].append(elem.text.strip())
+                    alabel = _clark_to_label(attr_name, nsmap)
+                    entries.append((f"{path}@{alabel}", f"{_tag_path_to_label(path, nsmap)}@{alabel}", attr_val.strip()))
+                for p, label, sample in entries:
+                    occurrences[p] = occurrences.get(p, 0) + 1
+                    if occurrences[p] > 1:
+                        path_repeats.add(p)
+                    path_labels.setdefault(p, label)
+                    path_samples.setdefault(p, [])
+                    if len(path_samples[p]) < 3:
+                        path_samples[p].append(sample)
 
         return [
             Selector(
                 path=p,
                 label=path_labels.get(p, p),
                 sample=", ".join(samples),
-                kind="scalar",
+                kind="list" if p in path_repeats else "scalar",
             )
             for p, samples in sorted(path_samples.items())
         ]

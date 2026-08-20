@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-08-20
+
+### Added
+- Import (XML): Mehrdatei-Upload für XML (z. B. LIDO-Exports mit einer Datei pro Datensatz) — Dateien werden serverseitig zu einem synthetischen Batch-Dokument zusammengeführt und wie gewohnt per Record-Element gemappt.
+- Mapping-UI: Selektoren werden nach übergeordnetem Element gruppiert angezeigt; kontextabhängige Beschriftungen (XML vs. CSV/Excel) für ID-Strategie und Feldauswahl.
+
+### Fixed
+- Import (XML, Mehrdatei-Upload): Namespace-Präfixe wurden anhand des synthetischen Batch-Root-Elements statt des jeweiligen Quell-Roots aufgelöst und dadurch als volle URIs statt lesbarer Präfixe angezeigt.
+- Mapping-UI: lange XML/LIDO-Selektorpfade wurden ohne Kürzung dargestellt und liefen aus dem UI heraus.
+
+## [1.2.5] - 2026-08-20
+
+### Changed
+- Dev-Workflow: Celery-Worker im Docker-Dev-Stack lädt Code-Änderungen jetzt automatisch (`watchfiles`) statt manuellen Container-Neustart zu erfordern.
+- `Makefile`: neue Kurzbefehle `make dev`, `make test`, `make migrate`, `make certs` (self-signed TLS-Zertifikat für lokales HTTPS).
+- Nginx/Compose: äußerer nginx unterstützt jetzt HTTPS (Port 443) über selbst-signiertes Dev-Zertifikat; API-Port 8000 im normalen Compose-Stack nicht mehr nach außen exponiert (nur noch intern über nginx erreichbar).
+
 ## [1.2.4] - 2026-08-20
 
 ### Fixed
