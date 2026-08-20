@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.17] - 2026-08-20
+
+### Fixed
+- Docs: `docs/04_produktion.md` beschreibt jetzt explizit den Fall, dass `nginx` hinter einem TLS-terminierenden Reverse Proxy (z. B. Traefik) läuft — der `listen 443 ssl`-Block verlangt trotzdem ladbare Zertifikate unter `docker/certs/`, auch wenn Port 443 nie extern erreichbar ist. Ohne Zertifikate startet nginx nicht (`cannot load certificate ... BIO_new_file() failed`).
+
 ## [1.2.16] - 2026-08-20
 
 ### Fixed

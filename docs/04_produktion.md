@@ -94,6 +94,22 @@ Automatische Erneuerung (crontab):
 
 Lege `fullchain.pem` und `privkey.pem` in `docker/certs/`.
 
+### Option C: TLS wird extern terminiert (z. B. Traefik, nginx-proxy)
+
+Läuft vor dem Stack bereits ein Reverse Proxy, der TLS terminiert (Traefik-Label-Setup,
+externer nginx, …), liefert der `nginx`-Service selbst trotzdem keine echten Zertifikate
+aus — Port 443 wird dann meist gar nicht mehr veröffentlicht, nur intern per
+Docker-Netzwerk auf Port 80 erreicht.
+
+Der `listen 443 ssl`-Block in `docker/nginx.conf`/`docker/nginx.prod.conf` verlangt aber
+in jedem Fall ladbare Zertifikatsdateien unter `docker/certs/` — sonst startet nginx gar
+nicht erst (`cannot load certificate ... BIO_new_file() failed`), unabhängig davon, ob
+Port 443 extern erreichbar ist. Ein Wegwerf-Zertifikat reicht hier aus:
+
+```bash
+make certs   # erzeugt docker/certs/localhost.{crt,key}
+```
+
 ## 4. URL-Layout wählen und nginx anpassen
 
 Es gibt zwei unterstützte Layouts. Einmal entscheiden, dann konsequent durchziehen.
@@ -388,6 +404,13 @@ curl "https://deine-domain.de/oai?verb=ListRecords&metadataPrefix=oai_dc"
 | **Gesamt** | **~2,1 GB** | **~4 GB** |
 
 ## Häufige Probleme
+
+### nginx startet nicht: "cannot load certificate ... BIO_new_file() failed"
+
+`docker/certs/` enthält keine Zertifikatsdateien. Betrifft auch Deployments hinter einem
+externen Reverse Proxy (Traefik, …), siehe [Option C](#option-c-tls-wird-extern-terminiert-z-b-traefik-nginx-proxy)
+oben — nginx braucht ladbare Zertifikate, auch wenn Port 443 nie extern erreichbar ist.
+Schnellster Fix: `make certs` ausführen, dann `docker compose ... up -d nginx`.
 
 ### API startet nicht (Datenbankverbindung schlägt fehl)
 
