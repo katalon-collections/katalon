@@ -24,7 +24,7 @@ Use this guide when starting Katalon locally or deciding which stack to use for 
 
 ## Choose The Smallest Stack That Tests The Change
 
-Use the Docker dev stack for ordinary full-stack feature work. It mounts backend source, migrations, and frontend source into containers, runs `uvicorn --reload` for the API, runs Vite for both frontends, and requires a manual worker restart when Celery code changes [@dev-doc] [@dev-compose].
+Use the Docker dev stack for ordinary full-stack feature work. It mounts backend source, migrations, and frontend source into containers, runs `uvicorn --reload` for the API, runs Vite for both frontends, and runs the Celery worker under `watchfiles` so it also reloads automatically on Python changes [@dev-doc] [@dev-compose].
 
 Use the local workflow when debugger support or fastest feedback matters. In that mode, only `db`, `redis`, `elasticsearch`, and `cantaloupe` come from Docker, while the API, worker, Admin app, and Portal app run from separate terminals on the host [@dev-doc].
 
@@ -45,7 +45,7 @@ After startup, run migrations in the API container:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
-The dev override exposes the API on `8000`, Admin on `4000`, Portal on `4001`, database on `5432`, Redis on `6379`, Elasticsearch on `9200`, and Cantaloupe on `8182` [@dev-compose]. The Makefile has `make up-dev`, but that target starts only the infrastructure services `db`, `redis`, `elasticsearch`, and `cantaloupe`, so it is not a substitute for the full dev-compose command when the API or frontends must run in Docker [@makefile].
+The dev override exposes the API on `8000`, Admin on `4000`, Portal on `4001`, database on `5432`, Redis on `6379`, Elasticsearch on `9200`, and Cantaloupe on `8182` [@dev-compose]. The Makefile has `make up-dev`, but that target starts only the infrastructure services `db`, `redis`, `elasticsearch`, and `cantaloupe`, so it is not a substitute for the full dev-compose command when the API or frontends must run in Docker [@makefile]. `make dev` is a shortcut for the two-flag `up --build` command above; `make test` and `make migrate` run `pytest` and `alembic upgrade head` inside the dev `api` container [@makefile].
 
 ## Run Locally Against Docker Services
 

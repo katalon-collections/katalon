@@ -53,11 +53,11 @@ Katalon has three relevant routing surfaces: the production-like Compose stack o
 | Portal public API | `http://localhost/portal/v1/...` | outer nginx `location /portal/v1/` to `api:8000` |
 | API docs | `http://localhost/api/docs` | outer nginx `location /api/` to `api:8000`, preserving `/api/...` |
 | IIIF | `http://localhost/iiif/...` | outer nginx `location /iiif/` to `cantaloupe:8182` |
-| API direct port | `http://localhost:8000` | Compose `api` port mapping |
+| HTTPS | `https://localhost/...` | outer nginx also listens on 443 with a self-signed dev cert from `docker/certs/` (`make certs`) |
 | Admin direct port | `http://localhost:3000` | Compose `admin` port mapping to container port 80 |
 | Portal direct port | `http://localhost:3001` | Compose `portal` port mapping to container port 80 |
 
-The base Compose file publishes `api` on `8000:8000`, `admin` on `3000:80`, `portal` on `3001:80`, and outer `nginx` on `80:80` [@compose]. For normal browser checks without an explicit dev-stack target, AGENTS says to use `http://localhost/admin/` and `http://localhost/` instead of direct frontend container ports [@agents].
+The base Compose file publishes `admin` on `3000:80`, `portal` on `3001:80`, and outer `nginx` on `80:80` and `443:443` [@compose]. `api` no longer publishes a host port in the base stack; it is reachable only through nginx or from other containers on the Compose network at `api:8000` [@compose]. For normal browser checks without an explicit dev-stack target, AGENTS says to use `http://localhost/admin/` and `http://localhost/` instead of direct frontend container ports [@agents].
 
 FastAPI mounts the anonymous Portal read model at `/portal/v1`, and the Portal client uses `/portal/v1` as its API prefix [@app] [@portal-client]. Both outer nginx and the Portal container nginx define slash-terminated `location /portal/v1/` proxies [@nginx] [@portal-nginx]. Operational checks should therefore hit a real child endpoint such as `http://localhost/portal/v1/objects`; `http://localhost/portal/v1` without the trailing slash is not the API index and can fall through to the Portal SPA route.
 
