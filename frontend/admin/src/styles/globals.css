@@ -406,6 +406,7 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .cr { min-width: 0; }
   .cr > span { display: none; }
   .cr b { display: block; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb .sp { display: none; }
   .tb .gs { width: auto; min-width: 0; flex: 1; }
   .tb .gs input { min-width: 0; }
   .user-menu-trigger { width: 44px; justify-content: center; }
@@ -438,11 +439,11 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .fg-2, .fg-3 { grid-template-columns: 1fr; }
   .record-toolbar { align-items: stretch; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   .record-title { flex: 1 1 100%; }
-  .record-actions { width: 100%; margin-left: 0; flex-wrap: wrap; }
-  .record-status { width: 100%; overflow-x: auto; }
+  .record-actions { width: 100%; min-width: 0; margin-left: 0; flex-wrap: wrap; }
+  .record-status { width: 100%; min-width: 0; overflow-x: auto; }
   .record-status button, .record-actions > .btn { min-height: 44px; }
-  .record-status button { padding-inline: 8px; }
-  .record-actions > .btn { flex: 1 1 auto; justify-content: center; }
+  .record-status button { padding-inline: 8px; flex: 1 1 0; min-width: 0; overflow-wrap: break-word; text-align: center; }
+  .record-actions > .btn { flex: 0 1 auto; justify-content: center; }
   .record-notice { max-height: 72px; overflow-y: auto; padding-inline: 12px; }
   .form-single { padding: 12px; }
   .form-grid { padding: 12px 12px 80px; }
@@ -531,8 +532,6 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 }
 
 @media (max-width: 480px) {
-  .record-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
-  .record-status button { width: 100%; }
   .pg-controls { grid-template-columns: 1fr 1fr; }
   .pg .nums { display: none; }
 }

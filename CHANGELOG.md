@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.17] - 2026-08-20
+
+### Fixed
+- Admin (mobil): Globale Suche in der Topbar wurde durch einen konkurrierenden Flex-Spacer auf die Hälfte der Breite gequetscht und dadurch abgeschnitten. Status-Pillen (Entwurf/Intern/Öffentlich) und Aktionsbuttons (Im Portal ansehen/Verwerfen/Speichern) im Formular-Toolbar wurden auf volle Zeilenbreite gestreckt statt sich an ihrem Inhalt zu orientieren. Berührungsziele bleiben weiterhin ≥44px hoch.
+
 ## [1.2.16] - 2026-08-20
 
 ### Fixed
