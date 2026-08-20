@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from typing import Any, Literal, cast
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from katalon.config import settings
 from katalon.core.dependencies import DBDep, require_admin_or_editor, require_role
-from katalon.core.models import FieldDefinition, RecordSubtype, User
-from katalon.core.schemas import FieldDefinitionRead
+from katalon.core.models import FieldDefinition, ImportMapping, RecordSubtype, User
+from katalon.core.schemas import FieldDefinitionRead, ImportMappingCreate, ImportMappingRead, ImportMappingUpdate
 from katalon.services import importer_service
 from katalon.services.importer import parse_file
 from katalon.services.importer.formats.xml_format import XmlFormat
@@ -20,10 +22,8 @@ from katalon.services.subtype_service import has_any_subtypes
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
-MAX_SIZE = 100 * 1024 * 1024  # 100 MB
-
-_UPLOAD_TTL = 3600  # seconds — for both raw XML and parsed rows
-_XML_UPLOAD_TTL = _UPLOAD_TTL  # keep alias used below
+# Upload limits / staging TTL are configurable via Settings (see .env.example).
+# Defaults: 500 MB upload size, 4 h TTL for the staged upload in Redis.
 
 VALID_TYPES = {"object", "entity", "place", "occurrence"}
 
@@ -55,7 +55,8 @@ class MappingEntry(BaseModel):
 
 
 class MappingRequest(BaseModel):
-    mapping: dict[str, MappingEntry]   # selector -> {target, transforms?}
+    mapping: dict[str, MappingEntry] = Field(default_factory=dict[str, Any])  # selector -> {target, transforms?}
+    mapping_id: uuid.UUID | None = None  # optional saved mapping template
     # selector = CSV/Excel column header OR Clark-notation XPath for XML
     upload_id: str
     record_type: str = "object"
@@ -92,7 +93,7 @@ def _get_redis() -> Any:
 def _store_rows(r: Any, rows: list[dict[str, Any]]) -> str:
     import json
     upload_id = str(uuid.uuid4())
-    r.setex(f"file_upload:{upload_id}", _UPLOAD_TTL, json.dumps(rows))
+    r.setex(f"file_upload:{upload_id}", settings.importer_upload_ttl_seconds, json.dumps(rows))
     return upload_id
 
 
@@ -101,7 +102,13 @@ def _load_rows(upload_id: str) -> list[dict[str, Any]]:
     r = _get_redis()
     data = r.get(f"file_upload:{upload_id}")
     if data is None:
-        raise HTTPException(status_code=404, detail="Upload nicht gefunden oder abgelaufen (max 1 Stunde)")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Upload nicht gefunden oder abgelaufen "
+                f"(max {settings.importer_upload_ttl_seconds // 3600} Stunde(n))"
+            ),
+        )
     return cast(list[dict[str, Any]], json.loads(data))
 
 
@@ -119,12 +126,76 @@ def _combine_xml_files(contents: list[bytes]) -> bytes:
     return _BATCH_ROOT_OPEN + b"".join(bodies) + _BATCH_ROOT_CLOSE
 
 
+def _normalize_transform(value: Any) -> dict[str, Any]:
+    if isinstance(value, TransformConfig):
+        return value.model_dump()
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
+def _normalize_mapping_entry(value: Any) -> dict[str, Any]:
+    """Convert a MappingEntry model or a stored dict into normalized form."""
+    if isinstance(value, MappingEntry):
+        return {
+            "target": value.target,
+            "transforms": [_normalize_transform(t) for t in value.transforms],
+        }
+    if isinstance(value, dict):
+        transforms = value.get("transforms") or []
+        return {
+            "target": value.get("target"),
+            "transforms": [_normalize_transform(t) for t in transforms],
+        }
+    return {"target": str(value), "transforms": []}
+
+
+def _normalize_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
+    return {k: _normalize_mapping_entry(v) for k, v in mapping.items()}
+
+
+async def _resolve_mapping(
+    body: MappingRequest,
+    db: AsyncSession,
+) -> tuple[dict[str, Any], str | None, str | None]:
+    """Return normalized mapping, subtype and media_selector.
+
+    If ``mapping_id`` is given, load the saved mapping and merge any inline
+    ``mapping`` entries on top.  Inline ``subtype`` / ``media_selector`` win
+    over the stored values.
+    """
+    mapping = _normalize_mapping(body.mapping or {})
+    subtype = body.subtype
+    media_selector = body.media_selector
+
+    if body.mapping_id:
+        result = await db.execute(
+            select(ImportMapping).where(ImportMapping.id == body.mapping_id)
+        )
+        stored = result.scalar_one_or_none()
+        if stored is None:
+            raise HTTPException(status_code=404, detail="Import-Mapping nicht gefunden")
+        if stored.record_type != body.record_type:
+            raise HTTPException(
+                status_code=422,
+                detail="Import-Mapping passt nicht zum gewählten Datensatz-Typ",
+            )
+        stored_mapping = _normalize_mapping(stored.mapping or {})
+        mapping = {**stored_mapping, **mapping}
+        if subtype is None:
+            subtype = stored.subtype
+        if media_selector is None:
+            media_selector = stored.media_selector
+
+    return mapping, subtype, media_selector
+
+
 @router.post(
     "/upload",
     summary="Upload one or more files for import (CSV, TSV, Excel, or XML)",
     responses={
         403: {"description": "Insufficient permissions"},
-        413: {"description": "File too large (max 100 MB total)"},
+        413: {"description": "File too large"},
         422: {"description": "Unsupported file format or unparseable XML"},
     },
 )
@@ -135,13 +206,20 @@ async def upload_file(
     if not files:
         raise HTTPException(status_code=422, detail="Keine Datei hochgeladen")
 
+    max_size = settings.importer_max_upload_size_mb * 1024 * 1024
     contents: list[bytes] = []
     total_size = 0
     for f in files:
-        c = await f.read(MAX_SIZE + 1)
+        c = await f.read(max_size + 1)
         total_size += len(c)
-        if total_size > MAX_SIZE:
-            raise HTTPException(status_code=413, detail="Dateien zu groß (max 100 MB insgesamt)")
+        if total_size > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Dateien zu groß (max {settings.importer_max_upload_size_mb} MB "
+                    "insgesamt)"
+                ),
+            )
         contents.append(c)
 
     xml_fmt = XmlFormat()
@@ -168,7 +246,7 @@ async def upload_file(
             raise HTTPException(status_code=422, detail=f"XML konnte nicht geparst werden: {exc}") from exc
         upload_id = str(uuid.uuid4())
         r = _get_redis()
-        r.setex(f"xml_upload:{upload_id}", _XML_UPLOAD_TTL, content)
+        r.setex(f"xml_upload:{upload_id}", settings.importer_upload_ttl_seconds, content)
         return {
             "source_type": "xml",
             "upload_id": upload_id,
@@ -214,7 +292,13 @@ async def xml_selectors(body: XmlSelectorsRequest, current_user: User = require_
     r = _get_redis()
     content = r.get(f"xml_upload:{body.upload_id}")
     if content is None:
-        raise HTTPException(status_code=404, detail="Upload nicht gefunden oder abgelaufen (max 1 Stunde)")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Upload nicht gefunden oder abgelaufen "
+                f"(max {settings.importer_upload_ttl_seconds // 3600} Stunde(n))"
+            ),
+        )
 
     xml_fmt = XmlFormat()
     try:
@@ -250,19 +334,22 @@ async def xml_selectors(body: XmlSelectorsRequest, current_user: User = require_
 async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
-    if body.media_selector and body.record_type != "object":
+
+    mapping, subtype, media_selector = await _resolve_mapping(body, db)
+
+    if media_selector and body.record_type != "object":
         raise HTTPException(status_code=422, detail="Medienzuordnung ist nur für Objekte möglich")
 
     # Validate subtype if provided
-    if body.subtype:
+    if subtype:
         subtype_result = await db.execute(
             select(RecordSubtype).where(
                 RecordSubtype.primary_type == body.record_type,
-                RecordSubtype.name == body.subtype,
+                RecordSubtype.name == subtype,
             )
         )
         if subtype_result.scalar_one_or_none() is None:
-            raise HTTPException(status_code=422, detail=f"Ungültiger Subtyp: {body.subtype}")
+            raise HTTPException(status_code=422, detail=f"Ungültiger Subtyp: {subtype}")
 
     result = await db.execute(
         select(FieldDefinition).where(
@@ -295,15 +382,13 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
 
     rows = _load_rows(body.upload_id)
 
-    # Build normalized mapping for dry_run: {csv_col -> {"target": ..., "transforms": [...]}}
-    norm_mapping: dict[str, dict[str, Any]] = {}
-    for k, v in body.mapping.items():
-        norm_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
+    # mapping is already normalized to {selector -> {"target": ..., "transforms": [...]}}
+    norm_mapping = mapping
 
     dry_result = importer_service.dry_run(rows, norm_mapping, field_defs)
 
     # Warn if type has subtypes but none was provided
-    if not body.subtype and await has_any_subtypes(db, body.record_type):
+    if not subtype and await has_any_subtypes(db, body.record_type):
         dry_result["warnings"].insert(0, {
             "row": None,
             "message": "Dieser Typ hat Subtypen — bitte einen Subtyp auswählen.",
@@ -314,19 +399,19 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
     all_records, _ = apply_mapping(rows, norm_mapping, field_defs)
     for i, metadata in enumerate(all_records):
         row_num = i + 2
-        val_errors = await validate_metadata(db, body.record_type, metadata, body.subtype)
+        val_errors = await validate_metadata(db, body.record_type, metadata, subtype)
         for err in val_errors:
             dry_result["errors"].append({"row": row_num, "message": err})
 
-    if body.media_selector:
+    if media_selector:
         from katalon.services.media_batch_import_service import media_references_for_rows
 
-        _, media_stats = media_references_for_rows(rows, body.media_selector)
+        _, media_stats = media_references_for_rows(rows, media_selector)
         dry_result["media_references"] = media_stats
         if not media_stats["selector_found"]:
             dry_result["errors"].append({
                 "row": None,
-                "message": f"Medienzuordnung '{body.media_selector}' wurde nicht gefunden",
+                "message": f"Medienzuordnung '{media_selector}' wurde nicht gefunden",
             })
         else:
             for conflict in media_stats["conflicts"]:
@@ -395,20 +480,23 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
         503: {"description": "Background task queue unavailable (broker down)"},
     },
 )
-async def run_import(body: ImportRequest, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
+async def run_import(body: ImportRequest, db: DBDep, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
-    if body.media_selector and body.record_type != "object":
+
+    mapping, subtype, media_selector = await _resolve_mapping(body, db)
+
+    if media_selector and body.record_type != "object":
         raise HTTPException(status_code=422, detail="Medienzuordnung ist nur für Objekte möglich")
     rows = _load_rows(body.upload_id)
-    if body.media_selector:
+    if media_selector:
         from katalon.services.media_batch_import_service import media_references_for_rows
 
-        _, media_stats = media_references_for_rows(rows, body.media_selector)
+        _, media_stats = media_references_for_rows(rows, media_selector)
         if not media_stats["selector_found"]:
             raise HTTPException(
                 status_code=422,
-                detail=f"Medienzuordnung '{body.media_selector}' wurde nicht gefunden",
+                detail=f"Medienzuordnung '{media_selector}' wurde nicht gefunden",
             )
         if media_stats["conflicts"]:
             raise HTTPException(
@@ -416,25 +504,187 @@ async def run_import(body: ImportRequest, current_user: User = require_admin_or_
                 detail="Ein Dateiname ist mehreren Datensätzen zugeordnet",
             )
     from katalon.workers.import_tasks import import_records_task
-    # Serialize mapping for Celery (plain dict)
-    serializable_mapping: dict[str, Any] = {}
-    for k, v in body.mapping.items():
-        serializable_mapping[k] = {"target": v.target, "transforms": [t.model_dump() for t in v.transforms]}
+    # mapping is already a normalized, serializable dict
     from katalon.workers.enqueue import enqueue_or_503
     task_id = enqueue_or_503(
         import_records_task,
         body.record_type,
         rows,
-        serializable_mapping,
+        mapping,
         idno_strategy=body.idno_strategy,
         upsert_strategy=body.upsert_strategy,
         auto_publish=body.auto_publish,
         user_id=str(current_user.id),
-        subtype=body.subtype,
+        subtype=subtype,
         fields_to_create=body.fields_to_create,
-        media_selector=body.media_selector,
+        media_selector=media_selector,
     )
     return {"status": "queued", "task_id": task_id}
+
+
+@router.get(
+    "/mappings",
+    response_model=list[ImportMappingRead],
+    summary="List saved import mappings",
+    responses={403: {"description": "Insufficient permissions"}},
+)
+async def list_import_mappings(
+    db: DBDep,
+    record_type: str | None = None,
+    current_user: User = require_admin_or_editor(),
+) -> list[ImportMapping]:
+    """Return saved import mappings, optionally filtered by record type."""
+    query = select(ImportMapping).order_by(ImportMapping.updated_at.desc())
+    if record_type:
+        if record_type not in VALID_TYPES:
+            raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {record_type}")
+        query = query.where(ImportMapping.record_type == record_type)
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/mappings",
+    response_model=ImportMappingRead,
+    status_code=201,
+    summary="Save an import mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid record type or missing name"},
+    },
+)
+async def create_import_mapping(
+    body: ImportMappingCreate,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
+) -> ImportMapping:
+    """Persist an import mapping so it can be reused by ID."""
+    if body.record_type not in VALID_TYPES:
+        raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+
+    mapping = ImportMapping(
+        name=name,
+        record_type=body.record_type,
+        subtype=body.subtype,
+        media_selector=body.media_selector,
+        mapping=_normalize_mapping(body.mapping or {}),
+        created_by=current_user.id,
+    )
+    db.add(mapping)
+    await db.flush()
+    await db.refresh(mapping)
+    return mapping
+
+
+@router.get(
+    "/mappings/{mapping_id}",
+    response_model=ImportMappingRead,
+    summary="Get a saved import mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Mapping not found"},
+    },
+)
+async def get_import_mapping(
+    mapping_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
+) -> ImportMapping:
+    result = await db.execute(select(ImportMapping).where(ImportMapping.id == mapping_id))
+    mapping = result.scalar_one_or_none()
+    if mapping is None:
+        raise HTTPException(status_code=404, detail="Import-Mapping nicht gefunden")
+    return mapping
+
+
+@router.put(
+    "/mappings/{mapping_id}",
+    response_model=ImportMappingRead,
+    summary="Update a saved import mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Mapping not found"},
+        422: {"description": "Invalid payload"},
+    },
+)
+async def update_import_mapping(
+    mapping_id: uuid.UUID,
+    body: ImportMappingUpdate,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
+) -> ImportMapping:
+    result = await db.execute(select(ImportMapping).where(ImportMapping.id == mapping_id))
+    mapping = result.scalar_one_or_none()
+    if mapping is None:
+        raise HTTPException(status_code=404, detail="Import-Mapping nicht gefunden")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        mapping.name = name
+    if body.subtype is not None:
+        mapping.subtype = body.subtype
+    if body.media_selector is not None:
+        mapping.media_selector = body.media_selector
+    if body.mapping is not None:
+        mapping.mapping = _normalize_mapping(body.mapping)
+
+    await db.flush()
+    await db.refresh(mapping)
+    return mapping
+
+
+@router.delete(
+    "/mappings/{mapping_id}",
+    status_code=204,
+    summary="Delete a saved import mapping",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Mapping not found"},
+    },
+)
+async def delete_import_mapping(
+    mapping_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
+) -> None:
+    result = await db.execute(select(ImportMapping).where(ImportMapping.id == mapping_id))
+    mapping = result.scalar_one_or_none()
+    if mapping is None:
+        raise HTTPException(status_code=404, detail="Import-Mapping nicht gefunden")
+    await db.delete(mapping)
+    await db.commit()
+
+
+@router.get(
+    "/mappings/{mapping_id}/download",
+    summary="Download a saved import mapping as JSON",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Mapping not found"},
+    },
+)
+async def download_import_mapping(
+    mapping_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
+) -> Response:
+    result = await db.execute(select(ImportMapping).where(ImportMapping.id == mapping_id))
+    mapping = result.scalar_one_or_none()
+    if mapping is None:
+        raise HTTPException(status_code=404, detail="Import-Mapping nicht gefunden")
+
+    return Response(
+        content=json.dumps(mapping.mapping, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="import-mapping-{mapping.id}.json"',
+        },
+    )
 
 
 @router.post(

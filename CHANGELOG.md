@@ -5,7 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [1.2.9] - 2026-08-20
+## [1.2.10] - 2026-08-20
+
+### Added
+- Management-CLI `katalon-manage` für Dev/Ops im Backend:
+  - `db-reset`: Daten-Tabellen zurücksetzen, Konfiguration-Tabellen optional mit `--all` ebenfalls, automatisches `pg_dump`-Backup vor dem Reset (außer `--no-backup`), interaktive Bestätigung (außer `--yes`).
+  - `import-csv` / `import-xml`: Datensatz-Import aus der Kommandozeile mit JSON-Mapping-Datei, `--dry-run`, `--subtype`, `--idno-strategy`, `--upsert-strategy`, `--auto-publish` und `--media-selector`.
+  - `reset-admin`: Bestehendes Admin-Passwort-Reset ist auch über `katalon-manage reset-admin` erreichbar; `katalon-reset-admin` bleibt erhalten.
 
 ### Added
 - Medienzuordnung aus dem Metadatenimport: Eine wählbare Datei-Spalte bzw. ein XML-Element speichert offene Medienreferenzen je Objekt; spätere Ordner- oder ZIP-Uploads ordnen Bilder ohne separate CSV automatisch und konfliktgesichert zu.

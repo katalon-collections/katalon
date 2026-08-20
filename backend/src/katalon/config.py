@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 100
     purge_after_days: int = 30
 
+    importer_max_upload_size_mb: int = 500
+    importer_upload_ttl_seconds: int = 14400  # 4 hours
+
     portal_theme: str | None = None
 
     default_admin_email: str = "admin@katalon.dev"

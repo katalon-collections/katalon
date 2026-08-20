@@ -236,6 +236,29 @@ class MetadataMapping(Base):
     )
 
 
+class ImportMapping(Base):
+    __tablename__ = "import_mappings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    record_type: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    media_selector: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    mapping: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    __table_args__ = (
+        Index("ix_import_mappings_record_type", "record_type"),
+    )
+
+
 class RecordSubtype(Base):
     __tablename__ = "record_subtypes"
 

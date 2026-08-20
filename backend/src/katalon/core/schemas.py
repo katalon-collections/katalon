@@ -71,6 +71,35 @@ class MetadataMappingUpsert(BaseModel):
     is_enabled: bool = True
 
 
+class ImportMappingCreate(BaseModel):
+    name: str
+    record_type: str
+    subtype: str | None = None
+    media_selector: str | None = None
+    mapping: dict[str, Any]
+
+
+class ImportMappingUpdate(BaseModel):
+    name: str | None = None
+    subtype: str | None = None
+    media_selector: str | None = None
+    mapping: dict[str, Any] | None = None
+
+
+class ImportMappingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    record_type: str
+    subtype: str | None = None
+    media_selector: str | None = None
+    mapping: dict[str, Any]
+    created_by: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class RecordSubtypeCreate(BaseModel):
     primary_type: str
     name: str

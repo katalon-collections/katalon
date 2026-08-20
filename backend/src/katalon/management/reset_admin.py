@@ -80,8 +80,13 @@ async def _reset() -> None:
         print(f"Could not write credentials file: {exc}", file=sys.stderr)
 
 
-def main() -> None:
+def reset_admin() -> None:
+    """Reset the admin/superuser password (interactive)."""
     asyncio.run(_reset())
+
+
+def main() -> None:
+    reset_admin()
 
 
 if __name__ == "__main__":
