@@ -39,6 +39,9 @@ sources:
   - id: object-detail
     type: file
     path: frontend/portal/src/pages/ObjectDetailPage.tsx
+  - id: portal-public
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
 ---
 
 Katalon's media workflow is object-only: media endpoints live under `/objects/{object_id}/media`, uploads require editor or admin rights, and public reads check object visibility before listing or serving files [@media-api]. Uploaded files are stored under `settings.media_root`, validated, represented by `MediaFile` rows, and handed to Celery for IIIF processing *only when they are images* [@media-api] [@media-validation]. Cantaloupe supplies IIIF Image API URLs and image dimensions for images, while the portal dispatches its viewer by `MediaFile.category`: Clover IIIF for images, a blob-backed iframe for PDF, HTML5 players for audio/video, and `@google/model-viewer` for 3D models [@cantaloupe] [@iiif-viewer] [@media-viewer] [@object-detail].
@@ -67,9 +70,9 @@ Non-image files never enter the Cantaloupe/IIIF pipeline. The upload path assign
 
 ## Public Reads And Portal Viewer
 
-Media listing and raw file serving both call `ensure_publicly_visible()` for anonymous users before returning media for an object [@media-api]. `ObjectDetailPage` fetches the object, its media files, and relations, filters media to `status === "ready"`, then points the IIIF viewer at `/v1/objects/{id}/iiif/manifest` [@object-detail]. If the IIIF viewer fails, the page falls back to raw image files; if there is no ready media, it uses the configured placeholder image or a no-image state [@object-detail].
+Media listing and raw file serving both call `ensure_publicly_visible()` for anonymous users before returning media for an object [@media-api]. `ObjectDetailPage` fetches the object, its media files, and relations, filters media to `status === "ready"`, then points the IIIF viewer at `/v1/objects/{id}/iiif/manifest` [@object-detail]. If the IIIF viewer fails, the page falls back to IIIF thumbnails; if there is no ready media, it uses the configured placeholder image or a no-image state [@object-detail].
 
-`IIIFViewer` fetches the manifest JSON itself and passes it to `@samvera/clover-iiif/viewer` with a minimal viewer configuration [@iiif-viewer]. The detail page also exposes the manifest URL as an alternate JSON-LD link and as a visible IIIF manifest link when ready media exists [@object-detail].
+`IIIFViewer` fetches the manifest JSON itself and passes it to `@samvera/clover-iiif/viewer` with a minimal viewer configuration [@iiif-viewer]. Portal cards, result rows, and media strips use the public thumbnail endpoint, which redirects image files to a 300px JPEG IIIF derivative rather than serving browser-incompatible source formats such as TIFF [@media-api] [@portal-public]. The detail page also exposes the manifest URL as an alternate JSON-LD link and as a visible IIIF manifest link when ready media exists [@object-detail].
 
 ## Batch Media Import
 

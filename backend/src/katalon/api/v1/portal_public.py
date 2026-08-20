@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, computed_field
 from sqlalchemy import and_, exists, or_, select
 
@@ -244,6 +244,11 @@ async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict[str, Any]]:
 @router.get("/objects/{object_id}/media/{media_id}/file")
 async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> FileResponse:
     return await media.serve_media_file(object_id, media_id, db, None)
+
+
+@router.get("/objects/{object_id}/media/{media_id}/thumbnail")
+async def serve_media_thumbnail(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> RedirectResponse:
+    return await media.serve_media_thumbnail(object_id, media_id, db, None)
 
 
 @router.get("/objects/{object_id}/iiif/manifest")

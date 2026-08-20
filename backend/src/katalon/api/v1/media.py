@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import aiofiles
 from celery.result import AsyncResult
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -245,6 +245,32 @@ async def serve_media_file(
     if not media or not Path(media.file_path).exists():
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     return FileResponse(media.file_path, media_type=media.mime_type, filename=media.filename)
+
+
+@router.get(
+    "/{media_id}/thumbnail",
+    summary="Serve a browser-compatible media thumbnail",
+    responses={404: {"description": "Object, media file, or image not found"}},
+)
+async def serve_media_thumbnail(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> RedirectResponse:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
+
+    query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
+    if current_user is None:
+        query = query.where(MediaFile.status == "ready")
+    result = await db.execute(query)
+    media = result.scalar_one_or_none()
+    if not media or media_category(media.mime_type) != "image":
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+
+    identifier = Path(media.file_path).name
+    return RedirectResponse(f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg")
 
 
 @router.delete(

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { MediaFile } from '../api/client'
-import { BASE, PORTAL_API } from '../api/client'
+import { BASE, mediaThumbnailUrl, PORTAL_API } from '../api/client'
 
 interface Props {
   objectId: string
@@ -163,6 +163,7 @@ export function MediaThumb({ objectId, media, active, onSelect }: {
   onSelect: () => void
 }) {
   const src = fileUrl(objectId, media)
+  const thumbnailSrc = mediaThumbnailUrl(objectId, media.id)
   const badge = MEDIA_BADGE[media.category]
   const isImage = media.category === 'image'
   const isVideo = media.category === 'video'
@@ -181,7 +182,7 @@ export function MediaThumb({ objectId, media, active, onSelect }: {
       }}
     >
       {isImage ? (
-        <img src={src} alt={media.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img src={thumbnailSrc} alt={media.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       ) : isVideo ? (
         <video src={src} muted preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       ) : (

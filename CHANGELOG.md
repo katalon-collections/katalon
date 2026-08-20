@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.16] - 2026-08-20
+
+### Fixed
+- Portal: Bildvorschauen verwenden IIIF-JPEG-Derivate statt browser-inkompatibler TIFF-Rohdateien. Dadurch erscheinen TIFF-, JPEG-, PNG- und WebP-Bilder einheitlich in Listen, Karten, Medienleiste und Detail-Fallback.
+
 ## [1.2.15] - 2026-08-20
 
 ### Added

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, BASE, PORTAL_API, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
+import { api, mediaThumbnailUrl, type ObjectSummary, type PortalConfig, type MediaFile } from '../api/client'
 import { recordTitle } from '../utils/renderFieldValue'
 import { useI18n } from '../i18n'
 
@@ -59,7 +59,7 @@ export function HomePage() {
                 const ready = media.filter((m: MediaFile) => m.status === 'ready')
                 const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
                 if (primary) {
-                  thumbMap[obj.id] = `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primary.id}/file`
+                  thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
                 }
               })
               .catch(() => {})

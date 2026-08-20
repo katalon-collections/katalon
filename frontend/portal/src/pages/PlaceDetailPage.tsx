@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type PlaceSummary, type Relation } from '../api/client'
+import { api, fetchRecord, mediaThumbnailUrl, type MediaFile, type ObjectSummary, type PlaceSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
@@ -88,7 +88,7 @@ export function PlaceDetailPage() {
             .then((media: MediaFile[]) => {
               const ready = media.filter(mf => mf.status === 'ready')
               const primary = ready.find(mf => mf.is_primary) ?? ready[0]
-              if (primary) thumbMap[obj.id] = `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primary.id}/file`
+              if (primary) thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
             })
             .catch(() => {})
         ))

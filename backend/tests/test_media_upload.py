@@ -287,6 +287,36 @@ async def test_portal_media_file_requests_only_ready_files() -> None:
         app.dependency_overrides.pop(get_db, None)
 
 
+@pytest.mark.asyncio
+async def test_portal_media_thumbnail_redirects_to_iiif() -> None:
+    obj_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="published", metadata_={})
+    media = MediaFile(
+        id=media_id,
+        object_id=obj_id,
+        filename="test.tif",
+        mime_type="image/tiff",
+        file_path=f"/media/{media_id}.tif",
+        status="ready",
+        created_at=datetime.now(),
+    )
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[_mock_result(obj), _mock_result(media)])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{obj_id}/media/{media_id}/thumbnail")
+        assert response.status_code == 307
+        assert response.headers["location"].endswith(f"/iiif/3/{media_id}.tif/full/,300/0/default.jpg")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
 # ---------------------------------------------------------------------------
 # GET /v1/objects/{id}/iiif/manifest
 # ---------------------------------------------------------------------------

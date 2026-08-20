@@ -3,6 +3,10 @@ import { recordTitle } from '../utils/renderFieldValue'
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_API = '/portal/v1'
 
+export function mediaThumbnailUrl(objectId: string, mediaId: string): string {
+  return `${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaId}/thumbnail`
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
   if (!res.ok) throw new Error(res.statusText)

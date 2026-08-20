@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, BASE, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
+import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
 import { t, typeLabel, useI18n } from '../i18n'
 
@@ -77,7 +77,7 @@ export function SearchPage() {
                   const ready = media.filter((m: MediaFile) => m.status === 'ready')
                   const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
                   if (primary) {
-                    thumbMap[r.id] = `${BASE}${PORTAL_API}/objects/${r.id}/media/${primary.id}/file`
+                    thumbMap[r.id] = mediaThumbnailUrl(r.id, primary.id)
                   }
                 })
                 .catch(() => {})

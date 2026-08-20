@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
+import { api, BASE, mediaThumbnailUrl, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
@@ -29,10 +29,9 @@ function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles
   if (mediaFiles.length === 1) {
     return (
       <img
-        src={`${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaFiles[0].id}/file`}
+        src={mediaThumbnailUrl(objectId, mediaFiles[0].id)}
         alt=""
         style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
       />
     )
   }
@@ -41,10 +40,9 @@ function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles
       {mediaFiles.map(f => (
         <img
           key={f.id}
-          src={`${BASE}${PORTAL_API}/objects/${objectId}/media/${f.id}/file`}
+          src={mediaThumbnailUrl(objectId, f.id)}
           alt=""
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#0f172a' }}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
       ))}
     </div>
@@ -128,7 +126,7 @@ export function ObjectDetailPage() {
   const description = renderFieldValue(m.description, locale) ?? ''
   const primaryImage = readyMedia.find(f => f.is_primary && (f.category ?? 'image') === 'image')
     ?? readyMedia.find(f => (f.category ?? 'image') === 'image')
-  const ogImage = primaryImage ? `${BASE}${PORTAL_API}/objects/${obj.id}/media/${primaryImage.id}/file` : ''
+  const ogImage = primaryImage ? mediaThumbnailUrl(obj.id, primaryImage.id) : ''
 
   const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
 

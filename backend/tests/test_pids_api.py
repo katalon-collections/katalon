@@ -1,4 +1,5 @@
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1 import dnb_urn_mock
@@ -26,7 +27,9 @@ async def test_register_dnb_urn_requires_auth() -> None:
 
 @pytest.mark.asyncio
 async def test_dnb_mock_suggestion_and_register() -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    mock_app = FastAPI()
+    mock_app.include_router(dnb_urn_mock.router, prefix="/v1")
+    async with AsyncClient(transport=ASGITransport(app=mock_app), base_url="http://test") as client:
         suggestion = await client.get(
             "/v1/dnb-urn-mock/namespaces/name/urn:nbn:de:test/urn-suggestion"
         )
