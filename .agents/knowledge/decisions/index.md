@@ -18,3 +18,4 @@
 * [Mehrsprachigkeit](mehrsprachigkeit.md) - konfigurierbare Sprachliste, is_translatable + {lang: text}-Dict, dependency-freies Portal-i18n
 * [Medien-Multiformat](medien-multiformat.md) - MIME-Kategorie-Dispatch, Nicht-Bild überspringt Cantaloupe, Viewer-Dispatch im Portal
 * [Medienzuordnung aus dem Metadatenimport](medienzuordnung-aus-metadatenimport.md) - nutzergewählter Datei-Selector, offene Referenzen je Objekt und automatische Auflösung im Batch-Import
+* [Management-CLI-Ergonomie](management-cli-ergonomics.md) - Repo-Root als uv-Workspace, source-relative `.env`, lesbarer Secrets-Fehler ohne Stacktrace

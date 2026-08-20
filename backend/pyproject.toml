@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.2.10"
+version = "1.2.11"
 description = "Katalon – Metadata Management System for GLAM collections"
 requires-python = ">=3.12"
 dependencies = [
@@ -46,7 +46,7 @@ dev = [
 
 [project.scripts]
 katalon-reset-admin = "katalon.management.reset_admin:main"
-katalon-manage = "katalon.management.cli:main"
+katalon-manage = "katalon.management.runner:launcher"
 
 [build-system]
 requires = ["hatchling"]

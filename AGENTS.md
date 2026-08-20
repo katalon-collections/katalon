@@ -143,9 +143,9 @@ authority_sources (id VARCHAR, label, adapter_class, config JSONB, is_enabled)
 
 ## Python/uv Hinweise
 
-- Backend-Python-Kommandos immer aus `backend/` ausführen. Im Repo-Root existiert auch eine `.venv`; von dort gestartete Backend-Tests können im falschen Interpreter landen und dann Dependencies wie `jinja2` "verlieren".
-- Backend-Tests immer mit einem mindestens 32 Zeichen langen Testschlüssel starten, z. B. `KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest ...`. Nicht erst einen Lauf ohne diese Variable versuchen.
-- Wenn `uv` über `backend/uv.lock` stolpert: der problematische Fall ist `click-didyoumean` mit inkonsistentem Lock-Eintrag (`version = "0.3.2"` zeigt auf `click_didyoumean-0.3.1` Dateien). Bis Upstream sauber ist, `click-didyoumean==0.3.1` beibehalten.
+- Backend-Python-Kommandos nach Möglichkeit aus `backend/` ausführen. Das Repo-Root ist seit dem uv-Workspace (`pyproject.toml` mit `[tool.uv.workspace] members = ["backend"]`) für `uv run` aus dem Root nutzbar (z. B. `uv run katalon-manage`), `backend/.venv/bin/katalon-manage` (expliziter Interpreter) funktioniert ebenfalls. `Settings` liest `.env` seit der Source-Relokalisierung aus `backend/.env` bzw. Repo-Root (siehe `almanac/reference/operations/environment-and-secrets.md`).
+- Backend-Tests immer mit einem mindestens 32 Zeichen langen Testschlüssel starten, z. B. `KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest ...`. Nicht erst einen Lauf ohne diese Variable versuchen. Via Root-`.env` kann die Variable implizit gesetzt sein, da `Settings` die `.env` source-relativ auflöst.
+- Wenn `uv` über den Workspace-Lock stolpert: der problematische Fall ist `click-didyoumean` mit inkonsistentem Lock-Eintrag (`version = "0.3.2"` zeigt auf `click_didyoumean-0.3.1` Dateien). Effektiver Lock ist seit dem uv-Workspace das Root-`uv.lock` (nicht mehr `backend/uv.lock`). Bis Upstream sauber ist, `click-didyoumean==0.3.1` beibehalten.
 
 ## Port-Regel Dev vs. Prod-Compose
 

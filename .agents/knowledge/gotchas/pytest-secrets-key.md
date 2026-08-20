@@ -40,6 +40,12 @@ cd backend
 KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest -q
 ```
 
+Seit dem uv-Workspace und der source-relativen `.env`-Auflösung kann dieselbe
+Variable auch aus dem Repo-Root kommen und den Lauf schon ohne manuelles Export
+versorgen: `Settings` liest `backend/.env` und Root-`.env`, und `uv run
+katalon-manage` / `uv run pytest` sind aus dem Root nutzbar. Die explizite
+Env-Var-Form oben bleibt die dokumentierte, umgebungsunabhängige Variante.
+
 Nicht im `api`-Container laufen lassen — das ist ein Prod-Image ohne `pytest`.
 
 # Citations

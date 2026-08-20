@@ -9,6 +9,12 @@ sources:
   - id: config
     type: file
     path: backend/src/katalon/config.py
+  - id: errors
+    type: file
+    path: backend/src/katalon/errors.py
+  - id: management-runner
+    type: file
+    path: backend/src/katalon/management/runner.py
   - id: main
     type: file
     path: backend/src/katalon/main.py
@@ -26,7 +32,7 @@ sources:
     path: .agents/knowledge/gotchas/pytest-secrets-key.md
 ---
 
-Katalon reads backend configuration through Pydantic settings, with `.env` support and environment variables mapped to fields in `backend/src/katalon/config.py` [@config]. Most variables have development defaults, but `KATALON_SECRETS_KEY` is required at settings construction time and must be at least 32 characters [@config]. Production startup also refuses insecure `SECRET_KEY` values and well-known default admin passwords when `DEBUG` is false [@main].
+Katalon reads backend configuration through Pydantic settings, with `.env` support and environment variables mapped to fields in `backend/src/katalon/config.py` [@config]. `.env` files are resolved relative to the source tree, not the current working directory: `backend/.env` and the repository root `.env` are both read, with the root file on the higher-precedence slot (later file wins) [@config]. Most variables have development defaults, but `KATALON_SECRETS_KEY` is required at settings construction time and must be at least 32 characters [@config]. On the CLI, a missing or too-short `KATALON_SECRETS_KEY` surfaces as a single readable message through the `katalon-manage` launcher rather than a Pydantic stack trace [@errors] [@management-runner]. Production startup also refuses insecure `SECRET_KEY` values and well-known default admin passwords when `DEBUG` is false [@main].
 
 ## Required Secrets
 
@@ -89,5 +95,7 @@ Because `Settings()` is instantiated during imports, backend tests that import t
 cd backend
 KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest -q
 ```
+
+Because `Settings` now also resolves the repository root `.env` regardless of the working directory, running from the repo root can satisfy the requirement from `.env` without exporting the variable manually. The explicit env-var form above stays the documented, environment-agnostic default [@config].
 
 The security policy tests import `app` from `katalon.main`, so they depend on settings import succeeding before the actual route assertions can run [@security-tests]. Broader test commands and validation context belong in [Testing And Validation](../../guides/development/testing-and-validation), while the backend configuration architecture is covered by [Security And Configuration](../../architecture/backend/security-and-configuration).

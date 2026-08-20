@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.11] - 2026-08-20
+
+### Added
+- Repo-Root als uv-Workspace (`pyproject.toml` mit `members = ["backend"]`): `uv run katalon-manage` und `uv run pytest` direkt aus dem Root nutzbar.
+- `katalon-manage`-Launcher (`katalon.management.runner`): fehlender/zu kurzer `KATALON_SECRETS_KEY` meldet eine einzelne lesbare Zeile auf stderr statt eines Pydantic-Stacktraces.
+
+### Changed
+- `Settings` löst `.env` source-relativ auf (`backend/.env` und Root-`.env`), unabhängig vom Arbeitsverzeichnis.
+
 ## [1.2.10] - 2026-08-20
 
 ### Added

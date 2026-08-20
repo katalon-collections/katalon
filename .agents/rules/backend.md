@@ -5,8 +5,8 @@ Gilt für `backend/`. Extrahiert aus `backend/pyproject.toml`, root `AGENTS.md` 
 ## Tooling & Ausführung
 
 - Immer `uv` für Package-Management, `uv venv` für virtuelle Umgebungen. Nie `pip` direkt.
-- Backend-Python-Kommandos immer aus `backend/` ausführen. Vom Repo-Root gestartete Tests können im falschen Interpreter landen (verlieren dann Dependencies wie `jinja2`).
-- `click-didyoumean==0.3.1` gepinnt halten — `uv` stolpert sonst über einen inkonsistenten Lock-Eintrag in `backend/uv.lock` (`version = "0.3.2"` zeigt auf `0.3.1`-Dateien). Nicht ändern bis Upstream sauber ist.
+- Backend-Python-Kommandos nach Möglichkeit aus `backend/` ausführen. Das Repo-Root ist seit dem uv-Workspace (`pyproject.toml` mit `[tool.uv.workspace] members = ["backend"]`) für `uv run` direkt nutzbar (z. B. `uv run katalon-manage`); `Settings` löst `.env` source-relativ auf (backend + Root).
+- `click-didyoumean==0.3.1` gepinnt halten — `uv` stolpert sonst über einen inkonsistenten Lock-Eintrag. Effektiver Lock ist seit dem uv-Workspace das Root-`uv.lock` (nicht `backend/uv.lock`). Nicht ändern bis Upstream sauber ist.
 - Python 3.12+, `hatchling`-Build.
 
 ## Lint & Types

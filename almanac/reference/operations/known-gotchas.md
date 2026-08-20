@@ -42,9 +42,20 @@ sources:
   - id: gotcha-secrets
     type: file
     path: .agents/knowledge/gotchas/pytest-secrets-key.md
+  - id: config
+    type: file
+    path: backend/src/katalon/config.py
+  - id: management-runner
+    type: file
+    path: backend/src/katalon/management/runner.py
+  - id: errors
+    type: file
+    path: backend/src/katalon/errors.py
 ---
 
 Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, reload nginx and frontend containers after route-prefix changes, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
+
+Background-configuration details move with `.env` resolution: `Settings` now reads `backend/.env` and the repository root `.env` from absolute source-relative paths, so backend commands are no longer coupled to a particular working directory for config [@config]. `katalon-manage` runs from the repo root with `backend/.venv/bin/katalon-manage` and reports a missing or short `KATALON_SECRETS_KEY` as one readable line via `backend/src/katalon/management/runner.py` [@management-runner] [@errors].
 
 ## Ports And Stack Choice
 
@@ -60,11 +71,13 @@ Before changing `docker/Dockerfile.admin`, `docker/nginx.admin.conf`, or `fronte
 
 ## Backend Command Location
 
-Backend Python commands should run from `backend/`, not the repository root, because the root also has a `.venv` and can select an interpreter that misses backend dependencies such as `jinja2` [@agents]. This applies to pytest, migrations, dependency syncs, and ad hoc backend commands.
+Backend Python commands should run from `backend/`, not the repository root, to keep a single, predictable interpreter [@agents]. This applies to pytest, migrations, dependency syncs, and ad hoc backend commands.
+
+Since the repository root is a uv workspace (`pyproject.toml` with `members = ["backend"]`), `uv run` from the root resolves the backend environment correctly and `katalon-manage` is directly usable there (`uv run katalon-manage ...`); the explicit `backend/.venv/bin/katalon-manage` interpreter also works and reads `.env` from absolute source paths [@backend-pyproject] [@config] [@management-runner].
 
 ## uv Lock Pin
 
-The known `uv` dependency trap is `click-didyoumean`: the repository note records an inconsistent `backend/uv.lock` state where version `0.3.2` points at `click_didyoumean-0.3.1` files [@gotcha-click]. Keep `click-didyoumean==0.3.1` pinned until the lock condition is deliberately checked and fixed [@agents] [@gotcha-click].
+The known `uv` dependency trap is `click-didyoumean`: the repository note records an inconsistent lock state where the entry version `0.3.2` points at `click_didyoumean-0.3.1` files [@gotcha-click]. Since the repository root is a uv workspace (`pyproject.toml` with `members = ["backend"]`), the effective lock is the root `uv.lock`; `backend/uv.lock` is superseded [@config]. Keep `click-didyoumean==0.3.1` pinned in `backend/pyproject.toml` until the lock condition is deliberately checked and fixed [@agents] [@gotcha-click].
 
 ## pytest Secrets Key
 
@@ -75,7 +88,7 @@ cd backend
 KATALON_SECRETS_KEY="test-katalon-secrets-key-32-chars" uv run pytest -q
 ```
 
-The CI backend workflow sets the same environment variable globally, but local shells do not inherit that automatically [@gotcha-secrets].
+The CI backend workflow sets the same environment variable globally, but local shells do not inherit that automatically [@gotcha-secrets]. Because `Settings` now reads the repository root `.env` from an absolute path, running from the repo root (where `.env` lives) can satisfy the requirement without exporting it by hand [@config].
 
 ## Database Volumes
 

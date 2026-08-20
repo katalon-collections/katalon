@@ -1,12 +1,27 @@
 import json
+from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from katalon.errors import KatalonSecretsKeyError
+
+
+def _resolve_env_files() -> tuple[str, ...]:
+    """Resolve .env files independent of the current working directory.
+
+    Ordered by precedence (later files win). The repo root .env is the
+    canonical source, so it is listed last and overrides backend/.env.
+    """
+    here = Path(__file__).resolve().parent
+    backend_dir = here.parents[2]
+    repo_root = here.parents[3]
+    return (str(backend_dir / ".env"), str(repo_root / ".env"))
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_resolve_env_files(), env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://katalon:katalon@localhost:5432/katalon"
     redis_url: str = "redis://localhost:6379/0"
@@ -84,4 +99,18 @@ class Settings(BaseSettings):
 
 
 
-settings = Settings()
+def _build_settings() -> Settings:
+    try:
+        return Settings()
+    except ValidationError as exc:
+        fields = {str(e.get("loc", ())[0]) for e in exc.errors()}
+        if "katalon_secrets_key" in fields:
+            raise KatalonSecretsKeyError(
+                "KATALON_SECRETS_KEY muss gesetzt und mindestens 32 Zeichen lang sein. "
+                "Setze die Umgebungsvariable (z. B. export KATALON_SECRETS_KEY=..."
+                ") oder trage sie in .env ein (Vorlage: .env.example)."
+            ) from exc
+        raise
+
+
+settings = _build_settings()
