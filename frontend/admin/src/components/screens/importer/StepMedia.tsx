@@ -4,7 +4,11 @@ import type { MediaBatchStatus } from '../../../api/client'
 
 const MEDIA_BATCH_TASK_STORAGE_KEY = 'katalon_media_batch_task_id'
 
-export function StepMedia() {
+interface Props {
+  focusHeading?: boolean
+}
+
+export function StepMedia({ focusHeading = false }: Props) {
   const [mediaArchive, setMediaArchive] = useState<File | null>(null)
   const [mediaMapping, setMediaMapping] = useState<File | null>(null)
   const [mediaFolderFiles, setMediaFolderFiles] = useState<File[]>([])
@@ -14,10 +18,15 @@ export function StepMedia() {
   const [mediaErr, setMediaErr] = useState<string | null>(null)
   const mediaPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     folderInputRef.current?.setAttribute('webkitdirectory', '')
   }, [])
+
+  useEffect(() => {
+    if (focusHeading) headingRef.current?.focus()
+  }, [focusHeading])
 
   useEffect(() => {
     const persistedTaskId = localStorage.getItem(MEDIA_BATCH_TASK_STORAGE_KEY)
@@ -70,41 +79,46 @@ export function StepMedia() {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Batch-Medienimport</h2>
+    <div className="media-import-content" style={{ padding: '24px' }}>
+      <h2 ref={headingRef} tabIndex={-1} style={{ margin: '0 0 4px', fontSize: 18 }}>Batch-Medienimport</h2>
       <div className="sub" style={{ marginBottom: 16 }}>
-        ZIP + CSV-Mapping oder Bildordner hochladen. Verarbeitung läuft asynchron im Hintergrund.
+        Bildordner oder ZIP hochladen. Gespeicherte Referenzen aus dem Metadatenimport ordnen passende Dateinamen automatisch den Objekten zu.
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
         <div className="bd" style={{ display: 'grid', gap: 10 }}>
-          <label style={{ fontSize: 12 }}>
+          <label className="media-import-file" style={{ fontSize: 12 }}>
             ZIP-Archiv (optional, wenn Ordner-Upload genutzt wird)
             <input type="file" accept=".zip" onChange={e => setMediaArchive(e.target.files?.[0] ?? null)} style={{ display: 'block', marginTop: 4 }} />
           </label>
-          <label style={{ fontSize: 12 }}>
-            CSV-Mapping (optional: Spalten filename/dateiname, object_id/objekt_id, media_type/medientyp)
-            <input type="file" accept=".csv,.tsv" onChange={e => setMediaMapping(e.target.files?.[0] ?? null)} style={{ display: 'block', marginTop: 4 }} />
-          </label>
-          <label style={{ fontSize: 12 }}>
+          <label className="media-import-file" style={{ fontSize: 12 }}>
             Bildordner (optional)
             <input ref={folderInputRef} type="file" multiple onChange={e => setMediaFolderFiles(Array.from(e.target.files ?? []))} style={{ display: 'block', marginTop: 4 }} />
           </label>
-          <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-            Ordner-Matching ohne CSV: Ordnername = Objekt-ID oder Dateiname startet mit Objekt-ID.
-          </div>
+          <details className="media-import-manual">
+            <summary>Manuelle CSV-Zuordnung</summary>
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              <label className="media-import-file" style={{ fontSize: 12 }}>
+                CSV/TSV mit filename/dateiname, object_id/objekt_id und optional media_type/medientyp
+                <input type="file" accept=".csv,.tsv" onChange={e => setMediaMapping(e.target.files?.[0] ?? null)} style={{ display: 'block', marginTop: 4 }} />
+              </label>
+              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                Ohne gespeicherte Referenz oder CSV bleibt die bisherige UUID-Zuordnung möglich: Ordnername = Objekt-ID oder Dateiname beginnt mit Objekt-ID.
+              </div>
+            </div>
+          </details>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn pri" onClick={startMediaBatchImport} disabled={mediaBusy}>
               {mediaBusy ? 'Starte…' : 'Batch-Import starten'}
             </button>
             {mediaTaskId && <span className="sub">Task: {mediaTaskId}</span>}
           </div>
-          {mediaErr && <div style={{ color: '#b91c1c', fontSize: 12 }}>{mediaErr}</div>}
+          {mediaErr && <div role="alert" style={{ color: '#b91c1c', fontSize: 12 }}>{mediaErr}</div>}
         </div>
       </div>
 
       {mediaTaskStatus && (
-        <div className="card" style={{ marginTop: 12 }}>
+        <div className="card" style={{ marginTop: 12 }} role="status">
           <div className="hd">Batch-Status: {mediaTaskStatus.state}</div>
           <div className="bd" style={{ fontSize: 12 }}>
             {(mediaTaskStatus.state === 'PENDING' || mediaTaskStatus.state === 'STARTED') && (

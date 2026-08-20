@@ -98,6 +98,7 @@ def media_references_for_rows(
         if len(row_indexes) > 1
     ]
     return extracted, {
+        "selector_found": any(selector in row for row in rows),
         "objects": sum(bool(references) for references in extracted),
         "files": sum(len(references) for references in extracted),
         "empty": sum(not references for references in extracted),

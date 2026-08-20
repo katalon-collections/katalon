@@ -6,6 +6,8 @@ interface Props {
   taskId: string | null
   onBack: () => void
   onReset: () => void
+  onOpenMedia: () => void
+  mediaReferencesSelected: boolean
 }
 
 function formatEta(seconds: number): string {
@@ -13,7 +15,7 @@ function formatEta(seconds: number): string {
   return `${Math.ceil(seconds / 60)} Min.`
 }
 
-export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
+export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, mediaReferencesSelected }: Props) {
   const historyRef = useRef<{ t: number; n: number }[]>([])
   const [eta, setEta] = useState<number | null>(null)
 
@@ -92,6 +94,11 @@ export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
                   )}
                 </div>
               )}
+              {mediaReferencesSelected && (
+                <div style={{ color: '#166534' }}>
+                  <b>{taskStatus.result.media_references_created ?? 0}</b> Medienreferenzen gespeichert
+                </div>
+              )}
               {taskStatus.result.errors.length > 0 && (
                 <div style={{ color: '#b91c1c' }}>
                   <b>{taskStatus.result.errors.length}</b> Fehler beim Import
@@ -118,6 +125,9 @@ export function StepResult({ taskStatus, taskId, onBack, onReset }: Props) {
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
         <button className="btn" onClick={onBack}>← Zurück zum Mapping</button>
+        {taskStatus?.state === 'SUCCESS' && mediaReferencesSelected && (
+          <button className="btn pri" onClick={onOpenMedia}>Medien hochladen</button>
+        )}
         <button className="btn gh" onClick={onReset}>Neuer Import</button>
       </div>
     </div>

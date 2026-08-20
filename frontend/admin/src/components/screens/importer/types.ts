@@ -3,6 +3,7 @@ import type { UploadResult, DryRunResult, TaskStatus, MappingEntry, XmlElementLe
 export interface ImportProfile {
   version: 1
   record_type: string
+  mediaSelector?: string | null
   idnoStrategy: string
   upsertStrategy: string
   autoPublish: boolean
@@ -19,6 +20,7 @@ export interface ImportProfile {
 
 export interface ProfileApplyResult {
   appliedMapping: Record<string, MappingEntry>
+  mediaSelector: string | null
   newPendingFields: PendingField[]
   missedSelectors: string[]
   missingFieldNames: string[]
@@ -51,6 +53,7 @@ export interface ImporterState {
   xmlSelectors: XmlSelector[] | null
   // Mapping
   mapping: Record<string, MappingEntry>
+  mediaSelector: string | null
   idnoStrategy: string
   idnoColumn: string | null
   // Options
@@ -78,6 +81,7 @@ export type ImporterAction =
   | { type: 'XML_SELECTORS_LOADING' }
   | { type: 'XML_RECORD_XPATH_SET'; payload: { uploaded: UploadResult; selectors: XmlSelector[] } }
   | { type: 'MAPPING_CHANGED'; payload: Record<string, MappingEntry> }
+  | { type: 'MEDIA_SELECTOR_CHANGED'; payload: string | null }
   | { type: 'IDNO_STRATEGY_CHANGED'; payload: { strategy: string; column: string | null } }
   | { type: 'OPTIONS_CHANGED'; payload: Partial<Pick<ImporterState, 'upsertStrategy' | 'autoPublish'>> }
   | { type: 'PENDING_FIELDS_CHANGED'; payload: PendingField[] }
@@ -88,6 +92,7 @@ export type ImporterAction =
   | { type: 'STEP_SET'; payload: number }
   | { type: 'PROFILE_APPLIED'; payload: {
       mapping: Record<string, MappingEntry>
+      mediaSelector: string | null
       pendingFields: PendingField[]
       upsertStrategy: string
       autoPublish: boolean
@@ -100,7 +105,7 @@ export type ImporterAction =
 export type PersistedImporterState = Pick<
   ImporterState,
   'step' | 'recordType' | 'subtype' | 'mapping' | 'idnoStrategy' | 'idnoColumn'
-  | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields'
+  | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields'
 >
 
 // ── Constants ──────────────────────────────────────────────────────────────────

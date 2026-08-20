@@ -12,6 +12,9 @@ sources:
   - id: version-migration
     type: file
     path: backend/migrations/versions/0027_record_version.py
+  - id: media-reference-migration
+    type: file
+    path: backend/migrations/versions/0038_media_import_references.py
 ---
 
 Katalon's persistence model uses PostgreSQL as the durable system of record, with separate ORM tables for record classes and JSONB columns for configurable metadata. Objects, entities, places, occurrences, and procedures all have stable columns for identity, status, timestamps, and search state, while user-defined fields live in the `metadata` JSONB column [@models]. The initial migration creates PostGIS and `pg_trgm` extensions, then builds the primary tables and supporting tables for users, schema definitions, vocabularies, relations, media, audit logs, snapshots, and authority sources [@initial-migration].
@@ -31,6 +34,8 @@ PostgreSQL indexes are tuned around that split. The ORM defines GIN indexes on m
 ## Relations, Media, And Configuration
 
 Relations are generic rows with `from_type`, `from_id`, `to_type`, `to_id`, `relation_type`, JSONB metadata, and indexes for both directions [@models]. Media files belong to objects through a foreign key and store filename, MIME type, filesystem path, IIIF manifest JSON, status, primary-image flag, and rights fields [@models].
+
+`MediaImportReference` stores a pending link from an object to a source filename before the file itself is uploaded. It keeps the original filename and a normalized basename used for matching. The table has indexes on `object_id` and `normalized_filename`, a uniqueness constraint across both columns, and an object foreign key with cascade deletion [@models] [@media-reference-migration]. These technical references remain outside the object's configurable `metadata` JSONB. A successful batch upload consumes its matching reference; a failed upload leaves it available for retry.
 
 Several product settings are singleton-like records. `PortalConfig` and `AdminConfig` use a string primary key defaulting to `default`, and both store structured settings in ordinary columns and JSONB fields [@models]. `AppSecret` stores encrypted values by key, while `AuthoritySource` stores adapter class names and adapter config in JSONB [@models].
 

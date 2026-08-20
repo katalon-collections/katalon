@@ -98,12 +98,14 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
         "errors": [],
     }
 
-    planned: list[tuple[Path, str, str | None, uuid.UUID | None]] = []
+    planned: list[tuple[Path, str, str | None, uuid.UUID | None, bool]] = []
     automatic_files: list[Path] = []
     if mapping_path.exists():
         rows, mapping_errors = parse_mapping_csv(mapping_path.read_bytes())
         report["errors"].extend(mapping_errors)
-        for row in rows:
+        explicitly_mapped: set[Path] = set()
+        explicit_targets: dict[Path, set[tuple[str, str | None]]] = {}
+        for row in rows if not mapping_errors else []:
             matches = by_basename.get(normalize_filename(row.filename), [])
             if not matches:
                 report["missing_files"].append({"row": row.row, "filename": row.filename})
@@ -111,7 +113,27 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             if len(matches) > 1:
                 report["duplicate_files"].append({"row": row.row, "filename": row.filename})
                 continue
-            planned.append((matches[0], row.object_id, row.media_type, None))
+            explicitly_mapped.add(matches[0])
+            explicit_targets.setdefault(matches[0], set()).add(
+                (row.object_id, row.media_type)
+            )
+        for file_path, targets in explicit_targets.items():
+            if len(targets) > 1:
+                report["errors"].append({
+                    "row": None,
+                    "message": (
+                        f"Datei {file_path.name} hat mehrere unterschiedliche CSV-Ziele"
+                    ),
+                })
+                continue
+            explicit_object_id, explicit_media_type = next(iter(targets))
+            planned.append(
+                (file_path, explicit_object_id, explicit_media_type, None, True)
+            )
+        if not mapping_errors:
+            automatic_files = [
+                file_path for file_path in files if file_path not in explicitly_mapped
+            ]
     else:
         automatic_files = files
 
@@ -163,20 +185,20 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 continue
             if references:
                 reference = references[0]
-                planned.append((file_path, str(reference.object_id), None, reference.id))
+                planned.append((file_path, str(reference.object_id), None, reference.id, False))
                 continue
             object_id = folder_or_filename_object_id(rel)
             if not object_id:
                 report["unmatched_files"].append({"filename": rel})
                 continue
-            planned.append((file_path, object_id, None, None))
+            planned.append((file_path, object_id, None, None, False))
 
         total = len(planned)
 
         media_root = Path(settings.media_root)
         media_root.mkdir(parents=True, exist_ok=True)
 
-        for file_path, object_id_raw, media_type, reference_id in planned:
+        for file_path, object_id_raw, media_type, reference_id, manual_override in planned:
             processed += 1
             task.update_state(
                 state="STARTED",
@@ -254,17 +276,19 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             session.add(media)
             await session.flush()
 
-            consumed_reference = (
-                await session.get(MediaImportReference, reference_id)
-                if reference_id is not None
-                else (await session.execute(
+            consumed_references = []
+            if reference_id is not None:
+                consumed_reference = await session.get(MediaImportReference, reference_id)
+                if consumed_reference is not None:
+                    consumed_references.append(consumed_reference)
+            elif manual_override:
+                consumed_references = list((await session.execute(
                     select(MediaImportReference).where(
                         MediaImportReference.object_id == object_uuid,
                         MediaImportReference.normalized_filename == normalize_filename(file_path.name),
                     )
-                )).scalar_one_or_none()
-            )
-            if consumed_reference is not None:
+                )).scalars().all())
+            for consumed_reference in consumed_references:
                 await session.delete(consumed_reference)
             generate_iiif_tiles.delay(str(file_id))
             created += 1

@@ -1,8 +1,8 @@
-# Katalon – CSV-Importer
+# Katalon: Metadaten- und Medienimport
 
 ## Zweck
 
-Der CSV-Importer dient der Massenerfassung von Datensätzen aus tabellarischen Quelldaten. Typische Anwendungsfälle:
+Der Metadatenimport dient der Massenerfassung von Datensätzen aus tabellarischen oder XML-basierten Quelldaten. Typische Anwendungsfälle:
 
 - Migration aus einem Altsystem (Excel-Listen, Access-Datenbanken als CSV-Export)
 - Initialerfassung von Beständen aus vorhandenen Inventartabellen
@@ -18,11 +18,11 @@ Der Importer ist in der Admin-UI unter **Importer** erreichbar.
 
 | Eigenschaft | Details |
 |---|---|
-| Dateiformate | CSV, TSV, Excel (.xlsx/.xls), XML |
+| Dateiformate | CSV, TSV, Excel (.xlsx), XML |
 | Zeichenkodierung | UTF-8 (mit oder ohne BOM) |
 | Trennzeichen | Automatische Erkennung: Komma (`,`), Semikolon (`;`), Tabulator (`\t`), Pipe (`\|`) |
 | Kopfzeile | Pflicht — erste Zeile wird als Spaltennamen interpretiert |
-| Maximale Dateigröße | 100 MB |
+| Maximale Gesamtgröße | 100 MB pro Upload-Anfrage; bei mehreren XML-Dateien zählt ihre Summe |
 | XML | Zwei-Schritt-Flow: Upload, dann Record-Element wählen |
 
 Die Trennzeichenerkennung analysiert die ersten 4 KB der Datei und wählt das häufigste Zeichen aus den unterstützten Trennzeichen.
@@ -38,16 +38,16 @@ Die Trennzeichenerkennung analysiert die ersten 4 KB der Datei und wählt das h�
 3. Nach dem Upload zeigt der Importer: Anzahl der erkannten Zeilen, Liste der Spaltenköpfe, Vorschau der ersten fünf Zeilen.
 
 Wenn der Upload fehlschlägt:
-- Datei ist größer als 100 MB → Datei aufteilen
+- Datei oder Summe der gemeinsam gewählten Dateien ist größer als 100 MB → Upload aufteilen
 - Dateiformat nicht unterstützt → CSV, TSV, Excel oder XML verwenden
 - Kodierungsfehler → Datei als UTF-8 speichern
 
 ### Schritt 2: Mapping
 
-Das Mapping bestimmt, welche CSV-Spalte welchem Katalon-Feld entspricht.
+Das Mapping bestimmt, welcher Quell-Selector welchem Katalon-Feld entspricht. Bei CSV und Excel ist der Selector eine Spalte, bei XML ein Elementpfad.
 
 Die Mapping-Tabelle zeigt:
-- **CSV-Spalte**: Spaltenname aus der Datei
+- **Quell-Selector**: Spaltenname oder XML-Elementpfad aus der Datei
 - **Beispielwert**: Inhalt der ersten Datenzeile in dieser Spalte
 - **Katalon-Feld**: Dropdown mit allen Feldern des gewählten Typs
 
@@ -81,6 +81,14 @@ Beispiele für automatisches Matching:
 
 Das Auto-Mapping ist ein Vorschlag und kann manuell korrigiert werden.
 
+#### Medienzuordnung bei Objekten
+
+Beim Ziel-Typ **Objekte** kann zusätzlich eine Spalte oder ein XML-Element mit Bilddateinamen gewählt werden. Diese Medienzuordnung ist optional und kein Metadatenfeld. Wiederholte XML-Elemente dürfen mehrere Dateinamen für dasselbe Objekt enthalten.
+
+Erkennt der Importer einen passenden Selector wie `resourceID`, zeigt er einen Vorschlag. Die Zuordnung wird erst übernommen, wenn **verwenden** angeklickt oder der Selector im Auswahlfeld gewählt wurde.
+
+Die Bilddateien werden noch nicht hochgeladen. Der Metadatenimport speichert zunächst nur die Zuordnung zwischen Objekt und Dateiname. Sie wird im späteren Batch-Medienimport verwendet.
+
 ### Schritt 3: Probelauf (Dry Run)
 
 Der Probelauf prüft die gemappten Daten, ohne etwas zu speichern.
@@ -92,6 +100,8 @@ Der Probelauf prüft die gemappten Daten, ohne etwas zu speichern.
 | Pflichtfelder gemappt | Hinweis (Warning) — nicht zwingend ein Fehler pro Zeile |
 | Pflichtfeld in gemappter Spalte ist leer | Fehler für die betroffene Zeile |
 | Zeile hat nach Mapping keine Felder | Fehler — Zeile wird übersprungen |
+| Gewählter Medien-Selector fehlt | Fehler für den Import |
+| Ein Dateiname gehört zu mehreren Datensätzen | Fehler für die betroffenen Zeilen |
 
 **Ausgabe des Probelaufs:**
 
@@ -100,6 +110,7 @@ Der Probelauf prüft die gemappten Daten, ohne etwas zu speichern.
 - **Fehler**: Anzahl Zeilen mit Fehlern, mit Detailtabelle (Zeilennummer + Fehlermeldung)
 - **Hinweise**: Warnungen, die nicht zwingend einen Import-Fehler bedeuten (z.B. nicht gemappte Pflichtfelder)
 - **Vorschau**: Die ersten fünf Datensätze in gemappter Form
+- **Medienzuordnung**: Anzahl der Datensätze mit Medien, erkannte Dateinamen, Datensätze ohne Dateinamen und Konflikte
 
 Zeilen mit Fehlern werden beim echten Import übersprungen. Nur gültige Zeilen werden importiert.
 
@@ -116,7 +127,23 @@ Mögliche Zustände:
 
 Je nach Import-Option kann der Lauf neue Datensätze nachträglich veröffentlichen.
 
+Wenn eine Medienzuordnung gewählt wurde, speichert der Task die erkannten Dateinamen für neu angelegte und aktualisierte Objekte. Bei der Upsert-Strategie `skip` bleiben die vorhandenen Metadaten unverändert; die Medienzuordnungen werden trotzdem am bestehenden Objekt ergänzt. Das Ergebnis nennt die Anzahl der neu gespeicherten Medienreferenzen.
+
 Nach dem Import: **Neuer Import** setzt den Wizard zurück.
+
+### Bilder anschließend hochladen
+
+Nach einem Metadatenimport mit Medienzuordnung führt **Medien hochladen** direkt zum Batch-Medienimport. Alternativ kann der Tab **Medien** geöffnet werden.
+
+1. Einen Bildordner oder ein ZIP-Archiv auswählen.
+2. Den Batch-Import starten.
+3. Katalon vergleicht die Dateinamen mit den gespeicherten Medienreferenzen und legt die Bilder an den passenden Objekten ab.
+
+Groß-/Kleinschreibung und die Unicode-Schreibweise werden beim Vergleich normalisiert. Ordnerbestandteile aus der Quelldatei werden nicht für den Vergleich verwendet. Ein Dateiname muss innerhalb des Imports eindeutig einem Objekt zugeordnet sein. Mehrdeutige oder doppelt hochgeladene Dateinamen werden gemeldet und nicht automatisch verknüpft.
+
+Eine CSV- oder TSV-Datei bleibt als manueller Fallback verfügbar. Sie verwendet die Spalten `filename` oder `dateiname`, `object_id` oder `objekt_id` und optional `media_type` oder `medientyp`. Explizite CSV-Zuordnungen haben Vorrang; nicht in der CSV genannte Dateien können weiterhin über gespeicherte Referenzen oder die bisherige UUID-Konvention zugeordnet werden.
+
+Eine fehlerhafte Mapping-Datei stoppt den Lauf: Es werden keine Bilder importiert, und Katalon wechselt nicht automatisch zur Zuordnung über gespeicherte Referenzen oder UUIDs. Die gemeldeten Mapping-Fehler müssen zuerst korrigiert werden.
 
 ---
 
@@ -153,9 +180,9 @@ Spalten, die auf den leeren String gemappt sind oder nicht im Mapping erscheinen
 
 | Einschränkung | Details |
 |---|---|
-| Nur CSV/TSV | Excel-Dateien (.xlsx, .xls) und XML werden ebenfalls unterstützt. |
-| Max. 100 MB | Größere Dateien müssen aufgeteilt werden. |
-| Kein Medien-Import | Bilddateien laufen über den separaten Batch-Medienimport im Wizard. |
-| Kein Update bestehender Datensätze | Der Import unterstützt `skip`, `merge` und `replace`. |
+| Unterstützte Metadatenformate | CSV, TSV, Excel (.xlsx) und XML. |
+| Max. 100 MB je Upload-Anfrage | Bei mehreren XML-Dateien darf ihre Gesamtgröße 100 MB nicht überschreiten. |
+| Bilddateien in separatem Schritt | Die Zuordnung kann im Metadatenimport vorbereitet werden; die Dateien werden danach im Medien-Tab hochgeladen. |
+| Bestehende Datensätze | `skip`, `merge` und `replace` werden unterstützt. Bei `skip` können Medienreferenzen ergänzt werden, ohne Metadaten zu ändern. |
 | Status immer `draft` | Neue Datensätze starten standardmäßig als `draft`, können aber per `auto_publish` veröffentlicht werden. |
 | Keine Zeichenkodierungskonvertierung | Die Datei muss in UTF-8 vorliegen. Latin-1 oder Windows-1252 kann zu Zeichenfehlern führen. |

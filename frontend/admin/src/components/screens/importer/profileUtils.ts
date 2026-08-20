@@ -4,7 +4,7 @@ import type { ImportProfile, PendingField, ProfileApplyResult } from './types'
 
 export function buildProfile(
   mapping: Record<string, MappingEntry>,
-  options: { record_type: string; idnoStrategy: string; upsertStrategy: string; autoPublish: boolean },
+  options: { record_type: string; mediaSelector: string | null; idnoStrategy: string; upsertStrategy: string; autoPublish: boolean },
   fieldDefs: FieldDefinition[],
 ): ImportProfile {
   const usedTargets = new Set(Object.values(mapping).map(e => e.target))
@@ -44,6 +44,11 @@ export function applyProfile(
   const newPendingFields: PendingField[] = []
   const missedSelectors: string[] = []
   const missingFieldNames: string[] = []
+  const mediaSelector = profile.mediaSelector && selectorSet.has(profile.mediaSelector)
+    ? profile.mediaSelector
+    : null
+
+  if (profile.mediaSelector && !mediaSelector) missedSelectors.push(profile.mediaSelector)
 
   for (const [selector, entry] of Object.entries(profile.mapping)) {
     if (!selectorSet.has(selector)) {
@@ -67,5 +72,5 @@ export function applyProfile(
     }
   }
 
-  return { appliedMapping, newPendingFields, missedSelectors, missingFieldNames }
+  return { appliedMapping, mediaSelector, newPendingFields, missedSelectors, missingFieldNames }
 }

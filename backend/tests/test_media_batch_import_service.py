@@ -52,7 +52,13 @@ def test_media_references_accept_repeated_xml_values() -> None:
         [("Vorderseite.jpg", "vorderseite.jpg"), ("Rückseite.jpg", "rückseite.jpg")],
         [],
     ]
-    assert stats == {"objects": 1, "files": 2, "empty": 1, "conflicts": []}
+    assert stats == {
+        "selector_found": True,
+        "objects": 1,
+        "files": 2,
+        "empty": 1,
+        "conflicts": [],
+    }
 
 
 def test_media_references_block_same_normalized_filename_across_rows() -> None:
@@ -64,3 +70,9 @@ def test_media_references_block_same_normalized_filename_across_rows() -> None:
     _, stats = media_references_for_rows(rows, "resourceID")
 
     assert stats["conflicts"] == [{"filename": "rückseite.jpg", "rows": [2, 3]}]
+
+
+def test_media_references_report_unknown_selector() -> None:
+    _, stats = media_references_for_rows([{"resourceID": "image.jpg"}], "missing")
+
+    assert stats["selector_found"] is False

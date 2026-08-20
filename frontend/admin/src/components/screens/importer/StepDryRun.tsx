@@ -50,7 +50,7 @@ export function StepDryRun({
       </div>
 
       {dryResult.warnings.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
+        <div role="status" style={{ marginBottom: 12 }}>
           {dryResult.warnings.map((w, i) => (
             <div key={i} style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
               {w.row ? `Zeile ${w.row}: ` : ''}{w.message}
@@ -59,8 +59,24 @@ export function StepDryRun({
         </div>
       )}
 
+      {dryResult.media_references && (
+        <div className="card" style={{ marginBottom: 16 }} role="status">
+          <div className="hd">Medienzuordnung</div>
+          <div className="bd" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
+            <span><b>{dryResult.media_references.objects}</b> Datensätze mit Medien</span>
+            <span><b>{dryResult.media_references.files}</b> Dateinamen zur Zuordnung erkannt</span>
+            <span><b>{dryResult.media_references.empty}</b> Datensätze ohne Dateinamen</span>
+            {dryResult.media_references.conflicts.length > 0 && (
+              <span style={{ color: '#b91c1c' }}>
+                <b>{dryResult.media_references.conflicts.length}</b> mehrfach zugeordnete Dateinamen
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {grouped.length > 0 && (
-        <div className="tw" style={{ marginBottom: 12 }}>
+        <div className="tw" style={{ marginBottom: 12 }} role="alert">
           <table className="tbl">
             <thead><tr><th>Fehler</th><th style={{ width: 80, textAlign: 'right' }}>Zeilen</th><th>Beispiel-Zeilen</th></tr></thead>
             <tbody>

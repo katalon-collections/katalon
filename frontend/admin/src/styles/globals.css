@@ -331,6 +331,8 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .importer-types, .importer-subtype { display: flex; gap: 8px; align-items: center; }
 .importer-types { gap: 6px; }
 .importer-subtype { margin-bottom: 16px; }
+.importer-source-select { width: min(100%, 560px); }
+.media-import-manual summary { min-height: 32px; display: flex; align-items: center; cursor: pointer; font-size: 12px; color: var(--fg-2); }
 
 /* Importer steps */
 .steps { display: flex; align-items: center; padding: 18px 24px 0; }
@@ -523,6 +525,9 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .importer-subtype .fld { width: 100% !important; min-height: 44px; }
   .steps { overflow-x: auto; padding: 0; }
   .step { min-height: 44px; flex: 0 0 auto; padding: 8px; }
+  .importer-source-select { min-height: 44px; width: 100%; }
+  .media-import-content { padding: 12px !important; }
+  .media-import-file input, .media-import-manual summary { min-height: 44px; }
 }
 
 @media (max-width: 480px) {

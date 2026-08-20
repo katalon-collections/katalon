@@ -619,6 +619,13 @@ export interface DryRunResult {
   errors: { row: number | null; message: string }[]
   warnings: { row: number | null; message: string }[]
   preview: Record<string, unknown>[]
+  media_references?: {
+    selector_found: boolean
+    objects: number
+    files: number
+    empty: number
+    conflicts: { filename: string; rows: number[] }[]
+  } | null
   vocab_warnings?: { field: string; label: string; unique_count: number; new_count: number; high_cardinality: boolean }[]
   vocab_clusters?: {
     field: string
@@ -629,7 +636,7 @@ export interface DryRunResult {
 
 export interface TaskStatus {
   state: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | string
-  result?: { created: number; updated: number; skipped: number; published: number; publish_failed: number; publish_fail_reasons?: string[]; errors: { row: number; error: string }[] }
+  result?: { created: number; updated: number; skipped: number; published: number; publish_failed: number; publish_fail_reasons?: string[]; media_references_created?: number; errors: { row: number; error: string }[] }
   error?: string
   meta?: { current: number; total: number; stage: string }
 }
@@ -676,10 +683,10 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [] }) }),
-  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[] }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [] }) }),
+  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null }) }),
+  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   cancelTask: (taskId: string): Promise<{ cancelled: boolean }> =>

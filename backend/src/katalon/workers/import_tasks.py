@@ -35,6 +35,7 @@ def import_records_task(
         user_id: optional UUID of the user who triggered the import (for audit log)
     """
     from sqlalchemy import select
+    from sqlalchemy.dialects.postgresql import insert
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.orm.exc import StaleDataError
     from sqlalchemy.pool import NullPool
@@ -81,6 +82,8 @@ def import_records_task(
         if media_selector
         else ([[] for _ in rows], {"conflicts": []})
     )
+    if media_selector and not media_stats["selector_found"]:
+        return {"error": f"Media selector not found: {media_selector}"}
     if media_stats["conflicts"]:
         return {"error": "A media filename is assigned to multiple records"}
 
@@ -259,23 +262,18 @@ def import_records_task(
                 nonlocal media_references_created
                 if not references:
                     return
-                normalized_names = [normalized for _, normalized in references]
-                existing_names = set((await session.execute(
-                    select(MediaImportReference.normalized_filename).where(
-                        MediaImportReference.object_id == object_id,
-                        MediaImportReference.normalized_filename.in_(normalized_names),
-                    )
-                )).scalars().all())
-                for filename, normalized in references:
-                    if normalized in existing_names:
-                        continue
-                    session.add(MediaImportReference(
-                        object_id=object_id,
-                        filename=filename,
-                        normalized_filename=normalized,
-                    ))
-                    existing_names.add(normalized)
-                    media_references_created += 1
+                statement = insert(MediaImportReference).values([
+                    {
+                        "object_id": object_id,
+                        "filename": filename,
+                        "normalized_filename": normalized,
+                    }
+                    for filename, normalized in references
+                ]).on_conflict_do_nothing(
+                    constraint="uq_media_import_references_object_filename"
+                ).returning(MediaImportReference.id)
+                inserted_ids = (await session.execute(statement)).scalars().all()
+                media_references_created += len(inserted_ids)
 
             # Resolve vocab field values: string → {id, label} by looking up/creating terms
             records = await _resolve_vocab_terms(session, field_defs, records)

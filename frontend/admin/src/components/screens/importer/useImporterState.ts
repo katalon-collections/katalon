@@ -140,6 +140,7 @@ function buildInitialState(persisted: PersistedImporterState | null): ImporterSt
     xmlSelectorsLoading: false,
     xmlSelectors:   null,
     mapping:        persisted?.mapping       ?? {},
+    mediaSelector:  persisted?.recordType === 'object' ? (persisted.mediaSelector ?? null) : null,
     idnoStrategy:   persisted?.idnoStrategy  ?? 'auto',
     idnoColumn:     persisted?.idnoColumn    ?? null,
     upsertStrategy: persisted?.upsertStrategy ?? 'skip',
@@ -175,7 +176,19 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       return { ...state, uploading: true, uploadErr: null }
 
     case 'UPLOADED':
-      return { ...state, uploading: false, uploaded: action.payload, sourceType: action.payload.source_type ?? 'csv', mapping: {}, step: 1, uploadErr: null, needsReupload: false }
+      return {
+        ...state,
+        uploading: false,
+        uploaded: action.payload,
+        sourceType: action.payload.source_type ?? 'csv',
+        mapping: {},
+        mediaSelector: state.mediaSelector && action.payload.headers.includes(state.mediaSelector)
+          ? state.mediaSelector
+          : null,
+        step: 1,
+        uploadErr: null,
+        needsReupload: false,
+      }
 
     case 'UPLOAD_ERROR':
       return { ...state, uploading: false, uploadErr: action.payload }
@@ -199,11 +212,17 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
         xmlSelectors: action.payload.selectors,
         uploaded: action.payload.uploaded,
         mapping: {},
+        mediaSelector: state.mediaSelector && action.payload.uploaded.headers.includes(state.mediaSelector)
+          ? state.mediaSelector
+          : null,
         step: 2, // Mapping step for XML
       }
 
     case 'MAPPING_CHANGED':
       return { ...state, mapping: action.payload }
+
+    case 'MEDIA_SELECTOR_CHANGED':
+      return { ...state, mediaSelector: state.recordType === 'object' ? action.payload : null }
 
     case 'IDNO_STRATEGY_CHANGED': {
       const { strategy, column } = action.payload
@@ -237,8 +256,8 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       return { ...state, step: action.payload }
 
     case 'PROFILE_APPLIED': {
-      const { mapping, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
-      return { ...state, mapping, pendingFields, upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
+      const { mapping, mediaSelector, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
+      return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields, upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
     }
 
     case 'RESET':
@@ -280,11 +299,16 @@ export function useImporterState(): ImporterStateAndHandlers {
   const [availableSubtypes, setAvailableSubtypes] = React.useState<RecordSubtype[]>([])
   const [profileWarnings, setProfileWarnings] = React.useState<ProfileApplyResult | null>(null)
 
+  useEffect(() => {
+    setProfileWarnings(null)
+  }, [state.recordType, state.uploaded?.upload_id])
+
   // Persist to localStorage — rows are NOT saved (too large); on restore, user must re-upload
   useEffect(() => {
     const toSave: PersistedImporterState = {
       step: state.step, recordType: state.recordType, subtype: state.subtype,
       mapping: state.mapping, idnoStrategy: state.idnoStrategy, idnoColumn: state.idnoColumn,
+      mediaSelector: state.recordType === 'object' ? state.mediaSelector : null,
       upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish,
       uploaded: state.uploaded ? { ...state.uploaded, upload_id: '' } : null,
       dryResult: state.dryResult, taskId: state.taskId,
@@ -292,7 +316,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(toSave))
   }, [
-    state.step, state.recordType, state.subtype, state.mapping, state.idnoStrategy,
+    state.step, state.recordType, state.subtype, state.mapping, state.mediaSelector, state.idnoStrategy,
     state.idnoColumn, state.upsertStrategy, state.autoPublish, state.uploaded,
     state.dryResult, state.taskId, state.pendingFields,
   ])
@@ -346,8 +370,17 @@ export function useImporterState(): ImporterStateAndHandlers {
   // Derived
   const mappedCount = Object.values(state.mapping).filter(m => m.target && m.target !== '__idno__').length
   const uploaded = state.uploaded
+  const mediaSelectorCountedSeparately = !!(
+    uploaded
+    && state.mediaSelector
+    && uploaded.headers.includes(state.mediaSelector)
+    && !state.mapping[state.mediaSelector]?.target
+  )
   const ignoredCount = uploaded
-    ? uploaded.headers.length - mappedCount - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
+    ? uploaded.headers.length
+      - mappedCount
+      - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
+      - (mediaSelectorCountedSeparately ? 1 : 0)
     : 0
   const mappedTargets = new Set(Object.values(state.mapping).map(m => m.target).filter(Boolean))
   const missingRequired = fields.filter(f => f.is_required && !mappedTargets.has(f.name))
@@ -356,6 +389,7 @@ export function useImporterState(): ImporterStateAndHandlers {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   async function handleFile(files: File | File[]) {
+    setProfileWarnings(null)
     dispatch({ type: 'UPLOAD_STARTED' })
     try {
       const raw = await importer.upload(files)
@@ -416,7 +450,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload())
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -442,7 +476,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     dispatch({ type: 'MAPPING_CHANGED', payload: nextMapping })
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, nextMapping, state.subtype, pendingFieldsPayload())
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, nextMapping, state.subtype, pendingFieldsPayload(), state.mediaSelector)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       alert((e as Error).message)
@@ -458,6 +492,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         auto_publish: state.autoPublish,
         subtype: state.subtype,
         fields_to_create: pendingFieldsPayload(),
+        media_selector: state.mediaSelector,
       })
       dispatch({ type: 'IMPORT_STARTED', payload: task_id })
     } catch (e) {
@@ -477,6 +512,7 @@ export function useImporterState(): ImporterStateAndHandlers {
       type: 'PROFILE_APPLIED',
       payload: {
         mapping: result.appliedMapping,
+        mediaSelector: result.mediaSelector,
         pendingFields: result.newPendingFields,
         upsertStrategy: profile.upsertStrategy,
         autoPublish: profile.autoPublish,
@@ -489,7 +525,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     const fieldDefs = await schema.list(state.recordType, state.subtype ?? undefined).catch(() => [] as FieldDefinition[])
     const profile = buildProfile(
       state.mapping,
-      { record_type: state.recordType, idnoStrategy: state.idnoStrategy, upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish },
+      { record_type: state.recordType, mediaSelector: state.mediaSelector, idnoStrategy: state.idnoStrategy, upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish },
       fieldDefs,
     )
     downloadProfile(profile)

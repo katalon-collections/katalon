@@ -11,6 +11,8 @@ interface Props {
   mapping: Record<string, MappingEntry>
   onMappingChange: (m: Record<string, MappingEntry>) => void
   recordType: string
+  mediaSelector: string | null
+  onMediaSelectorChange: (selector: string | null) => void
   idnoStrategy: string
   idnoColumn: string | null
   onIdnoStrategyChange: (strategy: string, column: string | null) => void
@@ -32,6 +34,7 @@ interface Props {
 
 export function StepMapping({
   uploaded, fields, mapping, onMappingChange, recordType,
+  mediaSelector, onMediaSelectorChange,
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
   pendingFields, onPendingFieldsChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
@@ -79,6 +82,14 @@ export function StepMapping({
   // Build path→label lookup for XML selector labels
   const xmlLabelMap = xmlSelectors
     ? Object.fromEntries(xmlSelectors.map(s => [s.path, s.label]))
+    : null
+
+  const suggestedMediaSelector = recordType === 'object'
+    ? uploaded.headers.find(selector => {
+        const label = xmlLabelMap?.[selector] ?? selector
+        const leaf = label.split('/').at(-1)?.split('@')[0].split(':').at(-1)?.toLowerCase()
+        return leaf === 'resourceid' || leaf === 'resource_id'
+      }) ?? null
     : null
 
   // Deep LIDO/XML paths share long common prefixes ("...administrativeMetadata/...") —
@@ -186,6 +197,58 @@ export function StepMapping({
           )}
         </div>
       </div>
+
+      {recordType === 'object' && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">Medienzuordnung (optional)</div>
+          <div className="bd" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label className="lbl" htmlFor="media-selector">
+              {xmlLabelMap ? 'Element mit Dateinamen' : 'Spalte mit Dateinamen'}
+            </label>
+            <select
+              id="media-selector"
+              className="fld importer-source-select"
+              value={mediaSelector ?? ''}
+              aria-describedby="media-selector-help"
+              onChange={e => onMediaSelectorChange(e.target.value || null)}
+            >
+              <option value="">— keine Medien zuordnen —</option>
+              {xmlLabelMap
+                ? Object.entries(
+                    uploaded.headers.reduce<Record<string, string[]>>((groups, h) => {
+                      const label = xmlLabelMap[h] ?? h
+                      const key = groupKey(label) || label
+                      ;(groups[key] ??= []).push(h)
+                      return groups
+                    }, {})
+                  ).map(([group, selectors]) => (
+                    <optgroup key={group} label={group}>
+                      {selectors.map(selector => {
+                        const repeatable = xmlSelectors?.find(s => s.path === selector)?.kind === 'list'
+                        return (
+                          <option key={selector} value={selector}>
+                            {shortSelectorLabel(xmlLabelMap[selector] ?? selector)}{repeatable ? ' (mehrfach)' : ''}
+                          </option>
+                        )
+                      })}
+                    </optgroup>
+                  ))
+                : uploaded.headers.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+            <div id="media-selector-help" style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+              Dateinamen werden beim Metadatenimport am Objekt gespeichert. Der spätere Ordner- oder ZIP-Upload ordnet passende Dateien automatisch zu.
+            </div>
+            {!mediaSelector && suggestedMediaSelector && (
+              <div role="status" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
+                Vorschlag erkannt:{' '}
+                <button className="btn sm gh" onClick={() => onMediaSelectorChange(suggestedMediaSelector)}>
+                  {xmlLabelMap ? shortSelectorLabel(xmlLabelMap[suggestedMediaSelector] ?? suggestedMediaSelector) : suggestedMediaSelector} verwenden
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--fg-2)' }}>
         <b>{uploaded.row_count}</b> Zeilen geladen ·{' '}

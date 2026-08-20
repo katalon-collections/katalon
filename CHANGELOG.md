@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-08-20
+
+### Added
+- Medienzuordnung aus dem Metadatenimport: Eine wählbare Datei-Spalte bzw. ein XML-Element speichert offene Medienreferenzen je Objekt; spätere Ordner- oder ZIP-Uploads ordnen Bilder ohne separate CSV automatisch und konfliktgesichert zu.
+
 ## [1.2.8] - 2026-08-20
 
 ### Fixed

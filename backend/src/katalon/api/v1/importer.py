@@ -323,14 +323,20 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
 
         _, media_stats = media_references_for_rows(rows, body.media_selector)
         dry_result["media_references"] = media_stats
-        for conflict in media_stats["conflicts"]:
-            for row_num in conflict["rows"]:
-                dry_result["errors"].append({
-                    "row": row_num,
-                    "message": (
-                        f"Dateiname '{conflict['filename']}' ist mehreren Datensätzen zugeordnet"
-                    ),
-                })
+        if not media_stats["selector_found"]:
+            dry_result["errors"].append({
+                "row": None,
+                "message": f"Medienzuordnung '{body.media_selector}' wurde nicht gefunden",
+            })
+        else:
+            for conflict in media_stats["conflicts"]:
+                for row_num in conflict["rows"]:
+                    dry_result["errors"].append({
+                        "row": row_num,
+                        "message": (
+                            f"Dateiname '{conflict['filename']}' ist mehreren Datensätzen zugeordnet"
+                        ),
+                    })
     else:
         dry_result["media_references"] = None
 
@@ -399,6 +405,11 @@ async def run_import(body: ImportRequest, current_user: User = require_admin_or_
         from katalon.services.media_batch_import_service import media_references_for_rows
 
         _, media_stats = media_references_for_rows(rows, body.media_selector)
+        if not media_stats["selector_found"]:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Medienzuordnung '{body.media_selector}' wurde nicht gefunden",
+            )
         if media_stats["conflicts"]:
             raise HTTPException(
                 status_code=422,

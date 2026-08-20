@@ -18,6 +18,12 @@ sources:
   - id: batch-service
     type: file
     path: backend/src/katalon/services/media_batch_import_service.py
+  - id: importer-task
+    type: file
+    path: backend/src/katalon/workers/import_tasks.py
+  - id: models
+    type: file
+    path: backend/src/katalon/core/models.py
   - id: admin-config
     type: file
     path: backend/src/katalon/api/v1/admin_config.py
@@ -67,6 +73,8 @@ Media listing and raw file serving both call `ensure_publicly_visible()` for ano
 
 ## Batch Media Import
 
-The batch import endpoint accepts either a ZIP archive or multiple uploaded files, optionally with a CSV or TSV mapping file, and stages them under `media_root/_batch_imports/<job_id>` [@media-api]. `_safe_join()` resolves staged paths under the intended root and rejects archive entries that escape that directory [@media-api].
+The batch import endpoint accepts either a ZIP archive or multiple uploaded files, optionally with a CSV or TSV mapping file, and stages them under `media_root/_batch_imports/<job_id>` [@media-api]. `_safe_join()` resolves staged paths under the intended root and rejects archive entries that escape that directory [@media-api]. Object metadata imports can prepare this step by storing pending `MediaImportReference` rows from a user-selected filename column or XML element [@importer-task] [@models].
 
-`import_media_batch_task` plans file-to-object matches from the mapping CSV or from UUIDs in parent folders and filenames, validates object IDs and optional `media_type` terms, copies accepted files into `media_root`, creates pending `MediaFile` rows, and queues the same `generate_iiif_tiles` task used by single uploads [@media-tasks] [@batch-service]. The batch task reports missing files, duplicate files, unmatched files, validation errors, and created counts, then removes the staging directory after completion or failure [@media-tasks].
+`import_media_batch_task` applies explicit CSV assignments first. Files not named in a valid CSV are matched against pending media references by normalized basename; files without a reference fall back to UUIDs in parent folders or filename prefixes [@media-tasks] [@batch-service]. An invalid mapping CSV blocks automatic processing, and conflicting CSV targets or references to several objects are reported instead of choosing one target [@media-tasks].
+
+After resolving an object, the task validates its ID and any optional `media_type`, copies the image into `media_root`, verifies its MIME type, creates a pending `MediaFile`, and queues the same `generate_iiif_tiles` task used by single uploads [@media-tasks]. A pending media reference is deleted only after the corresponding `MediaFile` has been created successfully in the same database transaction. Failed files retain their references for a later retry [@media-tasks]. The result reports missing files, duplicate files, unmatched files, validation errors, and created counts; the staged job directory is removed after completion or failure [@media-tasks].

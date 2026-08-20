@@ -79,7 +79,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
           ? <div style={{ fontWeight: 600 }}>Lade…</div>
           : <>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>Datei(en) hier ablegen oder klicken</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>CSV, TSV, Excel (.xlsx) oder XML · max. 500 MB · mehrere XML-Dateien möglich (1 Datensatz pro Datei) · im Dialog mit Cmd/Strg+A oder Cmd/Strg-Klick mehrere Dateien markieren</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>CSV, TSV, Excel (.xlsx) oder XML · max. 100 MB · mehrere XML-Dateien möglich (1 Datensatz pro Datei) · im Dialog mit Cmd/Strg+A oder Cmd/Strg-Klick mehrere Dateien markieren</div>
             </>
         }
         <input

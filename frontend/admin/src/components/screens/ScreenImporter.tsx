@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RECORD_TYPES, STEPS, STEPS_XML } from './importer/types'
 import { useImporterState } from './importer/useImporterState'
 import { StepDryRun } from './importer/StepDryRun'
@@ -31,6 +31,7 @@ type Props = { initialTab?: string | null; onTabChange?: (tab: 'metadata' | 'med
 
 export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   const [activeTab, setActiveTab] = useState<'metadata' | 'media'>(initialTab === 'media' ? 'media' : 'metadata')
+  const [focusMediaHeading, setFocusMediaHeading] = useState(false)
 
   const {
     state, needsReupload, dispatch, fields, availableSubtypes,
@@ -42,6 +43,11 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
 
   const isXml = state.sourceType === 'xml'
 
+  useEffect(() => {
+    setActiveTab(initialTab === 'media' ? 'media' : 'metadata')
+    setFocusMediaHeading(false)
+  }, [initialTab])
+
   // Step numbers differ between XML (5 steps) and CSV/Excel (4 steps)
   // XML:     0=Upload  1=Element  2=Mapping  3=DryRun  4=Import
   // CSV/Excel: 0=Upload  1=Mapping  2=DryRun  3=Import
@@ -50,6 +56,12 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   const resultStep    = isXml ? 4 : 3
 
   function reset() { dispatch({ type: 'RESET' }) }
+
+  function selectTab(tab: 'metadata' | 'media', focusHeading = false) {
+    setFocusMediaHeading(focusHeading)
+    setActiveTab(tab)
+    onTabChange?.(tab)
+  }
 
   return (
     <div className="scroll">
@@ -62,7 +74,9 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
         {IMPORTER_TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => { setActiveTab(t.id as 'metadata' | 'media'); onTabChange?.(t.id as 'metadata' | 'media') }}
+            aria-pressed={activeTab === t.id}
+            aria-label={`${t.label}-Import anzeigen`}
+            onClick={() => selectTab(t.id as 'metadata' | 'media')}
             style={{
               padding: '10px 20px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none',
               borderBottom: activeTab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
@@ -137,6 +151,8 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 mapping={state.mapping}
                 onMappingChange={m => dispatch({ type: 'MAPPING_CHANGED', payload: m })}
                 recordType={state.recordType}
+                mediaSelector={state.mediaSelector}
+                onMediaSelectorChange={selector => dispatch({ type: 'MEDIA_SELECTOR_CHANGED', payload: selector })}
                 idnoStrategy={state.idnoStrategy}
                 idnoColumn={state.idnoColumn}
                 onIdnoStrategyChange={(strategy, column) =>
@@ -181,6 +197,8 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 taskId={state.taskId}
                 onBack={() => dispatch({ type: 'STEP_SET', payload: mappingStep })}
                 onReset={reset}
+                onOpenMedia={() => selectTab('media', true)}
+                mediaReferencesSelected={state.mediaSelector !== null}
               />
             )}
           </div>
@@ -188,7 +206,11 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
       )}
 
       {/* ===== MEDIA TAB ===== */}
-      {activeTab === 'media' && <StepMedia />}
+      {activeTab === 'media' && (
+        <div>
+          <StepMedia focusHeading={focusMediaHeading} />
+        </div>
+      )}
     </div>
   )
 }
