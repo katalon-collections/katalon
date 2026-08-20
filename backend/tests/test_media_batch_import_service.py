@@ -1,5 +1,7 @@
 from katalon.services.media_batch_import_service import (
     folder_or_filename_object_id,
+    media_references_for_rows,
+    normalize_filename,
     parse_mapping_csv,
 )
 
@@ -32,3 +34,33 @@ def test_folder_or_filename_object_id_from_folder_name() -> None:
 def test_folder_or_filename_object_id_from_filename_prefix() -> None:
     object_id = folder_or_filename_object_id("bilder/550e8400-e29b-41d4-a716-446655440000_01.jpg")
     assert object_id == "550e8400-e29b-41d4-a716-446655440000"
+
+
+def test_normalize_filename_uses_basename_unicode_nfc_and_casefold() -> None:
+    assert normalize_filename("ordner/Ru\u0308ckseite.JPG") == "rückseite.jpg"
+
+
+def test_media_references_accept_repeated_xml_values() -> None:
+    rows: list[dict[str, object]] = [
+        {"resourceID": ["Vorderseite.jpg", "Rückseite.jpg", "Vorderseite.jpg"]},
+        {"resourceID": ""},
+    ]
+
+    references, stats = media_references_for_rows(rows, "resourceID")
+
+    assert references == [
+        [("Vorderseite.jpg", "vorderseite.jpg"), ("Rückseite.jpg", "rückseite.jpg")],
+        [],
+    ]
+    assert stats == {"objects": 1, "files": 2, "empty": 1, "conflicts": []}
+
+
+def test_media_references_block_same_normalized_filename_across_rows() -> None:
+    rows: list[dict[str, object]] = [
+        {"resourceID": "Ru\u0308ckseite.JPG"},
+        {"resourceID": "rückseite.jpg"},
+    ]
+
+    _, stats = media_references_for_rows(rows, "resourceID")
+
+    assert stats["conflicts"] == [{"filename": "rückseite.jpg", "rows": [2, 3]}]

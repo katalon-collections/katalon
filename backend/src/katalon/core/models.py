@@ -53,6 +53,9 @@ class Object(Base):
     media_files: Mapped[list["MediaFile"]] = relationship(
         back_populates="object", cascade="all, delete-orphan", passive_deletes=True
     )
+    media_import_references: Mapped[list["MediaImportReference"]] = relationship(
+        back_populates="object", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     __table_args__ = (
         Index("ix_objects_metadata_gin", "metadata", postgresql_using="gin"),
@@ -393,6 +396,28 @@ class MediaFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     object: Mapped["Object"] = relationship(back_populates="media_files")
+
+
+class MediaImportReference(Base):
+    __tablename__ = "media_import_references"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    object_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("objects.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(512))
+    normalized_filename: Mapped[str] = mapped_column(String(512), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    object: Mapped["Object"] = relationship(back_populates="media_import_references")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "object_id",
+            "normalized_filename",
+            name="uq_media_import_references_object_filename",
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

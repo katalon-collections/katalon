@@ -60,6 +60,7 @@ class MappingRequest(BaseModel):
     upload_id: str
     record_type: str = "object"
     subtype: str | None = None
+    media_selector: str | None = None
     # Fields the user will create on-the-fly. In dry-run these are merged as
     # transient (unpersisted) field defs so clustering/type-validation see them.
     fields_to_create: list[dict[str, Any]] = Field(default_factory=list[Any])
@@ -249,6 +250,8 @@ async def xml_selectors(body: XmlSelectorsRequest, current_user: User = require_
 async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
+    if body.media_selector and body.record_type != "object":
+        raise HTTPException(status_code=422, detail="Medienzuordnung ist nur für Objekte möglich")
 
     # Validate subtype if provided
     if body.subtype:
@@ -315,6 +318,22 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
         for err in val_errors:
             dry_result["errors"].append({"row": row_num, "message": err})
 
+    if body.media_selector:
+        from katalon.services.media_batch_import_service import media_references_for_rows
+
+        _, media_stats = media_references_for_rows(rows, body.media_selector)
+        dry_result["media_references"] = media_stats
+        for conflict in media_stats["conflicts"]:
+            for row_num in conflict["rows"]:
+                dry_result["errors"].append({
+                    "row": row_num,
+                    "message": (
+                        f"Dateiname '{conflict['filename']}' ist mehreren Datensätzen zugeordnet"
+                    ),
+                })
+    else:
+        dry_result["media_references"] = None
+
     # Recompute valid count after full validation
     dry_result["valid"] = dry_result["total"] - len(dry_result["errors"])
 
@@ -373,7 +392,18 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
 async def run_import(body: ImportRequest, current_user: User = require_admin_or_editor()) -> dict[str, Any]:
     if body.record_type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ: {body.record_type}")
+    if body.media_selector and body.record_type != "object":
+        raise HTTPException(status_code=422, detail="Medienzuordnung ist nur für Objekte möglich")
     rows = _load_rows(body.upload_id)
+    if body.media_selector:
+        from katalon.services.media_batch_import_service import media_references_for_rows
+
+        _, media_stats = media_references_for_rows(rows, body.media_selector)
+        if media_stats["conflicts"]:
+            raise HTTPException(
+                status_code=422,
+                detail="Ein Dateiname ist mehreren Datensätzen zugeordnet",
+            )
     from katalon.workers.import_tasks import import_records_task
     # Serialize mapping for Celery (plain dict)
     serializable_mapping: dict[str, Any] = {}
@@ -391,6 +421,7 @@ async def run_import(body: ImportRequest, current_user: User = require_admin_or_
         user_id=str(current_user.id),
         subtype=body.subtype,
         fields_to_create=body.fields_to_create,
+        media_selector=body.media_selector,
     )
     return {"status": "queued", "task_id": task_id}
 

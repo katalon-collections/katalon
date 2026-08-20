@@ -3,9 +3,11 @@ from __future__ import annotations
 import csv
 import io
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _UUID_PREFIX_RE = re.compile(
     r"^(?P<id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:[_\-\s\.].*)?$"
@@ -63,7 +65,44 @@ def parse_mapping_csv(content: bytes) -> tuple[list[MappingRow], list[dict[str, 
 
 
 def normalize_filename(value: str) -> str:
-    return Path(value).name.lower()
+    return unicodedata.normalize("NFC", Path(value).name).casefold()
+
+
+def media_references_for_rows(
+    rows: list[dict[str, object]], selector: str
+) -> tuple[list[list[tuple[str, str]]], dict[str, Any]]:
+    """Extract and validate pending media filenames from one import selector."""
+    extracted: list[list[tuple[str, str]]] = []
+    rows_by_name: dict[str, set[int]] = {}
+
+    for row_index, row in enumerate(rows):
+        raw = row.get(selector, "")
+        values = raw if isinstance(raw, list) else [raw]
+        references: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for value in values:
+            if value is None:
+                continue
+            filename = Path(str(value).strip()).name
+            normalized = normalize_filename(filename)
+            if not filename or not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            references.append((filename, normalized))
+            rows_by_name.setdefault(normalized, set()).add(row_index)
+        extracted.append(references)
+
+    conflicts = [
+        {"filename": normalized, "rows": [row + 2 for row in sorted(row_indexes)]}
+        for normalized, row_indexes in rows_by_name.items()
+        if len(row_indexes) > 1
+    ]
+    return extracted, {
+        "objects": sum(bool(references) for references in extracted),
+        "files": sum(len(references) for references in extracted),
+        "empty": sum(not references for references in extracted),
+        "conflicts": conflicts,
+    }
 
 
 def folder_or_filename_object_id(relative_path: str) -> str | None:

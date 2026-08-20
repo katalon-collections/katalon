@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-08-20
+
+### Fixed
+- Admin › Einstellungen › Facetten: Das Speichern persistiert jetzt korrekt. Direkte Facetten werden als `is_facet` auf der jeweiligen `FieldDefinition` gesetzt (das Backend verwendet dies als Quelle der Wahrheit und reindexiert automatisch); vererbte Facetten bleiben in `portal_config.facet_fields` gespeichert.
+
 ## [1.2.7] - 2026-08-20
 
 ### Fixed

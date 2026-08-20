@@ -19,6 +19,7 @@ def import_records_task(
     user_id: str | None = None,
     subtype: str | None = None,
     fields_to_create: list[dict[str, Any]] | None = None,
+    media_selector: str | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
 
@@ -43,6 +44,7 @@ def import_records_task(
         AdminConfig,
         Entity,
         FieldDefinition,
+        MediaImportReference,
         Object,
         Occurrence,
         Place,
@@ -52,6 +54,7 @@ def import_records_task(
     from katalon.services.audit_service import log_change
     from katalon.services.idno_service import consume_next_idno
     from katalon.services.importer_service import apply_mapping
+    from katalon.services.media_batch_import_service import media_references_for_rows
     from katalon.services.publish_service import publish_record
     from katalon.services.schema_service import validate_metadata
     from katalon.services.search_service import index_record
@@ -70,6 +73,16 @@ def import_records_task(
     model = model_map.get(record_type)
     if model is None:
         return {"error": f"Unknown record_type: {record_type}"}
+    if media_selector and record_type != "object":
+        return {"error": "Media references are only supported for objects"}
+
+    media_references, media_stats = (
+        media_references_for_rows(cast(list[dict[str, object]], rows), media_selector)
+        if media_selector
+        else ([[] for _ in rows], {"conflicts": []})
+    )
+    if media_stats["conflicts"]:
+        return {"error": "A media filename is assigned to multiple records"}
 
     # Subtype field name varies by type
     subtype_field = {
@@ -102,6 +115,7 @@ def import_records_task(
     published = 0
     publish_failed = 0
     index_failed = 0
+    media_references_created = 0
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     publish_fail_reasons: list[str] = []  # first few unique reasons
@@ -186,7 +200,8 @@ def import_records_task(
         return records
 
     async def _import() -> dict[str, Any]:
-        nonlocal created, updated, skipped, published, publish_failed, index_failed, publish_fail_reasons
+        nonlocal created, updated, skipped, published, publish_failed, index_failed
+        nonlocal media_references_created, publish_fail_reasons
 
         async with AsyncSessionLocal() as session:
             # Validate subtype before processing any rows
@@ -237,6 +252,31 @@ def import_records_task(
 
             records, idnos = apply_mapping(rows, mapping, field_defs)
 
+            async def store_media_references(
+                object_id: uuid.UUID,
+                references: list[tuple[str, str]],
+            ) -> None:
+                nonlocal media_references_created
+                if not references:
+                    return
+                normalized_names = [normalized for _, normalized in references]
+                existing_names = set((await session.execute(
+                    select(MediaImportReference.normalized_filename).where(
+                        MediaImportReference.object_id == object_id,
+                        MediaImportReference.normalized_filename.in_(normalized_names),
+                    )
+                )).scalars().all())
+                for filename, normalized in references:
+                    if normalized in existing_names:
+                        continue
+                    session.add(MediaImportReference(
+                        object_id=object_id,
+                        filename=filename,
+                        normalized_filename=normalized,
+                    ))
+                    existing_names.add(normalized)
+                    media_references_created += 1
+
             # Resolve vocab field values: string → {id, label} by looking up/creating terms
             records = await _resolve_vocab_terms(session, field_defs, records)
 
@@ -247,13 +287,12 @@ def import_records_task(
 
             # Build lookup of existing records by idno for upsert
             existing_by_idno: dict[str, Any] = {}
-            if upsert_strategy != "skip":
-                idnos_to_lookup = [row_idno for row_idno in idnos if row_idno]
-                if idnos_to_lookup:
-                    result = await session.execute(select(model).where(model.idno.in_(idnos_to_lookup)))
-                    for rec in cast(list[Object | Entity | Place | Occurrence], result.scalars().all()):
-                        if rec.idno:
-                            existing_by_idno[rec.idno] = rec
+            idnos_to_lookup = [row_idno for row_idno in idnos if row_idno]
+            if idnos_to_lookup:
+                result = await session.execute(select(model).where(model.idno.in_(idnos_to_lookup)))
+                for rec in cast(list[Object | Entity | Place | Occurrence], result.scalars().all()):
+                    if rec.idno:
+                        existing_by_idno[rec.idno] = rec
 
             total = len(records)
             user_uuid = uuid.UUID(user_id) if user_id else None
@@ -280,6 +319,7 @@ def import_records_task(
                 existing = existing_by_idno.get(idno) if idno else None
                 if existing:
                     if upsert_strategy == "skip":
+                        await store_media_references(existing.id, media_references[i])
                         skipped += 1
                         continue
 
@@ -313,6 +353,7 @@ def import_records_task(
                         continue
 
                     updated += 1
+                    await store_media_references(existing.id, media_references[i])
                     try:
                         await index_record(record_type, existing, session)
                     except Exception as e:
@@ -350,6 +391,7 @@ def import_records_task(
                 session.add(rec)
                 await session.flush()
                 created += 1
+                await store_media_references(rec.id, media_references[i])
 
                 try:
                     await log_change(
@@ -397,6 +439,7 @@ def import_records_task(
             "publish_failed": publish_failed,
             "publish_fail_reasons": publish_fail_reasons,
             "index_failed": index_failed,
+            "media_references_created": media_references_created,
             "errors": errors,
             "warnings": warnings,
         }

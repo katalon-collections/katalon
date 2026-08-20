@@ -470,11 +470,34 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   async function handleSave() {
     setSaving(true); setSaved(false); setError(null)
     try {
-      const c = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+      // Direct facets are driven by FieldDefinition.is_facet (the schema is the
+      // source of truth and triggers a reindex when changed). Inherited facets
+      // (from relation settings) have no FieldDefinition row, so they are still
+      // stored in portal_config.facet_fields.
+      const updates: Promise<unknown>[] = []
+      const inheritedToSave: Record<string, string[]> = {}
+
+      for (const { key } of RECORD_TYPES) {
+        const selected = facetFields[key] ?? []
+        inheritedToSave[key] = selected.filter(name => name.startsWith('inherited_'))
+
+        for (const f of fieldsByType[key] ?? []) {
+          const shouldBeFacet = selected.includes(f.name)
+          if (f.is_facet !== shouldBeFacet) {
+            const { id, children, ...payload } = f
+            updates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
+          }
+        }
+      }
+
+      updates.push(req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
         method: 'PUT',
-        body: JSON.stringify({ facet_fields: facetFields }),
-      })
-      onSaved(c)
+        body: JSON.stringify({ facet_fields: inheritedToSave }),
+      }))
+
+      const results = await Promise.all(updates)
+      const portalConfig = results[results.length - 1] as PortalConfigRead
+      onSaved(portalConfig)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) { setError((e as Error).message) }
     finally { setSaving(false) }

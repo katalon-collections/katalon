@@ -69,7 +69,14 @@ def generate_iiif_tiles(self: Any, media_file_id: str) -> dict[str, Any]:
 async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
-    from katalon.core.models import AdminConfig, MediaFile, Object, Vocabulary, VocabularyTerm
+    from katalon.core.models import (
+        AdminConfig,
+        MediaFile,
+        MediaImportReference,
+        Object,
+        Vocabulary,
+        VocabularyTerm,
+    )
     from katalon.services.media_batch_import_service import (
         folder_or_filename_object_id,
         normalize_filename,
@@ -91,7 +98,8 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
         "errors": [],
     }
 
-    planned: list[tuple[Path, str, str | None]] = []
+    planned: list[tuple[Path, str, str | None, uuid.UUID | None]] = []
+    automatic_files: list[Path] = []
     if mapping_path.exists():
         rows, mapping_errors = parse_mapping_csv(mapping_path.read_bytes())
         report["errors"].extend(mapping_errors)
@@ -103,21 +111,14 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             if len(matches) > 1:
                 report["duplicate_files"].append({"row": row.row, "filename": row.filename})
                 continue
-            planned.append((matches[0], row.object_id, row.media_type))
+            planned.append((matches[0], row.object_id, row.media_type, None))
     else:
-        for file_path in files:
-            rel = str(file_path.relative_to(images_dir))
-            object_id = folder_or_filename_object_id(rel)
-            if not object_id:
-                report["unmatched_files"].append({"filename": rel})
-                continue
-            planned.append((file_path, object_id, None))
+        automatic_files = files
 
     for name, dup in by_basename.items():
         if len(dup) > 1:
             report["duplicate_files"].append({"row": None, "filename": name, "count": len(dup)})
 
-    total = len(planned)
     created = 0
     failed = 0
     processed = 0
@@ -134,10 +135,48 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             media_terms = {t for t in terms_result.scalars().all()}
         media_vocab_ready = vocab is not None and bool(media_terms)
 
+        references_by_name: dict[str, list[MediaImportReference]] = {}
+        if automatic_files:
+            normalized_names = list(by_basename)
+            pending_references = (await session.execute(
+                select(MediaImportReference).where(
+                    MediaImportReference.normalized_filename.in_(normalized_names)
+                )
+            )).scalars().all()
+            for pending_reference in pending_references:
+                references_by_name.setdefault(
+                    pending_reference.normalized_filename, []
+                ).append(pending_reference)
+
+        for file_path in automatic_files:
+            normalized = normalize_filename(file_path.name)
+            if len(by_basename[normalized]) > 1:
+                continue
+            references = references_by_name.get(normalized, [])
+            object_ids = {reference.object_id for reference in references}
+            rel = str(file_path.relative_to(images_dir))
+            if len(object_ids) > 1:
+                report["errors"].append({
+                    "row": None,
+                    "message": f"Datei {rel} ist mehreren Objekten zugeordnet",
+                })
+                continue
+            if references:
+                reference = references[0]
+                planned.append((file_path, str(reference.object_id), None, reference.id))
+                continue
+            object_id = folder_or_filename_object_id(rel)
+            if not object_id:
+                report["unmatched_files"].append({"filename": rel})
+                continue
+            planned.append((file_path, object_id, None, None))
+
+        total = len(planned)
+
         media_root = Path(settings.media_root)
         media_root.mkdir(parents=True, exist_ok=True)
 
-        for file_path, object_id_raw, media_type in planned:
+        for file_path, object_id_raw, media_type, reference_id in planned:
             processed += 1
             task.update_state(
                 state="STARTED",
@@ -214,6 +253,19 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
             )
             session.add(media)
             await session.flush()
+
+            consumed_reference = (
+                await session.get(MediaImportReference, reference_id)
+                if reference_id is not None
+                else (await session.execute(
+                    select(MediaImportReference).where(
+                        MediaImportReference.object_id == object_uuid,
+                        MediaImportReference.normalized_filename == normalize_filename(file_path.name),
+                    )
+                )).scalar_one_or_none()
+            )
+            if consumed_reference is not None:
+                await session.delete(consumed_reference)
             generate_iiif_tiles.delay(str(file_id))
             created += 1
 
