@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { oaiSets, BASE } from '../../api/client'
+import { oaiSets } from '../../api/client'
 import type { OAISet, OAISetPayload } from '../../api/client'
 import { Plus, Trash, Edit } from '../ui/Icons'
 
@@ -113,7 +113,7 @@ export function ScreenOAISets() {
     setForm(f => f ? { ...f, [key]: value } : f)
   }
 
-  const oaiUrl = `${BASE}/v1/oai`
+  const oaiUrl = new URL('/oai', window.location.origin).href
 
   return (
     <div className="settings-page settings-page-oai">
