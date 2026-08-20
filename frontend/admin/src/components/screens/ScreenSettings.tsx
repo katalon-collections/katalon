@@ -222,6 +222,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [logoUrl, setLogoUrl] = useState(config.logo_url)
   const [placeholderImageUrl, setPlaceholderImageUrl] = useState(config.placeholder_image_url ?? '')
   const [featuredIds, setFeaturedIds] = useState((config.featured_object_ids ?? []).join('\n'))
+  const [browseTypes, setBrowseTypes] = useState(config.browse_enabled_types ?? ['object', 'entity', 'place', 'occurrence'])
   const [accentColor, setAccentColor] = useState(config.accent_color)
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
@@ -240,6 +241,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           site_title: siteTitle, site_subtitle: siteSubtitle, hero_text: heroText,
           logo_url: logoUrl, placeholder_image_url: placeholderImageUrl,
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
+          browse_enabled_types: browseTypes,
           accent_color: accentColor,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
@@ -310,6 +312,25 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
             <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2'} />
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Öffentliche Navigation</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+            Nur aktivierte Typen erscheinen als eigener Menüpunkt im Portal. Direkte Links bleiben erreichbar.
+          </p>
+          {RECORD_TYPES.filter(({ key }) => key !== 'procedure').map(({ key, label }) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={browseTypes.includes(key)}
+                onChange={e => setBrowseTypes(types => e.target.checked ? [...types, key] : types.filter(type => type !== key))}
+              />
+              {label}
+            </label>
+          ))}
         </div>
       </div>
 

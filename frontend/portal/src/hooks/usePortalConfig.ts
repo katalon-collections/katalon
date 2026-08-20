@@ -7,6 +7,7 @@ const DEFAULT: PortalConfig = {
   hero_text: '',
   featured_object_ids: [],
   facet_fields: {},
+  browse_enabled_types: ['object', 'entity', 'place', 'occurrence'],
   accent_color: '#1e3a8a',
   logo_url: '',
   placeholder_image_url: '',

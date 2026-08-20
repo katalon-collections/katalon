@@ -16,6 +16,13 @@ import { BannerBar } from './components/BannerBar'
 import { useI18n, typeLabel, setSupportedLocales } from './i18n'
 import { usePortalConfig } from './hooks/usePortalConfig'
 
+const BROWSE_NAV_ITEMS = [
+  { type: 'object', to: '/search?q=&type=object', label: 'nav.objects' },
+  { type: 'entity', to: '/search?q=&type=entity', label: 'nav.entities' },
+  { type: 'place', to: '/search?q=&type=place', label: 'nav.places' },
+  { type: 'occurrence', to: '/search?q=&type=occurrence', label: 'nav.works' },
+]
+
 function LanguageSwitcher() {
   const { locale, setLocale } = useI18n()
   const config = usePortalConfig()
@@ -37,6 +44,7 @@ function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useI18n()
+  const config = usePortalConfig()
   const [q, setQ] = useState('')
   const [suggestions, setSuggestions] = useState<Array<{ id: string; record_type: string; title: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -103,10 +111,9 @@ function Header() {
     <header className="site-header">
       <Link to="/" className="logo">Katalon</Link>
       <nav>
-        <Link to="/search?q=&type=object">{t('nav.objects')}</Link>
-        <Link to="/search?q=&type=entity">{t('nav.entities')}</Link>
-        <Link to="/search?q=&type=place">{t('nav.places')}</Link>
-        <Link to="/search?q=&type=occurrence">{t('nav.works')}</Link>
+        {BROWSE_NAV_ITEMS
+          .filter(({ type }) => config.browse_enabled_types.includes(type))
+          .map(({ type, to, label }) => <Link key={type} to={to}>{t(label)}</Link>)}
       </nav>
       <div className="sp" />
       <div ref={wrapRef} className={`search-wrap${location.pathname === '/' ? ' is-home' : ''}`} style={{ position: 'relative' }}>

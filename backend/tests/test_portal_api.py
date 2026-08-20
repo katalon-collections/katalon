@@ -212,6 +212,7 @@ async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
         site_title="Katalon", site_subtitle="", hero_text="", featured_object_ids=[],
         facet_fields={}, accent_color="#1e3a8a", logo_url="/v1/portal/logo/file",
         placeholder_image_url="", color_tokens={},
+        browse_enabled_types=["object", "entity", "place", "occurrence"],
     )
     monkeypatch.setattr("katalon.api.v1.portal_public.portal.get_portal_config", AsyncMock(return_value=config))
 
@@ -220,6 +221,7 @@ async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["logo_url"] == "/portal/v1/portal/logo/file"
+    assert response.json()["browse_enabled_types"] == ["object", "entity", "place", "occurrence"]
 
 
 @pytest.mark.asyncio

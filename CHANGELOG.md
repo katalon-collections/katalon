@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.12] - 2026-08-20
+
+### Added
+- Portal: Admins können für Objekte, Entitäten, Orte und Ereignisse einzeln festlegen, ob ein Browsing-Menüpunkt erscheint. Deaktivierte Typen bleiben über direkte Links zugänglich.
+
 ## [1.2.11] - 2026-08-20
 
 ### Added

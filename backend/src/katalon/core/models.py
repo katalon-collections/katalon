@@ -528,6 +528,9 @@ class PortalConfig(Base):
     featured_object_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # e.g. {"object": ["creator"], "entity": []}
     facet_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    browse_enabled_types: Mapped[list[str]] = mapped_column(
+        JSONB, default=lambda: ["object", "entity", "place", "occurrence"]
+    )
     accent_color: Mapped[str] = mapped_column(String(32), default="#1e3a8a")
     logo_url: Mapped[str] = mapped_column(String(512), default="")
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="")

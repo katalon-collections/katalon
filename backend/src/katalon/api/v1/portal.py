@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -35,6 +35,7 @@ _DEFAULTS = {
     "logo_url": "",
     "placeholder_image_url": "",
     "facet_fields": {"object": [], "entity": [], "place": [], "occurrence": []},
+    "browse_enabled_types": ["object", "entity", "place", "occurrence"],
     "color_tokens": {},
 }
 
@@ -45,6 +46,7 @@ class PortalConfigRead(BaseModel):
     hero_text: str
     featured_object_ids: list[str]
     facet_fields: dict[str, list[str]]
+    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence"]]
     accent_color: str
     logo_url: str
     placeholder_image_url: str
@@ -61,6 +63,7 @@ class PortalConfigUpdate(BaseModel):
     hero_text: str | None = None
     featured_object_ids: list[str] | None = None
     facet_fields: dict[str, list[str]] | None = None
+    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence"]] | None = None
     accent_color: str | None = None
     logo_url: str | None = None
     placeholder_image_url: str | None = None
