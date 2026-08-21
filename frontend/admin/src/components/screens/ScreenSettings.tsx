@@ -465,6 +465,12 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? []]))
     }
   )
+  const [subtitleFields, setSubtitleFields] = useState<Record<string, string[]>>(
+    () => {
+      const base = config.subtitle_fields ?? {}
+      return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? ['record_type', 'status']]))
+    }
+  )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -488,6 +494,29 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
     })
   }
 
+  function toggleSubtitle(type: string, name: string) {
+    setSubtitleFields(prev => {
+      const cur = prev[type] ?? []
+      return { ...prev, [type]: cur.includes(name) ? cur.filter(f => f !== name) : [...cur, name] }
+    })
+  }
+
+  function inheritedFacetFieldsFor(type: string) {
+    return (fieldsByType[type] ?? [])
+      .filter(f => f.field_type === 'relation')
+      .flatMap(relation => {
+        const targetType = relation.settings?.target_type as string | undefined
+        const inherited = relation.settings?.inherited_fields as string[] | undefined
+        if (!targetType || !inherited?.length) return []
+        const targetLabel = RECORD_TYPES.find(t => t.key === targetType)?.label ?? targetType
+        return inherited.map(name => {
+          const targetField = (fieldsByType[targetType] ?? []).find(field => field.name === name)
+          const label = targetField?.label?.de || targetField?.label?.en || name
+          return { name: `inherited_${targetType}_${name}`, label: `${targetLabel}: ${label}` }
+        })
+      })
+  }
+
   async function handleSave() {
     setSaving(true); setSaved(false); setError(null)
     try {
@@ -497,6 +526,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       // stored in portal_config.facet_fields.
       const updates: Promise<unknown>[] = []
       const inheritedToSave: Record<string, string[]> = {}
+      const subtitleToSave: Record<string, string[]> = {}
 
       for (const { key } of RECORD_TYPES) {
         const selected = facetFields[key] ?? []
@@ -510,11 +540,26 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
             updates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
           }
         }
+
+        // Subtitle fields may only reference the two system pseudo-fields or a
+        // field that is (about to be) enabled as a facet — those are the only
+        // ones with a resolvable display value in the search index. Fixed
+        // canonical order regardless of selection order in the UI.
+        const chosen = new Set(subtitleFields[key] ?? [])
+        const availableNames = [
+          ...(fieldsByType[key] ?? []).filter(f => selected.includes(f.name)).map(f => f.name),
+          ...inheritedFacetFieldsFor(key).filter(f => selected.includes(f.name)).map(f => f.name),
+        ]
+        subtitleToSave[key] = [
+          ...(chosen.has('record_type') ? ['record_type'] : []),
+          ...(chosen.has('status') ? ['status'] : []),
+          ...availableNames.filter(name => chosen.has(name)),
+        ]
       }
 
       updates.push(req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
         method: 'PUT',
-        body: JSON.stringify({ facet_fields: inheritedToSave }),
+        body: JSON.stringify({ facet_fields: inheritedToSave, subtitle_fields: subtitleToSave }),
       }))
 
       const results = await Promise.all(updates)
@@ -527,19 +572,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
   const fields = fieldsByType[activeType] ?? []
   const selected = facetFields[activeType] ?? []
-  const inheritedFacetFields = fields
-    .filter(f => f.field_type === 'relation')
-    .flatMap(relation => {
-      const targetType = relation.settings?.target_type as string | undefined
-      const inherited = relation.settings?.inherited_fields as string[] | undefined
-      if (!targetType || !inherited?.length) return []
-      const targetLabel = RECORD_TYPES.find(type => type.key === targetType)?.label ?? targetType
-      return inherited.map(name => {
-        const targetField = (fieldsByType[targetType] ?? []).find(field => field.name === name)
-        const label = targetField?.label?.de || targetField?.label?.en || name
-        return { name: `inherited_${targetType}_${name}`, label: `${targetLabel}: ${label}` }
-      })
-    })
+  const inheritedFacetFields = inheritedFacetFieldsFor(activeType)
+  const subtitleSelected = subtitleFields[activeType] ?? []
 
   return (
     <div>
@@ -611,6 +645,58 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           </div>
         </div>
       )}
+
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>Ergebnis-Untertitel</h4>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+        Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · public“).
+        Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.
+      </p>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="bd">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+            <input
+              type="checkbox"
+              className="ck"
+              checked={subtitleSelected.includes('record_type')}
+              onChange={() => toggleSubtitle(activeType, 'record_type')}
+            />
+            <span style={{ flex: 1 }}>Typ</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>record_type</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+            <input
+              type="checkbox"
+              className="ck"
+              checked={subtitleSelected.includes('status')}
+              onChange={() => toggleSubtitle(activeType, 'status')}
+            />
+            <span style={{ flex: 1 }}>Status</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>status</span>
+          </label>
+          {(() => {
+            const options = [
+              ...fields.filter(f => selected.includes(f.name)).map(f => ({ name: f.name, label: f.label?.de || f.label?.en || f.name })),
+              ...inheritedFacetFields.filter(f => selected.includes(f.name)),
+            ]
+            return options.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>
+                Keine weiteren Felder — aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
+              </div>
+            ) : options.map(f => (
+              <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  className="ck"
+                  checked={subtitleSelected.includes(f.name)}
+                  onChange={() => toggleSubtitle(activeType, f.name)}
+                />
+                <span style={{ flex: 1 }}>{f.label}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+              </label>
+            ))
+          })()}
+        </div>
+      </div>
 
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>

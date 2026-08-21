@@ -9,6 +9,24 @@ function facetLabel(field: string): string {
   return inherited ? t('search.linkedFacet', { type: typeLabel(inherited[1]), field: inherited[2] }) : field
 }
 
+const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
+
+function resultSubtitle(
+  r: { record_type: string; status: string | null; subtitle_values?: Record<string, string | string[]> | null },
+  subtitleConfig: Record<string, string[]>
+): string {
+  const fields = subtitleConfig[r.record_type]?.length ? subtitleConfig[r.record_type] : DEFAULT_SUBTITLE_FIELDS
+  return fields
+    .map(field => {
+      if (field === 'record_type') return typeLabel(r.record_type)
+      if (field === 'status') return r.status ?? '—'
+      const value = r.subtitle_values?.[field]
+      return value == null ? null : Array.isArray(value) ? value.join(', ') : value
+    })
+    .filter((v): v is string => !!v)
+    .join(' · ')
+}
+
 export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -20,13 +38,17 @@ export function SearchPage() {
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({})
+  const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const { t } = useI18n()
 
-  // Load configurable facet fields from portal config
+  // Load configurable facet + result-subtitle fields from portal config
   useEffect(() => {
     api.portal.config()
-      .then(c => setFacetConfig(c.facet_fields ?? {}))
+      .then(c => {
+        setFacetConfig(c.facet_fields ?? {})
+        setSubtitleConfig(c.subtitle_fields ?? {})
+      })
       .catch(() => {})
   }, [])
 
@@ -251,9 +273,7 @@ export function SearchPage() {
                 </div>
                 <div className="body">
                   <div className="title">{r.title || r.id}</div>
-                  <div className="desc">
-                    {typeLabel(r.record_type)} · {r.status ?? '—'}
-                  </div>
+                  <div className="desc">{resultSubtitle(r, subtitleConfig)}</div>
                 </div>
               </Link>
             )

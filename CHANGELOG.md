@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.19] - 2026-08-21
+
+### Added
+- Admin-Einstellungen: Der Untertitel in der Portal-Trefferliste (bisher fest „Typ · Status“) ist jetzt pro Datensatztyp unter Einstellungen → Facetten → „Ergebnis-Untertitel“ konfigurierbar. Zur Auswahl stehen Typ, Status sowie alle Felder, die auch als Filter (Facette) aktiviert sind.
+
 ## [1.2.18] - 2026-08-20
 
 ### Fixed

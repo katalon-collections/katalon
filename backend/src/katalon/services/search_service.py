@@ -387,6 +387,7 @@ async def search(
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
     record_types: tuple[str, ...] | None = None,
+    subtitle_fields: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -400,14 +401,19 @@ async def search(
 
     hits = raw.get("hits", {})
     total = hits.get("total", {}).get("value", 0)
-    items = [
-        {
-            "id": h["_id"],
-            "score": h.get("_score"),
-            **h["_source"],
+    items = []
+    for h in hits.get("hits", []):
+        source = h["_source"]
+        item: dict[str, Any] = {"id": h["_id"], "score": h.get("_score"), **source}
+        wanted = (subtitle_fields or {}).get(source.get("record_type", ""), [])
+        values = {
+            name: source[f"facet_{name}"]
+            for name in wanted
+            if name not in ("record_type", "status") and f"facet_{name}" in source
         }
-        for h in hits.get("hits", [])
-    ]
+        if values:
+            item["subtitle_values"] = values
+        items.append(item)
 
     aggs = raw.get("aggregations", {})
     facets: dict[str, list[dict[str, Any]]] = {}
