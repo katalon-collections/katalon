@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.19] - 2026-08-21
+
+### Added
+- Konfigurierbare Portal-Detailseiten-Layouts: pro Feld steuerbar, ob es im Hauptbereich oder in der Seitenspalte erscheint (`detail_slot`) und ob es die Beschreibungsrolle übernimmt (`detail_role`), plus ein globaler Schalter für die Sidebar-Position (links/rechts) in den Portal-Einstellungen. Siehe Issue [#317](https://github.com/karkraeg/Katalon/issues/317).
+- Portal: gemeinsamer `DetailPageLayout`-Baustein für Objekte/Entitäten/Orte/Occurrences ersetzt die bisherige, pro Seite duplizierte und teils heuristische (Textlänge-basierte) Platzierungslogik.
+
 ## [1.2.18] - 2026-08-20
 
 ### Fixed

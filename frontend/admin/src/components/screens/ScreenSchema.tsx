@@ -90,6 +90,8 @@ type FieldFormState = {
   authority_source: string
   show_in_detail: boolean
   show_in_list: boolean
+  detail_slot: 'main' | 'sidebar'
+  detail_role: 'none' | 'description'
   is_public: boolean
   is_facet: boolean
   is_searchable: boolean
@@ -111,7 +113,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -129,6 +131,8 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     authority_source: (f.settings?.source as string) ?? 'gnd',
     show_in_detail: f.show_in_detail ?? true,
     show_in_list: f.show_in_list ?? true,
+    detail_slot: f.detail_slot ?? 'sidebar',
+    detail_role: f.detail_role ?? 'none',
     is_public: f.is_public ?? true,
     is_facet: f.is_facet ?? false,
     is_searchable: f.is_searchable ?? true,
@@ -526,6 +530,24 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
                   <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
                 </label>
+                {form.show_in_detail && (
+                  <>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13 }}>Bereich (Portal-Detailseite)</span>
+                      <select className="fld" style={{ width: 'auto' }} value={form.detail_slot} onChange={e => set('detail_slot', e.target.value as 'main' | 'sidebar')}>
+                        <option value="sidebar">Seitenspalte</option>
+                        <option value="main">Hauptbereich</option>
+                      </select>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13 }}>Rolle (Portal-Detailseite)</span>
+                      <select className="fld" style={{ width: 'auto' }} value={form.detail_role} onChange={e => set('detail_role', e.target.value as 'none' | 'description')}>
+                        <option value="none">Keine</option>
+                        <option value="description">Beschreibung</option>
+                      </select>
+                    </label>
+                  </>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
                   <span style={{ fontSize: 13 }}>Öffentlich über APIs ausgeben</span>
@@ -1194,6 +1216,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       sort_order: form.sort_order,
       show_in_detail: form.show_in_detail,
       show_in_list: form.show_in_list ?? true,
+      detail_slot: form.detail_slot,
+      detail_role: form.detail_role,
       is_public: form.is_public,
       is_facet: form.is_facet ?? false,
       is_searchable: form.is_searchable,
@@ -1279,6 +1303,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           settings: f.settings,
           show_in_detail: f.show_in_detail,
           show_in_list: f.show_in_list,
+          detail_slot: f.detail_slot,
+          detail_role: f.detail_role,
           is_public: f.is_public,
           is_facet: f.is_facet,
           parent_id: f.parent_id ?? null,

@@ -1,29 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { api, fetchRecord, mediaThumbnailUrl, type MediaFile, type OccurrenceSummary, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
-import { authorityUrl, pidUrl, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { RelationFieldRow } from '../components/RelationFieldRow'
+import { usePortalConfig } from '../hooks/usePortalConfig'
+import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { occurrenceTypeLabel, useI18n } from '../i18n'
-
-function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
-  if (!value) return null
-  return (
-    <div className="meta-row">
-      <span className="key">{label}</span>
-      <span className="val">
-        {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
-      </span>
-    </div>
-  )
-}
-
 
 export function OccurrenceDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +26,7 @@ export function OccurrenceDetailPage() {
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
+  const portalConfig = usePortalConfig()
 
   useEffect(() => {
     if (!id) return
@@ -101,14 +88,7 @@ export function OccurrenceDetailPage() {
   const typeLabel = occurrenceTypeLabel(occurrence.occurrence_type)
   const description = renderFieldValue(m.description, locale) ?? ''
 
-  const allVisibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'title' && f.name !== 'name')
-  // Long text fields go into the main column (rendered with markdown); short fields into the sidebar
-  const bodyFields = allVisibleFields.filter(f => {
-    if (f.field_type === 'relation' || f.field_type === 'authority' || f.field_type === 'pid') return false
-    const rendered = renderFieldValue(m[f.name], locale, f.field_type)
-    return rendered !== null && rendered.length > 100
-  })
-  const sidebarFields = allVisibleFields.filter(f => !bodyFields.includes(f))
+  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'title' && f.name !== 'name')
 
   return (
     <div className="container page">
@@ -140,63 +120,41 @@ export function OccurrenceDetailPage() {
       </div>
       <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em' }}>{title}</h1>
 
-      <div className="detail-layout">
-        <div>
-          {m.description != null && (
-            <div
-              className="prose"
-              style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(renderFieldValue(m.description, locale) ?? '') as string) }}
-            />
-          )}
-
-          {bodyFields.map(f => {
-            const rendered = renderFieldValue(m[f.name], locale, f.field_type)
-            if (!rendered) return null
-            return (
-              <div key={f.name} style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
-                  {f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name}
-                </div>
-                <div
-                  className="prose"
-                  style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(rendered) as string) }}
-                />
-              </div>
-            )
-          })}
-
-          {linkedObjects.length > 0 && (
-            <section style={{ marginTop: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
-              <div className="obj-grid">
-                {linkedObjects.map(obj => {
-                  const om = obj.metadata_ as Record<string, unknown>
-                  const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
-                  const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
-                  const isFrom = rel ? rel.from_id === occurrence.id : true
-                  return (
-                    <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
-                      <div className="thumb">
-                        {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
-                      </div>
-                      <div className="info">
-                        <div className="title">{otitle}</div>
-                        {rel && (
-                          <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
-                            {resolveRelationType(rel.relation_type, isFrom)}
-                          </div>
-                        )}
-                        {obj.idno && <div className="meta">{obj.idno}</div>}
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
+      <DetailPageLayout
+        fieldDefs={detailFieldDefs}
+        metadata={m}
+        locale={locale}
+        sidebarPosition={portalConfig.detail_sidebar_position}
+        mainExtra={linkedObjects.length > 0 && (
+          <section style={{ marginTop: 8 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
+            <div className="obj-grid">
+              {linkedObjects.map(obj => {
+                const om = obj.metadata_ as Record<string, unknown>
+                const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
+                const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
+                const isFrom = rel ? rel.from_id === occurrence.id : true
+                return (
+                  <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
+                    <div className="thumb">
+                      {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
+                    </div>
+                    <div className="info">
+                      <div className="title">{otitle}</div>
+                      {rel && (
+                        <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
+                          {resolveRelationType(rel.relation_type, isFrom)}
+                        </div>
+                      )}
+                      {obj.idno && <div className="meta">{obj.idno}</div>}
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+        )}
+        relations={(
           <RelationsList
             relations={relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')}
             currentId={occurrence.id}
@@ -205,25 +163,9 @@ export function OccurrenceDetailPage() {
             metadata={relationMeta}
             fieldDefs={fieldDefs}
           />
-        </div>
-
-        <aside className="detail-meta">
-          {sidebarFields.map(f => {
-            const rawValue = m[f.name]
-            if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
-            }
-            const rendered = renderFieldValue(rawValue, locale, f.field_type)
-            const href = f.field_type === 'authority'
-              ? authorityUrl(rawValue)
-              : f.field_type === 'pid'
-                ? pidUrl(rawValue)
-                : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
-          })}
-          <MetaRow label={t('common.type')} value={typeLabel} />
-        </aside>
-      </div>
+        )}
+        sidebarExtra={<MetaRow label={t('common.type')} value={typeLabel} />}
+      />
     </div>
   )
 }

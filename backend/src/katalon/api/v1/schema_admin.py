@@ -40,6 +40,30 @@ async def _ensure_schema_subtype_exists(db: DBDep, target_type: str, subtype: st
     await ensure_subtype_exists(db, target_type, subtype)
 
 
+async def _validate_unique_detail_role(
+    db: DBDep, data: FieldDefinitionCreate, exclude_id: uuid.UUID | None
+) -> None:
+    if data.detail_role == "none":
+        return
+    conflict_query = select(FieldDefinition.id).where(
+        FieldDefinition.target_type == data.target_type,
+        (
+            FieldDefinition.target_subtype.is_(None)
+            if data.target_subtype is None
+            else FieldDefinition.target_subtype == data.target_subtype
+        ),
+        FieldDefinition.detail_role == data.detail_role,
+        FieldDefinition.is_deleted.is_(False),
+    )
+    if exclude_id is not None:
+        conflict_query = conflict_query.where(FieldDefinition.id != exclude_id)
+    if await db.scalar(conflict_query.limit(1)) is not None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Es gibt bereits ein Feld mit der Rolle '{data.detail_role}' für diesen Typ/Subtyp.",
+        )
+
+
 async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> None:
     if (
         data.target_type == "vocabulary_term"
@@ -325,6 +349,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     else:
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_settings(db, data)
+    await _validate_unique_detail_role(db, data, exclude_id=None)
     # Soft-deleted Felder blockieren ihren Namen per Unique-Constraint. Statt zu kollidieren,
     # reaktiviere die alte Zeile (gleiche ID, gleiche Historie) und übernehme die neuen Werte.
     reused = await db.scalar(
@@ -381,6 +406,7 @@ async def update_field(
     else:
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_settings(db, data)
+    await _validate_unique_detail_role(db, data, exclude_id=field_id)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)

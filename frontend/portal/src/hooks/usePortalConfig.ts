@@ -13,6 +13,7 @@ const DEFAULT: PortalConfig = {
   placeholder_image_url: '',
   color_tokens: {},
   supported_languages: ['de', 'en'],
+  detail_sidebar_position: 'right',
 }
 
 // Module-level cache so multiple components share one fetch per page load

@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   placeholder_image_url: '',
   color_tokens: {},
   supported_languages: ['de', 'en'],
+  detail_sidebar_position: 'right',
 }
 
 export function HomePage() {

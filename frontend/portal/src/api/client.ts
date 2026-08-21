@@ -71,6 +71,7 @@ export interface PortalConfig {
   placeholder_image_url: string
   color_tokens: Record<string, string>
   supported_languages: string[]
+  detail_sidebar_position: 'left' | 'right'
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

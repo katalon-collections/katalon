@@ -224,6 +224,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [featuredIds, setFeaturedIds] = useState((config.featured_object_ids ?? []).join('\n'))
   const [browseTypes, setBrowseTypes] = useState(config.browse_enabled_types ?? ['object', 'entity', 'place', 'occurrence'])
   const [accentColor, setAccentColor] = useState(config.accent_color)
+  const [detailSidebarPosition, setDetailSidebarPosition] = useState(config.detail_sidebar_position ?? 'right')
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
   const ct = config.color_tokens ?? {}
@@ -243,6 +244,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           featured_object_ids: featuredIds.split('\n').map(s => s.trim()).filter(Boolean),
           browse_enabled_types: browseTypes,
           accent_color: accentColor,
+          detail_sidebar_position: detailSidebarPosition,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
               .filter(([, v]) => v.trim())
@@ -331,6 +333,22 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
               {label}
             </label>
           ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">Detailseiten-Layout</div>
+        <div className="bd">
+          <div className="field">
+            <div className="lbl">Seitenspalte (Metadaten)</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={`btn${detailSidebarPosition === 'right' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('right')}>Rechts</button>
+              <button className={`btn${detailSidebarPosition === 'left' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('left')}>Links</button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              Gilt einheitlich für alle Detailseiten (Objekte, Entitäten, Orte, Occurrences). Auf kleinen Bildschirmen stehen Medien/Hauptinhalt immer zuerst.
+            </div>
+          </div>
         </div>
       </div>
 

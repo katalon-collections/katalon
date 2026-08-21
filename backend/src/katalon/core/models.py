@@ -177,6 +177,10 @@ class FieldDefinition(Base):
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Placement on the portal detail page when show_in_detail is true: main / sidebar
+    detail_slot: Mapped[str] = mapped_column(String(16), default="sidebar", server_default="sidebar")
+    # Special rendering role on the portal detail page: none / description
+    detail_role: Mapped[str] = mapped_column(String(16), default="none", server_default="none")
     # Controls anonymous output. Internal fields stay available to authenticated staff.
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_facet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -537,6 +541,8 @@ class PortalConfig(Base):
     logo_url: Mapped[str] = mapped_column(String(512), default="")
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="")
     color_tokens: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # extra CSS var overrides
+    # Global (not per-type) detail page layout: left/right sidebar position
+    detail_sidebar_position: Mapped[str] = mapped_column(String(16), default="right", server_default="right")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

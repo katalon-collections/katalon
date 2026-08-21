@@ -7,6 +7,8 @@ export interface FieldDefinition {
   field_type: string
   settings: Record<string, unknown>
   show_in_detail: boolean
+  detail_slot: 'main' | 'sidebar'
+  detail_role: 'none' | 'description'
 }
 
 export function useFieldDefinitions(targetType: string): FieldDefinition[] {
