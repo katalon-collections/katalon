@@ -50,7 +50,7 @@ export function ObjectDetailPage() {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [viewerError, setViewerError] = useState(false)
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
-  const fieldDefs = useFieldDefinitions('object')
+  const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('object')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
@@ -88,7 +88,7 @@ export function ObjectDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) {
+  if (loading || fieldDefsLoading) {
     return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   }
 

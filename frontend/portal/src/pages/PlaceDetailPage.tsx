@@ -49,7 +49,7 @@ export function PlaceDetailPage() {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const fieldDefs = useFieldDefinitions('place')
+  const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('place')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
@@ -103,7 +103,7 @@ export function PlaceDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !place) return (
     <div className="container page">
       <div style={{ color: '#dc2626' }}>{error ?? t('error.placeNotFound')}</div>

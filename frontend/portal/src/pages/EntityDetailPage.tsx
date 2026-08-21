@@ -22,7 +22,7 @@ export function EntityDetailPage() {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const fieldDefs = useFieldDefinitions('entity')
+  const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('entity')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
@@ -76,7 +76,7 @@ export function EntityDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !entity) return (
     <div className="container page">
       <div style={{ color: '#dc2626' }}>{error ?? t('error.entityNotFound')}</div>

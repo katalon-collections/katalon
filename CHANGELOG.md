@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-21
+
+### Fixed
+- Portal-Detailseiten: `useFieldDefinitions` lieferte Schema-Felder asynchron nach dem Datensatz, wodurch das neue detail_slot/detail_role-Layout kurz falsch (bzw. fälschlich als „metadata only") gerendert wurde, bevor es auf das korrekte Layout sprang. Detailseiten warten jetzt auch auf das Schema, bevor sie rendern.
+- Admin-Schema-Editor: Die Checkbox-Zeile für Feldeigenschaften hatte kein Umbruchverhalten und lief bei den zwei neuen Detailseiten-Layout-Dropdowns Gefahr, in schmaleren Fenstern über den Rand hinauszulaufen. Zeile umbricht jetzt (`flex-wrap`), die beiden neuen Dropdowns stehen zudem in einer eigenen Zeile statt zwischen den Checkboxen.
+
 ## [1.3.1] - 2026-08-21
 
 ### Fixed
