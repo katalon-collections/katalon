@@ -89,6 +89,7 @@ export function EntityDetailPage() {
   const description = renderFieldValue(m.description, locale) ?? ''
 
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'name' && f.name !== 'title')
+  const nonObjectRelations = relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 
   return (
     <div className="container page">
@@ -154,9 +155,9 @@ export function EntityDetailPage() {
             </div>
           </section>
         )}
-        relations={(
+        relations={nonObjectRelations.length > 0 && (
           <RelationsList
-            relations={relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')}
+            relations={nonObjectRelations}
             currentId={entity.id}
             resolveLabel={resolveRelationType}
             titles={relationTitles}

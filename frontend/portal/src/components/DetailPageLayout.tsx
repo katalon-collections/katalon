@@ -87,6 +87,23 @@ export function DetailPageLayout({
   const mainFields = otherFields.filter(f => f.detail_slot === 'main')
   const sidebarFields = otherFields.filter(f => f.detail_slot !== 'main')
 
+  const sidebar = (
+    <aside className="detail-meta">
+      {sidebarBefore}
+      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} />)}
+      {sidebarExtra}
+    </aside>
+  )
+
+  // Media, description, extra content and relations are all optional per record type/record —
+  // a metadata-only record (no media, nothing in the main slot, no relations) shouldn't leave
+  // a wide empty column next to a narrow sidebar. Callers pass falsy (not an always-truthy
+  // wrapper element) for mainExtra/relations when there's nothing to render, so this is reliable.
+  const hasMainContent = Boolean(media) || Boolean(description) || mainFields.length > 0 || Boolean(mainExtra) || Boolean(relations)
+  if (!hasMainContent) {
+    return <div className="detail-layout detail-layout--metadata-only">{sidebar}</div>
+  }
+
   return (
     <div className={`detail-layout${sidebarPosition === 'left' ? ' detail-layout--sidebar-left' : ''}`}>
       <div className="detail-main">
@@ -98,11 +115,7 @@ export function DetailPageLayout({
         {mainExtra}
         {relations}
       </div>
-      <aside className="detail-meta">
-        {sidebarBefore}
-        {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} />)}
-        {sidebarExtra}
-      </aside>
+      {sidebar}
     </div>
   )
 }

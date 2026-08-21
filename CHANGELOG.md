@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-21
+
+### Fixed
+- Portal-Detailseiten-Layout: Beim Umschalten der Sidebar-Position (links/rechts) wurden bisher auch die Spaltenbreiten vertauscht, sodass die Metadaten-Spalte plötzlich breiter als der Hauptbereich war. Die Seitenspalte bleibt jetzt unabhängig von der Position immer die schmale Spalte.
+- Portal-Detailseiten-Layout: Records ganz ohne Hauptbereichs-Inhalt (keine Medien, keine Beschreibung, keine Hauptbereichs-Felder, keine Beziehungen) zeigten eine leere breite Spalte neben der schmalen Seitenspalte. Layout klappt in diesem Fall jetzt auf eine einzelne, breitenbegrenzte Spalte zusammen.
+
 ## [1.3.0] - 2026-08-21
 
 ### Added

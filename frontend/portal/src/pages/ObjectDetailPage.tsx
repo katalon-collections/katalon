@@ -198,7 +198,7 @@ export function ObjectDetailPage() {
             {(m.keywords as string[]).map((kw, i) => <span key={i} className="tag">{kw}</span>)}
           </div>
         )}
-        relations={(
+        relations={relations.length > 0 && (
           <RelationsList
             relations={relations}
             currentId={obj.id}
