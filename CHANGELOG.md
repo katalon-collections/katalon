@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.2.19] - 2026-08-24
+
+### Fixed
+- Admin (mobil): Globale Suche in der Topbar wurde durch einen konkurrierenden Flex-Spacer auf die Hälfte der Breite gequetscht und dadurch abgeschnitten. Status-Pillen (Entwurf/Intern/Öffentlich) und Aktionsbuttons (Im Portal ansehen/Verwerfen/Speichern) im Formular-Toolbar wurden auf volle Zeilenbreite gestreckt statt sich an ihrem Inhalt zu orientieren. Berührungsziele bleiben weiterhin ≥44px hoch.
+
 ## [1.2.18] - 2026-08-20
 
 ### Fixed
@@ -14,7 +19,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ### Fixed
 - Docs: `docs/04_produktion.md` beschreibt jetzt explizit den Fall, dass `nginx` hinter einem TLS-terminierenden Reverse Proxy (z. B. Traefik) läuft — der `listen 443 ssl`-Block verlangt trotzdem ladbare Zertifikate unter `docker/certs/`, auch wenn Port 443 nie extern erreichbar ist. Ohne Zertifikate startet nginx nicht (`cannot load certificate ... BIO_new_file() failed`).
-
 ## [1.2.16] - 2026-08-20
 
 ### Fixed
