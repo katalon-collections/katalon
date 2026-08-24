@@ -18,6 +18,9 @@ sources:
   - id: visibility-tests
     type: file
     path: backend/tests/test_search_visibility.py
+  - id: index-task-tests
+    type: file
+    path: backend/tests/test_index_tasks.py
 ---
 
 Katalon's search workflow turns Objects, Entities, Places, Occurrences, and Procedures into Elasticsearch documents that the REST search API, portal search, OAI-PMH, and maintenance jobs can query. The builder uses record metadata, schema flags, relation titles, and configured inherited relation fields. Celery tasks write or rebuild documents in Elasticsearch [@search-service] [@index-tasks]. Anonymous visibility is enforced both in normal record queries and in Elasticsearch search filters, so public search excludes non-public records and inactive collection objects [@visibility] [@visibility-tests].
@@ -44,7 +47,7 @@ Every search response includes default aggregations for type, status, and the th
 
 Incremental indexing calls `index_record()`, which builds a document and dispatches `index_record_task` with retries [@search-service] [@index-tasks]. A failed permanent index write records an `index_failed` audit-log entry, which makes indexing failure visible beyond task logs [@index-tasks].
 
-Bulk repair paths are also Celery tasks. `bulk_reindex_type_task` deletes all documents for one record type and rebuilds them, while `reindex_all_task` rebuilds every supported record type after ensuring the index exists [@index-tasks]. `reconciliation_job_task` compares database and Elasticsearch counts or IDs, queues missing records for reindexing, and removes stale Elasticsearch documents [@index-tasks].
+Bulk repair paths are also Celery tasks. `bulk_reindex_type_task` acquires a Redis lock scoped to the record type before reading PostgreSQL and replacing that type's Elasticsearch documents. Concurrent rebuilds of the same type therefore run serially, while different types retain independent locks. The one-hour lock lease bounds abandoned locks after worker failure [@index-tasks] [@index-task-tests]. `reindex_all_task` rebuilds every supported record type after ensuring the index exists. `reconciliation_job_task` compares database and Elasticsearch counts or IDs, queues missing records for reindexing, and removes stale Elasticsearch documents [@index-tasks].
 
 ## Visibility Contract
 

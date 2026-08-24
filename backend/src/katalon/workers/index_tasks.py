@@ -150,8 +150,10 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict[str, Any]:
 @celery_app.task(name="katalon.bulk_reindex_type")
 def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
     """Reindex all records of a single type (e.g. after schema changes)."""
+    import redis as redis_lib
     from sqlalchemy import select
 
+    from katalon.config import settings
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
     from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import build_index_doc
@@ -182,9 +184,15 @@ def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
         count = await reindex_type(target_type, records)
         return {"status": "ok", "indexed": count, "target_type": target_type}
 
+    redis_client = redis_lib.from_url(settings.redis_url)  # type: ignore[no-untyped-call]
     try:
-        return _run(_do())
+        # ponytail: 1h lease; add renewal if one type can take longer to rebuild.
+        with redis_client.lock(
+            f"katalon:reindex:{target_type}", timeout=3600, blocking_timeout=3600
+        ):
+            return _run(_do())
     finally:
+        redis_client.close()
         _run(engine.dispose())
 
 

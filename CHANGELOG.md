@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-08-24
+
+### Fixed
+- Parallele Bulk-Reindexes desselben Datensatztyps werden über Redis serialisiert und können den Elasticsearch-Index nicht mehr gegenseitig leeren.
+
 ## [1.3.6] - 2026-08-24
 
 ### Fixed
