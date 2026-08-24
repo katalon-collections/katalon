@@ -62,6 +62,7 @@ export function SearchPage() {
   const relOccurrence = params.get('rel_occurrence') ?? ''
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     const searchParams: Record<string, string | number | undefined> = {
       q: q || undefined,
@@ -87,6 +88,7 @@ export function SearchPage() {
     fetch(`${BASE}${PORTAL_API}/search?${qs}`)
       .then(r => r.json())
       .then(async (result: SearchResponse) => {
+        if (cancelled) return
         setData(result)
         // Load thumbnails for object results
         const thumbMap: Record<string, string> = {}
@@ -105,10 +107,11 @@ export function SearchPage() {
                 .catch(() => {})
             )
         )
-        setThumbnails(thumbMap)
+        if (!cancelled) setThumbnails(thumbMap)
       })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!cancelled) setData(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [q, typeFilt, statusFilt, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
 
   function submit(e: React.FormEvent) {

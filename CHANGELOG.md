@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-08-24
+
+### Fixed
+- Portal-Suchfacetten bleiben nach Reloads stabil, auch wenn ein älterer paralleler Suchlauf erst nach der konfigurierten Facettenabfrage antwortet.
+
 ## [1.3.4] - 2026-08-24
 
 ### Fixed
