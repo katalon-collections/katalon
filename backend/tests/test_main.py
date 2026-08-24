@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import ValidationError
 
+import katalon.config as config
 from katalon.config import Settings
 from katalon.main import _check_production_secrets
 from katalon.services.relation_type_service import sync_relation_type_terms
@@ -37,6 +38,12 @@ async def test_sync_relation_type_terms_adds_missing_terms() -> None:
 def test_settings_require_katalon_secrets_key() -> None:
     with pytest.raises(ValidationError, match="katalon_secrets_key"):
         Settings(katalon_secrets_key="short")
+
+
+def test_env_files_support_shallow_container_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "__file__", "/app/src/katalon/config.py")
+
+    assert config._resolve_env_files() == ("/app/.env",)
 
 
 def test_check_production_secrets_accepts_valid_katalon_secrets_key(monkeypatch: pytest.MonkeyPatch) -> None:

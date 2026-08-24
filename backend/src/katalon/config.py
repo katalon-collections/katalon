@@ -14,10 +14,11 @@ def _resolve_env_files() -> tuple[str, ...]:
     Ordered by precedence (later files win). The repo root .env is the
     canonical source, so it is listed last and overrides backend/.env.
     """
-    here = Path(__file__).resolve().parent
-    backend_dir = here.parents[2]
-    repo_root = here.parents[3]
-    return (str(backend_dir / ".env"), str(repo_root / ".env"))
+    backend_dir = Path(__file__).resolve().parents[2]
+    env_files = [backend_dir / ".env"]
+    if backend_dir.name == "backend":
+        env_files.append(backend_dir.parent / ".env")
+    return tuple(map(str, env_files))
 
 
 class Settings(BaseSettings):

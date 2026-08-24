@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-08-24
+
+### Fixed
+- Backend-Konfiguration startet auch im flacheren `/app/src/katalon`-Layout der Docker-Container; die optionale Root-`.env` wird nur im Source-Checkout ergänzt.
+
 ## [1.3.3] - 2026-08-24
 
 ### Fixed
