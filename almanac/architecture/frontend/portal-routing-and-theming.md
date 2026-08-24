@@ -12,6 +12,9 @@ sources:
   - id: portal-client
     type: file
     path: frontend/portal/src/api/client.ts
+  - id: detail-layout
+    type: file
+    path: frontend/portal/src/components/DetailPageLayout.tsx
   - id: theme-loader
     type: file
     path: frontend/portal/src/theme/loader.ts
@@ -46,9 +49,13 @@ The portal client has one shared `get<T>` helper and no token lifecycle, so ever
 
 The backend confines this anonymous surface to the four inventory record families. It has no Procedure endpoint, and it returns relations only where both endpoints are visible inventory records. Its response models are public projections: they omit record versions and search vectors; relation responses omit relation metadata; and public responses return their own `/portal/v1` `_links` instead of the authenticated `/v1` links [@portal-public-api].
 
-Backend portal config is stored as the singleton `portal_config` row with defaults for title, subtitle, hero text, featured object ids, facet fields, enabled browsing types, accent color, logo URL, placeholder image URL, and extra CSS color tokens [@portal-api]. `GET /v1/portal/config` builds `facet_fields` dynamically from non-deleted `field_definitions` with `is_facet`, while `PUT /v1/portal/config` and logo upload require an admin role [@portal-api]. This makes search facets an effect of schema configuration rather than a separate portal-only list [@portal-api].
+Backend portal config is stored as the singleton `portal_config` row with defaults for title, subtitle, hero text, featured object ids, facet fields, result-subtitle fields, enabled browsing types, accent color, logo URL, placeholder image URL, extra CSS color tokens, and detail-sidebar position [@portal-api]. `GET /v1/portal/config` builds `facet_fields` dynamically from non-deleted `field_definitions` with `is_facet`, while `PUT /v1/portal/config` and logo upload require an admin role [@portal-api]. This makes search facets an effect of schema configuration rather than a separate portal-only list [@portal-api].
 
 Static pages have a public list and public by-slug read path that only return `is_published` pages, plus admin-only CRUD paths that can see unpublished pages [@pages-api]. Banners have public active endpoints for admin and portal surfaces, filtered by active flag, expiration, and surface visibility; banner CRUD remains admin-only [@banners-api].
+
+## Record Detail Layout
+
+The four public record-detail pages share `DetailPageLayout`. Public field definitions select the main column or metadata sidebar through `detail_slot`; one field per type or subtype can take the description role through `detail_role`. The portal setting `detail_sidebar_position` places the narrow sidebar left or right, while pages without main-column content collapse to one bounded metadata column [@detail-layout] [@portal-api] [@portal-client].
 
 ## Runtime Theme Layers
 

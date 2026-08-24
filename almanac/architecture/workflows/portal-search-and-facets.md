@@ -6,6 +6,9 @@ sources:
   - id: search-api
     type: file
     path: backend/src/katalon/api/v1/search.py
+  - id: search-service
+    type: file
+    path: backend/src/katalon/services/search_service.py
   - id: search-page
     type: file
     path: frontend/portal/src/pages/SearchPage.tsx
@@ -40,8 +43,12 @@ Search results return `facets` as named buckets with `value` and `count`, matchi
 
 Relation facets appear only when all types are searched or the active type is `object`. The page maps `related_entities`, `related_places`, and `related_occurrences` buckets to `rel_entity`, `rel_place`, and `rel_occurrence` URL parameters [@search-page]. The backend then converts those parameters back to relation keyword filters for Elasticsearch [@search-api].
 
+## Configured Result Subtitles
+
+Portal settings store an ordered `subtitle_fields` list per record type. Admins can choose the type/status pseudo-fields and schema fields that are already enabled as facets. The public search route passes this configuration into the search service, which returns display-ready `subtitle_values`; without a configured list, the portal retains the type-and-status fallback [@settings-screen] [@portal-api] [@search-api] [@search-service] [@search-page].
+
 ## Results And Detail Navigation
 
 Each result row links by record type: Entities go to `/entities/<id>`, Places to `/places/<id>`, Occurrences to `/occurrences/<id>`, and Objects to `/objects/<id>` [@search-page]. Before following the link, the portal saves the current search URL so detail pages can offer a return path to the same result state [@search-page].
 
-Object results get thumbnail URLs opportunistically. After search returns, the page loads media for object hits, chooses the primary ready file or first ready file, and builds a raw media URL through the portal API base [@search-page] [@portal-client]. That keeps search result cards lightweight: the search API returns record summaries and facets, while the object media endpoint supplies thumbnails only where needed.
+Object results get thumbnail URLs opportunistically. After search returns, the page loads media for object hits, chooses the primary ready file or first ready file, and builds the public JPEG-thumbnail endpoint through `mediaThumbnailUrl` [@search-page] [@portal-client]. That keeps search result cards lightweight: the search API returns record summaries and facets, while the object media endpoint supplies thumbnails only where needed.

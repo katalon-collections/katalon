@@ -36,6 +36,8 @@ Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann
 | `sort_order` | Nein | Numerische Sortierreihenfolge im Formular. Kleinere Zahlen erscheinen zuerst. |
 | `target_subtype` | Nein | Wenn gesetzt, gilt das Feld nur für den angegebenen Subtyp. |
 | `is_public` | Nein | Standardmäßig aktiv. Ist die Option **„Öffentlich über APIs ausgeben“** deaktiviert, bleibt der Wert für angemeldete Mitarbeitende sichtbar, wird aber weder im Public-Portal noch über anonyme REST-, Such-, OAI- oder IIIF-Ausgaben veröffentlicht. |
+| `detail_slot` | Nein | Ordnet das Feld auf öffentlichen Detailseiten dem Hauptbereich oder der Seitenspalte zu. Standard: Seitenspalte. |
+| `detail_role` | Nein | Kann das Feld als Beschreibung auszeichnen. Pro Datensatztyp und Subtyp ist nur ein Beschreibungsfeld zulässig. |
 | `settings` | Nein | Feldtyp-spezifische Optionen als JSON-Objekt (siehe unten). |
 
 ## Öffentliche und interne Felder
@@ -43,6 +45,12 @@ Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann
 Die Sichtbarkeit eines Feldes in einer Detail- oder Listenansicht ist keine Zugriffskontrolle. Für Daten wie interne Notizen, Kontaktdaten oder noch nicht veröffentlichte Provenienzangaben muss zusätzlich **„Öffentlich über APIs ausgeben“** deaktiviert werden.
 
 Dann wird der gespeicherte Wert nicht gelöscht und bleibt in der Admin-UI sowie in authentifizierten API-Antworten verfügbar. Katalon entfernt ihn aber serverseitig aus allen anonymen Ausgabewegen: Public-Portal, öffentliche REST-Antworten, Suchindex und Facetten, OAI-PMH sowie IIIF-Manifeste. Das gilt auch für einzelne Sub-Felder einer Gruppe.
+
+## Felder auf Portal-Detailseiten anordnen
+
+Im Feldformular legt **Detailseiten-Bereich** fest, ob ein öffentliches Feld im Hauptbereich oder in der Seitenspalte erscheint. Mit **Detailseiten-Rolle: Beschreibung** wird ein Feld als zentraler Beschreibungstext verwendet. Pro Datensatztyp und Subtyp kann nur ein Feld diese Rolle haben.
+
+Die Position der gesamten Seitenspalte wird nicht pro Feld eingestellt, sondern unter **Einstellungen → Portal** global auf links oder rechts gesetzt. Felder, die nicht öffentlich ausgegeben werden, erscheinen unabhängig von diesen Layout-Einstellungen nicht im Portal.
 
 ---
 

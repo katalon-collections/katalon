@@ -6,21 +6,10 @@ import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
 import { useBackToSearch } from '../hooks/useBackToSearch'
-import { authorityUrl, pidUrl, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { RelationFieldRow } from '../components/RelationFieldRow'
+import { usePortalConfig } from '../hooks/usePortalConfig'
+import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { useI18n } from '../i18n'
-
-function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
-  if (!value) return null
-  return (
-    <div className="meta-row">
-      <span className="key">{label}</span>
-      <span className="val">
-        {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
-      </span>
-    </div>
-  )
-}
 
 function StaticMap({ lat, lon, name }: { lat: number; lon: number; name: string }) {
   const bbox = `${lon - 0.05},${lat - 0.03},${lon + 0.05},${lat + 0.03}`
@@ -60,10 +49,11 @@ export function PlaceDetailPage() {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const fieldDefs = useFieldDefinitions('place')
+  const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('place')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
+  const portalConfig = usePortalConfig()
 
   useEffect(() => {
     if (!id) return
@@ -113,7 +103,7 @@ export function PlaceDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !place) return (
     <div className="container page">
       <div style={{ color: '#dc2626' }}>{error ?? t('error.placeNotFound')}</div>
@@ -125,7 +115,8 @@ export function PlaceDetailPage() {
   const hasCoords = place.lat != null && place.lon != null
   const description = renderFieldValue(m.description, locale) ?? ''
 
-  const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'name' && f.name !== 'title')
+  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'title' && f.name !== 'name')
+  const nonObjectRelations = relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 
   return (
     <div className="container page">
@@ -156,77 +147,55 @@ export function PlaceDetailPage() {
       </div>
       <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em' }}>{title}</h1>
 
-      <div className="detail-layout">
-        <div>
-          {hasCoords && (
-            <StaticMap lat={place.lat!} lon={place.lon!} name={title} />
-          )}
-
-          {m.description != null && (
-            <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)', marginBottom: 20 }}>
-              {renderFieldValue(m.description, locale)}
+      <DetailPageLayout
+        fieldDefs={detailFieldDefs}
+        metadata={m}
+        locale={locale}
+        sidebarPosition={portalConfig.detail_sidebar_position}
+        media={hasCoords ? <StaticMap lat={place.lat!} lon={place.lon!} name={title} /> : undefined}
+        mainExtra={linkedObjects.length > 0 && (
+          <section style={{ marginTop: 8 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
+            <div className="obj-grid">
+              {linkedObjects.map(obj => {
+                const om = obj.metadata_ as Record<string, unknown>
+                const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
+                const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
+                const isFrom = rel ? rel.from_id === place.id : true
+                return (
+                  <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
+                    <div className="thumb">
+                      {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
+                    </div>
+                    <div className="info">
+                      <div className="title">{otitle}</div>
+                      {rel && (
+                        <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
+                          {resolveRelationType(rel.relation_type, isFrom)}
+                        </div>
+                      )}
+                      {obj.idno && <div className="meta">{obj.idno}</div>}
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
-          )}
-
-          {linkedObjects.length > 0 && (
-            <section style={{ marginTop: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
-              <div className="obj-grid">
-                {linkedObjects.map(obj => {
-                  const om = obj.metadata_ as Record<string, unknown>
-                  const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
-                  const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
-                  const isFrom = rel ? rel.from_id === place.id : true
-                  return (
-                    <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
-                      <div className="thumb">
-                        {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
-                      </div>
-                      <div className="info">
-                        <div className="title">{otitle}</div>
-                        {rel && (
-                          <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
-                            {resolveRelationType(rel.relation_type, isFrom)}
-                          </div>
-                        )}
-                        {obj.idno && <div className="meta">{obj.idno}</div>}
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
+          </section>
+        )}
+        relations={nonObjectRelations.length > 0 && (
           <RelationsList
-            relations={relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')}
+            relations={nonObjectRelations}
             currentId={place.id}
             resolveLabel={resolveRelationType}
             titles={relationTitles}
             metadata={relationMeta}
             fieldDefs={fieldDefs}
           />
-        </div>
-
-        <aside className="detail-meta">
-          {visibleFields.map(f => {
-            const rawValue = m[f.name]
-            if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
-            }
-            const rendered = renderFieldValue(rawValue, locale, f.field_type)
-            const href = f.field_type === 'authority'
-              ? authorityUrl(rawValue)
-              : f.field_type === 'pid'
-                ? pidUrl(rawValue)
-                : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
-          })}
-          {hasCoords && (
-            <MetaRow label={t('common.coordinates')} value={`${place.lat!.toFixed(5)}, ${place.lon!.toFixed(5)}`} />
-          )}
-        </aside>
-      </div>
+        )}
+        sidebarExtra={hasCoords && (
+          <MetaRow label={t('common.coordinates')} value={`${place.lat!.toFixed(5)}, ${place.lon!.toFixed(5)}`} />
+        )}
+      />
     </div>
   )
 }

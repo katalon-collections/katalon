@@ -9,21 +9,9 @@ import { RelationsList } from '../components/RelationsList'
 import { MediaViewer, MediaThumb } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
-import { authorityUrl, pidUrl, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { RelationFieldRow } from '../components/RelationFieldRow'
+import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { useI18n } from '../i18n'
-
-function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
-  if (!value) return null
-  return (
-    <div className="meta-row">
-      <span className="key">{label}</span>
-      <span className="val">
-        {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
-      </span>
-    </div>
-  )
-}
 
 function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles: MediaFile[] }) {
   if (mediaFiles.length === 1) {
@@ -62,7 +50,7 @@ export function ObjectDetailPage() {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [viewerError, setViewerError] = useState(false)
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
-  const fieldDefs = useFieldDefinitions('object')
+  const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('object')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
@@ -100,7 +88,7 @@ export function ObjectDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) {
+  if (loading || fieldDefsLoading) {
     return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   }
 
@@ -128,7 +116,26 @@ export function ObjectDetailPage() {
     ?? readyMedia.find(f => (f.category ?? 'image') === 'image')
   const ogImage = primaryImage ? mediaThumbnailUrl(obj.id, primaryImage.id) : ''
 
-  const visibleFields = fieldDefs.filter(f => f.show_in_detail && f.name !== 'description' && f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
+  // Keywords get their own tag-pill rendering below; keep them out of the generic field loop.
+  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
+
+  const media = category !== 'image' && selectedMedia ? (
+    <MediaViewer objectId={obj.id} media={selectedMedia} />
+  ) : showViewer ? (
+    <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
+  ) : readyMedia.length > 0 ? (
+    <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
+  ) : portalConfig.placeholder_image_url ? (
+    <img
+      src={portalConfig.placeholder_image_url}
+      alt=""
+      style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+    />
+  ) : (
+    <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
+      {t('object.noImage')}
+    </div>
+  )
 
   return (
     <div className="container page">
@@ -163,52 +170,35 @@ export function ObjectDetailPage() {
         {[String(m.creator ?? m.photographer ?? ''), String(m.year ?? m.date ?? ''), obj.idno].filter(Boolean).join(' · ')}
       </div>
 
-      <div className="detail-layout">
-        <div>
-          {category !== 'image' && selectedMedia ? (
-            <MediaViewer objectId={obj.id} media={selectedMedia} />
-          ) : showViewer ? (
-            <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
-          ) : readyMedia.length > 0 ? (
-            <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
-          ) : portalConfig.placeholder_image_url ? (
-            <img
-              src={portalConfig.placeholder_image_url}
-              alt=""
-              style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
-            />
-          ) : (
-            <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
-              {t('object.noImage')}
-            </div>
-          )}
-
-          {readyMedia.length > 1 && !(showViewer && imageMedia.length === readyMedia.length) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>
-              {readyMedia.map(m => (
-                <MediaThumb
-                  key={m.id}
-                  objectId={obj.id}
-                  media={m}
-                  active={m.id === selectedMedia?.id}
-                  onSelect={() => setSelectedMediaId(m.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          {m.description != null && (
-            <div style={{ marginTop: 20, fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>
-              {renderFieldValue(m.description, locale)}
-            </div>
-          )}
-
-          {Array.isArray(m.keywords) && (m.keywords as string[]).length > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(m.keywords as string[]).map((t, i) => <span key={i} className="tag">{t}</span>)}
-            </div>
-          )}
-
+      <DetailPageLayout
+        fieldDefs={detailFieldDefs}
+        metadata={m}
+        locale={locale}
+        sidebarPosition={portalConfig.detail_sidebar_position}
+        media={(
+          <>
+            {media}
+            {readyMedia.length > 1 && !(showViewer && imageMedia.length === readyMedia.length) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>
+                {readyMedia.map(m => (
+                  <MediaThumb
+                    key={m.id}
+                    objectId={obj.id}
+                    media={m}
+                    active={m.id === selectedMedia?.id}
+                    onSelect={() => setSelectedMediaId(m.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        mainExtra={Array.isArray(m.keywords) && (m.keywords as string[]).length > 0 && (
+          <div style={{ marginTop: 16, marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(m.keywords as string[]).map((kw, i) => <span key={i} className="tag">{kw}</span>)}
+          </div>
+        )}
+        relations={relations.length > 0 && (
           <RelationsList
             relations={relations}
             currentId={obj.id}
@@ -217,23 +207,9 @@ export function ObjectDetailPage() {
             metadata={relationMeta}
             fieldDefs={fieldDefs}
           />
-        </div>
-
-        <aside className="detail-meta">
-          {obj.idno && <MetaRow label={t('common.inventoryNo')} value={obj.idno} />}
-          {visibleFields.map(f => {
-            const rawValue = m[f.name]
-            if (f.field_type === 'relation') {
-              return <RelationFieldRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rawValue} targetType={f.settings?.target_type as string | undefined} />
-            }
-            const rendered = renderFieldValue(rawValue, locale, f.field_type)
-            const href = f.field_type === 'authority'
-              ? authorityUrl(rawValue)
-              : f.field_type === 'pid'
-                ? pidUrl(rawValue)
-                : undefined
-            return rendered ? <MetaRow key={f.name} label={f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name} value={rendered} href={href} /> : null
-          })}
+        )}
+        sidebarBefore={obj.idno && <MetaRow label={t('common.inventoryNo')} value={obj.idno} />}
+        sidebarExtra={(
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {imageMedia.length > 0 && (
               <>
@@ -253,8 +229,8 @@ export function ObjectDetailPage() {
               </>
             )}
           </div>
-        </aside>
-      </div>
+        )}
+      />
     </div>
   )
 }

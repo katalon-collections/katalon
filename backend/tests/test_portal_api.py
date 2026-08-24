@@ -218,6 +218,8 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
         field_type="text",
         settings={"hint": "visible"},
         show_in_detail=True,
+        detail_slot="sidebar",
+        detail_role="none",
         is_deleted=False,
         is_required=True,
         is_repeatable=True,
@@ -241,6 +243,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
     assert response.json() == [{
         "name": "material", "label": {"de": "Material"}, "field_type": "text",
         "settings": {"hint": "visible"}, "show_in_detail": True,
+        "detail_slot": "sidebar", "detail_role": "none",
     }]
 
 

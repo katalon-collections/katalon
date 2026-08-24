@@ -80,6 +80,8 @@ export interface FieldDefinition {
   settings: Record<string, unknown>
   show_in_detail: boolean
   show_in_list: boolean
+  detail_slot?: 'main' | 'sidebar'
+  detail_role?: 'none' | 'description'
   is_public?: boolean
   is_facet: boolean
   is_searchable: boolean
@@ -214,6 +216,7 @@ export interface PortalConfigRead {
   logo_url: string
   placeholder_image_url: string
   color_tokens: Record<string, string>
+  detail_sidebar_position: 'left' | 'right'
 }
 
 export interface UserRead {

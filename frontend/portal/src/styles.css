@@ -120,6 +120,18 @@ input, select, textarea { font-family: inherit; }
 /* Detail page */
 .detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 32px; margin-top: 32px; }
 .detail-layout > * { min-width: 0; }
+/* Sidebar position is a global setting; on small screens media/main content always comes
+   first regardless — the order/column swap below only applies once there's room for two
+   columns. The sidebar stays the narrow (320px) track either side — swapping which side
+   it's on must not swap which track is wide, or media and metadata trade sizes. */
+@media (min-width: 769px) {
+  .detail-layout--sidebar-left { grid-template-columns: 320px 1fr; }
+  .detail-layout--sidebar-left .detail-main { order: 2; }
+  .detail-layout--sidebar-left .detail-meta { order: 1; }
+}
+/* A record with nothing in the main column (no media, no relations, ...) shows the
+   metadata panel alone instead of leaving a wide empty column beside a narrow one. */
+.detail-layout--metadata-only { display: block; max-width: 640px; }
 .detail-viewer { background: #0f172a; border-radius: 10px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.3); font-size: 14px; }
 .detail-meta { background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 20px; align-self: start; }
 .meta-row { display: flex; flex-direction: column; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border, #e4e6eb); }

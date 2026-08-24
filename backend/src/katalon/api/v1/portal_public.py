@@ -155,6 +155,8 @@ class PortalFieldDefinitionRead(BaseModel):
     field_type: str
     settings: dict[str, Any]
     show_in_detail: bool
+    detail_slot: str
+    detail_role: str
 
 
 class PortalVocabularyRead(BaseModel):

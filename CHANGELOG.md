@@ -5,6 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-08-24
+
+### Fixed
+- Die neuen Portal-Konfigurationen für Trefferlisten-Untertitel und Detailseiten-Layouts verwenden eine eindeutige lineare Alembic-Migrationsfolge und können gemeinsam ausgerollt werden.
+
+## [1.3.2] - 2026-08-21
+
+### Fixed
+- Portal-Detailseiten: `useFieldDefinitions` lieferte Schema-Felder asynchron nach dem Datensatz, wodurch das neue detail_slot/detail_role-Layout kurz falsch (bzw. fälschlich als „metadata only") gerendert wurde, bevor es auf das korrekte Layout sprang. Detailseiten warten jetzt auch auf das Schema, bevor sie rendern.
+- Admin-Schema-Editor: Die Checkbox-Zeile für Feldeigenschaften hatte kein Umbruchverhalten und lief bei den zwei neuen Detailseiten-Layout-Dropdowns Gefahr, in schmaleren Fenstern über den Rand hinauszulaufen. Zeile umbricht jetzt (`flex-wrap`), die beiden neuen Dropdowns stehen zudem in einer eigenen Zeile statt zwischen den Checkboxen.
+
+## [1.3.1] - 2026-08-21
+
+### Fixed
+- Portal-Detailseiten-Layout: Beim Umschalten der Sidebar-Position (links/rechts) wurden bisher auch die Spaltenbreiten vertauscht, sodass die Metadaten-Spalte plötzlich breiter als der Hauptbereich war. Die Seitenspalte bleibt jetzt unabhängig von der Position immer die schmale Spalte.
+- Portal-Detailseiten-Layout: Records ganz ohne Hauptbereichs-Inhalt (keine Medien, keine Beschreibung, keine Hauptbereichs-Felder, keine Beziehungen) zeigten eine leere breite Spalte neben der schmalen Seitenspalte. Layout klappt in diesem Fall jetzt auf eine einzelne, breitenbegrenzte Spalte zusammen.
+
+## [1.3.0] - 2026-08-21
+
+### Added
+- Konfigurierbare Portal-Detailseiten-Layouts: pro Feld steuerbar, ob es im Hauptbereich oder in der Seitenspalte erscheint (`detail_slot`) und ob es die Beschreibungsrolle übernimmt (`detail_role`), plus ein globaler Schalter für die Sidebar-Position (links/rechts) in den Portal-Einstellungen. Siehe Issue [#317](https://github.com/karkraeg/Katalon/issues/317).
+- Portal: gemeinsamer `DetailPageLayout`-Baustein für Objekte/Entitäten/Orte/Occurrences ersetzt die bisherige, pro Seite duplizierte und teils heuristische (Textlänge-basierte) Platzierungslogik.
+
 ## [1.2.20] - 2026-08-24
 
 ### Added
@@ -14,6 +37,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ### Fixed
 - Admin (mobil): Globale Suche in der Topbar wurde durch einen konkurrierenden Flex-Spacer auf die Hälfte der Breite gequetscht und dadurch abgeschnitten. Status-Pillen (Entwurf/Intern/Öffentlich) und Aktionsbuttons (Im Portal ansehen/Verwerfen/Speichern) im Formular-Toolbar wurden auf volle Zeilenbreite gestreckt statt sich an ihrem Inhalt zu orientieren. Berührungsziele bleiben weiterhin ≥44px hoch.
+
 ## [1.2.18] - 2026-08-20
 
 ### Fixed
