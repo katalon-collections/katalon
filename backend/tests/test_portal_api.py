@@ -287,17 +287,29 @@ async def test_portal_search_rejects_procedures(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeypatch) -> None:
     captured: dict = {}
+    config = MagicMock(subtitle_fields={"object": ["creator"]})
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = config
+    session = AsyncMock()
+    session.execute.return_value = config_result
 
     async def search(**kwargs):
         captured.update(kwargs)
         return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
 
-    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    async def override_db():
+        yield session
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/portal/v1/search")
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/search")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
     assert captured["record_type"] is None
     assert captured["record_types"] == ("object", "entity", "place", "occurrence")
     assert captured["status"] == "public"
+    assert captured["subtitle_fields"] == {"object": ["creator"]}

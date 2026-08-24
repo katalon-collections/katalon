@@ -65,6 +65,7 @@ export interface PortalConfig {
   hero_text: string
   featured_object_ids: string[]
   facet_fields: Record<string, string[]>
+  subtitle_fields: Record<string, string[]>
   browse_enabled_types: string[]
   accent_color: string
   logo_url: string
@@ -78,7 +79,10 @@ export interface Page<T> { total: number; page: number; page_size: number; items
 export interface FacetBucket { value: string; count: number }
 export interface SearchResponse {
   total: number; page: number; page_size: number
-  items: Array<{ id: string; record_type: string; title: string; status: string | null; score: number | null }>
+  items: Array<{
+    id: string; record_type: string; title: string; status: string | null; score: number | null
+    subtitle_values?: Record<string, string | string[]> | null
+  }>
   facets: Record<string, FacetBucket[]>
 }
 

@@ -30,6 +30,7 @@ from katalon.core.models import (
     Object,
     Occurrence,
     Place,
+    PortalConfig,
     Relation,
     StaticPage,
     Vocabulary,
@@ -302,6 +303,7 @@ async def list_relations(
 @limiter.limit("100/minute")
 async def search(
     request: Request,
+    db: DBDep,
     q: str | None = None,
     type: str | None = None,
     facets: str | None = None,
@@ -323,6 +325,9 @@ async def search(
         }.items()
         if value
     }
+    portal_config = (
+        await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+    ).scalar_one_or_none()
     result = await search_service.search(
         query=q,
         record_type=type,
@@ -334,6 +339,7 @@ async def search(
         facet_fields=[field.strip() for field in facets.split(",") if field.strip()] if facets else None,
         rel_filters=rel_filters or None,
         active_objects_only=True,
+        subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
     )
     return SearchResponse(**result)
 

@@ -11,12 +11,24 @@ from katalon.main import app
 async def test_search_rate_limit_allows_under_limit() -> None:
     """Requests under the rate limit should succeed."""
     result = {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
-    with patch("katalon.api.v1.search.search_service.search", AsyncMock(return_value=result)):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # First few requests should succeed
-            for _ in range(3):
-                r = await client.get("/portal/v1/search?q=test")
-                assert r.status_code == 200
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.return_value = config_result
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        with patch("katalon.api.v1.search.search_service.search", AsyncMock(return_value=result)):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                # First few requests should succeed
+                for _ in range(3):
+                    r = await client.get("/portal/v1/search?q=test")
+                    assert r.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio

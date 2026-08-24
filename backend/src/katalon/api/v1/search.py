@@ -23,6 +23,7 @@ class SearchResult(BaseModel):
     title: str
     status: str | None = None
     score: float | None = None
+    subtitle_values: dict[str, str | list[str]] | None = None
 
 
 class SearchResponse(BaseModel):
