@@ -255,7 +255,7 @@ export function SearchPage() {
 
       <div className="search-layout">
         <aside className="facets">
-          {(systemFacets.includes('record_type') || typeFilt) && (
+          {systemFacets.includes('record_type') && (
             <FacetPanel
               label={t('search.typeFacet')}
               buckets={typesFacet}
@@ -263,7 +263,7 @@ export function SearchPage() {
               onSelect={v => setFilter('type', v)}
             />
           )}
-          {(systemFacets.includes('status') || statusFilt) && (
+          {systemFacets.includes('status') && (
             <FacetPanel
               label={t('search.statusFacet')}
               buckets={statusFacet}

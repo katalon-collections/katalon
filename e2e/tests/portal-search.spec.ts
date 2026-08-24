@@ -45,7 +45,7 @@ test('keeps configured facets when an older search response arrives last', async
   await expect(page.getByRole('button', { name: /Archaeology/ })).toBeVisible()
 })
 
-test('hides configured system facets and shows reset only for an active filter', async ({ page }) => {
+test('hides a disabled system facet even when its URL filter is active', async ({ page }) => {
   await page.route('**/portal/v1/portal/config', route => route.fulfill({
     json: { ...portalConfig, facet_fields: { _system: ['status'] } },
   }))
@@ -64,7 +64,7 @@ test('hides configured system facets and shows reset only for an active filter',
     },
   }))
 
-  await page.goto('http://127.0.0.1:5174/search?q=')
+  await page.goto('http://127.0.0.1:5174/search?q=&type=object')
 
   await expect(page.getByRole('heading', { name: 'Type' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible()

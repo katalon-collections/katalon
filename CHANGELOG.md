@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-08-24
+
+### Fixed
+- Deaktivierte Portal-Systemfacetten bleiben auch bei aktiven URL-Filtern ausgeblendet.
+
 ## [1.3.9] - 2026-08-24
 
 ### Fixed
