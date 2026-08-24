@@ -3,6 +3,15 @@ title: "Search And Indexing"
 summary: "Katalon's search workflow builds Elasticsearch documents from database records, configured schema flags, relation titles, and inherited linked fields."
 topics: [architecture, workflows, search, indexing, elasticsearch, visibility]
 sources:
+  - id: admin-object-list
+    type: file
+    path: backend/src/katalon/api/v1/objects.py
+  - id: admin-procedure-list
+    type: file
+    path: backend/src/katalon/api/v1/procedures.py
+  - id: admin-list-tests
+    type: file
+    path: backend/tests/integration/test_objects_integration.py
   - id: search-service
     type: file
     path: backend/src/katalon/services/search_service.py
@@ -42,6 +51,8 @@ Relation fields can inherit selected metadata from linked records. During docume
 `search_documents()` builds a boolean Elasticsearch query. Text search uses `query_string` against boosted `title` and `search_text` fields, appends a trailing wildcard for simple user text, and rejects leading wildcards through Elasticsearch settings [@elasticsearch]. Filters cover record type, status, metadata facet values sent as `meta_` filters, relation facet values, and active-only object visibility for anonymous callers [@elasticsearch].
 
 Every search response includes default aggregations for type, status, and the three relation title arrays. Requested configured facets add `meta_<field>` aggregations over the matching `facet_<field>` keyword fields [@elasticsearch]. `search_service.search()` converts raw Elasticsearch hits into API items and aggregation buckets for [Portal Search And Facets](portal-search-and-facets) [@search-service].
+
+The Admin record lists are a separate PostgreSQL query path. Their `q` parameter performs a case-insensitive literal substring match against the record ID and JSON metadata; procedure lists also include the reference number. Thus `axt` matches `Steinaxt` without requiring users to type wildcards, and literal `%` or `_` characters do not broaden the query [@admin-object-list] [@admin-procedure-list] [@admin-list-tests].
 
 ## Reindex And Repair Paths
 

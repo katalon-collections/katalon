@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-08-24
+
+### Fixed
+- Admin-Datensatzlisten finden Suchbegriffe als case-insensitive Teilstrings in IDs und Metadaten.
+- Portal-Konfigurationen aus Altbeständen erhalten fehlende Standardwerte vor der Response-Validierung.
+
 ## [1.3.8] - 2026-08-24
 
 ### Fixed

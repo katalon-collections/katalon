@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import Text, func, select
+from sqlalchemy import cast as sql_cast
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
@@ -66,7 +67,10 @@ async def list_places(
     visibility_user = await _visibility_user(db, current_user)
     query = apply_public_visibility(query, Place, visibility_user)
     if q:
-        query = query.where(Place.search_vector.match(q))
+        query = query.where(
+            Place.idno.icontains(q, autoescape=True)
+            | sql_cast(Place.metadata_, Text).icontains(q, autoescape=True)
+        )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(Place.updated_at.desc())
     items = (await db.execute(query)).scalars().all()

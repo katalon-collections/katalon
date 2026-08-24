@@ -4,7 +4,7 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import Text, cast, func, select
 
 from katalon.core.concurrency import check_version, flush_record
 from katalon.core.dependencies import DBDep, require_record_permission
@@ -127,7 +127,11 @@ async def list_procedures(
     if reference_number:
         query = query.where(Procedure.reference_number.ilike(f"%{reference_number}%"))
     if q:
-        query = query.where(Procedure.search_vector.match(q))
+        query = query.where(
+            Procedure.idno.icontains(q, autoescape=True)
+            | Procedure.reference_number.icontains(q, autoescape=True)
+            | cast(Procedure.metadata_, Text).icontains(q, autoescape=True)
+        )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = (
         query.offset((page - 1) * page_size)

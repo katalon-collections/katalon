@@ -53,6 +53,28 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
 
 
 @pytest.mark.asyncio
+async def test_object_list_search_matches_metadata_substring(async_client, auth_headers) -> None:
+    suffix = uuid.uuid4().hex[:12]
+    create_response = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"SEARCH-{suffix}",
+            "status": "draft",
+            "metadata_": {"label": f"Steinaxt-{suffix}"},
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+
+    response = await async_client.get(
+        f"/v1/objects?q=aXt-{suffix}", headers=auth_headers
+    )
+
+    assert response.status_code == 200, response.text
+    assert [item["id"] for item in response.json()["items"]] == [create_response.json()["id"]]
+
+
+@pytest.mark.asyncio
 async def test_delete_object_with_media_files_succeeds(async_client, auth_headers) -> None:
     """Regression test: deleting an object with media files doesn't 500. Delete is a
     soft-delete now (see test_soft_delete.py) — media rows stay until the purge job

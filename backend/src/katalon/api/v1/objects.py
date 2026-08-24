@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.core.concurrency import check_version, flush_record, require_version
@@ -81,7 +81,10 @@ async def list_objects(
     if object_type:
         query = query.where(Object.object_type == object_type)
     if q:
-        query = query.where(Object.search_vector.match(q))
+        query = query.where(
+            Object.idno.icontains(q, autoescape=True)
+            | cast(Object.metadata_, Text).icontains(q, autoescape=True)
+        )
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
