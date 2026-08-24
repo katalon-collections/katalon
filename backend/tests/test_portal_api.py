@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1.portal import PortalConfigRead
-from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, Relation
+from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, PortalConfig, Relation
 from katalon.database import get_db
 from katalon.main import app
 
@@ -263,6 +263,41 @@ async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["logo_url"] == "/portal/v1/portal/logo/file"
     assert response.json()["browse_enabled_types"] == ["object", "entity", "place", "occurrence"]
+
+
+@pytest.mark.parametrize(
+    ("saved_facets", "expected_system_facets"),
+    [
+        ({}, ["record_type", "status"]),
+        ({"_system": ["status"]}, ["status"]),
+        ({"_system": []}, []),
+    ],
+)
+@pytest.mark.asyncio
+async def test_portal_config_preserves_system_facet_visibility(
+    saved_facets: dict[str, list[str]], expected_system_facets: list[str]
+) -> None:
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = PortalConfig(facet_fields=saved_facets)
+    facet_result = MagicMock()
+    facet_result.all.return_value = []
+    admin_result = MagicMock()
+    admin_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.side_effect = [config_result, facet_result, admin_result]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/portal/config")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json()["facet_fields"]["_system"] == expected_system_facets
 
 
 @pytest.mark.asyncio

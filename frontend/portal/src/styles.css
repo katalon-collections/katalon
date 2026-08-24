@@ -103,6 +103,8 @@ input, select, textarea { font-family: inherit; }
 .facet-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; border: 0; background: transparent; color: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .facet-item:hover { color: var(--accent, #1e3a8a); }
 .facet-item .ct { font-size: 11px; color: var(--fg-4, #8a92a3); font-family: 'IBM Plex Mono', monospace; }
+.facet-reset { width: 100%; margin-top: 6px; padding: 8px 0 0; border: 0; border-top: 1px solid var(--border, #e4e6eb); background: transparent; color: var(--accent, #1e3a8a); font-size: 12px; text-align: left; cursor: pointer; }
+.facet-reset:hover { color: var(--accent-hover, #15296b); }
 .result-list { display: flex; flex-direction: column; gap: 12px; }
 .result-row {
   background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb);

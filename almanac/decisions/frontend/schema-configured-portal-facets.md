@@ -36,7 +36,7 @@ The admin UI exposes the facet flag where fields are edited. `ScreenSchema` incl
 
 ## Decision
 
-The effective public facet list is derived from schema field definitions. `GET /v1/portal/config` loads the singleton portal config, queries `FieldDefinition.target_type` and `FieldDefinition.name` where `is_facet` is true and `is_deleted` is false, groups the names by target type, assigns that derived object to `config.facet_fields`, and returns it [@portal-api].
+The effective public metadata facet list is derived from schema field definitions. `GET /v1/portal/config` loads the singleton portal config, queries `FieldDefinition.target_type` and `FieldDefinition.name` where `is_facet` is true and `is_deleted` is false, groups the names by target type, adds the saved `_system` selection for the built-in type and status facets, and returns it [@portal-api]. Existing configurations without `_system` keep both built-in facets visible.
 
 The portal search page consumes that public config. On mount, it calls `api.portal.config()`, stores `facet_fields`, and builds the `/v1/search` `facets` query parameter from the active record type's configured fields or from all configured fields when no type filter is active [@portal-search]. It renders each configured metadata facet from response keys named `meta_<field>` and writes active metadata filters back into the URL as `meta_<field>=<value>` [@portal-search].
 

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-08-24
+
+### Fixed
+- Die Portal-Standardfacetten Typ und Status sind konfigurierbar; „Alle“ erscheint nur noch als Rücksetz-Aktion unter einem aktiven Filter.
+
 ## [1.3.5] - 2026-08-24
 
 ### Fixed

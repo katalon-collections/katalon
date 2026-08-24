@@ -477,6 +477,9 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   const [activeType, setActiveType] = useState<string>('object')
   const [fieldsByType, setFieldsByType] = useState<Record<string, FieldDefinition[]>>({})
   const [loadingFields, setLoadingFields] = useState(true)
+  const [systemFacets, setSystemFacets] = useState<string[]>(
+    () => config.facet_fields?._system ?? ['record_type', 'status']
+  )
   const [facetFields, setFacetFields] = useState<Record<string, string[]>>(
     () => {
       const base = config.facet_fields ?? {}
@@ -512,6 +515,10 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
     })
   }
 
+  function toggleSystemFacet(name: string) {
+    setSystemFacets(prev => prev.includes(name) ? prev.filter(f => f !== name) : [...prev, name])
+  }
+
   function toggleSubtitle(type: string, name: string) {
     setSubtitleFields(prev => {
       const cur = prev[type] ?? []
@@ -543,7 +550,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       // (from relation settings) have no FieldDefinition row, so they are still
       // stored in portal_config.facet_fields.
       const updates: Promise<unknown>[] = []
-      const inheritedToSave: Record<string, string[]> = {}
+      const inheritedToSave: Record<string, string[]> = { _system: systemFacets }
       const subtitleToSave: Record<string, string[]> = {}
 
       for (const { key } of RECORD_TYPES) {
@@ -596,8 +603,29 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   return (
     <div>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-        Wähle pro Datensatztyp die Felder aus, die im Portal als Filteroptionen erscheinen sollen.
+        Lege globale Standardfacetten und zusätzliche Filter pro Datensatztyp fest.
       </p>
+
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Standardfacetten</h4>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="bd">
+          {[
+            { name: 'record_type', label: 'Typ' },
+            { name: 'status', label: 'Status' },
+          ].map(f => (
+            <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                className="ck"
+                checked={systemFacets.includes(f.name)}
+                onChange={() => toggleSystemFacet(f.name)}
+              />
+              <span style={{ flex: 1 }}>{f.label}</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border-s)' }}>
         {RECORD_TYPES.map(({ key, label }) => (

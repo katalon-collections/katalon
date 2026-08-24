@@ -44,3 +44,32 @@ test('keeps configured facets when an older search response arrives last', async
   await expect(page.getByRole('heading', { name: 'classification' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Archaeology/ })).toBeVisible()
 })
+
+test('hides configured system facets and shows reset only for an active filter', async ({ page }) => {
+  await page.route('**/portal/v1/portal/config', route => route.fulfill({
+    json: { ...portalConfig, facet_fields: { _system: ['status'] } },
+  }))
+  await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/pages', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/search?**', route => route.fulfill({
+    json: {
+      total: 1,
+      page: 1,
+      page_size: 20,
+      items: [],
+      facets: {
+        by_type: [{ value: 'object', count: 1 }],
+        by_status: [{ value: 'public', count: 1 }],
+      },
+    },
+  }))
+
+  await page.goto('http://127.0.0.1:5174/search?q=')
+
+  await expect(page.getByRole('heading', { name: 'Type' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'All' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: /public/ }).click()
+  await expect(page.getByRole('button', { name: 'All' })).toBeVisible()
+})

@@ -10,6 +10,14 @@ function facetLabel(field: string): string {
 }
 
 const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
+const DEFAULT_SYSTEM_FACETS = ['record_type', 'status']
+
+function configuredMetadataFacets(config: Record<string, string[]>, recordType: string): string[] {
+  const fields = recordType
+    ? (config[recordType] ?? [])
+    : Object.entries(config).filter(([key]) => key !== '_system').flatMap(([, values]) => values)
+  return [...new Set(fields)]
+}
 
 function resultSubtitle(
   r: { record_type: string; status: string | null; subtitle_values?: Record<string, string | string[]> | null },
@@ -37,7 +45,7 @@ export function SearchPage() {
   const [localQ, setLocalQ] = useState(q)
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({})
+  const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const { t } = useI18n()
@@ -71,9 +79,8 @@ export function SearchPage() {
       page,
       page_size: 20,
       facets: (() => {
-        const fields = typeFilt ? (facetConfig[typeFilt] ?? []) : Object.values(facetConfig).flat()
-        const unique = [...new Set(fields)]
-        return unique.length > 0 ? unique.join(',') : undefined
+        const fields = configuredMetadataFacets(facetConfig, typeFilt)
+        return fields.length > 0 ? fields.join(',') : undefined
       })(),
       rel_entity: relEntity || undefined,
       rel_place: relPlace || undefined,
@@ -146,6 +153,7 @@ export function SearchPage() {
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 1
   const typesFacet: FacetBucket[] = data?.facets?.['by_type'] ?? []
   const statusFacet: FacetBucket[] = data?.facets?.['by_status'] ?? []
+  const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
 
   function FacetPanel({ label, buckets, active, onSelect }: {
     label: string
@@ -157,15 +165,6 @@ export function SearchPage() {
     return (
       <div style={{ marginBottom: 20 }}>
         <h3>{label}</h3>
-        <button
-          type="button"
-          className="facet-item"
-          onClick={() => onSelect('')}
-          aria-pressed={!active}
-          style={{ fontWeight: !active ? 600 : undefined }}
-        >
-          <span>{t('search.all')}</span>
-        </button>
         {buckets.map(b => (
           <button
             type="button"
@@ -179,6 +178,11 @@ export function SearchPage() {
             <span className="ct">{b.count}</span>
           </button>
         ))}
+        {active && (
+          <button type="button" className="facet-reset" onClick={() => onSelect('')}>
+            {t('search.all')}
+          </button>
+        )}
       </div>
     )
   }
@@ -209,19 +213,23 @@ export function SearchPage() {
 
       <div className="search-layout">
         <aside className="facets">
-          <FacetPanel
-            label={t('search.typeFacet')}
-            buckets={typesFacet}
-            active={typeFilt}
-            onSelect={v => setFilter('type', v)}
-          />
-          <FacetPanel
-            label={t('search.statusFacet')}
-            buckets={statusFacet}
-            active={statusFilt}
-            onSelect={v => setFilter('status', v)}
-          />
-          {(typeFilt ? (facetConfig[typeFilt] ?? []) : [...new Set(Object.values(facetConfig).flat())]).map(field => {
+          {(systemFacets.includes('record_type') || typeFilt) && (
+            <FacetPanel
+              label={t('search.typeFacet')}
+              buckets={typesFacet}
+              active={typeFilt}
+              onSelect={v => setFilter('type', v)}
+            />
+          )}
+          {(systemFacets.includes('status') || statusFilt) && (
+            <FacetPanel
+              label={t('search.statusFacet')}
+              buckets={statusFacet}
+              active={statusFilt}
+              onSelect={v => setFilter('status', v)}
+            />
+          )}
+          {configuredMetadataFacets(facetConfig, typeFilt).map(field => {
             const buckets = data?.facets?.[`meta_${field}`] ?? []
             return (
               <FacetPanel

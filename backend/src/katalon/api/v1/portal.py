@@ -34,7 +34,13 @@ _DEFAULTS = {
     "accent_color": "#1e3a8a",
     "logo_url": "",
     "placeholder_image_url": "",
-    "facet_fields": {"object": [], "entity": [], "place": [], "occurrence": []},
+    "facet_fields": {
+        "_system": ["record_type", "status"],
+        "object": [],
+        "entity": [],
+        "place": [],
+        "occurrence": [],
+    },
     "subtitle_fields": {},
     "browse_enabled_types": ["object", "entity", "place", "occurrence"],
     "color_tokens": {},
@@ -109,6 +115,10 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
     # remain an explicit portal choice because they do not have their own
     # FieldDefinition row.
     saved = config.facet_fields or {}
+    configured_system_facets = saved.get("_system", ["record_type", "status"])
+    facet_fields["_system"] = [
+        name for name in ("record_type", "status") if name in configured_system_facets
+    ]
     for target_type, names in saved.items():
         facet_fields.setdefault(target_type, []).extend(
             name for name in names if name.startswith("inherited_")
