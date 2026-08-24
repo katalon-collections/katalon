@@ -6,7 +6,15 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1.portal import PortalConfigRead
-from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, PortalConfig, Relation
+from katalon.core.models import (
+    Entity,
+    FieldDefinition,
+    Object,
+    Occurrence,
+    Place,
+    PortalConfig,
+    Relation,
+)
 from katalon.database import get_db
 from katalon.main import app
 
@@ -342,7 +350,9 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/portal/v1/search")
+            response = await client.get(
+                "/portal/v1/search?meta_event_date=Paläolithikum&meta_event_date=Neolithikum"
+            )
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -350,4 +360,7 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
     assert captured["record_type"] is None
     assert captured["record_types"] == ("object", "entity", "place", "occurrence")
     assert captured["status"] == "public"
+    assert captured["extra_filters"] == {
+        "event_date": ["Paläolithikum", "Neolithikum"]
+    }
     assert captured["subtitle_fields"] == {"object": ["creator"]}

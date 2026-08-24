@@ -27,7 +27,9 @@ Portal search is the public-facing consumer of Katalon's Elasticsearch workflow.
 
 ## URL State And Backend Parameters
 
-`SearchPage` reads `q`, `type`, `status`, `page`, `meta_*`, `rel_entity`, `rel_place`, and `rel_occurrence` from `useSearchParams()` [@search-page]. It turns those values into a request to `/v1/search`, including `page_size=20` and a comma-separated `facets` list when configured metadata facet fields are available [@search-page].
+`SearchPage` reads `q`, `type`, `status`, `page`, repeated `meta_*`, `rel_entity`, `rel_place`, and `rel_occurrence` parameters from `useSearchParams()` [@search-page]. It turns those values into a request to `/v1/search`, including `page_size=20` and a comma-separated `facets` list when configured metadata facet fields are available [@search-page]. Repeated values of one metadata field are combined as OR; filters from different metadata fields remain conjunctive [@search-page] [@search-api].
+
+Submitting the result page's refine field replaces or clears `q`, resets pagination to page one, and retains the active type, metadata, and relation filters [@search-page].
 
 The backend endpoint accepts the same shape: full-text `q`, `type`, `status`, requested `facets`, pagination, relation filters, and arbitrary `meta_` query parameters [@search-api]. It passes metadata filters without the `meta_` prefix and relation filters as Elasticsearch field names, so the portal does not need to know the Elasticsearch document layout beyond public query parameter names [@search-api].
 
@@ -39,7 +41,7 @@ The settings screen stores `facet_fields` by record type and saves changes to `/
 
 ## Facet Rendering
 
-Search results return `facets` as named buckets with `value` and `count`, matching the `SearchResponse` and `FacetBucket` interfaces in the portal API client [@portal-client]. `SearchPage` renders type and status when enabled in `_system`, or when the corresponding URL filter is active so a deep-linked filter never becomes impossible to clear. A facet's reset action appears below its values only while that facet is active. Configured metadata panels come from `meta_<field>` aggregation names [@search-page]. Inherited fields use the same `meta_` URL and backend filter path as direct metadata facets; the field key itself carries the `inherited_<target_type>_<field>` prefix, so the portal can label it as a linked-record facet without adding another query parameter family [@search-page].
+Search results return `facets` as named buckets with `value` and `count`, matching the `SearchResponse` and `FacetBucket` interfaces in the portal API client [@portal-client]. `SearchPage` renders type and status when enabled in `_system`, or when the corresponding URL filter is active so a deep-linked filter never becomes impossible to clear. A facet's reset action appears below its values only while that facet is active. Configured metadata panels come from `meta_<field>` aggregation names. Their headings use the public schema label for the active portal language, falling back through German, English, and finally the internal field name [@search-page]. Their Elasticsearch aggregation excludes that field's own active values while retaining all other filters, so further values remain selectable with meaningful counts [@search-service]. Inherited fields use the same repeated `meta_` URL and backend filter path as direct metadata facets; the field key itself carries the `inherited_<target_type>_<field>` prefix, so the portal can label it as a linked-record facet without adding another query parameter family [@search-page].
 
 Relation facets appear only when all types are searched or the active type is `object`. The page maps `related_entities`, `related_places`, and `related_occurrences` buckets to `rel_entity`, `rel_place`, and `rel_occurrence` URL parameters [@search-page]. The backend then converts those parameters back to relation keyword filters for Elasticsearch [@search-api].
 

@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-08-24
+
+### Fixed
+- Portal-Metadatenfacetten erlauben mehrere Werte derselben Facette, halten weitere Werte mit passenden Zählern auswählbar und zeigen lokalisierte Schema-Labels mit Sprach-Fallback statt interner Feldnamen.
+- „Suche verfeinern“ behält aktive Typ-, Metadaten- und Relationsfilter bei; der Suchuntertitel wiederholt den bereits gewählten Datensatztyp nicht.
+
 ## [1.3.7] - 2026-08-24
 
 ### Fixed

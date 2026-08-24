@@ -317,7 +317,11 @@ async def search(
 ) -> SearchResponse:
     if type and type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=422, detail="Ungültiger öffentlicher Record-Typ.")
-    extra_filters = {k[5:]: v for k, v in request.query_params.items() if k.startswith("meta_") and v}
+    extra_filters = {
+        key[5:]: [value for value in request.query_params.getlist(key) if value]
+        for key in request.query_params.keys()
+        if key.startswith("meta_")
+    }
     rel_filters = {
         key: value
         for key, value in {

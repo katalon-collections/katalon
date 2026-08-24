@@ -8,6 +8,7 @@ from katalon.api.v1 import index_health
 from katalon.api.v1.search import trigger_reindex_type
 from katalon.core.models import Object, Occurrence, Procedure, Relation
 from katalon.integrations import elasticsearch
+from katalon.services import search_service
 from katalon.services.search_service import build_index_doc
 
 
@@ -264,9 +265,43 @@ async def test_search_documents_filters_and_aggregates_inherited_facets(monkeypa
 
     await elasticsearch.search_documents(
         None, "object", "public", 0, 20,
-        extra_filters={field: "1905"}, facet_fields=[field],
+        extra_filters={field: ["1905", "1906"]}, facet_fields=[field],
     )
 
     body = captured["body"]
-    assert {"term": {f"facet_{field}": "1905"}} in body["query"]["bool"]["filter"]
-    assert body["aggs"][f"meta_{field}"] == {"terms": {"field": f"facet_{field}", "size": 20}}
+    selected_values = {"terms": {f"facet_{field}": ["1905", "1906"]}}
+    assert selected_values in body["query"]["bool"]["filter"]
+
+    aggregation = body["aggs"][f"meta_{field}"]
+    assert aggregation["global"] == {}
+    assert selected_values not in aggregation["aggs"]["filtered"]["filter"]["bool"]["filter"]
+    assert aggregation["aggs"]["filtered"]["aggs"]["values"] == {
+        "terms": {"field": f"facet_{field}", "size": 20}
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_reads_self_excluding_facet_buckets(monkeypatch) -> None:
+    async def search_documents(*args, **kwargs):
+        return {
+            "hits": {"total": {"value": 0}, "hits": []},
+            "aggregations": {
+                "meta_event_date": {
+                    "doc_count": 21,
+                    "filtered": {
+                        "doc_count": 21,
+                        "values": {
+                            "buckets": [{"key": "Neolithikum", "doc_count": 17}]
+                        },
+                    },
+                }
+            },
+        }
+
+    monkeypatch.setattr(search_service, "search_documents", search_documents)
+
+    result = await search_service.search(facet_fields=["event_date"])
+
+    assert result["facets"]["meta_event_date"] == [
+        {"value": "Neolithikum", "count": 17}
+    ]

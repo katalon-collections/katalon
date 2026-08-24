@@ -58,10 +58,10 @@ async def search(
         status = "public"
 
     # Extra metadata filters: any query param starting with "meta_"
-    extra_filters: dict[str, str] = {
-        k[5:]: v
-        for k, v in request.query_params.items()
-        if k.startswith("meta_") and v
+    extra_filters: dict[str, list[str]] = {
+        key[5:]: [value for value in request.query_params.getlist(key) if value]
+        for key in request.query_params.keys()
+        if key.startswith("meta_")
     }
     facet_fields = [f.strip() for f in facets.split(",") if f.strip()] if facets else []
     rel_filters: dict[str, str] = {}

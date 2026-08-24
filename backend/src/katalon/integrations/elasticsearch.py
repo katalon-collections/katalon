@@ -150,7 +150,7 @@ async def search_documents(
     status: str | None,
     from_: int,
     size: int,
-    extra_filters: dict[str, str] | None = None,
+    extra_filters: dict[str, list[str]] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
@@ -184,8 +184,15 @@ async def search_documents(
         filters.append({"terms": {"record_type": list(record_types)}})
     if status:
         filters.append({"term": {"status": status}})
-    for field, value in (extra_filters or {}).items():
-        filters.append({"term": {f"facet_{field}": value}})
+    facet_filters = {
+        field: (
+            {"term": {f"facet_{field}": values[0]}}
+            if len(values) == 1
+            else {"terms": {f"facet_{field}": values}}
+        )
+        for field, values in (extra_filters or {}).items()
+        if values
+    }
     for field, value in (rel_filters or {}).items():
         filters.append({"term": {field: value}})
     if active_objects_only:
@@ -199,6 +206,9 @@ async def search_documents(
             }
         })
 
+    base_filters = list(filters)
+    filters.extend(facet_filters.values())
+
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
     aggs: dict[str, Any] = {
@@ -209,7 +219,23 @@ async def search_documents(
         "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
     }
     for field in facet_fields or []:
-        aggs[f"meta_{field}"] = {"terms": {"field": f"facet_{field}", "size": 20}}
+        aggregation_filters = [
+            value for name, value in facet_filters.items() if name != field
+        ]
+        aggs[f"meta_{field}"] = {
+            "global": {},
+            "aggs": {
+                "filtered": {
+                    "filter": {"bool": {"must": must, "filter": [
+                        *base_filters,
+                        *aggregation_filters,
+                    ]}},
+                    "aggs": {
+                        "values": {"terms": {"field": f"facet_{field}", "size": 20}}
+                    },
+                }
+            },
+        }
 
     result = await es.search(
         index=INDEX_NAME,

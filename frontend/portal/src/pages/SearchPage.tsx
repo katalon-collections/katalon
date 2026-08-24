@@ -2,11 +2,25 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
+import { useFieldLabels } from '../hooks/useFieldLabels'
 import { t, typeLabel, useI18n } from '../i18n'
 
-function facetLabel(field: string): string {
+function facetLabel(
+  field: string,
+  labels: Record<string, Record<string, string>>,
+  config: Record<string, string[]>,
+  recordType: string,
+): string {
   const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_(.+)$/)
-  return inherited ? t('search.linkedFacet', { type: typeLabel(inherited[1]), field: inherited[2] }) : field
+  if (inherited) {
+    return t('search.linkedFacet', {
+      type: typeLabel(inherited[1]),
+      field: labels[inherited[1]]?.[inherited[2]] ?? inherited[2],
+    })
+  }
+  const owner = recordType || Object.entries(config)
+    .find(([type, fields]) => type !== '_system' && fields.includes(field))?.[0]
+  return (owner ? labels[owner]?.[field] : undefined) ?? field
 }
 
 const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
@@ -48,7 +62,19 @@ export function SearchPage() {
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
+  const facetTypesKey = [...new Set(
+    Object.entries(facetConfig)
+      .filter(([type]) => type !== '_system')
+      .flatMap(([type, fields]) => [
+        type,
+        ...fields.flatMap(field => {
+          const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_/)
+          return inherited ? [inherited[1]] : []
+        }),
+      ])
+  )].sort().join(',')
+  const fieldLabels = useFieldLabels(facetTypesKey, locale)
 
   // Load configurable facet + result-subtitle fields from portal config
   useEffect(() => {
@@ -61,9 +87,12 @@ export function SearchPage() {
   }, [])
 
   // Collect active meta_ filters from URL
-  const metaFilters: Record<string, string> = {}
+  const metaFilters: Record<string, string[]> = {}
   params.forEach((value, key) => {
-    if (key.startsWith('meta_')) metaFilters[key.slice(5)] = value
+    if (key.startsWith('meta_')) {
+      const field = key.slice(5)
+      if (!metaFilters[field]?.includes(value)) metaFilters[field] = [...(metaFilters[field] ?? []), value]
+    }
   })
   const relEntity = params.get('rel_entity') ?? ''
   const relPlace = params.get('rel_place') ?? ''
@@ -88,11 +117,14 @@ export function SearchPage() {
     }
     // Pass meta_ filters as extra query params
     const qs = new URLSearchParams(
-      Object.entries({ ...searchParams, ...Object.fromEntries(Object.entries(metaFilters).map(([k, v]) => [`meta_${k}`, v])) })
-        .filter(([, v]) => v != null)
-        .map(([k, v]) => [k, String(v)])
-    ).toString()
-    fetch(`${BASE}${PORTAL_API}/search?${qs}`)
+      Object.entries(searchParams)
+        .filter(([, value]) => value != null)
+        .map(([key, value]) => [key, String(value)])
+    )
+    Object.entries(metaFilters).forEach(([field, values]) => {
+      values.forEach(value => qs.append(`meta_${field}`, value))
+    })
+    fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`)
       .then(r => r.json())
       .then(async (result: SearchResponse) => {
         if (cancelled) return
@@ -123,7 +155,12 @@ export function SearchPage() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (localQ.trim()) navigate(`/search?q=${encodeURIComponent(localQ.trim())}`)
+    const next = new URLSearchParams(params)
+    const term = localQ.trim()
+    if (term) next.set('q', term)
+    else next.delete('q')
+    next.set('page', '1')
+    setParams(next)
   }
 
   function setFilter(key: string, value: string) {
@@ -134,9 +171,15 @@ export function SearchPage() {
     setParams(next)
   }
 
-  function setMetaFilter(field: string, value: string) {
+  function toggleMetaFilter(field: string, value: string) {
     const key = `meta_${field}`
-    setFilter(key, value)
+    const next = new URLSearchParams(params)
+    const selected = next.getAll(key)
+    next.delete(key)
+    selected.filter(current => current !== value).forEach(current => next.append(key, current))
+    if (!selected.includes(value)) next.append(key, value)
+    next.set('page', '1')
+    setParams(next)
   }
 
   function setRelFilter(paramKey: string, value: string) {
@@ -158,7 +201,7 @@ export function SearchPage() {
   function FacetPanel({ label, buckets, active, onSelect }: {
     label: string
     buckets: FacetBucket[]
-    active: string
+    active: string[]
     onSelect: (v: string) => void
   }) {
     if (!buckets.length) return null
@@ -171,14 +214,14 @@ export function SearchPage() {
             key={b.value}
             className="facet-item"
             onClick={() => onSelect(b.value)}
-            aria-pressed={active === b.value}
-            style={{ fontWeight: active === b.value ? 600 : undefined }}
+            aria-pressed={active.includes(b.value)}
+            style={{ fontWeight: active.includes(b.value) ? 600 : undefined }}
           >
             <span>{typeLabel(b.value)}</span>
             <span className="ct">{b.count}</span>
           </button>
         ))}
-        {active && (
+        {active.length > 0 && (
           <button type="button" className="facet-reset" onClick={() => onSelect('')}>
             {t('search.all')}
           </button>
@@ -207,7 +250,6 @@ export function SearchPage() {
           : <>
               {t('search.results', { count: total })}
               {q ? t('search.resultsFor', { q }) : ''}
-              {typeFilt ? t('search.resultsType', { type: typeLabel(typeFilt) }) : t('search.resultsAllTypes')}
             </>}
       </div>
 
@@ -217,7 +259,7 @@ export function SearchPage() {
             <FacetPanel
               label={t('search.typeFacet')}
               buckets={typesFacet}
-              active={typeFilt}
+              active={typeFilt ? [typeFilt] : []}
               onSelect={v => setFilter('type', v)}
             />
           )}
@@ -225,7 +267,7 @@ export function SearchPage() {
             <FacetPanel
               label={t('search.statusFacet')}
               buckets={statusFacet}
-              active={statusFilt}
+              active={statusFilt ? [statusFilt] : []}
               onSelect={v => setFilter('status', v)}
             />
           )}
@@ -234,10 +276,10 @@ export function SearchPage() {
             return (
               <FacetPanel
                 key={field}
-                label={facetLabel(field)}
+                label={facetLabel(field, fieldLabels, facetConfig, typeFilt)}
                 buckets={buckets}
-                active={metaFilters[field] ?? ''}
-                onSelect={v => setMetaFilter(field, v)}
+                active={metaFilters[field] ?? []}
+                onSelect={v => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')}
               />
             )
           })}
@@ -246,19 +288,19 @@ export function SearchPage() {
               <FacetPanel
                 label={t('search.relatedEntities')}
                 buckets={data?.facets?.['related_entities'] ?? []}
-                active={relEntity}
+                active={relEntity ? [relEntity] : []}
                 onSelect={v => setRelFilter('rel_entity', v)}
               />
               <FacetPanel
                 label={t('search.relatedPlaces')}
                 buckets={data?.facets?.['related_places'] ?? []}
-                active={relPlace}
+                active={relPlace ? [relPlace] : []}
                 onSelect={v => setRelFilter('rel_place', v)}
               />
               <FacetPanel
                 label={t('search.relatedOccurrences')}
                 buckets={data?.facets?.['related_occurrences'] ?? []}
-                active={relOccurrence}
+                active={relOccurrence ? [relOccurrence] : []}
                 onSelect={v => setRelFilter('rel_occurrence', v)}
               />
             </>

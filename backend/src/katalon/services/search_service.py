@@ -382,7 +382,7 @@ async def search(
     status: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    extra_filters: dict[str, str] | None = None,
+    extra_filters: dict[str, list[str]] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
@@ -418,9 +418,12 @@ async def search(
     aggs = raw.get("aggregations", {})
     facets: dict[str, list[dict[str, Any]]] = {}
     for agg_key, agg_val in aggs.items():
+        buckets = agg_val.get("filtered", {}).get("values", {}).get("buckets")
+        if buckets is None:
+            buckets = agg_val.get("buckets", [])
         facets[agg_key] = [
             {"value": b["key"], "count": b["doc_count"]}
-            for b in agg_val.get("buckets", [])
+            for b in buckets
         ]
 
     return {
