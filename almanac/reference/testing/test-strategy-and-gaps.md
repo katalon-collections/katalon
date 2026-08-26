@@ -12,6 +12,9 @@ sources:
   - id: e2e-tests
     type: file
     path: e2e/tests/
+  - id: e2e-config
+    type: file
+    path: e2e/playwright.config.ts
   - id: e2e-package
     type: file
     path: e2e/package.json
@@ -57,11 +60,11 @@ The backend workflow pins `actions/checkout` and `actions/setup-python` by 40-ch
 
 Admin exposes `dev`, `build`, `preview`, and `lint` scripts; `build` runs `tsc && vite build`, and `lint` runs ESLint against `src` TypeScript and TSX files [@admin-package]. Portal exposes `dev`, `build`, and `preview`; its `build` also runs `tsc && vite build`, but there is no package-level `lint` script in `frontend/portal/package.json` [@portal-package].
 
-There is no frontend-specific GitHub Actions workflow in the evidence for this page. The E2E workflow installs Admin dependencies, but it does not install Portal dependencies or run Admin/Portal build scripts directly [@e2e-ci].
+There is no frontend-specific GitHub Actions workflow in the evidence for this page. The Playwright config starts both Vite dev servers, but the E2E workflow installs Admin and E2E dependencies only; it neither installs Portal dependencies nor runs Admin or Portal build scripts directly [@e2e-ci] [@e2e-config].
 
 ## E2E Tests
 
-The Playwright suite has three browser specs: Admin login, object creation, and image upload, plus a helper that logs in with `admin@katalon.dev` and waits for a `katalon_token` in local storage [@e2e-tests]. The image upload spec creates an object through `/v1/objects`, opens its Admin form, uploads a tiny PNG through the file input, and expects the uploaded filename to become visible [@e2e-tests].
+The Playwright suite has browser specs for Admin login, object creation, image upload, Admin responsive layout, relation quick creation, and Portal search. The Admin helper logs in with `admin@katalon.dev` and waits for a `katalon_token` in local storage [@e2e-tests]. The image upload spec creates an object through `/v1/objects`, opens its Admin form, uploads a tiny PNG through the file input, and expects the uploaded filename to become visible [@e2e-tests]. The responsive spec checks narrow object lists, configuration screens, schema subtype controls, and form grids against horizontal overflow and touch-target expectations [@e2e-tests]. The relation quick-create spec covers generic relation picker draft creation, focus recovery, touch targets, and relation-field quick-create options across primary types [@e2e-tests]. The Portal search spec mocks portal config and search responses to cover configured facets, disabled built-in facets, multi-value metadata filters, translated field-label fallback, and refinement that preserves active filters [@e2e-tests].
 
 `e2e/package.json` exposes `npm run test` as `playwright test` and `npm run test:headed` as the headed Playwright run [@e2e-package].
 
@@ -76,6 +79,6 @@ The E2E environment sets `DATABASE_URL`, `REDIS_URL`, `CANTALOUPE_URL`, `MEDIA_R
 | Area | Gap |
 | --- | --- |
 | E2E scheduling | Playwright runs only by manual workflow dispatch, not on every push or pull request [@e2e-ci]. |
-| Browser breadth | The checked-in browser specs cover Admin login, object creation, and image upload; they do not cover Portal search/facets or IIIF viewer behavior, which are described in [Portal Search And Facets](../../architecture/workflows/portal-search-and-facets) and [Media And IIIF](../../architecture/workflows/media-and-iiif) [@e2e-tests]. |
-| Frontend automation | Admin has a lint script and both apps have build scripts, but no CI evidence in this page runs those scripts directly [@admin-package] [@portal-package] [@e2e-ci]. |
+| Browser breadth | The checked-in browser specs cover Admin login, object creation, image upload, responsive Admin layout, relation quick creation, and mocked Portal search/facet behavior; they do not cover IIIF viewer behavior or Portal search against a live Elasticsearch service, which are described in [Media And IIIF](../../architecture/workflows/media-and-iiif) and [Portal Search And Facets](../../architecture/workflows/portal-search-and-facets) [@e2e-tests]. |
+| Frontend automation | Admin has a lint script and both apps have build scripts, but no CI evidence in this page runs those scripts directly; the E2E workflow also does not install Portal dependencies although Playwright starts the Portal dev server [@admin-package] [@portal-package] [@e2e-ci] [@e2e-config]. |
 | External services in E2E CI | The E2E workflow starts PostGIS, Redis, and Cantaloupe, but not Elasticsearch, so Elasticsearch-dependent search paths need another validation surface [@e2e-ci]. |

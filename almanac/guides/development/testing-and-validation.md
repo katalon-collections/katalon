@@ -32,7 +32,7 @@ sources:
     path: .github/dependabot.yml
 ---
 
-Use this guide when validating Katalon changes before handing work back or before a commit. The backend has a pytest suite with separate integration tests, the Admin and Portal apps have TypeScript/Vite build checks, and the Playwright suite exercises a small set of Admin browser flows [@backend-project] [@admin-package] [@portal-package] [@e2e-tests]. The successful outcome is a check set matched to the changed surface, with known gaps recorded rather than assumed away.
+Use this guide when validating Katalon changes before handing work back or before a commit. The backend has a pytest suite with separate integration tests, the Admin and Portal apps have TypeScript/Vite build checks, and the Playwright suite exercises selected Admin flows, Admin responsive behavior, relation quick-create behavior, and mocked Portal search behavior [@backend-project] [@admin-package] [@portal-package] [@e2e-tests]. The successful outcome is a check set matched to the changed surface, with known gaps recorded rather than assumed away.
 
 ## Run Backend Tests From `backend/`
 
@@ -88,12 +88,12 @@ npx playwright install chromium
 npm run test
 ```
 
-The Playwright config starts `docker compose up -d api` from the repository root and starts the Admin dev server on `127.0.0.1:5173`; its default `baseURL` is `http://localhost:5173`, unless `E2E_BASE_URL` is set [@e2e-config]. Existing E2E specs cover Admin login, object creation, image upload, and shared helpers [@e2e-tests].
+The Playwright config starts the API from the repository root, the Admin dev server on `127.0.0.1:5173`, and the Portal dev server on `127.0.0.1:5174`; its default `baseURL` is `http://localhost:5173`, unless `E2E_BASE_URL` is set [@e2e-config]. Existing E2E specs cover Admin login, object creation, image upload, narrow Admin viewports, relation quick-create flows, mocked Portal search facets, metadata facet URL state, and search refinement preserving active filters [@e2e-tests].
 
-The E2E GitHub workflow is manual dispatch, not automatic on every push or pull request. It provisions PostGIS, Redis, and Cantaloupe services, installs backend, Admin, and E2E dependencies, installs Chromium, then runs `npm run test` from `e2e` with database, Redis, Cantaloupe, media, and secrets environment variables [@e2e-ci].
+The E2E GitHub workflow is manual dispatch, not automatic on every push or pull request. It provisions PostGIS, Redis, and Cantaloupe services, installs backend, Admin, and E2E dependencies, installs Chromium, then runs `npm run test` from `e2e` with database, Redis, Cantaloupe, media, and secrets environment variables; it does not install Portal dependencies even though the Playwright config starts the Portal dev server [@e2e-ci] [@e2e-config].
 
 ## Match Checks To Risk
 
-For backend-only service or API changes, run backend tests and include integration tests when database behavior, auth, media, search, or procedures are involved. For Admin changes, run Admin lint and build, then Playwright when the changed path is login, object creation, upload, or another browser flow close to those specs. For Portal changes, run the Portal build and add manual browser verification if the change is visual or route-driven because the current Playwright suite is Admin-focused [@e2e-tests].
+For backend-only service or API changes, run backend tests and include integration tests when database behavior, auth, media, search, or procedures are involved. For Admin changes, run Admin lint and build, then Playwright when the changed path is login, object creation, upload, relation creation, or responsive layout near the checked specs. For Portal search changes, run the Portal build and the Playwright portal-search spec when mocked API behavior is enough; add manual browser verification when the change depends on real Elasticsearch data, visual layout, or route behavior outside those mocked cases [@e2e-tests].
 
 Use [Test Strategy And Gaps](../../reference/testing/test-strategy-and-gaps) for a more compact coverage map, and use [Local Workflows](local-workflows) when a failing check is caused by the wrong stack or port rather than the code under test.
