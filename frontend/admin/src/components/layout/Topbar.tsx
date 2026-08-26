@@ -18,6 +18,11 @@ const ROUTE_DOCS: Record<string, string> = {
   import: `${DOCS_BASE}/03_csv_import.md`,
   'form-variants': `${MAIN_REPO_DOCS}/11_formularvarianten.md`,
   subtypes: `${MAIN_REPO_DOCS}/12_subtypen.md`,
+  list: `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
+  'entities-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
+  'places-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
+  'occurrences-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
+  'procedures-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
 }
 
 interface Props {

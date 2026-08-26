@@ -153,6 +153,71 @@ export interface Relation {
   created_at: string
 }
 
+export type BatchOperationType =
+  | 'set_status'
+  | 'set_field'
+  | 'append_field'
+  | 'clear_field'
+  | 'add_relation'
+  | 'remove_relation'
+
+export interface BatchSetStatus {
+  type: 'set_status'
+  value: string
+}
+
+export interface BatchSetField {
+  type: 'set_field'
+  field: string
+  value: unknown
+}
+
+export interface BatchAppendField {
+  type: 'append_field'
+  field: string
+  value: unknown
+}
+
+export interface BatchClearField {
+  type: 'clear_field'
+  field: string
+}
+
+export interface BatchAddRelation {
+  type: 'add_relation'
+  relation_to_type: RecordType
+  relation_to_id: string
+  relation_type: string
+}
+
+export interface BatchRemoveRelation {
+  type: 'remove_relation'
+  relation_to_type: RecordType
+  relation_to_id: string
+  relation_type: string
+}
+
+export type BatchOperation =
+  | BatchSetStatus
+  | BatchSetField
+  | BatchAppendField
+  | BatchClearField
+  | BatchAddRelation
+  | BatchRemoveRelation
+
+export interface BatchRequest {
+  operation: BatchOperation
+  ids?: string[]
+  filters?: Record<string, unknown>
+}
+
+export interface BatchResponse {
+  affected: number
+  errors: string[]
+  batch_job_id: string | null
+  task_id: string | null
+}
+
 export interface AuditEntry {
   id: string
   record_type: string

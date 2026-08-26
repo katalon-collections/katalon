@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-26
+
+### Added
+- Massenbearbeitung für Datensätze in allen fünf Record-Typen (Objekte, Entitäten, Orte, Occurrences, Vorgänge).
+  - Operationen pro Auswahl: Status setzen, Feld setzen/anhängen/leeren, Relation hinzufügen/entfernen.
+  - Auswahl entweder durch explizite IDs oder „alle Datensätze dieser Suche“ seitenübergreifend.
+  - Asynchrone Ausführung ab 100 Datensätzen über Celery; Warnung ab 50 Datensätzen.
+  - Audit-Log-Einträge enthalten `batch_job_id`; kein Rollback, keine automatischen Snapshots.
+
 ## [1.3.10] - 2026-08-24
 
 ### Fixed

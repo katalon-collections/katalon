@@ -19,3 +19,4 @@
 * [Medien-Multiformat](medien-multiformat.md) - MIME-Kategorie-Dispatch, Nicht-Bild überspringt Cantaloupe, Viewer-Dispatch im Portal
 * [Medienzuordnung aus dem Metadatenimport](medienzuordnung-aus-metadatenimport.md) - nutzergewählter Datei-Selector, offene Referenzen je Objekt und automatische Auflösung im Batch-Import
 * [Management-CLI-Ergonomie](management-cli-ergonomics.md) - Repo-Root als uv-Workspace, source-relative `.env`, lesbarer Secrets-Fehler ohne Stacktrace
+* [Massenbearbeitung](batch-editing.md) - Batch-Operationen auf Record-Listen mit seitenübergreifender Auswahl, Audit-Log-Transparenz, ohne Rollback/Snapshots

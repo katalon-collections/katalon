@@ -21,6 +21,7 @@ from katalon.api.v1 import (
     auth,
     authority,
     banners,
+    batch,
     dnb_urn_mock,
     entities,
     feedback,
@@ -431,6 +432,7 @@ app.include_router(record_subtypes.router, prefix="/v1", dependencies=_authentic
 app.include_router(form_variants.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(vocabularies.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(audit.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(batch.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(entities.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(places.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(occurrences.router, prefix="/v1", dependencies=_authenticated)

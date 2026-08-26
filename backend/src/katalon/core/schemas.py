@@ -1,8 +1,16 @@
 import uuid
 from datetime import date, datetime
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -528,3 +536,101 @@ class SnapshotRead(SnapshotCreate):
     snapshot: dict[str, Any]
     created_by: uuid.UUID | None
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Batch editing
+# ---------------------------------------------------------------------------
+
+BatchOperationType = Literal[
+    "set_status",
+    "set_field",
+    "append_field",
+    "clear_field",
+    "add_relation",
+    "remove_relation",
+]
+
+
+class BatchSetStatus(BaseModel):
+    type: Literal["set_status"]
+    value: str
+
+
+class BatchSetField(BaseModel):
+    type: Literal["set_field"]
+    field: str
+    value: Any
+
+
+class BatchAppendField(BaseModel):
+    type: Literal["append_field"]
+    field: str
+    value: Any
+
+
+class BatchClearField(BaseModel):
+    type: Literal["clear_field"]
+    field: str
+
+
+class BatchAddRelation(BaseModel):
+    type: Literal["add_relation"]
+    relation_to_type: str
+    relation_to_id: uuid.UUID
+    relation_type: str
+
+
+class BatchRemoveRelation(BaseModel):
+    type: Literal["remove_relation"]
+    relation_to_type: str
+    relation_to_id: uuid.UUID
+    relation_type: str
+
+
+BatchOperation = Annotated[
+    BatchSetStatus
+    | BatchSetField
+    | BatchAppendField
+    | BatchClearField
+    | BatchAddRelation
+    | BatchRemoveRelation,
+    Field(discriminator="type"),
+]
+
+
+class BatchRequest(BaseModel):
+    operation: BatchOperation
+    ids: list[uuid.UUID] | None = None
+    filters: dict[str, Any] | None = None
+
+    @field_validator("filters")
+    @classmethod
+    def _validate_filters(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None and not isinstance(v, dict):
+            raise ValueError("filters muss ein Objekt sein.")
+        return v
+
+    @field_validator("ids")
+    @classmethod
+    def _validate_ids(cls, v: list[uuid.UUID] | None) -> list[uuid.UUID] | None:
+        if v is not None and not isinstance(v, list):
+            raise ValueError("ids muss eine Liste sein.")
+        return v
+
+    @model_validator(mode="after")
+    def _exactly_one_selector(self) -> "BatchRequest":
+        has_ids = bool(self.ids)
+        has_filters = bool(self.filters)
+        if has_ids and has_filters:
+            raise ValueError("Nur einer der Parameter ids oder filters darf angegeben werden.")
+        if not has_ids and not has_filters:
+            raise ValueError("Entweder ids oder filters muss angegeben werden.")
+        return self
+
+
+class BatchResponse(BaseModel):
+    affected: int
+    errors: list[str] = []
+    batch_job_id: uuid.UUID | None = None
+    task_id: str | None = None

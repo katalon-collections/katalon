@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -186,6 +186,7 @@ export const objects = {
   update: (id: string, data: Partial<KatalonObject>, version?: number) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/objects/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/objects/${id}/publish`, { method: 'POST' }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/object', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/objects/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/objects/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -205,6 +206,7 @@ export const entities = {
   update: (id: string, data: Partial<Entity>, version?: number) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/entities/${id}/publish`, { method: 'POST' }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/entity', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/entities/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/entities/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -224,6 +226,7 @@ export const places = {
   update: (id: string, data: Partial<Place>, version?: number) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/places/${id}/publish`, { method: 'POST' }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/place', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/places/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/places/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -243,6 +246,7 @@ export const occurrences = {
   update: (id: string, data: Partial<Occurrence>, version?: number) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/occurrences/${id}/publish`, { method: 'POST' }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/occurrence', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
     list:    (id: string) => req<Snapshot[]>(`/v1/occurrences/${id}/snapshots`),
     create:  (id: string, label: string) => req<Snapshot>(`/v1/occurrences/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
@@ -266,6 +270,7 @@ export const procedures = {
       method: 'POST',
       body: JSON.stringify({ collection_status: collection_status ?? null }),
     }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/procedure', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 export interface SchemaImportResult {

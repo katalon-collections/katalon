@@ -18,6 +18,7 @@ class _Redis:
 @pytest.mark.asyncio
 async def test_task_status_rejects_unknown_pending_task(monkeypatch: pytest.MonkeyPatch) -> None:
     from celery import result as celery_result
+
     from katalon.api.v1 import importer
 
     monkeypatch.setattr(celery_result, "AsyncResult", lambda *args, **kwargs: _PendingResult())
@@ -32,6 +33,7 @@ async def test_task_status_rejects_unknown_pending_task(monkeypatch: pytest.Monk
 @pytest.mark.asyncio
 async def test_task_status_keeps_known_pending_task(monkeypatch: pytest.MonkeyPatch) -> None:
     from celery import result as celery_result
+
     from katalon.api.v1 import importer
 
     monkeypatch.setattr(celery_result, "AsyncResult", lambda *args, **kwargs: _PendingResult())

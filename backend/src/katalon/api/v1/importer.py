@@ -9,11 +9,17 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
 from katalon.core.dependencies import DBDep, require_admin_or_editor, require_role
 from katalon.core.models import FieldDefinition, ImportMapping, RecordSubtype, User
-from katalon.core.schemas import FieldDefinitionRead, ImportMappingCreate, ImportMappingRead, ImportMappingUpdate
+from katalon.core.schemas import (
+    FieldDefinitionRead,
+    ImportMappingCreate,
+    ImportMappingRead,
+    ImportMappingUpdate,
+)
 from katalon.services import importer_service
 from katalon.services.importer import parse_file
 from katalon.services.importer.formats.xml_format import XmlFormat
@@ -504,9 +510,9 @@ async def run_import(body: ImportRequest, db: DBDep, current_user: User = requir
                 status_code=422,
                 detail="Ein Dateiname ist mehreren Datensätzen zugeordnet",
             )
-    from katalon.workers.import_tasks import import_records_task
     # mapping is already a normalized, serializable dict
     from katalon.workers.enqueue import enqueue_or_503
+    from katalon.workers.import_tasks import import_records_task
     task_id = enqueue_or_503(
         import_records_task,
         body.record_type,

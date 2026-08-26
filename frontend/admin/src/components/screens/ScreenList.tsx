@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { objects, entities, places, occurrences, procedures, schema, subtypes, ConflictError } from '../../api/client'
 import type { AnyRecord, FieldDefinition, Page, RecordSubtype, RecordType } from '../../types'
 import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
-import { Edit, Plus, Search, Trash } from '../ui/Icons'
+import { Edit, Layers, Plus, Search, Trash } from '../ui/Icons'
+import { BatchEditModal } from './BatchEditModal'
 
 const TABS = [
   { id: 'all',      label: 'Alle' },
@@ -106,6 +107,25 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const selectAllRef = useRef<HTMLInputElement>(null)
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
+  const [selectionMode, setSelectionMode] = useState<'page' | 'all'>('page')
+  const [batchOpen, setBatchOpen] = useState(false)
+
+  const currentFilters = useMemo<Record<string, unknown>>(() => {
+    const f: Record<string, unknown> = {}
+    if (tab !== 'all') f.status = tab
+    if (debouncedQ) f.q = debouncedQ
+    if (subtypeKey && subtypeFilter) f[subtypeKey] = subtypeFilter
+    if (recordType === 'procedure') {
+      if (dueBefore) f.due_before = dueBefore
+      if (referenceNumber) f.reference_number = referenceNumber
+    }
+    return f
+  }, [tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, recordType])
+
+  function resetSelection() {
+    setSel(new Set())
+    setSelectionMode('page')
+  }
 
   // List columns include subtype-specific fields when a subtype is selected.
   useEffect(() => {
@@ -136,7 +156,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     setReferenceNumber('')
     setPage(1)
     setDebouncedQ('')
-    setSel(new Set())
+    resetSelection()
   }, [recordType])
 
   useEffect(() => {
@@ -164,7 +184,6 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       .then(d => {
         if (requestSeq !== requestSeqRef.current) return
         const lastPage = Math.max(1, Math.ceil(d.total / PAGE_SIZE))
-        setSel(new Set())
         if (page > lastPage) {
           setPage(lastPage)
           return
@@ -181,9 +200,10 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
 
   useEffect(() => { load() }, [load])
 
-  function handleTabChange(id: string) { setTab(id); setPage(1); onTabChange?.(id) }
-  function handleSearch(v: string) { setQ(v); setPage(1) }
+  function handleTabChange(id: string) { resetSelection(); setTab(id); setPage(1); onTabChange?.(id) }
+  function handleSearch(v: string) { resetSelection(); setQ(v); setPage(1) }
   function handleOverdue() {
+    resetSelection()
     setTab('active')
     setDueBefore(new Date().toISOString().slice(0, 10))
     setPage(1)
@@ -232,14 +252,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     totalPages - visiblePageCount + 1,
   )
   const visiblePages = Array.from({ length: visiblePageCount }, (_, i) => firstVisiblePage + i)
-  const allSel = items.length > 0 && items.every(o => sel.has(o.id))
-  const someSel = items.some(o => sel.has(o.id))
+  const allSel = selectionMode === 'all' || (items.length > 0 && items.every(o => sel.has(o.id)))
+  const someSel = selectionMode === 'all' || items.some(o => sel.has(o.id))
+  const canSelectAll = selectionMode === 'page' && someSel && data.total > items.length
 
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = someSel && !allSel
   }, [allSel, someSel])
 
   function toggle(id: string) {
+    if (selectionMode === 'all') {
+      setSel(new Set([id]))
+      setSelectionMode('page')
+      return
+    }
     setSel(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -248,7 +274,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     })
   }
   function toggleAll() {
+    if (selectionMode === 'all') {
+      resetSelection()
+      return
+    }
     if (allSel) setSel(new Set()); else setSel(new Set(items.map(o => o.id)))
+  }
+  function selectAllMatching() {
+    setSelectionMode('all')
+    setSel(new Set(items.map(o => o.id)))
+  }
+  function selectionSummary() {
+    if (selectionMode === 'all') return `${data.total.toLocaleString('de')} ausgewählt (alle Treffer)`
+    return `${sel.size.toLocaleString('de')} ausgewählt`
   }
   function fmt(iso: string) {
     return new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -307,7 +345,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
             className="fld"
             style={{ maxWidth: 210 }}
             value={subtypeFilter}
-            onChange={e => { setSubtypeFilter(e.target.value); setPage(1) }}
+            onChange={e => { resetSelection(); setSubtypeFilter(e.target.value); setPage(1) }}
           >
             <option value="">Alle Typen</option>
             {availableSubtypes.map(subtype => (
@@ -317,8 +355,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         )}
         {recordType === 'procedure' && (
           <>
-            <input aria-label="Fällig bis" className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
-            <input aria-label="Referenznummer" className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setPage(1) }} />
+            <input aria-label="Fällig bis" className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
+            <input aria-label="Referenznummer" className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { resetSelection(); setReferenceNumber(e.target.value); setPage(1) }} />
             <button className="btn gh" onClick={handleOverdue}>Überfällig</button>
           </>
         )}
@@ -326,9 +364,16 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
 
       {someSel && (
         <div className="bb">
-          <b>{sel.size} ausgewählt</b>
+          <b>{selectionSummary()}</b>
           <div className="grow" />
-          <button onClick={() => setSel(new Set())}>Abbrechen</button>
+          {canSelectAll && (
+            <button onClick={selectAllMatching}>Alle {data.total.toLocaleString('de')} Datensätze dieser Suche auswählen</button>
+          )}
+          {selectionMode === 'all' && (
+            <button onClick={resetSelection}>Nur diese Seite auswählen</button>
+          )}
+          <button onClick={() => setBatchOpen(true)}><Layers size={13} /> Massenbearbeitung</button>
+          <button onClick={resetSelection}>Abbrechen</button>
         </div>
       )}
 
@@ -428,6 +473,24 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           </nav>
         )}
       </div>
+
+      {batchOpen && (
+        <BatchEditModal
+          recordType={recordType}
+          fields={listFields}
+          selection={
+            selectionMode === 'all'
+              ? { mode: 'filters', ids: [], filters: currentFilters, count: data.total }
+              : { mode: 'ids', ids: Array.from(sel), filters: {}, count: sel.size }
+          }
+          onClose={() => setBatchOpen(false)}
+          onSuccess={() => {
+            setBatchOpen(false)
+            resetSelection()
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }
