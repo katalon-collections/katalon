@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-27
+
+### Removed
+- Ungenutzte `search_vector`-Spalte (TSVECTOR) samt GIN-Index aus objects/entities/places/occurrences/procedures entfernt. Suche läuft ausschließlich über Elasticsearch; die Spalte wurde nie von Anwendungscode befüllt.
+
 ## [1.4.0] - 2026-08-26
 
 ### Added

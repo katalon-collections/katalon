@@ -50,7 +50,7 @@ _MODELS: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]]
 
 
 class PortalRecordRead(BaseModel):
-    """Explicit public projection; never expose ORM-only fields such as version/search_vector."""
+    """Explicit public projection; never expose ORM-only fields such as version."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
