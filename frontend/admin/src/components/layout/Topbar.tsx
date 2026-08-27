@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { /* Bell, */ Search, Help } from '../ui/Icons'
+import { /* Bell, */ Search, Help, User } from '../ui/Icons'
 import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
@@ -167,7 +167,8 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
       </a>
       <div ref={userMenuRef} style={{ position: 'relative' }}>
         <button className="btn gh sm user-menu-trigger" onClick={() => setUserMenuOpen(v => !v)}>
-          <span>{currentUser?.email || 'Benutzer'}</span> ▾
+          <User size={15} className="mobile-only" aria-hidden="true" />
+          <span className="desktop-only">{currentUser?.email || 'Benutzer'} ▾</span>
         </button>
         {userMenuOpen && (
           <div style={{
