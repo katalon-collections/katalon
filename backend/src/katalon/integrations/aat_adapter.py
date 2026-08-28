@@ -4,7 +4,7 @@ import httpx
 
 from .authority import AuthorityHit, AuthoritySource
 
-_SPARQL = "http://vocab.getty.edu/sparql.json"
+_SPARQL = "https://vocab.getty.edu/sparql.json"
 
 
 class AATAdapter(AuthoritySource):
@@ -38,7 +38,7 @@ class AATAdapter(AuthoritySource):
         return hits
 
     async def fetch(self, external_id: str) -> AuthorityHit | None:
-        uri = f"http://vocab.getty.edu/aat/{external_id}.json"
+        uri = f"https://vocab.getty.edu/aat/{external_id}.json"
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(uri)
             if r.status_code == 404:

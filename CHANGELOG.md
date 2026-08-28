@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-08-28
+
+### Fixed
+- Authority-Adapter: Getty TGN/AAT verwenden HTTPS, ICONCLASS nutzt die aktuelle JSON-Suche mit kataloggerechter Rangfolge, und GeoNames meldet API-Statusfehler statt leerer Trefferlisten.
+- GeoNames-Account wird über `GEONAMES_USERNAME` an den Compose-API-Container weitergegeben; die Beispielkonfiguration dokumentiert die Variable.
+- Admin-Normdatenquellen zeigen pro Quelle eine klickbare, fachlich passende Testanfrage.
+
 ## [1.5.1] - 2026-08-28
 
 ### Fixed

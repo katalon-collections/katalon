@@ -68,6 +68,7 @@ services:
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       SECRET_KEY: ${SECRET_KEY}
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      GEONAMES_USERNAME: ${GEONAMES_USERNAME:-demo}
       DEBUG: ${DEBUG:-false}
       MEDIA_ROOT: /var/lib/katalon/media
       KATALON_BASE_URL: ${KATALON_BASE_URL:-}

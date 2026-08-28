@@ -20,6 +20,16 @@ const RECORD_TYPES = [
   { key: 'procedure',  label: 'Vorgänge' },
 ] as const
 
+const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
+  gnd: { query: 'Beethoven', href: 'https://lobid.org/gnd/search?q=Beethoven' },
+  geonames: { query: 'Berlin', href: 'https://www.geonames.org/search.html?q=Berlin' },
+  viaf: { query: 'Beethoven', href: 'https://viaf.org/viaf/search?query=local.names+all+%22Beethoven%22' },
+  wikidata: { query: 'Berlin', href: 'https://www.wikidata.org/w/index.php?search=Berlin' },
+  tgn: { query: 'Berlin', href: 'https://vocab.getty.edu/sparql' },
+  iconclass: { query: 'Leier', href: 'https://iconclass.org/search?lang=de&q=leier' },
+  aat: { query: 'photograph', href: 'https://vocab.getty.edu/sparql' },
+}
+
 // ---------------------------------------------------------------------------
 // Profil section
 // ---------------------------------------------------------------------------
@@ -1278,8 +1288,9 @@ function SectionAuthoritySources() {
 
   async function test(source: AuthoritySource) {
     setTesting(source.id)
+    const testRequest = AUTHORITY_TESTS[source.id] ?? { query: 'test', href: '#' }
     try {
-      const hits = await authority.search(source.id, 'test', 1)
+      const hits = await authority.search(source.id, testRequest.query, 1)
       setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: `Erreichbar — ${hits.length} Treffer für Testanfrage.` } }))
     } catch (e) {
       setTestResults(prev => ({ ...prev, [source.id]: { ok: false, message: (e as Error).message } }))
@@ -1299,6 +1310,7 @@ function SectionAuthoritySources() {
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       {sources.map(source => {
         const result = testResults[source.id]
+        const testRequest = AUTHORITY_TESTS[source.id] ?? { query: 'test', href: '#' }
         return (
           <div className="card" key={source.id} style={{ marginBottom: 12 }}>
             <div className="hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1310,6 +1322,9 @@ function SectionAuthoritySources() {
             </div>
             <div className="bd">
               <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>ID: <span className="mono">{source.id}</span></div>
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>
+                Testanfrage: <a href={testRequest.href} target="_blank" rel="noreferrer">{testRequest.query}</a>
+              </div>
               <button className="btn sm gh" onClick={() => test(source)} disabled={!source.is_enabled || testing === source.id}>
                 {testing === source.id ? 'Prüft…' : 'Verbindung testen'}
               </button>

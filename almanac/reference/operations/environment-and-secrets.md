@@ -74,6 +74,7 @@ On first startup with no existing admin or superuser and a usable `KATALON_BASE_
 | `MEDIA_ROOT` | `/var/lib/katalon/media` in settings and containers | Media storage path inside containers; host path is mounted from env [@config] [@compose] |
 | `MAX_UPLOAD_SIZE_MB` | `100` in settings, `200` in Compose and example env | Upload size limit [@config] [@compose] [@env-example] |
 | `OAI_ADMIN_EMAIL` | `admin@katalon.dev` | OAI-PMH admin email setting [@config] |
+| `GEONAMES_USERNAME` | `demo` | GeoNames webservice account name, passed through to the Compose API service [@config] [@compose] [@env-example] |
 | `WIKIDATA_USER_AGENT` | empty | Optional authority lookup user agent; `.env.example` says to leave it empty to derive from base URL and admin email [@env-example] [@config] |
 | `DNB_URN_*` | disabled and empty credentials by default | DNB URN integration settings [@config] [@env-example] |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | Optional Telegram feedback or notification settings passed into API service [@config] [@compose] |

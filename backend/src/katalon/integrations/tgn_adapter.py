@@ -4,7 +4,7 @@ import httpx
 
 from .authority import AuthorityHit, AuthoritySource
 
-_SPARQL = "http://vocab.getty.edu/sparql.json"
+_SPARQL = "https://vocab.getty.edu/sparql.json"
 _SPARQL_QUERY = """
 SELECT ?place ?label ?lat ?long WHERE {{
   ?place a skos:Concept ;
@@ -51,7 +51,7 @@ class TGNAdapter(AuthoritySource):
         return hits
 
     async def fetch(self, external_id: str) -> AuthorityHit | None:
-        uri = f"http://vocab.getty.edu/tgn/{external_id}.json"
+        uri = f"https://vocab.getty.edu/tgn/{external_id}.json"
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(uri)
             if r.status_code == 404:

@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
+from katalon.integrations import aat_adapter, tgn_adapter
 from katalon.integrations.aat_adapter import AATAdapter
 from katalon.integrations.geonames_adapter import GeonamesAdapter
 from katalon.integrations.gnd_adapter import GNDAdapter
@@ -294,6 +296,14 @@ async def test_geonames_search_empty_returns_empty() -> None:
 
 
 @pytest.mark.asyncio
+async def test_geonames_search_raises_api_status() -> None:
+    data = {"status": {"message": "the user does not exist.", "value": 10}}
+    with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http(data)):
+        with pytest.raises(httpx.HTTPError, match="the user does not exist"):
+            await GeonamesAdapter().search("berlin")
+
+
+@pytest.mark.asyncio
 async def test_geonames_fetch_returns_hit() -> None:
     data = {
         "name": "Berlin",
@@ -318,14 +328,19 @@ async def test_geonames_fetch_404_returns_none() -> None:
 
 
 @pytest.mark.asyncio
-async def test_geonames_fetch_status_error_returns_none() -> None:
+async def test_geonames_fetch_raises_api_status() -> None:
     data = {"status": {"message": "the user does not exist.", "value": 10}}
     with patch("katalon.integrations.geonames_adapter.httpx.AsyncClient", _http(data)):
-        hit = await GeonamesAdapter().fetch("99999")
-    assert hit is None
+        with pytest.raises(httpx.HTTPError, match="the user does not exist"):
+            await GeonamesAdapter().fetch("99999")
 
 
 # ── TGN ───────────────────────────────────────────────────────────────────────
+
+
+def test_getty_endpoints_use_https() -> None:
+    assert tgn_adapter._SPARQL.startswith("https://")
+    assert aat_adapter._SPARQL.startswith("https://")
 
 
 @pytest.mark.asyncio
@@ -488,17 +503,23 @@ async def test_iconclass_fetch_not_found_returns_none() -> None:
 @pytest.mark.asyncio
 async def test_iconclass_search_fetches_details_for_first_five() -> None:
     adapter = ICONCLASSAdapter()
-    search_data = {"result": ["71A1", "71A2", "71A3"]}
+    search_data = {"result": ["71A1", "71A2", "71A3", "11F4134", "91A1"]}
 
     from katalon.integrations.authority import AuthorityHit
-    fake_detail = AuthorityHit(source="iconclass", external_id="71A1", label="Detail", description="")
+    details = [
+        AuthorityHit(source="iconclass", external_id="71A1", label="Madonna mit Kind", extra={"_labels": ["Madonna mit Kind"]}),
+        AuthorityHit(source="iconclass", external_id="71A2", label="Madonna", extra={"_labels": ["Madonna"]}),
+        AuthorityHit(source="iconclass", external_id="71A3", label="Kind", extra={"_labels": ["Kind"]}),
+    ]
 
     with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(search_data)):
-        with patch.object(adapter, "_fetch_notation", AsyncMock(return_value=fake_detail)):
+        with patch.object(adapter, "_fetch_notation", AsyncMock(side_effect=details)) as mock_fetch:
             hits = await adapter.search("madonna")
 
     assert len(hits) == 3
-    assert all(h.label == "Detail" for h in hits)
+    assert [hit.label for hit in hits] == ["Madonna", "Madonna mit Kind", "Kind"]
+    assert mock_fetch.call_count == 3
+    assert all("_labels" not in hit.extra for hit in hits)
 
 
 @pytest.mark.asyncio
@@ -508,15 +529,15 @@ async def test_iconclass_search_stubs_beyond_five() -> None:
     search_data = {"result": notations}
 
     from katalon.integrations.authority import AuthorityHit
-    fake_detail = AuthorityHit(source="iconclass", external_id="x", label="Detail", description="")
+    details = [
+        AuthorityHit(source="iconclass", external_id=notation, label="Detail", extra={"_labels": ["Detail"]})
+        for notation in notations
+    ]
 
     with patch("katalon.integrations.iconclass_adapter.httpx.AsyncClient", _http(search_data)):
-        with patch.object(adapter, "_fetch_notation", AsyncMock(return_value=fake_detail)) as mock_fetch:
+        with patch.object(adapter, "_fetch_notation", AsyncMock(side_effect=details)) as mock_fetch:
             hits = await adapter.search("test")
 
     assert len(hits) == 7
-    assert mock_fetch.call_count == 5
-    detail_hits = [h for h in hits if h.label == "Detail"]
-    stub_hits = [h for h in hits if h.label != "Detail"]
-    assert len(detail_hits) == 5
-    assert len(stub_hits) == 2
+    assert mock_fetch.call_count == 7
+    assert all(hit.label == "Detail" for hit in hits)
