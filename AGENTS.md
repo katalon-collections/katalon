@@ -269,6 +269,10 @@ Wird ein Feature oder Bugfix umgesetzt, das ein offenes GitHub-Issue betrifft:
 3. Falls nur ein Teil erledigt ist: Issue aktualisieren, erledigte Checkboxen markieren und offenen Rest beschreiben.
 4. Issues nicht einfach offen stehen lassen, wenn der Code längst im Main-Branch ist.
 
+## Feature-Kommunikation
+
+Bei jedem echten neuen Feature (nicht bei Bugfixes, Refactorings oder rein technischen Änderungen) nach der Umsetzung einen kurzen, eigenständig versendbaren Text für Nicht-Techniker ausgeben. Er erklärt in klarer Sprache, was neu ist und welchen praktischen Nutzen es bringt; technische Details nur, wenn sie für die Nutzung wichtig sind. Der Text soll direkt als E-Mail-Absatz verwendbar sein.
+
 ## Production-Installation (katalon-cli)
 
 Production-Instanzen werden nicht aus diesem Repo geklont/gebaut, sondern über die separate CLI `katalon-cli` (`github.com/karkraeg/katalon-cli`, `uv tool install katalon-cli`) installiert/aktualisiert — sie pullt gepinnte Release-Images statt Source-Checkout. `install.sh` und `docker-compose.dev.yml` bleiben unverändert für lokale Entwicklung.
