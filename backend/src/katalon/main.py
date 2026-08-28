@@ -253,6 +253,7 @@ _DEFAULT_AUTHORITY_SOURCES = [
     ("wikidata",  "Wikidata",                          "katalon.integrations.wikidata_adapter.WikidataAdapter", False),
     ("tgn",       "Getty Thesaurus of Geographic Names","katalon.integrations.tgn_adapter.TGNAdapter",          False),
     ("iconclass", "ICONCLASS",                         "katalon.integrations.iconclass_adapter.ICONCLASSAdapter", False),
+    ("aat",       "Getty Art & Architecture Thesaurus", "katalon.integrations.aat_adapter.AATAdapter",          False),
 ]
 
 

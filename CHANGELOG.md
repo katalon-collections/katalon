@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-28
+
+### Added
+- Getty AAT (Art & Architecture Thesaurus) als Authority-Adapter (`aat_adapter.py`, SPARQL gegen `vocab.getty.edu`).
+- Admin-Einstellungsseite „Normdatenquellen“: alle registrierten Authority-Quellen (GND, GeoNames, VIAF, Wikidata, Getty TGN, Iconclass, Getty AAT) mit Aktivieren/Deaktivieren-Schalter und Verbindungstest pro Quelle.
+
+### Fixed
+- Deaktivierte Authority-Quellen wurden trotz `is_enabled=false` weiterhin für Suche/Fetch verwendet, weil `_load_registry()` deaktivierte DB-Einträge nie aus dem eingebauten Adapter-Set entfernt hat. Deaktivierung wirkt jetzt tatsächlich auf Authority-Felder und Vokabular-Term-Lookups.
+- Netzwerkfehler bei Authority-Suche/-Fetch werden als 502 mit verständlicher Fehlermeldung beantwortet statt als unbehandelter 500er.
+
 ## [1.4.4] - 2026-08-28
 
 ### Added
