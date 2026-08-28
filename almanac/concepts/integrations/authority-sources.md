@@ -60,28 +60,38 @@ sources:
   - id: iconclass-adapter
     type: file
     path: backend/src/katalon/integrations/iconclass_adapter.py
+  - id: aat-adapter
+    type: file
+    path: backend/src/katalon/integrations/aat_adapter.py
   - id: dnb-urn
     type: file
     path: backend/src/katalon/integrations/dnb_urn_adapter.py
+  - id: settings-screen
+    type: file
+    path: frontend/admin/src/components/screens/ScreenSettings.tsx
 ---
 
-Authority sources are Katalon's adapter system for searching external authority files and storing normalized authority references in metadata. The shared integration contract defines `AuthorityHit` with `source`, `external_id`, `label`, `description`, and `extra`, and every authority adapter implements asynchronous `search` and `fetch` methods [@authority-contract]. Built-in adapters cover GND, GeoNames, VIAF, Wikidata, TGN, and ICONCLASS, while the database can register enabled sources and custom adapter classes through the `authority_sources` table [@authority-service] [@models].
+Authority sources are Katalon's adapter system for searching external authority files and storing normalized authority references in metadata. The shared integration contract defines `AuthorityHit` with `source`, `external_id`, `label`, `description`, and `extra`, and every authority adapter implements asynchronous `search` and `fetch` methods [@authority-contract]. Built-in adapters cover GND, GeoNames, VIAF, Wikidata, Getty TGN, ICONCLASS, and Getty AAT, while the database can register enabled sources and custom adapter classes through the `authority_sources` table [@authority-service] [@models].
 
 ## Registry And Startup Defaults
 
-The runtime registry starts with built-in adapter instances for `gnd`, `geonames`, `viaf`, `wikidata`, `tgn`, and `iconclass` [@authority-service]. On startup, Katalon inserts default `authority_sources` rows for the same six sources when missing; GND is enabled by default and the other built-in sources are initially disabled [@main]. Each database row stores an id, label, adapter class path, JSONB config, and enabled flag [@models].
+The runtime registry starts with built-in adapter instances for `gnd`, `geonames`, `viaf`, `wikidata`, `tgn`, `iconclass`, and `aat` [@authority-service]. On startup, Katalon inserts default `authority_sources` rows for the same seven sources when missing; GND is enabled by default and the other built-in sources are initially disabled [@main]. Each database row stores an id, label, adapter class path, JSONB config, and enabled flag [@models].
 
-Enabled database rows can override built-in adapter attributes through their config. For non-built-in ids, the service imports `adapter_class`, instantiates it with config, and adds it to the registry; import failures are ignored, and if registry loading fails entirely the service falls back to built-ins [@authority-service]. The service caches the loaded registry and exposes `invalidate_cache` for callers that change source configuration [@authority-service].
+The registry always starts from all builtins, then applies every DB row: rows with `is_enabled = false` are removed from the registry (their built-in stays unregistered, so search/fetch treat the id as unknown), and enabled rows either patch a built-in adapter's attributes from `config` or, for non-built-in ids, dynamically import `adapter_class`, instantiate it with `config`, and add it to the registry; import failures are ignored, and if registry loading fails entirely the service falls back to all-builtins-enabled [@authority-service]. The service caches the loaded registry and exposes `invalidate_cache` for callers that change source configuration [@authority-service].
+
+## Admin Management
+
+Admins toggle sources under Settings → Normdatenquellen, which lists every built-in source (merging DB overrides with defaults for sources that have no DB row yet), shows an enable/disable switch per row, and offers a "Verbindung testen" button that issues a live search against the source and reports success or the raw error inline [@settings-screen]. Toggling calls `PATCH /authorities/{id}`, which upserts an `authority_sources` row (creating one with default label/adapter class on first toggle) and invalidates the registry cache so the change takes effect immediately [@authority-api] [@authority-service]. The endpoint requires the `admin` role [@authority-api].
 
 ## API Surface
 
-The authority API requires a current user for source listing, search, and fetch [@authority-api]. `GET /authorities/` returns configured database sources, or built-in source ids as uppercase labels when the table has no rows [@authority-api]. `GET /authorities/search` and `GET /authorities/fetch` call the registry, return `AuthorityHit` data, reject unknown sources with 404, and apply a `60/minute` rate limit [@authority-api].
+The authority API requires a current user for source listing, search, and fetch [@authority-api]. `GET /authorities/` always returns the full built-in catalog, using each source's DB row when one exists and falling back to its default label/`is_enabled = true` otherwise [@authority-api]. `GET /authorities/search` and `GET /authorities/fetch` call the registry, return `AuthorityHit` data, reject unknown or disabled sources with 404, translate adapter-side network errors (`httpx.HTTPError`) into a 502 with a German message instead of an unhandled 500, and apply a `60/minute` rate limit [@authority-api].
 
 The schema admin API validates authority field settings against enabled sources. When a field has `field_type == "authority"`, its `settings.source` must name an enabled database source, or a built-in source when no database source rows exist [@schema-api]. That validation connects authority registration to the [schema engine](../metadata/schema-engine) rather than letting forms store arbitrary source ids.
 
 ## Built-In Adapters
 
-The adapter directory contains concrete adapters for GND, GeoNames, VIAF, Wikidata, TGN, and ICONCLASS, each declaring a `source_id` and implementing `search` and `fetch` methods that return the shared `AuthorityHit` shape [@gnd-adapter] [@geonames-adapter] [@viaf-adapter] [@wikidata-adapter] [@tgn-adapter] [@iconclass-adapter]. Wikidata builds a custom User-Agent from Katalon's base URL and contact configuration before calling Wikidata APIs [@wikidata-adapter]. The DNB URN adapter is separate from the authority source contract: it talks to the configured DNB URN API for namespace suggestions and URN creation, but it does not subclass `AuthoritySource` or appear in the authority registry [@dnb-urn] [@authority-service].
+The adapter directory contains concrete adapters for GND, GeoNames, VIAF, Wikidata, Getty TGN, ICONCLASS, and Getty AAT, each declaring a `source_id` and implementing `search` and `fetch` methods that return the shared `AuthorityHit` shape [@gnd-adapter] [@geonames-adapter] [@viaf-adapter] [@wikidata-adapter] [@tgn-adapter] [@iconclass-adapter] [@aat-adapter]. Getty AAT mirrors the TGN adapter: it queries the `vocab.getty.edu` SPARQL endpoint filtered to `skos:inScheme <http://vocab.getty.edu/aat/>` for search and fetches `{id}.json` for detail lookups, preferring German `skos:prefLabel` values [@aat-adapter]. Wikidata builds a custom User-Agent from Katalon's base URL and contact configuration before calling Wikidata APIs [@wikidata-adapter]. The DNB URN adapter is separate from the authority source contract: it talks to the configured DNB URN API for namespace suggestions and URN creation, but it does not subclass `AuthoritySource` or appear in the authority registry [@dnb-urn] [@authority-service].
 
 ## Metadata Use
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { req, BASE, apiKeys, users, schema, subtypes, adminConfig } from '../../api/client'
-import type { AdminConfigRead } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority } from '../../api/client'
+import type { AdminConfigRead, AuthoritySource } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 
@@ -10,7 +10,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'changelog' | 'gefahrenbereich'
+type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte' },
@@ -1249,6 +1249,85 @@ function SectionMediaRights() {
 }
 
 // ---------------------------------------------------------------------------
+// Authority sources section
+// ---------------------------------------------------------------------------
+
+function SectionAuthoritySources() {
+  const [sources, setSources] = useState<AuthoritySource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
+  const [testing, setTesting] = useState<string | null>(null)
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean, message: string }>>({})
+
+  useEffect(() => {
+    authority.list().then(setSources).catch((e: Error) => setError(e.message)).finally(() => setLoading(false))
+  }, [])
+
+  async function toggle(source: AuthoritySource) {
+    setPending(source.id); setError(null)
+    try {
+      const updated = await authority.setEnabled(source.id, !source.is_enabled)
+      setSources(prev => prev.map(s => s.id === updated.id ? updated : s))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setPending(null)
+    }
+  }
+
+  async function test(source: AuthoritySource) {
+    setTesting(source.id)
+    try {
+      const hits = await authority.search(source.id, 'test', 1)
+      setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: `Erreichbar — ${hits.length} Treffer für Testanfrage.` } }))
+    } catch (e) {
+      setTestResults(prev => ({ ...prev, [source.id]: { ok: false, message: (e as Error).message } }))
+    } finally {
+      setTesting(null)
+    }
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+        Normdatenquellen für Authority-Felder und Vokabular-Term-Lookups. Deaktivierte Quellen stehen bei neuen
+        Verknüpfungen nicht mehr zur Auswahl; bereits gespeicherte Verknüpfungen bleiben unverändert erhalten.
+      </p>
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      {sources.map(source => {
+        const result = testResults[source.id]
+        return (
+          <div className="card" key={source.id} style={{ marginBottom: 12 }}>
+            <div className="hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{source.label}</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 400 }}>
+                <input type="checkbox" checked={source.is_enabled} disabled={pending === source.id} onChange={() => toggle(source)} />
+                {source.is_enabled ? 'Aktiviert' : 'Deaktiviert'}
+              </label>
+            </div>
+            <div className="bd">
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>ID: <span className="mono">{source.id}</span></div>
+              <button className="btn sm gh" onClick={() => test(source)} disabled={!source.is_enabled || testing === source.id}>
+                {testing === source.id ? 'Prüft…' : 'Verbindung testen'}
+              </button>
+              {!source.is_enabled && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--fg-3)' }}>Quelle deaktiviert — keine Anfragen möglich.</span>}
+              {source.is_enabled && result && (
+                <span style={{ marginLeft: 8, fontSize: 12, color: result.ok ? '#166534' : '#dc2626' }}>
+                  {result.message}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -1326,6 +1405,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
   { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
+  { id: 'authorities', label: 'Normdatenquellen', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
   { id: 'changelog', label: 'Versionshinweise', adminOnly: true },
   { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true },
@@ -1385,6 +1465,7 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
+          {!loading && isAdmin && section === 'authorities' && <SectionAuthoritySources />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
           {!loading && isAdmin && section === 'changelog' && <SectionChangelog />}
           {!loading && isAdmin && section === 'gefahrenbereich' && <SectionDangerZone />}

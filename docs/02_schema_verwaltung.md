@@ -228,7 +228,7 @@ Beispiele:
 
 ### `pid` – Persistenter Identifier
 
-Für Normdaten-IDs aus externen Quellen (GND, VIAF, Geonames, ORCID …). Das Authority-Plugin-System ermöglicht die Suche in der externen Quelle direkt aus der Erfassung.
+Für Normdaten-IDs aus externen Quellen (GND, VIAF, Geonames, Wikidata, Getty TGN, Iconclass, Getty AAT …). Das Authority-Plugin-System ermöglicht die Suche in der externen Quelle direkt aus der Erfassung. Welche Quellen zur Auswahl stehen, legen Administratoren unter Einstellungen → Normdatenquellen fest (aktivieren/deaktivieren, Verbindung testen); nur aktivierte Quellen erscheinen hier in der Auswahl.
 
 **Settings:**
 

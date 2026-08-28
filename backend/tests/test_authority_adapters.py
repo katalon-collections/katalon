@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from katalon.integrations.aat_adapter import AATAdapter
 from katalon.integrations.geonames_adapter import GeonamesAdapter
 from katalon.integrations.gnd_adapter import GNDAdapter
 from katalon.integrations.iconclass_adapter import ICONCLASSAdapter
@@ -383,6 +384,65 @@ async def test_tgn_fetch_parses_graph_prefers_german() -> None:
 async def test_tgn_fetch_404_returns_none() -> None:
     with patch("katalon.integrations.tgn_adapter.httpx.AsyncClient", _http({}, status=404)):
         hit = await TGNAdapter().fetch("9999999")
+    assert hit is None
+
+
+# ── AAT ───────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_aat_search_parses_bindings() -> None:
+    data = {
+        "results": {
+            "bindings": [
+                {
+                    "concept": {"value": "http://vocab.getty.edu/aat/300111999"},
+                    "label": {"value": "photographs"},
+                }
+            ]
+        }
+    }
+    with patch("katalon.integrations.aat_adapter.httpx.AsyncClient", _http(data)):
+        hits = await AATAdapter().search("photograph")
+    assert len(hits) == 1
+    assert hits[0].external_id == "300111999"
+    assert hits[0].label == "photographs"
+    assert hits[0].source == "aat"
+
+
+@pytest.mark.asyncio
+async def test_aat_search_empty_bindings_returns_empty() -> None:
+    data = {"results": {"bindings": []}}
+    with patch("katalon.integrations.aat_adapter.httpx.AsyncClient", _http(data)):
+        hits = await AATAdapter().search("xyz")
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_aat_fetch_parses_graph_prefers_german() -> None:
+    data = {
+        "@graph": [
+            {
+                "@id": "http://vocab.getty.edu/aat/300111999",
+                "skos:prefLabel": [
+                    {"@value": "Fotografien", "@language": "de"},
+                    {"@value": "photographs", "@language": "en"},
+                ],
+            }
+        ]
+    }
+    with patch("katalon.integrations.aat_adapter.httpx.AsyncClient", _http(data)):
+        hit = await AATAdapter().fetch("300111999")
+    assert hit is not None
+    assert hit.label == "Fotografien"
+    assert hit.external_id == "300111999"
+    assert hit.source == "aat"
+
+
+@pytest.mark.asyncio
+async def test_aat_fetch_404_returns_none() -> None:
+    with patch("katalon.integrations.aat_adapter.httpx.AsyncClient", _http({}, status=404)):
+        hit = await AATAdapter().fetch("9999999")
     assert hit is None
 
 

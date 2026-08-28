@@ -507,6 +507,8 @@ export const authority = {
     req<AuthorityHit[]>(`/v1/authorities/search?source=${encodeURIComponent(source)}&q=${encodeURIComponent(q)}&limit=${limit}`),
   fetch: (source: string, id: string) =>
     req<AuthorityHit>(`/v1/authorities/fetch?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`),
+  setEnabled: (id: string, is_enabled: boolean) =>
+    req<AuthoritySource>(`/v1/authorities/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ is_enabled }) }),
 }
 
 export const pids = {
