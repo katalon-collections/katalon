@@ -38,6 +38,46 @@ function appliesLabel(t: Pick<VocabularyTerm, 'applies_from' | 'applies_to'>): s
   return `${fmt(from)} → ${fmt(to)}`
 }
 
+type TreeTerm = { term: VocabularyTerm; depth: number }
+
+function flattenTerms(terms: VocabularyTerm[]): TreeTerm[] {
+  const children = new Map<string, VocabularyTerm[]>()
+  const byId = new Map(terms.map(term => [term.id, term]))
+  const roots = terms.filter(term => !term.parent_id || !byId.has(term.parent_id))
+  for (const term of terms) {
+    if (term.parent_id && byId.has(term.parent_id)) {
+      children.set(term.parent_id, [...(children.get(term.parent_id) ?? []), term])
+    }
+  }
+
+  const flattened: TreeTerm[] = []
+  const seen = new Set<string>()
+  const visit = (term: VocabularyTerm, depth: number) => {
+    if (seen.has(term.id)) return
+    seen.add(term.id)
+    flattened.push({ term, depth })
+    children.get(term.id)?.forEach(child => visit(child, depth + 1))
+  }
+  roots.forEach(root => visit(root, 0))
+  terms.forEach(term => visit(term, 0))
+  return flattened
+}
+
+function descendantIds(terms: VocabularyTerm[], termId: string): Set<string> {
+  const descendants = new Set<string>([termId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const term of terms) {
+      if (term.parent_id && descendants.has(term.parent_id) && !descendants.has(term.id)) {
+        descendants.add(term.id)
+        changed = true
+      }
+    }
+  }
+  return descendants
+}
+
 function AppliesPreview({ from, to }: { from: RecordType[]; to: RecordType[] }) {
   return (
     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-3)' }} aria-live="polite">
@@ -202,6 +242,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [newTermAppliesTo, setNewTermAppliesTo] = useState<RecordType[]>([])
   const [savingTerm, setSavingTerm] = useState(false)
   const [newTermMetadata, setNewTermMetadata] = useState<Record<string, unknown>>({})
+  const [newTermParentId, setNewTermParentId] = useState('')
 
   // edit term inline
   const [editTermId, setEditTermId] = useState<string | null>(null)
@@ -212,6 +253,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [editTermAppliesTo, setEditTermAppliesTo] = useState<RecordType[]>([])
   const [savingEditTerm, setSavingEditTerm] = useState(false)
   const [editTermMetadata, setEditTermMetadata] = useState<Record<string, unknown>>({})
+  const [editTermParentId, setEditTermParentId] = useState('')
   const [termFields, setTermFields] = useState<FieldDefinition[]>([])
   const [importFile, setImportFile] = useState<File | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
@@ -320,6 +362,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       .then(setTermFields)
       .catch(() => setTermFields([]))
     setNewTermMetadata({})
+    setNewTermParentId('')
     setEditTermId(null)
   }, [activeVocab])
 
@@ -348,6 +391,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
 
   async function createTerm() {
     if (!activeVocab || !newTermTerm.trim()) return
+    setError(null)
     setSavingTerm(true)
     try {
       await vocabularies.createTerm(activeVocab, {
@@ -356,7 +400,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         label: newTermLabel,
         inverse_label: vocab?.kind === 'relation' ? newTermInverseLabel : {},
         metadata_: newTermMetadata,
-        parent_id: null,
+        parent_id: vocab?.is_hierarchical ? newTermParentId || null : null,
         applies_from: vocab?.kind === 'relation' ? newTermAppliesFrom : [],
         applies_to: vocab?.kind === 'relation' ? newTermAppliesTo : [],
       })
@@ -366,10 +410,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       setNewTermAppliesFrom([])
       setNewTermAppliesTo([])
       setNewTermMetadata({})
+      setNewTermParentId('')
       setShowNewTerm(false)
       loadTerms()
     } catch (e) {
-      alert((e as Error).message)
+      setError((e as Error).message)
     } finally {
       setSavingTerm(false)
     }
@@ -383,9 +428,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermAppliesFrom((t.applies_from ?? []) as RecordType[])
     setEditTermAppliesTo((t.applies_to ?? []) as RecordType[])
     setEditTermMetadata({ ...(t.metadata_ ?? {}) })
+    setEditTermParentId(t.parent_id ?? '')
   }
 
   async function saveEditTerm(t: VocabularyTerm) {
+    setError(null)
     setSavingEditTerm(true)
     try {
       await vocabularies.updateTerm(t.id, {
@@ -394,26 +441,31 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         label: editTermLabel,
         inverse_label: vocab?.kind === 'relation' ? editTermInverseLabel : {},
         metadata_: editTermMetadata,
-        parent_id: t.parent_id,
+        parent_id: vocab?.is_hierarchical ? editTermParentId || null : null,
         applies_from: vocab?.kind === 'relation' ? editTermAppliesFrom : [],
         applies_to: vocab?.kind === 'relation' ? editTermAppliesTo : [],
       })
       setEditTermId(null)
       loadTerms()
     } catch (e) {
-      alert((e as Error).message)
+      setError((e as Error).message)
     } finally {
       setSavingEditTerm(false)
     }
   }
 
   async function deleteTerm(id: string) {
-    if (!window.confirm('Term wirklich löschen?')) return
+    const childCount = terms.filter(term => term.parent_id === id).length
+    const message = childCount
+      ? `Term wirklich löschen? ${childCount} direkte Unterterm${childCount === 1 ? '' : 'e'} werden zu Haupttermen.`
+      : 'Term wirklich löschen?'
+    if (!window.confirm(message)) return
+    setError(null)
     try {
       await vocabularies.deleteTerm(id)
       loadTerms()
     } catch (e) {
-      alert((e as Error).message)
+      setError((e as Error).message)
     }
   }
 
@@ -447,10 +499,27 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }
 
   const vocab = vocabs.find(v => v.id === activeVocab)
+  const isHierarchical = vocab?.is_hierarchical === true
+  const displayTerms = isHierarchical ? flattenTerms(terms) : terms.map(term => ({ term, depth: 0 }))
+  const parentOptions = (termId?: string) => {
+    const excluded = termId ? descendantIds(terms, termId) : new Set<string>()
+    return flattenTerms(terms).filter(({ term }) => !excluded.has(term.id))
+  }
   const csvTargets = vocab?.kind === 'relation'
     ? CSV_TARGETS.filter(target => target.value !== 'parent_term')
     : CSV_TARGETS
-  const tableColumnCount = vocab?.kind === 'relation' ? 5 : 4
+  const tableColumnCount = vocab?.kind === 'relation' ? 5 : isHierarchical ? 4 : 3
+
+  function startNewChild(parent: VocabularyTerm) {
+    setNewTermTerm('')
+    setNewTermLabel({})
+    setNewTermInverseLabel({})
+    setNewTermAppliesFrom([])
+    setNewTermAppliesTo([])
+    setNewTermMetadata({})
+    setNewTermParentId(parent.id)
+    setShowNewTerm(true)
+  }
 
   if (loading) {
     return (
@@ -469,7 +538,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         </div>
       </div>
 
-      {error && <div style={{ padding: '8px 24px', color: '#b91c1c', fontSize: 13 }}>{error}</div>}
+      {error && <div role="alert" style={{ padding: '8px 24px', color: '#b91c1c', fontSize: 13 }}>{error}</div>}
 
       {showNewVocab && (
         <div className="card" style={{ margin: '0 24px 12px', flexShrink: 0 }}>
@@ -529,7 +598,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                  <button className="btn pri" onClick={() => setShowNewTerm(v => !v)}><Plus size={13} /> Neuer Term</button>
+                  <button className="btn pri" onClick={() => { setNewTermParentId(''); setShowNewTerm(v => !v) }}><Plus size={13} /> Neuer Term</button>
                 </div>
               </div>
 
@@ -637,6 +706,17 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         value={newTermLabel}
                         onChange={(lang, val) => setNewTermLabel({ ...newTermLabel, [lang]: val })}
                       />
+                      {isHierarchical && (
+                        <div className="field">
+                          <label className="lbl" htmlFor="new-term-parent">Übergeordneter Term</label>
+                          <select id="new-term-parent" className="fld" value={newTermParentId} onChange={e => setNewTermParentId(e.target.value)}>
+                            <option value="">Kein übergeordneter Term</option>
+                            {parentOptions().map(({ term, depth }) => (
+                              <option key={term.id} value={term.id}>{`${'— '.repeat(depth)}${getLabel(term, term.term)} (${term.term})`}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       {vocab.kind === 'relation' && (
                         <LabelEditor
                           languages={languages}
@@ -684,7 +764,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       <th>Label</th>
                       {vocab.kind === 'relation' && <th>Gegenrichtung</th>}
                       {vocab.kind === 'relation' && <th>Typen</th>}
-                      {vocab.kind !== 'relation' && <th>Übergeordnet</th>}
+                      {isHierarchical && <th>Übergeordnet</th>}
                       <th className="col-act" />
                     </tr>
                   </thead>
@@ -693,15 +773,22 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     {!termsLoading && terms.length === 0 && (
                       <tr><td colSpan={tableColumnCount} className="empty">Keine Terme.</td></tr>
                     )}
-                    {!termsLoading && terms.map(t => (
+                    {!termsLoading && displayTerms.map(({ term: t, depth }) => (
                       editTermId === t.id ? (
                         <Fragment key={t.id}>
                           <tr>
-                            <td style={{ minWidth: 160, width: 160 }}><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ width: '100%' }} /></td>
+                            <td style={{ minWidth: 160, width: 160 }}><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ width: '100%', marginLeft: depth * 16 }} /></td>
                             <td><LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} /></td>
                             {vocab.kind === 'relation' && <td><LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix="Gegenrichtung" /></td>}
                             {vocab.kind === 'relation' && <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>{appliesLabel(t)}</td>}
-                            {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)' }}>{t.parent_id ?? '—'}</td>}
+                            {isHierarchical && <td>
+                              <select className="fld" aria-label={`Übergeordneter Term für ${t.term}`} value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
+                                <option value="">Kein übergeordneter Term</option>
+                                {parentOptions(t.id).map(({ term, depth: parentDepth }) => (
+                                  <option key={term.id} value={term.id}>{`${'— '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
+                                ))}
+                              </select>
+                            </td>}
                             <td className="col-act">
                               <div className="row-actions">
                                 <button className="btn sm pri" onClick={() => saveEditTerm(t)} disabled={savingEditTerm}>OK</button>
@@ -738,17 +825,18 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         </Fragment>
                       ) : (
                         <tr key={t.id}>
-                          <td className="mono" style={{ minWidth: 160, width: 160 }}>{t.term}</td>
+                          <td className="mono" style={{ minWidth: 160, width: 160, paddingLeft: 12 + depth * 16 }}>{t.term}</td>
                           <td style={{ maxWidth: 220 }}>
                             {getLabel(t, '—')}
                             <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: t.inverse_label }, '—')}</td>}
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t)}</td>}
-                          {vocab.kind !== 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ?? '—'}</td>}
+                          {isHierarchical && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ? getLabel(terms.find(term => term.id === t.parent_id) ?? t, '—') : '—'}</td>}
                           <td className="col-act">
                             <div className="row-actions">
                               <button className="btn sm ico gh" onClick={() => startEditTerm(t)}><Edit size={12} /></button>
+                              {isHierarchical && <button className="btn sm gh" onClick={() => startNewChild(t)}><Plus size={12} /> Unterterm</button>}
                               <button className="btn sm ico gh dn" onClick={() => deleteTerm(t.id)}><Trash size={12} /></button>
                             </div>
                           </td>

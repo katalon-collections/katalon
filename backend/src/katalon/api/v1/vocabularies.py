@@ -48,6 +48,34 @@ def _build_tree(terms: list[VocabularyTerm]) -> list[VocabularyTermNode]:
     return roots
 
 
+async def _validate_parent(
+    db: DBDep, vocab: Vocabulary, parent_id: uuid.UUID | None, term_id: uuid.UUID | None = None
+) -> None:
+    """Reject parent links that would make a vocabulary tree invalid."""
+    if parent_id is None:
+        return
+    if not vocab.is_hierarchical:
+        raise HTTPException(status_code=422, detail="Nur hierarchische Vokabulare dürfen übergeordnete Terme haben")
+
+    result = await db.execute(
+        select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab.id)
+    )
+    terms = {term.id: term for term in result.scalars().all()}
+    parent = terms.get(parent_id)
+    if parent is None:
+        raise HTTPException(status_code=422, detail="Übergeordneter Term gehört nicht zu diesem Vokabular")
+
+    current: VocabularyTerm | None = parent
+    seen: set[uuid.UUID] = set()
+    while current is not None:
+        if current.id in seen:
+            raise HTTPException(status_code=422, detail="Vokabularhierarchie enthält einen Zyklus")
+        if current.id == term_id:
+            raise HTTPException(status_code=422, detail="Ein Term kann nicht sein eigener Nachfahre sein")
+        seen.add(current.id)
+        current = terms.get(current.parent_id) if current.parent_id else None
+
+
 # ---------------------------------------------------------------------------
 # Vocabulary CRUD
 # ---------------------------------------------------------------------------
@@ -234,8 +262,7 @@ async def create_term(
     vocab = await db.get(Vocabulary, vocab_id)
     if not vocab:
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
-    if vocab.kind == "relation" and data.parent_id:
-        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
+    await _validate_parent(db, vocab, data.parent_id)
     errors = await validate_metadata(
         db, "vocabulary_term", data.metadata_, str(vocab_id)
     )
@@ -266,8 +293,9 @@ async def update_term(
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
     vocab = await db.get(Vocabulary, term.vocabulary_id)
-    if vocab and vocab.kind == "relation" and data.parent_id:
-        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
+    if vocab is None:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    await _validate_parent(db, vocab, data.parent_id, term.id)
     errors = await validate_metadata(
         db, "vocabulary_term", data.metadata_, str(term.vocabulary_id)
     )

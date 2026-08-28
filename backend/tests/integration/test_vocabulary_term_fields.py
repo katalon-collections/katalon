@@ -181,3 +181,84 @@ async def test_relation_vocabulary_rejects_hierarchy(
         files={"file": ("relation-types.csv", b"term;parent\nhas_editor;has_author\n", "text/csv")},
     )
     assert imported.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_hierarchical_terms_reject_cycles_and_promote_children_on_delete(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    vocab_response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={"name": f"hierarchy-{uuid.uuid4()}", "is_hierarchical": True, "kind": "term"},
+    )
+    assert vocab_response.status_code == 201, vocab_response.text
+    vocab = vocab_response.json()
+
+    async def create(term: str, parent_id: str | None = None) -> dict:
+        response = await async_client.post(
+            f"/v1/vocabularies/{vocab['id']}/terms",
+            headers=auth_headers,
+            json={
+                "vocabulary_id": vocab["id"],
+                "term": term,
+                "label": {"de": term},
+                "parent_id": parent_id,
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    root = await create("root")
+    child = await create("child", root["id"])
+    grandchild = await create("grandchild", child["id"])
+
+    other_vocab = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={"name": f"other-{uuid.uuid4()}", "is_hierarchical": True, "kind": "term"},
+    )
+    assert other_vocab.status_code == 201, other_vocab.text
+    foreign_parent = await async_client.post(
+        f"/v1/vocabularies/{other_vocab.json()['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": other_vocab.json()["id"],
+            "term": "foreign",
+            "label": {"de": "foreign"},
+        },
+    )
+    assert foreign_parent.status_code == 201, foreign_parent.text
+    foreign_parent_link = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "wrong-parent",
+            "label": {"de": "wrong-parent"},
+            "parent_id": foreign_parent.json()["id"],
+        },
+    )
+    assert foreign_parent_link.status_code == 422
+
+    cycle = await async_client.put(
+        f"/v1/vocabularies/terms/{root['id']}",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "root",
+            "label": {"de": "root"},
+            "parent_id": grandchild["id"],
+        },
+    )
+    assert cycle.status_code == 422
+
+    deleted = await async_client.delete(
+        f"/v1/vocabularies/terms/{root['id']}", headers=auth_headers
+    )
+    assert deleted.status_code == 204, deleted.text
+    child_after_delete = await async_client.get(
+        f"/v1/vocabularies/{vocab['id']}/terms/{child['id']}", headers=auth_headers
+    )
+    assert child_after_delete.status_code == 200, child_after_delete.text
+    assert child_after_delete.json()["parent_id"] is None

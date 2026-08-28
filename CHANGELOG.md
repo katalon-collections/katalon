@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-08-28
+
+### Added
+- Hierarchische Vokabulare lassen sich im Admin als Baum pflegen: Elternterm auswählen, Unterterm direkt anlegen und Hierarchie sicher verschieben.
+
+### Fixed
+- Das Löschen eines Elternterms löscht keine Unterterme mehr; direkte Kinder werden zu Haupttermen.
+
 ## [1.4.3] - 2026-08-28
 
 ### Fixed

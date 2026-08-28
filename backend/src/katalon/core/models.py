@@ -364,7 +364,7 @@ class VocabularyTerm(Base):
 
     vocabulary: Mapped["Vocabulary"] = relationship(back_populates="terms")
     children: Mapped[list["VocabularyTerm"]] = relationship(
-        back_populates="parent", cascade="all, delete-orphan"
+        back_populates="parent", passive_deletes=True
     )
     parent: Mapped["VocabularyTerm | None"] = relationship(
         back_populates="children", remote_side="VocabularyTerm.id"
