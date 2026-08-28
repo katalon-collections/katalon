@@ -53,6 +53,41 @@ async def test_object_crud_roundtrip(async_client, auth_headers) -> None:
 
 
 @pytest.mark.asyncio
+async def test_public_object_can_omit_subtype_when_subtypes_exist(async_client, auth_headers) -> None:
+    idno = f"OPTIONAL-SUBTYPE-{uuid.uuid4().hex[:12]}"
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={"idno": idno, "status": "draft", "metadata_": {"label": "Optional subtype"}},
+    )
+    assert created.status_code == 201, created.text
+
+    subtype = await async_client.post(
+        "/v1/record-subtypes",
+        headers=auth_headers,
+        json={
+            "primary_type": "object",
+            "name": f"optional_subtype_{uuid.uuid4().hex[:8]}",
+            "label": {"de": "Optional"},
+        },
+    )
+    assert subtype.status_code == 201, subtype.text
+
+    updated = await async_client.put(
+        f"/v1/objects/{created.json()['id']}",
+        headers={**auth_headers, "If-Match": str(created.json()["version"])},
+        json={"idno": idno, "status": "public", "metadata_": {"label": "Optional subtype"}},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["object_type"] is None
+
+    deleted_subtype = await async_client.delete(
+        f"/v1/record-subtypes/{subtype.json()['id']}", headers=auth_headers
+    )
+    assert deleted_subtype.status_code == 204, deleted_subtype.text
+
+
+@pytest.mark.asyncio
 async def test_object_list_search_matches_metadata_substring(async_client, auth_headers) -> None:
     suffix = uuid.uuid4().hex[:12]
     create_response = await async_client.post(

@@ -32,7 +32,6 @@ from katalon.services.relation_service import count_relations, sync_schema_relat
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
-    has_any_subtypes,
     normalize_subtype_name,
 )
 
@@ -114,10 +113,9 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: User = requir
         if schema:
             await maybe_advance_counter(db, "place", schema, idno)
 
-    _has_subtypes = await has_any_subtypes(db, "place")
     place_type = normalize_subtype_name(
         data.place_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "place", place_type)
     metadata = await prepare_metadata(
@@ -208,10 +206,9 @@ async def update_place(
         existing = await db.execute(select(Place).where(Place.idno == idno, Place.id != place_id))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    _has_subtypes = await has_any_subtypes(db, "place")
     place_type = normalize_subtype_name(
         data.place_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "place", place_type)
     metadata = await prepare_metadata(

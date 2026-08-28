@@ -374,6 +374,7 @@ export const vocabularies = {
     return req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms${qs ? `?${qs}` : ''}`)
   },
   searchTerms: (vocabId: string, q: string) => req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms?q=${encodeURIComponent(q)}`),
+  ancestors: (vocabId: string, termId: string) => req<VocabularyTerm[]>(`/v1/vocabularies/${vocabId}/terms/${termId}/ancestors`),
   createTerm: (vocabId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/${vocabId}/terms`, { method: 'POST', body: JSON.stringify(data) }),
   updateTerm: (termId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTerm: (termId: string) => req<void>(`/v1/vocabularies/terms/${termId}`, { method: 'DELETE' }),

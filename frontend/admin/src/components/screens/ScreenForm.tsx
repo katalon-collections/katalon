@@ -360,6 +360,26 @@ const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
 
 export type VocabEntry = { id: string; label: string }
 export type RelationEntry = { id: string; label: string; relation_type: string }
+type VocabSuggestion = { term: VocabularyTerm; depth: number }
+
+function orderVocabSuggestions(terms: VocabularyTerm[]): VocabSuggestion[] {
+  const byId = new Map(terms.map(term => [term.id, term]))
+  const children = new Map<string, VocabularyTerm[]>()
+  const roots = terms.filter(term => !term.parent_id || !byId.has(term.parent_id))
+  for (const term of terms) {
+    if (term.parent_id && byId.has(term.parent_id)) {
+      children.set(term.parent_id, [...(children.get(term.parent_id) ?? []), term])
+    }
+  }
+
+  const suggestions: VocabSuggestion[] = []
+  const visit = (term: VocabularyTerm, depth: number) => {
+    suggestions.push({ term, depth })
+    children.get(term.id)?.forEach(child => visit(child, depth + 1))
+  }
+  roots.forEach(term => visit(term, 0))
+  return suggestions
+}
 
 function buildRightsHolder(name: string, uri: string): { name: string; uri?: string } | null {
   return name ? { name, ...(uri ? { uri } : {}) } : null
@@ -384,7 +404,8 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
   disabled?: boolean
 }) {
   const [q, setQ] = useState('')
-  const [results, setResults] = useState<VocabularyTerm[]>([])
+  const [results, setResults] = useState<VocabSuggestion[]>([])
+  const [ancestorPath, setAncestorPath] = useState('')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
@@ -424,18 +445,30 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, q.trim())
-        .then(r => { setResults(r); setOpen(r.length > 0) })
+        .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
         .catch(() => setResults([]))
         .finally(() => setBusy(false))
     }, 200)
     return () => clearTimeout(timer.current)
   }, [q, vocabId])
 
+  useEffect(() => {
+    if (!value) {
+      setAncestorPath('')
+      return
+    }
+    let current = true
+    vocabularies.ancestors(vocabId, value.id)
+      .then(ancestors => { if (current) setAncestorPath(ancestors.map(term => getLabel(term)).join(' › ')) })
+      .catch(() => { if (current) setAncestorPath('') })
+    return () => { current = false }
+  }, [value?.id, vocabId])
+
   function openSuggestions() {
     if (!vocabId) return
     setBusy(true)
     vocabularies.searchTerms(vocabId, q.trim())
-      .then(r => { setResults(r); setOpen(r.length > 0) })
+      .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
@@ -453,7 +486,7 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
           padding: '3px 8px', borderRadius: 4,
           background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
         }}>
-          {value.label}
+          {ancestorPath ? `${ancestorPath} › ${value.label}` : value.label}
         </span>
         {!disabled && (
           <button className="btn sm ico gh" onClick={() => onChange(null)} title="Entfernen">
@@ -486,13 +519,13 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
           background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
         }}>
-          {results.map(term => (
+          {results.map(({ term, depth }) => (
             <button
               key={term.id}
               onMouseDown={e => { e.preventDefault(); pick(term) }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
-                padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)',
+                padding: `8px 12px 8px ${12 + depth * 16}px`, border: 'none', borderBottom: '1px solid var(--border)',
                 background: 'none', cursor: 'pointer',
               }}
               className="authority-hit"
@@ -521,7 +554,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
   placeholder?: string
 }) {
   const [draft, setDraft] = useState(value ?? '')
-  const [results, setResults] = useState<VocabularyTerm[]>([])
+  const [results, setResults] = useState<VocabSuggestion[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
@@ -563,7 +596,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, draft.trim())
-        .then(r => { setResults(r); setOpen(r.length > 0) })
+        .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
         .catch(() => setResults([]))
         .finally(() => setBusy(false))
     }, 200)
@@ -574,7 +607,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
     if (!vocabId) return
     setBusy(true)
     vocabularies.searchTerms(vocabId, draft.trim())
-      .then(r => { setResults(r); setOpen(r.length > 0) })
+      .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
@@ -623,13 +656,13 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
           background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,.18)', maxHeight: dropPos.maxHeight, overflowY: 'auto',
         }}>
-          {results.map(term => (
+          {results.map(({ term, depth }) => (
             <button
               key={term.id}
               onMouseDown={e => { e.preventDefault(); pick(term) }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
-                padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)',
+                padding: `8px 12px 8px ${12 + depth * 16}px`, border: 'none', borderBottom: '1px solid var(--border)',
                 background: 'none', cursor: 'pointer',
               }}
               className="authority-hit"
@@ -1686,15 +1719,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!idno.trim()) {
       addRequired('__idno', 'ID-Nr. ist ein Pflichtfeld.')
     }
-    // Entity subtype choice and fixed relation subtypes are structural in quick-create,
-    // so drafts must not bypass them.
+    // A fixed relation subtype is structural in quick-create, so drafts must not bypass it.
     const validConfiguredSubtype = availableSubtypes.some(item => item.name === subtype)
-    if (quickCreate &&
-        ((recordType === 'entity' && availableSubtypes.length > 0) || lockSubtype) &&
-        !validConfiguredSubtype) {
-      errors.__subtype = lockSubtype ? 'Der konfigurierte Subtyp ist ungültig.' : 'Subtyp ist ein Pflichtfeld.'
-    } else if (subtypeKey && availableSubtypes.length > 0 && !subtype) {
-      addRequired('__subtype', 'Subtyp ist ein Pflichtfeld.')
+    if (quickCreate && lockSubtype && !validConfiguredSubtype) {
+      errors.__subtype = 'Der konfigurierte Subtyp ist ungültig.'
     }
     for (const f of fields) {
       const val = values[f.name]
@@ -2416,7 +2444,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'}</div>
+                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
                     <select
                       className="fld"
                       value={subtype}

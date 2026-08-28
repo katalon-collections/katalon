@@ -270,7 +270,7 @@ async def create_term(
         raise HTTPException(status_code=422, detail=errors)
     term = VocabularyTerm(**data.model_dump(exclude={"vocabulary_id"}) | {"vocabulary_id": vocab_id})
     db.add(term)
-    await db.flush()
+    await db.commit()
     return term
 
 
@@ -303,6 +303,7 @@ async def update_term(
         raise HTTPException(status_code=422, detail=errors)
     for k, v in data.model_dump(exclude={"vocabulary_id"}).items():
         setattr(term, k, v)
+    await db.commit()
     return term
 
 
@@ -322,6 +323,7 @@ async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
     await db.delete(term)
+    await db.commit()
 
 
 @router.post(

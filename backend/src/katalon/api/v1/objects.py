@@ -45,7 +45,6 @@ from katalon.services.relation_service import count_relations, sync_schema_relat
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
-    has_any_subtypes,
     normalize_subtype_name,
 )
 
@@ -138,10 +137,9 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
         if schema:
             await maybe_advance_counter(db, "object", schema, idno)
 
-    _has_subtypes = await has_any_subtypes(db, "object")
     object_type = normalize_subtype_name(
         data.object_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(
@@ -236,10 +234,9 @@ async def update_object(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
-    _has_subtypes = await has_any_subtypes(db, "object")
     object_type = normalize_subtype_name(
         data.object_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(

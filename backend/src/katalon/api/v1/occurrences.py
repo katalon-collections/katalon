@@ -37,7 +37,6 @@ from katalon.services.relation_service import count_relations, sync_schema_relat
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
-    has_any_subtypes,
     normalize_subtype_name,
 )
 
@@ -119,10 +118,9 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Use
         if schema:
             await maybe_advance_counter(db, "occurrence", schema, idno)
 
-    _has_subtypes = await has_any_subtypes(db, "occurrence")
     occurrence_type = normalize_subtype_name(
         data.occurrence_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     metadata = await prepare_metadata(
@@ -205,10 +203,9 @@ async def update_occurrence(
         existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno, Occurrence.id != occ_id))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    _has_subtypes = await has_any_subtypes(db, "occurrence")
     occurrence_type = normalize_subtype_name(
         data.occurrence_type,
-        allow_null=data.status == "draft" or not _has_subtypes,
+        allow_null=True,
     )
     await ensure_subtype_exists(db, "occurrence", occurrence_type)
     metadata = await prepare_metadata(

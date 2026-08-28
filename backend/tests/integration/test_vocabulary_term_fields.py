@@ -61,6 +61,32 @@ async def test_vocabulary_term_schema_and_metadata_validation(
 
 
 @pytest.mark.asyncio
+async def test_new_term_is_immediately_available_in_its_vocabulary(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    vocab_response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={"name": f"immediate-terms-{uuid.uuid4()}", "is_hierarchical": False, "kind": "term"},
+    )
+    vocab = vocab_response.json()
+
+    created = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "new-term",
+            "label": {"de": "Neuer Term"},
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    listed = await async_client.get(f"/v1/vocabularies/{vocab['id']}/terms", headers=auth_headers)
+    assert "new-term" in {term["term"] for term in listed.json()}
+
+
+@pytest.mark.asyncio
 async def test_vocabulary_kind_limits_schema_usage(
     async_client: AsyncClient, auth_headers: dict
 ) -> None:

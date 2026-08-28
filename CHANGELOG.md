@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-08-28
+
+### Added
+- Vokabular-Feld zeigt Treffer hierarchisch eingerückt und mit Vorfahren-Pfad (`Elternbegriff › Kind`) statt flacher Liste.
+
+### Changed
+- Subtyp (Object/Entity/Place/Occurrence) ist beim Anlegen/Bearbeiten nicht mehr Pflichtfeld (außer bei fest konfiguriertem Subtyp in Quick-Create).
+
+### Fixed
+- Vokabular-Term-Anlage/-Änderung/-Löschung committete nicht explizit; Term konnte je nach Session-Handling verloren gehen.
+
 ## [1.5.2] - 2026-08-28
 
 ### Fixed

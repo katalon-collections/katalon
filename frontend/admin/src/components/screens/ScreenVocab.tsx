@@ -3,7 +3,7 @@ import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import { ChevD, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
+import { ChevD, ChevR, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
@@ -222,6 +222,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [terms, setTerms] = useState<VocabularyTerm[]>([])
   const [activeVocab, setActiveVocab] = useState<string | null>(null)
+  const [expandedVocab, setExpandedVocab] = useState<string | null>(null)
+  const [selectedTermId, setSelectedTermId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [termsLoading, setTermsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -575,13 +577,41 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
           {vocabs.map(v => (
             <div key={v.id}>
               <div className={`tree-it${activeVocab === v.id ? ' active' : ''}`} onClick={() => { setActiveVocab(v.id); onVocabSelect?.(v.name) }}>
-                <span className="caret">
-                  {v.is_hierarchical ? <ChevD size={12} /> : null}
-                </span>
+                <button
+                  className="caret"
+                  type="button"
+                  aria-label={`${v.name} ${expandedVocab === v.id ? 'zuklappen' : 'aufklappen'}`}
+                  aria-expanded={expandedVocab === v.id}
+                  onClick={event => {
+                    event.stopPropagation()
+                    setActiveVocab(v.id)
+                    setExpandedVocab(current => current === v.id ? null : v.id)
+                    onVocabSelect?.(v.name)
+                  }}
+                  style={{ border: 0, background: 'none', padding: 0, cursor: v.is_hierarchical ? 'pointer' : 'default' }}
+                  disabled={!v.is_hierarchical}
+                >
+                  {v.is_hierarchical ? (expandedVocab === v.id ? <ChevD size={12} /> : <ChevR size={12} />) : null}
+                </button>
                 <Tag size={13} className="ic" />
                 <span style={{ flex: 1 }}>{v.name}</span>
                 {activeVocab === v.id && !termsLoading && <span className="ct">{terms.length}</span>}
               </div>
+              {activeVocab === v.id && expandedVocab === v.id && !termsLoading && (
+                <div aria-label={`${v.name}-Hierarchie`}>
+                  {displayTerms.map(({ term, depth }) => (
+                    <button
+                      key={term.id}
+                      type="button"
+                      onClick={() => setSelectedTermId(term.id)}
+                      aria-pressed={selectedTermId === term.id}
+                      style={{ display: 'block', width: '100%', border: 0, background: selectedTermId === term.id ? 'var(--accent-50)' : 'none', padding: `4px 6px 4px ${30 + depth * 16}px`, textAlign: 'left', color: 'var(--fg-2)', cursor: 'pointer', fontSize: 12 }}
+                    >
+                      {getLabel(term, term.term)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {vocabs.length === 0 && <div className="empty" style={{ padding: 12, fontSize: 12 }}>Keine Vokabulare.</div>}
@@ -777,22 +807,27 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       editTermId === t.id ? (
                         <Fragment key={t.id}>
                           <tr>
-                            <td style={{ minWidth: 160, width: 160 }}><input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} style={{ width: '100%', marginLeft: depth * 16 }} /></td>
-                            <td><LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} /></td>
-                            {vocab.kind === 'relation' && <td><LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix="Gegenrichtung" /></td>}
-                            {vocab.kind === 'relation' && <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>{appliesLabel(t)}</td>}
-                            {isHierarchical && <td>
-                              <select className="fld" aria-label={`Übergeordneter Term für ${t.term}`} value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
-                                <option value="">Kein übergeordneter Term</option>
-                                {parentOptions(t.id).map(({ term, depth: parentDepth }) => (
-                                  <option key={term.id} value={term.id}>{`${'— '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
-                                ))}
-                              </select>
-                            </td>}
-                            <td className="col-act">
-                              <div className="row-actions">
-                                <button className="btn sm pri" onClick={() => saveEditTerm(t)} disabled={savingEditTerm}>OK</button>
-                                <button className="btn sm gh" onClick={() => setEditTermId(null)}><X size={12} /></button>
+                            <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end', padding: '8px 0' }}>
+                                <div className="field">
+                                  <div className="lbl">ID</div>
+                                  <input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} />
+                                </div>
+                                <LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} />
+                                {vocab.kind === 'relation' && <LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix="Gegenrichtung" />}
+                                {isHierarchical && <div className="field">
+                                  <label className="lbl" htmlFor={`edit-term-parent-${t.id}`}>Übergeordneter Term</label>
+                                  <select id={`edit-term-parent-${t.id}`} className="fld" value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
+                                    <option value="">Kein übergeordneter Term</option>
+                                    {parentOptions(t.id).map(({ term, depth: parentDepth }) => (
+                                      <option key={term.id} value={term.id}>{`${'— '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
+                                    ))}
+                                  </select>
+                                </div>}
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <button className="btn pri" onClick={() => saveEditTerm(t)} disabled={savingEditTerm}>Speichern</button>
+                                  <button className="btn gh" onClick={() => setEditTermId(null)}><X size={12} /> Abbrechen</button>
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -824,7 +859,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           </tr>
                         </Fragment>
                       ) : (
-                        <tr key={t.id}>
+                        <tr key={t.id} style={selectedTermId === t.id ? { background: 'var(--accent-50)' } : undefined}>
                           <td className="mono" style={{ minWidth: 160, width: 160, paddingLeft: 12 + depth * 16 }}>{t.term}</td>
                           <td style={{ maxWidth: 220 }}>
                             {getLabel(t, '—')}
