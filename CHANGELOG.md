@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-08-28
+
+### Fixed
+- Importer: XML-Wiederholungen in Container-Subfeldern erzeugen positionsweise mehrere Containerinstanzen. Ungleiche Wiederholungszahlen werden im Probelauf gemeldet statt falsch zusammengeführt.
+
+### Added
+- Importer: Container-Subfelder sind im Mapping auswählbar; der Expression-Dialog bietet die Vorlage „Nachname, Vorname“ → „Vorname Nachname“. Das Importer-Cookbook dokumentiert die häufigen Transformationen.
+
 ## [1.4.2] - 2026-08-28
 
 ### Added

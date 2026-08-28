@@ -181,8 +181,17 @@ def apply_mapping(
         else:
             normalized[selector] = (val, [])
 
+    container_targets: dict[str, tuple[str, str]] = {}
+    if field_defs:
+        groups = {field.id: field.name for field in field_defs.values() if field.field_type == "group"}
+        for field in field_defs.values():
+            parent_name = groups.get(getattr(field, "parent_id", None))
+            if parent_name:
+                container_targets[f"{parent_name}.{field.name}"] = (parent_name, field.name)
+
     for row in rows:
         record: dict[str, Any] = {}
+        containers: dict[str, dict[str, list[str]]] = {}
         row_idno: str | None = None
         for selector, (field_name, transforms) in normalized.items():
             combine = next((t for t in transforms if t.get("type") == "combine"), None)
@@ -200,6 +209,12 @@ def apply_mapping(
                 continue
 
             fd = field_defs.get(field_name) if field_defs else None
+            container_target = container_targets.get(field_name)
+            if container_target:
+                group_name, child_name = container_target
+                parts = [part for raw in raws for part in (apply_transforms(raw, transforms) if transforms else [raw])]
+                containers.setdefault(group_name, {})[child_name] = parts
+                continue
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
 
@@ -227,6 +242,12 @@ def apply_mapping(
                 record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
             else:
                 record[field_name] = single
+        for group_name, values in containers.items():
+            count = max(len(parts) for parts in values.values())
+            record[group_name] = [
+                {child_name: parts[index] if index < len(parts) else "" for child_name, parts in values.items()}
+                for index in range(count)
+            ]
         result.append(record)
         idnos.append(row_idno)
     return result, idnos
@@ -390,6 +411,25 @@ def dry_run(
             "row": None,
             "message": f"Pflichtfelder nicht gemappt: {', '.join(sorted(missing_required))}",
         })
+
+    if field_defs:
+        groups = {field.id: field.name for field in field_defs.values() if field.field_type == "group"}
+        targets = {
+            target: groups.get(getattr(field, "parent_id", None))
+            for field in field_defs.values()
+            if groups.get(getattr(field, "parent_id", None))
+            for target in [f"{groups[field.parent_id]}.{field.name}"]
+        }
+        for index, row in enumerate(rows):
+            counts: dict[str, list[int]] = {}
+            for selector, value in mapping.items():
+                target = value.get("target", "") if isinstance(value, dict) else value
+                group_name = targets.get(target)
+                if group_name:
+                    counts.setdefault(group_name, []).append(len(_row_values(row, selector)))
+            for group_name, lengths in counts.items():
+                if len(lengths) > 1 and len(set(lengths)) > 1:
+                    errors.append({"row": index + 2, "message": f"Container '{group_name}': Subfelder haben unterschiedlich viele Wiederholungen"})
 
     # Check for idno mapping
     has_idno_mapping = "__idno__" in mapped_fields

@@ -4,8 +4,8 @@ import type { TransformConfig, MappingEntry } from '../../api/client'
 interface TransformModalProps {
   csvColumn: string
   sourceColumns: string[]
-  sampleValues: string[]
-  sampleRows: Record<string, string>[]
+  sampleValues: unknown[]
+  sampleRows: Record<string, unknown>[]
   mappingEntry: MappingEntry
   onSave: (entry: MappingEntry) => void
   onClose: () => void
@@ -20,9 +20,19 @@ const TRANSFORM_TYPES: { id: TransformConfig['type']; label: string }[] = [
   { id: 'expression', label: 'Expression' },
   { id: 'combine', label: 'Zusammenlegen' },
 ]
+const NAME_REVERSE_EXPRESSION = "{{ value.split(',')[1] | trim }} {{ value.split(',')[0] | trim }}"
 
-function applyTransformsLocal(value: string, transforms: TransformConfig[], row: Record<string, string> = {}): string[] {
-  let values = [value]
+function previewValues(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value]
+  return values.map(item => String(item ?? ''))
+}
+
+function previewText(value: unknown): string {
+  return previewValues(value).join(', ')
+}
+
+function applyTransformsLocal(value: unknown, transforms: TransformConfig[], row: Record<string, unknown> = {}): string[] {
+  let values = previewValues(value)
   for (const t of transforms) {
     const newValues: string[] = []
     for (const v of values) {
@@ -69,7 +79,7 @@ function applyTransformsLocal(value: string, transforms: TransformConfig[], row:
         }
         case 'combine': {
           const sources = t.sources ?? []
-          const values = sources.map(source => row[source] ?? '')
+          const values = sources.map(source => previewValues(row[source]).join(', '))
           const template = t.template
           newValues.push(template
             ? template.replace(/\{(\d+)\}/g, (_, index: string) => values[Number(index)] ?? '')
@@ -78,6 +88,11 @@ function applyTransformsLocal(value: string, transforms: TransformConfig[], row:
         }
         case 'expression': {
           const expr = t.expression ?? ''
+          if (expr === NAME_REVERSE_EXPRESSION) {
+            const [last, first] = v.split(',', 2)
+            newValues.push(first?.trim() ? `${first.trim()} ${last.trim()}` : v)
+            break
+          }
           let result = expr
           const pattern = /\$\{value(?::([^}]+))?\}/g
           const match = pattern.exec(expr)
@@ -297,6 +312,9 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
                   <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
                     Variablen: <code>${'{'}value{'}'}</code>, <code>${'{'}value:upper{'}'}</code>, <code>${'{'}value:lower{'}'}</code>, <code>${'{'}value:trim{'}'}</code>, <code>${'{'}value:slice(0,4){'}'}</code>, <code>${'{'}value:replace(a,b){'}'}</code>
                   </div>
+                  <button className="btn sm gh" type="button" onClick={() => updateTransform(i, { expression: NAME_REVERSE_EXPRESSION })}>
+                    Beispiel: „Nachname, Vorname“ umdrehen
+                  </button>
                 </div>
               )}
 
@@ -349,7 +367,7 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
             <tbody>
               {effectiveRows.map((row, i) => (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-soft)' : undefined }}>
-                  <td style={{ padding: '3px 8px 3px 0', color: 'var(--fg-2)', fontFamily: 'monospace' }}>&quot;{row[csvColumn] ?? ''}&quot;</td>
+                  <td style={{ padding: '3px 8px 3px 0', color: 'var(--fg-2)', fontFamily: 'monospace' }}>&quot;{previewText(row[csvColumn])}&quot;</td>
                   <td style={{ padding: '3px 0', color: '#166534', fontFamily: 'monospace' }}>
                     {previews[i].length === 0 ? '(leer)' : previews[i].map(p => `"${p}"`).join(', ')}
                   </td>

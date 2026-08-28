@@ -310,11 +310,18 @@ export function StepMapping({
                             ([otherCol, otherEntry]) => otherCol !== col && otherEntry.target === f.name
                           )
                           const isPending = pendingFields.some(p => p.name === f.name)
-                          return (
-                            <option key={f.id} value={f.name} disabled={isMappedByOther}>
-                              {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isPending ? ' (neu)' : ''}{isMappedByOther ? ' (bereits zugewiesen)' : ''}
-                            </option>
-                          )
+                          if (f.field_type === 'group') {
+                            return (f.children ?? []).map(child => {
+                              const target = `${f.name}.${child.name}`
+                              const used = Object.entries(mapping).some(([otherCol, entry]) => otherCol !== col && entry.target === target)
+                              return <option key={child.id} value={target} disabled={used}>
+                                {getLabel(f, f.name)} → {getLabel(child, child.name)}{child.is_required ? ' *' : ''}{used ? ' (bereits zugewiesen)' : ''}
+                              </option>
+                            })
+                          }
+                          return <option key={f.id} value={f.name} disabled={isMappedByOther}>
+                            {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isPending ? ' (neu)' : ''}{isMappedByOther ? ' (bereits zugewiesen)' : ''}
+                          </option>
                         })}
                       </optgroup>
                     </select>

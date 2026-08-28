@@ -80,6 +80,45 @@ def test_apply_mapping_with_split_transform_repeatable() -> None:
     assert records[0]["languages"] == ["Deutsch", "Englisch", "Französisch"]
 
 
+def test_apply_mapping_to_container_subfields() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="name", field_type="group", parent_id=None)
+    first = SimpleNamespace(id=object(), name="vorname", field_type="text", parent_id=group_id)
+    last = SimpleNamespace(id=object(), name="nachname", field_type="text", parent_id=group_id)
+    records, _ = apply_mapping(
+        [{"first": "Peter", "last": "Müller"}],
+        {"first": {"target": "name.vorname"}, "last": {"target": "name.nachname"}},
+        {"name": group, "vorname": first, "nachname": last},
+    )
+    assert records == [{"name": [{"vorname": "Peter", "nachname": "Müller"}]}]
+
+
+def test_apply_mapping_to_repeated_container_subfields() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="name", field_type="group", parent_id=None)
+    first = SimpleNamespace(id=object(), name="vorname", field_type="text", parent_id=group_id)
+    last = SimpleNamespace(id=object(), name="nachname", field_type="text", parent_id=group_id)
+    records, _ = apply_mapping(
+        [{"first": ["Peter", "Anna"], "last": ["Müller", "Schmidt"]}],
+        {"first": {"target": "name.vorname"}, "last": {"target": "name.nachname"}},
+        {"name": group, "vorname": first, "nachname": last},
+    )
+    assert records == [{"name": [{"vorname": "Peter", "nachname": "Müller"}, {"vorname": "Anna", "nachname": "Schmidt"}]}]
+
+
+def test_dry_run_rejects_uneven_container_repetitions() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="name", field_type="group", parent_id=None, is_required=False)
+    first = SimpleNamespace(id=object(), name="vorname", field_type="text", parent_id=group_id, is_required=False)
+    last = SimpleNamespace(id=object(), name="nachname", field_type="text", parent_id=group_id, is_required=False)
+    result = dry_run(
+        [{"first": ["Peter", "Anna"], "last": ["Müller"]}],
+        {"first": {"target": "name.vorname"}, "last": {"target": "name.nachname"}},
+        {"name": group, "vorname": first, "nachname": last},
+    )
+    assert result["errors"] == [{"row": 2, "message": "Container 'name': Subfelder haben unterschiedlich viele Wiederholungen"}]
+
+
 def test_apply_mapping_with_xml_repeated_element_list_value() -> None:
     """XmlFormat.parse() returns a list for repeated elements even when mapped
     to a non-repeatable field; apply_mapping must not crash on list values.

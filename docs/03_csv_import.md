@@ -64,6 +64,35 @@ Unterstützte Transformationsschritte pro Spalte:
 - `vocab_map`
 - `expression`
 
+#### Cookbook: häufige Transformationen
+
+Die Vorschau im Transformationsdialog zeigt die ersten drei Werte nach jedem gespeicherten Schritt. Immer zuerst den Probelauf ausführen.
+
+| Aufgabe | Einstellung oder Expression | Beispiel |
+|---|---|---|
+| Leerzeichen entfernen | `trim` | `  Peter Müller  ` → `Peter Müller` |
+| Mehrere Werte übernehmen | `split`, Trennzeichen `;` | `Rot; Blau` → zwei Werte |
+| Namen umdrehen | Bei `expression` **Beispiel: „Nachname, Vorname“ umdrehen** wählen | `Müller, Peter` → `Peter Müller` |
+| Präfix ergänzen | Expression `Inventar-${value}` | `42` → `Inventar-42` |
+| Schreibweise vereinheitlichen | `vocab_map` | `DE` → `Deutsch` |
+
+Expressions laufen beim Import serverseitig. Die Vorlage für Namen erwartet genau ein Komma; Werte ohne Komma bleiben unverändert.
+
+#### Containerfelder importieren
+
+Containerfelder bestehen aus wiederholbaren Einträgen mit Subfeldern. Im Mapping-Dropdown stehen sie als `Container → Subfeld`, zum Beispiel `Person → Vorname` und `Person → Nachname`.
+
+Ordne die Quellspalten den einzelnen Subfeldern zu. Pro Importzeile wird eine Containerinstanz angelegt:
+
+| CSV-Spalte | Katalon-Feld | Ergebnis |
+|---|---|---|
+| `vorname` | `Person → Vorname` | `{"person": [{"vorname": "Peter"}]}` |
+| `nachname` | `Person → Nachname` | `{"person": [{"vorname": "Peter", "nachname": "Müller"}]}` |
+
+Pflicht-Subfelder prüft der Probelauf wie andere Pflichtfelder. Eine einzelne Quellspalte kann derzeit nicht gleichzeitig auf mehrere Subfelder gemappt werden; dafür die Daten vorher in getrennte Spalten aufteilen.
+
+Wiederholte XML-Subfelder werden positionsweise zu mehreren Containerinstanzen zusammengeführt. Haben die beteiligten XML-Elemente unterschiedlich viele Werte, stoppt der Probelauf mit einem Fehler statt Werte falsch zu kombinieren.
+
 #### Auto-Mapping
 
 Nach dem Upload versucht der Importer, Spalten automatisch zuzuordnen. Eine Spalte wird automatisch gemappt, wenn:
