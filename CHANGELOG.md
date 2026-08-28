@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [1.4.2] - 2026-08-28
+## [1.5.0] - 2026-08-28
 
 ### Added
 - Getty AAT (Art & Architecture Thesaurus) als Authority-Adapter (`aat_adapter.py`, SPARQL gegen `vocab.getty.edu`).
