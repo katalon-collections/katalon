@@ -9,6 +9,9 @@ sources:
   - id: initial-migration
     type: file
     path: backend/migrations/versions/0001_initial.py
+  - id: drop-search-vector
+    type: file
+    path: backend/migrations/versions/0044_drop_search_vector.py
   - id: version-migration
     type: file
     path: backend/migrations/versions/0027_record_version.py
@@ -17,7 +20,7 @@ sources:
     path: backend/migrations/versions/0038_media_import_references.py
 ---
 
-Katalon's persistence model uses PostgreSQL as the durable system of record, with separate ORM tables for record classes and JSONB columns for configurable metadata. Objects, entities, places, occurrences, and procedures all have stable columns for identity, status, timestamps, and search state, while user-defined fields live in the `metadata` JSONB column [@models]. The initial migration creates PostGIS and `pg_trgm` extensions, then builds the primary tables and supporting tables for users, schema definitions, vocabularies, relations, media, audit logs, snapshots, and authority sources [@initial-migration].
+Katalon's persistence model uses PostgreSQL as the durable system of record, with separate ORM tables for record classes and JSONB columns for configurable metadata. Objects, entities, places, occurrences, and procedures all have stable columns for identity, status, timestamps, and record versions, while user-defined fields live in the `metadata` JSONB column [@models]. Search state is not stored in those PostgreSQL record tables: migration `0044` drops the unused `search_vector` TSVECTOR columns from all five record tables after Elasticsearch became the search read model [@drop-search-vector]. The initial migration creates PostGIS and `pg_trgm` extensions, then builds the primary tables and supporting tables for users, schema definitions, vocabularies, relations, media, audit logs, snapshots, and authority sources [@initial-migration].
 
 ## Record Tables And JSONB
 

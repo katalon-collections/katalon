@@ -34,7 +34,7 @@ sources:
 
 # Batch Editing
 
-The Admin UI lets curators select many records and apply a single operation to all of them. Selection can be explicit (checkboxes on the current page) or implicit ("all records matching the current search/filter across pages"). The backend handles small batches synchronously and large batches (>100 records) asynchronously via Celery.
+The Admin UI lets curators select many records and apply a single operation to all of them. Selection can be explicit (checkboxes on the current page) or implicit ("all records matching the current search/filter across pages") [@frontend-list] [@frontend-modal]. The backend handles small batches synchronously and large batches (>100 records) asynchronously via Celery [@backend-router] [@backend-worker].
 
 ## When to Use
 
@@ -47,11 +47,11 @@ Use this workflow when the same change must be applied to many records without o
 
 ## Selecting Records
 
-In any record list screen the leftmost checkbox selects a single record. The header checkbox selects all records on the current page. When at least one record on the page is selected and the total result set is larger than one page, the bulk bar offers **"Alle N Datensätze dieser Suche auswählen"** to switch to filter-based selection. The filter set is captured from the current list view: status tab, search query, subtype filter, and procedure-specific filters (`due_before`, `reference_number`).
+In any record list screen the leftmost checkbox selects a single record. The header checkbox selects all records on the current page. When at least one record on the page is selected and the total result set is larger than one page, the bulk bar offers **"Alle N Datensätze dieser Suche auswählen"** to switch to filter-based selection [@frontend-list]. The filter set is captured from the current list view: status tab, search query, subtype filter, and procedure-specific filters (`due_before`, `reference_number`) [@backend-service].
 
 ## Supported Operations
 
-The modal supports one operation per request:
+The modal supports one operation per request [@frontend-modal] [@backend-schemas]:
 
 | Operation | What it does |
 |---|---|
@@ -62,21 +62,21 @@ The modal supports one operation per request:
 | Relation hinzufügen | Creates a relation from every selected record to one target record. |
 | Relation entfernen | Deletes a matching relation from every selected record to one target record. |
 
-Group fields, PID fields, and authority fields are excluded from the field dropdown because their semantics are not safe to edit blindly.
+Group fields, PID fields, and authority fields are excluded from the field dropdown because their semantics are not safe to edit blindly [@frontend-modal].
 
 ## Warning and Safety
 
-A warning is shown when more than 50 records are selected. The user must confirm before the operation runs. There is **no automatic rollback** and **no automatic snapshot** before a batch operation. Every successful change is written to the audit log with `batch_job_id` so an administrator can trace what changed. Manual snapshots can be created before a batch operation if a restore point is needed.
+A warning is shown when more than 50 records are selected. The user must confirm before the operation runs [@frontend-modal]. There is **no automatic rollback** and **no automatic snapshot** before a batch operation [@decision] [@docs]. Every successful change is written to the audit log with `batch_job_id` so an administrator can trace what changed [@backend-service]. Manual snapshots can be created before a batch operation if a restore point is needed [@docs].
 
 ## Async Path
 
-If the resolved record count exceeds 100, the endpoint returns a `task_id` and hands the work to Celery. The modal shows the task ID; polling is not implemented yet, so users refresh the list to see results.
+If the resolved record count exceeds 100, the endpoint returns a `task_id` and hands the work to Celery [@backend-router] [@backend-worker]. The modal shows the task ID; polling is not implemented yet, so users refresh the list to see results [@frontend-modal].
 
 ## Backend Flow
 
-1. `POST /v1/batch/{record_type}` receives `operation` plus either `ids` or `filters`.
-2. `resolve_record_ids` turns `filters` into a UUID list using the same filters as the list endpoint.
-3. For each record, `apply_batch` runs a nested transaction:
+1. `POST /v1/batch/{record_type}` receives `operation` plus either `ids` or `filters` [@backend-router].
+2. `resolve_record_ids` turns `filters` into a UUID list using the same filters as the list endpoint [@backend-service].
+3. For each record, `apply_batch` runs a nested transaction [@backend-service]:
    - Load the record.
    - Apply status, field, or relation operation.
    - Validate metadata.
@@ -93,4 +93,4 @@ If the resolved record count exceeds 100, the endpoint returns a `task_id` and h
 - Pydantic models: `backend/src/katalon/core/schemas.py` (`BatchRequest`, `BatchOperation`, `BatchResponse`)
 - Frontend modal: `frontend/admin/src/components/screens/BatchEditModal.tsx`
 - Frontend list/selection: `frontend/admin/src/components/screens/ScreenList.tsx`
-- API client wrappers: `frontend/admin/src/api/client.ts` (`objects.batch`, `entities.batch`, etc.)
+- API client wrappers: `frontend/admin/src/api/client.ts` (`objects.batch`, `entities.batch`, etc.) [@frontend-client]
