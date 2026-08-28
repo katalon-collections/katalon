@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-08-28
+
+### Fixed
+- Integrationstest `test_bulk_reindex_and_reindex_all_skip_soft_deleted` verband sich mit echtem Redis (Hostname `redis`, nur im Docker-Netz auflösbar) statt den Reindex-Lock zu mocken; schlug lokal außerhalb von Docker fehl. Fake-Redis-Client (analog zu `tests/test_index_tasks.py`) ergänzt.
+
 ## [1.5.0] - 2026-08-28
 
 ### Added

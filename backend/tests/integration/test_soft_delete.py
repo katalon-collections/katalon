@@ -1,9 +1,25 @@
 import asyncio
+import threading
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+
+
+class _FakeRedis:
+    """Stand-in for redis.from_url in bulk_reindex_type_task's lock — no broker
+    is available in the integration test environment (see tests/test_index_tasks.py
+    for the same fake used at the unit-test level)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+
+    def lock(self, _name, **_kwargs):
+        return self._lock
+
+    def close(self) -> None:
+        return None
 
 
 @pytest.mark.asyncio
@@ -243,6 +259,7 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(async_client, auth
         return len(records)
 
     monkeypatch.setattr("katalon.integrations.elasticsearch.reindex_type", _fake_reindex_type)
+    monkeypatch.setattr("redis.from_url", lambda *_args, **_kwargs: _FakeRedis())
     report = await asyncio.to_thread(index_tasks.bulk_reindex_type_task, "object")
     assert object_id not in indexed
     assert report["status"] == "ok"
