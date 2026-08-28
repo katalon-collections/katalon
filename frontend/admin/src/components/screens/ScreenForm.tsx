@@ -9,6 +9,7 @@ import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../..
 import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box } from '../ui/Icons'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
+import { RichTextEditor } from '../ui/RichTextEditor'
 import { MediaLightbox } from '../MediaLightbox'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, TT.MM.JJJJ, -JJJJ (v. Chr.), "ca./um" oder "(unsicher)", oder Zeitraum ("… bis …", "vor …", "nach …")'
@@ -2842,9 +2843,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           disabled={justCreated}
                           style={getFeedbackStyle(f.name)} />
                       ) : f.field_type === 'richtext' ? (
-                        <textarea className="fld" rows={4}
+                        <RichTextEditor
                           value={(val as string) ?? ''}
-                          onChange={e => { setField(f.name, e.target.value); clearFieldFeedback(f.name) }}
+                          onChange={v => { setField(f.name, v); clearFieldFeedback(f.name) }}
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
                           style={getFeedbackStyle(f.name)} />

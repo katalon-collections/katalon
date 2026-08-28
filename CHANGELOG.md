@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-28
+
+### Added
+- WYSIWYG-Editor (Tiptap) für `richtext`-Felder in Objekten, Entitäten, Orten, Occurrences und Vorgängen. Toolbar: Fett, Kursiv, Überschriften, Listen, Links. Speichert weiterhin Markdown-Strings, damit das Portal-Rendering (`marked` + `DOMPurify`) unverändert bleibt.
+
 ## [1.4.1] - 2026-08-27
 
 ### Removed

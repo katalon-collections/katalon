@@ -51,6 +51,18 @@ sources:
   - id: changelog
     type: file
     path: CHANGELOG.md
+  - id: translatable-input
+    type: file
+    path: frontend/admin/src/components/ui/TranslatableInput.tsx
+  - id: portal-detail-layout
+    type: file
+    path: frontend/portal/src/components/DetailPageLayout.tsx
+  - id: rich-text-editor
+    type: file
+    path: frontend/admin/src/components/ui/RichTextEditor.tsx
+  - id: batch-edit-modal
+    type: file
+    path: frontend/admin/src/components/screens/BatchEditModal.tsx
 ---
 
 Schema-driven record forms are the admin workflow that turns Katalon's configurable metadata model into editable screens. One `ScreenForm` component handles objects, entities, places, occurrences, and procedures by selecting the correct API module, loading the record and field definitions, rendering inputs from `field_type`, validating the local draft, then saving a payload that combines record scalars with `metadata_` [@screen-form] [@admin-client]. The backend repeats the same contract for each record type: prepare metadata through schema rules, validate required fields unless the status is `draft`, synchronize schema relation fields, log the change, and update the search index [@objects-api] [@entities-api] [@procedures-api].
@@ -66,6 +78,8 @@ The list screen chooses an API module from `recordType`, loads records with pagi
 Field definitions control both default values and rendered controls. The form applies `settings.default_value` on new records, reloads subtype-specific definitions when a new record's subtype changes, and renders specialized controls for vocabularies, free vocabulary text, authority links, schema relation fields, groups, PID fields, booleans, numbers, dates, and text [@screen-form].
 
 Repeatable fields are represented as arrays in local state, while group fields are arrays of child-field objects [@screen-form]. Vocabulary and relation fields call their own lookup endpoints through the admin API client; relation-field inputs use search results and relation-type vocabularies when configured [@screen-form] [@admin-client].
+
+`richtext` is a distinct `field_type` with a WYSIWYG editor: both translated richtext fields (via `TranslatableInput`) and non-translated richtext fields (via `ScreenForm`) render the shared `RichTextEditor` component, a Tiptap instance (`StarterKit` + `Link`) with a minimal toolbar (bold, italic, H2/H3, bullet/ordered list, link) [@screen-form] [@translatable-input] [@rich-text-editor]. The editor reads and writes Markdown strings through the `tiptap-markdown` extension, preserving the storage format the public portal already expects: portal rendering is unchanged — it still parses saved strings with `marked.parse` and sanitizes the generated HTML with `DOMPurify.sanitize` before rendering [@portal-detail-layout]. Batch editing (`BatchEditModal`) still edits richtext fields as plain single-line text, since bulk value-setting has no WYSIWYG need [@batch-edit-modal].
 
 The component also handles object media after a record has an id. It loads existing media, uploads a selected or dropped file, patches rights and media type data, marks a primary image, deletes media, and polls until pending uploads finish processing [@screen-form] [@admin-client].
 

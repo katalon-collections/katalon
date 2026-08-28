@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { X } from './Icons'
+import { RichTextEditor } from './RichTextEditor'
 
 interface TranslatableInputProps {
   languages: string[]
@@ -46,7 +47,7 @@ export function TranslatableInput({
   const field = (lang: string) => {
     const ph = labels?.[lang] ?? placeholder
     return richtext ? (
-      <textarea className="fld" rows={3} value={value[lang] ?? ''} onChange={e => onChange(lang, e.target.value)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} />
+      <RichTextEditor value={value[lang] ?? ''} onChange={v => onChange(lang, v)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} />
     ) : (
       <input className="fld" value={value[lang] ?? ''} onChange={e => onChange(lang, e.target.value)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} />
     )
