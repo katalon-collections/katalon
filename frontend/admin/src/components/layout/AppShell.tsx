@@ -14,6 +14,7 @@ import { ScreenUsers } from '../screens/ScreenUsers'
 import { ScreenUserRoles } from '../screens/ScreenUserRoles'
 import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
+import { ScreenExport } from '../screens/ScreenExport'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { ScreenFormVariants } from '../screens/ScreenFormVariants'
@@ -43,6 +44,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
   pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
   'oai-sets':         [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'OAI-PMH Sets' }],
+  export:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Export' }],
   import:             [{ label: 'Katalon' }, { label: 'Importer' }],
   audit:              [{ label: 'Katalon' }, { label: 'Audit-Log' }],
   users:              [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer' }],
@@ -175,6 +177,7 @@ export function AppShell() {
       case 'vocab':             return isAdmin ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
       case 'pages':             return isAdmin ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
+      case 'export':            return isAdmin ? <ScreenExport /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} />
       case 'audit':             return <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} />
       case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />

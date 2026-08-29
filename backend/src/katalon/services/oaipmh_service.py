@@ -6,10 +6,10 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
 
-from katalon.services.metadata_mapping_service import MappingIndex, extract_values
+from katalon.integrations.metadata_format import MetadataFormat
+from katalon.services.metadata_mapping_service import MappingIndex
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
-DC_NS = "http://purl.org/dc/elements/1.1/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 SCHEMA_LOC = (
     "http://www.openarchives.org/OAI/2.0/ "
@@ -66,35 +66,18 @@ def _datestamp(ts: str | None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Dublin Core mapping from ES hit
+# Format-agnostic record rendering (delegates to the metadata_format_service registry)
 # ---------------------------------------------------------------------------
-
-def _append_dc_value(dc: ET.Element, target_path: str, value: str) -> None:
-    if not target_path.startswith("dc:") or not value:
-        return
-    ET.SubElement(dc, target_path).text = value
-
-
-def _append_mapped_dc_values(
-    dc: ET.Element,
-    src: dict[str, Any],
-    mappings: dict[str, list[str]],
-) -> None:
-    for field_name, target_paths in mappings.items():
-        for value in extract_values(src, field_name):
-            for target_path in target_paths:
-                _append_dc_value(dc, target_path, value)
-
 
 def _hit_to_oai_record(
     hit: dict[str, Any],
     set_spec: str | None,
+    metadata_format: MetadataFormat,
     mapping_index: MappingIndex | None = None,
 ) -> ET.Element:
     src = hit["_source"]
     record_id = hit["_id"]
     record_type = src.get("record_type", "")
-    md: dict[str, Any] = src.get("metadata", {})
     record_mappings = (mapping_index or {}).get(record_type, {})
 
     oai_rec = ET.Element("record")
@@ -105,68 +88,7 @@ def _hit_to_oai_record(
         ET.SubElement(header, "setSpec").text = set_spec
 
     metadata_el = ET.SubElement(oai_rec, "metadata")
-    dc = ET.SubElement(metadata_el, "oai_dc:dc", {
-        "xmlns:oai_dc": "http://www.openarchives.org/OAI/2.0/oai_dc/",
-        "xmlns:dc": DC_NS,
-        "xmlns:xsi": XSI_NS,
-        "xsi:schemaLocation": (
-            "http://www.openarchives.org/OAI/2.0/oai_dc/ "
-            "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
-        ),
-    })
-
-    if record_mappings:
-        _append_mapped_dc_values(dc, src, record_mappings)
-    else:
-        title = src.get("title") or record_id
-        ET.SubElement(dc, "dc:title").text = str(title)
-
-        for creator_key in ("creator", "photographer", "author", "artist", "illustrator"):
-            if val := md.get(creator_key):
-                if isinstance(val, list):
-                    for item in val:
-                        text = item.get("value", "") if isinstance(item, dict) else str(item)
-                        if text:
-                            ET.SubElement(dc, "dc:creator").text = text
-                else:
-                    ET.SubElement(dc, "dc:creator").text = str(val)
-                break
-
-        if desc := md.get("description"):
-            text = str(desc)
-            if isinstance(desc, list):
-                text = desc[0].get("value", "") if isinstance(desc[0], dict) else str(desc[0])
-            ET.SubElement(dc, "dc:description").text = text
-
-        keywords = md.get("keywords", [])
-        if isinstance(keywords, list):
-            for kw in keywords:
-                if kw:
-                    ET.SubElement(dc, "dc:subject").text = str(kw)
-        elif keywords:
-            ET.SubElement(dc, "dc:subject").text = str(keywords)
-
-        date_val = (src.get("created_at") or "")[:10]
-        if date_val:
-            ET.SubElement(dc, "dc:date").text = date_val
-
-    if not record_mappings or "dc:type" not in {
-        target_path for targets in record_mappings.values() for target_path in targets
-    }:
-        ET.SubElement(dc, "dc:type").text = record_type
-    ET.SubElement(dc, "dc:identifier").text = f"oai:katalon:{record_type}:{record_id}"
-
-    if idno := src.get("idno") or md.get("idno"):
-        ET.SubElement(dc, "dc:identifier").text = str(idno)
-
-    if not record_mappings and (lang := md.get("language")):
-        ET.SubElement(dc, "dc:language").text = str(lang)
-
-    if not record_mappings:
-        for rights_key in ("rights", "license", "licence"):
-            if val := md.get(rights_key):
-                ET.SubElement(dc, "dc:rights").text = str(val)
-                break
+    metadata_el.append(metadata_format.render(hit, record_mappings))
 
     return oai_rec
 
@@ -203,15 +125,18 @@ def identify(base_url: str, repo_name: str, admin_email: str, earliest: str) -> 
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
-def list_metadata_formats(base_url: str) -> str:
+def list_metadata_formats(base_url: str, formats: list[MetadataFormat]) -> str:
     root = _root()
     req = ET.SubElement(root, "request", verb="ListMetadataFormats")
     req.text = base_url
     lmf = ET.SubElement(root, "ListMetadataFormats")
-    fmt = ET.SubElement(lmf, "metadataFormat")
-    ET.SubElement(fmt, "metadataPrefix").text = "oai_dc"
-    ET.SubElement(fmt, "schema").text = "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
-    ET.SubElement(fmt, "metadataNamespace").text = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+    if not formats:
+        return _error(root, "noMetadataFormats", "No metadata formats are mapped yet.")
+    for metadata_format in formats:
+        fmt = ET.SubElement(lmf, "metadataFormat")
+        ET.SubElement(fmt, "metadataPrefix").text = metadata_format.key
+        ET.SubElement(fmt, "schema").text = metadata_format.schema_url
+        ET.SubElement(fmt, "metadataNamespace").text = metadata_format.namespace
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
@@ -238,6 +163,7 @@ def list_records(
     until: str | None,
     prefix: str,
     base_url: str,
+    metadata_format: MetadataFormat,
     mapping_index: MappingIndex | None = None,
 ) -> str:
     root = _root()
@@ -256,7 +182,7 @@ def list_records(
 
     lr = ET.SubElement(root, "ListRecords")
     for hit in hits:
-        lr.append(_hit_to_oai_record(hit, set_spec, mapping_index))
+        lr.append(_hit_to_oai_record(hit, set_spec, metadata_format, mapping_index))
 
     next_offset = offset + len(hits)
     if next_offset < total:
@@ -313,6 +239,7 @@ def get_record(
     base_url: str,
     identifier: str,
     prefix: str,
+    metadata_format: MetadataFormat,
     mapping_index: MappingIndex | None = None,
 ) -> str:
     root = _root()
@@ -320,7 +247,7 @@ def get_record(
                         identifier=identifier)
     req.text = base_url
     gr = ET.SubElement(root, "GetRecord")
-    gr.append(_hit_to_oai_record(hit, None, mapping_index))
+    gr.append(_hit_to_oai_record(hit, None, metadata_format, mapping_index))
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 

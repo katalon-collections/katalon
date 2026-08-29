@@ -1,7 +1,10 @@
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
 
+from katalon.integrations.oai_dc_format import OaiDcFormat
 from katalon.services import oaipmh_service
+
+OAI_DC = OaiDcFormat()
 
 
 def test_identify_contains_repository_name() -> None:
@@ -43,10 +46,23 @@ def _mock_hit() -> dict:
     }
 
 
-def test_get_record_contains_dc_title() -> None:
+def test_get_record_requires_mapping_no_title_without_it() -> None:
+    # Format-agnostic rendering: without an explicit mapping, no content fields are guessed.
     hit = _mock_hit()
-    xml = oaipmh_service.get_record(hit, "http://test/oai", "oai:katalon:object:550e8400", "oai_dc")
-    assert "Test Foto" in xml
+    xml = oaipmh_service.get_record(
+        hit, "http://test/oai", "oai:katalon:object:550e8400", "oai_dc", OAI_DC
+    )
+    assert "Test Foto" not in xml
+    assert "<dc:type>object</dc:type>" in xml
+
+
+def test_get_record_contains_dc_title_when_mapped() -> None:
+    hit = _mock_hit()
+    mapping_index = {"object": {"title": ["dc:title"]}}
+    xml = oaipmh_service.get_record(
+        hit, "http://test/oai", "oai:katalon:object:550e8400", "oai_dc", OAI_DC, mapping_index
+    )
+    assert "<dc:title>Test Foto</dc:title>" in xml
 
 
 def test_get_record_uses_configured_dc_mapping() -> None:
@@ -67,6 +83,7 @@ def test_get_record_uses_configured_dc_mapping() -> None:
         "http://test/oai",
         "oai:katalon:object:550e8400",
         "oai_dc",
+        OAI_DC,
         mapping_index,
     )
 
@@ -86,6 +103,7 @@ def test_get_record_repeatable_mapping_emits_multiple_dc_elements() -> None:
         "http://test/oai",
         "oai:katalon:object:550e8400",
         "oai_dc",
+        OAI_DC,
         mapping_index,
     )
 
@@ -94,7 +112,7 @@ def test_get_record_repeatable_mapping_emits_multiple_dc_elements() -> None:
 
 
 def test_list_records_empty_returns_noRecordsMatch() -> None:
-    xml = oaipmh_service.list_records([], 0, 0, None, None, None, "oai_dc", "http://test/oai")
+    xml = oaipmh_service.list_records([], 0, 0, None, None, None, "oai_dc", "http://test/oai", OAI_DC)
     assert "noRecordsMatch" in xml
 
 
@@ -134,7 +152,7 @@ def test_list_records_with_resumption_token() -> None:
     hit = _mock_hit()
     xml = oaipmh_service.list_records(
         [hit], total=200, offset=0, set_spec=None,
-        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai", metadata_format=OAI_DC
     )
     assert "resumptionToken" in xml
     assert 'completeListSize="200"' in xml
@@ -152,7 +170,7 @@ def test_list_records_last_page_empty_token() -> None:
     hit = _mock_hit()
     xml = oaipmh_service.list_records(
         [hit], total=1, offset=0, set_spec=None,
-        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+        from_=None, until=None, prefix="oai_dc", base_url="http://test/oai", metadata_format=OAI_DC
     )
     # Last page: resumptionToken element present but empty (no text)
     assert "resumptionToken" in xml
@@ -182,7 +200,7 @@ def test_list_records_resumption_token_roundtrip_across_pages() -> None:
         page_hits = all_hits[offset : offset + page_size]
         xml = oaipmh_service.list_records(
             page_hits, total=total, offset=offset, set_spec=None,
-            from_=None, until=None, prefix="oai_dc", base_url="http://test/oai"
+            from_=None, until=None, prefix="oai_dc", base_url="http://test/oai", metadata_format=OAI_DC
         )
         root = ET.fromstring(xml.split("\n", 1)[-1] if xml.startswith("<?") else xml)
         seen_ids.extend(

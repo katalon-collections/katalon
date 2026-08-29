@@ -24,6 +24,7 @@ from katalon.api.v1 import (
     batch,
     dnb_urn_mock,
     entities,
+    export,
     feedback,
     form_variants,
     idno,
@@ -449,6 +450,7 @@ app.include_router(authority.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(pids.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(importer.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(metadata_mappings.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(export.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(feedback.router, prefix="/v1", dependencies=_authenticated)

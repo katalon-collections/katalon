@@ -10,31 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from katalon.core.models import FieldDefinition, MetadataMapping
 
 OAI_DC_FORMAT = "oai_dc"
-OAI_DC_TARGETS = {
-    "dc:title",
-    "dc:creator",
-    "dc:subject",
-    "dc:description",
-    "dc:publisher",
-    "dc:contributor",
-    "dc:date",
-    "dc:type",
-    "dc:format",
-    "dc:identifier",
-    "dc:source",
-    "dc:language",
-    "dc:relation",
-    "dc:coverage",
-    "dc:rights",
-}
 
 MappingIndex = dict[str, dict[str, list[str]]]
 
 
-def validate_mapping_target(format_key: str, target_path: str) -> None:
-    if format_key == OAI_DC_FORMAT and target_path not in OAI_DC_TARGETS:
-        allowed = ", ".join(sorted(OAI_DC_TARGETS))
-        raise ValueError(f"Ungültiges OAI-DC-Ziel '{target_path}'. Erlaubt: {allowed}")
+async def validate_mapping_target(format_key: str, target_path: str) -> None:
+    from katalon.services import metadata_format_service
+
+    fmt = await metadata_format_service.get_format(format_key)
+    if fmt is None:
+        raise ValueError(f"Unbekanntes Export-Format '{format_key}'.")
+    if target_path not in fmt.targets:
+        allowed = ", ".join(sorted(fmt.targets))
+        raise ValueError(f"Ungültiges {fmt.label}-Ziel '{target_path}'. Erlaubt: {allowed}")
 
 
 async def get_mappings(
@@ -50,6 +38,37 @@ async def get_mappings(
         q = q.where(MetadataMapping.field_definition_id == field_definition_id)
     result = await db.execute(q.order_by(MetadataMapping.format_key, MetadataMapping.sort_order))
     return list(result.scalars().all())
+
+
+async def mapped_format_keys(db: AsyncSession) -> set[str]:
+    """format_keys that have at least one enabled mapping — the only ones OAI-PMH may disseminate."""
+    result = await db.execute(
+        select(MetadataMapping.format_key)
+        .join(FieldDefinition, MetadataMapping.field_definition_id == FieldDefinition.id)
+        .where(
+            MetadataMapping.is_enabled.is_(True),
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
+        )
+        .distinct()
+    )
+    return set(result.scalars().all())
+
+
+async def mapped_record_types(db: AsyncSession, format_key: str) -> set[str]:
+    """Record types that have at least one field mapped to format_key — the only types worth rendering."""
+    result = await db.execute(
+        select(FieldDefinition.target_type)
+        .join(MetadataMapping, MetadataMapping.field_definition_id == FieldDefinition.id)
+        .where(
+            MetadataMapping.format_key == format_key,
+            MetadataMapping.is_enabled.is_(True),
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
+        )
+        .distinct()
+    )
+    return set(result.scalars().all())
 
 
 async def get_mapping_index(db: AsyncSession, format_key: str) -> MappingIndex:

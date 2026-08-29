@@ -497,6 +497,20 @@ class AuthoritySource(Base):
 
 
 # ---------------------------------------------------------------------------
+# Metadata export formats (OAI-DC, LIDO, METS/MODS, ... plugin registry)
+# ---------------------------------------------------------------------------
+
+
+class MetadataFormat(Base):
+    __tablename__ = "metadata_formats"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(256))
+    adapter_class: Mapped[str] = mapped_column(String(256))
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+
+
+# ---------------------------------------------------------------------------
 # Static pages (FAQ, Impressum, etc.)
 # ---------------------------------------------------------------------------
 

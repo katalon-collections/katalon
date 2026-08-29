@@ -3,11 +3,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import FieldDefinition, MetadataMapping
 from katalon.core.schemas import MetadataMappingCreate, MetadataMappingRead, MetadataMappingUpsert
+from katalon.services import metadata_format_service
 from katalon.services.metadata_mapping_service import get_mappings, validate_mapping_target
 
 router = APIRouter(prefix="/metadata-mappings", tags=["metadata-mappings"])
@@ -19,6 +21,22 @@ def _require_admin(current_user: CurrentUser) -> None:
             status_code=403,
             detail="Nur Admins können Metadaten-Mappings verwalten.",
         )
+
+
+class FormatOut(BaseModel):
+    key: str
+    label: str
+    targets: list[str]
+
+
+@router.get(
+    "/formats",
+    response_model=list[FormatOut],
+    summary="List registered export formats and their mappable targets",
+)
+async def list_formats() -> list[FormatOut]:
+    formats = await metadata_format_service.list_formats()
+    return [FormatOut(key=f.key, label=f.label, targets=sorted(f.targets)) for f in formats]
 
 
 @router.get(
@@ -56,7 +74,7 @@ async def create_metadata_mapping(
 ) -> MetadataMapping:
     _require_admin(current_user)
     try:
-        validate_mapping_target(data.format_key, data.target_path)
+        await validate_mapping_target(data.format_key, data.target_path)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -113,7 +131,7 @@ async def set_field_format_mapping(
 
     target_path = data.target_path.strip()
     try:
-        validate_mapping_target(format_key, target_path)
+        await validate_mapping_target(format_key, target_path)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -345,11 +345,18 @@ export const schema = {
     }),
 }
 
+export interface MetadataFormatInfo {
+  key: string
+  label: string
+  targets: string[]
+}
+
 export const metadataMappings = {
   list: (params?: { format_key?: string; field_definition_id?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v).map(([k, v]) => [k, String(v)])).toString()
     return req<MetadataMapping[]>(`/v1/metadata-mappings${qs ? `?${qs}` : ''}`)
   },
+  listFormats: () => req<MetadataFormatInfo[]>('/v1/metadata-mappings/formats'),
   setFieldFormat: (fieldId: string, formatKey: string, data: { target_path: string | null; settings?: Record<string, unknown>; sort_order?: number; is_enabled?: boolean }) =>
     req<MetadataMapping | null>(`/v1/metadata-mappings/field/${fieldId}/${encodeURIComponent(formatKey)}`, {
       method: 'PUT',
@@ -360,6 +367,29 @@ export const metadataMappings = {
         is_enabled: data.is_enabled ?? true,
       }),
     }),
+}
+
+export interface ExportFormatInfo {
+  key: string
+  label: string
+  kind: 'flat' | 'xml'
+}
+
+export const exportApi = {
+  listFormats: (recordType: string) => req<ExportFormatInfo[]>(`/v1/export/formats?record_type=${encodeURIComponent(recordType)}`),
+  download: async (recordType: string, format: string, subtype?: string): Promise<void> => {
+    const qs = new URLSearchParams({ format, ...(subtype ? { subtype } : {}) }).toString()
+    const res = await authorizedFetch(`/v1/export/${recordType}?${qs}`)
+    if (!res.ok) throw new Error(`Export fehlgeschlagen (${res.status}).`)
+    const blob = await res.blob()
+    const ext = format === 'csv' ? 'csv' : format === 'json' ? 'json' : `${format}.xml`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${recordType}.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
 }
 
 // Vocabularies

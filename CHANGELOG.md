@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-29
+
+### Added
+- Neuer Export-Bereich im Admin (Sidebar „Export"): CSV-/JSON-Datendumps je Bestandstyp herunterladen, optional nach Subtyp gefiltert.
+- Metadaten-Export-Formate sind jetzt ein Plugin-Register (`metadata_formats`, analog zu Authority-Quellen) statt hartcodiert: OAI-DC, LIDO und METS/MODS sind ab Werk verfügbar; weitere Formate (z. B. DataCite, MARC21XML) lassen sich per DB-Eintrag + eigener Adapterklasse ergänzen oder ein eingebautes Format überschreiben, ohne Core-Code zu ändern.
+- Format-Mapping-Verwaltung aus dem Schema-Editor herausgelöst: neue Tabellenansicht (Felder × Formate) im Export-Bereich statt Konfiguration pro Feld einzeln.
+
+### Changed
+- OAI-PMH bietet ein Metadatenformat nur noch an (und liefert es nur noch aus), wenn dafür tatsächlich mindestens ein Feld gemappt ist — auch für OAI-DC. Der bisherige Rate-Fallback (Titel/Urheber/Beschreibung aus generischen Feldnamen erraten, wenn kein Mapping existiert) entfällt; Bestände ohne konfiguriertes Mapping liefern bis zur Pflege eines Mappings keinen OAI-DC-Output mehr.
+
 ## [1.5.3] - 2026-08-28
 
 ### Added

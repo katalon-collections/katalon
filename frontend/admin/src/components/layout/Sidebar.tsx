@@ -1,7 +1,7 @@
 import pkg from '../../../package.json'
 import { getTokenUser } from '../../api/client'
 import { FeedbackButton } from '../feedback/FeedbackButton'
-import { Bell, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
+import { Bell, Download, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 
 type Route = string
 
@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { id: 'pages',     label: 'Statische Seiten', Icon: File,  roles: ['admin', 'superuser'] },
   { id: 'oai-sets',  label: 'OAI-PMH Sets',    Icon: Globe, roles: ['admin', 'superuser'] },
   { id: 'banners',   label: 'Banner',           Icon: Bell,  roles: ['admin', 'superuser'] },
+  { id: 'export',    label: 'Export',           Icon: Download, roles: ['admin', 'superuser'] },
   { g: 'Verwaltung', roles: ['admin', 'superuser'] },
   { id: 'users',  label: 'Benutzer',       Icon: Users,   roles: ['admin', 'superuser'] },
   { id: 'settings', label: 'Einstellungen', Icon: Gear, roles: ['admin', 'superuser'] },

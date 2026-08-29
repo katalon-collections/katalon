@@ -12,8 +12,12 @@ from katalon.config import settings
 from katalon.core.dependencies import DBDep
 from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
-from katalon.services import oaipmh_service
-from katalon.services.metadata_mapping_service import OAI_DC_FORMAT, get_mapping_index
+from katalon.services import metadata_format_service, oaipmh_service
+from katalon.services.metadata_mapping_service import (
+    get_mapping_index,
+    mapped_format_keys,
+    mapped_record_types,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +26,20 @@ router = APIRouter(prefix="/oai", tags=["oai-pmh"])
 PAGE_SIZE = 100
 
 
+async def _available_formats(db: DBDep) -> dict[str, Any]:
+    """Formats that are both registered and actually mapped to at least one field."""
+    mapped_keys = await mapped_format_keys(db)
+    formats = await metadata_format_service.list_formats()
+    return {fmt.key: fmt for fmt in formats if fmt.key in mapped_keys}
+
+
 async def _es_search_for_oai(
     set_def: OAISet | None,
     from_param: str | None,
     until_param: str | None,
     offset: int,
     identifier: str | None = None,
+    record_types: set[str] | None = None,
 ) -> dict[str, Any]:
     """Run an Elasticsearch query for OAI-PMH harvesting."""
     from katalon.integrations.elasticsearch import INDEX_NAME, get_es
@@ -47,6 +59,9 @@ async def _es_search_for_oai(
 
     # Always restrict OAI-PMH to public records
     filters.append({"term": {"status": "public"}})
+
+    if record_types:
+        filters.append({"terms": {"record_type": sorted(record_types)}})
 
     if set_def:
         if set_def.filter_record_type:
@@ -107,7 +122,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
         # --- ListMetadataFormats ---
         elif verb == "ListMetadataFormats":
-            xml = oaipmh_service.list_metadata_formats(base_url)
+            available = await _available_formats(db)
+            xml = oaipmh_service.list_metadata_formats(base_url, list(available.values()))
 
         # --- ListSets ---
         elif verb == "ListSets":
@@ -117,7 +133,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
         # --- ListRecords ---
         elif verb == "ListRecords":
-            prefix = params.get("metadataPrefix", "oai_dc")
+            available = await _available_formats(db)
+            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
 
             token_str = params.get("resumptionToken")
             if token_str:
@@ -128,17 +145,17 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 until = token["until"]
                 prefix = token["prefix"]
             else:
-                if prefix != "oai_dc":
-                    root = oaipmh_service._root()
-                    msg = f"Unsupported prefix: {prefix}"
-                    xml = oaipmh_service._error(
-                        root, "cannotDisseminateFormat", msg
-                    )
-                    return Response(content=xml, media_type="application/xml")
                 offset = 0
                 set_spec = params.get("set")
                 from_ = params.get("from")
                 until = params.get("until")
+
+            if prefix not in available:
+                root = oaipmh_service._root()
+                xml = oaipmh_service._error(
+                    root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}"
+                )
+                return Response(content=xml, media_type="application/xml")
 
             set_def: OAISet | None = None
             if set_spec:
@@ -153,18 +170,20 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                     )
                     return Response(content=xml, media_type="application/xml")
 
-            es_result = await _es_search_for_oai(set_def, from_, until, offset)
+            record_types = await mapped_record_types(db, prefix)
+            es_result = await _es_search_for_oai(set_def, from_, until, offset, record_types=record_types)
 
             hits = es_result.get("hits", {}).get("hits", [])
             total = es_result.get("hits", {}).get("total", {}).get("value", 0)
-            mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
+            mapping_index = await get_mapping_index(db, prefix)
             xml = oaipmh_service.list_records(
-                hits, total, offset, set_spec, from_, until, prefix, base_url, mapping_index
+                hits, total, offset, set_spec, from_, until, prefix, base_url, available[prefix], mapping_index
             )
 
         # --- ListIdentifiers ---
         elif verb == "ListIdentifiers":
-            prefix = params.get("metadataPrefix", "oai_dc")
+            available = await _available_formats(db)
+            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
 
             token_str = params.get("resumptionToken")
             if token_str:
@@ -175,17 +194,17 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 until = token["until"]
                 prefix = token["prefix"]
             else:
-                if prefix != "oai_dc":
-                    root = oaipmh_service._root()
-                    msg = f"Unsupported prefix: {prefix}"
-                    xml = oaipmh_service._error(
-                        root, "cannotDisseminateFormat", msg
-                    )
-                    return Response(content=xml, media_type="application/xml")
                 offset = 0
                 set_spec = params.get("set")
                 from_ = params.get("from")
                 until = params.get("until")
+
+            if prefix not in available:
+                root = oaipmh_service._root()
+                xml = oaipmh_service._error(
+                    root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}"
+                )
+                return Response(content=xml, media_type="application/xml")
 
             set_def = None
             if set_spec:
@@ -200,7 +219,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                     )
                     return Response(content=xml, media_type="application/xml")
 
-            es_result = await _es_search_for_oai(set_def, from_, until, offset)
+            record_types = await mapped_record_types(db, prefix)
+            es_result = await _es_search_for_oai(set_def, from_, until, offset, record_types=record_types)
 
             hits = es_result.get("hits", {}).get("hits", [])
             total = es_result.get("hits", {}).get("total", {}).get("value", 0)
@@ -219,8 +239,9 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 return Response(content=xml, media_type="application/xml")
 
             identifier = params.get("identifier", "")
-            prefix = params.get("metadataPrefix", "oai_dc")
-            if prefix != "oai_dc":
+            available = await _available_formats(db)
+            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            if prefix not in available:
                 root = oaipmh_service._root()
                 msg = f"Unsupported prefix: {prefix}"
                 xml = oaipmh_service._error(
@@ -238,13 +259,13 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             es_result = await _es_search_for_oai(None, None, None, 0, identifier=record_id)
 
             hits = es_result.get("hits", {}).get("hits", [])
-            if not hits:
+            if not hits or hits[0]["_source"].get("record_type") not in await mapped_record_types(db, prefix):
                 root = oaipmh_service._root()
                 xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
             else:
-                mapping_index = await get_mapping_index(db, OAI_DC_FORMAT)
+                mapping_index = await get_mapping_index(db, prefix)
                 xml = oaipmh_service.get_record(
-                    hits[0], base_url, identifier, prefix, mapping_index
+                    hits[0], base_url, identifier, prefix, available[prefix], mapping_index
                 )
 
         else:
