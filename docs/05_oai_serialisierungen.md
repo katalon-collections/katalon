@@ -2,13 +2,16 @@
 
 ## Architektur: wie das aktuell funktioniert
 
-Der OAI-PMH-Stack besteht aus drei Schichten:
+Der Export-Stack besteht aus fuenf Schichten:
 
 | Datei | Verantwortung |
 |---|---|
-| `backend/src/katalon/api/v1/oai.py` | HTTP-Handler, verb-Dispatch, ES-Query |
-| `backend/src/katalon/services/oaipmh_service.py` | XML-Serialisierung (DC-Mapping, verb-Responses) |
-| `backend/src/katalon/services/metadata_mapping_service.py` | Formatneutrale Export-Mappings aus der DB lesen |
+| `backend/src/katalon/api/v1/oai.py` | HTTP-Handler, verb-Dispatch, ES-Query, Format-Gating |
+| `backend/src/katalon/api/v1/export.py` | Daten-Dumps (CSV/JSON/XML) fuer den Admin-Export-Bereich |
+| `backend/src/katalon/services/oaipmh_service.py` | OAI-PMH-Umschlag (Header, Resumption-Token, Fehler) |
+| `backend/src/katalon/integrations/*_format.py` | Format-Plugins (`MetadataFormat`-Subklassen): rendern einen Treffer zu XML |
+| `backend/src/katalon/services/metadata_format_service.py` | Registry: laedt Builtins + DB-Overrides/Custom-Adapter |
+| `backend/src/katalon/services/metadata_mapping_service.py` | Formatneutrale Feld-zu-Zielpfad-Mappings aus der DB lesen |
 
 Ein Treffer aus Elasticsearch hat diese Struktur (vereinfacht):
 
@@ -21,178 +24,92 @@ Ein Treffer aus Elasticsearch hat diese Struktur (vereinfacht):
     "status": "public",
     "idno": "INV-1234",
     "metadata": { "photographer": "Mayer", "keywords": ["Reise"] },
-    "updated_at": "2026-05-01T12:00:00",
-    "related_entities": ["Max Mustermann"],
-    "related_places": ["Marrakesch"]
+    "updated_at": "2026-05-01T12:00:00"
   }
 }
 ```
 
- Das aktuelle Format `oai_dc` nutzt die generische Export-Mapping-Schicht aus `metadata_mappings`. Wenn Mappings fuer einen Record-Typ vorhanden sind, werden sie exportiert. Ohne Mappings bleibt ein konservativer Fallback aktiv.
+Ein Format wird nur ausgeliefert, wenn fuer den angefragten Record-Typ mindestens ein Feld darauf gemappt ist (siehe [10_export_mappings.md](./10_export_mappings.md)). Es gibt keinen Rate-Fallback mehr fuer ungemappte Formate/Typen.
 
-Die generische Architektur ist in [10_export_mappings.md](./10_export_mappings.md) beschrieben.
+## Neues Format hinzufügen — Schritt für Schritt
 
-## Neue Serialisierung hinzufügen — Schritt für Schritt
+### Schritt 1: Plugin-Klasse schreiben
 
-### Schritt 1: Serializer in `oaipmh_service.py`
-
-Füge eine neue Funktion analog zu `_hit_to_oai_record()` hinzu:
+Neue Datei unter `backend/src/katalon/integrations/`, z. B. `marc21xml_format.py`:
 
 ```python
-MODS_NS = "http://www.loc.gov/mods/v3"
+from __future__ import annotations
+import xml.etree.ElementTree as ET
+from typing import Any
 
-def _hit_to_mods(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
-    src = hit["_source"]
-    record_id = hit["_id"]
-    md: dict = src.get("metadata", {})
+from katalon.integrations.metadata_format import MetadataFormat, append_path
+from katalon.services.metadata_mapping_service import extract_values
 
-    oai_rec = ET.Element("record")
-    header = ET.SubElement(oai_rec, "header")
-    ET.SubElement(header, "identifier").text = f"oai:katalon:{src.get('record_type')}:{record_id}"
-    ET.SubElement(header, "datestamp").text = _datestamp(src.get("updated_at"))
-    if set_spec:
-        ET.SubElement(header, "setSpec").text = set_spec
+class Marc21XmlFormat(MetadataFormat):
+    key = "marc21xml"
+    label = "MARC21XML"
+    targets = {
+        "marc:datafield[245]/marc:subfield[a]",  # Titel
+        "marc:datafield[100]/marc:subfield[a]",  # Hauptverfasser
+    }
+    schema_url = "https://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd"
+    namespace = "http://www.loc.gov/MARC21/slim"
 
-    metadata_el = ET.SubElement(oai_rec, "metadata")
-    mods = ET.SubElement(metadata_el, "mods", {
-        "xmlns": MODS_NS,
-        "version": "3.7",
-    })
-    title_info = ET.SubElement(mods, "titleInfo")
-    ET.SubElement(title_info, "title").text = str(src.get("title") or record_id)
-
-    # ... weiteres Mapping
-
-    return oai_rec
+    def render(self, hit: dict[str, Any], mappings: dict[str, list[str]]) -> ET.Element:
+        root = ET.Element("record", {"xmlns": self.namespace})
+        for field_name, target_paths in mappings.items():
+            for value in extract_values(hit["_source"], field_name):
+                for target_path in target_paths:
+                    if target_path in self.targets:
+                        append_path(root, target_path, value)
+        return root
 ```
 
-### Schritt 2: Format registrieren
+`append_path()` aus `metadata_format.py` baut die verschachtelte Elementkette aus einem `/`-getrennten `target_path` — wiederverwendbar fuer jedes hierarchische XML-Format, nicht nur MODS/LIDO.
 
-Wenn ein neues Format angeboten werden soll, muss es in `ListMetadataFormats` erscheinen und im Handler akzeptiert werden. Die aktuelle Implementierung prueft den Prefix noch direkt im Handler. Fuer neue Formate empfiehlt sich, die Prefix-Validierung und die Serializer-Auswahl zusammenzufassen.
+### Schritt 2: In der Registry bekannt machen
 
-```python
-# Typ: MetadataPrefix → Callable(hit, set_spec) → ET.Element
-RECORD_SERIALIZERS: dict[str, Callable[[dict, str | None], ET.Element]] = {
-    "oai_dc": _hit_to_oai_record,
-    "mods":   _hit_to_mods,
-    # "lido": _hit_to_lido,
-}
+Keine Aenderung an `metadata_format_service.py` noetig — nur eine Zeile in `metadata_formats`:
+
+```sql
+INSERT INTO metadata_formats (id, label, adapter_class, config)
+VALUES ('marc21xml', 'MARC21XML', 'katalon.integrations.marc21xml_format.Marc21XmlFormat', '{}');
 ```
 
-Dann in `list_records`, `list_identifiers`, `get_record`:
+`_load_registry()` erkennt den neuen Key, importiert `adapter_class` dynamisch (`importlib`) und instanziiert sie. Ist der Key bereits ein Builtin (`oai_dc`/`lido`/`mets_mods`), wird stattdessen `config` per `setattr` auf die bestehende Instanz gepatcht (z. B. um `targets` zu erweitern), ohne die Klasse zu ersetzen.
 
-```python
-serializer = RECORD_SERIALIZERS.get(prefix)
-if serializer is None:
-    return _error(root, "cannotDisseminateFormat", f"Unsupported prefix: {prefix}")
-# ...
-for hit in hits:
-    lr.append(serializer(hit, set_spec))
-```
+**Cache-Hinweis:** Die Registry wird pro Prozess einmal geladen (`_cache`). Nach einem `INSERT`/`UPDATE` auf `metadata_formats` muss der `api`-Container neu gestartet werden, damit die Aenderung wirkt — es gibt aktuell keinen Endpoint, der `metadata_format_service.invalidate_cache()` analog zu `authority_service.invalidate_cache()` (siehe `authority.py`) triggert.
 
-### Schritt 3: Format in `ListMetadataFormats` registrieren
+### Schritt 3: Feld-Mappings pflegen
 
-```python
-METADATA_FORMATS = [
-    {
-        "prefix": "oai_dc",
-        "schema": "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
-        "namespace": "http://www.openarchives.org/OAI/2.0/oai_dc/",
-    },
-    {
-        "prefix": "mods",
-        "schema": "http://www.loc.gov/standards/mods/v3/mods-3-7.xsd",
-        "namespace": "http://www.loc.gov/mods/v3",
-    },
-]
+Im Admin-Export-Bereich (Tab „Format-Mapping") erscheint das neue Format automatisch als Spalte (`GET /v1/metadata-mappings/formats` liest die Registry). Zielpfade fuer die Dropdown-Optionen kommen aus `targets` der Klasse.
 
-def list_metadata_formats(base_url: str) -> str:
-    root = _root()
-    req = ET.SubElement(root, "request", verb="ListMetadataFormats")
-    req.text = base_url
-    lmf = ET.SubElement(root, "ListMetadataFormats")
-    for fmt in METADATA_FORMATS:
-        fmt_el = ET.SubElement(lmf, "metadataFormat")
-        ET.SubElement(fmt_el, "metadataPrefix").text = fmt["prefix"]
-        ET.SubElement(fmt_el, "schema").text = fmt["schema"]
-        ET.SubElement(fmt_el, "metadataNamespace").text = fmt["namespace"]
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
-```
+### Schritt 4: Nichts weiter
 
-### Schritt 4: Prefix-Validierung in `oai.py` vereinheitlichen
-
-Wenn mehr als ein Format aktiv ist, sollte die Prefix-Validierung zentral erfolgen. Das verhindert, dass `ListRecords`, `ListIdentifiers` und `GetRecord` auseinanderlaufen.
+`oai.py`, `oaipmh_service.py` und `export.py` brauchen keine Aenderung — Prefix-Validierung, `ListMetadataFormats`, ES-Typ-Filterung und Dump-Rendering laufen generisch ueber die Registry und `mapped_record_types()`/`mapped_format_keys()`.
 
 ---
 
-## Aufwandsabschätzung: LIDO
+## Aufwandsabschätzung: LIDO-Vollausbau
 
-**LIDO** (Lightweight Information Describing Objects) ist der GLAM-Standard für Objektmetadaten, verwendet von Museen, Archiven und Aggregatoren (Europeana, Deutsche Digitale Bibliothek).
+Der aktuelle `LidoFormat` deckt eine pragmatische Teilmenge ab (Titel, Objekttyp, Beschreibung, ein Ereignisdatum, ein Akteur, Rechte). Fuer einen vollstaendigeren LIDO-Export bleiben bekannte Luecken:
 
-### Was gut passt (aus dem ES-Dokument direkt ableitbar)
-
-| LIDO-Element | Quelle im ES-Dokument | Aufwand |
-|---|---|---|
-| `lido:lidoRecID` | `_id` + `record_type` | trivial |
-| `lido:titleSet/appellationValue` | `title` | trivial |
-| `lido:repositorySet` (Inventarnr.) | `idno` | trivial |
-| `lido:recordWrap/recordID` | `_id` | trivial |
-| `lido:recordWrap/recordType` | `record_type` | trivial |
-| `lido:recordMetadataDate` | `updated_at` | trivial |
-| `lido:subjectSet` (Schlagwörter) | `metadata.keywords` | gering |
-| `lido:rightsWorkSet` | `metadata.rights/license` | gering |
-| `lido:resourceSet` (IIIF-Link) | Cantaloupe-URL aus Config | mittel |
-
-### Was Aufwand macht
-
-**Ereignis-Struktur (`lido:eventSet`):**
-LIDO beschreibt Herstellung, Erwerb, Verwendung als verschachtelte Events mit Akteuren und Orten. Unser ES-Dokument hat `related_entities` nur als flache String-Liste (Namen), keine Rollen. Ein minimales Mapping (nur "Production"-Event mit Creator) ist machbar, aber ein korrektes Mapping mit Rollen (`lido:roleActor`) bräuchte die Relations-Tabelle — und die ist bei der OAI-Abfrage nicht verfügbar (nur ES-Daten).
+**Ereignis-Struktur mit Rollen (`lido:roleActor`):**
+Das ES-Dokument liefert Akteure nur als flache Werte aus dem gemappten Feld, keine Rollen (Fotograf vs. Auftraggeber vs. Vorbesitzer). Ein korrektes Rollen-Mapping braucht einen Zugriff auf die `relations`-Tabelle, die im OAI-/Export-Lesepfad (nur ES) nicht verfuegbar ist.
 
 **`lido:objectWorkType`:**
-LIDO erwartet kontrollierten Vokabular-Eintrag (SKOS, AAT). Unser `record_type` (`object`/`entity`/`place`) ist zu grob; der echte Objekttyp liegt im Vokabular-Feld des Schemas. Mapping ohne Vokabular-Lookup ist nur annähernd korrekt.
+LIDO erwartet einen kontrollierten Vokabular-Eintrag (SKOS/AAT). Der grobe `record_type` (`object`/`entity`/`place`) reicht dafuer nicht; der eigentliche Objekttyp liegt im Vokabular-Feld des Schemas und muss explizit dorthin gemappt werden.
 
-**Nur für Objects sinnvoll:**
-LIDO ist auf materielle Objekte ausgelegt. Entities, Places und Occurrences lassen sich nicht sauber auf LIDO mappen. Der LIDO-Serializer würde also `record_type != "object"` überspringen oder minimale Felder liefern.
+**Nur fuer Objects sinnvoll:**
+LIDO ist auf materielle Objekte ausgelegt. Fuer Entities/Places/Occurrences liefert `mapped_record_types()` ohnehin nur Typen mit tatsaechlichem Mapping — ein Museum mappt LIDO typischerweise nur fuer `object`.
 
-### Aufwand-Einschätzung
-
-| Variante | Aufwand | Ergebnis |
-|---|---|---|
-| Minimales LIDO (Titel, ID, Rechte, Typ) | 3–4 h | Valides XML, aber dünn |
-| LIDO mit eventSet (Creator), resourceSet (IIIF) | 1–1,5 Tage | Praxistauglich für DDB/Europeana |
-| LIDO mit Rollen aus Relations-Tabelle | +0,5 Tage | Erfordert zusätzliche DB-Abfrage im OAI-Handler |
-
-Für eine Europeana-Einspielung wäre Variante 2 der Mindeststandard.
-
-### Was dafür zu tun wäre (konkret)
-
-1. `_hit_to_lido(hit, set_spec) -> ET.Element` in `oaipmh_service.py`
-2. LIDO-Namespace-Deklarationen (`http://www.lido-schema.org`)
-3. `RECORD_SERIALIZERS["lido"] = _hit_to_lido` eintragen
-4. `METADATA_FORMATS` um LIDO erweitern
-5. Testen gegen den [LIDO-Validator](https://validator.lido-schema.org/)
-
----
-
-## Könnte die Admin-Oberfläche das steuern?
-
-**Was bereits sinnvoll umgesetzt ist:** Das Mapping selbst wird pro Feld im Schema-Editor konfiguriert, nicht im OAI-Handler.
-
-**Was spaeter ergaenzt werden kann:** Aktivieren/Deaktivieren einzelner Formate je Installation. Beispiel: eine Instanz liefert nur `oai_dc`, eine andere zusaetzlich `lido`.
-
-**Mogliche naechste Ausbaustufe:**
-- Neue Tabelle `oai_metadata_formats (prefix VARCHAR PK, is_enabled BOOLEAN)` mit Seed-Daten fuer alle verfuegbaren Formate
-- `list_metadata_formats` liest nur aktivierte Formate aus der DB
-- `cannotDisseminateFormat`-Check prueft zusaetzlich gegen aktivierte Formate
-- Admin-UI: Toggle-Liste in den OAI-Einstellungen
-
-Das ist ~0,5 Tage Backend + ~0,5 Tage Frontend, setzt aber die Registry-Umstrukturierung (Schritte 1–4 oben) voraus.
+Aufwand fuer Rollen-Ereignisse: zusaetzliche DB-Abfrage im Export-/OAI-Handler, kein reiner Renderer-Umbau.
 
 ---
 
 ## Warum `/oai` statt `/v1/oai`?
 
-OAI-PMH ist ein Protokoll-Endpunkt, kein versionierter REST-Endpoint. Darum hängt Katalon den OAI-Router direkt unter `/oai` ein.
+OAI-PMH ist ein Protokoll-Endpunkt, kein versionierter REST-Endpoint. Darum haengt Katalon den OAI-Router direkt unter `/oai` ein.
 
 Harvester sollten immer die kurze URL verwenden:
 
@@ -200,4 +117,4 @@ Harvester sollten immer die kurze URL verwenden:
 https://example.org/oai
 ```
 
-Die übrige REST API bleibt unter `/v1`.
+Die uebrige REST API bleibt unter `/v1`, Daten-Dumps liegen unter `/v1/export`.

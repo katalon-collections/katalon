@@ -20,3 +20,4 @@
 * [Medienzuordnung aus dem Metadatenimport](medienzuordnung-aus-metadatenimport.md) - nutzergewählter Datei-Selector, offene Referenzen je Objekt und automatische Auflösung im Batch-Import
 * [Management-CLI-Ergonomie](management-cli-ergonomics.md) - Repo-Root als uv-Workspace, source-relative `.env`, lesbarer Secrets-Fehler ohne Stacktrace
 * [Massenbearbeitung](batch-editing.md) - Batch-Operationen auf Record-Listen mit seitenübergreifender Auswahl, Audit-Log-Transparenz, ohne Rollback/Snapshots
+* [Export-Format-Plugin-Registry](metadata-format-plugin-registry.md) - metadata_formats-Tabelle analog authority_sources, OAI/Export liefern Format nur bei tatsächlichem Mapping, Heuristik-Fallback entfernt

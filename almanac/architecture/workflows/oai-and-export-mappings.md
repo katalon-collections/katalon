@@ -1,17 +1,29 @@
 ---
 title: "OAI And Export Mappings"
-summary: "Katalon's OAI-PMH endpoint exposes public Elasticsearch records as `oai_dc` XML using configurable metadata mappings with a conservative fallback."
+summary: "Katalon disseminates records via OAI-PMH and a direct Export area using a pluggable metadata-format registry; a format is offered only once fields are mapped to it."
 topics: [architecture, workflows, oai-pmh, export, metadata, elasticsearch]
 sources:
   - id: oai-api
     type: file
     path: backend/src/katalon/api/v1/oai.py
+  - id: export-api
+    type: file
+    path: backend/src/katalon/api/v1/export.py
   - id: oai-sets-api
     type: file
     path: backend/src/katalon/api/v1/oai_sets.py
   - id: oaipmh-service
     type: file
     path: backend/src/katalon/services/oaipmh_service.py
+  - id: export-service
+    type: file
+    path: backend/src/katalon/services/export_service.py
+  - id: format-service
+    type: file
+    path: backend/src/katalon/services/metadata_format_service.py
+  - id: format-abc
+    type: file
+    path: backend/src/katalon/integrations/metadata_format.py
   - id: mapping-service
     type: file
     path: backend/src/katalon/services/metadata_mapping_service.py
@@ -21,44 +33,42 @@ sources:
   - id: mapping-doc
     type: file
     path: docs/10_export_mappings.md
-  - id: schema-screen
+  - id: export-screen
     type: file
-    path: frontend/admin/src/components/screens/ScreenSchema.tsx
+    path: frontend/admin/src/components/screens/ScreenExport.tsx
   - id: issue-268
     type: web
     url: https://github.com/karkraeg/Katalon/issues/268
 ---
 
-Katalon's OAI-PMH workflow exposes public indexed records at `/oai` and currently disseminates the `oai_dc` metadata format. Fields marked internal (`is_public = false`) are excluded from the index and cannot be included in OAI mappings. The HTTP handler dispatches OAI verbs, queries Elasticsearch with public-record filters, loads optional OAI set definitions, and passes hits to XML serializers [@oai-api]. Export mappings connect `field_definitions` to Dublin Core target paths, so an installation can map schema fields to `dc:title`, `dc:creator`, and other OAI-DC elements without changing the OAI handler [@mapping-service] [@mapping-doc]. The endpoint uses Elasticsearch as its read model, so [Search And Indexing](search-and-indexing) is part of the export path.
+Katalon exposes records two ways: the OAI-PMH protocol endpoint at `/oai` for harvesters, and a direct Export area in the admin UI for CSV/JSON dumps and one-off XML downloads [@oai-api] [@export-api]. Both read paths share the same building blocks: a field-to-target-path mapping (`metadata_mappings`) and a pluggable metadata-format registry (`metadata_formats`) that decides which XML shape a mapped field lands in [@mapping-service] [@format-service]. Fields marked internal (`is_public = false`) are excluded from the index and cannot be mapped.
 
-## Endpoint And Verb Dispatch
+## Format Registry (Plugin Pattern)
 
-The OAI router is mounted at `/oai`, not under the versioned REST API path, because OAI-PMH is a protocol endpoint rather than a normal `/v1` resource [@oai-doc]. `oai_endpoint()` handles `Identify`, `ListMetadataFormats`, `ListSets`, `ListRecords`, `ListIdentifiers`, `GetRecord`, and bad verbs [@oai-api]. Elasticsearch connection failures return HTTP 503 with `Retry-After: 60` instead of malformed XML from a partial export path [@oai-api].
+`metadata_format_service` mirrors `authority_service`'s adapter pattern: a `_BUILTIN` dict holds always-available `MetadataFormat` instances (`OaiDcFormat`, `LidoFormat`, `MetsModsFormat`), and rows in `metadata_formats` either patch config onto a builtin instance (same `id`) or dynamically import a custom `adapter_class` (new `id`) [@format-service] [@format-abc]. There is no `is_enabled` toggle — presence of a row is the override signal, and per-format visibility is driven by whether any field is actually mapped to it, not by an admin switch. The registry cache is process-lifetime; there is currently no endpoint that calls `invalidate_cache()` after a `metadata_formats` write (unlike `authority.py`'s `PATCH` handler for authority sources), so adding or overriding a format needs an `api` container restart to take effect.
 
-`Identify` uses the portal site title as repository name when available and falls back to `Katalon`; admin email comes from OAI or default admin settings [@oai-api]. `ListMetadataFormats` currently advertises only `oai_dc`, and the handler rejects other prefixes with `cannotDisseminateFormat` in `ListRecords`, `ListIdentifiers`, and `GetRecord` [@oai-api] [@oaipmh-service].
+Each `MetadataFormat` declares `targets` (the valid `target_path` values for mapping validation and the admin mapping-table dropdown), `schema_url`/`namespace` (for OAI's `ListMetadataFormats`), and a `render(hit, mappings)` method that builds one XML element from an Elasticsearch hit plus that record type's mappings [@format-abc]. `metadata_mapping_service.validate_mapping_target()` looks up `targets` from the registry instead of a hardcoded set, so validation is format-agnostic [@mapping-service].
 
-## Elasticsearch Read Model
+## OAI-PMH: Endpoint And Format Gating
 
-`_es_search_for_oai()` always filters list-style OAI queries to `status = public` [@oai-api]. `GetRecord` fetches one Elasticsearch document by ID and returns it only when the stored source has public status [@oai-api]. Date filters become an `updated_at` range, and list responses sort by `updated_at` and `_doc` with page size 100 [@oai-api].
+`oai_endpoint()` handles `Identify`, `ListMetadataFormats`, `ListSets`, `ListRecords`, `ListIdentifiers`, `GetRecord`, and bad verbs [@oai-api]. `_available_formats()` intersects the registry's formats with `mapped_format_keys()` (format keys that have at least one enabled, non-deleted, public field mapping) — that intersection is what `ListMetadataFormats` advertises and what every other verb validates `metadataPrefix` against [@oai-api] [@mapping-service]. There is no default-to-`oai_dc` fallback for unmapped record types anymore: `_es_search_for_oai()` additionally restricts `ListRecords`/`ListIdentifiers` to `mapped_record_types(prefix)`, and `GetRecord` rejects a hit whose `record_type` isn't in that set with `idDoesNotExist` [@oai-api].
 
-OAI sets are optional filters layered onto that public Elasticsearch query. A set may filter by record type, status, metadata key/value pairs, and a free-text query over title and search text [@oai-api]. The set management API lets users list sets and lets admins or superusers create, update, and delete set definitions [@oai-sets-api].
+Elasticsearch connection failures still return HTTP 503 with `Retry-After: 60` [@oai-api]. OAI sets remain optional filters layered onto the public-only Elasticsearch query (record type, status, metadata key/value, free-text) [@oai-sets-api].
 
-## Mapping Model
+## Rendering
 
-The mapping service defines `oai_dc` as the active format key and allows only the fifteen Dublin Core element paths in `OAI_DC_TARGETS` for that format [@mapping-service]. `get_mapping_index()` joins enabled `MetadataMapping` rows to active `FieldDefinition` rows and returns a nested index by record type and field name [@mapping-service]. `extract_values()` flattens source metadata values from strings, lists, and dictionaries by preferring keys such as `value`, `label`, `term`, `name`, `title`, and `idno` [@mapping-service].
+`oaipmh_service._hit_to_oai_record()` builds the OAI envelope (header, identifier, datestamp, setSpec) and delegates the `<metadata>` payload to `metadata_format.render(hit, mappings)` — the OAI service itself has no format-specific XML logic anymore [@oaipmh-service]. `OaiDcFormat.render()` emits only mapped Dublin Core elements plus two always-structural ones (`dc:type` from `record_type`, `dc:identifier` as the OAI id) — the old heuristic fallback that guessed title/creator/description/subject/language/rights from generic field names when no mapping existed has been removed; unmapped record types simply aren't offered the format at all [@oaipmh-service].
 
-The repository documentation describes the same design intent: `metadata_mappings` is format-neutral, a field can map to multiple target paths, and `oai_dc` is the first productive consumer while later formats such as LIDO or METS/MODS are prepared conceptually [@mapping-doc]. Current code implements the generic mapping read path and OAI-DC validation, but it still advertises and accepts only `oai_dc` at the protocol layer [@oai-api] [@mapping-service].
+`LidoFormat` and `MetsModsFormat` cover a pragmatic subset of their respective schemas (title, type, description/abstract, one event date, one actor, rights for LIDO; title, name, type, origin date, abstract, access condition, identifier, language for MODS) and share a generic `append_path()` helper that turns a `/`-separated `target_path` into a nested element chain — reusable for any hierarchical XML format, not just these two [@format-abc].
 
-Container fields are not independently mapped to OAI-DC. The schema editor exposes export mapping controls for top-level fields and explicitly marks `group` fields as not directly exported; sub-field editing has no separate export mapping panel [@schema-screen].
+## Export Area (Admin UI)
 
-## XML Serialization
+`export.py` serves `/v1/export/formats` (CSV/JSON always; XML formats only if `mapped_record_types()` includes the requested type) and `/v1/export/{record_type}` (streamed download) [@export-api]. CSV/JSON dumps read directly from the Postgres tables (not Elasticsearch) via `export_service.stream_csv/json`, so they reflect canonical data including internal fields, independent of reindex staleness [@export-service]. XML dumps reuse the same Elasticsearch scroll + format-registry rendering path as OAI, via `integrations.elasticsearch.iter_hits_by_type()` (no public-status restriction, since this is an authenticated admin action) [@export-service].
 
-`oaipmh_service` builds OAI-PMH XML with `xml.etree.ElementTree`, including response date, protocol namespaces, OAI errors, resumption tokens, record headers, and metadata records [@oaipmh-service]. Resumption tokens encode offset, set, date range, and prefix as base64 JSON, and list responses include a next token when more hits remain [@oaipmh-service].
+The Format-Mapping table that used to live per-field inside the Schema editor (`ScreenSchema.tsx`'s `ExportMappingPanel`) has moved to its own tab in `ScreenExport.tsx`: one table, fields × registered formats, driven by `GET /v1/metadata-mappings/formats` [@export-screen] [@mapping-doc].
 
-When a mapping index has entries for a hit's record type, `_hit_to_oai_record()` emits mapped values to the configured Dublin Core target paths [@oaipmh-service]. Without mappings, it falls back to a conservative Dublin Core record: title, first creator-like metadata field, description, keywords as subjects, created date, record type, identifiers, language, and rights where present [@oaipmh-service]. `dc:type` and the OAI identifier are still added when mapped output does not already supply type [@oaipmh-service].
+## Adding A New Format
 
-## Consequences For Future Formats
+No changes to `oai.py`, `oaipmh_service.py`, or `export.py` are needed: write a `MetadataFormat` subclass and add one `metadata_formats` row (new `adapter_class` for a new format, or a config patch on an existing `id` to extend/override targets). Step-by-step with a worked MARC21XML example is in [@oai-doc]. This closes out the "Consequences For Future Formats" gap noted in the prior version of this page — LIDO and METS/MODS are now productive built-ins rather than conceptual placeholders.
 
-Adding another export format is not only a serializer change. The current docs call out the need to register the format in `ListMetadataFormats`, centralize prefix validation, and choose the serializer from a prefix-to-function registry before formats such as LIDO can be active [@oai-doc]. Until that registry exists, export mappings may be format-neutral in storage, but runtime OAI dissemination is intentionally limited to `oai_dc` [@oai-api] [@mapping-service].
-
-This page is about record export through OAI-PMH. Vocabulary Linked Open Data is a separate track: Katalon has REST JSON for vocabularies, but no SKOS/JSON-LD vocabulary publication surface yet [@issue-268]. The current minimal plan for that track starts with public vocabulary boundaries, dereferenceable term URLs, SKOS output, and persisted authority match URIs before any SPARQL endpoint or broad record-RDF mapping [@issue-268].
+This page is about record export through OAI-PMH and the Export area. Vocabulary Linked Open Data is a separate track: Katalon has REST JSON for vocabularies, but no SKOS/JSON-LD vocabulary publication surface yet [@issue-268].

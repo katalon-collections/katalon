@@ -2,17 +2,16 @@
 
 ## Worum es geht
 
-Katalon soll Metadaten nicht nur erfassen, sondern auch in mehrere Zielmodelle exportieren koennen. Das gilt zuerst fuer OAI-PMH, spaeter auch fuer komplexere Formate wie LIDO oder METS/MODS.
-
-Die Kernidee ist bewusst generisch:
+Katalon exportiert Metadaten nicht nur ueber OAI-PMH, sondern auch als direkte Daten-Dumps (CSV/JSON) und als XML in mehreren Formaten (OAI-DC, LIDO, METS/MODS). Die Kernidee ist bewusst generisch:
 
 - Ein Feld aus `field_definitions` kann auf mehrere Exportziele gemappt werden.
 - Ein Exportziel ist nicht direkt ein Formatname allein, sondern ein konkreter Zielpfad innerhalb eines Formats.
-- Format-spezifische Sonderlogik bleibt im Export-Serializer, das Mapping selbst bleibt datengetrieben.
+- Format-spezifische Sonderlogik bleibt im Format-Plugin, das Mapping selbst bleibt datengetrieben.
+- Ein Format wird nur ausgeliefert (Export-Screen wie OAI-PMH), wenn dafuer tatsaechlich mindestens ein Feld gemappt ist.
 
 ## Datenmodell
 
-Die zentrale Tabelle ist `metadata_mappings`:
+### `metadata_mappings` — Feld-zu-Zielpfad
 
 ```sql
 metadata_mappings (
@@ -28,102 +27,68 @@ metadata_mappings (
 )
 ```
 
-Wichtige Felder:
-
 - `field_definition_id`: welches Schemafeld exportiert wird
-- `format_key`: z. B. `oai_dc`, spaeter `lido`, `metsmods`
-- `target_path`: der konkrete Zielpfad, z. B. `dc:title`
-- `settings`: freie Zusatzdaten fuer spaetere Transformationen
+- `format_key`: z. B. `oai_dc`, `lido`, `mets_mods`
+- `target_path`: der konkrete Zielpfad, z. B. `dc:title` oder `mods:titleInfo/mods:title`
 - `is_enabled`: Mapping pro Instanz oder Feld deaktivierbar
 
 Ein Feld kann mehrere Mappings haben, auch fuer dasselbe Format, solange die Zielpfade unterschiedlich sind.
 
-## Aktuelle Formate
+### `metadata_formats` — Format-Registry (Plugin-Pattern)
 
-### `oai_dc`
+```sql
+metadata_formats (
+    id VARCHAR PRIMARY KEY,
+    label VARCHAR,
+    adapter_class VARCHAR,
+    config JSONB
+)
+```
 
-Fuer OAI-PMH ist aktuell `oai_dc` aktiv. In der UI werden die 15 Dublin-Core-Elemente angeboten:
+Analog zu `authority_sources`: eine Zeile mit dem Key eines eingebauten Formats (`oai_dc`/`lido`/`mets_mods`) patcht dessen `config` (z. B. eine erweiterte `targets`-Liste) auf die bestehende Instanz. Eine Zeile mit neuem Key laedt `adapter_class` dynamisch (`module.ClassName`) — ein neues Format braucht also keine Aenderung an Registry-Code, nur eine neue Python-Klasse plus diese eine Zeile.
 
-- `dc:title`
-- `dc:creator`
-- `dc:subject`
-- `dc:description`
-- `dc:publisher`
-- `dc:contributor`
-- `dc:date`
-- `dc:type`
-- `dc:format`
-- `dc:identifier`
-- `dc:source`
-- `dc:language`
-- `dc:relation`
-- `dc:coverage`
-- `dc:rights`
+Kein `is_enabled`: Praesenz einer Zeile bedeutet aktiv/override; Formate ganz abschalten ist kein Use-Case, den die UI aktuell braucht.
 
-Wenn fuer einen Record-Typ mindestens ein `oai_dc`-Mapping existiert, benutzt der OAI-Serializer diese Konfiguration.
-Wenn keine Mappings definiert sind, bleibt ein konservativer Fallback aktiv, damit bestehende Instanzen nicht brechen.
+**Bekannte Einschraenkung:** Die Registry cached pro Prozess (`metadata_format_service._load_registry`). Nach einem `INSERT`/`UPDATE` auf `metadata_formats` braucht es aktuell einen Neustart des `api`-Containers, damit die Aenderung greift — anders als bei Authority-Quellen gibt es noch keinen Endpoint, der `invalidate_cache()` aufruft.
 
-### `lido`
+## Formate
 
-Der Tab ist bereits als Stub angelegt. Das Format nutzt dieselbe Mapping-Infrastruktur, aber die eigentliche Serialisierung ist noch nicht implementiert.
+### `oai_dc` (`backend/src/katalon/integrations/oai_dc_format.py`)
 
-### `metsmods`
+Die 15 Dublin-Core-Elemente (`dc:title` … `dc:rights`). `dc:type` und `dc:identifier` werden immer strukturell ergaenzt (Record-Typ bzw. OAI-Identifier), unabhaengig vom Mapping — das ist keine Ratelogik, sondern abgeleitete Struktur.
 
-Auch dieser Tab ist nur vorbereitet. Ziel ist, spaeter ein weiteres Exportprofil ohne neues UI-Konzept an dieselbe Mapping-Tabelle anzuhangen.
+Es gibt **keinen** Fallback mehr fuer ungemappte Felder. Ohne mindestens ein Mapping fuer einen Record-Typ wird `oai_dc` fuer diesen Typ weder in `ListMetadataFormats` angeboten noch ueber `GetRecord`/`ListRecords` ausgeliefert.
+
+### `lido` (`backend/src/katalon/integrations/lido_format.py`)
+
+Pragmatische Teilmenge von LIDO 1.1 (Titel, Objekttyp, Beschreibung, Ereignisdatum, Akteur, Rechte). Produktiv, kein Stub mehr.
+
+### `mets_mods` (`backend/src/katalon/integrations/mets_mods_format.py`)
+
+Pragmatische Teilmenge von MODS 3.x (Titel, Name, Typ, Entstehungsdatum, Abstract, Zugriffsbedingung, Identifier, Sprache). Produktiv, kein Stub mehr.
+
+### Weitere Formate
+
+Siehe [05_oai_serialisierungen.md](./05_oai_serialisierungen.md) fuer die Schritt-fuer-Schritt-Anleitung (neue Klasse + `metadata_formats`-Zeile).
 
 ## UI-Verhalten
 
-Die Mapping-Konfiguration sitzt im Admin im Schema-Editor direkt an der Felddefinition.
+Die Mapping-Konfiguration sitzt **nicht** mehr im Schema-Editor, sondern im eigenen Export-Bereich (`frontend/admin/src/components/screens/ScreenExport.tsx`, Tab „Format-Mapping"): eine Tabelle Felder × Formate statt einer Konfiguration pro Feld einzeln. Der Export-Bereich hat zusaetzlich einen Tab „Dumps" fuer CSV-/JSON-Downloads je Bestandstyp, unabhaengig vom Format-Mapping.
 
-Warum dort:
-
-- Das Mapping ist Teil der fachlichen Bedeutung eines Feldes.
-- Admins arbeiten dort schon mit Label, Feldtyp, Wiederholbarkeit und Sichtbarkeit.
-- Ein Extra-Screen wuerde dieselbe Feldliste erneut duplizieren.
-
-Aktuelles Verhalten:
-
-- Neue Felder muessen zuerst gespeichert werden.
-- Gruppenfelder werden nicht direkt exportiert, nur ihre Subfelder.
-- Pro Feld gibt es eine einfache Select-Logik fuer das aktive Format.
-- `oai_dc` ist produktiv, die anderen Tabs zeigen nur den Platzhalter fuer spaetere Erweiterungen.
+Container-/Gruppenfelder werden weiterhin nicht direkt gemappt, nur ihre Subfelder.
 
 ## Serverseitige Verarbeitung
 
-Der Export laeuft in zwei Schritten:
+1. `metadata_format_service.get_format(format_key)` laedt das Plugin (Builtin oder DB-Override/Custom).
+2. `metadata_mapping_service.get_mapping_index()` laedt die aktiven Feld-Mappings fuer den Format-Schluessel.
+3. `MetadataFormat.render(hit, mappings)` baut daraus das Ziel-XML-Element.
 
-1. Der API-Handler laedt die aktiven Mappings fuer den angefragten Format-Schluessel.
-2. Der Serializer baut daraus das Ziel-XML.
-
-Das ist wichtig:
-
-- Mapping und XML-Struktur sind getrennt.
-- Ein neues Format braucht nicht sofort eine neue UI.
-- Ein neues Format braucht in erster Linie einen Serializer und ggf. neue Zielpfade.
+Mapping, Plugin-Auswahl und XML-Struktur sind sauber getrennt: ein neues Format braucht eine neue Klasse plus eine DB-Zeile, keine Aenderung an `oaipmh_service.py`, `oai.py` oder `export.py`.
 
 ## Werttransformation
 
-Die erste Version arbeitet mit direkter Durchleitung:
+- String-Werte werden als Text exportiert.
+- Wiederholbare Felder erzeugen mehrere Ziel-Elemente.
+- Dictionaries werden ueber ihren `value`- oder `label`-Inhalt aufgeloest (`metadata_mapping_service.extract_values`/`_flatten_value`).
 
-- String-Werte werden als Text exportiert
-- Wiederholbare Felder erzeugen mehrere Ziel-Elemente
-- Dictionaries werden ueber ihren `value`- oder `label`-Inhalt aufgeloest
-
-`settings` ist absichtlich frei gehalten, damit spaetere Formate Transformationen wie Rollenfilter, Sprachfilter oder Template-Ausdruecke aufnehmen koennen, ohne die Tabelle zu wechseln.
-
-## Designprinzipien
-
-- Die Tabelle ist formatneutral.
-- Das UI ist formatneutral.
-- Das OAI-DC-Format ist nur der erste produktive Consumer.
-- Spaetere Formate sollen dieselbe Infrastruktur nutzen koennen, nicht eine zweite Sonderloesung.
-
-## Praktische Konsequenz
-
-Wenn spaeter ein Museum LIDO aktivieren will, soll das moeglich sein, ohne das Schema-UI neu zu bauen. Dann kommt nur hinzu:
-
-- ein neuer `format_key`
-- ein Serializer
-- ggf. ein neuer Satz an Zielpfaden und Validierungen
-
-Die existierende Mapping-Tabelle und die Feld-UI bleiben gleich.
+`settings` auf `metadata_mappings` ist weiterhin frei gehalten fuer spaetere Transformationen (Rollenfilter, Sprachfilter), wird aktuell aber von keinem Format ausgewertet.
