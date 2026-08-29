@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy import and_, exists, or_, select
 
 from katalon.api.v1 import (
@@ -38,6 +38,7 @@ from katalon.core.models import (
 )
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services import search_service
+from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 
 router = APIRouter(tags=["portal"])
 _PUBLIC_TYPES = ("object", "entity", "place", "occurrence")
@@ -153,10 +154,23 @@ class PortalFieldDefinitionRead(BaseModel):
     name: str
     label: dict[str, Any]
     field_type: str
+    is_repeatable: bool
+    is_searchable: bool
+    parent_id: uuid.UUID | None
     settings: dict[str, Any]
     show_in_detail: bool
     detail_slot: str
     detail_role: str
+
+
+class AdvancedSearchRequest(BaseModel):
+    query: AdvancedQuery
+    q: str | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+    facet_fields: list[str] = Field(default_factory=list, max_length=100)
+    metadata_filters: dict[str, list[str]] = Field(default_factory=dict)
+    relation_filters: dict[str, str] = Field(default_factory=dict)
 
 
 class PortalVocabularyRead(BaseModel):
@@ -346,6 +360,41 @@ async def search(
         rel_filters=rel_filters or None,
         active_objects_only=True,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
+    )
+    return SearchResponse(**result)
+
+
+@router.post("/search/advanced", response_model=SearchResponse)
+@limiter.limit("100/minute")
+async def advanced_search(
+    request: Request,
+    data: AdvancedSearchRequest,
+    db: DBDep,
+) -> SearchResponse:
+    try:
+        advanced_filter = await resolve_query(db, data.query)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    allowed_relation_filters = {
+        key: value
+        for key, value in data.relation_filters.items()
+        if key in {"related_entities", "related_places", "related_occurrences"} and value
+    }
+    portal_config = (
+        await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+    ).scalar_one_or_none()
+    result = await search_service.search(
+        query=data.q,
+        record_type=data.query.record_type,
+        status="public",
+        page=data.page,
+        page_size=data.page_size,
+        extra_filters=data.metadata_filters or None,
+        facet_fields=data.facet_fields or None,
+        rel_filters=allowed_relation_filters or None,
+        active_objects_only=True,
+        subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
+        advanced_filter=advanced_filter,
     )
     return SearchResponse(**result)
 

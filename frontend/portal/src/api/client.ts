@@ -13,6 +13,19 @@ async function get<T>(path: string): Promise<T> {
   return res.json()
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null) as { detail?: string } | null
+    throw new Error(payload?.detail ?? res.statusText)
+  }
+  return res.json()
+}
+
 export interface ObjectSummary {
   id: string; idno: string | null; status: string
   metadata_: Record<string, unknown>
@@ -87,6 +100,19 @@ export interface SearchResponse {
   facets: Record<string, FacetBucket[]>
 }
 
+export interface PortalFieldDefinition {
+  name: string
+  label: Record<string, string>
+  field_type: string
+  is_repeatable: boolean
+  is_searchable: boolean
+  parent_id: string | null
+  settings: Record<string, unknown>
+  show_in_detail: boolean
+  detail_slot: 'main' | 'sidebar'
+  detail_role: 'none' | 'description'
+}
+
 export interface VocabSummary { id: string; name: string; is_hierarchical: boolean }
 export interface VocabTerm { id: string; term: string; label: Record<string, string>; inverse_label: Record<string, string>; parent_id: string | null }
 
@@ -147,6 +173,7 @@ export const api = {
   },
   portal: {
     config: () => get<PortalConfig>(`${PORTAL_API}/portal/config`),
+    schema: (type: string) => get<PortalFieldDefinition[]>(`${PORTAL_API}/schema/${type}`),
   },
   pages: {
     list: () => get<StaticPageSummary[]>(`${PORTAL_API}/pages`),
@@ -165,6 +192,7 @@ export const api = {
       ).toString()
       return get<SearchResponse>(`${PORTAL_API}/search?${qs}`)
     },
+    advanced: (body: unknown) => post<SearchResponse>(`${PORTAL_API}/search/advanced`, body),
   },
 }
 

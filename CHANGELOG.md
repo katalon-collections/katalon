@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-29
+
+### Added
+- Erweiterte Portalsuche mit kombinierbaren Feldbedingungen, UND/ODER-Gruppen und bis zu zwei Relationsschritten.
+- Gemeinsame Ergebnisseite für Schnell- und erweiterte Suche; erweiterte Suchdefinitionen bleiben als teilbare URL erhalten.
+
+### Changed
+- Die Suche im Portal-Kopf durchsucht immer Objekte, Entitäten, Orte und Occurrences gemeinsam, unabhängig von der aktuellen Ergebnisseite.
+
 ## [1.6.0] - 2026-08-29
 
 ### Added
@@ -14,7 +23,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ### Changed
 - OAI-PMH bietet ein Metadatenformat nur noch an (und liefert es nur noch aus), wenn dafür tatsächlich mindestens ein Feld gemappt ist — auch für OAI-DC. Der bisherige Rate-Fallback (Titel/Urheber/Beschreibung aus generischen Feldnamen erraten, wenn kein Mapping existiert) entfällt; Bestände ohne konfiguriertes Mapping liefern bis zur Pflege eines Mappings keinen OAI-DC-Output mehr.
-
 ## [1.5.3] - 2026-08-28
 
 ### Added

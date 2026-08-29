@@ -15,6 +15,9 @@ sources:
   - id: search-service
     type: file
     path: backend/src/katalon/services/search_service.py
+  - id: advanced-search-service
+    type: file
+    path: backend/src/katalon/services/advanced_search_service.py
   - id: elasticsearch
     type: file
     path: backend/src/katalon/integrations/elasticsearch.py
@@ -40,6 +43,8 @@ Katalon's search workflow turns Objects, Entities, Places, Occurrences, and Proc
 
 Facet data is opt-in. Fields marked `is_facet` are copied into keyword-safe `facet_<field>` fields, and group fields are indexed under nested `grp_<field>` keys [@search-service]. The Elasticsearch mapping contains dynamic templates for those two prefixes, while the main `metadata` object is stored with `enabled: false`, so search and aggregations depend on explicit extracted fields rather than arbitrary JSON indexing [@elasticsearch].
 
+Public fields marked `is_searchable` also produce typed nested `adv_fields` entries. Text and selection values use text/keyword projections, numbers use doubles, booleans use booleans, and EDTF-lite dates use inclusive integer bounds. Public relation fields produce `adv_relations` entries with source field, target type, target ID, and relation type [@search-service] [@elasticsearch]. Existing indices must be rebuilt after this mapping is introduced.
+
 ## Relation Denormalization
 
 The index includes relation titles because search and portal facets need names without joining back to PostgreSQL. `_load_relation_titles()` reads relations in both directions for a record and resolves linked Entity, Place, and Occurrence titles into `related_entities`, `related_places`, and `related_occurrences` arrays [@search-service]. Elasticsearch maps those arrays as keyword fields and always aggregates them for relation facets [@elasticsearch].
@@ -49,6 +54,8 @@ Relation fields can inherit selected metadata from linked records. During docume
 ## Query Execution
 
 `search_documents()` builds a boolean Elasticsearch query. Text search uses `query_string` against boosted `title` and `search_text` fields, appends a trailing wildcard for simple user text, and rejects leading wildcards through Elasticsearch settings [@elasticsearch]. Filters cover record type, status, metadata facet values sent as `meta_` filters, relation facet values, and active-only object visibility for anonymous callers [@elasticsearch].
+
+Advanced search validates every requested field against the current public searchable schema. Direct conditions query `adv_fields`. Relation conditions are resolved from the innermost target outwards: each target search returns public record IDs, then the parent condition filters `adv_relations` by source field and target ID. The public builder permits two relation steps and limits each intermediate ID set to 10,000; broader intermediate results return a validation error instead of issuing an unbounded terms query [@advanced-search-service] [@elasticsearch]. This keeps relation traversal query-time and avoids cascading multi-hop denormalization.
 
 Every search response includes default aggregations for type, status, and the three relation title arrays. Requested configured facets add `meta_<field>` aggregations over the matching `facet_<field>` keyword fields [@elasticsearch]. `search_service.search()` converts raw Elasticsearch hits into API items and aggregation buckets for [Portal Search And Facets](portal-search-and-facets) [@search-service].
 

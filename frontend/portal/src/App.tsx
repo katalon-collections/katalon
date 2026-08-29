@@ -6,6 +6,7 @@ import { loadAndApplyTheme } from './theme/loader'
 import { api, BASE, PORTAL_API, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
+import { AdvancedSearchPage } from './pages/AdvancedSearchPage'
 import { ObjectDetailPage } from './pages/ObjectDetailPage'
 import { EntityDetailPage } from './pages/EntityDetailPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
@@ -52,9 +53,6 @@ function Header() {
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
-  // Preserve type scope from current search page
-  const currentType = new URLSearchParams(location.search).get('type') ?? ''
-
   // Debounced autocomplete
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -65,7 +63,6 @@ function Header() {
     setLoadingSuggestions(true)
     const timer = setTimeout(() => {
       const qs = new URLSearchParams({ q: q.trim(), page_size: '5' })
-      if (currentType) qs.set('type', currentType)
       fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`)
         .then(r => r.json())
         .then((result: { items: Array<{ id: string; record_type: string; title: string }> }) => {
@@ -76,7 +73,7 @@ function Header() {
         .finally(() => setLoadingSuggestions(false))
     }, 200)
     return () => clearTimeout(timer)
-  }, [q, currentType])
+  }, [q])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -94,7 +91,6 @@ function Header() {
     const term = q.trim()
     if (!term) return
     const qs = new URLSearchParams({ q: term })
-    if (currentType) qs.set('type', currentType)
     navigate(`/search?${qs.toString()}`)
     setShowSuggestions(false)
     inputRef.current?.blur()
@@ -126,7 +122,7 @@ function Header() {
             value={q}
             onChange={e => setQ(e.target.value)}
             onFocus={() => { if (suggestions.length) setShowSuggestions(true) }}
-            placeholder={currentType ? t('search.inType', { type: typeLabel(currentType) }) : t('search.placeholder')}
+            placeholder={t('search.placeholder')}
           />
         </form>
         {showSuggestions && (
@@ -149,6 +145,7 @@ function Header() {
           </div>
         )}
       </div>
+      <Link className="advanced-search-link" to="/advanced-search">{t('advanced.link')}</Link>
       <LanguageSwitcher />
     </header>
   )
@@ -201,6 +198,7 @@ function AppInner() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/advanced-search" element={<AdvancedSearchPage />} />
           <Route path="/objects/:id" element={<ErrorBoundary><ObjectDetailPage /></ErrorBoundary>} />
           <Route path="/entities/:id" element={<EntityDetailPage />} />
           <Route path="/places/:id" element={<PlaceDetailPage />} />

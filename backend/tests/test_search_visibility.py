@@ -9,7 +9,7 @@ from katalon.api.v1.search import trigger_reindex_type
 from katalon.core.models import Object, Occurrence, Procedure, Relation
 from katalon.integrations import elasticsearch
 from katalon.services import search_service
-from katalon.services.search_service import build_index_doc
+from katalon.services.search_service import build_index_doc, date_bounds
 
 
 @pytest.mark.asyncio
@@ -45,6 +45,61 @@ async def test_procedure_index_doc_builds() -> None:
 
     assert doc["record_type"] == "procedure"
     assert doc["title"] == "Leihvorgang"
+
+
+def test_date_bounds_cover_partial_and_open_edtf_dates() -> None:
+    assert date_bounds("1950") == (19500101, 19501231)
+    assert date_bounds("1950-02") == (19500201, 19500228)
+    assert date_bounds("1900~/1950?") == (19000101, 19501231)
+    assert date_bounds("/1950") == (None, 19501231)
+
+
+@pytest.mark.parametrize("value", ["1950-13", "1950-02-30", "1951/1950"])
+def test_date_bounds_rejects_invalid_values(value: str) -> None:
+    with pytest.raises(ValueError):
+        date_bounds(value)
+
+
+def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
+    obj = Object(
+        id=uuid.uuid4(), idno="OBJ-1", status="public", collection_status="active",
+        metadata_={
+            "title": "Ansicht von Bremen",
+            "year": 1949,
+            "photographer": {
+                "id": str(uuid.uuid4()), "label": "Ada Beispiel", "relation_type": "created_by",
+            },
+        },
+        created_at=datetime(2026, 1, 1), updated_at=datetime(2026, 1, 2),
+    )
+    fields = [
+        SimpleNamespace(
+            name="title", field_type="text", is_searchable=True, is_public=True,
+            is_facet=False, settings={},
+        ),
+        SimpleNamespace(
+            name="year", field_type="number", is_searchable=True, is_public=True,
+            is_facet=False, settings={},
+        ),
+        SimpleNamespace(
+            name="photographer", field_type="relation", is_searchable=True, is_public=True,
+            is_facet=False, settings={"target_type": "entity"},
+        ),
+    ]
+
+    doc = search_service._build_doc(
+        "object", obj, searchable_fields={"title", "year", "photographer"},
+        field_definitions=fields,
+    )
+
+    assert {"name": "title", "text_value": "Ansicht von Bremen", "keyword_value": "Ansicht von Bremen"} in doc["adv_fields"]
+    assert {"name": "year", "number_value": 1949.0} in doc["adv_fields"]
+    assert doc["adv_relations"] == [{
+        "source_field": "photographer",
+        "target_type": "entity",
+        "target_id": obj.metadata_["photographer"]["id"],
+        "relation_type": "created_by",
+    }]
 
 
 @pytest.mark.asyncio
@@ -231,6 +286,23 @@ async def test_search_documents_keeps_only_active_public_objects(monkeypatch) ->
             "minimum_should_match": 1,
         }
     } in filters
+
+
+@pytest.mark.asyncio
+async def test_intermediate_search_tracks_exact_total(monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"body": {"hits": {"total": {"value": 10001}, "hits": []}}})()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+
+    _, truncated = await elasticsearch.search_ids_by_filter("entity", {"match_all": {}}, limit=10000)
+
+    assert captured["body"]["track_total_hits"] is True
+    assert truncated is True
 
 
 @pytest.mark.asyncio

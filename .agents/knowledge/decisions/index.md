@@ -6,6 +6,7 @@
 * [Relationen-Design](relationen-design.md) - abgelöst: flexibel statt feldgebunden, gefiltert über konfigurierbares Vokabular
 * [Vokabular-Custom-Fields](vocabulary-custom-fields.md) - JSONB-Metadaten für VocabularyTerm, später vereinheitlicht mit field_definitions
 * [Inherited Fields (ES)](inherited-fields-es.md) - Denormalisierung nur im Suchindex, Reindex-Kaskade auf 1 Ebene begrenzt
+* [Erweiterte Relationssuche](advanced-relational-search.md) - typisierte Eigenfelder und begrenzte Inside-out-Auflösung über maximal zwei Relationsschritte
 * [XML-Importer-Scope](xml-importer-scope.md) - generisches Parsing, nutzer-wählbare Record-Granularität, 100 MB Limit
 * [Importer-Plugin-Architektur](importer-multi-format-architektur.md) - SourceFormat-ABC + Registry statt formatspezifischer Funktionen
 * [Docker-Customization-Strategie](docker-customization-strategy.md) - Volume Mounts + Override-Datei statt Image-Rebuilds

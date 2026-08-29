@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react'
-import { BASE, PORTAL_API } from '../api/client'
+import { BASE, PORTAL_API, type PortalFieldDefinition } from '../api/client'
 
-export interface FieldDefinition {
-  name: string
-  label: Record<string, string>
-  field_type: string
-  settings: Record<string, unknown>
-  show_in_detail: boolean
-  detail_slot: 'main' | 'sidebar'
-  detail_role: 'none' | 'description'
-}
+export type FieldDefinition = PortalFieldDefinition
 
 /**
  * Returns [fields, loading]. The detail pages fold `loading` into their own loading gate:

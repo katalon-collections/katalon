@@ -1,9 +1,49 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from uuid import UUID
 
 from katalon.integrations.elasticsearch import search_documents
+
+
+def _is_leap_year(year: int) -> bool:
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+
+
+def _date_part_bounds(value: str) -> tuple[int, int]:
+    value = value.removesuffix("~?").removesuffix("~").removesuffix("?")
+    match = re.fullmatch(r"(-?\d{4})(?:-(\d{2})(?:-(\d{2}))?)?", value)
+    if not match:
+        raise ValueError(f"Ungültiges Datum: {value}")
+    year = int(match.group(1))
+    month = int(match.group(2)) if match.group(2) else None
+    day = int(match.group(3)) if match.group(3) else None
+    if month is not None and not 1 <= month <= 12:
+        raise ValueError(f"Ungültiger Monat: {value}")
+    if day is not None and month is not None:
+        days = [31, 29 if _is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        if not 1 <= day <= days[month - 1]:
+            raise ValueError(f"Ungültiger Tag: {value}")
+        encoded = year * 10000 + month * 100 + day
+        return encoded, encoded
+    if month is not None:
+        days = [31, 29 if _is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        return year * 10000 + month * 100 + 1, year * 10000 + month * 100 + days[month - 1]
+    return year * 10000 + 101, year * 10000 + 1231
+
+
+def date_bounds(value: str) -> tuple[int | None, int | None]:
+    """Convert one EDTF-lite value into sortable inclusive bounds."""
+    if value.count("/") == 1:
+        start, end = value.split("/", 1)
+        lower = _date_part_bounds(start)[0] if start else None
+        upper = _date_part_bounds(end)[1] if end else None
+        if lower is not None and upper is not None and lower > upper:
+            raise ValueError(f"Ungültiger Datumsbereich: {value}")
+        return lower, upper
+    lower, upper = _date_part_bounds(value)
+    return lower, upper
 
 
 def _extract_title(md: dict[str, Any]) -> str:
@@ -114,6 +154,70 @@ def _normalize_for_index(val: Any) -> Any:
     return val
 
 
+def _advanced_scalar_values(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return [item for entry in value for item in _advanced_scalar_values(entry)]
+    if isinstance(value, dict):
+        if "label" in value:
+            return [value["label"]]
+        if "value" in value:
+            return [value["value"]]
+        return [item for entry in value.values() for item in _advanced_scalar_values(entry)]
+    return [] if value in (None, "") else [value]
+
+
+def _build_advanced_index(
+    metadata: dict[str, Any], field_definitions: list[Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    fields: list[dict[str, Any]] = []
+    relations: list[dict[str, str]] = []
+    for definition in field_definitions:
+        if not definition.is_public or not definition.is_searchable:
+            continue
+        raw = metadata.get(definition.name)
+        if raw in (None, "", []):
+            continue
+        if definition.field_type == "relation":
+            entries = raw if isinstance(raw, list) else [raw]
+            for entry in entries:
+                if not isinstance(entry, dict) or not entry.get("id"):
+                    continue
+                relations.append({
+                    "source_field": definition.name,
+                    "target_type": str((definition.settings or {}).get("target_type", "")),
+                    "target_id": str(entry["id"]),
+                    "relation_type": str(entry.get("relation_type", "")),
+                })
+            continue
+        for value in _advanced_scalar_values(raw):
+            item: dict[str, Any] = {"name": definition.name}
+            if definition.field_type == "number":
+                try:
+                    item["number_value"] = float(value)
+                except (TypeError, ValueError):
+                    continue
+            elif definition.field_type == "date" and isinstance(value, str):
+                try:
+                    lower, upper = date_bounds(value)
+                except ValueError:
+                    continue
+                if lower is not None:
+                    item["date_min"] = lower
+                if upper is not None:
+                    item["date_max"] = upper
+            elif definition.field_type == "boolean" and isinstance(value, bool):
+                item["bool_value"] = value
+            elif definition.field_type in {
+                "text", "richtext", "vocab", "vocab_free", "authority", "pid",
+            }:
+                item["text_value"] = str(value)
+                item["keyword_value"] = str(value)
+            else:
+                continue
+            fields.append(item)
+    return fields, relations
+
+
 def inherited_facet_name(target_type: str, field_name: str) -> str:
     """Return the portal facet key for an inherited relation field."""
     return f"inherited_{target_type}_{field_name}"
@@ -129,6 +233,7 @@ def _build_doc(
     linked_data: dict[str, list[dict[str, Any]]] | None = None,
     inherited_facets: dict[str, list[str]] | None = None,
     metadata: dict[str, Any] | None = None,
+    field_definitions: list[Any] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict[str, Any] = _clean_metadata(
@@ -186,6 +291,12 @@ def _build_doc(
         doc.update(linked_data)
     if inherited_facets:
         doc.update(inherited_facets)
+    if field_definitions:
+        advanced_fields, advanced_relations = _build_advanced_index(md, field_definitions)
+        if advanced_fields:
+            doc["adv_fields"] = advanced_fields
+        if advanced_relations:
+            doc["adv_relations"] = advanced_relations
     return doc
 
 
@@ -314,6 +425,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     group_fields: set[str] | None = None
     inherited_config: dict[tuple[str, str | None], list[str]] = {}
     public_metadata: dict[str, Any] | None = None
+    rows: list[Any] = []
     if db is not None:
         public_fields = await load_public_fields(db, record_type)
         public_metadata = filter_public_metadata(
@@ -358,7 +470,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
 
     return _build_doc(
         record_type, record, rel_data, searchable_fields, facet_fields, group_fields,
-        linked_data, inherited_facets, public_metadata,
+        linked_data, inherited_facets, public_metadata, rows,
     )
 
 
@@ -388,6 +500,7 @@ async def search(
     active_objects_only: bool = False,
     record_types: tuple[str, ...] | None = None,
     subtitle_fields: dict[str, list[str]] | None = None,
+    advanced_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -397,6 +510,7 @@ async def search(
         rel_filters=rel_filters,
         active_objects_only=active_objects_only,
         record_types=record_types,
+        advanced_filter=advanced_filter,
     )
 
     hits = raw.get("hits", {})

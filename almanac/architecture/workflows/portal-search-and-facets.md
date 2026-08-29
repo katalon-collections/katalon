@@ -20,7 +20,10 @@ sources:
     path: frontend/admin/src/components/screens/ScreenSettings.tsx
   - id: portal-api
     type: file
-    path: backend/src/katalon/api/v1/portal.py
+    path: backend/src/katalon/api/v1/portal_public.py
+  - id: advanced-page
+    type: file
+    path: frontend/portal/src/pages/AdvancedSearchPage.tsx
 ---
 
 Portal search is the public-facing consumer of Katalon's Elasticsearch workflow. The React page stores query text, type filters, metadata facets, relation facets, and page number in the URL, asks `/v1/search` for matching records, and renders links to the record detail routes [@search-page]. The backend search endpoint normalizes those parameters into one search-service call and defaults anonymous requests to public records when no status is supplied [@search-api]. The indexed data and aggregation behavior are explained in [Search And Indexing](search-and-indexing).
@@ -30,6 +33,8 @@ Portal search is the public-facing consumer of Katalon's Elasticsearch workflow.
 `SearchPage` reads `q`, `type`, `status`, `page`, repeated `meta_*`, `rel_entity`, `rel_place`, and `rel_occurrence` parameters from `useSearchParams()` [@search-page]. It turns those values into a request to `/v1/search`, including `page_size=20` and a comma-separated `facets` list when configured metadata facet fields are available [@search-page]. Repeated values of one metadata field are combined as OR; filters from different metadata fields remain conjunctive [@search-page] [@search-api].
 
 Submitting the result page's refine field replaces or clears `q`, resets pagination to page one, and retains the active type, metadata, and relation filters [@search-page].
+
+`/advanced-search` builds a versioned query from schema fields instead of free text. A query selects one result type, combines rule groups with all/any, and can nest conditions through at most two relation fields. The query is base64url-encoded in `aq` and sent as JSON to `POST /portal/v1/search/advanced`; the shared `/search` page then provides the same result cards, refinements, facets, pagination, and stable URL state as quick search [@advanced-page] [@search-page] [@portal-api].
 
 The backend endpoint accepts the same shape: full-text `q`, `type`, `status`, requested `facets`, pagination, relation filters, and arbitrary `meta_` query parameters [@search-api]. It passes metadata filters without the `meta_` prefix and relation filters as Elasticsearch field names, so the portal does not need to know the Elasticsearch document layout beyond public query parameter names [@search-api].
 
@@ -44,6 +49,8 @@ The settings screen stores `facet_fields` by record type and saves changes to `/
 Search results return `facets` as named buckets with `value` and `count`, matching the `SearchResponse` and `FacetBucket` interfaces in the portal API client [@portal-client]. `SearchPage` renders type and status only when enabled in `_system`; active URL filters do not override that configuration. A facet's reset action appears below its values only while that facet is active. Configured metadata panels come from `meta_<field>` aggregation names. Their headings use the public schema label for the active portal language, falling back through German, English, and finally the internal field name [@search-page]. Their Elasticsearch aggregation excludes that field's own active values while retaining all other filters, so further values remain selectable with meaningful counts [@search-service]. Inherited fields use the same repeated `meta_` URL and backend filter path as direct metadata facets; the field key itself carries the `inherited_<target_type>_<field>` prefix, so the portal can label it as a linked-record facet without adding another query parameter family [@search-page].
 
 Relation facets appear only when all types are searched or the active type is `object`. The page maps `related_entities`, `related_places`, and `related_occurrences` buckets to `rel_entity`, `rel_place`, and `rel_occurrence` URL parameters [@search-page]. The backend then converts those parameters back to relation keyword filters for Elasticsearch [@search-api].
+
+For an advanced query, the selected result type replaces the ordinary type filter and the type facet is hidden. Metadata and relation facets remain usable and are included in the advanced POST body [@search-page] [@portal-api].
 
 ## Configured Result Subtitles
 

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from katalon.api.v1 import portal_public
 from katalon.api.v1.portal import PortalConfigRead
 from katalon.core.models import (
     Entity,
@@ -250,6 +251,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
     assert response.status_code == 200
     assert response.json() == [{
         "name": "material", "label": {"de": "Material"}, "field_type": "text",
+        "is_repeatable": True, "is_searchable": True, "parent_id": None,
         "settings": {"hint": "visible"}, "show_in_detail": True,
         "detail_slot": "sidebar", "detail_role": "none",
     }]
@@ -330,6 +332,47 @@ async def test_portal_search_rejects_procedures(monkeypatch) -> None:
     search.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None:
+    advanced_filter = {"bool": {"filter": [{"match_all": {}}]}}
+    resolve = AsyncMock(return_value=advanced_filter)
+    search = AsyncMock(return_value={
+        "total": 0, "page": 1, "page_size": 20, "items": [], "facets": {},
+    })
+    monkeypatch.setattr(portal_public, "resolve_query", resolve)
+    monkeypatch.setattr(portal_public.search_service, "search", search)
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.return_value = config_result
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/portal/v1/search/advanced", json={
+                "query": {
+                    "version": 1,
+                    "record_type": "object",
+                    "group": {
+                        "mode": "all",
+                        "clauses": [{
+                            "kind": "field", "field": "title",
+                            "operator": "contains", "value": "Bremen",
+                        }],
+                    },
+                },
+                "q": "Ansicht",
+            })
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert search.await_args.kwargs["advanced_filter"] == advanced_filter
+    assert search.await_args.kwargs["record_type"] == "object"
+    assert search.await_args.kwargs["status"] == "public"
 @pytest.mark.asyncio
 async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeypatch) -> None:
     captured: dict = {}

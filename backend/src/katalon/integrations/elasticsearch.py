@@ -54,6 +54,27 @@ INDEX_SETTINGS: dict[str, Any] = {
             "related_entities":    {"type": "keyword"},
             "related_places":      {"type": "keyword"},
             "related_occurrences": {"type": "keyword"},
+            "adv_fields": {
+                "type": "nested",
+                "properties": {
+                    "name":          {"type": "keyword"},
+                    "text_value":    {"type": "text", "analyzer": "katalon_default"},
+                    "keyword_value": {"type": "keyword"},
+                    "number_value":  {"type": "double"},
+                    "date_min":      {"type": "long"},
+                    "date_max":      {"type": "long"},
+                    "bool_value":    {"type": "boolean"},
+                },
+            },
+            "adv_relations": {
+                "type": "nested",
+                "properties": {
+                    "source_field": {"type": "keyword"},
+                    "target_type":  {"type": "keyword"},
+                    "target_id":    {"type": "keyword"},
+                    "relation_type": {"type": "keyword"},
+                },
+            },
         }
     },
 }
@@ -180,6 +201,7 @@ async def search_documents(
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
     record_types: tuple[str, ...] | None = None,
+    advanced_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -230,6 +252,8 @@ async def search_documents(
                 "minimum_should_match": 1,
             }
         })
+    if advanced_filter:
+        filters.append(advanced_filter)
 
     base_filters = list(filters)
     filters.extend(facet_filters.values())
@@ -267,3 +291,33 @@ async def search_documents(
         body={"query": es_query, "aggs": aggs, "from": from_, "size": size},
     )
     return cast(dict[str, Any], result.body)
+
+
+async def search_ids_by_filter(
+    record_type: str,
+    advanced_filter: dict[str, Any],
+    *,
+    limit: int = 10000,
+) -> tuple[list[str], bool]:
+    """Return public matching IDs and whether the result exceeded the bounded intermediate set."""
+    es = get_es()
+    filters: list[dict[str, Any]] = [
+        {"term": {"record_type": record_type}},
+        {"term": {"status": "public"}},
+        advanced_filter,
+    ]
+    if record_type == "object":
+        filters.append({"term": {"collection_status": "active"}})
+    result = await es.search(
+        index=ALIAS_NAME,
+        body={
+            "query": {"bool": {"filter": filters}},
+            "_source": False,
+            "size": limit,
+            "track_total_hits": True,
+        },
+    )
+    body = cast(dict[str, Any], result.body)
+    hits = body.get("hits", {})
+    total = int(hits.get("total", {}).get("value", 0))
+    return [str(hit["_id"]) for hit in hits.get("hits", [])], total > limit

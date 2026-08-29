@@ -4,6 +4,7 @@ import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type Search
 import { saveLastSearch } from '../hooks/useBackToSearch'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { t, typeLabel, useI18n } from '../i18n'
+import { decodeAdvancedQuery } from '../utils/advancedSearch'
 
 function facetLabel(
   field: string,
@@ -55,10 +56,14 @@ export function SearchPage() {
   const q = params.get('q') ?? ''
   const typeFilt = params.get('type') ?? ''
   const statusFilt = params.get('status') ?? ''
+  const encodedAdvancedQuery = params.get('aq') ?? ''
+  const advancedQuery = decodeAdvancedQuery(encodedAdvancedQuery)
+  const effectiveType = advancedQuery?.record_type ?? typeFilt
   const page = parseInt(params.get('page') ?? '1', 10)
   const [localQ, setLocalQ] = useState(q)
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
@@ -101,6 +106,7 @@ export function SearchPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError('')
     const searchParams: Record<string, string | number | undefined> = {
       q: q || undefined,
       type: typeFilt || undefined,
@@ -108,7 +114,7 @@ export function SearchPage() {
       page,
       page_size: 20,
       facets: (() => {
-        const fields = configuredMetadataFacets(facetConfig, typeFilt)
+        const fields = configuredMetadataFacets(facetConfig, effectiveType)
         return fields.length > 0 ? fields.join(',') : undefined
       })(),
       rel_entity: relEntity || undefined,
@@ -124,8 +130,27 @@ export function SearchPage() {
     Object.entries(metaFilters).forEach(([field, values]) => {
       values.forEach(value => qs.append(`meta_${field}`, value))
     })
-    fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`)
-      .then(r => r.json())
+    const request = encodedAdvancedQuery
+      ? advancedQuery
+        ? api.search.advanced({
+            query: advancedQuery,
+            q: q || undefined,
+            page,
+            page_size: 20,
+            facet_fields: configuredMetadataFacets(facetConfig, advancedQuery.record_type),
+            metadata_filters: metaFilters,
+            relation_filters: {
+              related_entities: relEntity,
+              related_places: relPlace,
+              related_occurrences: relOccurrence,
+            },
+          })
+        : Promise.reject(new Error(t('advanced.invalidLink')))
+      : fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`).then(r => {
+          if (!r.ok) throw new Error(r.statusText)
+          return r.json() as Promise<SearchResponse>
+        })
+    request
       .then(async (result: SearchResponse) => {
         if (cancelled) return
         setData(result)
@@ -148,10 +173,15 @@ export function SearchPage() {
         )
         if (!cancelled) setThumbnails(thumbMap)
       })
-      .catch(() => { if (!cancelled) setData(null) })
+      .catch(reason => {
+        if (!cancelled) {
+          setData(null)
+          setError(reason instanceof Error ? reason.message : t('advanced.searchFailed'))
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [q, typeFilt, statusFilt, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
+  }, [q, typeFilt, statusFilt, encodedAdvancedQuery, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -232,6 +262,12 @@ export function SearchPage() {
 
   return (
     <div className="container page">
+      {advancedQuery && (
+        <div className="advanced-summary">
+          <span>{t('advanced.active', { type: typeLabel(advancedQuery.record_type) })}</span>
+          <Link to={`/advanced-search?aq=${encodeURIComponent(encodedAdvancedQuery)}`}>{t('advanced.edit')}</Link>
+        </div>
+      )}
       <form onSubmit={submit} className="refine-search" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input
           aria-label={t('search.refine')}
@@ -255,7 +291,7 @@ export function SearchPage() {
 
       <div className="search-layout">
         <aside className="facets">
-          {systemFacets.includes('record_type') && (
+          {!advancedQuery && systemFacets.includes('record_type') && (
             <FacetPanel
               label={t('search.typeFacet')}
               buckets={typesFacet}
@@ -271,19 +307,19 @@ export function SearchPage() {
               onSelect={v => setFilter('status', v)}
             />
           )}
-          {configuredMetadataFacets(facetConfig, typeFilt).map(field => {
+          {configuredMetadataFacets(facetConfig, effectiveType).map(field => {
             const buckets = data?.facets?.[`meta_${field}`] ?? []
             return (
               <FacetPanel
                 key={field}
-                label={facetLabel(field, fieldLabels, facetConfig, typeFilt)}
+                label={facetLabel(field, fieldLabels, facetConfig, effectiveType)}
                 buckets={buckets}
                 active={metaFilters[field] ?? []}
                 onSelect={v => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')}
               />
             )
           })}
-          {(!typeFilt || typeFilt === 'object') && (
+          {(!effectiveType || effectiveType === 'object') && (
             <>
               <FacetPanel
                 label={t('search.relatedEntities')}
@@ -308,6 +344,7 @@ export function SearchPage() {
         </aside>
 
         <div className="result-list">
+          {error && <div className="advanced-error" role="alert">{error}</div>}
           {loading && <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('common.loading')}</div>}
           {!loading && data?.items.length === 0 && (
             <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('search.noResultsShort')}</div>

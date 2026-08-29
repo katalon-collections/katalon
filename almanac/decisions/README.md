@@ -16,6 +16,8 @@ Katalon's decision pages record choices that future changes must account for bef
 
 [Vocabulary Term Custom Fields](metadata/vocabulary-term-custom-fields) covers configurable metadata on vocabulary terms. [Multilingual Content](metadata/multilingual-content) covers the lang-keyed dict model for labels and translatable values, the `supported_languages` config, and the dependency-free portal i18n. [Inherited Fields In Elasticsearch](search/inherited-fields-in-elasticsearch) covers relation-derived search fields and denormalized Elasticsearch documents.
 
+[Advanced Relational Search](search/advanced-relational-search) records why nested relation conditions are resolved inside-out at query time rather than denormalized recursively.
+
 [Schema Configured Portal Facets](frontend/schema-configured-portal-facets) explains why public Portal facets come from schema configuration rather than hard-coded frontend filters.
 
 ## Frontend And Workflow Behavior
