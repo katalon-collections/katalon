@@ -204,11 +204,22 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 
 **Nachpflegepflicht**: Seit MVP sind viele Features dazugekommen, die in den Docs (noch) nicht abgebildet sind (u. a. Procedure-Typ/Vorgänge, Formularvarianten, Subtypen, Onboarding-Tour, granulare Rollen, katalon-cli für Deployment, Deep-Linking). Bei Feature-Arbeit, die eine der beiden Nutzer-Doku-Dateien betrifft, oder bei größeren Feature-Batches: betroffene `docs/`-Seite(n) aktualisieren bzw. Lücke benennen. Bei neuen Bedienungs-relevanten Features prüfen, ob eine neue Nutzer-Doku-Seite + `ROUTE_DOCS`-Eintrag nötig ist.
 
+## Doku-Pflicht (Definition of Done)
+
+**Eine Feature-Umsetzung oder ein Verhaltens-/Architekturwechsel gilt erst als abgeschlossen, wenn die betroffene Doku im Repo mitgezogen wurde — das ist kein optionaler Nachputz-Schritt, sondern Teil der Aufgabe selbst.** Vor der Abschlussmeldung an Karl prüfen, nicht danach:
+
+1. `almanac/` — betroffene Seiten identifizieren (Pfad steht meist schon in `sources:` im Frontmatter) und gegen den tatsächlichen Code korrigieren. Nicht nur ergänzen: veraltete Aussagen (alte Architektur, entfernte Fallbacks, "geplant für später" bei Dingen, die jetzt gebaut sind) explizit korrigieren oder streichen.
+2. `docs/02_schema_verwaltung.md` / `docs/03_csv_import.md` — nur wenn das Feature admin-UI-Bedienung betrifft, die Kuratoren/Sachbearbeiter direkt sehen. Neue Bedienungs-relevante Fläche → prüfen, ob eine neue Seite + `ROUTE_DOCS`-Eintrag (`Topbar.tsx`) nötig ist.
+3. `.agents/knowledge/decisions/` (dev-only, nicht Teil des Git-Repos) — bei echter Architekturentscheidung (neue Komponente, Trade-off, Abweichung von bestehendem Muster) neues Konzept anlegen und in `decisions/index.md` verlinken.
+4. Externe Doku (`karkraeg/katalon-docs`) — **nicht** im selben Zug pflegen, macht Karl bewusst gebündelt später. Nur intern (dieses Repo) sofort.
+
+Ist eine Doku-Anpassung aus Zeit-/Scope-Gründen bewusst zurückgestellt: das explizit benennen ("Doku X ist jetzt veraltet, noch nicht nachgezogen"), nicht stillschweigend weglassen. Ein Feature ohne diesen Schritt ist unvollständig geliefert, selbst wenn Code und Tests grün sind.
+
 ## CodeAlmanac
 
 Vor jeder Umsetzung die relevanten CodeAlmanac-Seiten konsultieren und den Plan auf Widersprüche prüfen. Zusätzlich mögliche UX-Einwände gegen `PRODUCT.md` und `DESIGN.md` prüfen und vor der Umsetzung benennen; auch technisch getriebene Features auf Auswirkungen für Bedienung, Accessibility, Fehlerzustände und Responsive-Verhalten prüfen.
 
-Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur ändern, `almanac/` aktualisieren und die betroffenen Seiten gegen den tatsächlichen Code verifizieren. Veraltete Seiten korrigieren oder kennzeichnen; rein aus dem Code ablesbare Details nicht duplizieren.
+Nach Implementierungen, die dokumentiertes Verhalten, Abläufe oder Architektur ändern, `almanac/` aktualisieren und die betroffenen Seiten gegen den tatsächlichen Code verifizieren. Veraltete Seiten korrigieren oder kennzeichnen; rein aus dem Code ablesbare Details nicht duplizieren. Siehe "Doku-Pflicht" oben — das ist keine Kann-Empfehlung.
 
 ## Kontext-Dateien — Lazy Loading
 
