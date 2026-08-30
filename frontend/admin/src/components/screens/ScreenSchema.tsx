@@ -378,13 +378,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             </select>
           </div>
         )}
-        <div className="fg-2">
-          <div className="field">
-            <div className="lbl">Sortierung</div>
-            <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
-          </div>
-          <div className="field">
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingTop: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_required} onChange={e => set('is_required', e.target.checked)} />
               <span style={{ fontSize: 13 }}>Pflichtfeld</span>
@@ -402,59 +396,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             {!isVocabularyTerm && !((form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable) && (
               <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>Dieser Feldtyp ist nicht übersetzbar (nur Text/Rich-Text, nicht wiederholbar).</span>
             )}
-            {!isVocabularyTerm && (
-              <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>Öffentlich über APIs ausgeben</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Suche einbeziehen</span>
-                </label>
-              </>
-            )}
-          </div>
-          {!isVocabularyTerm && form.show_in_detail && (
-            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingTop: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13 }}>Bereich (Portal-Detailseite)</span>
-                <select className="fld" style={{ width: 'auto' }} value={form.detail_slot} onChange={e => set('detail_slot', e.target.value as 'main' | 'sidebar')}>
-                  <option value="sidebar">Seitenspalte</option>
-                  <option value="main">Hauptbereich</option>
-                </select>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13 }}>Rolle (Portal-Detailseite)</span>
-                <select className="fld" style={{ width: 'auto' }} value={form.detail_role} onChange={e => set('detail_role', e.target.value as 'none' | 'description')}>
-                  <option value="none">Keine</option>
-                  <option value="description">Beschreibung</option>
-                </select>
-              </label>
-            </div>
-          )}
-          </div>
         </div>
-        {form.field_type === 'text' && (
-          <div className="field">
-            <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
-            <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
-              placeholder="^97[89]-[0-9]{10}$" />
-            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Beispiele: ISBN-13, ISSN, DOI</div>
-          </div>
-        )}
         {form.field_type === 'authority' && (
           <div className="field">
             <div className="lbl">Normdaten-Quelle</div>
@@ -482,6 +424,63 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             </select>
           </div>
         )}
+        <details style={{ marginBottom: 16 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Erweiterte Optionen</summary>
+          <div style={{ marginTop: 14 }}>
+            <div className="field">
+              <div className="lbl">Sortierung</div>
+              <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
+            </div>
+            {!isVocabularyTerm && (
+              <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Öffentlich über APIs ausgeben</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>In Suche einbeziehen</span>
+                </label>
+              </div>
+            )}
+          {!isVocabularyTerm && form.show_in_detail && (
+            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingTop: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>Bereich (Portal-Detailseite)</span>
+                <select className="fld" style={{ width: 'auto' }} value={form.detail_slot} onChange={e => set('detail_slot', e.target.value as 'main' | 'sidebar')}>
+                  <option value="sidebar">Seitenspalte</option>
+                  <option value="main">Hauptbereich</option>
+                </select>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>Rolle (Portal-Detailseite)</span>
+                <select className="fld" style={{ width: 'auto' }} value={form.detail_role} onChange={e => set('detail_role', e.target.value as 'none' | 'description')}>
+                  <option value="none">Keine</option>
+                  <option value="description">Beschreibung</option>
+                </select>
+              </label>
+            </div>
+          )}
+            {form.field_type === 'text' && (
+              <div className="field">
+                <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
+                  placeholder="^97[89]-[0-9]{10}$" />
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Beispiele: ISBN-13, ISSN, DOI</div>
+              </div>
+            )}
         {!isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
           <div className="field">
             <div className="lbl">Standardwert <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
@@ -552,6 +551,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             )}
           </div>
         )}
+          </div>
+        </details>
         {form.field_type === 'relation' && (
           <>
             <div className="fg-2">

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-30
+
+### Changed
+- Felddefinitionen sind übersichtlicher: Grundoptionen und feldtypspezifische Einstellungen bleiben sichtbar, weitere Steuerungsoptionen liegen unter „Erweiterte Optionen“.
+
 ## [1.8.0] - 2026-08-30
 
 ### Added

@@ -26,7 +26,7 @@ sources:
     path: docs/02_schema_verwaltung.md
 ---
 
-The schema engine is Katalon's configurable metadata layer. It stores field definitions in `field_definitions`, stores record values in JSONB metadata columns, and lets admins change field structure without adding database columns for each cataloguing field [@models]. The current API accepts schema targets for objects, entities, places, occurrences, procedures, and vocabulary terms, validates subtype scope, embeds group sub-fields, soft-deletes fields, and queues reindex work for create, delete, restore, and facet-flag changes [@schema-api]. The admin schema screen uses the same definitions to render field editors, subtype filters, visibility flags, facets, authority fields, relation settings, group fields, defaults, locks, AI settings, and metadata export mappings [@schema-screen].
+The schema engine is Katalon's configurable metadata layer. It stores field definitions in `field_definitions`, stores record values in JSONB metadata columns, and lets admins change field structure without adding database columns for each cataloguing field [@models]. The current API accepts schema targets for objects, entities, places, occurrences, procedures, and vocabulary terms, validates subtype scope, embeds group sub-fields, soft-deletes fields, and queues reindex work for create, delete, restore, and facet-flag changes [@schema-api]. The admin schema screen keeps core field properties and field-type-specific settings visible; its native **Erweiterte Optionen** disclosure contains sort order, visibility flags, portal placement, validation, defaults, locks, AI settings, and metadata export mappings [@schema-screen].
 
 ## Field Definitions
 

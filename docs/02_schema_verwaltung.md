@@ -25,6 +25,8 @@ Im selben Feld-Detailbereich gibt es den Abschnitt `Metadaten-Export`. Dort kann
 
 ## Eigenschaften einer Felddefinition
 
+Im Feldformular bleiben die Grundoptionen **Pflichtfeld**, **Wiederholbar** und – soweit möglich – **Mehrsprachig** direkt sichtbar. Feldtyp-spezifische Einstellungen wie Vokabular, Relation oder Normdaten-Quelle erscheinen ebenfalls direkt am Feld. Sortierung, Portal- und Suchdarstellung, öffentliche API-Ausgabe, Facetten, Validierung, Standardwert, Sperre und KI-Konfiguration liegen unter **Erweiterte Optionen**.
+
 | Eigenschaft | Pflicht | Beschreibung |
 |---|---|---|
 | `name` | Ja | Interner Bezeichner (Kleinbuchstaben, Unterstriche). Unveränderlich nach dem Anlegen. Beispiel: `photographer` |
