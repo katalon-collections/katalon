@@ -159,7 +159,7 @@ def test_make_pyramid_tiff_creates_tiled_pyramid_tiff(tmp_path: Path) -> None:
     pyvips = pytest.importorskip("pyvips")
 
     source_path = tmp_path / "source.jpg"
-    pyvips.Image.black(64, 64).jpegsave(str(source_path))
+    pyvips.Image.black(256, 256).jpegsave(str(source_path))
 
     dest_path = _make_pyramid_tiff(source_path)
 
