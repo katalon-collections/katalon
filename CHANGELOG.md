@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-08-30
+
+### Fixed
+- Portal-Suchergebnisse für Entitäten, Orte und Occurrences zeigen keine leere Medienfläche mehr; nur Objektzeilen reservieren Raum für Vorschaubilder.
+
 ## [1.9.0] - 2026-08-30
 
 ### Changed

@@ -356,11 +356,13 @@ export function SearchPage() {
               : `/objects/${r.id}`
             return (
               <Link key={r.id} className="result-row" to={path} onClick={() => saveLastSearch(window.location.pathname + window.location.search)}>
-                <div className="thumb-sm">
-                  {thumbnails[r.id] ? (
-                    <img src={thumbnails[r.id]} alt="" loading="lazy" />
-                  ) : null}
-                </div>
+                {r.record_type === 'object' && (
+                  <div className="thumb-sm">
+                    {thumbnails[r.id] ? (
+                      <img src={thumbnails[r.id]} alt="" loading="lazy" />
+                    ) : null}
+                  </div>
+                )}
                 <div className="body">
                   <div className="title">{r.title || r.id}</div>
                   <div className="desc">{resultSubtitle(r, subtitleConfig)}</div>
