@@ -53,6 +53,47 @@ def delete_label_fields(idno: str | None, metadata: dict[str, Any] | None) -> di
     return fields
 
 
+def collapse_value(value: object) -> object | None:
+    """Collapse vocab-ish values to their human-readable label.
+
+    Vocab/title fields store objects like ``{"id": <uuid>, "label": "..."}``
+    (or ``[{"value": "...", "lang": "..."}]`` for repeatable/i18n fields), so
+    a raw JSON diff leaks the internal DB id. Pre-serialized JSON strings are
+    parsed first so legacy audit entries (whose values were stringified at log
+    time) are handled too. When every item of a value can be reduced to a
+    label, return it; otherwise return None so the caller falls back to the
+    original rendering.
+    """
+
+    def label_of(item: object) -> str | None:
+        if isinstance(item, str):
+            return item
+        if isinstance(item, dict):
+            for key in ("label", "value", "name"):
+                v = item.get(key)
+                if isinstance(v, str) and v:
+                    return v
+        return None
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped or not (stripped.startswith("{") or stripped.startswith("[")):
+            return None
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return None
+        return collapse_value(parsed)
+
+    if isinstance(value, dict):
+        return label_of(value)
+    if isinstance(value, list):
+        parts = [label_of(item) for item in value]
+        if parts and all(part is not None for part in parts):
+            return ", ".join(parts)
+    return None
+
+
 def _display_value(value: object) -> object:
     """Render a metadata value for the audit-log diff.
 
@@ -60,8 +101,15 @@ def _display_value(value: object) -> object:
     dict/list into the literal text "[object Object]" — stringify
     non-primitives ourselves (truncated) instead.
     """
-    if value is None or isinstance(value, str | int | float | bool):
+    if value is None or isinstance(value, int | float | bool):
         return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            return value
+    short = collapse_value(value)
+    if short is not None:
+        return short
     try:
         text = json.dumps(value, ensure_ascii=False)
     except TypeError:

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from katalon.core.dependencies import DBDep
 from katalon.core.models import AuditLog, Entity, Object, Occurrence, Place, Procedure, User
 from katalon.core.schemas import AuditLogRead
-from katalon.services.audit_service import extract_title, format_label
+from katalon.services.audit_service import collapse_value, extract_title, format_label
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -47,6 +47,25 @@ def _delete_snapshot_label(log: AuditLog) -> str | None:
     return format_label(title, idno, str(log.record_id)[:8])
 
 
+def _collapse_diff_values(changed_fields: dict[str, object] | None) -> dict[str, object] | None:
+    """Replace vocab-ish diff values (fresh dicts or legacy JSON strings) with
+    their human-readable label so old audit entries don't leak the internal
+    record id that was stringified into the snapshot at log time."""
+    if not changed_fields:
+        return changed_fields
+    collapsed = dict(changed_fields)
+    for side in ("old", "new"):
+        current = collapsed.get(side)
+        if not isinstance(current, dict):
+            continue
+        reduced: dict[str, object] = {}
+        for key, value in current.items():
+            label = collapse_value(value)
+            reduced[key] = label if label is not None else value
+        collapsed[side] = reduced
+    return collapsed
+
+
 @router.get(
     "",
     response_model=list[AuditLogRead],
@@ -84,7 +103,7 @@ async def list_audit_log(
 
     out: list[AuditLogRead] = []
     for log, user_email in rows:
-        changed_fields = log.changed_fields
+        changed_fields = _collapse_diff_values(log.changed_fields)
         related_id = (changed_fields or {}).get("related_record_id")
         if related_id and uuid.UUID(related_id) in labels:
             changed_fields = {**changed_fields, "related_record_label": labels[uuid.UUID(related_id)]}

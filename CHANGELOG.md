@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-08-30
+
+### Fixed
+- Vokabularwerte im Audit-Log werden nur noch mit ihrem Anzeigenamen (Label) dargestellt statt mit dem internen DB-ID-Objekt; gilt auch für bestehende Einträge, deren Werte beim Loggen als JSON-String gespeichert wurden.
+
 ## [1.12.2] - 2026-08-30
 
 ### Changed
