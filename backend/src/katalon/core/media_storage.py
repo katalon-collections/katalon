@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import quote
 
-from katalon.config import settings
+from katalon import config
 
 
 def safe_filename(filename: str) -> str:
@@ -24,7 +24,7 @@ def storage_key(media_id: uuid.UUID, filename: str) -> str:
 
 def storage_path(key: str) -> Path:
     """Resolve a media key under MEDIA_ROOT without allowing path traversal."""
-    root = Path(settings.media_root).resolve()
+    root = Path(config.settings.media_root).resolve()
     path = (root / key).resolve()
     if not path.is_relative_to(root):
         raise ValueError("Ungültiger Media-Storage-Key")
@@ -36,7 +36,7 @@ def relative_storage_key(value: str, media_root: str | Path | None = None) -> st
     path = Path(value)
     if not path.is_absolute():
         return value
-    root = Path(media_root or settings.media_root).resolve()
+    root = Path(media_root or config.settings.media_root).resolve()
     try:
         return path.resolve().relative_to(root).as_posix()
     except ValueError as exc:

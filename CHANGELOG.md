@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.4] - 2026-08-30
+
+### Fixed
+- Die CI-Integrationstests liefen wieder mit `PermissionError`/`FileNotFoundError` auf `/var/lib/katalon`: Die Medienspeicherung hielt seit 1.12.2 eine veraltete Settings-Referenz fest und ignorierte den pro Test gesetzten `media_root`. Sie liest die Medien-Wurzel jetzt zur Laufzeit aus der aktuellen Konfiguration; der CI-Job setzt zusätzlich `MEDIA_ROOT`.
+
 ## [1.12.3] - 2026-08-30
 
 ### Fixed

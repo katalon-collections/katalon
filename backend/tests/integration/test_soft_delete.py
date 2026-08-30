@@ -142,7 +142,7 @@ async def test_purge_task_hard_deletes_past_retention_window(async_client, auth_
     # media_files.object_id NOT NULL cascade bug (fixed via passive_deletes=True):
     # purge is now where an object row actually gets hard-deleted.
     media_root = tmp_path / "media"
-    monkeypatch.setattr("katalon.core.media_storage.settings.media_root", str(media_root))
+    monkeypatch.setattr("katalon.config.settings.media_root", str(media_root))
     media_path = media_root / "ab" / "purge-me.jpg"
     media_path.parent.mkdir(parents=True)
     media_path.write_bytes(b"fake-image-bytes")
