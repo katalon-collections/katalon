@@ -168,6 +168,8 @@ def test_make_pyramid_tiff_creates_tiled_pyramid_tiff(tmp_path: Path) -> None:
     assert dest_path.exists()
 
     result = pyvips.Image.new_from_file(str(dest_path))
+    print("DEBUG libvips version:", pyvips.base.version(0), pyvips.base.version(1), pyvips.base.version(2))
+    print("DEBUG fields:", result.get_fields())
     assert result.get("vips-loader") == "tiffload"
     assert result.get("tile-width") > 0
 
