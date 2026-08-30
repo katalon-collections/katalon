@@ -194,7 +194,9 @@ input, select, textarea { font-family: inherit; }
 .advanced-submit { min-height: 44px; border: 0; border-radius: 6px; padding: 0 18px; background: var(--accent, #1e3a8a); color: #fff; font-weight: 600; }
 .advanced-error { padding: 12px 14px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #991b1b; }
 .advanced-actions + .advanced-error, .advanced-error + .advanced-actions { margin-top: 14px; }
-.advanced-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--accent-100, #dde3f5); border-radius: 6px; background: var(--accent-50, #eef2fb); font-size: 13px; }
+.advanced-summary { margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--accent-100, #dde3f5); border-radius: 6px; background: var(--accent-50, #eef2fb); font-size: 13px; }
+.advanced-summary-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.advanced-query-summary { margin: 6px 0 0; color: var(--fg-2, #3a3f4b); }
 
 /* Clover IIIF overrides */
 .clover-viewer-media-search { display: none !important; }

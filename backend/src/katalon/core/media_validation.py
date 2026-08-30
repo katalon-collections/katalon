@@ -6,6 +6,7 @@ from PIL import Image, UnidentifiedImageError
 ALLOWED_IMAGE_MIME = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
 PIL_MIME_BY_FORMAT = {
     "JPEG": "image/jpeg",
+    "MPO": "image/jpeg",
     "PNG": "image/png",
     "TIFF": "image/tiff",
     "WEBP": "image/webp",

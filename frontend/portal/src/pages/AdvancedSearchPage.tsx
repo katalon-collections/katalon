@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type PortalFieldDefinition } from '../api/client'
@@ -39,6 +40,75 @@ function fieldLabel(field: PortalFieldDefinition, locale: string): string {
 
 function defaultOperator(fieldType: string): string {
   return OPERATORS[fieldType]?.[0]?.[0] ?? 'eq'
+}
+
+function operatorLabel(fieldType: string, operator: string, t: (key: string) => string): string {
+  const key = OPERATORS[fieldType]?.find(([value]) => value === operator)?.[1]
+  return key ? t(key) : operator
+}
+
+async function summarizeGroup(
+  targetType: string,
+  group: AdvancedGroup,
+  locale: string,
+  t: (key: string, params?: Record<string, string>) => string,
+): Promise<ReactNode> {
+  const fields = await api.portal.schema(targetType).catch(() => [])
+  const parts = await Promise.all(group.clauses.map(async clause => {
+    const field = fields.find(item => item.name === clause.field)
+    if (!field) return clause.field
+    if (clause.kind === 'relation') {
+      const nestedTarget = String(field.settings.target_type ?? '')
+      const nested = await summarizeGroup(nestedTarget, clause.group, locale, t)
+      return <>{fieldLabel(field, locale)} → {typeLabel(nestedTarget)} ({nested})</>
+    }
+    if (clause.operator === 'exists') return <>{fieldLabel(field, locale)} <em>{t('advanced.exists')}</em></>
+    if (clause.operator === 'not_exists') return <>{fieldLabel(field, locale)} <em>{t('advanced.notExists')}</em></>
+    const value = await valueLabel(field, targetType, clause.value, locale, t)
+    return <>{fieldLabel(field, locale)} <em>{operatorLabel(field.field_type, clause.operator, t)}</em> &quot;{value}&quot;</>
+  }))
+  const joinWord = t(group.mode === 'all' ? 'advanced.joinAll' : 'advanced.joinAny')
+  return (
+    <>
+      {parts.map((part, i) => <span key={i}>{i > 0 ? ` ${joinWord} ` : ''}{part}</span>)}
+    </>
+  )
+}
+
+async function valueLabel(
+  field: PortalFieldDefinition,
+  targetType: string,
+  value: unknown,
+  locale: string,
+  t: (key: string) => string,
+): Promise<string> {
+  if (value == null) return ''
+  if (field.field_type === 'boolean') return t(value ? 'advanced.yes' : 'advanced.no')
+  if (Array.isArray(value)) {
+    const resolved = await Promise.all(value.map(v => valueLabel(field, targetType, v, locale, t)))
+    return resolved.join(` ${t('advanced.and')} `)
+  }
+  if (['vocab', 'vocab_free', 'authority', 'pid'].includes(field.field_type)) {
+    const terms = await api.portal.searchFieldTerms(targetType, field.name).catch(() => [])
+    const term = terms.find(item => item.id === value)
+    if (term) return term.label[locale] ?? term.label.de ?? term.label.en ?? term.term
+  }
+  return String(value)
+}
+
+export function QuerySummary({ query }: { query: AdvancedQuery }) {
+  const { locale, t } = useI18n()
+  const [summary, setSummary] = useState<ReactNode>(null)
+  const key = JSON.stringify(query)
+
+  useEffect(() => {
+    let cancelled = false
+    summarizeGroup(query.record_type, query.group, locale, t).then(text => { if (!cancelled) setSummary(text) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, locale])
+
+  return <p className="advanced-query-summary">{summary}</p>
 }
 
 function ValueEditor({ clause, field, targetType, onChange }: {

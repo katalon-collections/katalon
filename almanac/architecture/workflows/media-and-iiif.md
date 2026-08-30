@@ -51,7 +51,7 @@ Katalon's media workflow is object-only: media endpoints live under `/objects/{o
 
 ## Upload And Storage
 
-`upload_media()` first verifies the target Object exists, rejects unsupported MIME types, streams the upload to `media_root`, and enforces `settings.max_upload_size_mb` while writing [@media-api]. Images (JPEG, PNG, TIFF, WebP) are validated with `verified_image_mime()` via Pillow `verify()`; non-image files (PDF, MP3/WAV/OGG, MP4/WebM, GLB/GLTF) are accepted without Pillow and stored under a `category` derived from their MIME type [@media-validation].
+`upload_media()` first verifies the target Object exists, rejects unsupported MIME types, streams the upload to `media_root`, and enforces `settings.max_upload_size_mb` while writing [@media-api]. Images (JPEG, including MPO camera files, PNG, TIFF, WebP) are validated with `verified_image_mime()` via Pillow `verify()`; non-image files (PDF, MP3/WAV/OGG, MP4/WebM, GLB/GLTF) are accepted without Pillow and stored under a `category` derived from their MIME type [@media-validation].
 
 The created `MediaFile` starts with `status="pending"` and becomes primary when it is the object's first media file [@media-api]. The API commits before queueing `generate_iiif_tiles`, so the worker can load the row from its own database session [@media-api]. This is the queue boundary also covered by [Celery And Worker Queues](../backend/celery-and-worker-queues).
 

@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1.media import _serialize
 from katalon.core.dependencies import get_current_user
+from katalon.core.media_validation import PIL_MIME_BY_FORMAT
 from katalon.core.models import MediaFile, Object, User
 from katalon.database import get_db
 from katalon.main import app
@@ -15,6 +16,10 @@ from katalon.main import app
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def test_mpo_images_are_stored_as_jpeg() -> None:
+    assert PIL_MIME_BY_FORMAT["MPO"] == "image/jpeg"
 
 
 def _mock_result(value):

@@ -5,6 +5,7 @@ import { saveLastSearch } from '../hooks/useBackToSearch'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { t, typeLabel, useI18n } from '../i18n'
 import { decodeAdvancedQuery } from '../utils/advancedSearch'
+import { QuerySummary } from './AdvancedSearchPage'
 
 function facetLabel(
   field: string,
@@ -328,8 +329,11 @@ export function SearchPage() {
     <div className="container page">
       {advancedQuery && (
         <div className="advanced-summary">
-          <span>{t('advanced.active', { type: typeLabel(advancedQuery.record_type) })}</span>
-          <Link to={`/advanced-search?aq=${encodeURIComponent(encodedAdvancedQuery)}`}>{t('advanced.edit')}</Link>
+          <div className="advanced-summary-head">
+            <span>{t('advanced.active', { type: typeLabel(advancedQuery.record_type) })}</span>
+            <Link to={`/advanced-search?aq=${encodeURIComponent(encodedAdvancedQuery)}`}>{t('advanced.edit')}</Link>
+          </div>
+          <QuerySummary query={advancedQuery} />
         </div>
       )}
       <form onSubmit={submit} className="refine-search" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>

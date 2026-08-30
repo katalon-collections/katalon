@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-08-30
+
+### Added
+- Die Portal-Suchergebnisse zeigen bei einer aktiven erweiterten Suche die verständliche Zusammenfassung der angewendeten Bedingungen.
+
+### Fixed
+- Datums- und Rich-Text-Eingaben aktualisieren Formulardaten nur noch bei tatsächlichen Änderungen.
+
 ## [1.12.0] - 2026-08-30
 
 ### Added

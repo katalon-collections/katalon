@@ -148,7 +148,7 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
     <div style={{ display: 'flex', gap: 6 }}>
       <input className="fld" type="text" value={value}
         onChange={e => onChange(e.target.value)}
-        onBlur={() => { onChange(normalizeDateInput(value)); onBlur?.() }}
+        onBlur={() => { const n = normalizeDateInput(value); if (n !== value) onChange(n); onBlur?.() }}
         placeholder={t('dateInput.placeholder')} disabled={disabled} style={{ flex: 1, ...style }} />
       <button type="button" className="btn sm ico gh" title={isPlainDate ? t('dateInput.pickerTitleEnabled') : t('dateInput.pickerTitleDisabled')}
         disabled={disabled || !isPlainDate} onClick={() => pickerRef.current?.showPicker()}>

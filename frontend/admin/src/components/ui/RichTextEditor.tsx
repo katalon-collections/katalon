@@ -31,7 +31,7 @@ export function RichTextEditor({ value, onChange, placeholder, disabled, style }
     ],
     content: value,
     editable: !disabled,
-    onUpdate: ({ editor }) => onChange(getMarkdown(editor)),
+    onUpdate: ({ editor }) => { const md = getMarkdown(editor); if (md !== value) onChange(md) },
     editorProps: {
       attributes: { class: 'fld richtext-editor', style: 'min-height: 76px; padding: 8px 10px;' },
     },
