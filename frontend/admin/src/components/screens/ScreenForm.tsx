@@ -13,6 +13,8 @@ import { TranslatableInput } from '../ui/TranslatableInput'
 import { RichTextEditor } from '../ui/RichTextEditor'
 import { MediaLightbox } from '../MediaLightbox'
 
+const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
+
 /** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
@@ -1766,7 +1768,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             }
             if (sf.field_type === 'date' && typeof sv === 'string' && sv && !isValidDateInput(sv)) {
               errors[`${f.name}.${sf.name}:${idx}`] =
-                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): ${INVALID_DATE_MESSAGE}`
+                `Feld '${getLabel(sf, sf.name)}' (Eintrag ${idx + 1}): Ungültiges Datum`
             }
             if (!isEmptyValue(sv) && sf.field_type === 'authority') {
               const entry = typeof sv === 'object' && sv !== null && !Array.isArray(sv)

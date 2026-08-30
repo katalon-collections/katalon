@@ -83,16 +83,18 @@ function descendantIds(terms: VocabularyTerm[], termId: string): Set<string> {
 }
 
 function AppliesPreview({ from, to }: { from: RecordType[]; to: RecordType[] }) {
+  const { t } = useTranslation('screenVocab')
   return (
     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-3)' }} aria-live="polite">
-      Gilt für: <strong>{appliesLabel({ applies_from: from, applies_to: to })}</strong>
+      Gilt für: <strong>{appliesLabel(t, { applies_from: from, applies_to: to })}</strong>
       <div>Keine Auswahl in beiden Feldern gilt für alle Kombinationen; Objekt ohne Zieltyp gilt für Objekt → alle.</div>
     </div>
   )
 }
 
 function typePreview(types: RecordType[]): string {
-  return types.length === 0 ? 'alle Typen' : types.map(type => RECORD_TYPE_LABELS[type]).join(', ')
+  const { t } = useTranslation('screenVocab')
+  return types.length === 0 ? t('appliesLabel.all') : types.map(type => recordTypeLabel(t, type)).join(', ')
 }
 
 function RelationTypeHelp({ label, inverseLabel, from, to }: {
@@ -870,7 +872,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
                           </td>
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: t.inverse_label }, '—')}</td>}
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t)}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{(t.applies_from?.length ?? 0) === 0 && (t.applies_to?.length ?? 0) === 0 ? 'Alle' : [...(t.applies_from ?? []), ...(t.applies_to ?? [])].join(' → ')}</td>}
                           {isHierarchical && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ? getLabel(terms.find(term => term.id === t.parent_id) ?? t, '—') : '—'}</td>}
                           <td className="col-act">
                             <div className="row-actions">

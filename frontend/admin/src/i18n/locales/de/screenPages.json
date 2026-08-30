@@ -5,9 +5,9 @@
   "loading": "Lade…",
   "empty": "Keine Seiten.",
   "draftSuffix": " · Entwurf",
-  "openAria": "Seite ${title} öffnen",
-  "deleteAria": "Seite ${title} löschen",
-  "deleteTitle": "Seite ${title} löschen",
+  "openAria": "Seite {{title}} öffnen",
+  "deleteAria": "Seite {{title}} löschen",
+  "deleteTitle": "Seite {{title}} löschen",
   "editorNew": "Neue Seite",
   "close": "Schließen",
   "errorSlugEmpty": "Slug darf nicht leer sein.",
@@ -25,5 +25,5 @@
   "saving": "Speichert…",
   "delete": "Löschen",
   "emptyEditor": "Seite auswählen oder neue anlegen.",
-  "deleteConfirm": "Seite \"${slug}\" wirklich löschen?"
+  "deleteConfirm": "Seite \"{{slug}}\" wirklich löschen?"
 }

@@ -54,7 +54,8 @@ type AiSchemaAssistFields = {
 }
 
 function aiSchemaAssistTitle(diff: AiSchemaAssistFields): string {
-  const typeLabel = (diff.target_type && TYPE_SINGULAR_LABELS[diff.target_type]) || diff.target_type || 'Schema'
+  const LABELS: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
+  const typeLabel = (diff.target_type && LABELS[diff.target_type]) || diff.target_type || 'Schema'
   return diff.target_subtype ? `${typeLabel} · ${diff.target_subtype}` : typeLabel
 }
 
@@ -67,7 +68,7 @@ type ExtraFields = {
   related_record_label?: string
 }
 
-function extraLines(diff: ExtraFields): string[] {
+function extraLines(t: (k: string, p?: Record<string, string>) => string, diff: ExtraFields): string[] {
   const lines: string[] = []
   if (diff.filename) lines.push(t('extraFile', { filename: diff.filename }))
   if (diff.relation_type) lines.push(t('extraRelationType', { relationType: diff.relation_type }))
@@ -172,7 +173,7 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
         <div className="timeline">
           {items.map(evt => {
             const diff = evt.changed_fields as { old?: Record<string, string>; new?: Record<string, string> } & ExtraFields
-            const extras = extraLines(diff)
+            const extras = extraLines(t, diff)
             const relatedRecord = relatedRecordSuffix(diff)
             return (
               <div key={evt.id} className={`evt ic-${evt.action}`}>

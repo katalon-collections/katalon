@@ -14,11 +14,11 @@ interface Props {
 type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
-  { key: 'object',     labelKey: 'recordTypes.object' },
-  { key: 'entity',     labelKey: 'recordTypes.entity' },
-  { key: 'place',      labelKey: 'recordTypes.place' },
-  { key: 'occurrence', labelKey: 'recordTypes.occurrence' },
-  { key: 'procedure',  labelKey: 'recordTypes.procedure' },
+  { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
+  { key: 'entity',     label: 'Entitäten',   labelKey: 'recordTypes.entity' },
+  { key: 'place',      label: 'Orte',        labelKey: 'recordTypes.place' },
+  { key: 'occurrence', label: 'Occurrences', labelKey: 'recordTypes.occurrence' },
+  { key: 'procedure',  label: 'Vorgänge',    labelKey: 'recordTypes.procedure' },
 ] as const
 
 const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
@@ -412,6 +412,7 @@ function SectionDangerZone() {
   const [activeSubtype, setActiveSubtype] = useState('')
   const [summary, setSummary] = useState<number | null>(null)
   const [confirmation, setConfirmation] = useState('')
+  const { t } = useTranslation('screenSettings')
   const [resetting, setResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)

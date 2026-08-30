@@ -5,9 +5,9 @@
   "loading": "Loading…",
   "empty": "No pages.",
   "draftSuffix": " · Draft",
-  "openAria": "Open page ${title}",
-  "deleteAria": "Delete page ${title}",
-  "deleteTitle": "Delete page ${title}",
+  "openAria": "Open page {{title}}",
+  "deleteAria": "Delete page {{title}}",
+  "deleteTitle": "Delete page {{title}}",
   "editorNew": "New Page",
   "close": "Close",
   "errorSlugEmpty": "Slug must not be empty.",
@@ -25,5 +25,5 @@
   "saving": "Saving…",
   "delete": "Delete",
   "emptyEditor": "Select a page or create a new one.",
-  "deleteConfirm": "Really delete page \"${slug}\"?"
+  "deleteConfirm": "Really delete page \"{{slug}}\"?"
 }

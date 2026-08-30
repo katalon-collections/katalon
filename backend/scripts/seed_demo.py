@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from pathlib import Path
 from typing import Any
 
+import httpx
 from geoalchemy2 import WKTElement
 from sqlalchemy import select, update
 
@@ -24,6 +26,7 @@ from katalon.core.models import (
     AuthoritySource,
     Entity,
     FieldDefinition,
+    MediaFile,
     Object,
     Occurrence,
     Place,
@@ -32,7 +35,10 @@ from katalon.core.models import (
     VocabularyTerm,
 )
 from katalon.database import AsyncSessionLocal
+from katalon.config import settings
+from katalon.core.media_validation import verified_image_mime
 from katalon.services.relation_service import sync_schema_relations
+from katalon.workers.media_tasks import generate_iiif_tiles
 
 # Relation-type terms MUST live in the system "relation_types" vocabulary — the portal's
 # generic incoming-relations panel (useRelationTypeLabels.ts, portal_public.py) only ever
@@ -46,6 +52,34 @@ GENRE_VOCAB_NAME = "gattungen"
 MATERIAL_LABELS = {"papier": "Papier", "buetten": "Büttenpapier", "karton": "Karton", "leinwand": "Leinwand", "glasnegativ": "Glasnegativ"}
 ORTSTYP_LABELS = {"residenzstadt": "Residenzstadt", "stadt": "Stadt", "dorf": "Dorf"}
 GENRE_LABELS = {"drama": "Drama", "roman": "Roman", "gedichtzyklus": "Gedichtzyklus", "oper": "Oper", "epos": "Epos"}
+
+PD_MARK = "https://creativecommons.org/publicdomain/mark/1.0/"
+CC0 = "https://creativecommons.org/publicdomain/zero/1.0/"
+
+# Original files and rights are verified on the linked Commons file pages.  A seed run
+# fails instead of silently creating incomplete media rows when a source is unavailable.
+DEMO_IMAGES: list[tuple[str, str, str, str, str]] = [
+    ("OBJ-001", "goethe-stieler.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Goethe_(Stieler_1828).jpg", "https://upload.wikimedia.org/wikipedia/commons/0/0e/Goethe_%28Stieler_1828%29.jpg"),
+    ("OBJ-002", "schiller.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Schiller_edit1.jpg", "https://upload.wikimedia.org/wikipedia/commons/e/e5/Schiller_edit1.jpg"),
+    ("OBJ-003", "herder-rijksmuseum.jpg", "CC0", "https://commons.wikimedia.org/wiki/File:Portret_van_Johann_Gottfried_Herder,_RP-P-1914-4131.jpg", "https://upload.wikimedia.org/wikipedia/commons/2/27/Portret_van_Johann_Gottfried_Herder%2C_RP-P-1914-4131.jpg"),
+    ("OBJ-004", "faust-opening.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Goethe_Faust_Opening_Fraktur_20052706_crop.jpg", "https://upload.wikimedia.org/wikipedia/commons/f/f7/Goethe_Faust_Opening_Fraktur_20052706_crop.jpg"),
+    ("OBJ-005", "schiller-portrait.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Friedrich_von_Schiller_(5254815).jpg", "https://upload.wikimedia.org/wikipedia/commons/8/81/Friedrich_von_Schiller_%285254815%29.jpg"),
+    ("OBJ-006", "werther-manuscript.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Recueil._%22Werther%22_de_P._Milliet,_G._Hartamann,_d%27apr%C3%A8s_Goethe_-_btv1b10507503p_(03_of_32).jpg", "https://upload.wikimedia.org/wikipedia/commons/0/0e/Recueil._%22Werther%22_de_P._Milliet%2C_G._Hartamann%2C_d%27apr%C3%A8s_Goethe_-_btv1b10507503p_%2803_of_32%29.jpg"),
+    ("OBJ-007", "wieland-engraving.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:1800_circa_Christoph_Martin_Wieland,_Kupferstich_von_Heinrich_Friedrich_Thomas_Schmidt_nach_Ferdinand_Jagermann,_Landes-Industrie-Comptoir.jpg", "https://upload.wikimedia.org/wikipedia/commons/b/b6/1800_circa_Christoph_Martin_Wieland%2C_Kupferstich_von_Heinrich_Friedrich_Thomas_Schmidt_nach_Ferdinand_Jagermann%2C_Landes-Industrie-Comptoir.jpg"),
+    ("OBJ-008", "goethe-roman-campagna.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Johann_Heinrich_Wilhelm_Tischbein_-_Goethe_in_the_Roman_Campagna_-_Google_Art_Project.jpg", "https://upload.wikimedia.org/wikipedia/commons/a/a0/Johann_Heinrich_Wilhelm_Tischbein_-_Goethe_in_the_Roman_Campagna_-_Google_Art_Project.jpg"),
+    ("OBJ-009", "goethe-passport-1787.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Goethes_Reisepass_von_1787.jpg", "https://upload.wikimedia.org/wikipedia/commons/a/a7/Goethes_Reisepass_von_1787.jpg"),
+    ("OBJ-010", "goethe-alsace-manuscript.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Chansons_populaires_recueillies_par_Goethe_en_Alsace.jpg", "https://upload.wikimedia.org/wikipedia/commons/6/6b/Chansons_populaires_recueillies_par_Goethe_en_Alsace.jpg"),
+    ("OBJ-011", "schiller-portrait-engraving.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Portrait_of_Schiller_(4674247).jpg", "https://upload.wikimedia.org/wikipedia/commons/a/a6/Portrait_of_Schiller_%284674247%29.jpg"),
+    ("OBJ-012", "goethe-bury.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:JohannWolfgangVonGoethe_FriedrichBury.jpg", "https://upload.wikimedia.org/wikipedia/commons/f/ff/JohannWolfgangVonGoethe_FriedrichBury.jpg"),
+    ("OBJ-013", "herder-portrait-engraving.jpg", "CC0", "https://commons.wikimedia.org/wiki/File:Portret_van_Johann_Gottfried_von_Herder,_RP-P-1914-785.jpg", "https://upload.wikimedia.org/wikipedia/commons/9/99/Portret_van_Johann_Gottfried_von_Herder%2C_RP-P-1914-785.jpg"),
+    ("OBJ-014", "weimar-station-1910.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Bahnhof_Weimar_ca_1910.jpg", "https://upload.wikimedia.org/wikipedia/commons/9/96/Bahnhof_Weimar_ca_1910.jpg"),
+    ("OBJ-015", "goethehaus-weimar.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Weimar,_Th%C3%BCringen_-_Goethehaus_(Zeno_Ansichtskarten).jpg", "https://upload.wikimedia.org/wikipedia/commons/6/6a/Weimar%2C_Th%C3%BCringen_-_Goethehaus_%28Zeno_Ansichtskarten%29.jpg"),
+    ("OBJ-016", "erlkoenig.png", "Public domain", "https://commons.wikimedia.org/wiki/File:Erlk%C3%B6nig.png", "https://upload.wikimedia.org/wikipedia/commons/6/6d/Erlk%C3%B6nig.png"),
+    ("OBJ-017", "theatre-notice.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Die_Gartenlaube_(1885)_277.jpg", "https://upload.wikimedia.org/wikipedia/commons/1/10/Die_Gartenlaube_%281885%29_277.jpg"),
+    ("OBJ-018", "strasbourg-cathedral.jpg", "CC0", "https://commons.wikimedia.org/wiki/File:Interior_View_of_Strasbourg_Cathedral_MET_DP102697.jpg", "https://upload.wikimedia.org/wikipedia/commons/3/33/Interior_View_of_Strasbourg_Cathedral_MET_DP102697.jpg"),
+    ("OBJ-019", "strasbourg-plan.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Plan_de_Strasbourg_-_dress%C3%A9e_par_Woerl_et_grav%C3%A9e_sous_sa_direction_;_lithographie_de_B._Herder_-_btv1b10109501c.jpg", "https://upload.wikimedia.org/wikipedia/commons/7/7c/Plan_de_Strasbourg_-_dress%C3%A9e_par_Woerl_et_grav%C3%A9e_sous_sa_direction_%3B_lithographie_de_B._Herder_-_btv1b10109501c.jpg"),
+    ("OBJ-020", "goethe-plaque.jpg", "CC0", "https://commons.wikimedia.org/wiki/File:Gedenktafel_Johann_Wolfgang_Goethe.jpg", "https://upload.wikimedia.org/wikipedia/commons/3/30/Gedenktafel_Johann_Wolfgang_Goethe.jpg"),
+]
 
 
 async def make_vocab(db, name: str, kind: str, terms: list[dict[str, Any]], hierarchical: bool = False) -> dict[str, str]:
@@ -80,6 +114,50 @@ async def make_vocab(db, name: str, kind: str, terms: list[dict[str, Any]], hier
 
 def rel(id_: str, label: str, rtype: str) -> dict[str, Any]:
     return {"id": id_, "label": label, "relation_type": rtype}
+
+
+async def seed_demo_images(db, objects: dict[str, Object]) -> None:
+    """Download the fixed PD/CC0 demo images and enqueue their ordinary IIIF processing."""
+    media_root = Path(settings.media_root)
+    media_root.mkdir(parents=True, exist_ok=True)
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    media_ids: list[uuid.UUID] = []
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+        for idno, filename, license_name, source_url, download_url in DEMO_IMAGES:
+            file_id = uuid.uuid4()
+            destination = media_root / f"{file_id}{Path(filename).suffix}"
+            try:
+                async with client.stream("GET", download_url) as response:
+                    response.raise_for_status()
+                    size = 0
+                    with destination.open("wb") as target:
+                        async for chunk in response.aiter_bytes():
+                            size += len(chunk)
+                            if size > max_bytes:
+                                raise ValueError(f"{filename} exceeds configured upload size")
+                            target.write(chunk)
+                mime_type = verified_image_mime(destination)
+            except Exception:
+                destination.unlink(missing_ok=True)
+                raise
+
+            db.add(MediaFile(
+                id=file_id,
+                object_id=objects[idno].id,
+                filename=filename,
+                mime_type=mime_type,
+                file_path=str(destination),
+                status="pending",
+                is_primary=True,
+                license_uri=CC0 if license_name == "CC0" else PD_MARK,
+                rights_holder={"name": f"{license_name}; Wikimedia Commons", "uri": source_url},
+            ))
+            media_ids.append(file_id)
+
+    await db.commit()
+    for media_id in media_ids:
+        generate_iiif_tiles.delay(str(media_id))
 
 
 async def add_field(
