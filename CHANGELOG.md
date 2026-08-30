@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-08-30
+
+### Changed
+- Vokabular-Import aus der Termpflege in den Importer-Reiter „Vokabulare“ verschoben.
+
 ## [1.10.0] - 2026-08-30
 
 ### Added
