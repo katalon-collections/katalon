@@ -111,30 +111,30 @@ export type PersistedImporterState = Pick<
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 export const RECORD_TYPES = [
-  { id: 'object',     label: 'Objekte' },
-  { id: 'entity',     label: 'Entitäten' },
-  { id: 'place',      label: 'Orte' },
+  { id: 'object',     label: 'Objects' },
+  { id: 'entity',     label: 'Entities' },
+  { id: 'place',      label: 'Places' },
   { id: 'occurrence', label: 'Occurrences' },
 ] as const
 
 export const UPSERT_STRATEGIES = [
-  { id: 'skip',    label: 'Bestehende überspringen (nur neue anlegen)' },
-  { id: 'merge',   label: 'Zusammenführen (neue Felder hinzufügen)' },
-  { id: 'replace', label: 'Ersetzen (komplett überschreiben)' },
+  { id: 'skip',    label: 'Skip existing (only create new)' },
+  { id: 'merge',   label: 'Merge (add new fields)' },
+  { id: 'replace', label: 'Replace (overwrite completely)' },
 ] as const
 
 export const FIELD_TYPE_OPTIONS = [
   { id: 'text',     label: 'Text' },
-  { id: 'number',   label: 'Zahl' },
-  { id: 'date',     label: 'Datum' },
+  { id: 'number',   label: 'Number' },
+  { id: 'date',     label: 'Date' },
   { id: 'boolean',  label: 'Boolean' },
-  { id: 'vocab',    label: 'Vokabular' },
+  { id: 'vocab',    label: 'Vocabulary' },
   { id: 'relation', label: 'Relation' },
 ] as const
 
 // Steps 0=Upload, 1=Mapping (CSV/Excel) or XmlRecordSelector (XML), 2=Mapping (XML only), 3=DryRun, 4=Import
 // For CSV/Excel the wizard has 4 steps; XML adds one extra step between Upload and Mapping
-export const STEPS = ['Upload', 'Mapping', 'Probelauf', 'Import'] as const
-export const STEPS_XML = ['Upload', 'Element', 'Mapping', 'Probelauf', 'Import'] as const
+export const STEPS = ['Upload', 'Mapping', 'Dry run', 'Import'] as const
+export const STEPS_XML = ['Upload', 'Element', 'Mapping', 'Dry run', 'Import'] as const
 
 export const IMPORTER_STATE_KEY = 'katalon_importer_state'

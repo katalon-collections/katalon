@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
 import { getLabel } from '../../../types'
@@ -40,6 +41,7 @@ export function StepMapping({
   missingRequired, idnoMissing, mappedCount, ignoredCount,
   dryRunning, onDryRun, onBack, onProfileExport, profileWarnings, xmlSelectors,
 }: Props) {
+  const { t } = useTranslation('screenImporter')
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
   const [warningsExpanded, setWarningsExpanded] = useState(false)
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
@@ -432,7 +434,7 @@ export function StepMapping({
         <button className="btn pri" onClick={onDryRun} disabled={dryRunning || mappedCount === 0 || idnoMissing}>
           {dryRunning
             ? <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .7s linear infinite', marginRight: 6 }} />Prüfe…</>
-            : 'Weiter → Probelauf'}
+            : t('continueToDryRun')}
         </button>
         {onProfileExport && Object.keys(mapping).length > 0 && (
           <button className="btn gh" onClick={onProfileExport} style={{ marginLeft: 'auto' }}>

@@ -103,6 +103,7 @@ function RelationTypeHelp({ label, inverseLabel, from, to }: {
   from: RecordType[]
   to: RecordType[]
 }) {
+  const { t } = useTranslation('screenVocab')
   const source = typePreview(from)
   const target = typePreview(to)
   return (
@@ -111,16 +112,16 @@ function RelationTypeHelp({ label, inverseLabel, from, to }: {
     >
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--fg)' }}>
         <Help size={14} aria-hidden="true" />
-        <strong>So wird der Relationstyp verwendet</strong>
+        <strong>{t('relationTypeHelp.heading')}</strong>
       </div>
       <div style={{ marginTop: 4 }}>
-        <strong>Quelle</strong> ist der Ausgangsdatensatz, <strong>Ziel</strong> der verknüpfte Datensatz. Das Label gilt von Quelle → Ziel; die Gegenrichtung zeigt dieselbe Verbindung vom Ziel aus.
+        <strong>{t('relationTypeHelp.source')}</strong> ist der Ausgangsdatensatz, <strong>{t('relationTypeHelp.target')}</strong> der verknüpfte Datensatz. Das Label gilt von Quelle → Ziel; die Gegenrichtung zeigt dieselbe Verbindung vom Ziel aus.
       </div>
       <div style={{ marginTop: 4 }}>
-        Beispiel: <em>„ist Teil von“</em> für Objekt → Occurrence; als Gegenrichtung <em>„hat Teil“</em> für Occurrence → Objekt.
+        {t('relationTypeHelp.example')}
       </div>
       <div style={{ marginTop: 6, color: 'var(--fg)' }}>
-        <strong>Ihre Vorschau:</strong> {source} — <em>{label || 'Label'}</em> → {target}
+        <strong>{t('relationTypeHelp.preview')}</strong> {source} — <em>{label || t('relationTypeHelp.labelFallback')}</em> → {target}
         <br />
         {target} — <em>{inverseLabel || 'Gegenrichtung'}</em> → {source}
       </div>
@@ -225,6 +226,7 @@ interface ScreenVocabProps {
 }
 
 export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
+  const { t } = useTranslation('screenVocab')
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [terms, setTerms] = useState<VocabularyTerm[]>([])
   const [activeVocab, setActiveVocab] = useState<string | null>(null)
@@ -263,77 +265,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [editTermMetadata, setEditTermMetadata] = useState<Record<string, unknown>>({})
   const [editTermParentId, setEditTermParentId] = useState('')
   const [termFields, setTermFields] = useState<FieldDefinition[]>([])
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
-  const [mapping, setMapping] = useState<Record<string, string>>({})
-  const [importStrategy, setImportStrategy] = useState<'append' | 'replace'>('append')
-  const [importBusy, setImportBusy] = useState(false)
   const languages = useSupportedLanguages()
-  const [importFeedback, setImportFeedback] = useState<string | null>(null)
-  const [importResult, setImportResult] = useState<null | {
-    created: number
-    updated: number
-    deleted: number
-    dry_run: boolean
-    errors: { row: number | null; message: string }[]
-  }>(null)
-  const [isDragging, setIsDragging] = useState(false)
-
-  const CSV_TARGETS = [
-    { value: '', label: 'Ignorieren' },
-    { value: 'term', label: 'ID' },
-    { value: 'parent_term', label: 'Parent-ID' },
-    { value: 'label:de', label: 'Label (de)' },
-    { value: 'label:en', label: 'Label (en)' },
-    { value: 'inverse_label:de', label: 'Gegenrichtung (de)' },
-    { value: 'inverse_label:en', label: 'Gegenrichtung (en)' },
-  ]
-
-  function detectDelimiter(line: string): string {
-    const candidates = [',', ';', '\t', '|']
-    let best = ','
-    let bestCount = -1
-    for (const delimiter of candidates) {
-      const count = line.split(delimiter).length
-      if (count > bestCount) {
-        best = delimiter
-        bestCount = count
-      }
-    }
-    return best
-  }
-
-  async function prepareCsvMapping(file: File) {
-    const text = await file.text()
-    const firstLine = text.split(/\r?\n/)[0] ?? ''
-    const delimiter = detectDelimiter(firstLine)
-    const headers = firstLine.split(delimiter).map(v => v.trim()).filter(Boolean)
-    setCsvHeaders(headers)
-    setMapping(
-      headers.reduce<Record<string, string>>((acc, header) => {
-        const normalized = header.toLowerCase()
-        if (normalized === 'term') acc[header] = 'term'
-        else if ((normalized === 'parent_term' || normalized === 'parent') && vocabs.find(v => v.id === activeVocab)?.kind !== 'relation') acc[header] = 'parent_term'
-        else if (normalized === 'label_de' || normalized === 'de') acc[header] = 'label:de'
-        else if (normalized === 'label_en' || normalized === 'en') acc[header] = 'label:en'
-        else acc[header] = ''
-        return acc
-      }, {}),
-    )
-  }
-
-  async function handleFile(file: File | null) {
-    setImportFeedback(null)
-    setImportResult(null)
-    setImportFile(file)
-    setCsvHeaders([])
-    setMapping({})
-    if (!file) return
-    const lower = file.name.toLowerCase()
-    if (lower.endsWith('.csv') || lower.endsWith('.tsv')) {
-      await prepareCsvMapping(file)
-    }
-  }
 
   const loadVocabs = useCallback(() => {
     setLoading(true)
@@ -477,35 +409,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     }
   }
 
-  const isCsvImport = importFile ? /\.(csv|tsv)$/i.test(importFile.name) : false
-  const hasTermMapping = Object.values(mapping).includes('term')
-  const hasLabelMapping = Object.values(mapping).some(v => v.startsWith('label:'))
-
-  async function runVocabularyImport(dryRun: boolean) {
-    if (!activeVocab || !importFile) return
-    if (isCsvImport && !hasTermMapping && !hasLabelMapping) {
-      setImportFeedback("Bitte mindestens eine Spalte auf 'ID' oder 'Label' mappen. Ohne ID-Spalte wird die ID aus dem Label abgeleitet.")
-      return
-    }
-    setImportBusy(true)
-    setImportFeedback(null)
-    try {
-      const result = await vocabularies.importTerms(activeVocab, importFile, {
-        dryRun,
-        strategy: importStrategy,
-        mapping: isCsvImport ? mapping : undefined,
-      })
-      setImportResult(result)
-      if (!dryRun && result.errors.length === 0) {
-        loadTerms()
-      }
-    } catch (e) {
-      setImportFeedback((e as Error).message)
-    } finally {
-      setImportBusy(false)
-    }
-  }
-
   const vocab = vocabs.find(v => v.id === activeVocab)
   const isHierarchical = vocab?.is_hierarchical === true
   const displayTerms = isHierarchical ? flattenTerms(terms) : terms.map(term => ({ term, depth: 0 }))
@@ -513,9 +416,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     const excluded = termId ? descendantIds(terms, termId) : new Set<string>()
     return flattenTerms(terms).filter(({ term }) => !excluded.has(term.id))
   }
-  const csvTargets = vocab?.kind === 'relation'
-    ? CSV_TARGETS.filter(target => target.value !== 'parent_term')
-    : CSV_TARGETS
   const tableColumnCount = vocab?.kind === 'relation' ? 5 : isHierarchical ? 4 : 3
 
   function startNewChild(parent: VocabularyTerm) {
@@ -540,7 +440,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="ph">
-        <div><h1>Vokabular</h1><div className="sub">Kontrollierte Vokabulare und Terme</div></div>
+        <div><h1>{t('headline')}</h1><div className="sub">{t('headlineSub')}</div></div>
         <div className="right">
           <button className="btn" onClick={() => setShowNewVocab(v => !v)}><Plus size={13} /> Neues Vokabular</button>
         </div>
@@ -635,97 +535,6 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                   <button className="btn pri" onClick={() => { setNewTermParentId(''); setShowNewTerm(v => !v) }}><Plus size={13} /> Neuer Term</button>
-                </div>
-              </div>
-
-              <div className="card" style={{ marginBottom: 12 }}>
-                <div className="bd">
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Vokabular-Import (CSV/JSON)</div>
-                  <div className="help" style={{ marginBottom: 8 }}>
-                    {vocab.kind === 'relation'
-                      ? 'Relationstypen sind flach. Ohne ID-Spalte wird die ID automatisch aus dem Label abgeleitet.'
-                      : 'Hierarchische Listen: eine Spalte auf „Parent-ID" mappen — Inhalt ist die ID oder das Label des Elternterms (z. B. „Kopierschutz"). Ohne gemappte ID-Spalte wird die ID automatisch aus dem Label abgeleitet (z. B. „Kopierschutz DRM" → „kopierschutz-drm").'}
-                  </div>
-                  <div
-                    onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={e => {
-                      e.preventDefault()
-                      setIsDragging(false)
-                      void handleFile(e.dataTransfer.files?.[0] ?? null)
-                    }}
-                    style={{
-                      border: `1px dashed ${isDragging ? 'var(--ac)' : 'var(--line)'}`,
-                      background: isDragging ? 'color-mix(in oklab, var(--ac) 8%, white)' : 'transparent',
-                      borderRadius: 8,
-                      padding: 10,
-                      fontSize: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    Datei hier ablegen oder auswählen
-                    <div style={{ marginTop: 8 }}>
-                      <input
-                        type="file"
-                        accept=".csv,.tsv,.json"
-                        onChange={e => { void handleFile(e.target.files?.[0] ?? null) }}
-                      />
-                    </div>
-                    {importFile && <div style={{ marginTop: 8, color: 'var(--fg-3)' }}>{importFile.name}</div>}
-                  </div>
-
-                  {isCsvImport && csvHeaders.length > 0 && (
-                    <div style={{ marginBottom: 10 }}>
-                      <div className="lbl" style={{ marginBottom: 6 }}>Mapping-Dialog (CSV-Spalten → Zielfelder)</div>
-                      <div style={{ display: 'grid', gap: 6 }}>
-                        {csvHeaders.map(header => (
-                          <div key={header} className="vocab-mapping-row">
-                            <input className="fld mono" value={header} readOnly />
-                            <select
-                              className="fld"
-                              value={mapping[header] ?? ''}
-                              onChange={e => setMapping(prev => ({ ...prev, [header]: e.target.value }))}
-                            >
-                              {csvTargets.map(opt => <option key={opt.value || 'ignore'} value={opt.value}>{opt.label}</option>)}
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <select
-                      className="fld"
-                      style={{ maxWidth: 220 }}
-                      value={importStrategy}
-                      onChange={e => setImportStrategy(e.target.value as 'append' | 'replace')}
-                    >
-                      <option value="append">Strategie: Ergänzen</option>
-                      <option value="replace">Strategie: Komplett ersetzen</option>
-                    </select>
-                    <button className="btn" disabled={!importFile || importBusy} onClick={() => void runVocabularyImport(true)}>Dry-Run</button>
-                    <button className="btn pri" disabled={!importFile || importBusy} onClick={() => void runVocabularyImport(false)}>Import ausführen</button>
-                  </div>
-
-                  {importFeedback && (
-                    <div style={{ marginTop: 8, color: '#b91c1c', fontSize: 12 }}>{importFeedback}</div>
-                  )}
-
-                  {importResult && (
-                    <div style={{ marginTop: 10, fontSize: 12 }}>
-                      <div>
-                        {importResult.dry_run ? 'Dry-Run' : 'Import'} · erstellt: {importResult.created} · aktualisiert: {importResult.updated} · gelöscht: {importResult.deleted}
-                      </div>
-                      {importResult.errors.length > 0 && (
-                        <ul role="alert" style={{ marginTop: 6, color: '#b91c1c', paddingLeft: 16 }}>
-                          {importResult.errors.map((err, idx) => (
-                            <li key={`${err.row ?? 'x'}-${idx}`}>Zeile {err.row ?? '—'}: {err.message}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
 

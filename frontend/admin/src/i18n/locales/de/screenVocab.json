@@ -4,5 +4,15 @@
   },
   "appliesLabel": {
     "all": "Alle"
+  },
+  "headline": "Vokabular",
+  "headlineSub": "Kontrollierte Vokabulare und Terme",
+  "relationTypeHelp": {
+    "heading": "So wird der Relationstyp verwendet",
+    "source": "Quelle",
+    "target": "Ziel",
+    "example": "Beispiel: „ist Teil von“ für Objekt → Occurrence; als Gegenrichtung „hat Teil“ für Occurrence → Objekt.",
+    "preview": "Ihre Vorschau:",
+    "labelFallback": "Label"
   }
 }

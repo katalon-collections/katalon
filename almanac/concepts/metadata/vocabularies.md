@@ -27,6 +27,9 @@ sources:
   - id: screen-vocab
     type: file
     path: frontend/admin/src/components/screens/ScreenVocab.tsx
+  - id: vocabulary-import-screen
+    type: file
+    path: frontend/admin/src/components/screens/VocabularyImport.tsx
   - id: screen-form
     type: file
     path: frontend/admin/src/components/screens/ScreenForm.tsx
@@ -63,7 +66,7 @@ This is why relation vocabularies are connected to [generic relations](../relati
 
 ## Imports
 
-Vocabulary imports accept CSV, TSV, or JSON. CSV and TSV require a JSON mapping from input columns to `term`, `parent_term`, `label:<lang>`, or `inverse_label:<lang>` targets; relation vocabularies omit and reject `parent_term`. JSON can be either a list of term objects or an object with a `terms` list [@vocab-api] [@import-service]. The import service detects delimiters, tries common encodings, merges duplicate terms by key, supports nested JSON `children`, reports parent conflicts, and supports dry-run statistics before writing [@import-service].
+Vocabulary imports are in the **Importer** under the **Vocabularies** tab. Editors first select the target vocabulary, then upload CSV, TSV, or JSON. CSV and TSV require a mapping from input columns to `term`, `parent_term`, `label:<lang>`, or `inverse_label:<lang>` targets; relation vocabularies omit `parent_term`. JSON can be either a list of term objects or an object with a `terms` list [@vocab-api] [@import-service] [@vocabulary-import-screen]. The import service detects delimiters, tries common encodings, merges duplicate terms by key, supports nested JSON `children`, reports parent conflicts, and supports dry-run statistics before writing [@import-service].
 
 Import writes are keyed by the term code. In append mode the service counts new and updated term codes; in replace mode it deletes existing terms before recreating the imported set when `dry_run` is false [@import-service].
 

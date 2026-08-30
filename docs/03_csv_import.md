@@ -12,6 +12,10 @@ Der Importer legt neue Datensätze an und kann bestehende Datensätze je nach Up
 
 Der Importer ist in der Admin-UI unter **Importer** erreichbar.
 
+## Vokabulare importieren
+
+Für kontrollierte Vokabulare im Importer den Reiter **Vokabulare** öffnen. Zuerst das Zielvokabular wählen, dann eine CSV-, TSV- oder JSON-Datei hochladen. Bei CSV und TSV die Spalten auf **ID**, **Parent-ID**, **Label** oder bei Relationstypen auf **Gegenrichtung** mappen. Ein **Dry-Run** zeigt die geplanten Änderungen, bevor der Import sie schreibt. Relationstypen sind flach und haben keine Parent-ID.
+
 ---
 
 ## Unterstützte Formate

@@ -8,7 +8,7 @@ Not committed. Run inside the api container after a full db-reset --all:
 
 Populates schema (field_definitions + vocabularies) for all four primary
 types plus 20 objects / 5 entities / 5 places / 5 occurrences with every
-field_type in use, and cross-type relations.
+field_type in use, cross-type relations, and 20 Wikimedia Commons PD/CC0 images.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ import httpx
 from geoalchemy2 import WKTElement
 from sqlalchemy import select, update
 
+from katalon.config import settings
+from katalon.core.media_validation import verified_image_mime
 from katalon.core.models import (
     AuthoritySource,
     Entity,
@@ -35,8 +37,6 @@ from katalon.core.models import (
     VocabularyTerm,
 )
 from katalon.database import AsyncSessionLocal
-from katalon.config import settings
-from katalon.core.media_validation import verified_image_mime
 from katalon.services.relation_service import sync_schema_relations
 from katalon.workers.media_tasks import generate_iiif_tiles
 
@@ -70,7 +70,7 @@ DEMO_IMAGES: list[tuple[str, str, str, str, str]] = [
     ("OBJ-009", "goethe-passport-1787.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Goethes_Reisepass_von_1787.jpg", "https://upload.wikimedia.org/wikipedia/commons/a/a7/Goethes_Reisepass_von_1787.jpg"),
     ("OBJ-010", "goethe-alsace-manuscript.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Chansons_populaires_recueillies_par_Goethe_en_Alsace.jpg", "https://upload.wikimedia.org/wikipedia/commons/6/6b/Chansons_populaires_recueillies_par_Goethe_en_Alsace.jpg"),
     ("OBJ-011", "schiller-portrait-engraving.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Portrait_of_Schiller_(4674247).jpg", "https://upload.wikimedia.org/wikipedia/commons/a/a6/Portrait_of_Schiller_%284674247%29.jpg"),
-    ("OBJ-012", "goethe-bury.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:JohannWolfgangVonGoethe_FriedrichBury.jpg", "https://upload.wikimedia.org/wikipedia/commons/f/ff/JohannWolfgangVonGoethe_FriedrichBury.jpg"),
+    ("OBJ-012", "goethe-stieler-portrait.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Joseph_Karl_Stieler_portrait_de_Johann_Wolfgang_von_Goethe.jpg", "https://upload.wikimedia.org/wikipedia/commons/f/f4/Joseph_Karl_Stieler_portrait_de_Johann_Wolfgang_von_Goethe.jpg"),
     ("OBJ-013", "herder-portrait-engraving.jpg", "CC0", "https://commons.wikimedia.org/wiki/File:Portret_van_Johann_Gottfried_von_Herder,_RP-P-1914-785.jpg", "https://upload.wikimedia.org/wikipedia/commons/9/99/Portret_van_Johann_Gottfried_von_Herder%2C_RP-P-1914-785.jpg"),
     ("OBJ-014", "weimar-station-1910.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Bahnhof_Weimar_ca_1910.jpg", "https://upload.wikimedia.org/wikipedia/commons/9/96/Bahnhof_Weimar_ca_1910.jpg"),
     ("OBJ-015", "goethehaus-weimar.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Weimar,_Th%C3%BCringen_-_Goethehaus_(Zeno_Ansichtskarten).jpg", "https://upload.wikimedia.org/wikipedia/commons/6/6a/Weimar%2C_Th%C3%BCringen_-_Goethehaus_%28Zeno_Ansichtskarten%29.jpg"),
@@ -123,20 +123,29 @@ async def seed_demo_images(db, objects: dict[str, Object]) -> None:
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     media_ids: list[uuid.UUID] = []
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=120.0,
+        headers={"User-Agent": "Katalon demo seeder/1.0 (https://github.com/karkraeg/Katalon)"},
+    ) as client:
         for idno, filename, license_name, source_url, download_url in DEMO_IMAGES:
             file_id = uuid.uuid4()
             destination = media_root / f"{file_id}{Path(filename).suffix}"
             try:
-                async with client.stream("GET", download_url) as response:
-                    response.raise_for_status()
-                    size = 0
-                    with destination.open("wb") as target:
-                        async for chunk in response.aiter_bytes():
-                            size += len(chunk)
-                            if size > max_bytes:
-                                raise ValueError(f"{filename} exceeds configured upload size")
-                            target.write(chunk)
+                for attempt in range(3):
+                    async with client.stream("GET", download_url) as response:
+                        if response.status_code == 429 and attempt < 2:
+                            await asyncio.sleep(5 * (attempt + 1))
+                            continue
+                        response.raise_for_status()
+                        size = 0
+                        with destination.open("wb") as target:
+                            async for chunk in response.aiter_bytes():
+                                size += len(chunk)
+                                if size > max_bytes:
+                                    raise ValueError(f"{filename} exceeds configured upload size")
+                                target.write(chunk)
+                    break
                 mime_type = verified_image_mime(destination)
             except Exception:
                 destination.unlink(missing_ok=True)
@@ -154,6 +163,7 @@ async def seed_demo_images(db, objects: dict[str, Object]) -> None:
                 rights_holder={"name": f"{license_name}; Wikimedia Commons", "uri": source_url},
             ))
             media_ids.append(file_id)
+            await asyncio.sleep(1)
 
     await db.commit()
     for media_id in media_ids:
@@ -498,10 +508,11 @@ async def main() -> None:
 
         # ============================================================== records: objects (20)
         photographer = entities["schroeter-atelier"]
+        objects: dict[str, Object] = {}
         obj_templates = [
             ("Bildnis Goethe im Alter", "goethe", "weimar", "faust", "leinwand", "Ölmalerei"),
             ("Bildnis Schiller", "schiller", "weimar", "raeuber", "leinwand", "Ölmalerei"),
-            ("Porträtfoto Herder", "herder", "weimar", "ideen-geschichte", "glasnegativ", "Albumin-Abzug"),
+            ("Porträt Herder", "herder", "weimar", "ideen-geschichte", "papier", "Kupferstich"),
             ("Erstausgabe Faust", None, "weimar", "faust", "papier", "Buchdruck"),
             ("Erstausgabe Die Räuber", None, "jena", "raeuber", "papier", "Buchdruck"),
             ("Manuskriptseite Werther", "goethe", "frankfurt-am-main", "werther", "buetten", "Handschrift"),
@@ -553,8 +564,11 @@ async def main() -> None:
             }
             o = Object(idno=f"OBJ-{i:03d}", object_type="sammlungsobjekt", status="public", metadata_=md)
             db.add(o)
+            objects[o.idno] = o
         await db.flush()
         await db.commit()
+
+        await seed_demo_images(db, objects)
 
         # -------------------------------------------------------------- mirror relation fields into `relations`
         result = await db.execute(select(Object))

@@ -8,6 +8,7 @@ import { StepMedia } from './importer/StepMedia'
 import { StepResult } from './importer/StepResult'
 import { StepUpload } from './importer/StepUpload'
 import { StepXmlRecordSelector } from './importer/StepXmlRecordSelector'
+import { VocabularyImport } from './VocabularyImport'
 
 function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
   const steps = isXml ? STEPS_XML : STEPS
@@ -23,15 +24,17 @@ function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
   )
 }
 
-type Props = { initialTab?: string | null; onTabChange?: (tab: 'metadata' | 'media') => void }
+type ImporterTab = 'metadata' | 'media' | 'vocabularies'
+type Props = { initialTab?: string | null; onTabChange?: (tab: ImporterTab) => void }
 
 export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   const { t } = useTranslation('screenImporter')
   const IMPORTER_TABS = [
     { id: 'metadata', label: t('tabs.metadata') },
     { id: 'media',    label: t('tabs.media') },
+    { id: 'vocabularies', label: t('tabs.vocabularies') },
   ]
-  const [activeTab, setActiveTab] = useState<'metadata' | 'media'>(initialTab === 'media' ? 'media' : 'metadata')
+  const [activeTab, setActiveTab] = useState<ImporterTab>(initialTab === 'media' || initialTab === 'vocabularies' ? initialTab : 'metadata')
   const [focusMediaHeading, setFocusMediaHeading] = useState(false)
 
   const {
@@ -45,7 +48,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   const isXml = state.sourceType === 'xml'
 
   useEffect(() => {
-    setActiveTab(initialTab === 'media' ? 'media' : 'metadata')
+    setActiveTab(initialTab === 'media' || initialTab === 'vocabularies' ? initialTab : 'metadata')
     setFocusMediaHeading(false)
   }, [initialTab])
 
@@ -58,7 +61,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
 
   function reset() { dispatch({ type: 'RESET' }) }
 
-  function selectTab(tab: 'metadata' | 'media', focusHeading = false) {
+  function selectTab(tab: ImporterTab, focusHeading = false) {
     setFocusMediaHeading(focusHeading)
     setActiveTab(tab)
     onTabChange?.(tab)
@@ -77,7 +80,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
             key={tab.id}
             aria-pressed={activeTab === tab.id}
             aria-label={t('tabAriaLabel', { label: tab.label })}
-            onClick={() => selectTab(tab.id as 'metadata' | 'media')}
+            onClick={() => selectTab(tab.id as ImporterTab)}
             style={{
               padding: '10px 20px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none',
               borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
@@ -212,6 +215,8 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
           <StepMedia focusHeading={focusMediaHeading} />
         </div>
       )}
+
+      {activeTab === 'vocabularies' && <VocabularyImport />}
     </div>
   )
 }
