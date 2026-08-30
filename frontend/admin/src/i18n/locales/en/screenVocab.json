@@ -1,0 +1,8 @@
+{
+  "appliesCheckboxes": {
+    "noSelectionMeansAll": "Nothing selected = applies to all types"
+  },
+  "appliesLabel": {
+    "all": "All"
+  }
+}

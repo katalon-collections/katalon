@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { adminConfig, authority, schema, subtypes, vocabularies } from '../../api/client'
 import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
@@ -7,15 +8,6 @@ import { Edit, Grip, Lightning, Plus, Trash } from '../ui/Icons'
 import { SchemaAiAssist } from './SchemaAiAssist'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
-
-const TYPES = [
-  { id: 'object',      label: 'Objekte',     key: 'object' },
-  { id: 'entity',      label: 'Entitäten',   key: 'entity' },
-  { id: 'place',       label: 'Orte',        key: 'place' },
-  { id: 'occurrence',  label: 'Occurrences', key: 'occurrence' },
-  { id: 'procedure',   label: 'Vorgänge',    key: 'procedure' },
-  { id: 'vocabulary_term', label: 'Vokabulare', key: 'vocabulary_term' },
-]
 
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
@@ -156,6 +148,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
 }
 
 function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
+  const { t } = useTranslation('screenSchema')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
   const primaryLang = languages[0] ?? 'de'
@@ -204,13 +197,13 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 
   async function handleSubFieldSave() {
     if (!subFieldForm || !fieldId) return
-    if (!subFieldForm.name.trim()) { setSubFieldError('Interner Name darf nicht leer sein.'); return }
+    if (!subFieldForm.name.trim()) { setSubFieldError(t('fieldDetail.subFieldErrorNameEmpty')); return }
     if (subFieldForm.field_type === 'relation' && !subFieldForm.relation_type_vocab) {
-      setSubFieldError('Bitte ein Relationstyp-Vokabular wählen.')
+      setSubFieldError(t('fieldDetail.subFieldErrorRelationVocab'))
       return
     }
     if (subFieldForm.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === subFieldForm.authority_source)) {
-      setSubFieldError('Bitte eine aktive Normdaten-Quelle wählen.')
+      setSubFieldError(t('fieldDetail.subFieldErrorAuthoritySource'))
       return
     }
     setSubFieldSaving(true)
@@ -267,7 +260,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   }
 
   async function handleSubFieldDelete(sfId: string) {
-    if (!window.confirm('Sub-Feld wirklich löschen?')) return
+    if (!window.confirm(t('fieldDetail.subFieldDeleteConfirm'))) return
     try {
       await schema.delete(sfId)
       onSubFieldChange()
@@ -331,10 +324,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   return (
     <div className="card" style={{ margin: '18px 24px' }}>
       <div className="hd">
-        <span>{isNew ? 'Neues Feld' : (getLabel({ label: form.label }, form.name))}</span>
+        <span>{isNew ? t('fieldDetail.newField') : (getLabel({ label: form.label }, form.name))}</span>
         {!isNew && <span className="sub">{form.name}</span>}
         <div className="grow" />
-        <button className="btn sm" onClick={onClose}>Schließen</button>
+        <button className="btn sm" onClick={onClose}>{t('fieldDetail.close')}</button>
       </div>
       <div className="bd">
         {error && <div style={{ marginBottom: 10, color: '#b91c1c', fontSize: 13 }}>{error}</div>}
@@ -354,24 +347,24 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         </div>
         <div className="fg-2">
           <div className="field">
-            <div className="lbl">Interner Name</div>
+            <div className="lbl">{t('fieldDetail.internalName')}</div>
             <input className="fld mono" value={form.name} onChange={e => {
               setNameManuallyEdited(true)
               set('name', e.target.value)
             }} disabled={!isNew} />
           </div>
           <div className="field" data-tour="field-type-select">
-            <div className="lbl">Feldtyp</div>
+            <div className="lbl">{t('fieldDetail.fieldType')}</div>
             <select className="fld" value={form.field_type} onChange={e => set('field_type', e.target.value)}>
-              {fieldTypes.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
+              {fieldTypes.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
             </select>
           </div>
         </div>
         {showSubtype && (
           <div className="field">
-            <div className="lbl">Subtyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(leer = gilt für alle Subtypen)</span></div>
+            <div className="lbl">{t('fieldDetail.subtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.subtypeHint')}</span></div>
             <select className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)} disabled={!isNew}>
-              <option value="">— alle Subtypen —</option>
+              <option value="">{t('fieldDetail.subtypeAll')}</option>
               {availableSubtypes.map(s => (
                 <option key={s.id} value={s.name}>{s.label.de || s.name}</option>
               ))}
@@ -381,115 +374,115 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_required} onChange={e => set('is_required', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Pflichtfeld</span>
+              <span style={{ fontSize: 13 }}>{t('fieldDetail.required')}</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_repeatable} onChange={e => set('is_repeatable', e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Wiederholbar</span>
+              <span style={{ fontSize: 13 }}>{t('fieldDetail.repeatable')}</span>
             </label>
             {!isVocabularyTerm && (form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" className="ck" checked={form.is_translatable} onChange={e => set('is_translatable', e.target.checked)} />
-                <span style={{ fontSize: 13 }}>Mehrsprachig</span>
+                <span style={{ fontSize: 13 }}>{t('fieldDetail.translatable')}</span>
               </label>
             )}
             {!isVocabularyTerm && !((form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable) && (
-              <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>Dieser Feldtyp ist nicht übersetzbar (nur Text/Rich-Text, nicht wiederholbar).</span>
+              <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>{t('fieldDetail.notTranslatableHint')}</span>
             )}
         </div>
         {form.field_type === 'authority' && (
           <div className="field">
-            <div className="lbl">Normdaten-Quelle</div>
+            <div className="lbl">{t('fieldDetail.authoritySource')}</div>
             <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
               {authoritySources
                 .filter(source => source.is_enabled || source.id === form.authority_source)
                 .map(source => (
                   <option key={source.id} value={source.id} disabled={!source.is_enabled}>
-                    {source.label}{source.is_enabled ? '' : ' (deaktiviert)'}
+                    {source.label}{source.is_enabled ? '' : t('fieldDetail.authorityDisabled')}
                   </option>
                 ))}
             </select>
-            {!isNew && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Ein Quellenwechsel macht bereits gespeicherte Normdatenwerte ungültig.</div>}
+            {!isNew && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.authorityChangeWarning')}</div>}
           </div>
         )}
         {(form.field_type === 'vocab' || form.field_type === 'vocab_free') && (
           <div className="field">
             <div className="lbl">
-              Vokabular {form.field_type === 'vocab' && <span className="req">*</span>}
-              {form.field_type === 'vocab_free' && <span style={{ fontSize: 11, color: 'var(--fg-3)', marginLeft: 4 }}>(optional — nur für Vorschläge)</span>}
+              {t('fieldDetail.vocabLabel')} {form.field_type === 'vocab' && <span className="req">*</span>}
+              {form.field_type === 'vocab_free' && <span style={{ fontSize: 11, color: 'var(--fg-3)', marginLeft: 4 }}>{t('fieldDetail.vocabFreeHint')}</span>}
             </div>
             <select className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
-              <option value="">— Vokabular wählen —</option>
+              <option value="">{t('fieldDetail.vocabPlaceholder')}</option>
               {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
         )}
         <details style={{ marginBottom: 16 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Erweiterte Optionen</summary>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{t('fieldDetail.advancedOptions')}</summary>
           <div style={{ marginTop: 14 }}>
             <div className="field">
-              <div className="lbl">Sortierung</div>
+              <div className="lbl">{t('fieldDetail.sortOrder')}</div>
               <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
             </div>
             {!isVocabularyTerm && (
               <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.show_in_detail} onChange={e => set('show_in_detail', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Detailansicht zeigen</span>
+                  <span style={{ fontSize: 13 }}>{t('fieldDetail.showInDetail')}</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.show_in_list} onChange={e => set('show_in_list', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Listenansicht zeigen</span>
+                  <span style={{ fontSize: 13 }}>{t('fieldDetail.showInList')}</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>Öffentlich über APIs ausgeben</span>
+                  <span style={{ fontSize: 13 }}>{t('fieldDetail.isPublic')}</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.is_facet} onChange={e => set('is_facet', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>Als Facette verwenden</span>
+                  <span style={{ fontSize: 13 }}>{t('fieldDetail.isFacet')}</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" className="ck" checked={form.is_searchable} onChange={e => set('is_searchable', e.target.checked)} />
-                  <span style={{ fontSize: 13 }}>In Suche einbeziehen</span>
+                  <span style={{ fontSize: 13 }}>{t('fieldDetail.isSearchable')}</span>
                 </label>
               </div>
             )}
           {!isVocabularyTerm && form.show_in_detail && (
             <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingTop: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13 }}>Bereich (Portal-Detailseite)</span>
+                <span style={{ fontSize: 13 }}>{t('fieldDetail.detailSlot')}</span>
                 <select className="fld" style={{ width: 'auto' }} value={form.detail_slot} onChange={e => set('detail_slot', e.target.value as 'main' | 'sidebar')}>
-                  <option value="sidebar">Seitenspalte</option>
-                  <option value="main">Hauptbereich</option>
+                  <option value="sidebar">{t('fieldDetail.detailSlotSidebar')}</option>
+                  <option value="main">{t('fieldDetail.detailSlotMain')}</option>
                 </select>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13 }}>Rolle (Portal-Detailseite)</span>
+                <span style={{ fontSize: 13 }}>{t('fieldDetail.detailRole')}</span>
                 <select className="fld" style={{ width: 'auto' }} value={form.detail_role} onChange={e => set('detail_role', e.target.value as 'none' | 'description')}>
-                  <option value="none">Keine</option>
-                  <option value="description">Beschreibung</option>
+                  <option value="none">{t('fieldDetail.detailRoleNone')}</option>
+                  <option value="description">{t('fieldDetail.detailRoleDescription')}</option>
                 </select>
               </label>
             </div>
           )}
             {form.field_type === 'text' && (
               <div className="field">
-                <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <div className="lbl">{t('fieldDetail.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
                 <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
                   placeholder="^97[89]-[0-9]{10}$" />
-                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Beispiele: ISBN-13, ISSN, DOI</div>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.validationExamples')}</div>
               </div>
             )}
         {!isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
           <div className="field">
-            <div className="lbl">Standardwert <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+            <div className="lbl">{t('fieldDetail.defaultValue')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.defaultValueHint')}</span></div>
             {form.field_type === 'vocab' ? (
               <select className="fld" value={(form.default_value as { id?: string })?.id ?? ''} onChange={e => {
                 const term = defaultTerms.find(t => t.id === e.target.value)
                 set('default_value', term ? { id: term.id, label: getLabel(term) } : '')
               }}>
-                <option value="">— kein Standardwert —</option>
+                <option value="">{t('fieldDetail.defaultValueNone')}</option>
                 {defaultTerms.map(t => <option key={t.id} value={t.id}>{getLabel(t, t.term)}</option>)}
               </select>
             ) : (
@@ -500,30 +493,30 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         {!isVocabularyTerm && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
-            <span style={{ fontSize: 13 }}>Feld sperren (nur durch Admins änderbar)</span>
+            <span style={{ fontSize: 13 }}>{t('fieldDetail.locked')}</span>
           </label>
         )}
         {aiEligible && (
           <div style={{ marginBottom: 16, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--panel)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
               <input type="checkbox" className="ck" checked={form.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
-              KI-Assistent für dieses Feld aktivieren
+              {t('fieldDetail.aiEnable')}
             </label>
             {form.ai_enabled && (
               <>
                 <div className="field">
-                  <div className="lbl">Modus</div>
+                  <div className="lbl">{t('fieldDetail.aiMode')}</div>
                   <select className="fld" value={form.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
-                    <option value="text">Nur Textkontext</option>
-                    <option value="vision">Bild + Textkontext</option>
+                    <option value="text">{t('fieldDetail.aiModeText')}</option>
+                    <option value="vision">{t('fieldDetail.aiModeVision')}</option>
                   </select>
                 </div>
                 <div className="field">
-                  <div className="lbl">Prompt</div>
-                  <textarea className="fld" value={form.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={5} placeholder="Beschreibe das Bild in 2-3 Sätzen auf Deutsch." />
+                  <div className="lbl">{t('fieldDetail.aiPrompt')}</div>
+                  <textarea className="fld" value={form.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={5} placeholder={t('fieldDetail.aiPromptPlaceholder')} />
                 </div>
                 <div className="field">
-                  <div className="lbl">Weitere Felder als Kontext</div>
+                  <div className="lbl">{t('fieldDetail.aiContextFields')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
                     {availableFields
                       .filter(f => f.id !== fieldId && f.parent_id == null)
@@ -545,7 +538,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                   <input type="checkbox" className="ck" checked={form.ai_send_existing_value} onChange={e => set('ai_send_existing_value', e.target.checked)} />
-                  Vorhandenen Feldwert als Kontext mitsenden
+                  {t('fieldDetail.aiSendExisting')}
                 </label>
               </>
             )}
@@ -557,40 +550,40 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <>
             <div className="fg-2">
               <div className="field">
-                <div className="lbl">Ziel-Typ <span className="req">*</span></div>
+                <div className="lbl">{t('fieldDetail.relationTargetType')} <span className="req">*</span></div>
                 <select className="fld" value={form.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
-                  <option value="object">Objekte</option>
-                  <option value="entity">Entitäten</option>
-                  <option value="place">Orte</option>
-                  <option value="occurrence">Occurrences</option>
-                  <option value="procedure">Vorgänge</option>
+                  <option value="object">{t('fieldDetail.relationTargetTypeOptions.object')}</option>
+                  <option value="entity">{t('fieldDetail.relationTargetTypeOptions.entity')}</option>
+                  <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
+                  <option value="occurrence">{t('fieldDetail.relationTargetTypeOptions.occurrence')}</option>
+                  <option value="procedure">{t('fieldDetail.relationTargetTypeOptions.procedure')}</option>
                 </select>
               </div>
               <div className="field">
-                <div className="lbl">Ziel-Subtyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                <div className="lbl">{t('fieldDetail.relationTargetSubtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.relationTargetSubtypeHint')}</span></div>
                 <input className="fld" value={form.relation_target_subtype} onChange={e => set('relation_target_subtype', e.target.value)}
-                  placeholder="z.B. person, organisation" />
+                  placeholder={t('fieldDetail.relationTargetSubtypePlaceholder')} />
               </div>
             </div>
             <div className="field">
-              <div className="lbl">Relationstyp-Vokabular <span className="req">*</span></div>
+              <div className="lbl">{t('fieldDetail.relationTypeVocab')} <span className="req">*</span></div>
               <select className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
-                <option value="">— Vokabular wählen —</option>
+                <option value="">{t('fieldDetail.relationTypeVocabPlaceholder')}</option>
                 {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
             {form.relation_type_vocab && (
               <div className="field">
-                <div className="lbl">Fester Relationstyp <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — sonst im Formular wählbar)</span></div>
+                <div className="lbl">{t('fieldDetail.fixedRelationType')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.fixedRelationTypeHint')}</span></div>
                 <select className="fld" value={form.fixed_relation_type} onChange={e => set('fixed_relation_type', e.target.value)}>
-                  <option value="">— Alle Typen dieses Vokabulars —</option>
+                  <option value="">{t('fieldDetail.fixedRelationTypeAll')}</option>
                   {relationTypeTerms.map(term => <option key={term.id} value={term.term}>{getLabel(term, term.term)}</option>)}
                 </select>
               </div>
             )}
             {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
               <div className="field">
-                <div className="lbl">Felder des Zieldatensatzes mit anzeigen <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional — z.B. Land bei Ortsverknüpfung)</span></div>
+                <div className="lbl">{t('fieldDetail.inheritedFields')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.inheritedFieldsHint')}</span></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                   {targetTypeFields.filter(f => f.field_type !== 'relation').map(f => (
                     <label key={f.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
@@ -613,10 +606,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
-            {saving ? 'Speichert…' : 'Speichern'}
+            {saving ? t('fieldDetail.saving') : t('fieldDetail.save')}
           </button>
           {!isNew && (
-            <button className="btn dn" onClick={onDelete} disabled={saving}>Feld löschen</button>
+            <button className="btn dn" onClick={onDelete} disabled={saving}>{t('fieldDetail.delete')}</button>
           )}
         </div>
 
@@ -624,14 +617,14 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         {form.field_type === 'group' && !isNew && fieldId && (
           <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Sub-Felder</span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{t('fieldDetail.subFields')}</span>
               <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--fg-3)' }}>
-                {form.subFields?.length ?? 0} definiert
+                {t('fieldDetail.subFieldsDefined', { count: form.subFields?.length ?? 0 })}
               </span>
               <div style={{ flex: 1 }} />
               {subFieldEditing === null && (
                 <button className="btn sm gh" onClick={openNewSubField}>
-                  <Plus size={12} /> Sub-Feld
+                  <Plus size={12} /> {t('fieldDetail.addSubField')}
                 </button>
               )}
             </div>
@@ -657,8 +650,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)' }}>
                     <span style={{ flex: 1, fontWeight: 500 }}>{getLabel(sf, sf.name)}</span>
                     <span className="key" style={{ fontSize: 11 }}>{sf.name}</span>
-                    <span className="typ">{FIELD_TYPE_LABELS[sf.field_type] ?? sf.field_type}</span>
-                    {sf.is_required && <span className="req-mark">Pflicht</span>}
+                    <span className="typ">{t(`fieldTypes.${sf.field_type}`)}</span>
+                    {sf.is_required && <span className="req-mark">{t('fieldDetail.subFieldRequired')}</span>}
                     <button className="btn sm ico gh" onClick={() => openEditSubField(sf)}><Edit size={12} /></button>
                     <button className="btn sm ico gh dn" onClick={() => handleSubFieldDelete(sf.id)}><Trash size={12} /></button>
                   </div>
@@ -687,14 +680,14 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 
             {(form.subFields?.length ?? 0) === 0 && subFieldEditing === null && (
               <div style={{ fontSize: 12, color: 'var(--fg-3)', paddingBottom: 4 }}>
-                Noch keine Sub-Felder. Klicke „Sub-Feld" um das erste anzulegen.
+                {t('fieldDetail.noSubFields')}
               </div>
             )}
           </div>
         )}
         {form.field_type === 'group' && isNew && (
           <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--accent-50)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
-            Containerfeld zuerst speichern, dann Sub-Felder anlegen.
+            {t('fieldDetail.groupSaveHint')}
           </div>
         )}
       </div>
@@ -717,6 +710,7 @@ interface SubFieldFormPanelProps {
 }
 
 function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
+  const { t } = useTranslation('screenSchema')
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
   const languages = useSupportedLanguages()
   const primaryLang = languages[0] ?? 'de'
@@ -740,37 +734,37 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
       </div>
       <div className="fg-2">
         <div className="field">
-          <div className="lbl">Interner Name</div>
+          <div className="lbl">{t('subFieldForm.internalName')}</div>
           <input className="fld mono" value={sf.name} onChange={e => { onNameManual(); set('name', e.target.value) }} disabled={Boolean(sf.id)} />
         </div>
         <div className="field">
-          <div className="lbl">Feldtyp</div>
+          <div className="lbl">{t('subFieldForm.fieldType')}</div>
           <select className="fld" value={sf.field_type} onChange={e => set('field_type', e.target.value as SubFieldType)}>
-            {SUB_FIELD_TYPES.map(k => <option key={k} value={k}>{FIELD_TYPE_LABELS[k]}</option>)}
+            {SUB_FIELD_TYPES.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
           </select>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 8 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" className="ck" checked={sf.is_required} onChange={e => set('is_required', e.target.checked)} />
-          Pflichtfeld
+          {t('subFieldForm.required')}
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" className="ck" checked={sf.is_public} onChange={e => set('is_public', e.target.checked)} />
-          Öffentlich über APIs ausgeben
+          {t('subFieldForm.isPublic')}
         </label>
       </div>
       {sf.field_type === 'text' && (
         <div className="field">
-          <div className="lbl">Validierungs-Regex <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
-          <input className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder="^https?://.+" />
+          <div className="lbl">{t('subFieldForm.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
+          <input className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder={t('subFieldForm.validationRegexPlaceholder')} />
         </div>
       )}
       {(sf.field_type === 'vocab' || sf.field_type === 'vocab_free') && (
         <div className="field">
-          <div className="lbl">Vokabular</div>
+          <div className="lbl">{t('subFieldForm.vocabLabel')}</div>
           <select className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
-            <option value="">— Vokabular wählen —</option>
+            <option value="">{t('subFieldForm.vocabPlaceholder')}</option>
             {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         </div>
@@ -778,18 +772,18 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
       {sf.field_type === 'relation' && (
         <>
           <div className="field">
-            <div className="lbl">Ziel-Typ</div>
+            <div className="lbl">{t('subFieldForm.targetType')}</div>
             <select className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
-              <option value="object">Objekte</option>
-              <option value="entity">Entitäten</option>
-              <option value="place">Orte</option>
-              <option value="occurrence">Occurrences</option>
+              <option value="object">{t('fieldDetail.relationTargetTypeOptions.object')}</option>
+              <option value="entity">{t('fieldDetail.relationTargetTypeOptions.entity')}</option>
+              <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
+              <option value="occurrence">{t('fieldDetail.relationTargetTypeOptions.occurrence')}</option>
             </select>
           </div>
           <div className="field">
-            <div className="lbl">Relationstyp-Vokabular <span className="req">*</span></div>
+            <div className="lbl">{t('subFieldForm.relationTypeVocab')} <span className="req">*</span></div>
             <select className="fld" value={sf.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
-              <option value="">— Vokabular wählen —</option>
+              <option value="">{t('subFieldForm.relationTypeVocabPlaceholder')}</option>
               {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
@@ -797,40 +791,40 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
       )}
       {sf.field_type === 'authority' && (
         <div className="field">
-          <div className="lbl">Normdaten-Quelle</div>
+          <div className="lbl">{t('subFieldForm.authoritySource')}</div>
           <select className="fld" value={sf.authority_source} onChange={e => set('authority_source', e.target.value)}>
             {authoritySources
               .filter(source => source.is_enabled || source.id === sf.authority_source)
               .map(source => (
                 <option key={source.id} value={source.id} disabled={!source.is_enabled}>
-                  {source.label}{source.is_enabled ? '' : ' (deaktiviert)'}
+                  {source.label}{source.is_enabled ? '' : t('subFieldForm.authorityDisabled')}
                 </option>
               ))}
           </select>
-          {sf.id && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>Ein Quellenwechsel macht bereits gespeicherte Normdatenwerte ungültig.</div>}
+          {sf.id && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('subFieldForm.authorityChangeWarning')}</div>}
         </div>
       )}
       {aiEligible && (
         <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
             <input type="checkbox" className="ck" checked={sf.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
-            KI-Assistent für dieses Sub-Feld aktivieren
+            {t('subFieldForm.aiEnable')}
           </label>
           {sf.ai_enabled && (
             <>
               <div className="field">
-                <div className="lbl">Modus</div>
+                <div className="lbl">{t('fieldDetail.aiMode')}</div>
                 <select className="fld" value={sf.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
-                  <option value="text">Nur Textkontext</option>
-                  <option value="vision">Bild + Textkontext</option>
+                  <option value="text">{t('fieldDetail.aiModeText')}</option>
+                  <option value="vision">{t('fieldDetail.aiModeVision')}</option>
                 </select>
               </div>
               <div className="field">
-                <div className="lbl">Prompt</div>
+                <div className="lbl">{t('subFieldForm.aiPrompt')}</div>
                 <textarea className="fld" value={sf.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={4} />
               </div>
               <div className="field">
-                <div className="lbl">Weitere Datensatzfelder als Kontext</div>
+                <div className="lbl">{t('subFieldForm.aiContextFields')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
                   {availableFields.filter(f => f.parent_id == null).map(f => (
                     <label key={f.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
@@ -849,22 +843,23 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
                 <input type="checkbox" className="ck" checked={sf.ai_send_existing_value} onChange={e => set('ai_send_existing_value', e.target.checked)} />
-                Vorhandenen Sub-Feldwert als Kontext mitsenden
+                {t('subFieldForm.aiSendExisting')}
               </label>
-              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Andere Werte derselben Gruppeninstanz werden automatisch als Kontext mitgesendet.</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('subFieldForm.aiAutoContextHint')}</div>
             </>
           )}
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button className="btn pri sm" onClick={onSave} disabled={saving}>{saving ? '…' : 'Speichern'}</button>
-        <button className="btn gh sm" onClick={onCancel}>Abbrechen</button>
+        <button className="btn pri sm" onClick={onSave} disabled={saving}>{saving ? '…' : t('subFieldForm.save')}</button>
+        <button className="btn gh sm" onClick={onCancel}>{t('subFieldForm.cancel')}</button>
       </div>
     </div>
   )
 }
 
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation('screenSchema')
   const fileRef = useRef<HTMLInputElement>(null)
   const [dryRun, setDryRun] = useState(true)
   const [overwrite, setOverwrite] = useState(false)
@@ -874,7 +869,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   async function handleImport() {
     const file = fileRef.current?.files?.[0]
-    if (!file) { setError('Bitte eine Datei auswählen.'); return }
+    if (!file) { setError(t('importModal.errorNoFile')); return }
     setBusy(true)
     setError(null)
     setResult(null)
@@ -893,16 +888,16 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ width: 480, maxWidth: '90vw' }}>
         <div className="hd">
-          <span>Schema-Import</span>
+          <span>{t('importModal.headline')}</span>
           <div className="grow" />
-          <button className="btn sm" onClick={onClose}>Schließen</button>
+          <button className="btn sm" onClick={onClose}>{t('importModal.close')}</button>
         </div>
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-2)', margin: '0 0 12px' }}>
-            YAML- oder JSON-Datei mit Felddefinitionen für einen Typ importieren.
+            {t('importModal.description')}
           </p>
           <details style={{ marginBottom: 12, fontSize: 12 }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--fg-3)', userSelect: 'none' }}>Format-Hilfe</summary>
+            <summary style={{ cursor: 'pointer', color: 'var(--fg-3)', userSelect: 'none' }}>{t('importModal.formatHelp')}</summary>
             <pre style={{ margin: '8px 0 0', padding: '10px 12px', background: 'var(--panel)', borderRadius: 6, overflowX: 'auto', lineHeight: 1.5, fontSize: 11 }}>{`target_type: object   # object | entity | place | occurrence
 fields:
   - name: title
@@ -922,34 +917,34 @@ fields:
       vocabulary: materials`}</pre>
           </details>
           <div className="field">
-            <div className="lbl">Datei (YAML / JSON)</div>
+            <div className="lbl">{t('importModal.fileLabel')}</div>
             <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="fld" />
           </div>
           <div className="field" style={{ display: 'flex', gap: 16, flexDirection: 'row', paddingTop: 4 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               <input type="checkbox" className="ck" checked={dryRun} onChange={e => setDryRun(e.target.checked)} />
-              Dry-Run (nur Vorschau)
+              {t('importModal.dryRun')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               <input type="checkbox" className="ck" checked={overwrite} onChange={e => setOverwrite(e.target.checked)} />
-              Bestehende überschreiben
+              {t('importModal.overwrite')}
             </label>
           </div>
           {error && <div style={{ fontSize: 12, color: '#dc2626', margin: '8px 0' }}>{error}</div>}
           {result && (
             <div style={{ fontSize: 12, background: 'var(--accent-50)', borderRadius: 6, padding: '10px 12px', margin: '8px 0' }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{dryRun ? 'Vorschau (kein Schreiben)' : 'Import abgeschlossen'}</div>
-              <div>Neu: {result.created} · Aktualisiert: {result.updated} · Übersprungen: {result.skipped}</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{dryRun ? t('importModal.resultPreview') : t('importModal.resultDone')}</div>
+              <div>{t('importModal.resultLine', { created: result.created, updated: result.updated, skipped: result.skipped })}</div>
               {result.errors.length > 0 && (
                 <div style={{ color: '#b91c1c', marginTop: 4 }}>
-                  Fehler: {result.errors.map((e, i) => <div key={i}>{e}</div>)}
+                  {t('importModal.errorLabel')} {result.errors.map((e, i) => <div key={i}>{e}</div>)}
                 </div>
               )}
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button className="btn pri" onClick={handleImport} disabled={busy}>
-              {busy ? 'Lädt…' : dryRun ? 'Vorschau' : 'Importieren'}
+              {busy ? t('importModal.importBusy') : dryRun ? t('importModal.importPreview') : t('importModal.import')}
             </button>
           </div>
         </div>
@@ -958,7 +953,7 @@ fields:
   )
 }
 
-const TYPE_IDS = TYPES.map(t => t.id)
+const TYPE_IDS = ['object', 'entity', 'place', 'occurrence', 'procedure', 'vocabulary_term']
 
 function parseInitial(editId?: string | null): { type: string; subtype: string } {
   if (!editId) return { type: 'object', subtype: '' }
@@ -969,6 +964,7 @@ function parseInitial(editId?: string | null): { type: string; subtype: string }
 type Props = { initialPath?: string | null; onPathChange?: (path: string) => void }
 
 export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
+  const { t } = useTranslation('screenSchema')
   const initial = parseInitial(initialPath)
   const [activeType, setActiveType] = useState(initial.type)
   const [activeSubtype, setActiveSubtype] = useState(initial.subtype)
@@ -986,6 +982,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [aiEnabled, setAiEnabled] = useState(false)
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
   const [dragId, setDragId] = useState<string | null>(null)
+
+  const TYPES = [
+    { id: 'object',      label: t('typeLabels.object'),     key: 'object' },
+    { id: 'entity',      label: t('typeLabels.entity'),     key: 'entity' },
+    { id: 'place',       label: t('typeLabels.place'),      key: 'place' },
+    { id: 'occurrence',  label: t('typeLabels.occurrence'), key: 'occurrence' },
+    { id: 'procedure',   label: t('typeLabels.procedure'),  key: 'procedure' },
+    { id: 'vocabulary_term', label: t('typeLabels.vocabulary_term'), key: 'vocabulary_term' },
+  ]
 
   const activeFieldIdRef = useRef<string | null>(null)
   activeFieldIdRef.current = activeFieldId
@@ -1074,15 +1079,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   async function handleSave() {
     if (!form) return
     if (!form.name.trim()) {
-      setSaveError('Interner Name darf nicht leer sein.')
+      setSaveError(t('errorInternalNameEmpty'))
       return
     }
     if (form.field_type === 'relation' && !form.relation_type_vocab) {
-      setSaveError('Bitte ein Relationstyp-Vokabular wählen.')
+      setSaveError(t('errorRelationVocabEmpty'))
       return
     }
     if (form.field_type === 'authority' && !authoritySources.some(source => source.is_enabled && source.id === form.authority_source)) {
-      setSaveError('Bitte eine aktive Normdaten-Quelle wählen.')
+      setSaveError(t('errorAuthoritySourceEmpty'))
       return
     }
     setSaving(true)
@@ -1201,7 +1206,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   }
 
   async function handleDelete() {
-    if (!activeFieldId || !window.confirm('Feld wirklich löschen?')) return
+    if (!activeFieldId || !window.confirm(t('deleteConfirm', { name: form?.name ?? '' }))) return
     setSaving(true)
     try {
       await schema.delete(activeFieldId)
@@ -1232,13 +1237,13 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         />
       )}
       <div className="ph">
-        <div><h1>Schemata</h1><div className="sub">Felddefinitionen pro Typ/Subtyp</div></div>
+        <div><h1>{t('headline')}</h1><div className="sub">{t('headlineSub')}</div></div>
         <div className="right">
           {aiEnabled && (
-            <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title="KI-Assistent für Felder"><Lightning size={13} /> KI-Assistent</button>
+            <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title={t('aiAssistTitle')}><Lightning size={13} /> {t('aiAssist')}</button>
           )}
-          <button className="btn gh" onClick={() => setShowImport(true)}>Import</button>
-          <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> Neues Feld</button>
+          <button className="btn gh" onClick={() => setShowImport(true)}>{t('import')}</button>
+          <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> {t('addField')}</button>
         </div>
       </div>
 
@@ -1258,15 +1263,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         {hasSubtypes && (
           <div className="schema-subtype-panel">
             <div style={{ padding: '14px 12px 6px', fontFamily: "'IBM Plex Mono',monospace", fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-4)', fontWeight: 500 }}>
-              Subtypen
+              {t('subtypes.headline')}
             </div>
-            {(activeType === 'vocabulary_term' ? subtypesList : [{ id: '', name: '', label: { de: 'Alle / Global' } }, ...subtypesList]).map(s => (
+            {(activeType === 'vocabulary_term' ? subtypesList : [{ id: '', name: '', label: { de: t('subtypes.allGlobal') } }, ...subtypesList]).map(s => (
               <button
                 key={s.id}
                 className={`panel-it${activeSubtype === s.name ? ' active' : ''}`}
                 onClick={() => { setActiveSubtype(s.name); onPathChange?.(s.name ? `${activeType}.${s.name}` : activeType) }}
               >
-                <span>{s.label?.de || s.name || 'Alle / Global'}</span>
+                <span>{s.label?.de || s.name || t('subtypes.allGlobal')}</span>
                 {s.name && <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>}
               </button>
             ))}
@@ -1277,7 +1282,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           {hasSubtypes && (
             <div className="schema-subtype-select field">
               <label className="lbl" htmlFor="schema-subtype">
-                {activeType === 'vocabulary_term' ? 'Vokabular' : 'Subtyp'}
+                {activeType === 'vocabulary_term' ? t('subtypes.filterLabelVocab') : t('subtypes.filterLabel')}
               </label>
               <select
                 id="schema-subtype"
@@ -1285,8 +1290,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                 value={activeSubtype}
                 onChange={e => setActiveSubtype(e.target.value)}
               >
-                {activeType === 'vocabulary_term' && <option value="">Bitte wählen</option>}
-                {activeType !== 'vocabulary_term' && <option value="">Alle / Global</option>}
+                {activeType === 'vocabulary_term' && <option value="">{t('subtypes.pleaseSelect')}</option>}
+                {activeType !== 'vocabulary_term' && <option value="">{t('subtypes.allGlobal')}</option>}
                 {subtypesList.map(s => (
                   <option key={s.id} value={s.name}>{s.label?.de || s.name}</option>
                 ))}
@@ -1312,13 +1317,13 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           ) : (
             <>
               {loading ? (
-                <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>
+                <div className="empty" style={{ paddingTop: 40 }}>{t('loading')}</div>
               ) : (
                 <>
                   <div style={{ margin: '12px 24px 4px', color: 'var(--fg-3)', fontSize: 12 }}>
-                    {fields.length} Felder
+                    {t('fieldCount', { count: fields.length })}
                     {activeSubtype && (
-                      <span> für Subtyp <b>{activeSubtype}</b></span>
+                      <span>{t('forSubtype', { subtype: activeSubtype })}</span>
                     )}
                   </div>
                   {fields.map(f => {
@@ -1344,14 +1349,14 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                           {f.target_subtype && (
                             <span className="typ target-subtype" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
                           )}
-                          <span className="typ">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</span>
+                          <span className="typ">{t(`fieldTypes.${f.field_type}`)}</span>
                           {f.field_type === 'group' && <span className="typ" style={{ background: 'var(--fg-5)', color: 'var(--fg-3)' }}>{f.children?.length ?? 0} Sub-Felder</span>}
-                          {f.is_required && <span className="req-mark">Pflicht</span>}
+                          {f.is_required && <span className="req-mark">{t('fieldDetail.subFieldRequired')}</span>}
                           {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}
                         </button>
                         <div className="actions">
                           <button className="btn sm ico gh dn" aria-label={`Feld ${fieldLabel} löschen`} onClick={async () => {
-                            if (!window.confirm('Feld wirklich löschen?')) return
+                            if (!window.confirm(t('deleteConfirm', { name: fieldLabel }))) return
                             try {
                               await schema.delete(f.id)
                               loadFields()
@@ -1363,7 +1368,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                       </div>
                     )
                   })}
-                  {fields.length === 0 && <div className="empty">Keine Felder definiert.</div>}
+                  {fields.length === 0 && <div className="empty">{t('noFields')}</div>}
                 </>
               )}
             </>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
@@ -11,8 +12,6 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { RichTextEditor } from '../ui/RichTextEditor'
 import { MediaLightbox } from '../MediaLightbox'
-
-const INVALID_DATE_MESSAGE = 'Ungültiges Datum. Erlaubt: JJJJ, JJJJ-MM, JJJJ-MM-TT, TT.MM.JJJJ, -JJJJ (v. Chr.), "ca./um" oder "(unsicher)", oder Zeitraum ("… bis …", "vor …", "nach …")'
 
 /** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
 function isLeapYear(year: number): boolean {
@@ -138,6 +137,7 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
   disabled?: boolean
   style?: CSSProperties
 }) {
+  const { t } = useTranslation('screenForm')
   const pickerRef = useRef<HTMLInputElement>(null)
   const normalized = normalizeDateInput(value)
   const isPlainDate = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(normalized)
@@ -147,13 +147,13 @@ function DateInput({ value, onChange, onBlur, disabled, style }: {
       <input className="fld" type="text" value={value}
         onChange={e => onChange(e.target.value)}
         onBlur={() => { onChange(normalizeDateInput(value)); onBlur?.() }}
-        placeholder='JJJJ-MM-TT, TT.MM.JJJJ, "ca. 1900", "1900 bis 1950", "vor 1900" …' disabled={disabled} style={{ flex: 1, ...style }} />
-      <button type="button" className="btn sm ico gh" title={isPlainDate ? 'Datum aus Kalender auswählen' : 'Kalender unterstützt nur exakte Einzeldaten – Wert direkt eingeben'}
+        placeholder={t('dateInput.placeholder')} disabled={disabled} style={{ flex: 1, ...style }} />
+      <button type="button" className="btn sm ico gh" title={isPlainDate ? t('dateInput.pickerTitleEnabled') : t('dateInput.pickerTitleDisabled')}
         disabled={disabled || !isPlainDate} onClick={() => pickerRef.current?.showPicker()}>
         <Calendar size={14} />
       </button>
       <input ref={pickerRef} type="date" value={pickerValue} disabled={disabled}
-        onChange={e => onChange(e.target.value)} aria-label="Datum aus Kalender auswählen"
+        onChange={e => onChange(e.target.value)} aria-label={t('dateInput.pickerAriaLabel')}
         style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} />
     </div>
   )

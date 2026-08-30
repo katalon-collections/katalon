@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { audit } from '../../api/client'
 import type { AuditEntry } from '../../types'
 import { Check, Edit, Trash, Globe, Upload, Link, Lightning } from '../ui/Icons'
@@ -27,12 +28,7 @@ function RecordLink({ type, id, label }: { type: string; id: string; label: stri
   )
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  create: 'Angelegt', update: 'Geändert', delete: 'Gelöscht', publish: 'Veröffentlicht',
-  media_add: 'Medium angehängt', media_update: 'Medium geändert', media_delete: 'Medium entfernt',
-  relation_add: 'Relation angelegt', relation_update: 'Relation geändert', relation_delete: 'Relation gelöscht',
-  ai_schema_assist: 'KI-Schema-Assistent verwendet',
-}
+
 const ACTION_ICON: Record<string, React.ReactNode> = {
   create:            <Check size={13} />,
   update:            <Edit size={13} />,
@@ -47,9 +43,7 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
   ai_schema_assist:  <Lightning size={13} />,
 }
 
-const TYPE_SINGULAR_LABELS: Record<string, string> = {
-  object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
-}
+
 
 type AiSchemaAssistFields = {
   target_type?: string
@@ -75,8 +69,8 @@ type ExtraFields = {
 
 function extraLines(diff: ExtraFields): string[] {
   const lines: string[] = []
-  if (diff.filename) lines.push(`Datei: ${diff.filename}`)
-  if (diff.relation_type) lines.push(`Beziehungstyp: ${diff.relation_type}`)
+  if (diff.filename) lines.push(t('extraFile', { filename: diff.filename }))
+  if (diff.relation_type) lines.push(t('extraRelationType', { relationType: diff.relation_type }))
   return lines
 }
 
@@ -113,7 +107,18 @@ const ACTIONS = ['all', 'create', 'update', 'delete', 'publish', 'media', 'relat
 type Props = { initialFilter?: string | null; onFilterChange?: (filter: string) => void }
 
 export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
+  const { t } = useTranslation('screenAudit')
   const [entries, setEntries] = useState<AuditEntry[]>([])
+
+  const ACTION_LABELS: Record<string, string> = {
+    create: t('actionLabels.create'), update: t('actionLabels.update'), delete: t('actionLabels.delete'), publish: t('actionLabels.publish'),
+    media_add: t('actionLabels.media_add'), media_update: t('actionLabels.media_update'), media_delete: t('actionLabels.media_delete'),
+    relation_add: t('actionLabels.relation_add'), relation_update: t('actionLabels.relation_update'), relation_delete: t('actionLabels.relation_delete'),
+    ai_schema_assist: t('actionLabels.ai_schema_assist'),
+  }
+  const TYPE_SINGULAR_LABELS: Record<string, string> = {
+    object: t('typeLabels.object'), entity: t('typeLabels.entity'), place: t('typeLabels.place'), occurrence: t('typeLabels.occurrence'), procedure: t('typeLabels.procedure'),
+  }
   const [filter, setFilter] = useState(initialFilter && ACTIONS.includes(initialFilter) ? initialFilter : 'all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -149,18 +154,18 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
   return (
     <div className="scroll">
       <div className="ph">
-        <div><h1>Audit-Log</h1><div className="sub">Alle Änderungen im System</div></div>
+        <div><h1>{t('headline')}</h1><div className="sub">{t('subtitle')}</div></div>
       </div>
 
       <div className="toolbar">
         {ACTIONS.map(a => (
           <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => { setFilter(a); onFilterChange?.(a) }}>
-            {a === 'all' ? 'Alle' : a === 'media' ? 'Medien' : a === 'relation' ? 'Relationen' : ACTION_LABELS[a]}
+            {a === 'all' ? t('actionLabels.all') : a === 'media' ? t('actionLabels.media') : a === 'relation' ? t('actionLabels.relation') : ACTION_LABELS[a]}
           </button>
         ))}
       </div>
 
-      {loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
+      {loading && <div className="empty" style={{ paddingTop: 40 }}>{t('loading')}</div>}
       {error && <div className="empty" style={{ paddingTop: 40, color: '#f87171' }}>{error}</div>}
 
       {!loading && !error && (
@@ -222,7 +227,7 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
               </div>
             )
           })}
-          {items.length === 0 && <div className="empty">Keine Einträge.</div>}
+          {items.length === 0 && <div className="empty">{t('empty')}</div>}
         </div>
       )}
     </div>

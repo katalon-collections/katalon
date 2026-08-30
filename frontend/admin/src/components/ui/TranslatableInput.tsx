@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X } from './Icons'
 import { RichTextEditor } from './RichTextEditor'
 
@@ -36,6 +37,7 @@ export function TranslatableInput({
   disabled,
   style,
 }: TranslatableInputProps) {
+  const { t } = useTranslation('translatableInput')
   const primary = languages[0]
   const [expanded, setExpanded] = useState<string[]>([])
 
@@ -74,7 +76,7 @@ export function TranslatableInput({
           <span style={LANG_TAG}>{lang}</span>
           {field(lang)}
           {onRemove && (
-            <button type="button" className="btn sm ico gh" onClick={() => remove(lang)} disabled={disabled} aria-label={`${lang.toUpperCase()} entfernen`} title={`${lang.toUpperCase()} entfernen`}>
+            <button type="button" className="btn sm ico gh" onClick={() => remove(lang)} disabled={disabled} aria-label={t('removeLang', { lang: lang.toUpperCase() })} title={t('removeLang', { lang: lang.toUpperCase() })}>
               <X size={12} />
             </button>
           )}

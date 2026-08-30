@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from geoalchemy2 import Geometry
+from geoalchemy2.shape import to_shape
 from sqlalchemy import (
     Boolean,
     Date,
@@ -101,6 +102,16 @@ class Place(Base):
         Index("ix_places_metadata_gin", "metadata", postgresql_using="gin"),
         Index("ix_places_geom", "geom", postgresql_using="gist"),
     )
+
+    @property
+    def lat(self) -> float | None:
+        """Latitude derived from geom, for PlaceRead/PortalPlaceRead (from_attributes)."""
+        return to_shape(self.geom).y if self.geom is not None else None
+
+    @property
+    def lon(self) -> float | None:
+        """Longitude derived from geom, for PlaceRead/PortalPlaceRead (from_attributes)."""
+        return to_shape(self.geom).x if self.geom is not None else None
 
 
 class Occurrence(Base):

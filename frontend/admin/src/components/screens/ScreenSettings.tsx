@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
@@ -13,11 +14,11 @@ interface Props {
 type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich'
 
 const RECORD_TYPES = [
-  { key: 'object',     label: 'Objekte' },
-  { key: 'entity',     label: 'Entitäten' },
-  { key: 'place',      label: 'Orte' },
-  { key: 'occurrence', label: 'Ereignisse' },
-  { key: 'procedure',  label: 'Vorgänge' },
+  { key: 'object',     labelKey: 'recordTypes.object' },
+  { key: 'entity',     labelKey: 'recordTypes.entity' },
+  { key: 'place',      labelKey: 'recordTypes.place' },
+  { key: 'occurrence', labelKey: 'recordTypes.occurrence' },
+  { key: 'procedure',  labelKey: 'recordTypes.procedure' },
 ] as const
 
 const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
@@ -35,6 +36,7 @@ const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
 // ---------------------------------------------------------------------------
 
 function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) => void }) {
+  const { t } = useTranslation('screenSettings')
   const [pwdCurrent, setPwdCurrent] = useState('')
   const [pwdNew, setPwdNew] = useState('')
   const [pwdConfirm, setPwdConfirm] = useState('')
@@ -70,7 +72,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
   }
 
   async function handleRevokeOwnKey(keyId: string) {
-    if (!window.confirm('API-Schlüssel wirklich widerrufen?')) return
+    if (!window.confirm(t('profil.apiKeys.revokeConfirm'))) return
     try {
       await apiKeys.revokeOwn(keyId)
       setOwnKeys(prev => prev.filter(k => k.id !== keyId))
@@ -79,9 +81,9 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
 
   async function handleChangePassword() {
     setPwdError(null); setPwdSuccess(false)
-    if (pwdNew !== pwdConfirm) { setPwdError('Die neuen Passwörter stimmen nicht überein.'); return }
+    if (pwdNew !== pwdConfirm) { setPwdError(t('profil.password.errors.mismatch')); return }
     if (pwdNew.length < 8 || !/[A-Za-z]/.test(pwdNew) || !/[0-9]/.test(pwdNew)) {
-      setPwdError('Das neue Passwort muss mindestens 8 Zeichen sowie Buchstaben und Zahlen enthalten.'); return
+      setPwdError(t('profil.password.errors.weak')); return
     }
     try {
       await users.changeOwnPassword(pwdCurrent, pwdNew)
@@ -92,9 +94,9 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
 
   async function handleChangeEmail() {
     setEmailError(null); setEmailSuccess(false)
-    if (!emailNew.trim()) { setEmailError('Bitte neue E-Mail eingeben.'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNew.trim())) { setEmailError('Bitte gültige E-Mail-Adresse eingeben.'); return }
-    if (!emailPassword) { setEmailError('Bitte aktuelles Passwort zur Bestätigung eingeben.'); return }
+    if (!emailNew.trim()) { setEmailError(t('profil.email.errors.newRequired')); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNew.trim())) { setEmailError(t('profil.email.errors.invalid')); return }
+    if (!emailPassword) { setEmailError(t('profil.email.errors.passwordRequired')); return }
     try {
       await users.changeOwnEmail(emailNew.trim(), emailPassword)
       setEmailSuccess(true); setEmailNew(''); setEmailPassword('')
@@ -105,56 +107,56 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
   return (
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">E-Mail-Adresse ändern</div>
+        <div className="hd">{t('profil.email.title')}</div>
         <div className="bd">
           <div className="field">
-            <div className="lbl">Neue E-Mail</div>
+            <div className="lbl">{t('profil.email.newLabel')}</div>
             <input className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">Aktuelles Passwort zur Bestätigung</div>
+            <div className="lbl">{t('profil.email.currentPasswordLabel')}</div>
             <input className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
           </div>
           {emailError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{emailError}</div>}
-          {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>E-Mail-Adresse geändert.</div>}
-          <button className="btn pri" onClick={handleChangeEmail}>E-Mail ändern</button>
+          {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{t('profil.email.success')}</div>}
+          <button className="btn pri" onClick={handleChangeEmail}>{t('profil.email.submit')}</button>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Passwort ändern</div>
+        <div className="hd">{t('profil.password.title')}</div>
         <div className="bd">
           <div className="field">
-            <div className="lbl">Aktuelles Passwort</div>
+            <div className="lbl">{t('profil.password.currentLabel')}</div>
             <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">Neues Passwort</div>
+            <div className="lbl">{t('profil.password.newLabel')}</div>
             <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">Neues Passwort wiederholen</div>
+            <div className="lbl">{t('profil.password.confirmLabel')}</div>
             <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
           </div>
           {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
-          {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Passwort geändert.</div>}
-          <button className="btn pri" onClick={handleChangePassword}>Passwort ändern</button>
+          {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{t('profil.password.success')}</div>}
+          <button className="btn pri" onClick={handleChangePassword}>{t('profil.password.submit')}</button>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">API-Schlüssel</div>
+        <div className="hd">{t('profil.apiKeys.title')}</div>
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-            API-Schlüssel ermöglichen den Zugriff auf die API ohne Passwort. Schicke den Schlüssel im Header <code>X-API-Key</code>.
+            {t('profil.apiKeys.intro')} <code>X-API-Key</code>.
           </p>
           {keyCreated && (
             <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
-              <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>Schlüssel erstellt — bitte jetzt kopieren, er wird nicht erneut angezeigt:</div>
+              <div style={{ fontWeight: 600, color: '#166534', marginBottom: 4 }}>{t('profil.apiKeys.created')}</div>
               <code style={{ display: 'block', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: 11, background: '#dcfce7', padding: '6px 8px', borderRadius: 4, color: '#14532d' }}>
                 {keyCreated.key}
               </code>
-              <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated!.key)}>Kopieren</button>
+              <button className="btn sm gh" style={{ marginTop: 6 }} onClick={() => navigator.clipboard.writeText(keyCreated!.key)}>{t('profil.apiKeys.copy')}</button>
             </div>
           )}
           {keyError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{keyError}</div>}
@@ -162,10 +164,10 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-s)' }}>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Name</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Präfix</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Erstellt</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>Zuletzt verwendet</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>{t('profil.apiKeys.columns.name')}</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>{t('profil.apiKeys.columns.prefix')}</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>{t('profil.apiKeys.columns.created')}</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: 'var(--fg-3)' }}>{t('profil.apiKeys.columns.lastUsed')}</th>
                   <th style={{ width: 60 }} />
                 </tr>
               </thead>
@@ -177,7 +179,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
                     <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
                     <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>
-                      <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title="Widerrufen">🗑</button>
+                      <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title={t('profil.apiKeys.revoke')}>🗑</button>
                     </td>
                   </tr>
                 ))}
@@ -186,12 +188,12 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
           )}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
-              className="fld" style={{ flex: 1 }} placeholder="Name des neuen Schlüssels"
+              className="fld" style={{ flex: 1 }} placeholder={t('profil.apiKeys.namePlaceholder')}
               value={newKeyName} onChange={e => setNewKeyName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateOwnKey()}
             />
             <button className="btn pri" onClick={handleCreateOwnKey} disabled={keyCreating || !newKeyName.trim()}>
-              {keyCreating ? 'Erstelle…' : 'Erstellen'}
+              {keyCreating ? t('profil.apiKeys.creating') : t('profil.apiKeys.create')}
             </button>
           </div>
         </div>
@@ -199,14 +201,14 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
 
       {onStartTour && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="hd">Geführte Tour</div>
+          <div className="hd">{t('profil.tour.title')}</div>
           <div className="bd">
             <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-              Die Einführungstour zeigt die wichtigsten Einrichtungsschritte. Jederzeit erneut startbar.
+              {t('profil.tour.intro')}
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn gh" onClick={() => onStartTour('basic')}>Einstiegs-Tour starten</button>
-              <button className="btn gh" onClick={() => onStartTour('advanced')}>Erweiterte Tour starten</button>
+              <button className="btn gh" onClick={() => onStartTour('basic')}>{t('profil.tour.startBasic')}</button>
+              <button className="btn gh" onClick={() => onStartTour('advanced')}>{t('profil.tour.startAdvanced')}</button>
             </div>
           </div>
         </div>

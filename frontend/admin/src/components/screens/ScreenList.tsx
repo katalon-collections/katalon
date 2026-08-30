@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, schema, subtypes, ConflictError } from '../../api/client'
 import type { AnyRecord, FieldDefinition, Page, RecordSubtype, RecordType } from '../../types'
 import { getLabel } from '../../types'
@@ -6,36 +7,7 @@ import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Layers, Plus, Search, Trash } from '../ui/Icons'
 import { BatchEditModal } from './BatchEditModal'
 
-const TABS = [
-  { id: 'all',      label: 'Alle' },
-  { id: 'draft',    label: 'Entwurf' },
-  { id: 'internal', label: 'Intern' },
-  { id: 'public',   label: 'Öffentlich' },
-]
-const PROCEDURE_TABS = [
-  { id: 'all',       label: 'Alle' },
-  { id: 'draft',     label: 'Entwurf' },
-  { id: 'active',    label: 'Aktiv' },
-  { id: 'completed', label: 'Abgeschlossen' },
-  { id: 'cancelled', label: 'Abgebrochen' },
-]
 const PAGE_SIZE = 50
-
-const TYPE_LABELS: Record<RecordType, string> = {
-  object: 'Objekte',
-  entity: 'Entitäten',
-  place: 'Orte',
-  occurrence: 'Occurrences',
-  procedure: 'Vorgänge',
-}
-
-const TYPE_SINGULAR_LABELS: Record<RecordType, string> = {
-  object: 'Objekt',
-  entity: 'Entität',
-  place: 'Ort',
-  occurrence: 'Occurrence',
-  procedure: 'Vorgang',
-}
 
 const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
   object: 'object_type',
@@ -86,9 +58,40 @@ interface Props {
 }
 
 export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Props) {
+  const { t } = useTranslation('screenList')
   const api = getApi(recordType)
   const subtypeKey = SUBTYPE_KEYS[recordType]
-  const tabIds = (recordType === 'procedure' ? PROCEDURE_TABS : TABS).map(t => t.id)
+
+  const tabs = recordType === 'procedure'
+    ? [
+        { id: 'all',       label: t('tabAll') },
+        { id: 'draft',     label: t('tabDraft') },
+        { id: 'active',    label: t('tabActive') },
+        { id: 'completed', label: t('tabCompleted') },
+        { id: 'cancelled', label: t('tabCancelled') },
+      ]
+    : [
+        { id: 'all',      label: t('tabAll') },
+        { id: 'draft',    label: t('tabDraft') },
+        { id: 'internal', label: t('tabInternal') },
+        { id: 'public',   label: t('tabPublic') },
+      ]
+  const tabIds = tabs.map(t => t.id)
+
+  const typeLabels: Record<RecordType, string> = {
+    object: t('typeObject'),
+    entity: t('typeEntity'),
+    place: t('typePlace'),
+    occurrence: t('typeOccurrence'),
+    procedure: t('typeProcedure'),
+  }
+  const typeSingularLabels: Record<RecordType, string> = {
+    object: t('typeSingularObject'),
+    entity: t('typeSingularEntity'),
+    place: t('typeSingularPlace'),
+    occurrence: t('typeSingularOccurrence'),
+    procedure: t('typeSingularProcedure'),
+  }
 
   const [tab, setTab] = useState(initialTab && tabIds.includes(initialTab) ? initialTab : 'all')
   const skipResetRef = useRef(true)
@@ -211,24 +214,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   }
 
   function removeLocally(id: string) {
-    // Drop the row immediately instead of waiting on the re-fetch triggered
-    // by load() below — that request can be slower than the confirm-dialog
-    // round-trip the user just went through, which reads as "nothing happened".
     setData(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id), total: Math.max(0, prev.total - 1) }))
     setSel(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(`${TYPE_SINGULAR_LABELS[recordType]} wirklich löschen?`)) return
+    if (!window.confirm(t('deleteConfirm', { type: typeSingularLabels[recordType] }))) return
     try {
       await api.delete(id)
       removeLocally(id)
       load()
     } catch (e) {
       if (e instanceof ConflictError) {
-        const confirmed = window.confirm(
-          `${e.message}\n\nAlle Verknüpfungen werden beim Löschen entfernt. Fortfahren?`
-        )
+        const confirmed = window.confirm(t('deleteConfirmWithConflicts', { message: e.message }))
         if (!confirmed) return
         try {
           await api.delete(id, true)
@@ -244,7 +242,6 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   }
 
   const items = data.items
-  const tabs = recordType === 'procedure' ? PROCEDURE_TABS : TABS
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const visiblePageCount = Math.min(totalPages, 5)
   const firstVisiblePage = Math.min(
@@ -285,8 +282,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     setSel(new Set(items.map(o => o.id)))
   }
   function selectionSummary() {
-    if (selectionMode === 'all') return `${data.total.toLocaleString('de')} ausgewählt (alle Treffer)`
-    return `${sel.size.toLocaleString('de')} ausgewählt`
+    if (selectionMode === 'all') return t('selectionAllMatching', { count: data.total })
+    return t('selectionSomeSelected', { count: sel.size })
   }
   function fmt(iso: string) {
     return new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -310,21 +307,21 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     <div className="scroll">
       <div className="ph">
         <div>
-          <h1>{TYPE_LABELS[recordType]}</h1>
-          <div className="sub">{data.total.toLocaleString('de')} Datensätze</div>
+          <h1>{typeLabels[recordType]}</h1>
+          <div className="sub">{t('recordsCount', { count: data.total })}</div>
         </div>
         <div className="right">
           <button className="btn pri" onClick={() => onOpen?.('new')} data-tour="new-record-button">
-            <Plus size={13} /> Neu anlegen
+            <Plus size={13} /> {t('addButton')}
           </button>
         </div>
       </div>
 
       <div className="tabs">
-            {tabs.map(t => (
-          <button key={t.id} className={`tab${tab === t.id ? ' active' : ''}`} onClick={() => handleTabChange(t.id)}>
-            {t.label}
-            {t.id === 'all' && <span className="ct">{data.total}</span>}
+            {tabs.map(tp => (
+          <button key={tp.id} className={`tab${tab === tp.id ? ' active' : ''}`} onClick={() => handleTabChange(tp.id)}>
+            {tp.label}
+            {tp.id === 'all' && <span className="ct">{data.total}</span>}
           </button>
         ))}
       </div>
@@ -333,21 +330,21 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         <div className="search">
           <Search className="ic" size={14} />
           <input
-            aria-label={`${TYPE_LABELS[recordType]} durchsuchen`}
-            placeholder="Suchen…"
+            aria-label={t('searchAriaLabel', { type: typeLabels[recordType] })}
+            placeholder={t('searchPlaceholder')}
             value={q}
             onChange={e => handleSearch(e.target.value)}
           />
         </div>
         {availableSubtypes.length > 0 && (
           <select
-            aria-label="Subtyp filtern"
+            aria-label={t('subtypeFilterAriaLabel')}
             className="fld"
             style={{ maxWidth: 210 }}
             value={subtypeFilter}
             onChange={e => { resetSelection(); setSubtypeFilter(e.target.value); setPage(1) }}
           >
-            <option value="">Alle Typen</option>
+            <option value="">{t('subtypeFilterAll')}</option>
             {availableSubtypes.map(subtype => (
               <option key={subtype.id} value={subtype.name}>{getLabel(subtype, subtype.name)}</option>
             ))}
@@ -355,9 +352,9 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         )}
         {recordType === 'procedure' && (
           <>
-            <input aria-label="Fällig bis" className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title="Fällig bis" />
-            <input aria-label="Referenznummer" className="fld mono" style={{ maxWidth: 180 }} placeholder="Referenznr." value={referenceNumber} onChange={e => { resetSelection(); setReferenceNumber(e.target.value); setPage(1) }} />
-            <button className="btn gh" onClick={handleOverdue}>Überfällig</button>
+            <input aria-label={t('dueDateAriaLabel')} className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title={t('dueDateTitle')} />
+            <input aria-label={t('referenceNumberAriaLabel')} className="fld mono" style={{ maxWidth: 180 }} placeholder={t('referenceNumberPlaceholder')} value={referenceNumber} onChange={e => { resetSelection(); setReferenceNumber(e.target.value); setPage(1) }} />
+            <button className="btn gh" onClick={handleOverdue}>{t('overdueButton')}</button>
           </>
         )}
       </div>
@@ -367,13 +364,13 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           <b>{selectionSummary()}</b>
           <div className="grow" />
           {canSelectAll && (
-            <button onClick={selectAllMatching}>Alle {data.total.toLocaleString('de')} Datensätze dieser Suche auswählen</button>
+            <button onClick={selectAllMatching}>{t('selectAllMatching', { count: data.total })}</button>
           )}
           {selectionMode === 'all' && (
-            <button onClick={resetSelection}>Nur diese Seite auswählen</button>
+            <button onClick={resetSelection}>{t('selectThisPage')}</button>
           )}
-          <button onClick={() => setBatchOpen(true)}><Layers size={13} /> Massenbearbeitung</button>
-          <button onClick={resetSelection}>Abbrechen</button>
+          <button onClick={() => setBatchOpen(true)}><Layers size={13} /> {t('batchEdit')}</button>
+          <button onClick={resetSelection}>{t('selectionCancel')}</button>
         </div>
       )}
 
@@ -386,7 +383,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
               <th className="col-ck">
                 <label className="ck-hit">
                   <input
-                    aria-label="Alle Datensätze auf dieser Seite auswählen"
+                    aria-label={t('selectAllAriaLabel')}
                     ref={selectAllRef}
                     type="checkbox"
                     className={`ck${someSel && !allSel ? ' ind' : ''}`}
@@ -395,23 +392,23 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   />
                 </label>
               </th>
-              {showIdno && <th>ID-Nr.</th>}
-              {showSubtype && <th>Typ</th>}
+              {showIdno && <th>{t('tableIdno')}</th>}
+              {showSubtype && <th>{t('tableType')}</th>}
               <th>{primaryLabel}</th>
               {extraFields.map(f => (
                 <th key={f.name}>{f.label?.de || f.label?.en || f.name}</th>
               ))}
-              <th>Status</th>
-              <th>Geändert</th>
+              <th>{t('tableStatus')}</th>
+              <th>{t('tableChanged')}</th>
               <th className="col-act" />
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={colCount} className="empty">Lade…</td></tr>
+              <tr><td colSpan={colCount} className="empty">{t('loading')}</td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={colCount} className="empty">Keine Datensätze gefunden.</td></tr>
+              <tr><td colSpan={colCount} className="empty">{t('empty')}</td></tr>
             )}
             {!loading && items.map(rec => {
               const m = rec.metadata_ as Record<string, unknown>
@@ -424,7 +421,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                 <tr key={rec.id} className={sel.has(rec.id) ? 'sel' : ''}>
                   <td className="col-ck">
                     <label className="ck-hit">
-                      <input aria-label={`${recordLabel} auswählen`} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
+                      <input aria-label={t('selectRowAriaLabel', { label: recordLabel })} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
                     </label>
                   </td>
                   {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{idno}</td>}
@@ -439,8 +436,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   <td style={{ maxWidth: 120, color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <button aria-label={`${recordLabel} bearbeiten`} className="btn sm ico gh" title="Bearbeiten" onClick={() => onOpen?.(rec.id)}><Edit size={12} /></button>
-                      <button aria-label={`${recordLabel} löschen`} className="btn sm ico gh dn" title="Löschen" onClick={() => handleDelete(rec.id)}><Trash size={12} /></button>
+                      <button aria-label={t('editRowAriaLabel', { label: recordLabel })} className="btn sm ico gh" title={t('editRowTitle')} onClick={() => onOpen?.(rec.id)}><Edit size={12} /></button>
+                      <button aria-label={t('deleteRowAriaLabel', { label: recordLabel })} className="btn sm ico gh dn" title={t('deleteRowTitle')} onClick={() => handleDelete(rec.id)}><Trash size={12} /></button>
                     </div>
                   </td>
                 </tr>
@@ -449,15 +446,15 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           </tbody>
         </table>
         {totalPages > 1 && (
-          <nav className="pg" aria-label="Seitennavigation">
-            <span className="pg-range">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} von {data.total}</span>
+          <nav className="pg" aria-label={t('paginationNavAriaLabel')}>
+            <span className="pg-range">{t('paginationRange', { start: (page - 1) * PAGE_SIZE + 1, end: Math.min(page * PAGE_SIZE, data.total), total: data.total })}</span>
             <div className="pg-controls">
-              <button className="pg-nav" disabled={page === 1} onClick={() => setPage(page - 1)}>Zurück</button>
+              <button className="pg-nav" disabled={page === 1} onClick={() => setPage(page - 1)}>{t('paginationPrev')}</button>
               <div className="nums">
                 {visiblePages.map(n => (
                   <button
                     key={n}
-                    aria-label={`Seite ${n}`}
+                    aria-label={t('paginationPageAriaLabel', { number: n })}
                     aria-current={n === page ? 'page' : undefined}
                     className={`pg-num${n === page ? ' active' : ''}`}
                     onClick={() => setPage(n)}
@@ -466,10 +463,10 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   </button>
                 ))}
               </div>
-              <button className="pg-nav" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Weiter</button>
+              <button className="pg-nav" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t('paginationNext')}</button>
             </div>
-            <span className="pg-summary">Seite {page} von {totalPages}</span>
-            <span className="pg-size">{PAGE_SIZE} pro Seite</span>
+            <span className="pg-summary">{t('paginationSummary', { page, totalPages })}</span>
+            <span className="pg-size">{t('paginationPageSize', { size: PAGE_SIZE })}</span>
           </nav>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useId, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { authority as authorityApi } from '../api/client'
 import type { AuthorityHit } from '../api/client'
 import { X } from './ui/Icons'
@@ -45,6 +46,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   onChange: (v: AuthorityEntry | null) => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation('authorityInput')
   const [q, setQ] = useState('')
   const [results, setResults] = useState<AuthorityHit[]>([])
   const [open, setOpen] = useState(false)
@@ -136,7 +138,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
           </span>
         </span>
         {!disabled && (
-          <button className="btn sm ico gh" onClick={() => onChange(null)} title="Entfernen" aria-label={`${value.label || value.external_id} entfernen`}>
+          <button className="btn sm ico gh" onClick={() => onChange(null)} title={t('remove')} aria-label={t('removeAriaLabel', { label: value.label || value.external_id })}>
             <X size={12} />
           </button>
         )}
@@ -153,10 +155,10 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
         value={q}
         onChange={e => setQ(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={`${source.toUpperCase()} durchsuchen…`}
+        placeholder={t('searchPlaceholder', { source: source.toUpperCase() })}
         disabled={disabled}
         role="combobox"
-        aria-label={`${source.toUpperCase()} durchsuchen`}
+        aria-label={t('searchAriaLabel', { source: source.toUpperCase() })}
         aria-autocomplete="list"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
@@ -165,7 +167,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
       />
       {busy && (
         <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--fg-3)' }}>
-          Suche…
+          {t('searching')}
         </div>
       )}
       {open && results.length > 0 && dropPos && (

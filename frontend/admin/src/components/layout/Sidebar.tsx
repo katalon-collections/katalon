@@ -1,4 +1,5 @@
 import pkg from '../../../package.json'
+import { useTranslation } from 'react-i18next'
 import { getTokenUser } from '../../api/client'
 import { FeedbackButton } from '../feedback/FeedbackButton'
 import { Bell, Download, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
@@ -6,9 +7,9 @@ import { Bell, Download, File, Globe, History, Gear, Image, Layers, Lightning, L
 type Route = string
 
 interface NavItem {
-  g?: string
+  gKey?: string
   id?: string
-  label?: string
+  labelKey?: string
   Icon?: React.FC<{ size?: number; className?: string }>
   ct?: string
   routes?: string[]
@@ -16,26 +17,26 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { g: 'Inhalte' },
-  { id: 'list',             label: 'Objekte',       Icon: Image,     routes: ['list', 'form'] },
-  { id: 'entities-list',   label: 'Entitäten',      Icon: User,      routes: ['entities-list', 'entities-form'] },
-  { id: 'places-list',     label: 'Orte',           Icon: MapPin,    routes: ['places-list', 'places-form'] },
-  { id: 'occurrences-list', label: 'Occurrences',   Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
-  { id: 'procedures-list', label: 'Vorgänge',       Icon: ListTree,  routes: ['procedures-list', 'procedures-form'] },
-  { id: 'import',          label: 'Importer',       Icon: Upload },
-  { id: 'audit',           label: 'Audit-Log',      Icon: History },
-  { g: 'Konfiguration', roles: ['admin', 'superuser'] },
-  { id: 'subtypes', label: 'Subtypen',       Icon: ListTree, roles: ['admin', 'superuser'] },
-  { id: 'schema', label: 'Schemata',        Icon: Layers,  ct: '5', roles: ['admin', 'superuser'] },
-  { id: 'form-variants', label: 'Formularvarianten', Icon: Layers, roles: ['admin', 'superuser'] },
-  { id: 'vocab',  label: 'Vokabular',       Icon: Tag,     ct: '4', roles: ['admin', 'superuser'] },
-  { id: 'pages',     label: 'Statische Seiten', Icon: File,  roles: ['admin', 'superuser'] },
-  { id: 'oai-sets',  label: 'OAI-PMH Sets',    Icon: Globe, roles: ['admin', 'superuser'] },
-  { id: 'banners',   label: 'Banner',           Icon: Bell,  roles: ['admin', 'superuser'] },
-  { id: 'export',    label: 'Export',           Icon: Download, roles: ['admin', 'superuser'] },
-  { g: 'Verwaltung', roles: ['admin', 'superuser'] },
-  { id: 'users',  label: 'Benutzer',       Icon: Users,   roles: ['admin', 'superuser'] },
-  { id: 'settings', label: 'Einstellungen', Icon: Gear, roles: ['admin', 'superuser'] },
+  { gKey: 'sidebar.groups.content' },
+  { id: 'list',             labelKey: 'sidebar.nav.list',             Icon: Image,     routes: ['list', 'form'] },
+  { id: 'entities-list',    labelKey: 'sidebar.nav.entitiesList',     Icon: User,      routes: ['entities-list', 'entities-form'] },
+  { id: 'places-list',      labelKey: 'sidebar.nav.placesList',       Icon: MapPin,    routes: ['places-list', 'places-form'] },
+  { id: 'occurrences-list', labelKey: 'sidebar.nav.occurrencesList',  Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
+  { id: 'procedures-list',  labelKey: 'sidebar.nav.proceduresList',   Icon: ListTree,  routes: ['procedures-list', 'procedures-form'] },
+  { id: 'import',           labelKey: 'sidebar.nav.import',           Icon: Upload },
+  { id: 'audit',            labelKey: 'sidebar.nav.audit',            Icon: History },
+  { gKey: 'sidebar.groups.config', roles: ['admin', 'superuser'] },
+  { id: 'subtypes', labelKey: 'sidebar.nav.subtypes',       Icon: ListTree, roles: ['admin', 'superuser'] },
+  { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  ct: '5', roles: ['admin', 'superuser'] },
+  { id: 'form-variants', labelKey: 'sidebar.nav.formVariants', Icon: Layers, roles: ['admin', 'superuser'] },
+  { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     ct: '4', roles: ['admin', 'superuser'] },
+  { id: 'pages',     labelKey: 'sidebar.nav.pages',         Icon: File,  roles: ['admin', 'superuser'] },
+  { id: 'oai-sets',  labelKey: 'sidebar.nav.oaiSets',       Icon: Globe, roles: ['admin', 'superuser'] },
+  { id: 'banners',   labelKey: 'sidebar.nav.banners',       Icon: Bell,  roles: ['admin', 'superuser'] },
+  { id: 'export',    labelKey: 'sidebar.nav.export',        Icon: Download, roles: ['admin', 'superuser'] },
+  { gKey: 'sidebar.groups.admin', roles: ['admin', 'superuser'] },
+  { id: 'users',  labelKey: 'sidebar.nav.users',         Icon: Users,   roles: ['admin', 'superuser'] },
+  { id: 'settings', labelKey: 'sidebar.nav.settings',    Icon: Gear, roles: ['admin', 'superuser'] },
 ]
 
 interface Props {
@@ -48,23 +49,29 @@ interface Props {
 }
 
 export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open = false, onClose }: Props) {
+  const { t } = useTranslation()
   const user = getTokenUser()
   const initials = user?.email ? user.email[0].toUpperCase() : 'A'
-  const roleLabel: Record<string, string> = { admin: 'Administrator', editor: 'Redakteur', cataloger: 'Katalogisierer', viewer: 'Betrachter' }
+  const roleLabel: Record<string, string> = {
+    admin: t('sidebar.roles.admin'),
+    editor: t('sidebar.roles.editor'),
+    cataloger: t('sidebar.roles.cataloger'),
+    viewer: t('sidebar.roles.viewer'),
+  }
 
   return (
-    <aside className={`sb${open ? ' open' : ''}`} aria-label="Hauptnavigation">
+    <aside className={`sb${open ? ' open' : ''}`} aria-label={t('sidebar.mainNav')}>
       <div className="sb-brand">
         <div className="logo">K</div>
         <div className="sb-name">{appTitle}</div>
-        <button className="sb-close" aria-label="Navigation schließen" onClick={onClose}>×</button>
+        <button className="sb-close" aria-label={t('sidebar.closeNav')} onClick={onClose}>×</button>
       </div>
 
       <nav className="sb-nav">
         {NAV.map((it, i) => {
-          if (it.g) {
+          if (it.gKey) {
             const visible = !it.roles || it.roles.includes(user?.role ?? '')
-            return visible ? <div key={`g${i}`} className="sb-grp">{it.g}</div> : null
+            return visible ? <div key={`g${i}`} className="sb-grp">{t(it.gKey)}</div> : null
           }
           const visible = !it.roles || it.roles.includes(user?.role ?? '')
           if (!visible) return null
@@ -76,7 +83,7 @@ export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open 
               data-tour={`nav-${it.id}`}
             >
               {it.Icon && <it.Icon className="ic" size={15} />}
-              <span>{it.label}</span>
+              <span>{t(it.labelKey!)}</span>
               {it.ct && <span className="ct">{it.ct}</span>}
             </button>
           )
@@ -99,7 +106,7 @@ export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open 
         </div>
         <button
           onClick={onLogout}
-          title="Abmelden"
+          title={t('sidebar.logout')}
           style={{ background: 'none', border: 0, color: 'var(--sb-mute)', cursor: 'pointer', padding: '4px', borderRadius: 4, flexShrink: 0 }}
         >
           ⏻

@@ -1,0 +1,8 @@
+{
+  "dateInput": {
+    "placeholder": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
+    "pickerTitleEnabled": "Datumsauswahl öffnen",
+    "pickerTitleDisabled": "Kein einzelner Tag – manuell bearbeiten",
+    "pickerAriaLabel": "Datum auswählen"
+  }
+}

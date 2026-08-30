@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { TaskStatus } from '../../../api/client'
 
 interface Props {
@@ -10,14 +11,15 @@ interface Props {
   mediaReferencesSelected: boolean
 }
 
-function formatEta(seconds: number): string {
-  if (seconds < 60) return `${seconds} Sek.`
-  return `${Math.ceil(seconds / 60)} Min.`
-}
-
 export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, mediaReferencesSelected }: Props) {
+  const { t } = useTranslation('stepResult')
   const historyRef = useRef<{ t: number; n: number }[]>([])
   const [eta, setEta] = useState<number | null>(null)
+
+  function formatEta(seconds: number): string {
+    if (seconds < 60) return t('etaSeconds', { count: seconds })
+    return t('etaMinutes', { count: Math.ceil(seconds / 60) })
+  }
 
   useEffect(() => {
     if (taskStatus?.state !== 'STARTED' || !taskStatus.meta) return
@@ -39,22 +41,22 @@ export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, m
     <div style={{ maxWidth: 520 }}>
       {(!taskStatus || taskStatus.state === 'PENDING') && (
         <div className="card">
-          <div className="hd">Import wird gestartet…</div>
+          <div className="hd">{t('startingHeading')}</div>
           <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
-            Der Import wird in die Warteschlange gestellt.
+            {t('queuedMessage')}
           </div>
         </div>
       )}
 
       {taskStatus?.state === 'STARTED' && (
         <div className="card">
-          <div className="hd">Import läuft…</div>
+          <div className="hd">{t('runningHeading')}</div>
           <div className="bd" style={{ fontSize: 13, color: 'var(--fg-2)' }}>
             {taskStatus.meta ? (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                  <span>Zeile {taskStatus.meta.current} von {taskStatus.meta.total}</span>
-                  {eta !== null && <span style={{ color: 'var(--fg-3)' }}>noch ca. {formatEta(eta)}</span>}
+                  <span>{t('rowProgress', { current: taskStatus.meta.current, total: taskStatus.meta.total })}</span>
+                  {eta !== null && <span style={{ color: 'var(--fg-3)' }}>{t('etaRemaining', { eta: formatEta(eta) })}</span>}
                 </div>
                 <div style={{ background: 'var(--border-soft)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                   <div style={{
@@ -63,30 +65,30 @@ export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, m
                   }} />
                 </div>
               </>
-            ) : 'Der Import läuft im Hintergrund. Bitte warten.'}
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-3)' }}>Task: {taskId}</div>
+            ) : t('runningInBackground')}
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-3)' }}>{t('taskLabel', { id: taskId })}</div>
           </div>
         </div>
       )}
 
       {taskStatus?.state === 'SUCCESS' && taskStatus.result && (
         <div className="card">
-          <div className="hd">Import abgeschlossen</div>
+          <div className="hd">{t('completedHeading')}</div>
           <div className="bd">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-              <div style={{ color: '#166534' }}><b>{taskStatus.result.created}</b> Datensätze angelegt</div>
+              <div style={{ color: '#166534' }}><b>{taskStatus.result.created}</b> {t('createdCount')}</div>
               {taskStatus.result.updated > 0 && (
-                <div style={{ color: '#1e3a8a' }}><b>{taskStatus.result.updated}</b> Datensätze aktualisiert</div>
+                <div style={{ color: '#1e3a8a' }}><b>{taskStatus.result.updated}</b> {t('updatedCount')}</div>
               )}
               {taskStatus.result.skipped > 0 && (
-                <div style={{ color: 'var(--fg-3)' }}><b>{taskStatus.result.skipped}</b> Datensätze übersprungen</div>
+                <div style={{ color: 'var(--fg-3)' }}><b>{taskStatus.result.skipped}</b> {t('skippedCount')}</div>
               )}
               {typeof taskStatus.result.published === 'number' && taskStatus.result.published > 0 && (
-                <div style={{ color: '#1e3a8a' }}><b>{taskStatus.result.published}</b> Datensätze veröffentlicht</div>
+                <div style={{ color: '#1e3a8a' }}><b>{taskStatus.result.published}</b> {t('publishedCount')}</div>
               )}
               {typeof taskStatus.result.publish_failed === 'number' && taskStatus.result.publish_failed > 0 && (
                 <div style={{ color: '#92400e' }}>
-                  <b>{taskStatus.result.publish_failed}</b> Datensätze konnten nicht veröffentlicht werden
+                  <b>{taskStatus.result.publish_failed}</b> {t('publishFailedCount')}
                   {(taskStatus.result.publish_fail_reasons ?? []).length > 0 && (
                     <ul style={{ margin: '4px 0 0 16px', fontSize: 12 }}>
                       {(taskStatus.result.publish_fail_reasons ?? []).map((r, i) => <li key={i}>{r}</li>)}
@@ -96,15 +98,15 @@ export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, m
               )}
               {mediaReferencesSelected && (
                 <div style={{ color: '#166534' }}>
-                  <b>{taskStatus.result.media_references_created ?? 0}</b> Medienreferenzen gespeichert
+                  <b>{taskStatus.result.media_references_created ?? 0}</b> {t('mediaReferencesCount')}
                 </div>
               )}
               {taskStatus.result.errors.length > 0 && (
                 <div style={{ color: '#b91c1c' }}>
-                  <b>{taskStatus.result.errors.length}</b> Fehler beim Import
+                  <b>{taskStatus.result.errors.length}</b> {t('errorCount')}
                   <div style={{ marginTop: 6 }}>
                     {taskStatus.result.errors.slice(0, 5).map((e, i) => (
-                      <div key={i} style={{ fontSize: 11 }}>Zeile {e.row}: {e.error}</div>
+                      <div key={i} style={{ fontSize: 11 }}>{t('rowError', { row: e.row, error: e.error })}</div>
                     ))}
                   </div>
                 </div>
@@ -116,19 +118,19 @@ export function StepResult({ taskStatus, taskId, onBack, onReset, onOpenMedia, m
 
       {taskStatus?.state === 'FAILURE' && (
         <div className="card">
-          <div className="hd">Import fehlgeschlagen</div>
+          <div className="hd">{t('failedHeading')}</div>
           <div className="bd" style={{ fontSize: 13, color: '#b91c1c' }}>
-            {taskStatus.error ?? 'Unbekannter Fehler'}
+            {taskStatus.error ?? t('unknownError')}
           </div>
         </div>
       )}
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-        <button className="btn" onClick={onBack}>← Zurück zum Mapping</button>
+        <button className="btn" onClick={onBack}>{t('backToMapping')}</button>
         {taskStatus?.state === 'SUCCESS' && mediaReferencesSelected && (
-          <button className="btn pri" onClick={onOpenMedia}>Medien hochladen</button>
+          <button className="btn pri" onClick={onOpenMedia}>{t('uploadMedia')}</button>
         )}
-        <button className="btn gh" onClick={onReset}>Neuer Import</button>
+        <button className="btn gh" onClick={onReset}>{t('newImport')}</button>
       </div>
     </div>
   )

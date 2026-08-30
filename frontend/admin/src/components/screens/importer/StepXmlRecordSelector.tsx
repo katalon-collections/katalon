@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { XmlElementLevel, XmlElementTag } from '../../../api/client'
 
 interface Props {
@@ -8,12 +9,13 @@ interface Props {
 }
 
 export function StepXmlRecordSelector({ elementLevels, loading, onSelect }: Props) {
+  const { t } = useTranslation('stepXmlRecordSelector')
   const [selected, setSelected] = useState<XmlElementTag | null>(null)
 
   if (loading) {
     return (
       <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--fg-3)', fontSize: 13 }}>
-        Selektoren werden geladen…
+        {t('loadingSelectors')}
       </div>
     )
   }
@@ -26,9 +28,9 @@ export function StepXmlRecordSelector({ elementLevels, loading, onSelect }: Prop
   return (
     <>
       <div style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>XML-Record-Element wählen</h3>
+        <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>{t('heading')}</h3>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-2)' }}>
-          Welches Element entspricht einem Datensatz? Jedes Vorkommen dieses Elements wird als ein Import-Record behandelt.
+          {t('description')}
         </p>
       </div>
 
@@ -62,7 +64,7 @@ export function StepXmlRecordSelector({ elementLevels, loading, onSelect }: Prop
                 }}>
                   {'  '.repeat(tag.depth)}{'<'}{tag.label}{'>'}
                 </span>
-                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>Tiefe {tag.depth}</span>
+                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('depth', { depth: tag.depth })}</span>
               </button>
             )
           })}
@@ -71,14 +73,14 @@ export function StepXmlRecordSelector({ elementLevels, loading, onSelect }: Prop
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
         {!selected && (
-          <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Bitte ein Element auswählen</span>
+          <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('selectElementHint')}</span>
         )}
         <button
           className="btn pri"
           disabled={!selected}
           onClick={() => selected && onSelect(selected.clark_tag)}
         >
-          Weiter → Mapping
+          {t('continueToMapping')}
         </button>
       </div>
     </>

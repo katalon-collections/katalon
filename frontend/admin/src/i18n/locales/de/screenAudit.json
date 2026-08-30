@@ -1,0 +1,31 @@
+{
+  "headline": "Audit-Log",
+  "subtitle": "Alle Änderungen im System",
+  "actionLabels": {
+    "all": "Alle",
+    "media": "Medien",
+    "relation": "Relationen",
+    "create": "Angelegt",
+    "update": "Geändert",
+    "delete": "Gelöscht",
+    "publish": "Veröffentlicht",
+    "media_add": "Medium angehängt",
+    "media_update": "Medium geändert",
+    "media_delete": "Medium entfernt",
+    "relation_add": "Relation angelegt",
+    "relation_update": "Relation geändert",
+    "relation_delete": "Relation gelöscht",
+    "ai_schema_assist": "KI-Schema-Assistent verwendet"
+  },
+  "loading": "Lade…",
+  "empty": "Keine Einträge.",
+  "typeLabels": {
+    "object": "Objekt",
+    "entity": "Entität",
+    "place": "Ort",
+    "occurrence": "Occurrence",
+    "procedure": "Vorgang"
+  },
+  "extraFile": "Datei: {filename}",
+  "extraRelationType": "Beziehungstyp: {relationType}"
+}

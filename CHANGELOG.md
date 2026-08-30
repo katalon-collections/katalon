@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-08-30
+
+### Added
+- Admin-Oberfläche komplett zweisprachig (DE/EN): alle 18 Namespaces mit Übersetzungsdateien, `i18n/index.ts` liefert alle Ressourcen aus.
+- 140+ hartcodierte deutsche Strings durch `useTranslation()`-Aufrufe ersetzt (Audit-Log, Banner, Export, Benutzer, Subtypen, Listen, Formularvarianten, OAI-Sets, Seiten, Schema, Massenbearbeitung, Importer-Schritte, Tour, RichText-Editor, Authority-Input, Feedback-Button, Vokabular, Settings-Profil).
+
+### Changed
+- Sprachumschaltung zwischen DE und EN über `katalon.ui_language` im localStorage; Default ist Deutsch.
+
 ## [1.9.2] - 2026-08-30
 
 ### Added

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { UploadResult } from '../../../api/client'
 import { Upload } from '../../ui/Icons'
 import type { ImportProfile } from './types'
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFile, onProfileLoaded }: Props) {
+  const { t } = useTranslation('stepUpload')
   const [over, setOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const profileRef = useRef<HTMLInputElement>(null)
@@ -30,7 +32,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
       return entry != null && entry.isDirectory
     })
     if (hasDirectory) {
-      setDropErr('Ordner können nicht per Drag & Drop abgelegt werden. Bitte auf die Fläche klicken, in den Ordner wechseln und die Dateien darin markieren (Cmd/Strg+A).')
+      setDropErr(t('folderDropNotSupported'))
       return
     }
     setDropErr(null)
@@ -46,12 +48,12 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
       try {
         const parsed = JSON.parse(e.target?.result as string)
         if (parsed.version !== 1 || typeof parsed.mapping !== 'object') {
-          setProfileErr('Ungültiges Profilformat (version 1 erwartet).')
+          setProfileErr(t('invalidProfileFormat'))
           return
         }
         onProfileLoaded?.(parsed as ImportProfile)
       } catch {
-        setProfileErr('Datei konnte nicht gelesen werden.')
+        setProfileErr(t('profileReadFailed'))
       }
     }
     reader.readAsText(file)
@@ -64,7 +66,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
           marginBottom: 16, padding: '10px 14px', background: '#fefce8',
           border: '1px solid #fde047', borderRadius: 8, fontSize: 13, color: '#854d0e',
         }}>
-          Mapping und Optionen wurden wiederhergestellt. Bitte Datei erneut hochladen, um fortzufahren.
+          {t('reuploadNotice')}
         </div>
       )}
       <div
@@ -76,10 +78,10 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
       >
         <div className="ic"><Upload size={40} /></div>
         {uploading
-          ? <div style={{ fontWeight: 600 }}>Lade…</div>
+          ? <div style={{ fontWeight: 600 }}>{t('loading')}</div>
           : <>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>Datei(en) hier ablegen oder klicken</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>CSV, TSV, Excel (.xlsx) oder XML · max. 100 MB · mehrere XML-Dateien möglich (1 Datensatz pro Datei) · im Dialog mit Cmd/Strg+A oder Cmd/Strg-Klick mehrere Dateien markieren</div>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>{t('dropOrClick')}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('fileTypeHint')}</div>
             </>
         }
         <input
@@ -100,7 +102,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
           <button
             className="btn sm gh"
             onClick={() => profileRef.current?.click()}
-          >Import-Profil laden</button>
+          >{t('loadProfileButton')}</button>
           <input
             ref={profileRef}
             type="file"
@@ -115,7 +117,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
       {uploaded && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="hd">
-            Vorschau · {uploaded.row_count} Zeilen · {uploaded.headers.length} Spalten
+            {t('previewSummary', { rows: uploaded.row_count, columns: uploaded.headers.length })}
           </div>
           <div className="bd" style={{ overflow: 'auto' }}>
             <table className="tbl" style={{ fontSize: 12 }}>

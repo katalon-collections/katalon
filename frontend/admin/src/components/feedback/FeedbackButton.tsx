@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { req, getTokenUser } from '../../api/client'
 import { Help, X } from '../ui/Icons'
 
@@ -18,6 +19,7 @@ const panel = {
 } as const
 
 export function FeedbackButton() {
+  const { t } = useTranslation('feedbackButton')
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -46,7 +48,7 @@ export function FeedbackButton() {
       setMessage('')
       setTimeout(() => { setOpen(false); setSent(false) }, 2000)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler beim Senden')
+      setError(e instanceof Error ? e.message : t('sendError'))
     } finally {
       setSending(false)
     }
@@ -58,16 +60,16 @@ export function FeedbackButton() {
         <div style={panel}>
           {sent ? (
             <div style={{ textAlign: 'center', padding: '18px 0', fontSize: 13 }}>
-              ✓ Feedback gesendet. Danke!
+              {t('sentConfirmation')}
             </div>
           ) : (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <strong style={{ fontSize: 13 }}>Feedback senden</strong>
+            <strong style={{ fontSize: 13 }}>{t('title')}</strong>
             <button
               type="button"
               className="ib"
               style={{ marginLeft: 'auto' }}
-              aria-label="Feedback schließen"
+              aria-label={t('close')}
               onClick={() => setOpen(false)}
             >
               <X size={15} />
@@ -78,24 +80,24 @@ export function FeedbackButton() {
             rows={5}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Was ist dir aufgefallen?"
+            placeholder={t('placeholder')}
             autoFocus
           />
           {error && (
             <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 6 }}>{error}</div>
           )}
           <div style={{ color: 'var(--fg-3)', fontSize: 11.5, marginTop: 8 }}>
-            URL, Browser und Fenstergröße werden mitgeschickt.
+            {t('hint')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-            <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
+            <button type="button" className="btn" onClick={() => setOpen(false)}>{t('cancel')}</button>
             <button
               type="button"
               className="btn pri"
               disabled={!message.trim() || sending}
               onClick={send}
             >
-              {sending ? 'Senden…' : 'Senden'}
+              {sending ? t('sending') : t('send')}
             </button>
           </div>
           </>)}
@@ -107,7 +109,7 @@ export function FeedbackButton() {
         onClick={() => setOpen(true)}
       >
         <Help className="ic" size={15} />
-        <span>Feedback</span>
+        <span>{t('buttonLabel')}</span>
       </button>
     </>
   )

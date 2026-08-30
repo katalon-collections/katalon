@@ -1,4 +1,6 @@
 import { Fragment, useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
@@ -7,12 +9,14 @@ import { ChevD, ChevR, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
-const RECORD_TYPE_LABELS: Record<RecordType, string> = {
-  object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang',
+const RECORD_TYPES: RecordType[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
+
+function recordTypeLabel(t: TFunction, rt: RecordType): string {
+  return t(`recordTypes.${rt}`)
 }
-const RECORD_TYPES = Object.keys(RECORD_TYPE_LABELS) as RecordType[]
 
 function AppliesCheckboxes({ value, onChange }: { value: RecordType[]; onChange: (v: RecordType[]) => void }) {
+  const { t } = useTranslation('screenVocab')
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 12 }}>
       {RECORD_TYPES.map(rt => (
@@ -22,19 +26,19 @@ function AppliesCheckboxes({ value, onChange }: { value: RecordType[]; onChange:
             checked={value.includes(rt)}
             onChange={e => onChange(e.target.checked ? [...value, rt] : value.filter(v => v !== rt))}
           />
-          {RECORD_TYPE_LABELS[rt]}
+          {recordTypeLabel(t, rt)}
         </label>
       ))}
-      <span style={{ color: 'var(--fg-3)' }}>(keine Auswahl = alle)</span>
+      <span style={{ color: 'var(--fg-3)' }}>{t('appliesCheckboxes.noSelectionMeansAll')}</span>
     </div>
   )
 }
 
-function appliesLabel(t: Pick<VocabularyTerm, 'applies_from' | 'applies_to'>): string {
-  const from = (t.applies_from ?? []) as RecordType[]
-  const to = (t.applies_to ?? []) as RecordType[]
-  if (from.length === 0 && to.length === 0) return 'alle'
-  const fmt = (arr: RecordType[]) => arr.length === 0 ? 'alle' : arr.map(r => RECORD_TYPE_LABELS[r]).join(', ')
+function appliesLabel(t: TFunction, term: Pick<VocabularyTerm, 'applies_from' | 'applies_to'>): string {
+  const from = (term.applies_from ?? []) as RecordType[]
+  const to = (term.applies_to ?? []) as RecordType[]
+  if (from.length === 0 && to.length === 0) return t('appliesLabel.all')
+  const fmt = (arr: RecordType[]) => arr.length === 0 ? t('appliesLabel.all') : arr.map(r => recordTypeLabel(t, r)).join(', ')
   return `${fmt(from)} → ${fmt(to)}`
 }
 

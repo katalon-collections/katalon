@@ -1,6 +1,6 @@
 {
   "name": "katalon-admin",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,8 +15,10 @@
     "@tiptap/extension-link": "^3.30.5",
     "@tiptap/react": "^3.30.5",
     "@tiptap/starter-kit": "^3.30.5",
+    "i18next": "^26.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.12",
     "react-joyride": "^2.9.3",
     "tiptap-markdown": "^0.9.0"
   },

@@ -1,0 +1,51 @@
+{
+  "profil": {
+    "apiKeys": {
+      "title": "API keys",
+      "intro": "API keys allow programmatic read access. Include the key as the",
+      "create": "Create key",
+      "creating": "Creating…",
+      "created": "Key created",
+      "namePlaceholder": "Label for this key",
+      "copy": "📋 Copy",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke this key? It will stop working immediately.",
+      "columns": {
+        "name": "Name",
+        "prefix": "Key",
+        "created": "Created",
+        "lastUsed": "Last used"
+      }
+    },
+    "email": {
+      "title": "Change email",
+      "currentPasswordLabel": "Current password",
+      "newLabel": "New email",
+      "submit": "Save",
+      "success": "Email updated successfully.",
+      "errors": {
+        "invalid": "Invalid email address.",
+        "newRequired": "New email is required.",
+        "passwordRequired": "Current password is required."
+      }
+    },
+    "password": {
+      "title": "Change password",
+      "currentLabel": "Current password",
+      "newLabel": "New password",
+      "confirmLabel": "Confirm new password",
+      "submit": "Save",
+      "success": "Password updated successfully.",
+      "errors": {
+        "mismatch": "Passwords do not match.",
+        "weak": "Password is too weak."
+      }
+    },
+    "tour": {
+      "title": "Onboarding tour",
+      "intro": "Walk through the key features of Katalon.",
+      "startBasic": "Take the tour",
+      "startAdvanced": "I know the basics"
+    }
+  }
+}

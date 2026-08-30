@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { subtypes } from '../../api/client'
 import type { RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
@@ -6,13 +7,7 @@ import { Edit, Plus, Trash, X } from '../ui/Icons'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
-const PRIMARY_TYPES = [
-  { id: 'object',     label: 'Objekte' },
-  { id: 'entity',     label: 'Entitäten' },
-  { id: 'place',      label: 'Orte' },
-  { id: 'occurrence', label: 'Occurrences' },
-  { id: 'procedure',  label: 'Vorgänge' },
-]
+const TYPE_IDS: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
 
 interface FormState {
   primary_type: string
@@ -38,11 +33,10 @@ function subtypeToForm(s: RecordSubtype): FormState {
   }
 }
 
-const TYPE_IDS = PRIMARY_TYPES.map(t => t.id)
-
 type Props = { initialType?: string | null; onTypeChange?: (type: string) => void }
 
 export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
+  const { t } = useTranslation('screenSubtype')
   const [activeType, setActiveType] = useState(initialType && TYPE_IDS.includes(initialType) ? initialType : 'object')
   const [items, setItems] = useState<RecordSubtype[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +48,14 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   const [saving, setSaving] = useState(false)
   const languages = useSupportedLanguages()
   const [formError, setFormError] = useState<string | null>(null)
+
+  const primaryTypes = useMemo(() => [
+    { id: 'object',     label: t('typeObject') },
+    { id: 'entity',     label: t('typeEntity') },
+    { id: 'place',      label: t('typePlace') },
+    { id: 'occurrence', label: t('typeOccurrence') },
+    { id: 'procedure',  label: t('typeProcedure') },
+  ], [t])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,7 +90,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { setFormError('Interner Name ist erforderlich.'); return }
+    if (!form.name.trim()) { setFormError(t('errorNameRequired')); return }
     setSaving(true)
     setFormError(null)
     try {
@@ -115,7 +117,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   }
 
   async function handleDelete(s: RecordSubtype) {
-    if (!confirm(`Subtyp „${s.name}" wirklich löschen? Zugehörige Schemafelder und Formularvarianten werden deaktiviert. Vorgänge oder andere Datensätze bleiben erhalten.`)) return
+    if (!confirm(t('deleteConfirm', { name: s.name }))) return
     try {
       await subtypes.delete(s.id)
       await load()
@@ -128,22 +130,22 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
     <div className="scroll">
       <div className="ph">
         <div>
-          <h1>Subtypen</h1>
-          <div className="sub">Subtypen für Bestandsdaten und Vorgänge verwalten</div>
+          <h1>{t('headline')}</h1>
+          <div className="sub">{t('subtitle')}</div>
         </div>
         <div className="right">
-          <button className="btn pri" onClick={openNew}><Plus size={13} /> Neuer Subtyp</button>
+          <button className="btn pri" onClick={openNew}><Plus size={13} /> {t('addButton')}</button>
         </div>
       </div>
 
       <div className="tabs">
-        {PRIMARY_TYPES.map(t => (
+        {primaryTypes.map(tp => (
           <button
-            key={t.id}
-            className={`tab${activeType === t.id ? ' active' : ''}`}
-            onClick={() => { setActiveType(t.id); setShowForm(false); onTypeChange?.(t.id) }}
+            key={tp.id}
+            className={`tab${activeType === tp.id ? ' active' : ''}`}
+            onClick={() => { setActiveType(tp.id); setShowForm(false); onTypeChange?.(tp.id) }}
           >
-            {t.label}
+            {tp.label}
           </button>
         ))}
       </div>
@@ -154,7 +156,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
         <div style={{ padding: '14px 24px 0' }}>
           <div className="card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <b style={{ fontSize: 13 }}>{editId ? 'Subtyp bearbeiten' : 'Neuer Subtyp'}</b>
+              <b style={{ fontSize: 13 }}>{editId ? t('editFormHeading') : t('newFormHeading')}</b>
               <button className="btn gh" onClick={() => setShowForm(false)}><X size={14} /></button>
             </div>
             {formError && <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 10 }}>{formError}</div>}
@@ -166,57 +168,57 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
               />
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
-              <div className="lbl">Beschreibung / Einsatz</div>
+              <div className="lbl">{t('descriptionLabel')}</div>
               <textarea
                 className="fld"
                 value={form.description}
                 onChange={e => set('description', e.target.value)}
                 rows={3}
-                placeholder="Wofür wird dieser Subtyp verwendet?"
+                placeholder={t('descriptionPlaceholder')}
                 style={{ height: 'auto', padding: '8px 10px', resize: 'vertical' }}
               />
             </div>
             <div className="fg-2" style={{ marginBottom: 10 }}>
               <div className="field">
-                <div className="lbl">Interner Name <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(wird nach dem Erstellen gesperrt)</span></div>
+                <div className="lbl">{t('internalNameLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('internalNameHint')})</span></div>
                 <input className="fld mono" value={form.name} onChange={e => set('name', e.target.value)} disabled={!!editId} />
               </div>
               <div className="field">
-                <div className="lbl">Sortierung</div>
+                <div className="lbl">{t('sortOrderLabel')}</div>
                 <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                 <input type="checkbox" className="ck" checked={form.is_default} onChange={e => set('is_default', e.target.checked)} />
-                Standard-Subtyp
+                {t('defaultCheckbox')}
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
-              <button className="btn" onClick={() => setShowForm(false)}>Abbrechen</button>
+              <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('saving') : t('save')}</button>
+              <button className="btn" onClick={() => setShowForm(false)}>{t('cancel')}</button>
             </div>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="empty">Lade…</div>
+        <div className="empty">{t('loading')}</div>
       ) : items.length === 0 ? (
         <div className="empty">
-          <div style={{ marginBottom: 6 }}>Keine Subtypen für {PRIMARY_TYPES.find(t => t.id === activeType)?.label} definiert.</div>
-          <button className="btn" onClick={openNew}><Plus size={13} /> Ersten Subtyp erstellen</button>
+          <div style={{ marginBottom: 6 }}>{t('emptyNoSubtypes', { type: primaryTypes.find(tp => tp.id === activeType)?.label })}</div>
+          <button className="btn" onClick={openNew}><Plus size={13} /> {t('emptyCreateFirst')}</button>
         </div>
       ) : (
         <div className="tw">
           <table className="tbl">
             <thead>
               <tr>
-                <th style={{ width: '20%' }}>Name</th>
-                <th>Label</th>
-                <th>Beschreibung / Einsatz</th>
-                <th style={{ width: 100, textAlign: 'center' }}>Standard</th>
-                <th style={{ width: 90, textAlign: 'right' }}>Sortierung</th>
+                <th style={{ width: '20%' }}>{t('tableName')}</th>
+                <th>{t('tableLabel')}</th>
+                <th>{t('tableDescription')}</th>
+                <th style={{ width: 100, textAlign: 'center' }}>{t('tableDefault')}</th>
+                <th style={{ width: 90, textAlign: 'right' }}>{t('tableSortOrder')}</th>
                 <th className="col-act"></th>
               </tr>
             </thead>
@@ -227,13 +229,13 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                   <td>{getLabel(s, '—')}</td>
                   <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '—'}</td>
                   <td style={{ textAlign: 'center' }}>
-                    {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>Standard</span>}
+                    {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{t('defaultBadge')}</span>}
                   </td>
                   <td style={{ textAlign: 'right', color: 'var(--fg-3)', fontSize: 12 }}>{s.sort_order}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <button className="btn ico gh" title="Bearbeiten" onClick={() => openEdit(s)}><Edit size={13} /></button>
-                      <button className="btn ico gh dn" title="Löschen" onClick={() => handleDelete(s)}><Trash size={13} /></button>
+                      <button className="btn ico gh" title={t('editButtonTitle')} onClick={() => openEdit(s)}><Edit size={13} /></button>
+                      <button className="btn ico gh dn" title={t('deleteButtonTitle')} onClick={() => handleDelete(s)}><Trash size={13} /></button>
                     </div>
                   </td>
                 </tr>

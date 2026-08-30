@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { /* Bell, */ Search, Help, User } from '../ui/Icons'
+import { UI_LANGUAGES, setUiLanguage } from '../../i18n'
 import { search } from '../../api/client'
 import type { SearchResult } from '../../types'
 
@@ -35,6 +37,7 @@ interface Props {
 }
 
 export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpenNavigation }: Props) {
+  const { t, i18n } = useTranslation()
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
@@ -84,7 +87,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
 
   return (
     <div className="tb">
-      <button className="mobile-menu" aria-label="Navigation öffnen" onClick={onOpenNavigation}>
+      <button className="mobile-menu" aria-label={t('topbar.openNav')} onClick={onOpenNavigation}>
         <span />
         <span />
         <span />
@@ -107,10 +110,10 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
       <div className="gs" ref={wrapRef} style={{ position: 'relative' }}>
         <Search size={14} />
         <input
-          aria-label="Global suchen"
+          aria-label={t('topbar.globalSearch')}
           aria-expanded={open}
           aria-controls="global-search-results"
-          placeholder="Global suchen…"
+          placeholder={t('topbar.globalSearchPlaceholder')}
           value={q}
           onChange={e => setQ(e.target.value)}
           onFocus={() => { if (results.length > 0) setOpen(true) }}
@@ -149,7 +152,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
             boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200,
             padding: '12px', fontSize: 13, color: 'var(--fg-3)', textAlign: 'center',
           }}>
-            Keine Treffer für „{q}"
+            {t('topbar.noResults', { query: q })}
           </div>
         )}
       </div>
@@ -157,8 +160,8 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
       {/* <button className="ib" title="Benachrichtigungen"><Bell size={15} /></button> */}
       <a
         className="ib"
-        title="Hilfe zu diesem Screen"
-        aria-label="Hilfe zu diesem Screen"
+        title={t('topbar.help')}
+        aria-label={t('topbar.help')}
         href={(route && ROUTE_DOCS[route]) || DOCS_ROOT}
         target="_blank"
         rel="noopener noreferrer"
@@ -168,7 +171,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
       <div ref={userMenuRef} style={{ position: 'relative' }}>
         <button className="btn gh sm user-menu-trigger" onClick={() => setUserMenuOpen(v => !v)}>
           <User size={15} className="mobile-only" aria-hidden="true" />
-          <span className="desktop-only">{currentUser?.email || 'Benutzer'} ▾</span>
+          <span className="desktop-only">{currentUser?.email || t('topbar.user')} ▾</span>
         </button>
         {userMenuOpen && (
           <div style={{
@@ -191,8 +194,20 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
                 onNavigate?.('settings')
               }}
             >
-              Kontoeinstellungen
+              {t('topbar.account')}
             </button>
+            <div style={{ display: 'flex', gap: 4, padding: '4px 8px' }}>
+              {UI_LANGUAGES.map(lng => (
+                <button
+                  key={lng}
+                  className="btn gh sm"
+                  style={{ flex: 1, fontWeight: i18n.language === lng ? 700 : 400 }}
+                  onClick={() => setUiLanguage(lng)}
+                >
+                  {lng.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <button
               className="btn gh"
               style={{ width: '100%', justifyContent: 'flex-start', borderRadius: 6, color: '#b91c1c' }}
@@ -201,7 +216,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
                 onLogout?.()
               }}
             >
-              Abmelden
+              {t('topbar.logout')}
             </button>
           </div>
         )}

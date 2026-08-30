@@ -1,0 +1,55 @@
+{
+  "login": {
+    "tagline": "Digital Collection Management System",
+    "cardTitle": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…"
+  },
+  "topbar": {
+    "openNav": "Open navigation",
+    "globalSearch": "Global search",
+    "globalSearchPlaceholder": "Search everything…",
+    "noResults": "No results for \"{{query}}\"",
+    "help": "Help for this screen",
+    "account": "Account settings",
+    "logout": "Log out",
+    "user": "User"
+  },
+  "sidebar": {
+    "mainNav": "Main navigation",
+    "closeNav": "Close navigation",
+    "logout": "Log out",
+    "groups": {
+      "content": "Content",
+      "config": "Configuration",
+      "admin": "Administration"
+    },
+    "nav": {
+      "list": "Objects",
+      "entitiesList": "Entities",
+      "placesList": "Places",
+      "occurrencesList": "Occurrences",
+      "proceduresList": "Procedures",
+      "import": "Importer",
+      "audit": "Audit log",
+      "subtypes": "Subtypes",
+      "schema": "Schemas",
+      "formVariants": "Form variants",
+      "vocab": "Vocabulary",
+      "pages": "Static pages",
+      "oaiSets": "OAI-PMH sets",
+      "banners": "Banners",
+      "export": "Export",
+      "users": "Users",
+      "settings": "Settings"
+    },
+    "roles": {
+      "admin": "Administrator",
+      "editor": "Editor",
+      "cataloger": "Cataloger",
+      "viewer": "Viewer"
+    }
+  }
+}

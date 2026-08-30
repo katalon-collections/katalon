@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RECORD_TYPES, STEPS, STEPS_XML } from './importer/types'
 import { useImporterState } from './importer/useImporterState'
 import { StepDryRun } from './importer/StepDryRun'
@@ -7,11 +8,6 @@ import { StepMedia } from './importer/StepMedia'
 import { StepResult } from './importer/StepResult'
 import { StepUpload } from './importer/StepUpload'
 import { StepXmlRecordSelector } from './importer/StepXmlRecordSelector'
-
-const IMPORTER_TABS = [
-  { id: 'metadata', label: 'Metadaten' },
-  { id: 'media',    label: 'Medien' },
-]
 
 function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
   const steps = isXml ? STEPS_XML : STEPS
@@ -30,6 +26,11 @@ function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
 type Props = { initialTab?: string | null; onTabChange?: (tab: 'metadata' | 'media') => void }
 
 export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
+  const { t } = useTranslation('screenImporter')
+  const IMPORTER_TABS = [
+    { id: 'metadata', label: t('tabs.metadata') },
+    { id: 'media',    label: t('tabs.media') },
+  ]
   const [activeTab, setActiveTab] = useState<'metadata' | 'media'>(initialTab === 'media' ? 'media' : 'metadata')
   const [focusMediaHeading, setFocusMediaHeading] = useState(false)
 
@@ -66,24 +67,24 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   return (
     <div className="scroll">
       <div className="ph">
-        <div><h1>Importer</h1><div className="sub">Daten in Katalon übernehmen</div></div>
+        <div><h1>{t('title')}</h1><div className="sub">{t('subtitle')}</div></div>
       </div>
 
       {/* Tabs */}
       <div className="importer-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-soft)', padding: '0 24px' }}>
-        {IMPORTER_TABS.map(t => (
+        {IMPORTER_TABS.map(tab => (
           <button
-            key={t.id}
-            aria-pressed={activeTab === t.id}
-            aria-label={`${t.label}-Import anzeigen`}
-            onClick={() => selectTab(t.id as 'metadata' | 'media')}
+            key={tab.id}
+            aria-pressed={activeTab === tab.id}
+            aria-label={t('tabAriaLabel', { label: tab.label })}
+            onClick={() => selectTab(tab.id as 'metadata' | 'media')}
             style={{
               padding: '10px 20px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none',
-              borderBottom: activeTab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab === t.id ? 'var(--fg-1)' : 'var(--fg-3)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+              color: activeTab === tab.id ? 'var(--fg-1)' : 'var(--fg-3)',
               cursor: 'pointer', marginBottom: -1,
             }}
-          >{t.label}</button>
+          >{tab.label}</button>
         ))}
       </div>
 
@@ -92,26 +93,26 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
         <div className="importer-content">
           {/* Record type selector */}
           <div className="importer-types" style={{ marginBottom: availableSubtypes.length > 0 ? 8 : 16 }}>
-            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Typ:</span>
-            {RECORD_TYPES.map(t => (
+            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('typeLabel')}</span>
+            {RECORD_TYPES.map(rt => (
               <button
-                key={t.id}
-                className={`btn sm${state.recordType === t.id ? ' pri' : ' gh'}`}
-                onClick={() => dispatch({ type: 'SET_RECORD_TYPE', payload: t.id })}
-              >{t.label}</button>
+                key={rt.id}
+                className={`btn sm${state.recordType === rt.id ? ' pri' : ' gh'}`}
+                onClick={() => dispatch({ type: 'SET_RECORD_TYPE', payload: rt.id })}
+              >{rt.label}</button>
             ))}
           </div>
 
           {/* Subtype selector */}
           {availableSubtypes.length > 0 && (
             <div className="importer-subtype">
-              <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Subtyp:</span>
+              <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('subtypeLabel')}</span>
               <select
                 className="fld" style={{ height: 28, fontSize: 12, width: 220 }}
                 value={state.subtype ?? ''}
                 onChange={e => dispatch({ type: 'SET_SUBTYPE', payload: e.target.value || null })}
               >
-                <option value="">— kein Subtyp —</option>
+                <option value="">{t('noSubtype')}</option>
                 {availableSubtypes.map(s => (
                   <option key={s.id} value={s.name}>{s.label?.de ?? s.label?.en ?? s.name}</option>
                 ))}

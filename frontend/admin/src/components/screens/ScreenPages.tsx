@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { staticPages } from '../../api/client'
 import type { StaticPage } from '../../api/client'
 import { Plus, Trash } from '../ui/Icons'
@@ -32,6 +33,7 @@ function pageToForm(p: StaticPage): FormState {
 type Props = { initialSlug?: string | null; onSlugChange?: (slug: string | null) => void }
 
 export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
+  const { t } = useTranslation('screenPages')
   const [pages, setPages] = useState<StaticPage[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
@@ -84,7 +86,7 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
 
   async function handleSave() {
     if (!form) return
-    if (!form.slug.trim()) { setError('Slug darf nicht leer sein.'); return }
+    if (!form.slug.trim()) { setError(t('errorSlugEmpty')); return }
     setSaving(true)
     setError(null)
     const payload = {
@@ -111,7 +113,7 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
   }
 
   async function handleDelete(slug: string) {
-    if (!window.confirm(`Seite "${slug}" wirklich löschen?`)) return
+    if (!window.confirm(t('deleteConfirm', { slug }))) return
     try {
       await staticPages.delete(slug)
       if (activeSlug === slug) close()
@@ -124,17 +126,17 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
   return (
     <div className={`pages-screen${form ? ' has-editor' : ''}`}>
       <div className="ph">
-        <div><h1>Statische Seiten</h1><div className="sub">FAQ, Impressum, Über die Sammlung</div></div>
+        <div><h1>{t('headline')}</h1><div className="sub">{t('subtitle')}</div></div>
         <div className="right">
-          <button className="btn pri" onClick={openNew}><Plus size={13} /> Neue Seite</button>
+          <button className="btn pri" onClick={openNew}><Plus size={13} /> {t('newPage')}</button>
         </div>
       </div>
 
       <div className="pages-layout">
         {/* Seitenliste */}
         <div className="pages-list">
-          {loading && <div className="empty" style={{ paddingTop: 40 }}>Lade…</div>}
-          {!loading && pages.length === 0 && <div className="empty">Keine Seiten.</div>}
+          {loading && <div className="empty" style={{ paddingTop: 40 }}>{t('loading')}</div>}
+          {!loading && pages.length === 0 && <div className="empty">{t('empty')}</div>}
           {pages.map(p => (
             <div
               key={p.slug}
@@ -146,17 +148,17 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
                   type="button"
                   className="pages-open"
                   onClick={() => openPage(p)}
-                  aria-label={`Seite ${p.title.de || p.slug} öffnen`}
+                  aria-label={t('openAria', { title: p.title.de || p.slug })}
                 >
                   <div className="nm">{p.title.de || p.slug}</div>
-                  <div className="sub">{p.slug}{!p.is_published ? ' · Entwurf' : ''}</div>
+                  <div className="sub">{p.slug}{!p.is_published ? t('draftSuffix') : ''}</div>
                 </button>
                 <button
                   className="btn sm ico gh dn"
                   style={{ flexShrink: 0 }}
                   onClick={() => handleDelete(p.slug)}
-                  aria-label={`Seite ${p.title.de || p.slug} löschen`}
-                  title={`Seite ${p.title.de || p.slug} löschen`}
+                  aria-label={t('deleteAria', { title: p.title.de || p.slug })}
+                  title={t('deleteTitle', { title: p.title.de || p.slug })}
                 >
                   <Trash size={12} />
                 </button>
@@ -170,26 +172,26 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
           {form ? (
             <div className="card" style={{ margin: '18px 24px' }}>
               <div className="hd">
-                <span>{isNew ? 'Neue Seite' : (form.title_de || form.slug)}</span>
+                <span>{isNew ? t('editorNew') : (form.title_de || form.slug)}</span>
                 {!isNew && <span className="sub">/{form.slug}</span>}
                 <div className="grow" />
-                <button className="btn sm" onClick={close}>Schließen</button>
+                <button className="btn sm" onClick={close}>{t('close')}</button>
               </div>
               <div className="bd">
                 {error && <div style={{ marginBottom: 10, color: '#b91c1c', fontSize: 13 }}>{error}</div>}
 
                 <div className="fg-2">
                   <div className="field">
-                    <div className="lbl">Slug <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(URL-Pfad, z.B. impressum)</span></div>
+                    <div className="lbl">{t('slugLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('slugHint')}</span></div>
                     <input className="fld mono" value={form.slug} onChange={e => set('slug', e.target.value)} disabled={!isNew} />
                   </div>
                   <div className="field" style={{ display: 'flex', gap: 16, flexDirection: 'row', paddingTop: 22 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                       <input type="checkbox" className="ck" checked={form.is_published} onChange={e => set('is_published', e.target.checked)} />
-                      Veröffentlicht
+                      {t('published')}
                     </label>
                     <div className="field" style={{ margin: 0 }}>
-                      <div className="lbl">Reihenfolge</div>
+                      <div className="lbl">{t('sortOrder')}</div>
                       <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} style={{ width: 70 }} />
                     </div>
                   </div>
@@ -197,40 +199,40 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
 
                 <div className="fg-2">
                   <div className="field">
-                    <div className="lbl">Titel DE</div>
+                    <div className="lbl">{t('titleDE')}</div>
                     <input className="fld" value={form.title_de} onChange={e => set('title_de', e.target.value)} />
                   </div>
                   <div className="field">
-                    <div className="lbl">Titel EN</div>
+                    <div className="lbl">{t('titleEN')}</div>
                     <input className="fld" value={form.title_en} onChange={e => set('title_en', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="field">
-                  <div className="lbl">Inhalt DE <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(Markdown)</span></div>
+                  <div className="lbl">{t('contentDE')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentDEHint')}</span></div>
                   <textarea className="fld mono" rows={10} value={form.content_de} onChange={e => set('content_de', e.target.value)}
                     style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.5 }} />
                 </div>
                 <div className="field">
-                  <div className="lbl">Inhalt EN <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                  <div className="lbl">{t('contentEN')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentENHint')}</span></div>
                   <textarea className="fld mono" rows={6} value={form.content_en} onChange={e => set('content_en', e.target.value)}
                     style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.5 }} />
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button className="btn pri" onClick={handleSave} disabled={saving}>
-                    {saving ? 'Speichert…' : 'Speichern'}
+                    {saving ? t('saving') : t('save')}
                   </button>
                   {!isNew && (
                     <button className="btn dn" onClick={() => handleDelete(activeSlug!)} disabled={saving}>
-                      Löschen
+                      {t('delete')}
                     </button>
                   )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="empty" style={{ paddingTop: 60 }}>Seite auswählen oder neue anlegen.</div>
+            <div className="empty" style={{ paddingTop: 60 }}>{t('emptyEditor')}</div>
           )}
         </div>
       </div>

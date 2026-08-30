@@ -1,0 +1,12 @@
+{
+  "title": "Importer",
+  "subtitle": "Bring data into Katalon",
+  "tabs": {
+    "metadata": "Metadata",
+    "media": "Media"
+  },
+  "tabAriaLabel": "Show {{label}} import",
+  "typeLabel": "Type:",
+  "subtypeLabel": "Subtype:",
+  "noSubtype": "— no subtype —"
+}

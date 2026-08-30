@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, search, vocabularies } from '../../api/client'
 import type { BatchOperation, BatchOperationType, BatchRequest, BatchResponse, FieldDefinition, RecordType } from '../../types'
 import { getLabel } from '../../types'
@@ -12,29 +13,12 @@ const API_MAP = {
   procedure: procedures,
 }
 
-const TYPE_LABELS: Record<RecordType, string> = {
-  object: 'Objekt',
-  entity: 'Entität',
-  place: 'Ort',
-  occurrence: 'Occurrence',
-  procedure: 'Vorgang',
-}
-
 const STATUS_OPTIONS: Record<RecordType, string[]> = {
   object: ['draft', 'internal', 'public'],
   entity: ['draft', 'internal', 'public'],
   place: ['draft', 'internal', 'public'],
   occurrence: ['draft', 'internal', 'public'],
   procedure: ['draft', 'active', 'completed', 'cancelled'],
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Entwurf',
-  internal: 'Intern',
-  public: 'Öffentlich',
-  active: 'Aktiv',
-  completed: 'Abgeschlossen',
-  cancelled: 'Abgebrochen',
 }
 
 interface Props {
@@ -51,6 +35,22 @@ interface Props {
 }
 
 export function BatchEditModal({ recordType, fields, selection, onClose, onSuccess }: Props) {
+  const { t } = useTranslation('batchEditModal')
+  const TYPE_LABELS: Record<RecordType, string> = {
+    object: t('types.object'),
+    entity: t('types.entity'),
+    place: t('types.place'),
+    occurrence: t('types.occurrence'),
+    procedure: t('types.procedure'),
+  }
+  const STATUS_LABELS: Record<string, string> = {
+    draft: t('statuses.draft'),
+    internal: t('statuses.internal'),
+    public: t('statuses.public'),
+    active: t('statuses.active'),
+    completed: t('statuses.completed'),
+    cancelled: t('statuses.cancelled'),
+  }
   const [opType, setOpType] = useState<BatchOperationType>('set_status')
   const [statusValue, setStatusValue] = useState<string>(STATUS_OPTIONS[recordType][0])
   const [fieldName, setFieldName] = useState<string>('')
@@ -144,7 +144,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
           relation_type: relationType,
         }
       default:
-        throw new Error('Unbekannte Operation')
+        throw new Error(t('errors.unknownOperation'))
     }
   }
 
@@ -170,19 +170,19 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
 
   function validate(): string | null {
     if (opType === 'set_field' || opType === 'append_field') {
-      if (!fieldName) return 'Bitte Feld wählen.'
+      if (!fieldName) return t('errors.selectField')
       if (opType === 'append_field' && !selectedField?.is_repeatable) {
-        return 'Anhängen ist nur bei wiederholbaren Feldern möglich.'
+        return t('errors.appendOnlyRepeatable')
       }
       if ((selectedField?.field_type === 'vocab' || selectedField?.field_type === 'vocab_free') && !selectedTerm && !fieldValue.trim()) {
-        return 'Bitte einen Wert eingeben oder einen Vokabularbegriff wählen.'
+        return t('errors.enterValueOrTerm')
       }
     }
     if ((opType === 'add_relation' || opType === 'remove_relation')) {
-      if (!selectedRecord) return 'Bitte Ziel-Datensatz wählen.'
-      if (!relationType.trim()) return 'Bitte Relationstyp eingeben.'
+      if (!selectedRecord) return t('errors.selectTargetRecord')
+      if (!relationType.trim()) return t('errors.enterRelationType')
     }
-    if (selection.count === 0) return 'Keine Datensätze ausgewählt.'
+    if (selection.count === 0) return t('errors.noRecordsSelected')
     if (selection.count > 50 && !acceptedWarning) return 'WARNUNG_BITTE_BESTÄTIGEN'
     return null
   }
@@ -225,26 +225,26 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
     <div className="batch-modal-backdrop" onClick={onClose}>
       <div className="batch-modal" onClick={e => e.stopPropagation()}>
         <div className="batch-modal-header">
-          <h2>Massenbearbeitung</h2>
-          <button type="button" className="btn ico gh" onClick={onClose} aria-label="Schließen"><X size={16} /></button>
+          <h2>{t('title')}</h2>
+          <button type="button" className="btn ico gh" onClick={onClose} aria-label={t('close')}><X size={16} /></button>
         </div>
 
         <div className="batch-modal-body">
           <div className="batch-summary">
             <strong>{selection.count.toLocaleString('de')} {TYPE_LABELS[recordType]}{selection.count === 1 ? '' : 'e'}</strong>
-            {' '}ausgewählt{selection.mode === 'filters' ? ' (alle Treffer dieser Suche)' : ''}
+            {' '}{t('selected')}{selection.mode === 'filters' ? ` ${t('allSearchResults')}` : ''}
           </div>
 
           {needsWarning && (
             <div className="batch-warning">
               <Alert size={18} />
               <div>
-                <strong>Achtung: {selection.count.toLocaleString('de')} Datensätze werden verändert.</strong>
-                <p>Es gibt keinen automatischen Rollback. Fortfahren?</p>
+                <strong>{t('warningTitle', { count: selection.count.toLocaleString('de') })}</strong>
+                <p>{t('warningBody')}</p>
               </div>
               <label className="ck-hit">
                 <input type="checkbox" className="ck" checked={acceptedWarning} onChange={e => setAcceptedWarning(e.target.checked)} />
-                <span>Ja, ich möchte fortfahren.</span>
+                <span>{t('warningConfirm')}</span>
               </label>
             </div>
           )}
@@ -253,11 +253,11 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
             <div className={`batch-result ${result.errors.length ? 'partial' : 'ok'}`}>
               <Check size={18} />
               <div>
-                <strong>{result.affected.toLocaleString('de')} Datensätze bearbeitet</strong>
-                {result.task_id && <p>Job läuft asynchron (Task {result.task_id}).</p>}
+                <strong>{t('recordsEdited', { count: result.affected.toLocaleString('de') })}</strong>
+                {result.task_id && <p>{t('asyncJob', { taskId: result.task_id })}</p>}
                 {result.errors.length > 0 && (
                   <details>
-                    <summary>{result.errors.length} Fehler</summary>
+                    <summary>{t('errorCount', { count: result.errors.length })}</summary>
                     <ul>{result.errors.map((err, i) => <li key={i}>{err}</li>)}</ul>
                   </details>
                 )}
@@ -269,20 +269,20 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
 
           <form id="batch-form" onSubmit={handleSubmit}>
             <div className="fld-row">
-              <label>Operation</label>
+              <label>{t('operation')}</label>
               <select className="fld" value={opType} onChange={e => setOpType(e.target.value as BatchOperationType)}>
-                <option value="set_status">Status setzen</option>
-                <option value="set_field">Feld setzen</option>
-                <option value="append_field">Feld anhängen</option>
-                <option value="clear_field">Feld leeren</option>
-                <option value="add_relation">Relation hinzufügen</option>
-                <option value="remove_relation">Relation entfernen</option>
+                <option value="set_status">{t('operations.setStatus')}</option>
+                <option value="set_field">{t('operations.setField')}</option>
+                <option value="append_field">{t('operations.appendField')}</option>
+                <option value="clear_field">{t('operations.clearField')}</option>
+                <option value="add_relation">{t('operations.addRelation')}</option>
+                <option value="remove_relation">{t('operations.removeRelation')}</option>
               </select>
             </div>
 
             {opType === 'set_status' && (
               <div className="fld-row">
-                <label>Neuer Status</label>
+                <label>{t('newStatus')}</label>
                 <select className="fld" value={statusValue} onChange={e => setStatusValue(e.target.value)}>
                   {STATUS_OPTIONS[recordType].map(s => (
                     <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
@@ -294,7 +294,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
             {(opType === 'set_field' || opType === 'append_field' || opType === 'clear_field') && (
               <>
                 <div className="fld-row">
-                  <label>Feld</label>
+                  <label>{t('field')}</label>
                   <select className="fld" value={fieldName} onChange={e => setFieldName(e.target.value)}>
                     {batchableFields.map(f => (
                       <option key={f.name} value={f.name}>{getLabel(f, f.name)}</option>
@@ -304,11 +304,11 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
 
                 {opType !== 'clear_field' && selectedField && (
                   <div className="fld-row">
-                    <label>Wert</label>
+                    <label>{t('value')}</label>
                     {selectedField.field_type === 'boolean' && (
                       <label className="ck-hit">
                         <input type="checkbox" className="ck" checked={booleanValue} onChange={e => setBooleanValue(e.target.checked)} />
-                        <span>Aktiv</span>
+                        <span>{t('active')}</span>
                       </label>
                     )}
                     {selectedField.field_type === 'number' && (
@@ -329,15 +329,15 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
                             <input
                               className="fld"
                               type="text"
-                              placeholder="Begriff suchen…"
+                              placeholder={t('searchTermPlaceholder')}
                               value={vocabQuery}
                               onChange={e => setVocabQuery(e.target.value)}
                             />
                             {vocabResults.length > 0 && (
                               <ul className="batch-dropdown">
-                                {vocabResults.map(t => (
-                                  <li key={t.id} onClick={() => { setSelectedTerm(t); setVocabQuery(t.label); setVocabResults([]) }}>
-                                    {t.label}
+                                {vocabResults.map(vr => (
+                                  <li key={vr.id} onClick={() => { setSelectedTerm(vr); setVocabQuery(vr.label); setVocabResults([]) }}>
+                                    {vr.label}
                                   </li>
                                 ))}
                               </ul>
@@ -346,7 +346,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
                               <input
                                 className="fld"
                                 type="text"
-                                placeholder="oder freien Wert eingeben"
+                                placeholder={t('freeValuePlaceholder')}
                                 value={fieldValue}
                                 onChange={e => setFieldValue(e.target.value)}
                               />
@@ -355,13 +355,13 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
                         ) : (
                           <div className="batch-selected">
                             {selectedTerm.label}
-                            <button type="button" className="btn sm gh" onClick={() => { setSelectedTerm(null); setVocabQuery('') }}>Entfernen</button>
+                            <button type="button" className="btn sm gh" onClick={() => { setSelectedTerm(null); setVocabQuery('') }}>{t('remove')}</button>
                           </div>
                         )}
                       </div>
                     )}
                     {selectedField.field_type === 'relation' && (
-                      <input className="fld" type="text" placeholder="ID des verknüpften Datensatzes" value={fieldValue} onChange={e => setFieldValue(e.target.value)} />
+                      <input className="fld" type="text" placeholder={t('relatedRecordIdPlaceholder')} value={fieldValue} onChange={e => setFieldValue(e.target.value)} />
                     )}
                     {selectedField.is_repeatable && (selectedField.field_type === 'text' || selectedField.field_type === 'richtext') && opType === 'set_field' && (
                       <div className="batch-repeatable">
@@ -385,23 +385,23 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
             {(opType === 'add_relation' || opType === 'remove_relation') && (
               <>
                 <div className="fld-row">
-                  <label>Ziel-Typ</label>
+                  <label>{t('targetType')}</label>
                   <select className="fld" value={relationToType} onChange={e => setRelationToType(e.target.value as RecordType)}>
-                    <option value="object">Objekt</option>
-                    <option value="entity">Entität</option>
-                    <option value="place">Ort</option>
-                    <option value="occurrence">Occurrence</option>
+                    <option value="object">{t('types.object')}</option>
+                    <option value="entity">{t('types.entity')}</option>
+                    <option value="place">{t('types.place')}</option>
+                    <option value="occurrence">{t('types.occurrence')}</option>
                   </select>
                 </div>
                 <div className="fld-row">
-                  <label>Ziel-Datensatz</label>
+                  <label>{t('targetRecord')}</label>
                   <div className="batch-record-search">
                     {!selectedRecord ? (
                       <>
                         <input
                           className="fld"
                           type="text"
-                          placeholder="Suchen…"
+                          placeholder={t('searchRecords')}
                           value={recordQuery}
                           onChange={e => setRecordQuery(e.target.value)}
                         />
@@ -418,14 +418,14 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
                     ) : (
                       <div className="batch-selected">
                         {selectedRecord.label}
-                        <button type="button" className="btn sm gh" onClick={() => { setSelectedRecord(null); setRecordQuery('') }}>Entfernen</button>
+                        <button type="button" className="btn sm gh" onClick={() => { setSelectedRecord(null); setRecordQuery('') }}>{t('remove')}</button>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="fld-row">
-                  <label>Relationstyp</label>
-                  <input className="fld" type="text" value={relationType} onChange={e => setRelationType(e.target.value)} placeholder="z. B. isPartOf" />
+                  <label>{t('relationType')}</label>
+                  <input className="fld" type="text" value={relationType} onChange={e => setRelationType(e.target.value)} placeholder={t('relationTypePlaceholder')} />
                 </div>
               </>
             )}
@@ -433,9 +433,9 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
         </div>
 
         <div className="batch-modal-footer">
-          <button type="button" className="btn gh" onClick={onClose} disabled={loading}>Abbrechen</button>
+          <button type="button" className="btn gh" onClick={onClose} disabled={loading}>{t('cancel')}</button>
           <button type="submit" form="batch-form" className="btn pri" disabled={loading || (selection.count > 50 && !acceptedWarning)}>
-            {loading ? 'Wird ausgeführt…' : 'Massenbearbeitung ausführen'}
+            {loading ? t('executing') : t('executeButton')}
           </button>
         </div>
       </div>

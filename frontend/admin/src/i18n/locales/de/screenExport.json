@@ -1,0 +1,21 @@
+{
+  "headline": "Export",
+  "tabDumps": "Dumps",
+  "tabMapping": "Format-Mapping",
+  "typeLabel": "Typ",
+  "recordTypeObject": "Objekte",
+  "recordTypeEntity": "Entitäten",
+  "recordTypePlace": "Orte",
+  "recordTypeOccurrence": "Occurrences",
+  "recordTypeProcedure": "Vorgänge",
+  "formatLabel": "Format",
+  "subtypeLabel": "Subtyp (optional)",
+  "subtypeAll": "Alle",
+  "exportDownloading": "Exportiere…",
+  "exportButton": "Export starten",
+  "exportFailed": "Export fehlgeschlagen.",
+  "mappingLoading": "Lade…",
+  "mappingNoFields": "Keine mappbaren Felder für diesen Typ.",
+  "mappingFieldHeader": "Feld",
+  "mappingNoMapping": "— kein Mapping —"
+}

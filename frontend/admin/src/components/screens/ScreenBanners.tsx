@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { bannersApi } from '../../api/client'
 import type { Banner } from '../../types'
 import { Bell, Edit, Plus, Trash } from '../ui/Icons'
@@ -46,7 +47,9 @@ function colorStyle(color: Banner['color']): React.CSSProperties {
 }
 
 export function ScreenBanners() {
+  const { t } = useTranslation('screenBanners')
   const [banners, setBanners] = useState<Banner[]>([])
+  const colorLabel = (c: Banner['color']) => COLORS.find(x => x.value === c)?.label ?? c
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<string | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -84,7 +87,7 @@ export function ScreenBanners() {
 
   async function save() {
     if (!form) return
-    if (!form.message.trim()) { setError('Nachricht ist erforderlich.'); return }
+    if (!form.message.trim()) { setError(t('messageRequired')); return }
     setSaving(true)
     setError(null)
     try {
@@ -100,14 +103,14 @@ export function ScreenBanners() {
       cancel()
       load()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Fehler beim Speichern.')
+      setError(e instanceof Error ? e.message : t('saveError'))
     } finally {
       setSaving(false)
     }
   }
 
   async function del(b: Banner) {
-    if (!confirm(`Banner wirklich löschen?`)) return
+    if (!confirm(t('deleteConfirm'))) return
     await bannersApi.remove(b.id).catch(() => {})
     load()
   }
@@ -126,45 +129,42 @@ export function ScreenBanners() {
   return (
     <div className="banners-page settings-page">
       <div className="settings-head" style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Banner</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('headline')}</h1>
         <button
           onClick={startNew}
           style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent)', color: '#fff', border: 0, borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          <Plus size={14} /> Neuer Banner
+          <Plus size={14} /> {t('addButton')}
         </button>
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 24, lineHeight: 1.6 }}>
-        Banner werden oben in der Admin-Oberfläche und/oder im öffentlichen Portal angezeigt.
-        Sie können unabhängig aktiviert, deaktiviert und mit einem Ablaufdatum versehen werden.
+        {t('description')}
       </p>
 
       {(isNew || editId) && form && (
         <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, marginBottom: 24 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 18px' }}>{isNew ? 'Neuer Banner' : 'Banner bearbeiten'}</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 18px' }}>{isNew ? t('newBanner') : t('editBanner')}</h2>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>
-              Nachricht <span style={{ color: '#dc2626' }}>*</span>
-            </label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>{t('messageLabel')} <span style={{ color: '#dc2626' }}>*</span></label>
             <textarea
               style={{ ...inp, minHeight: 72, resize: 'vertical' }}
               value={form.message}
               onChange={e => set('message', e.target.value)}
-              placeholder="z.B. Das System ist am Sonntag von 10–12 Uhr für Wartungsarbeiten nicht erreichbar."
+              placeholder={t('messagePlaceholder')}
             />
           </div>
 
           <div className="fg-2" style={{ marginBottom: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Farbe</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>{t('colorLabel')}</label>
               <select style={{ ...inp }} value={form.color} onChange={e => set('color', e.target.value as Banner['color'])}>
-                {COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                {COLORS.map(c => <option key={c.value} value={c.value}>{t('color' + c.value.charAt(0).toUpperCase() + c.value.slice(1))}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Ablaufdatum (optional)</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>{t('expiresLabel')}</label>
               <input
                 type="datetime-local"
                 style={inp}
@@ -184,15 +184,15 @@ export function ScreenBanners() {
           <div className="banner-form-checks">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.show_admin} onChange={e => set('show_admin', e.target.checked)} />
-              Im Admin anzeigen
+              {t('showAdmin')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.show_portal} onChange={e => set('show_portal', e.target.checked)} />
-              Im Portal anzeigen
+              {t('showPortal')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.is_active} onChange={e => set('is_active', e.target.checked)} />
-              Aktiv
+              {t('isActive')}
             </label>
           </div>
 
@@ -204,20 +204,20 @@ export function ScreenBanners() {
               disabled={saving}
               style={{ background: 'var(--accent)', color: '#fff', border: 0, borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
-              {saving ? 'Speichere…' : 'Speichern'}
+              {saving ? t('saving') : t('save')}
             </button>
             <button onClick={cancel} style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-              Abbrechen
+              {t('cancel')}
             </button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div style={{ color: 'var(--fg-3)', fontSize: 13 }}>Lade…</div>
+        <div style={{ color: 'var(--fg-3)', fontSize: 13 }}>{t('loading')}</div>
       ) : banners.length === 0 ? (
         <div style={{ color: 'var(--fg-3)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
-          Noch keine Banner konfiguriert.
+          {t('empty')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -231,31 +231,31 @@ export function ScreenBanners() {
                     {b.message}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--fg-3)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {b.show_admin && <span>Admin</span>}
-                    {b.show_portal && <span>Portal</span>}
-                    {b.expires_at && <span>Läuft ab: {new Date(b.expires_at).toLocaleString('de-DE')}</span>}
-                    {expired && <span style={{ color: '#dc2626' }}>Abgelaufen</span>}
-                    {!b.is_active && !expired && <span style={{ color: 'var(--fg-3)' }}>Inaktiv</span>}
+                    {b.show_admin && <span>{t('adminTag')}</span>}
+                    {b.show_portal && <span>{t('portalTag')}</span>}
+                    {b.expires_at && <span>{t('expiresAt', { date: new Date(b.expires_at).toLocaleString('de-DE') })}</span>}
+                    {expired && <span style={{ color: '#dc2626' }}>{t('expired')}</span>}
+                    {!b.is_active && !expired && <span style={{ color: 'var(--fg-3)' }}>{t('inactive')}</span>}
                   </div>
                 </div>
                 <div className="banner-actions">
                   <button
                     onClick={() => toggle(b)}
-                    title={b.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                    title={b.is_active ? t('deactivate') : t('activate')}
                     style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--fg-2)' }}
                   >
-                    {b.is_active ? 'Aus' : 'An'}
+                    {b.is_active ? t('toggleOff') : t('toggleOn')}
                   </button>
                   <button
                     onClick={() => startEdit(b)}
-                    title="Bearbeiten"
+                    title={t('editTitle')}
                     style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--fg-2)', display: 'flex', alignItems: 'center' }}
                   >
                     <Edit size={14} />
                   </button>
                   <button
                     onClick={() => del(b)}
-                    title="Löschen"
+                    title={t('deleteTitle')}
                     style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
                   >
                     <Trash size={14} />

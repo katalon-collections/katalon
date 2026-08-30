@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { auth, setToken } from '../../api/client'
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function ScreenLogin({ onLogin }: Props) {
+  const { t } = useTranslation()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState<string | null>(null)
@@ -40,15 +42,15 @@ export function ScreenLogin({ onLogin }: Props) {
             fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, fontSize: 20,
           }}>K</div>
           <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-.01em' }}>Katalon</div>
-          <div style={{ color: 'var(--fg-3)', fontSize: 13, marginTop: 4 }}>Digital Collection Management System</div>
+          <div style={{ color: 'var(--fg-3)', fontSize: 13, marginTop: 4 }}>{t('login.tagline')}</div>
         </div>
 
         <div className="card">
-          <div className="hd">Anmelden</div>
+          <div className="hd">{t('login.cardTitle')}</div>
           <div className="bd">
             <form onSubmit={handleSubmit}>
               <div className="field">
-                <div className="lbl">E-Mail</div>
+                <div className="lbl">{t('login.email')}</div>
                 <input
                   className="fld"
                   type="email"
@@ -60,7 +62,7 @@ export function ScreenLogin({ onLogin }: Props) {
                 />
               </div>
               <div className="field">
-                <div className="lbl">Passwort</div>
+                <div className="lbl">{t('login.password')}</div>
                 <input
                   className="fld"
                   type="password"
@@ -87,7 +89,7 @@ export function ScreenLogin({ onLogin }: Props) {
                 style={{ width: '100%', justifyContent: 'center', padding: '9px 0', fontSize: 14 }}
                 disabled={loading}
               >
-                {loading ? 'Anmelden…' : 'Anmelden'}
+                {loading ? t('login.submitting') : t('login.submit')}
               </button>
             </form>
           </div>

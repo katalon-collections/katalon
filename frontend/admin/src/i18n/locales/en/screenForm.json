@@ -1,0 +1,8 @@
+{
+  "dateInput": {
+    "placeholder": "YYYY, YYYY-MM or YYYY-MM-DD",
+    "pickerTitleEnabled": "Open date picker",
+    "pickerTitleDisabled": "Date is not a single day – edit manually",
+    "pickerAriaLabel": "Pick a date"
+  }
+}

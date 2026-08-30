@@ -17,6 +17,7 @@ import asyncio
 import uuid
 from typing import Any
 
+from geoalchemy2 import WKTElement
 from sqlalchemy import select, update
 
 from katalon.core.models import (
@@ -162,6 +163,8 @@ async def main() -> None:
                 {"term": "wirkte_in", "label": {"de": "wirkte in"}, "inverse_label": {"de": "Wirkungsort von"}, "applies_from": ["entity"], "applies_to": ["place"]},
                 {"term": "auffuehrung_in", "label": {"de": "aufgeführt in"}, "inverse_label": {"de": "Aufführungsort von"}, "applies_from": ["occurrence"], "applies_to": ["place"]},
                 {"term": "mitwirkende", "label": {"de": "mitwirkende Person"}, "inverse_label": {"de": "wirkte mit an"}, "applies_from": ["occurrence"], "applies_to": ["entity"]},
+                {"term": "aufgenommen_in", "label": {"de": "aufgenommen in"}, "inverse_label": {"de": "Aufnahmeort von"}, "applies_from": ["object"], "applies_to": ["place"]},
+                {"term": "illustriert", "label": {"de": "illustriert"}, "inverse_label": {"de": "illustriert durch"}, "applies_from": ["object"], "applies_to": ["occurrence"]},
             ],
         )
         material_ids = await make_vocab(
@@ -219,8 +222,16 @@ async def main() -> None:
                          settings={"target_type": "entity", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "abgebildete_person"})
         await add_field(db, "object", "zeigt_ort", {"de": "Zeigt Ort"}, "relation", sort_order=12,
                          settings={"target_type": "place", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "zeigt"})
-        await add_field(db, "object", "bezug_werk", {"de": "Bezug zu Werk/Ereignis"}, "relation", sort_order=13,
+        # Second, distinct place-relation type: a photograph was taken AT a place, which is
+        # a different fact from an engraving/painting DEPICTING a place (zeigt_ort above).
+        await add_field(db, "object", "aufnahmeort", {"de": "Aufnahmeort"}, "relation", sort_order=13,
+                         settings={"target_type": "place", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "aufgenommen_in"})
+        await add_field(db, "object", "bezug_werk", {"de": "Bezug zu Werk/Ereignis"}, "relation", sort_order=14,
                          settings={"target_type": "occurrence", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "bezieht_sich_auf"})
+        # Second, distinct occurrence-relation type: a playbill directly illustrates/documents
+        # a performance, which is a stronger tie than the generic "bezieht sich auf".
+        await add_field(db, "object", "illustriert", {"de": "Illustriert Werk/Ereignis"}, "relation", sort_order=15,
+                         settings={"target_type": "occurrence", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "illustriert"})
         objektgeschichte = await add_field(db, "object", "objektgeschichte", {"de": "Objektgeschichte"}, "group", sort_order=13, is_repeatable=True)
         await add_field(db, "object", "ereignistyp", {"de": "Ereignistyp"}, "vocab", sort_order=1,
                          settings={"vocabulary_id": str(obj_ortstyp_vocab_id)}, parent_id=objektgeschichte.id)
@@ -319,6 +330,10 @@ async def main() -> None:
                 idno=f"PLACE-{idno.upper()}",
                 place_type="ort",
                 status="public",
+                # Portal map (StaticMap in PlaceDetailPage.tsx) reads lat/lon from this
+                # PostGIS column via the API's PlaceRead schema — NOT from the "grenzpunkt"
+                # metadata field or the geonames authority link. Must be set explicitly.
+                geom=WKTElement(f"POINT({lon} {lat})", srid=4326),
                 metadata_={
                     "label": label_de,
                     "beschreibung": f"{label_de} ist ein zentraler Schauplatz der Weimarer Klassik.",
@@ -441,8 +456,14 @@ async def main() -> None:
                 "aufnahmeort_koordinate": "50.9795,11.3235",
                 "fotograf": rel(str(photographer.id), photographer.metadata_["label"], "fotografiert_von") if "Fotografie" in title else None,
                 "abgebildete_person": rel(str(entities[ent_key].id), entities[ent_key].metadata_["label"], "abgebildete_person") if ent_key and any(word in title for word in ("Bildnis", "Porträt", "Silhouette")) else None,
-                "zeigt_ort": rel(str(places[place_key].id), places[place_key].metadata_["label"], "zeigt") if place_key else None,
-                "bezug_werk": rel(str(occurrences[occ_key].id), occurrences[occ_key].metadata_["label"], "bezieht_sich_auf") if occ_key else None,
+                # A photograph was taken AT a place (aufnahmeort); a painting/engraving instead
+                # DEPICTS a place (zeigt_ort) — two distinct relation types, not one blurred field.
+                "zeigt_ort": rel(str(places[place_key].id), places[place_key].metadata_["label"], "zeigt") if place_key and "Fotografie" not in title else None,
+                "aufnahmeort": rel(str(places[place_key].id), places[place_key].metadata_["label"], "aufgenommen_in") if place_key and "Fotografie" in title else None,
+                # A playbill directly illustrates a performance (illustriert); other objects
+                # merely relate to a work in a looser sense (bezug_werk).
+                "bezug_werk": rel(str(occurrences[occ_key].id), occurrences[occ_key].metadata_["label"], "bezieht_sich_auf") if occ_key and "Theaterzettel" not in title else None,
+                "illustriert": rel(str(occurrences[occ_key].id), occurrences[occ_key].metadata_["label"], "illustriert") if occ_key and "Theaterzettel" in title else None,
                 "objektgeschichte": [
                     {
                         "ereignistyp": {"id": ortstyp_ids["stadt"], "label": ORTSTYP_LABELS["stadt"]},

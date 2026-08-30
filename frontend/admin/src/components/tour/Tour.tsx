@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import Joyride, { ACTIONS, EVENTS, STATUS, type CallBackProps, type Step, type TooltipRenderProps } from 'react-joyride'
 import { basicTourSteps, advancedTourSteps, type TourStep } from '../../tour/steps'
 import { users } from '../../api/client'
@@ -25,6 +26,7 @@ function toJoyrideSteps(steps: TourStep[]): Step[] {
 }
 
 export function Tour({ variant, route, navigate, onDone }: Props) {
+  const { t } = useTranslation('tour')
   const tourSteps = variant === 'advanced' ? advancedTourSteps : basicTourSteps
   const [stepIndex, setStepIndex] = useState(0)
   const [run, setRun] = useState(false)
@@ -75,7 +77,7 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
             }}
             onClick={() => setRun(false)}
           >
-            Ausprobieren
+            {t('tryItOut')}
           </button>
           {index > 0 && <button type="button" style={{ ...step.styles.buttonBack, margin: 0 }} {...backProps} />}
           <button type="button" style={{ ...step.styles.buttonNext, margin: 0, whiteSpace: 'nowrap' }} {...primaryProps} />
@@ -136,12 +138,12 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
         callback={handleCallback}
         tooltipComponent={renderTooltip}
         locale={{
-          back: 'Zurück',
-          close: 'Schließen',
-          last: 'Fertig',
-          next: 'Weiter',
-          nextLabelWithProgress: 'Weiter (Schritt {step} von {steps})',
-          skip: 'Überspringen',
+          back: t('locale.back'),
+          close: t('locale.close'),
+          last: t('locale.last'),
+          next: t('locale.next'),
+          nextLabelWithProgress: t('locale.nextLabelWithProgress'),
+          skip: t('locale.skip'),
         }}
         styles={{ options: { primaryColor: 'var(--accent, #2563eb)', width: 440, zIndex: 10000 } }}
       />
@@ -151,13 +153,13 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
           style={{ position: 'fixed', bottom: '1rem', right: '1rem', left: 'auto', zIndex: 10001, margin: 0 }}
         >
           <span>
-            Schritt {stepIndex + 1}/{tourSteps.length} — pausiert
+            {t('paused', { current: stepIndex + 1, total: tourSteps.length })}
           </span>
           <button type="button" onClick={() => setRun(true)}>
-            Tour fortsetzen
+            {t('resume')}
           </button>
           <button type="button" onClick={finish}>
-            Tour abbrechen
+            {t('cancel')}
           </button>
         </div>
       )}
