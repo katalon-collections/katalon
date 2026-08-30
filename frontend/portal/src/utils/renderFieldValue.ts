@@ -31,14 +31,18 @@ export function pidUrl(value: unknown): string | undefined {
 
 /** Converts a single EDTF-lite qualified date ("1900~", "1900?", "1900~?") to display text. */
 function formatQualifiedDate(value: string): string {
+  const formatBce = (date: string) => {
+    const match = /^-(\d{4})(.*)$/.exec(date)
+    return match ? `${Number(match[1]) + 1}${match[2]} v. Chr.` : date
+  }
   for (const [suffix, wrap] of [
     ['~?', (d: string) => `ca. ${d} (unsicher)`],
     ['~', (d: string) => `ca. ${d}`],
     ['?', (d: string) => `${d} (unsicher)`],
   ] as const) {
-    if (value.endsWith(suffix)) return wrap(value.slice(0, -suffix.length))
+    if (value.endsWith(suffix)) return wrap(formatBce(value.slice(0, -suffix.length)))
   }
-  return value
+  return formatBce(value)
 }
 
 /** Converts a canonical EDTF-lite date value (single or "START/END" range) to display text. */
