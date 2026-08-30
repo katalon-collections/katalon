@@ -70,7 +70,7 @@ The Admin relation picker passes the current source record type and chosen targe
 
 The portal relation list receives a `resolveLabel` callback and passes it the relation type plus direction flag, so the display layer can choose the forward or inverse label for the current record [@relation-list]. The same component computes the other endpoint from the current record ID and navigates to a type-specific portal path [@relation-list].
 
-Entity, place, and occurrence pages show linked objects as cards. When those cards use more than one relation type, the portal offers local relation-type chips; they filter the already loaded cards without another API request, and resolve each chip's directional label with the same vocabulary data [@related-objects].
+Entity, place, and occurrence pages show each linked object once as a card, even when several relation rows connect it to the current record. Cards list their distinct directional relation labels. When the cards use more than one relation type, the portal offers local relation-type chips with the number of matching unique objects; their counts can overlap because one object may have several relation types. The chips filter the already loaded cards without another API request and resolve each directional label with the same vocabulary data [@related-objects].
 
 ## Procedure Rule
 

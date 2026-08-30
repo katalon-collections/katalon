@@ -21,12 +21,13 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
   const relationsForObject = (objectId: string) => relations.filter(r =>
     (r.from_id === currentId && r.to_id === objectId) || (r.to_id === currentId && r.from_id === objectId)
   )
+  const uniqueObjects = [...new Map(objects.map(obj => [obj.id, obj])).values()]
   const relationTypes = [...new Map(
-    objects.flatMap(obj => relationsForObject(obj.id)).map(rel => [rel.relation_type, rel])
+    uniqueObjects.flatMap(obj => relationsForObject(obj.id)).map(rel => [rel.relation_type, rel])
   ).values()]
   const visibleObjects = selectedType
-    ? objects.filter(obj => relationsForObject(obj.id).some(rel => rel.relation_type === selectedType))
-    : objects
+    ? uniqueObjects.filter(obj => relationsForObject(obj.id).some(rel => rel.relation_type === selectedType))
+    : uniqueObjects
 
   return (
     <section style={{ marginTop: 8 }}>
@@ -38,9 +39,10 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
           </button>
           {relationTypes.map(rel => {
             const isFrom = rel.from_id === currentId
+            const count = uniqueObjects.filter(obj => relationsForObject(obj.id).some(item => item.relation_type === rel.relation_type)).length
             return (
               <button key={rel.relation_type} type="button" className="tag relation-filter__chip" aria-pressed={selectedType === rel.relation_type} onClick={() => setSelectedType(rel.relation_type)}>
-                {resolveLabel(rel.relation_type, isFrom)}
+                {resolveLabel(rel.relation_type, isFrom)} ({count})
               </button>
             )
           })}
@@ -48,7 +50,9 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
       )}
       <div className="obj-grid">
         {visibleObjects.map(obj => {
-          const rel = relationsForObject(obj.id)[0]
+          const relationLabels = [...new Set(relationsForObject(obj.id).map(rel =>
+            resolveLabel(rel.relation_type, rel.from_id === currentId)
+          ))]
           const metadata = obj.metadata_ as Record<string, unknown>
           return (
             <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
@@ -57,9 +61,9 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
               </div>
               <div className="info">
                 <div className="title">{recordTitle(metadata, locale, obj.idno ?? obj.id)}</div>
-                {rel && (
+                {relationLabels.length > 0 && (
                   <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
-                    {resolveLabel(rel.relation_type, rel.from_id === currentId)}
+                    {relationLabels.join(' · ')}
                   </div>
                 )}
                 {obj.idno && <div className="meta">{obj.idno}</div>}

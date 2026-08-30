@@ -41,8 +41,8 @@ export function OccurrenceDetailPage() {
         const objIds = rels
           .filter(r => r.from_type === 'object' || r.to_type === 'object')
           .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
-          .slice(0, 12)
-        const objs = await Promise.all(objIds.map(oid => api.objects.get(oid).catch(() => null)))
+        const uniqueObjIds = [...new Set(objIds)]
+        const objs = await Promise.all(uniqueObjIds.map(oid => api.objects.get(oid).catch(() => null)))
         const validObjs = objs.filter((o): o is ObjectSummary => o !== null)
         setLinkedObjects(validObjs)
 

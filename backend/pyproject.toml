@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.11.3"
+version = "1.11.4"
 description = "Katalon – Metadata Management System for GLAM collections"
 requires-python = ">=3.12"
 dependencies = [
@@ -24,6 +24,7 @@ dependencies = [
     "geoalchemy2>=0.15.1",
     "shapely>=2.0.4",
     "pillow>=10.3.0",
+    "pyvips>=2.2.3",
     "openpyxl>=3.1.0",
     "slowapi>=0.1.9",
     "pyyaml>=6.0",

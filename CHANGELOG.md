@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 ### Fixed
 - Vollständiger Suchindex-Neuaufbau entfernt veraltete Elasticsearch-Dokumente.
 - Negative ISO-Jahre werden im Portal als Jahre v. Chr. angezeigt.
+- Verknüpfte Objekte mit mehreren Relationstypen erscheinen im Portal nicht mehr als doppelte Karten; Relation-Typ-Chips zeigen die Trefferzahl.
 
 ## [1.11.0] - 2026-08-30
 
