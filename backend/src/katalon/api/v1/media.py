@@ -54,7 +54,7 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
     }
     if f.status == "ready" and media_category(f.mime_type) == "image":
-        identifier = Path(f.file_path).name
+        identifier = Path(f.iiif_source_path or f.file_path).name
         links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
     if f.license_uri and _is_absolute_http_url(f.license_uri):
         links["license"] = {"href": f.license_uri}
@@ -269,7 +269,7 @@ async def serve_media_thumbnail(
     if not media or media_category(media.mime_type) != "image":
         raise HTTPException(status_code=404, detail="Bild nicht gefunden")
 
-    identifier = Path(media.file_path).name
+    identifier = Path(media.iiif_source_path or media.file_path).name
     return RedirectResponse(f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg")
 
 
@@ -288,6 +288,8 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
     if not media:
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
     Path(media.file_path).unlink(missing_ok=True)
+    if media.iiif_source_path:
+        Path(media.iiif_source_path).unlink(missing_ok=True)
     await log_change(
         db,
         record_type="object",

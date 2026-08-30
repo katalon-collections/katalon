@@ -421,6 +421,7 @@ class MediaFile(Base):
     filename: Mapped[str] = mapped_column(String(512))
     mime_type: Mapped[str] = mapped_column(String(128))
     file_path: Mapped[str] = mapped_column(String(1024))
+    iiif_source_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     iiif_manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)

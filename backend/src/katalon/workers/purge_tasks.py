@@ -32,6 +32,8 @@ async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutof
             )
             for media in media_result.scalars().all():
                 Path(media.file_path).unlink(missing_ok=True)
+                if media.iiif_source_path:
+                    Path(media.iiif_source_path).unlink(missing_ok=True)
         await delete_relations(session, record_type, record.id)
         await log_change(session, record_type=record_type, record_id=record.id, user_id=None, action="purge")
         await session.delete(record)

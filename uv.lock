@@ -1472,7 +1472,7 @@ wheels = [
 
 [[package]]
 name = "katalon"
-version = "1.11.3"
+version = "1.11.5"
 source = { editable = "backend" }
 dependencies = [
     { name = "aiofiles" },
@@ -1494,6 +1494,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-jose", extra = ["cryptography"] },
     { name = "python-multipart" },
+    { name = "pyvips" },
     { name = "pyyaml" },
     { name = "rapidfuzz" },
     { name = "redis" },
@@ -1549,6 +1550,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "pyvips", specifier = ">=2.2.3" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rapidfuzz", specifier = ">=3.9.0" },
     { name = "redis", specifier = ">=5.0.4" },
@@ -2703,6 +2705,15 @@ client = [
     { name = "requests" },
     { name = "websocket-client" },
 ]
+
+[[package]]
+name = "pyvips"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/f3/90993aab504fa2e1f28fcc09aa16b6ea4f00e75a037d9136e737855833e2/pyvips-3.2.0.tar.gz", hash = "sha256:5fa47cdce4e7f450747c118c12fde913e0710850c6015d8ec4f5af490003a347", size = 72067, upload-time = "2026-08-29T13:31:03.773Z" }
 
 [[package]]
 name = "pywin32"

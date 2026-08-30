@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import shutil
 import uuid
 from pathlib import Path
@@ -9,6 +10,32 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from katalon.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
+
+
+def _make_pyramid_tiff(source_path: Path) -> Path | None:
+    """Convert source image to a tiled, pyramidal TIFF for fast IIIF random-access reads.
+
+    Returns None on failure so callers can fall back to serving the original.
+    """
+    dest_path = source_path.with_name(f"{source_path.stem}_pyramid.tif")
+    try:
+        import pyvips
+
+        image = pyvips.Image.new_from_file(str(source_path), access="sequential")
+        image.tiffsave(
+            str(dest_path),
+            tile=True,
+            pyramid=True,
+            compression="jpeg",
+            Q=85,
+        )
+        return dest_path
+    except Exception:
+        logger.warning("Pyramid-TIFF-Konvertierung fehlgeschlagen für %s", source_path, exc_info=True)
+        dest_path.unlink(missing_ok=True)
+        return None
 
 
 def _worker_session() -> async_sessionmaker[AsyncSession]:
@@ -27,7 +54,11 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
         if not media:
             raise ValueError(f"MediaFile {media_file_id} not found")
 
-        filename = Path(media.file_path).name
+        source_path = Path(media.file_path)
+        pyramid_path = await asyncio.to_thread(_make_pyramid_tiff, source_path)
+        if pyramid_path is not None:
+            media.iiif_source_path = str(pyramid_path)
+        filename = pyramid_path.name if pyramid_path is not None else source_path.name
 
         try:
             # Trigger Cantaloupe processing and get image dimensions for IIIF canvas

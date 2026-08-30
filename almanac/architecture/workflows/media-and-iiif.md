@@ -21,6 +21,9 @@ sources:
   - id: importer-task
     type: file
     path: backend/src/katalon/workers/import_tasks.py
+  - id: purge-tasks
+    type: file
+    path: backend/src/katalon/workers/purge_tasks.py
   - id: models
     type: file
     path: backend/src/katalon/core/models.py
@@ -58,9 +61,13 @@ License URI and rights holder belong to each `MediaFile`. Administrators may set
 
 ## Cantaloupe And Manifests
 
-The media worker loads the `MediaFile`, derives the stored filename, and calls Cantaloupe's `/iiif/3/{filename}/info.json` endpoint to trigger lazy image processing and read dimensions [@media-tasks] [@cantaloupe]. Cantaloupe 4xx responses are treated as permanent errors and mark the media row `error`; other fetch failures return missing dimensions, so the worker still stores a manifest and marks the row `ready` unless an unexpected exception escapes into Celery retry handling [@media-tasks] [@cantaloupe].
+Before calling Cantaloupe, the media worker converts the stored original into a tiled, pyramidal TIFF via `pyvips` (`tile=True, pyramid=True, compression="jpeg", Q=85`) so Cantaloupe's `Java2dProcessor` gets random access into the right resolution level instead of decoding the full source image on every tile/zoom request [@media-tasks]. The pyramid is written next to the original as `{file_id}_pyramid.tif` and recorded in `MediaFile.iiif_source_path`; the original file itself is untouched and stays the download source [@media-tasks] [@models]. If the conversion fails (unreadable source, missing `libvips`, unexpected `pyvips` error), the worker logs a warning and falls back to the original file — `iiif_source_path` stays `NULL` and Cantaloupe reads the flat original with its usual (slower) full-decode behaviour [@media-tasks].
 
-For each successful file, the worker stores a single-canvas IIIF Presentation 3.0 manifest in `media.iiif_manifest` and marks the row `ready` [@media-tasks] [@cantaloupe]. Object-level manifests are built separately with one Canvas per media item, include object label, summary, configured metadata entries, homepage, and required inventory statement when those values are available [@cantaloupe]. This split lets stored per-file manifests support processing state while public object pages can expose a multi-canvas manifest.
+The worker then derives the stored filename — the pyramid's if one exists, otherwise the original's — and calls Cantaloupe's `/iiif/3/{filename}/info.json` endpoint to trigger lazy image processing and read dimensions [@media-tasks] [@cantaloupe]. Cantaloupe 4xx responses are treated as permanent errors and mark the media row `error`; other fetch failures return missing dimensions, so the worker still stores a manifest and marks the row `ready` unless an unexpected exception escapes into Celery retry handling [@media-tasks] [@cantaloupe].
+
+For each successful file, the worker stores a single-canvas IIIF Presentation 3.0 manifest in `media.iiif_manifest` and marks the row `ready` [@media-tasks] [@cantaloupe]. Object-level manifests are built separately with one Canvas per media item, include object label, summary, configured metadata entries, homepage, and required inventory statement when those values are available [@cantaloupe]. This split lets stored per-file manifests support processing state while public object pages can expose a multi-canvas manifest. All IIIF-facing identifiers — object manifests, the media list's `_links.thumbnail`, and the portal thumbnail redirect — resolve to `iiif_source_path` when set, falling back to `file_path` otherwise, so they always point at whichever file Cantaloupe should actually read [@cantaloupe] [@media-api].
+
+Deleting a `MediaFile` and purging a soft-deleted object both remove the pyramid alongside the original when `iiif_source_path` is set [@media-api] [@purge-tasks].
 
 ## Non-Image Media And Viewer Dispatch
 

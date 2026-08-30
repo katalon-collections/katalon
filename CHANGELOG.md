@@ -5,8 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-08-30
+
 ### Added
 - Zahlenfacetten im Portal erlauben präzise Von/Bis-Bereiche und native Schieberegler.
+- IIIF-Bilder werden beim Upload als gekachelte Pyramid-TIFF-Ableitung vorbereitet, sodass Cantaloupe bei Zoom-/Tile-Anfragen nicht mehr das komplette Quellbild decodieren muss (Issue #333).
 
 ### Fixed
 - Vollständiger Suchindex-Neuaufbau entfernt veraltete Elasticsearch-Dokumente.

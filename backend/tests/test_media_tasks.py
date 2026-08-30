@@ -1,11 +1,12 @@
 """Tests for media Celery task internals."""
 import uuid
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from katalon.integrations.cantaloupe import CantaloupeError
-from katalon.workers.media_tasks import _process, _set_error
+from katalon.workers.media_tasks import _make_pyramid_tiff, _process, _set_error
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,6 +28,7 @@ def _make_media_file(**kwargs):
     media.file_path = kwargs.get("file_path", "/media/test.jpg")
     media.status = kwargs.get("status", "pending")
     media.iiif_manifest = kwargs.get("iiif_manifest", None)
+    media.iiif_source_path = kwargs.get("iiif_source_path", None)
     return media
 
 
@@ -79,6 +81,49 @@ async def test_process_fetches_info_builds_manifest_sets_ready() -> None:
 
 
 @pytest.mark.asyncio
+async def test_process_uses_pyramid_filename_when_conversion_succeeds() -> None:
+    media = _make_media_file(file_path="/media/test.jpg")
+    session = _make_session(media)
+
+    with _patch_worker_session(session):
+        with (
+            patch(
+                "katalon.workers.media_tasks._make_pyramid_tiff",
+                return_value=Path("/media/test_pyramid.tif"),
+            ),
+            patch(
+                "katalon.integrations.cantaloupe.fetch_image_info",
+                AsyncMock(return_value=(1200, 800)),
+            ) as fetch_mock,
+            patch("katalon.integrations.cantaloupe.build_manifest", return_value={}),
+        ):
+            await _process(media.id)
+
+    fetch_mock.assert_awaited_with("test_pyramid.tif")
+    assert media.iiif_source_path == "/media/test_pyramid.tif"
+
+
+@pytest.mark.asyncio
+async def test_process_falls_back_to_original_when_pyramid_conversion_fails() -> None:
+    media = _make_media_file(file_path="/media/test.jpg")
+    session = _make_session(media)
+
+    with _patch_worker_session(session):
+        with (
+            patch("katalon.workers.media_tasks._make_pyramid_tiff", return_value=None),
+            patch(
+                "katalon.integrations.cantaloupe.fetch_image_info",
+                AsyncMock(return_value=(1200, 800)),
+            ) as fetch_mock,
+            patch("katalon.integrations.cantaloupe.build_manifest", return_value={}),
+        ):
+            await _process(media.id)
+
+    fetch_mock.assert_awaited_with("test.jpg")
+    assert media.iiif_source_path is None
+
+
+@pytest.mark.asyncio
 async def test_process_sets_error_on_cantaloupe_error() -> None:
     media = _make_media_file()
     session = _make_session(media)
@@ -103,6 +148,38 @@ async def test_process_raises_when_media_not_found() -> None:
     with _patch_worker_session(session):
         with pytest.raises(ValueError, match="not found"):
             await _process(uuid.uuid4())
+
+
+# ---------------------------------------------------------------------------
+# _make_pyramid_tiff
+# ---------------------------------------------------------------------------
+
+
+def test_make_pyramid_tiff_creates_tiled_pyramid_tiff(tmp_path: Path) -> None:
+    pyvips = pytest.importorskip("pyvips")
+
+    source_path = tmp_path / "source.jpg"
+    pyvips.Image.black(64, 64).jpegsave(str(source_path))
+
+    dest_path = _make_pyramid_tiff(source_path)
+
+    assert dest_path is not None
+    assert dest_path == source_path.with_name("source_pyramid.tif")
+    assert dest_path.exists()
+
+    result = pyvips.Image.new_from_file(str(dest_path))
+    assert result.get("vips-loader") == "tiffload"
+    assert result.get("tile-width") > 0
+
+
+def test_make_pyramid_tiff_returns_none_for_unreadable_source(tmp_path: Path) -> None:
+    pytest.importorskip("pyvips")
+
+    source_path = tmp_path / "not-an-image.jpg"
+    source_path.write_bytes(b"not a real image")
+
+    assert _make_pyramid_tiff(source_path) is None
+    assert not source_path.with_name("not-an-image_pyramid.tif").exists()
 
 
 # ---------------------------------------------------------------------------

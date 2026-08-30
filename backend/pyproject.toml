@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.11.4"
+version = "1.12.0"
 description = "Katalon – Metadata Management System for GLAM collections"
 requires-python = ">=3.12"
 dependencies = [
