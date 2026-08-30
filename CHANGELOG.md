@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [1.7.1] - 2026-08-30
+## [1.8.0] - 2026-08-30
 
 ### Added
 - Erweiterte Suche: feste Vokabularfelder bieten die zulässigen Begriffe zur Auswahl an; freie Vokabularfelder schlagen konfigurierte Begriffe vor, erlauben aber weiterhin eigene Werte.

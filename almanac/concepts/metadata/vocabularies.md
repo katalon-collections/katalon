@@ -27,6 +27,9 @@ sources:
   - id: screen-vocab
     type: file
     path: frontend/admin/src/components/screens/ScreenVocab.tsx
+  - id: screen-form
+    type: file
+    path: frontend/admin/src/components/screens/ScreenForm.tsx
   - id: vocab-applies-migration
     type: file
     path: backend/migrations/versions/0029_vocab_term_applies.py
