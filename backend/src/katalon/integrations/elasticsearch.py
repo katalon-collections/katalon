@@ -35,6 +35,13 @@ INDEX_SETTINGS: dict[str, Any] = {
                 }
             },
             {
+                "numeric_facet_fields": {
+                    "match_pattern": "regex",
+                    "match": "^number_facet_.*",
+                    "mapping": {"type": "double"},
+                }
+            },
+            {
                 # group field instances are indexed as nested objects under grp_{fieldname}
                 "group_fields": {
                     "match_pattern": "regex",
@@ -197,6 +204,7 @@ async def search_documents(
     from_: int,
     size: int,
     extra_filters: dict[str, list[str]] | None = None,
+    numeric_filters: dict[str, tuple[float | None, float | None]] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
@@ -240,6 +248,13 @@ async def search_documents(
         for field, values in (extra_filters or {}).items()
         if values
     }
+    numeric_facet_filters = {
+        field: {"range": {f"number_facet_{field}": {
+            key: value for key, value in {"gte": lower, "lte": upper}.items() if value is not None
+        }}}
+        for field, (lower, upper) in (numeric_filters or {}).items()
+        if lower is not None or upper is not None
+    }
     for field, value in (rel_filters or {}).items():
         filters.append({"term": {field: value}})
     if active_objects_only:
@@ -257,6 +272,7 @@ async def search_documents(
 
     base_filters = list(filters)
     filters.extend(facet_filters.values())
+    filters.extend(numeric_facet_filters.values())
 
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
@@ -281,6 +297,26 @@ async def search_documents(
                     ]}},
                     "aggs": {
                         "values": {"terms": {"field": f"facet_{field}", "size": 20}}
+                    },
+                }
+            },
+        }
+        numeric_aggregation_filters = [
+            value for name, value in numeric_facet_filters.items() if name != field
+        ]
+        aggs[f"numeric_{field}"] = {
+            "global": {},
+            "aggs": {
+                "filtered": {
+                    "filter": {"bool": {"must": must, "filter": [
+                        *base_filters,
+                        *facet_filters.values(),
+                        *numeric_aggregation_filters,
+                    ]}},
+                    "aggs": {
+                        "values": {
+                            "stats": {"field": f"number_facet_{field}"}
+                        }
                     },
                 }
             },

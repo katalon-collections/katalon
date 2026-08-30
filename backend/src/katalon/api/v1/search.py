@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import math
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from katalon.core.dependencies import OptionalCurrentUser, require_role
 from katalon.core.limiter import limiter
@@ -15,6 +16,11 @@ router = APIRouter(prefix="/search", tags=["search"])
 class FacetBucket(BaseModel):
     value: str
     count: int
+
+
+class NumericFacetBounds(BaseModel):
+    min: float
+    max: float
 
 
 class SearchResult(BaseModel):
@@ -32,6 +38,29 @@ class SearchResponse(BaseModel):
     page_size: int
     items: list[SearchResult]
     facets: dict[str, list[FacetBucket]]
+    numeric_facets: dict[str, NumericFacetBounds] = Field(default_factory=dict)
+
+
+def _range_filters(request: Request) -> dict[str, tuple[float | None, float | None]]:
+    values: dict[str, dict[str, float]] = {}
+    for key, value in request.query_params.multi_items():
+        if not key.startswith("range_") or not key.endswith(("_from", "_to")):
+            continue
+        field, bound = key[6:].rsplit("_", 1)
+        try:
+            number = float(value)
+        except ValueError as exc:
+            raise ValueError("Zahlengrenzen müssen gültige Zahlen sein.") from exc
+        if not math.isfinite(number):
+            raise ValueError("Zahlengrenzen müssen endliche Zahlen sein.")
+        values.setdefault(field, {})[bound] = number
+    result = {
+        field: (bounds.get("from"), bounds.get("to"))
+        for field, bounds in values.items()
+    }
+    if any(lower is not None and upper is not None and lower > upper for lower, upper in result.values()):
+        raise ValueError("Die untere Zahlengrenze muss vor der oberen liegen.")
+    return result
 
 
 @router.get(
@@ -72,6 +101,11 @@ async def search(
         rel_filters["related_places"] = rel_place
     if rel_occurrence:
         rel_filters["related_occurrences"] = rel_occurrence
+    try:
+        numeric_filters = _range_filters(request)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = await search_service.search(
         query=q,
         record_type=type,
@@ -79,6 +113,7 @@ async def search(
         page=page,
         page_size=page_size,
         extra_filters=extra_filters or None,
+        numeric_filters=numeric_filters or None,
         facet_fields=facet_fields or None,
         rel_filters=rel_filters or None,
         active_objects_only=active_objects_only,

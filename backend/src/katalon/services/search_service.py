@@ -270,6 +270,7 @@ def _build_doc(
 
     # Build facet_* fields for fields marked as is_facet
     if facet_fields:
+        field_types = {field.name: field.field_type for field in field_definitions or []}
         for field_name in facet_fields:
             val = md.get(field_name)
             if val is None:
@@ -277,6 +278,15 @@ def _build_doc(
             label = _extract_facet_value(val)
             if label:
                 doc[f"facet_{field_name}"] = label
+            if field_types.get(field_name) == "number":
+                values: list[float] = []
+                for value in _advanced_scalar_values(val):
+                    try:
+                        values.append(float(value))
+                    except (TypeError, ValueError):
+                        continue
+                if values:
+                    doc[f"number_facet_{field_name}"] = values if len(values) > 1 else values[0]
 
     # Index group field instances as nested ES objects under grp_* keys
     if group_fields:
@@ -495,6 +505,7 @@ async def search(
     page: int = 1,
     page_size: int = 20,
     extra_filters: dict[str, list[str]] | None = None,
+    numeric_filters: dict[str, tuple[float | None, float | None]] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
     active_objects_only: bool = False,
@@ -506,6 +517,7 @@ async def search(
     raw = await search_documents(
         query, record_type, status, from_, page_size,
         extra_filters=extra_filters,
+        numeric_filters=numeric_filters,
         facet_fields=facet_fields,
         rel_filters=rel_filters,
         active_objects_only=active_objects_only,
@@ -531,7 +543,14 @@ async def search(
 
     aggs = raw.get("aggregations", {})
     facets: dict[str, list[dict[str, Any]]] = {}
+    numeric_facets: dict[str, dict[str, float]] = {}
     for agg_key, agg_val in aggs.items():
+        if agg_key.startswith("numeric_"):
+            values = agg_val.get("filtered", {}).get("values", {})
+            lower, upper = values.get("min", {}).get("value"), values.get("max", {}).get("value")
+            if lower is not None and upper is not None:
+                numeric_facets[agg_key[8:]] = {"min": lower, "max": upper}
+            continue
         buckets = agg_val.get("filtered", {}).get("values", {}).get("buckets")
         if buckets is None:
             buckets = agg_val.get("buckets", [])
@@ -546,4 +565,5 @@ async def search(
         "page_size": page_size,
         "items": items,
         "facets": facets,
+        "numeric_facets": numeric_facets,
     }

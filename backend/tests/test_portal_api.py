@@ -439,3 +439,30 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
         "event_date": ["Paläolithikum", "Neolithikum"]
     }
     assert captured["subtitle_fields"] == {"object": ["creator"]}
+
+
+@pytest.mark.asyncio
+async def test_portal_search_forwards_numeric_range_filters(monkeypatch) -> None:
+    captured: dict = {}
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.return_value = config_result
+
+    async def search(**kwargs):
+        captured.update(kwargs)
+        return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+
+    async def override_db():
+        yield session
+
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/search?range_year_from=1900&range_year_to=1950")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert captured["numeric_filters"] == {"year": (1900.0, 1950.0)}

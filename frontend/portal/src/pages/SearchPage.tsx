@@ -8,7 +8,7 @@ import { decodeAdvancedQuery } from '../utils/advancedSearch'
 
 function facetLabel(
   field: string,
-  labels: Record<string, Record<string, string>>,
+  labels: Record<string, Record<string, { label: string }>>,
   config: Record<string, string[]>,
   recordType: string,
 ): string {
@@ -16,12 +16,12 @@ function facetLabel(
   if (inherited) {
     return t('search.linkedFacet', {
       type: typeLabel(inherited[1]),
-      field: labels[inherited[1]]?.[inherited[2]] ?? inherited[2],
+      field: labels[inherited[1]]?.[inherited[2]]?.label ?? inherited[2],
     })
   }
   const owner = recordType || Object.entries(config)
     .find(([type, fields]) => type !== '_system' && fields.includes(field))?.[0]
-  return (owner ? labels[owner]?.[field] : undefined) ?? field
+  return (owner ? labels[owner]?.[field]?.label : undefined) ?? field
 }
 
 const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
@@ -32,6 +32,43 @@ function configuredMetadataFacets(config: Record<string, string[]>, recordType: 
     ? (config[recordType] ?? [])
     : Object.entries(config).filter(([key]) => key !== '_system').flatMap(([, values]) => values)
   return [...new Set(fields)]
+}
+
+function isNumericFacet(
+  field: string,
+  labels: Record<string, Record<string, { field_type: string }>>,
+  config: Record<string, string[]>,
+  recordType: string,
+): boolean {
+  const owners = recordType
+    ? [recordType]
+    : Object.entries(config).filter(([type, fields]) => type !== '_system' && fields.includes(field)).map(([type]) => type)
+  return owners.length > 0 && owners.every(owner => labels[owner]?.[field]?.field_type === 'number')
+}
+
+function NumericFacetPanel({ label, bounds, from, to, onChange }: {
+  label: string
+  bounds: { min: number; max: number } | undefined
+  from: string
+  to: string
+  onChange: (from: string, to: string) => void
+}) {
+  const { t } = useI18n()
+  if (!bounds) return null
+  const lower = Number(from || bounds.min)
+  const upper = Number(to || bounds.max)
+  return (
+    <div className="numeric-facet">
+      <h3>{label}</h3>
+      <div className="numeric-facet-inputs">
+        <input aria-label={`${label}: ${t('advanced.from')}`} type="number" value={from} placeholder={t('advanced.from')} onChange={event => onChange(event.target.value, to)} />
+        <input aria-label={`${label}: ${t('advanced.to')}`} type="number" value={to} placeholder={t('advanced.to')} onChange={event => onChange(from, event.target.value)} />
+      </div>
+      <input aria-label={`${label}: ${t('advanced.from')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.min(lower, upper)} onChange={event => onChange(event.target.value, to && Number(event.target.value) > Number(to) ? event.target.value : to)} />
+      <input aria-label={`${label}: ${t('advanced.to')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.max(lower, upper)} onChange={event => onChange(from && Number(event.target.value) < Number(from) ? event.target.value : from, event.target.value)} />
+      {(from || to) && <button type="button" className="facet-reset" onClick={() => onChange('', '')}>{t('search.all')}</button>}
+    </div>
+  )
 }
 
 function resultSubtitle(
@@ -93,10 +130,17 @@ export function SearchPage() {
 
   // Collect active meta_ filters from URL
   const metaFilters: Record<string, string[]> = {}
+  const numericFilters: Record<string, { from: string; to: string }> = {}
   params.forEach((value, key) => {
     if (key.startsWith('meta_')) {
       const field = key.slice(5)
       if (!metaFilters[field]?.includes(value)) metaFilters[field] = [...(metaFilters[field] ?? []), value]
+    }
+    if (key.startsWith('range_') && key.endsWith('_from')) {
+      numericFilters[key.slice(6, -5)] = { ...(numericFilters[key.slice(6, -5)] ?? { from: '', to: '' }), from: value }
+    }
+    if (key.startsWith('range_') && key.endsWith('_to')) {
+      numericFilters[key.slice(6, -3)] = { ...(numericFilters[key.slice(6, -3)] ?? { from: '', to: '' }), to: value }
     }
   })
   const relEntity = params.get('rel_entity') ?? ''
@@ -130,6 +174,10 @@ export function SearchPage() {
     Object.entries(metaFilters).forEach(([field, values]) => {
       values.forEach(value => qs.append(`meta_${field}`, value))
     })
+    Object.entries(numericFilters).forEach(([field, range]) => {
+      if (range.from) qs.set(`range_${field}_from`, range.from)
+      if (range.to) qs.set(`range_${field}_to`, range.to)
+    })
     const request = encodedAdvancedQuery
       ? advancedQuery
         ? api.search.advanced({
@@ -139,6 +187,10 @@ export function SearchPage() {
             page_size: 20,
             facet_fields: configuredMetadataFacets(facetConfig, advancedQuery.record_type),
             metadata_filters: metaFilters,
+            numeric_filters: Object.fromEntries(Object.entries(numericFilters).map(([field, range]) => [field, {
+              ...(range.from ? { from: Number(range.from) } : {}),
+              ...(range.to ? { to: Number(range.to) } : {}),
+            }])),
             relation_filters: {
               related_entities: relEntity,
               related_places: relPlace,
@@ -181,7 +233,7 @@ export function SearchPage() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [q, typeFilt, statusFilt, encodedAdvancedQuery, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), relEntity, relPlace, relOccurrence])
+  }, [q, typeFilt, statusFilt, encodedAdvancedQuery, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), JSON.stringify(numericFilters), relEntity, relPlace, relOccurrence])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -208,6 +260,18 @@ export function SearchPage() {
     next.delete(key)
     selected.filter(current => current !== value).forEach(current => next.append(key, current))
     if (!selected.includes(value)) next.append(key, value)
+    next.set('page', '1')
+    setParams(next)
+  }
+
+  function setNumericFilter(field: string, from: string, to: string) {
+    const next = new URLSearchParams(params)
+    const fromKey = `range_${field}_from`
+    const toKey = `range_${field}_to`
+    if (from) next.set(fromKey, from)
+    else next.delete(fromKey)
+    if (to) next.set(toKey, to)
+    else next.delete(toKey)
     next.set('page', '1')
     setParams(next)
   }
@@ -309,6 +373,10 @@ export function SearchPage() {
           )}
           {configuredMetadataFacets(facetConfig, effectiveType).map(field => {
             const buckets = data?.facets?.[`meta_${field}`] ?? []
+            const range = numericFilters[field] ?? { from: '', to: '' }
+            if (isNumericFacet(field, fieldLabels, facetConfig, effectiveType)) {
+              return <NumericFacetPanel key={field} label={facetLabel(field, fieldLabels, facetConfig, effectiveType)} bounds={data?.numeric_facets?.[field]} from={range.from} to={range.to} onChange={(from, to) => setNumericFilter(field, from, to)} />
+            }
             return (
               <FacetPanel
                 key={field}

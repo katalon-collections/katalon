@@ -112,6 +112,33 @@ test('adds metadata facet values and uses the translated field label fallback', 
   await expect(page.getByRole('button', { name: /Paläolithikum/ })).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('filters a numeric facet through range controls', async ({ page }) => {
+  await page.route('**/portal/v1/portal/config', route => route.fulfill({
+    json: { ...portalConfig, facet_fields: { object: ['year'] } },
+  }))
+  await page.route('**/portal/v1/schema/object', route => route.fulfill({
+    json: [{ id: 'field-1', name: 'year', label: { de: 'Jahr' }, field_type: 'number' }],
+  }))
+  await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/pages', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/search?**', route => route.fulfill({
+    json: {
+      total: 1, page: 1, page_size: 20, items: [], facets: {},
+      numeric_facets: { year: { min: 1900, max: 2000 } },
+    },
+  }))
+
+  await page.goto('http://127.0.0.1:5174/search?type=object&page=2')
+  const from = page.getByRole('spinbutton', { name: 'Jahr: Von' })
+  await from.fill('1950')
+
+  await expect.poll(() => new URL(page.url()).searchParams.get('range_year_from')).toBe('1950')
+  expect(new URL(page.url()).searchParams.get('page')).toBe('1')
+  await expect(page.getByRole('slider', { name: 'Jahr: Bis slider' })).toBeVisible()
+  await page.getByRole('button', { name: 'Alle' }).click()
+  await expect.poll(() => new URL(page.url()).searchParams.has('range_year_from')).toBe(false)
+})
+
 test('refines within the active search filters', async ({ page }) => {
   await page.route('**/portal/v1/portal/config', route => route.fulfill({ json: portalConfig }))
   await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))

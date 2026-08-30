@@ -91,6 +91,7 @@ export interface PortalConfig {
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
 
 export interface FacetBucket { value: string; count: number }
+export interface NumericFacetBounds { min: number; max: number }
 export interface SearchResponse {
   total: number; page: number; page_size: number
   items: Array<{
@@ -98,6 +99,7 @@ export interface SearchResponse {
     subtitle_values?: Record<string, string | string[]> | null
   }>
   facets: Record<string, FacetBucket[]>
+  numeric_facets: Record<string, NumericFacetBounds>
 }
 
 export interface PortalFieldDefinition {

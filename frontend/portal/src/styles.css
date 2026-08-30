@@ -107,6 +107,11 @@ input, select, textarea { font-family: inherit; }
 .facet-item .ct { font-size: 11px; color: var(--fg-4, #8a92a3); font-family: 'IBM Plex Mono', monospace; }
 .facet-reset { width: 100%; margin-top: 6px; padding: 8px 0 0; border: 0; border-top: 1px solid var(--border, #e4e6eb); background: transparent; color: var(--accent, #1e3a8a); font-size: 12px; text-align: left; cursor: pointer; }
 .facet-reset:hover { color: var(--accent-hover, #15296b); }
+.numeric-facet { margin-bottom: 20px; }
+.numeric-facet-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.numeric-facet-inputs input, .numeric-facet input[type="range"] { width: 100%; box-sizing: border-box; }
+.numeric-facet-inputs input { min-height: 32px; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; padding: 4px 7px; }
+.numeric-facet input[type="range"] { display: block; accent-color: var(--accent, #1e3a8a); }
 .result-list { display: flex; flex-direction: column; gap: 12px; }
 .result-row {
   background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb);

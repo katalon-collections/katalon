@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import datetime
 from typing import Any, ClassVar
@@ -20,7 +21,7 @@ from katalon.api.v1 import (
     portal,
     theme,
 )
-from katalon.api.v1.search import SearchResponse
+from katalon.api.v1.search import SearchResponse, _range_filters
 from katalon.core.dependencies import DBDep
 from katalon.core.limiter import limiter
 from katalon.core.models import (
@@ -172,6 +173,11 @@ class PortalSearchTermRead(BaseModel):
     parent_id: uuid.UUID | None
 
 
+class NumericRange(BaseModel):
+    from_: float | None = Field(default=None, alias="from")
+    to: float | None = None
+
+
 class AdvancedSearchRequest(BaseModel):
     query: AdvancedQuery
     q: str | None = None
@@ -179,6 +185,7 @@ class AdvancedSearchRequest(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
     facet_fields: list[str] = Field(default_factory=list, max_length=100)
     metadata_filters: dict[str, list[str]] = Field(default_factory=dict)
+    numeric_filters: dict[str, NumericRange] = Field(default_factory=dict)
     relation_filters: dict[str, str] = Field(default_factory=dict)
 
 
@@ -357,6 +364,10 @@ async def search(
     portal_config = (
         await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
     ).scalar_one_or_none()
+    try:
+        numeric_filters = _range_filters(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = await search_service.search(
         query=q,
         record_type=type,
@@ -365,6 +376,7 @@ async def search(
         page=page,
         page_size=page_size,
         extra_filters=extra_filters or None,
+        numeric_filters=numeric_filters or None,
         facet_fields=[field.strip() for field in facets.split(",") if field.strip()] if facets else None,
         rel_filters=rel_filters or None,
         active_objects_only=True,
@@ -392,6 +404,17 @@ async def advanced_search(
     portal_config = (
         await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
     ).scalar_one_or_none()
+    numeric_filters = {
+        field: (bounds.from_, bounds.to)
+        for field, bounds in data.numeric_filters.items()
+        if bounds.from_ is not None or bounds.to is not None
+    }
+    if any(
+        not all(math.isfinite(value) for value in bounds if value is not None)
+        or (bounds[0] is not None and bounds[1] is not None and bounds[0] > bounds[1])
+        for bounds in numeric_filters.values()
+    ):
+        raise HTTPException(status_code=422, detail="Ungültiger Zahlenbereich.")
     result = await search_service.search(
         query=data.q,
         record_type=data.query.record_type,
@@ -399,6 +422,7 @@ async def advanced_search(
         page=data.page,
         page_size=data.page_size,
         extra_filters=data.metadata_filters or None,
+        numeric_filters=numeric_filters or None,
         facet_fields=data.facet_fields or None,
         rel_filters=allowed_relation_filters or None,
         active_objects_only=True,

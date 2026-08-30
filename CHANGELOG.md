@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Zahlenfacetten im Portal erlauben präzise Von/Bis-Bereiche und native Schieberegler.
+
 ### Fixed
 - Vollständiger Suchindex-Neuaufbau entfernt veraltete Elasticsearch-Dokumente.
 - Negative ISO-Jahre werden im Portal als Jahre v. Chr. angezeigt.

@@ -8,8 +8,13 @@ export interface FieldDefinition {
   field_type: string
 }
 
+export interface FieldInfo {
+  label: string
+  field_type: string
+}
+
 export function useFieldLabels(targetTypesKey: string, locale: string) {
-  const [labels, setLabels] = useState<Record<string, Record<string, string>>>({})
+  const [labels, setLabels] = useState<Record<string, Record<string, FieldInfo>>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -20,13 +25,13 @@ export function useFieldLabels(targetTypesKey: string, locale: string) {
     }))
       .then(results => {
         if (cancelled) return
-        const map: Record<string, Record<string, string>> = {}
+        const map: Record<string, Record<string, FieldInfo>> = {}
         for (const [targetType, fields] of results) {
           map[targetType] = {}
           for (const field of fields) {
             const label = [field.label?.[locale], field.label?.de, field.label?.en]
               .find(value => value?.trim())
-            map[targetType][field.name] = label ?? field.name
+            map[targetType][field.name] = { label: label ?? field.name, field_type: field.field_type }
           }
         }
         setLabels(map)

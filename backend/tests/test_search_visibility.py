@@ -109,6 +109,24 @@ def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
     }]
 
 
+def test_index_doc_builds_numeric_facet_field() -> None:
+    obj = Object(
+        id=uuid.uuid4(), idno="OBJ-1", status="public", collection_status="active",
+        metadata_={"year": [{"value": "1949"}, {"value": "1950"}]},
+    )
+    fields = [SimpleNamespace(
+        name="year", field_type="number", is_searchable=False, is_public=True,
+        is_facet=True, settings={},
+    )]
+
+    doc = search_service._build_doc(
+        "object", obj, facet_fields={"year"}, field_definitions=fields,
+    )
+
+    assert doc["facet_year"] == ["1949", "1950"]
+    assert doc["number_facet_year"] == [1949.0, 1950.0]
+
+
 @pytest.mark.asyncio
 async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
     object_id = uuid.uuid4()
@@ -356,6 +374,31 @@ async def test_search_documents_filters_and_aggregates_inherited_facets(monkeypa
     assert selected_values not in aggregation["aggs"]["filtered"]["filter"]["bool"]["filter"]
     assert aggregation["aggs"]["filtered"]["aggs"]["values"] == {
         "terms": {"field": f"facet_{field}", "size": 20}
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_documents_filters_and_aggregates_numeric_facets(monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}})()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+    await elasticsearch.search_documents(
+        None, "object", "public", 0, 20,
+        numeric_filters={"year": (1900.0, 1950.0)}, facet_fields=["year"],
+    )
+
+    body = captured["body"]
+    selected_range = {"range": {"number_facet_year": {"gte": 1900.0, "lte": 1950.0}}}
+    assert selected_range in body["query"]["bool"]["filter"]
+    aggregation = body["aggs"]["numeric_year"]
+    assert selected_range not in aggregation["aggs"]["filtered"]["filter"]["bool"]["filter"]
+    assert aggregation["aggs"]["filtered"]["aggs"]["values"] == {
+        "stats": {"field": "number_facet_year"}
     }
 
 
