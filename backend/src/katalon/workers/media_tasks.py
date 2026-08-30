@@ -27,6 +27,8 @@ def _make_pyramid_tiff(source_path: Path) -> Path | None:
         image.tiffsave(
             str(dest_path),
             tile=True,
+            tile_width=128,
+            tile_height=128,
             pyramid=True,
             compression="jpeg",
             Q=85,
