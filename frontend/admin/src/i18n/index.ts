@@ -46,6 +46,10 @@ import deScreenSubtype from './locales/de/screenSubtype.json'
 import enScreenSubtype from './locales/en/screenSubtype.json'
 import deScreenList from './locales/de/screenList.json'
 import enScreenList from './locales/en/screenList.json'
+import deScreenPages from './locales/de/screenPages.json'
+import enScreenPages from './locales/en/screenPages.json'
+import deScreenSchema from './locales/de/screenSchema.json'
+import enScreenSchema from './locales/en/screenSchema.json'
 
 const STORAGE_KEY = 'katalon.ui_language'
 
@@ -83,6 +87,8 @@ i18next.use(initReactI18next).init({
       screenUsers: deScreenUsers,
       screenSubtype: deScreenSubtype,
       screenList: deScreenList,
+      screenPages: deScreenPages,
+      screenSchema: deScreenSchema,
     },
     en: {
       translation: en,
@@ -108,6 +114,8 @@ i18next.use(initReactI18next).init({
       screenUsers: enScreenUsers,
       screenSubtype: enScreenSubtype,
       screenList: enScreenList,
+      screenPages: enScreenPages,
+      screenSchema: enScreenSchema,
     },
   },
   lng: detectLanguage(),
