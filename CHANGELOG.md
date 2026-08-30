@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.5] - 2026-08-30
+
+### Added
+- Statische Seiten lassen sich im Portal wahlweise als Link in der Kopfzeile (Navigation), im Fußbereich oder ganz ohne sichtbaren Link platzieren. Bisherige Seiten bleiben standardmäßig im Footer.
+
 ## [1.12.4] - 2026-08-30
 
 ### Fixed

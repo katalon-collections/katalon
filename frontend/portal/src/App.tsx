@@ -24,6 +24,11 @@ const BROWSE_NAV_ITEMS = [
   { type: 'occurrence', to: '/search?q=&type=occurrence', label: 'nav.works' },
 ]
 
+function pageLabel(p: StaticPageSummary, locale: string): string {
+  const t = (p.title ?? {}) as Record<string, string>
+  return t[locale] ?? Object.values(t)[0] ?? p.slug
+}
+
 function LanguageSwitcher() {
   const { locale, setLocale } = useI18n()
   const config = usePortalConfig()
@@ -44,14 +49,19 @@ function LanguageSwitcher() {
 function Header() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const config = usePortalConfig()
   const [q, setQ] = useState('')
   const [suggestions, setSuggestions] = useState<Array<{ id: string; record_type: string; title: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [headerPages, setHeaderPages] = useState<StaticPageSummary[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    api.pages.list().then(ps => setHeaderPages(ps.filter(p => p.placement === 'header'))).catch(() => {})
+  }, [])
 
   // Debounced autocomplete
   useEffect(() => {
@@ -110,6 +120,7 @@ function Header() {
         {BROWSE_NAV_ITEMS
           .filter(({ type }) => config.browse_enabled_types.includes(type))
           .map(({ type, to, label }) => <Link key={type} to={to}>{t(label)}</Link>)}
+        {headerPages.map(p => <Link key={p.slug} to={`/page/${p.slug}`}>{pageLabel(p, locale)}</Link>)}
       </nav>
       <div className="sp" />
       <div ref={wrapRef} className={`search-wrap${location.pathname === '/' ? ' is-home' : ''}`} style={{ position: 'relative' }}>
@@ -154,12 +165,12 @@ function Header() {
 function Footer() {
   const { locale } = useI18n()
   const [pages, setPages] = useState<StaticPageSummary[]>([])
-  useEffect(() => { api.pages.list().then(setPages).catch(() => {}) }, [])
+  useEffect(() => { api.pages.list().then(ps => setPages(ps.filter(p => p.placement === 'footer'))).catch(() => {}) }, [])
   return (
     <footer className="site-footer">
       Katalon · Metadata Management System
       {pages.map(p => {
-        const label = (p.title as Record<string, string>)[locale] ?? Object.values(p.title)[0] ?? p.slug
+        const label = pageLabel(p, locale)
         return (
           <span key={p.slug}>
             {' · '}

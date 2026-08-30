@@ -71,6 +71,7 @@ export interface StaticPageSummary {
   title: Record<string, string>
   content: Record<string, string>
   is_published: boolean
+  placement: 'header' | 'footer' | 'none'
   sort_order: number
 }
 

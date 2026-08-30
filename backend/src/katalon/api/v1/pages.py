@@ -12,6 +12,7 @@ from katalon.core.dependencies import DBDep, require_admin
 from katalon.core.models import StaticPage, User
 
 _SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+_PLACEMENTS = {'header', 'footer', 'none'}
 
 router = APIRouter(prefix="/pages", tags=["pages"])
 
@@ -21,6 +22,7 @@ class PageCreate(BaseModel):
     title: dict[str, Any] = {}
     content: dict[str, Any] = {}
     is_published: bool = False
+    placement: str = "footer"
     sort_order: int = 0
 
     @field_validator('slug')
@@ -30,12 +32,27 @@ class PageCreate(BaseModel):
             raise ValueError('Slug muss URL-sicher sein (nur Kleinbuchstaben, Zahlen, Bindestriche)')
         return v
 
+    @field_validator('placement')
+    @classmethod
+    def validate_placement(cls, v: str) -> str:
+        if v not in _PLACEMENTS:
+            raise ValueError('placement muss "header", "footer" oder "none" sein')
+        return v
+
 
 class PageUpdate(BaseModel):
     title: dict[str, Any] | None = None
     content: dict[str, Any] | None = None
     is_published: bool | None = None
+    placement: str | None = None
     sort_order: int | None = None
+
+    @field_validator('placement')
+    @classmethod
+    def validate_placement(cls, v: str | None) -> str | None:
+        if v is not None and v not in _PLACEMENTS:
+            raise ValueError('placement muss "header", "footer" oder "none" sein')
+        return v
 
 
 class PageRead(BaseModel):
@@ -46,6 +63,7 @@ class PageRead(BaseModel):
     title: dict[str, Any]
     content: dict[str, Any]
     is_published: bool
+    placement: str
     sort_order: int
 
 

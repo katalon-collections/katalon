@@ -597,14 +597,15 @@ export interface StaticPage {
   title: Record<string, string>
   content: Record<string, string>
   is_published: boolean
+  placement: 'header' | 'footer' | 'none'
   sort_order: number
 }
 
 export const staticPages = {
   list:   () => req<StaticPage[]>('/v1/pages/admin'),
-  create: (data: { slug: string; title: Record<string, string>; content: Record<string, string>; is_published: boolean; sort_order: number }) =>
+  create: (data: { slug: string; title: Record<string, string>; content: Record<string, string>; is_published: boolean; placement: 'header' | 'footer' | 'none'; sort_order: number }) =>
     req<StaticPage>('/v1/pages', { method: 'POST', body: JSON.stringify(data) }),
-  update: (slug: string, data: Partial<{ title: Record<string, string>; content: Record<string, string>; is_published: boolean; sort_order: number }>) =>
+  update: (slug: string, data: Partial<{ title: Record<string, string>; content: Record<string, string>; is_published: boolean; placement: 'header' | 'footer' | 'none'; sort_order: number }>) =>
     req<StaticPage>(`/v1/pages/${slug}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (slug: string) => req<void>(`/v1/pages/${slug}`, { method: 'DELETE' }),
 }

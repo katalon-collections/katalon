@@ -2,7 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
+from katalon.api.v1.pages import PageCreate, PageUpdate
 from katalon.database import get_db
 from katalon.main import app
 
@@ -92,6 +94,24 @@ async def test_delete_page_requires_auth() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.delete("/v1/pages/test-seite")
     assert r.status_code == 401
+
+
+# ── Placement validation ──────────────────────────────────────────────────────
+
+
+def test_page_create_default_placement_is_footer() -> None:
+    p = PageCreate(slug="impressum")
+    assert p.placement == "footer"
+
+
+def test_page_create_rejects_invalid_placement() -> None:
+    with pytest.raises(ValidationError):
+        PageCreate(slug="impressum", placement="sidebar")
+
+
+def test_page_update_rejects_invalid_placement() -> None:
+    with pytest.raises(ValidationError):
+        PageUpdate(placement="sidebar")
 
 
 # ── Authority API auth guards ─────────────────────────────────────────────────

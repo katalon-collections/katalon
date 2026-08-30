@@ -11,11 +11,12 @@ type FormState = {
   content_de: string
   content_en: string
   is_published: boolean
+  placement: 'header' | 'footer' | 'none'
   sort_order: number
 }
 
 function emptyForm(): FormState {
-  return { slug: '', title_de: '', title_en: '', content_de: '', content_en: '', is_published: false, sort_order: 0 }
+  return { slug: '', title_de: '', title_en: '', content_de: '', content_en: '', is_published: false, placement: 'footer', sort_order: 0 }
 }
 
 function pageToForm(p: StaticPage): FormState {
@@ -26,6 +27,7 @@ function pageToForm(p: StaticPage): FormState {
     content_de: p.content.de ?? '',
     content_en: p.content.en ?? '',
     is_published: p.is_published,
+    placement: p.placement,
     sort_order: p.sort_order,
   }
 }
@@ -93,6 +95,7 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
       title: { de: form.title_de, en: form.title_en },
       content: { de: form.content_de, en: form.content_en },
       is_published: form.is_published,
+      placement: form.placement,
       sort_order: form.sort_order,
     }
     try {
@@ -190,6 +193,14 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
                       <input type="checkbox" className="ck" checked={form.is_published} onChange={e => set('is_published', e.target.checked)} />
                       {t('published')}
                     </label>
+                    <div className="field" style={{ margin: 0 }}>
+                      <div className="lbl">{t('placementLabel')}</div>
+                      <select className="fld" value={form.placement} onChange={e => set('placement', e.target.value as FormState['placement'])}>
+                        <option value="footer">{t('placementFooter')}</option>
+                        <option value="header">{t('placementHeader')}</option>
+                        <option value="none">{t('placementNone')}</option>
+                      </select>
+                    </div>
                     <div className="field" style={{ margin: 0 }}>
                       <div className="lbl">{t('sortOrder')}</div>
                       <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} style={{ width: 70 }} />

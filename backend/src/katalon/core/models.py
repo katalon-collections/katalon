@@ -535,6 +535,8 @@ class StaticPage(Base):
     title: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])    # {"de": "...", "en": "..."}
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "Markdown...", "en": "..."}
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Link placement in the portal: "header" | "footer" | "none"
+    placement: Mapped[str] = mapped_column(String(32), default="footer", server_default="footer")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
