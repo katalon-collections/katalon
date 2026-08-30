@@ -38,6 +38,7 @@ from katalon.core.models import (
 )
 from katalon.database import AsyncSessionLocal
 from katalon.services.relation_service import sync_schema_relations
+from katalon.workers.index_tasks import reindex_all_task
 from katalon.workers.media_tasks import generate_iiif_tiles
 
 # Relation-type terms MUST live in the system "relation_types" vocabulary — the portal's
@@ -303,7 +304,6 @@ async def main() -> None:
         await add_field(db, "object", "inventardatum", {"de": "Inventardatum"}, "date", sort_order=7)
         await add_field(db, "object", "objekt_pid", {"de": "Persistenter Identifier"}, "pid", sort_order=8,
                          settings={"pattern": r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$"})
-        await add_field(db, "object", "aufnahmeort_koordinate", {"de": "Aufnahmeort (Koordinate)"}, "geo", sort_order=9)
         await add_field(db, "object", "fotograf", {"de": "Fotograf/in"}, "relation", sort_order=10,
                          settings={"target_type": "entity", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "fotografiert_von"})
         await add_field(db, "object", "abgebildete_person", {"de": "Abgebildete Person"}, "relation", sort_order=11,
@@ -338,7 +338,6 @@ async def main() -> None:
                          settings={"source": "gnd"})
         await add_field(db, "entity", "beruf", {"de": "Beruf/Tätigkeit"}, "vocab_free", sort_order=5,
                          settings={"vocabulary_id": str(obj_ortstyp_vocab_id)}, is_repeatable=True)
-        await add_field(db, "entity", "ist_person", {"de": "Ist Einzelperson (kein Kollektiv)"}, "boolean", sort_order=6)
         await add_field(db, "entity", "anzahl_werke", {"de": "Anzahl bekannter Werke"}, "number", sort_order=7)
         # authority, not pid: pidUrl() only resolves urn:nbn: values via nbn-resolving.org,
         # VIAF isn't a URN. AUTHORITY_BASE already maps "viaf" to https://viaf.org/viaf/.
@@ -390,7 +389,6 @@ async def main() -> None:
                          settings={"target_type": "entity", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "komponiert_von"})
         await add_field(db, "occurrence", "spielort", {"de": "Spielort"}, "relation", sort_order=7,
                          settings={"target_type": "place", "relation_type_vocab": str(obj_rel_vocab_id), "fixed_relation_type": "spielt_in"})
-        await add_field(db, "occurrence", "werk_pid", {"de": "Persistenter Identifier"}, "pid", sort_order=8)
         await add_field(db, "occurrence", "ist_vollendet", {"de": "Vollendet"}, "boolean", sort_order=9)
         await add_field(db, "occurrence", "umfang", {"de": "Umfang (Akte/Seiten)"}, "number", sort_order=10)
         auffuehrungen = await add_field(db, "occurrence", "auffuehrungen", {"de": "Aufführungen/Ausgaben"}, "group", sort_order=11, is_repeatable=True)
@@ -452,7 +450,6 @@ async def main() -> None:
                 "label": name,
                 "beschreibung": f"{name} — Teil der Sammlung Weimarer Klassik.",
                 "beruf": [beruf],
-                "ist_person": idno not in ("gnd-verein",),
                 "anzahl_werke": 42 if idno in ("goethe", "schiller") else 3,
                 "viaf_pid": {"source": "viaf", "external_id": str(1000 + len(entities)), "label": name},
                 "gnd_id": {"source": "gnd", "external_id": f"11850053{len(entities)}", "label": name},
@@ -492,7 +489,6 @@ async def main() -> None:
                 "form": [gattung],
                 "verfasser": rel(str(entities[verfasser].id), entities[verfasser].metadata_["label"], "verfasst_von") if verfasser else None,
                 "spielort": rel(str(places[spielort].id), places[spielort].metadata_["label"], "spielt_in") if spielort else None,
-                "werk_pid": {"value": f"urn:nbn:de:demo-{idno}", "label": "URN"},
                 "ist_vollendet": True,
                 "umfang": 5 if gattung == "drama" else 1,
                 "auffuehrungen": [
@@ -542,7 +538,6 @@ async def main() -> None:
                 "ist_ausgestellt": i % 3 == 0,
                 "inventardatum": f"20{10 + (i % 10):02d}-0{1 + (i % 9)}",
                 "objekt_pid": {"value": f"10.5072/demo.obj.{i:04d}", "label": "DOI"},
-                "aufnahmeort_koordinate": "50.9795,11.3235",
                 "fotograf": rel(str(photographer.id), photographer.metadata_["label"], "fotografiert_von") if "Fotografie" in title else None,
                 "abgebildete_person": rel(str(entities[ent_key].id), entities[ent_key].metadata_["label"], "abgebildete_person") if ent_key and any(word in title for word in ("Bildnis", "Porträt", "Silhouette")) else None,
                 # A photograph was taken AT a place (aufnahmeort); a painting/engraving instead
@@ -585,7 +580,8 @@ async def main() -> None:
             await sync_schema_relations(db, "occurrence", occ.id, occ.metadata_)
         await db.commit()
 
-    print("Seed done: 5 places, 5 entities, 5 occurrences, 20 objects, 4 vocabularies, schema fields.")
+    reindex_all_task.delay()
+    print("Seed done: 5 places, 5 entities, 5 occurrences, 20 objects, 4 vocabularies, schema fields. ES reindex enqueued.")
 
 
 if __name__ == "__main__":
