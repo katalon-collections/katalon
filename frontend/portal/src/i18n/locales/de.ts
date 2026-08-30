@@ -74,6 +74,10 @@ export default {
   'advanced.searchFailed': 'Die erweiterte Suche konnte nicht ausgeführt werden.',
   'advanced.active': 'Erweiterte Suche in {type}',
   'advanced.edit': 'Suche bearbeiten',
+  'advanced.joinAll': 'und',
+  'advanced.joinAny': 'oder',
+  'advanced.exists': 'vorhanden',
+  'advanced.notExists': 'leer',
   'advanced.op.contains': 'enthält',
   'advanced.op.notContains': 'enthält nicht',
   'advanced.op.eq': 'ist',
@@ -110,6 +114,7 @@ export default {
   'object.imageSingular': 'Bild',
   'object.imagePlural': 'Bilder',
   'object.copyManifest': '📋 Manifest-URL kopieren',
+  'object.rightsStatement': 'Rechteangaben',
 
   'home.searchPlaceholder': 'Suchbegriff eingeben…',
   'home.searchButton': 'Suchen',

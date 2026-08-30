@@ -6,7 +6,7 @@ import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
-import { MediaViewer, MediaThumb } from '../components/MediaViewer'
+import { MediaViewer, MediaThumb, RightsStatement } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
@@ -178,6 +178,7 @@ export function ObjectDetailPage() {
         media={(
           <>
             {media}
+            {selectedMedia && <RightsStatement media={selectedMedia} label={t('object.rightsStatement')} />}
             {readyMedia.length > 1 && !(showViewer && imageMedia.length === readyMedia.length) && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>
                 {readyMedia.map(m => (

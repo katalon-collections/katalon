@@ -54,6 +54,8 @@ export interface OccurrenceSummary {
 export interface MediaFile {
   id: string; filename: string; mime_type: string; category: string
   status: string; is_primary: boolean; created_at: string
+  license_uri?: string | null
+  rights_holder?: { name: string; uri?: string } | null
 }
 
 export interface Relation {

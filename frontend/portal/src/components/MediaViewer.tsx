@@ -144,6 +144,36 @@ export function MediaViewer({ objectId, media }: Props) {
   }
 }
 
+/**
+ * Collapsible license/attribution block for a single media file, shown as
+ * "Rechteangaben ⌄ <license url> · <rights holder name>".
+ */
+export function RightsStatement({ media, label }: { media: MediaFile; label: string }) {
+  const { license_uri, rights_holder } = media
+  if (!license_uri && !rights_holder?.name) return null
+
+  return (
+    <details style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-3)' }}>
+      <summary style={{ cursor: 'pointer' }}>{label}</summary>
+      <div style={{ marginTop: 6 }}>
+        {license_uri && (
+          <a href={license_uri} target="_blank" rel="noreferrer" style={{ color: 'var(--fg-3)' }}>
+            {license_uri}
+          </a>
+        )}
+        {license_uri && rights_holder?.name && ' · '}
+        {rights_holder?.name && (
+          rights_holder.uri ? (
+            <a href={rights_holder.uri} target="_blank" rel="noreferrer" style={{ color: 'var(--fg-3)' }}>
+              {rights_holder.name}
+            </a>
+          ) : rights_holder.name
+        )}
+      </div>
+    </details>
+  )
+}
+
 const MEDIA_BADGE: Record<string, string> = {
   audio: 'AUDIO',
   video: 'VIDEO',

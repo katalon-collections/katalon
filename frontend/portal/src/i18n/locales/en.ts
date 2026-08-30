@@ -74,6 +74,10 @@ export default {
   'advanced.searchFailed': 'The advanced search could not be completed.',
   'advanced.active': 'Advanced search in {type}',
   'advanced.edit': 'Edit search',
+  'advanced.joinAll': 'and',
+  'advanced.joinAny': 'or',
+  'advanced.exists': 'present',
+  'advanced.notExists': 'empty',
   'advanced.op.contains': 'contains',
   'advanced.op.notContains': 'does not contain',
   'advanced.op.eq': 'is',
@@ -110,6 +114,7 @@ export default {
   'object.imageSingular': 'Image',
   'object.imagePlural': 'Images',
   'object.copyManifest': '📋 Copy manifest URL',
+  'object.rightsStatement': 'Rights statement',
 
   'home.searchPlaceholder': 'Enter search term…',
   'home.searchButton': 'Search',
