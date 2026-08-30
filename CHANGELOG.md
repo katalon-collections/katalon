@@ -5,9 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
-## [1.10.1] - 2026-08-30
+## [1.11.0] - 2026-08-30
 
-### Changed
+### Fixed
+- Fehlende Namespace-Registrierungen in `i18n/index.ts` (`screenSchema`, `screenPages`) behoben.
+- Falsche Interpolations-Syntax (`${var}` → `{{var}}`) in JSON-Dateien korrigiert.
+- Hartcodierte deutsche Strings in Importer (StepMapping, StepDryRun, types.ts), Vocab (RelationTypeHelp) und Schema durch `t()`-Aufrufe ersetzt.
 - Vokabular-Import aus der Termpflege in den Importer-Reiter „Vokabulare“ verschoben.
 
 ## [1.10.0] - 2026-08-30
