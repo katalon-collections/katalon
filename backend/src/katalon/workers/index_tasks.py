@@ -298,17 +298,16 @@ def index_record_dispatch_task(record_type: str, record_id: str) -> None:
 
 @celery_app.task(name="katalon.reindex_all")
 def reindex_all_task() -> None:
-    """Full reindex – reads all records from DB and pushes to ES directly."""
+    """Full reindex – replace every indexed record type from the database."""
     from sqlalchemy import select
 
     from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
-    from katalon.integrations.elasticsearch import ensure_index, index_document
+    from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import build_index_doc
 
     AsyncSessionLocal, engine = _make_session()
 
     async def _reindex() -> None:
-        await ensure_index()
         async with AsyncSessionLocal() as session:
             models: list[tuple[Any, str]] = [
                 (Object, "object"),
@@ -322,9 +321,11 @@ def reindex_all_task() -> None:
                 if hasattr(model, "deleted_at"):
                     query = query.where(model.deleted_at.is_(None))
                 result = await session.execute(query)
+                records = []
                 for rec in result.scalars().all():
                     doc = await build_index_doc(rtype, rec, session)
-                    await index_document(str(rec.id), {"record_type": rtype, **doc})
+                    records.append((str(rec.id), doc))
+                await reindex_type(rtype, records)
 
     try:
         _run(_reindex())

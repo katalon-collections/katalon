@@ -253,8 +253,10 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(async_client, auth
     assert delete_response.status_code == 204
 
     indexed: list[str] = []
+    reindexed_types: list[str] = []
 
     async def _fake_reindex_type(record_type: str, records: list) -> int:
+        reindexed_types.append(record_type)
         indexed.extend(rid for rid, _ in records)
         return len(records)
 
@@ -264,13 +266,8 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(async_client, auth
     assert object_id not in indexed
     assert report["status"] == "ok"
 
-    async def _fake_ensure_index() -> None:
-        return None
-
-    async def _fake_index_document(record_id: str, doc: dict) -> None:
-        indexed.append(record_id)
-
-    monkeypatch.setattr("katalon.integrations.elasticsearch.ensure_index", _fake_ensure_index)
-    monkeypatch.setattr("katalon.integrations.elasticsearch.index_document", _fake_index_document)
+    indexed.clear()
+    reindexed_types.clear()
     await asyncio.to_thread(index_tasks.reindex_all_task)
     assert object_id not in indexed
+    assert reindexed_types == ["object", "entity", "place", "occurrence", "procedure"]
