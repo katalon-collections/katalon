@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-08-30
+
+### Added
+- GeoNames-Autoritätsfelder zeigen eine eingebettete OpenStreetMap-Karte (Admin-Formular und Portal-Detailseiten).
+
+### Changed
+- Verwandte-Objekte-Darstellung auf Portal-Detailseiten (Entity/Occurrence/Place) in gemeinsame Komponente `RelatedObjects` extrahiert.
+
 ## [1.9.1] - 2026-08-30
 
 ### Fixed

@@ -21,6 +21,9 @@ sources:
   - id: relation-list
     type: file
     path: frontend/portal/src/components/RelationsList.tsx
+  - id: related-objects
+    type: file
+    path: frontend/portal/src/components/RelatedObjects.tsx
   - id: schema-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenSchema.tsx
@@ -66,6 +69,8 @@ Relation-type vocabularies are always flat: their terms cannot have parent links
 The Admin relation picker passes the current source record type and chosen target type into the vocabulary endpoint before showing relation-type choices [@screen-form] [@admin-client]. That keeps the dropdown from offering known-disallowed relation types, while the server remains the final authority and returns HTTP 422 for a relation vocabulary term that does not apply to the requested pair [@relation-api] [@relation-type-service].
 
 The portal relation list receives a `resolveLabel` callback and passes it the relation type plus direction flag, so the display layer can choose the forward or inverse label for the current record [@relation-list]. The same component computes the other endpoint from the current record ID and navigates to a type-specific portal path [@relation-list].
+
+Entity, place, and occurrence pages show linked objects as cards. When those cards use more than one relation type, the portal offers local relation-type chips; they filter the already loaded cards without another API request, and resolve each chip's directional label with the same vocabulary data [@related-objects].
 
 ## Procedure Rule
 

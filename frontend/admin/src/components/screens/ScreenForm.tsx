@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } f
 import { createPortal } from 'react-dom'
 import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
 import type { MediaFile } from '../../api/client'
-import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
+import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
@@ -2668,6 +2668,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 </span>
                               ))}
                             </div>
+                            {((val as AuthorityEntry[] | undefined) ?? []).map((entry, i) => (
+                              <GeoNamesMap key={`${entry.external_id}-${i}`} value={entry} />
+                            ))}
                             <AuthorityInput
                               source={(f.settings?.source as string) ?? 'gnd'}
                               value={null}

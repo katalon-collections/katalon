@@ -93,6 +93,7 @@ export default {
   'common.backToSearch': 'Back to search',
   'common.home': 'Home',
   'common.search': 'Search',
+  'common.all': 'All',
   'common.relatedObjects': 'Related objects',
   'common.type': 'Type',
   'common.relations': 'Relations',

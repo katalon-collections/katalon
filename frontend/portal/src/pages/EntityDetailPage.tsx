@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, fetchRecord, mediaThumbnailUrl, type EntitySummary, type MediaFile, type ObjectSummary, type Relation } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
+import { RelatedObjects } from '../components/RelatedObjects'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
@@ -126,35 +127,7 @@ export function EntityDetailPage() {
         metadata={m}
         locale={locale}
         sidebarPosition={portalConfig.detail_sidebar_position}
-        mainExtra={linkedObjects.length > 0 && (
-          <section style={{ marginTop: 8 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
-            <div className="obj-grid">
-              {linkedObjects.map(obj => {
-                const om = obj.metadata_ as Record<string, unknown>
-                const otitle = recordTitle(om, locale, obj.idno ?? obj.id)
-                const rel = relations.find(r => r.from_id === obj.id || r.to_id === obj.id)
-                const isFrom = rel ? rel.from_id === entity.id : true
-                return (
-                  <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
-                    <div className="thumb">
-                      {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
-                    </div>
-                    <div className="info">
-                      <div className="title">{otitle}</div>
-                      {rel && (
-                        <div className="meta" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }}>
-                          {resolveRelationType(rel.relation_type, isFrom)}
-                        </div>
-                      )}
-                      {obj.idno && <div className="meta">{obj.idno}</div>}
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </section>
-        )}
+        mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={entity.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (
           <RelationsList
             relations={nonObjectRelations}

@@ -17,6 +17,38 @@ export function MetaRow({ label, value, href }: { label: string; value: string; 
   )
 }
 
+function GeoNamesMaps({ value }: { value: unknown }) {
+  const entries = Array.isArray(value) ? value : [value]
+  const maps = entries.flatMap(entry => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return []
+    const authority = entry as Record<string, unknown>
+    const coordinates = authority.coordinates
+    if (authority.source !== 'geonames' || typeof coordinates !== 'object' || coordinates === null) return []
+    const { lat, lng } = coordinates as Record<string, unknown>
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)
+      || Math.abs(lat) > 90 || Math.abs(lng) > 180) return []
+    return [{ label: typeof authority.label === 'string' ? authority.label : authority.external_id, lat, lng }]
+  })
+
+  return maps.map(({ label, lat, lng }, index) => {
+    const bbox = `${lng - 0.05},${lat - 0.03},${lng + 0.05},${lat + 0.03}`
+    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+    return (
+      <details key={`${label}-${index}`} style={{ margin: '-6px 0 14px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--fg-2)' }}>OpenStreetMap</summary>
+        <iframe
+          src={src}
+          title={`OpenStreetMap: ${label}`}
+          width="100%"
+          height="240"
+          style={{ border: '1px solid var(--border)', borderRadius: 6, display: 'block', marginTop: 6 }}
+          loading="lazy"
+        />
+      </details>
+    )
+  })
+}
+
 function fieldLabel(f: FieldDefinition, locale: string): string {
   return f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
 }
@@ -42,6 +74,7 @@ function MainField({ field, value, locale }: { field: FieldDefinition; value: un
       {field.field_type === 'richtext' ? richText(rendered) : (
         <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>{rendered}</div>
       )}
+      {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
     </div>
   )
 }
@@ -53,7 +86,10 @@ function SidebarField({ field, value, locale }: { field: FieldDefinition; value:
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
   const href = field.field_type === 'authority' ? authorityUrl(value) : field.field_type === 'pid' ? pidUrl(value) : undefined
-  return rendered ? <MetaRow label={fieldLabel(field, locale)} value={rendered} href={href} /> : null
+  return rendered ? <>
+    <MetaRow label={fieldLabel(field, locale)} value={rendered} href={href} />
+    {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
+  </> : null
 }
 
 interface DetailPageLayoutProps {

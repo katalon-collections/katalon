@@ -3,7 +3,41 @@ import { authority as authorityApi } from '../api/client'
 import type { AuthorityHit } from '../api/client'
 import { X } from './ui/Icons'
 
-export type AuthorityEntry = { source: string; external_id: string; label: string }
+export type AuthorityEntry = {
+  source: string
+  external_id: string
+  label: string
+  coordinates?: { lat: number; lng: number }
+}
+
+function geonamesCoordinates(value: AuthorityEntry): { lat: number; lng: number } | null {
+  if (value.source !== 'geonames' || !value.coordinates) return null
+  const { lat, lng } = value.coordinates
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+    ? { lat, lng }
+    : null
+}
+
+export function GeoNamesMap({ value }: { value: AuthorityEntry }) {
+  const coordinates = geonamesCoordinates(value)
+  if (!coordinates) return null
+  const { lat, lng } = coordinates
+  const bbox = `${lng - 0.05},${lat - 0.03},${lng + 0.05},${lat + 0.03}`
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+  return (
+    <details style={{ width: '100%', marginTop: 8 }}>
+      <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--accent-ink)' }}>OpenStreetMap</summary>
+      <iframe
+        src={src}
+        title={`OpenStreetMap: ${value.label}`}
+        width="100%"
+        height="240"
+        style={{ border: '1px solid var(--border)', borderRadius: 6, display: 'block', marginTop: 6 }}
+        loading="lazy"
+      />
+    </details>
+  )
+}
 
 export function AuthorityInput({ source, value, onChange, disabled }: {
   source: string
@@ -61,7 +95,13 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   }, [q, source])
 
   function pick(hit: AuthorityHit) {
-    onChange({ source: hit.source, external_id: hit.external_id, label: hit.label })
+    const lat = Number(hit.extra.lat)
+    const lng = Number(hit.extra.lng)
+    const coordinates = hit.source === 'geonames' && Number.isFinite(lat) && Number.isFinite(lng)
+      && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+      ? { lat, lng }
+      : undefined
+    onChange({ source: hit.source, external_id: hit.external_id, label: hit.label, coordinates })
     setQ(''); setResults([]); setOpen(false)
   }
 
@@ -100,6 +140,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
             <X size={12} />
           </button>
         )}
+        <GeoNamesMap value={value} />
       </div>
     )
   }
