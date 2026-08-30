@@ -9,6 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from katalon.core.media_storage import (
+    iiif_identifier,
+    pyramid_storage_key,
+    storage_key,
+    storage_path,
+)
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -56,11 +62,11 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
         if not media:
             raise ValueError(f"MediaFile {media_file_id} not found")
 
-        source_path = Path(media.file_path)
+        source_path = storage_path(media.storage_key)
         pyramid_path = await asyncio.to_thread(_make_pyramid_tiff, source_path)
         if pyramid_path is not None:
-            media.iiif_source_path = str(pyramid_path)
-        filename = pyramid_path.name if pyramid_path is not None else source_path.name
+            media.iiif_storage_key = pyramid_storage_key(media.storage_key)
+        filename = iiif_identifier(media.iiif_storage_key, media.storage_key)
 
         try:
             # Trigger Cantaloupe processing and get image dimensions for IIIF canvas
@@ -100,7 +106,6 @@ def generate_iiif_tiles(self: Any, media_file_id: str) -> dict[str, Any]:
 
 
 async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> dict[str, Any]:
-    from katalon.config import settings
     from katalon.core.media_validation import ALLOWED_IMAGE_MIME, verified_image_mime
     from katalon.core.models import (
         AdminConfig,
@@ -227,9 +232,6 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
 
         total = len(planned)
 
-        media_root = Path(settings.media_root)
-        media_root.mkdir(parents=True, exist_ok=True)
-
         for file_path, object_id_raw, media_type in planned:
             processed += 1
             task.update_state(
@@ -283,8 +285,9 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 continue
 
             file_id = uuid.uuid4()
-            suffix = file_path.suffix or ".bin"
-            dest_path = media_root / f"{file_id}{suffix}"
+            key = storage_key(file_id, file_path.name)
+            dest_path = storage_path(key)
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file_path, dest_path)
             try:
                 mime = verified_image_mime(dest_path)
@@ -313,7 +316,7 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 object_id=object_uuid,
                 filename=file_path.name,
                 mime_type=mime,
-                file_path=str(dest_path),
+                storage_key=key,
                 status="pending",
                 is_primary=existing is None,
                 media_type=media_type,

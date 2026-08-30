@@ -40,7 +40,7 @@ def test_media_license_link_requires_absolute_http_url() -> None:
         object_id=uuid.uuid4(),
         filename="test.jpg",
         mime_type="image/jpeg",
-        file_path="/media/test.jpg",
+        storage_key="ab/test.jpg",
         status="ready",
         created_at=datetime.now(),
         license_uri="javascript:alert(1)",
@@ -142,7 +142,7 @@ async def test_list_media_returns_files() -> None:
         object_id=obj_id,
         filename="test.jpg",
         mime_type="image/jpeg",
-        file_path="/media/test.jpg",
+        storage_key="ab/test.jpg",
         status="ready",
         is_primary=True,
         media_type=None,
@@ -207,7 +207,7 @@ async def test_patch_media_rights(override_auth) -> None:
         object_id=obj_id,
         filename="test.jpg",
         mime_type="image/jpeg",
-        file_path="/media/test.jpg",
+        storage_key="ab/test.jpg",
         status="ready",
         is_primary=True,
         created_at=datetime.now(),
@@ -302,7 +302,7 @@ async def test_portal_media_thumbnail_redirects_to_iiif() -> None:
         object_id=obj_id,
         filename="test.tif",
         mime_type="image/tiff",
-        file_path=f"/media/{media_id}.tif",
+        storage_key=f"{media_id.hex[:2]}/{media_id}--test.tif",
         status="ready",
         created_at=datetime.now(),
     )
@@ -317,7 +317,9 @@ async def test_portal_media_thumbnail_redirects_to_iiif() -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/portal/v1/objects/{obj_id}/media/{media_id}/thumbnail")
         assert response.status_code == 307
-        assert response.headers["location"].endswith(f"/iiif/3/{media_id}.tif/full/,300/0/default.jpg")
+        assert response.headers["location"].endswith(
+            f"/iiif/3/{media_id.hex[:2]}%2F{media_id}--test.tif/full/,300/0/default.jpg"
+        )
     finally:
         app.dependency_overrides.pop(get_db, None)
 

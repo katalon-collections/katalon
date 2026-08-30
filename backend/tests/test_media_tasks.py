@@ -25,10 +25,10 @@ def _make_session(media_file=None):
 def _make_media_file(**kwargs):
     media = MagicMock()
     media.id = kwargs.get("id", uuid.uuid4())
-    media.file_path = kwargs.get("file_path", "/media/test.jpg")
+    media.storage_key = kwargs.get("storage_key", "ab/test.jpg")
     media.status = kwargs.get("status", "pending")
     media.iiif_manifest = kwargs.get("iiif_manifest", None)
-    media.iiif_source_path = kwargs.get("iiif_source_path", None)
+    media.iiif_storage_key = kwargs.get("iiif_storage_key", None)
     return media
 
 
@@ -82,14 +82,14 @@ async def test_process_fetches_info_builds_manifest_sets_ready() -> None:
 
 @pytest.mark.asyncio
 async def test_process_uses_pyramid_filename_when_conversion_succeeds() -> None:
-    media = _make_media_file(file_path="/media/test.jpg")
+    media = _make_media_file(storage_key="ab/test.jpg")
     session = _make_session(media)
 
     with _patch_worker_session(session):
         with (
             patch(
                 "katalon.workers.media_tasks._make_pyramid_tiff",
-                return_value=Path("/media/test_pyramid.tif"),
+                return_value=Path("/anywhere/test_pyramid.tif"),
             ),
             patch(
                 "katalon.integrations.cantaloupe.fetch_image_info",
@@ -99,13 +99,13 @@ async def test_process_uses_pyramid_filename_when_conversion_succeeds() -> None:
         ):
             await _process(media.id)
 
-    fetch_mock.assert_awaited_with("test_pyramid.tif")
-    assert media.iiif_source_path == "/media/test_pyramid.tif"
+    fetch_mock.assert_awaited_with("ab%2Ftest_pyramid.tif")
+    assert media.iiif_storage_key == "ab/test_pyramid.tif"
 
 
 @pytest.mark.asyncio
 async def test_process_falls_back_to_original_when_pyramid_conversion_fails() -> None:
-    media = _make_media_file(file_path="/media/test.jpg")
+    media = _make_media_file(storage_key="ab/test.jpg")
     session = _make_session(media)
 
     with _patch_worker_session(session):
@@ -119,8 +119,8 @@ async def test_process_falls_back_to_original_when_pyramid_conversion_fails() ->
         ):
             await _process(media.id)
 
-    fetch_mock.assert_awaited_with("test.jpg")
-    assert media.iiif_source_path is None
+    fetch_mock.assert_awaited_with("ab%2Ftest.jpg")
+    assert media.iiif_storage_key is None
 
 
 @pytest.mark.asyncio

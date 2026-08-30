@@ -123,6 +123,7 @@ async def test_procedure_archive_flips_status_without_deleting(async_client, aut
 @pytest.mark.asyncio
 async def test_purge_task_hard_deletes_past_retention_window(async_client, auth_headers, monkeypatch, tmp_path) -> None:
     import katalon.database as database_module
+    from katalon.core.media_storage import storage_path
     from katalon.core.models import AuditLog, MediaFile, Object
     from katalon.workers import purge_tasks
 
@@ -140,15 +141,19 @@ async def test_purge_task_hard_deletes_past_retention_window(async_client, auth_
     # Attach a real on-disk media file — this is also the regression case for the
     # media_files.object_id NOT NULL cascade bug (fixed via passive_deletes=True):
     # purge is now where an object row actually gets hard-deleted.
-    media_path = tmp_path / "purge-me.jpg"
+    media_root = tmp_path / "media"
+    monkeypatch.setattr("katalon.core.media_storage.settings.media_root", str(media_root))
+    media_path = media_root / "ab" / "purge-me.jpg"
+    media_path.parent.mkdir(parents=True)
     media_path.write_bytes(b"fake-image-bytes")
+    assert storage_path("ab/purge-me.jpg") == media_path
     async with database_module.AsyncSessionLocal() as session:
         session.add(
             MediaFile(
                 object_id=uuid.UUID(object_id),
                 filename="purge-me.jpg",
                 mime_type="image/jpeg",
-                file_path=str(media_path),
+                storage_key="ab/purge-me.jpg",
                 status="ready",
             )
         )

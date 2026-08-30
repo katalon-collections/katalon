@@ -131,7 +131,7 @@ async def test_delete_object_with_media_files_succeeds(async_client, auth_header
                 object_id=uuid.UUID(object_id),
                 filename="delete-me.jpg",
                 mime_type="image/jpeg",
-                file_path="/not-needed-for-this-test.jpg",
+                storage_key="ab/not-needed-for-this-test.jpg",
                 status="ready",
             )
         )

@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Coroutine
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from katalon.core.media_storage import storage_path
 from katalon.workers.celery_app import celery_app
 
 
@@ -31,9 +31,9 @@ async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutof
                 select(MediaFile).where(MediaFile.object_id == record.id)
             )
             for media in media_result.scalars().all():
-                Path(media.file_path).unlink(missing_ok=True)
-                if media.iiif_source_path:
-                    Path(media.iiif_source_path).unlink(missing_ok=True)
+                storage_path(media.storage_key).unlink(missing_ok=True)
+                if media.iiif_storage_key:
+                    storage_path(media.iiif_storage_key).unlink(missing_ok=True)
         await delete_relations(session, record_type, record.id)
         await log_change(session, record_type=record_type, record_id=record.id, user_id=None, action="purge")
         await session.delete(record)

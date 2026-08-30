@@ -70,7 +70,7 @@ async def test_vocabulary_and_media_links_are_navigable(async_client, auth_heade
             object_id=uuid.UUID(object_id),
             filename="licensed.jpg",
             mime_type="image/jpeg",
-            file_path="/not-needed-for-listing.jpg",
+            storage_key="ab/not-needed-for-listing.jpg",
             status="ready",
             license_uri="https://creativecommons.org/licenses/by/4.0/",
         )
@@ -116,7 +116,7 @@ async def test_portal_record_media_and_term_links(async_client, auth_headers) ->
             object_id=uuid.UUID(object_id),
             filename="licensed.jpg",
             mime_type="image/jpeg",
-            file_path="/not-needed-for-listing.jpg",
+            storage_key="ab/not-needed-for-listing.jpg",
             status="ready",
             license_uri="https://creativecommons.org/licenses/by/4.0/",
         )

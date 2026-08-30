@@ -18,6 +18,9 @@ sources:
   - id: media-reference-migration
     type: file
     path: backend/migrations/versions/0038_media_import_references.py
+  - id: media-storage
+    type: file
+    path: backend/src/katalon/core/media_storage.py
 ---
 
 Katalon's persistence model uses PostgreSQL as the durable system of record, with separate ORM tables for record classes and JSONB columns for configurable metadata. Objects, entities, places, occurrences, and procedures all have stable columns for identity, status, timestamps, and record versions, while user-defined fields live in the `metadata` JSONB column [@models]. Search state is not stored in those PostgreSQL record tables: migration `0044` drops the unused `search_vector` TSVECTOR columns from all five record tables after Elasticsearch became the search read model [@drop-search-vector]. The initial migration creates PostGIS and `pg_trgm` extensions, then builds the primary tables and supporting tables for users, schema definitions, vocabularies, relations, media, audit logs, snapshots, and authority sources [@initial-migration].
@@ -36,7 +39,7 @@ PostgreSQL indexes are tuned around that split. The ORM defines GIN indexes on m
 
 ## Relations, Media, And Configuration
 
-Relations are generic rows with `from_type`, `from_id`, `to_type`, `to_id`, `relation_type`, JSONB metadata, and indexes for both directions [@models]. Media files belong to objects through a foreign key and store filename, MIME type, filesystem path, IIIF manifest JSON, status, primary-image flag, and rights fields [@models].
+Relations are generic rows with `from_type`, `from_id`, `to_type`, `to_id`, `relation_type`, JSONB metadata, and indexes for both directions [@models]. Media files belong to objects through a foreign key and store the original filename, MIME type, relative managed `storage_key`, optional relative `iiif_storage_key`, IIIF manifest JSON, status, primary-image flag, and rights fields [@models]. Absolute filesystem paths are resolved from the keys under `MEDIA_ROOT` at the local-storage boundary [@media-storage].
 
 `MediaImportReference` stores a pending link from an object to a source filename before the file itself is uploaded. It keeps the original filename and a normalized basename used for matching. The table has indexes on `object_id` and `normalized_filename`, a uniqueness constraint across both columns, and an object foreign key with cascade deletion [@models] [@media-reference-migration]. These technical references remain outside the object's configurable `metadata` JSONB. A successful batch upload consumes its matching reference; a failed upload leaves it available for retry.
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -23,6 +22,7 @@ from geoalchemy2 import WKTElement
 from sqlalchemy import select, update
 
 from katalon.config import settings
+from katalon.core.media_storage import storage_key, storage_path
 from katalon.core.media_validation import verified_image_mime
 from katalon.core.models import (
     AuthoritySource,
@@ -119,8 +119,6 @@ def rel(id_: str, label: str, rtype: str) -> dict[str, Any]:
 
 async def seed_demo_images(db, objects: dict[str, Object]) -> None:
     """Download the fixed PD/CC0 demo images and enqueue their ordinary IIIF processing."""
-    media_root = Path(settings.media_root)
-    media_root.mkdir(parents=True, exist_ok=True)
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     media_ids: list[uuid.UUID] = []
 
@@ -131,7 +129,9 @@ async def seed_demo_images(db, objects: dict[str, Object]) -> None:
     ) as client:
         for idno, filename, license_name, source_url, download_url in DEMO_IMAGES:
             file_id = uuid.uuid4()
-            destination = media_root / f"{file_id}{Path(filename).suffix}"
+            key = storage_key(file_id, filename)
+            destination = storage_path(key)
+            destination.parent.mkdir(parents=True, exist_ok=True)
             try:
                 for attempt in range(3):
                     async with client.stream("GET", download_url) as response:
@@ -157,7 +157,7 @@ async def seed_demo_images(db, objects: dict[str, Object]) -> None:
                 object_id=objects[idno].id,
                 filename=filename,
                 mime_type=mime_type,
-                file_path=str(destination),
+                storage_key=key,
                 status="pending",
                 is_primary=True,
                 license_uri=CC0 if license_name == "CC0" else PD_MARK,
@@ -234,7 +234,7 @@ async def main() -> None:
         )
 
         # -------------------------------------------------------------- vocabularies
-        rel_ids = await make_vocab(
+        await make_vocab(
             db, REL_VOCAB_NAME, "relation",
             [
                 {"term": "fotografiert_von", "label": {"de": "fotografiert von"}, "inverse_label": {"de": "fotografierte"}, "applies_from": ["object"], "applies_to": ["entity"]},

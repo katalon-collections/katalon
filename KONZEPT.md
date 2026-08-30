@@ -288,8 +288,8 @@ vocabulary_terms (id UUID, vocabulary_id UUID, term VARCHAR, label JSONB, parent
 ```sql
 media_files (
     id UUID, object_id UUID, filename VARCHAR,
-    mime_type VARCHAR, file_path TEXT,
-    iiif_manifest JSONB, status VARCHAR
+    mime_type VARCHAR, storage_key TEXT,
+    iiif_storage_key TEXT, iiif_manifest JSONB, status VARCHAR
 )
 ```
 

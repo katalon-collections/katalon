@@ -19,6 +19,7 @@ from katalon.core.dependencies import (
     OptionalCurrentUser,
     require_admin_or_editor,
 )
+from katalon.core.media_storage import iiif_identifier, storage_key, storage_path
 from katalon.core.media_validation import (
     ALLOWED_MEDIA_MIME,
     media_category,
@@ -54,7 +55,7 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
     }
     if f.status == "ready" and media_category(f.mime_type) == "image":
-        identifier = Path(f.iiif_source_path or f.file_path).name
+        identifier = iiif_identifier(f.iiif_storage_key, f.storage_key)
         links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
     if f.license_uri and _is_absolute_http_url(f.license_uri):
         links["license"] = {"href": f.license_uri}
@@ -113,11 +114,10 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
 
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    Path(settings.media_root).mkdir(parents=True, exist_ok=True)
-
     file_id = uuid.uuid4()
-    suffix = Path(file.filename or "upload").suffix or ".bin"
-    dest_path = Path(settings.media_root) / f"{file_id}{suffix}"
+    key = storage_key(file_id, file.filename or "upload")
+    dest_path = storage_path(key)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
 
     size = 0
     async with aiofiles.open(dest_path, "wb") as out:
@@ -136,9 +136,9 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     media = MediaFile(
         id=file_id,
         object_id=object_id,
-        filename=file.filename or dest_path.name,
+        filename=file.filename or "upload",
         mime_type=actual_mime,
-        file_path=str(dest_path),
+        storage_key=key,
         status="pending" if category == "image" else "ready",
         is_primary=len(existing) == 0,
         license_uri=config.media_default_license_uri if config else None,
@@ -242,9 +242,10 @@ async def serve_media_file(
         query = query.where(MediaFile.status == "ready")
     result = await db.execute(query)
     media = result.scalar_one_or_none()
-    if not media or not Path(media.file_path).exists():
+    path = storage_path(media.storage_key) if media else None
+    if not media or not path.exists():
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    return FileResponse(media.file_path, media_type=media.mime_type, filename=media.filename)
+    return FileResponse(path, media_type=media.mime_type, filename=media.filename)
 
 
 @router.get(
@@ -269,7 +270,7 @@ async def serve_media_thumbnail(
     if not media or media_category(media.mime_type) != "image":
         raise HTTPException(status_code=404, detail="Bild nicht gefunden")
 
-    identifier = Path(media.iiif_source_path or media.file_path).name
+    identifier = iiif_identifier(media.iiif_storage_key, media.storage_key)
     return RedirectResponse(f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg")
 
 
@@ -287,9 +288,9 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
     media = result.scalar_one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
-    Path(media.file_path).unlink(missing_ok=True)
-    if media.iiif_source_path:
-        Path(media.iiif_source_path).unlink(missing_ok=True)
+    storage_path(media.storage_key).unlink(missing_ok=True)
+    if media.iiif_storage_key:
+        storage_path(media.iiif_storage_key).unlink(missing_ok=True)
     await log_change(
         db,
         record_type="object",

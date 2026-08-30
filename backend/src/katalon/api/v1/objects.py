@@ -1,7 +1,6 @@
 import logging
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -484,8 +483,10 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
     public_fields = await load_public_fields(db, "object")
     public_metadata = filter_public_metadata(obj.metadata_, public_fields, obj.object_type)
 
+    from katalon.core.media_storage import iiif_identifier
+
     media_items = [
-        (Path(m.iiif_source_path or m.file_path).name, m.iiif_manifest) for m in media_files
+        (iiif_identifier(m.iiif_storage_key, m.storage_key), m.iiif_manifest) for m in media_files
     ]
     portal_url = settings.katalon_base_url.rstrip("/")
     manifest_id = f"{portal_url}{request.url.path}" if portal_url else str(request.url)

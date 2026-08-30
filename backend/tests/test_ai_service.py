@@ -6,6 +6,7 @@ import pytest
 from fastapi import HTTPException
 from PIL import Image
 
+from katalon.config import settings
 from katalon.services.ai_service import (
     _build_messages,
     _coerce_value,
@@ -83,22 +84,24 @@ def test_group_ai_uses_only_requested_instance() -> None:
     assert "Vorderseite" not in prompt
 
 
-def test_vision_image_is_resized_to_1024px_jpeg(tmp_path) -> None:
+def test_vision_image_is_resized_to_1024px_jpeg(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "media_root", str(tmp_path))
     path = tmp_path / "primary.png"
     Image.new("RGB", (2048, 1024), "red").save(path)
 
-    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(file_path=str(path)))
+    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(storage_key="primary.png"))
 
     assert mime_type == "image/jpeg"
     with Image.open(BytesIO(image_bytes)) as image:
         assert image.size == (1024, 512)
 
 
-def test_vision_image_with_alpha_remains_png(tmp_path) -> None:
+def test_vision_image_with_alpha_remains_png(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "media_root", str(tmp_path))
     path = tmp_path / "primary.png"
     Image.new("RGBA", (2048, 1024), (255, 0, 0, 128)).save(path)
 
-    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(file_path=str(path)))
+    image_bytes, mime_type = _prepare_vision_image(SimpleNamespace(storage_key="primary.png"))
 
     assert mime_type == "image/png"
     with Image.open(BytesIO(image_bytes)) as image:

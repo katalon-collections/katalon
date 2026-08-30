@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.2] - 2026-08-30
+
+### Changed
+- Medien werden mit geshardeten, anhand des Originalnamens auffindbaren Storage-Keys abgelegt; IIIF, Download, Import und Bereinigung verwenden dieselbe sichere Referenz.
+
+### Fixed
+- IIIF-URLs kodieren geshardete Medienpfade korrekt für Cantaloupe.
+
 ## [1.12.1] - 2026-08-30
 
 ### Added

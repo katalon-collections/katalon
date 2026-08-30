@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
+from katalon.core.media_storage import storage_path
 from katalon.core.models import (
     AdminConfig,
     AIUsageEvent,
@@ -214,7 +215,7 @@ def _serialize_field_context(field: FieldDefinition, record: Any, include_fields
 
 def _prepare_vision_image(media: MediaFile) -> tuple[bytes, str]:
     try:
-        with Image.open(media.file_path) as source:
+        with Image.open(storage_path(media.storage_key)) as source:
             image = ImageOps.exif_transpose(source)
             image.thumbnail((AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION), Image.Resampling.LANCZOS)
             output = io.BytesIO()
