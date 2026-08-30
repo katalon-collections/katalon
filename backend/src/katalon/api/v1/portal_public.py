@@ -163,6 +163,15 @@ class PortalFieldDefinitionRead(BaseModel):
     detail_role: str
 
 
+class PortalSearchTermRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    term: str
+    label: dict[str, Any]
+    parent_id: uuid.UUID | None
+
+
 class AdvancedSearchRequest(BaseModel):
     query: AdvancedQuery
     q: str | None = None
@@ -412,6 +421,40 @@ async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
         ).order_by(FieldDefinition.sort_order)
     )
     return list(result.scalars().all())
+
+
+@router.get(
+    "/schema/{target_type}/fields/{field_name}/terms",
+    response_model=list[PortalSearchTermRead],
+)
+async def list_search_field_terms(
+    target_type: str, field_name: str, db: DBDep
+) -> list[VocabularyTerm]:
+    if target_type not in _PUBLIC_TYPES:
+        raise HTTPException(status_code=404, detail="Suchfeld nicht gefunden")
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == target_type,
+            FieldDefinition.name == field_name,
+            FieldDefinition.field_type.in_(("vocab", "vocab_free")),
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
+            FieldDefinition.is_searchable.is_(True),
+            FieldDefinition.parent_id.is_(None),
+        )
+    )
+    field = result.scalar_one_or_none()
+    vocabulary_id = (field.settings or {}).get("vocabulary_id") if field else None
+    try:
+        vocabulary_uuid = uuid.UUID(str(vocabulary_id))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=404, detail="Suchfeld-Vokabular nicht gefunden") from None
+    terms = await db.execute(
+        select(VocabularyTerm)
+        .where(VocabularyTerm.vocabulary_id == vocabulary_uuid)
+        .order_by(VocabularyTerm.term)
+    )
+    return list(terms.scalars().all())
 
 
 @router.get("/vocabularies", response_model=list[PortalVocabularyRead])

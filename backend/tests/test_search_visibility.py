@@ -66,6 +66,7 @@ def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
         metadata_={
             "title": "Ansicht von Bremen",
             "year": 1949,
+            "material": {"id": "term-1", "label": "Stein"},
             "photographer": {
                 "id": str(uuid.uuid4()), "label": "Ada Beispiel", "relation_type": "created_by",
             },
@@ -82,6 +83,10 @@ def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
             is_facet=False, settings={},
         ),
         SimpleNamespace(
+            name="material", field_type="vocab", is_searchable=True, is_public=True,
+            is_facet=False, settings={},
+        ),
+        SimpleNamespace(
             name="photographer", field_type="relation", is_searchable=True, is_public=True,
             is_facet=False, settings={"target_type": "entity"},
         ),
@@ -94,6 +99,8 @@ def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
 
     assert {"name": "title", "text_value": "Ansicht von Bremen", "keyword_value": "Ansicht von Bremen"} in doc["adv_fields"]
     assert {"name": "year", "number_value": 1949.0} in doc["adv_fields"]
+    assert {"name": "material", "text_value": "Stein", "keyword_value": "Stein"} in doc["adv_fields"]
+    assert {"name": "material", "text_value": "term-1", "keyword_value": "term-1"} in doc["adv_fields"]
     assert doc["adv_relations"] == [{
         "source_field": "photographer",
         "target_type": "entity",

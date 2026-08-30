@@ -159,7 +159,7 @@ def _advanced_scalar_values(value: Any) -> list[Any]:
         return [item for entry in value for item in _advanced_scalar_values(entry)]
     if isinstance(value, dict):
         if "label" in value:
-            return [value["label"]]
+            return [value["label"], value["id"]] if value.get("id") else [value["label"]]
         if "value" in value:
             return [value["value"]]
         return [item for entry in value.values() for item in _advanced_scalar_values(entry)]

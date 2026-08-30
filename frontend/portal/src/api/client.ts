@@ -174,6 +174,8 @@ export const api = {
   portal: {
     config: () => get<PortalConfig>(`${PORTAL_API}/portal/config`),
     schema: (type: string) => get<PortalFieldDefinition[]>(`${PORTAL_API}/schema/${type}`),
+    searchFieldTerms: (type: string, field: string) =>
+      get<VocabTerm[]>(`${PORTAL_API}/schema/${type}/fields/${encodeURIComponent(field)}/terms`),
   },
   pages: {
     list: () => get<StaticPageSummary[]>(`${PORTAL_API}/pages`),

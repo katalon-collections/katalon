@@ -19,7 +19,7 @@ Portal routes are browser routes rendered through React Router. `App` wraps `App
 |---|---|---|
 | `/` | `HomePage` | Portal config and page-specific resources |
 | `/search` | `SearchPage` | `/v1/search` |
-| `/advanced-search` | `AdvancedSearchPage` | `/portal/v1/schema/:type`; results use `/portal/v1/search/advanced` |
+| `/advanced-search` | `AdvancedSearchPage` | `/portal/v1/schema/:type`, field-scoped vocabulary terms; results use `/portal/v1/search/advanced` |
 | `/objects/:id` | `ObjectDetailPage` inside `ErrorBoundary` | `/v1/objects/:id`, `/v1/objects/:id/media`, `/v1/relations` |
 | `/entities/:id` | `EntityDetailPage` | `/v1/entities/:id`, `/v1/relations` |
 | `/places/:id` | `PlaceDetailPage` | `/v1/places/:id`, `/v1/relations` |

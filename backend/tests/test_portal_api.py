@@ -15,6 +15,7 @@ from katalon.core.models import (
     Place,
     PortalConfig,
     Relation,
+    VocabularyTerm,
 )
 from katalon.database import get_db
 from katalon.main import app
@@ -254,6 +255,37 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
         "is_repeatable": True, "is_searchable": True, "parent_id": None,
         "settings": {"hint": "visible"}, "show_in_detail": True,
         "detail_slot": "sidebar", "detail_role": "none",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_portal_exposes_terms_only_through_public_searchable_vocab_field() -> None:
+    vocabulary_id = uuid.uuid4()
+    field_result = MagicMock()
+    field_result.scalar_one_or_none.return_value = MagicMock(
+        settings={"vocabulary_id": str(vocabulary_id)}
+    )
+    term = VocabularyTerm(
+        id=uuid.uuid4(), vocabulary_id=vocabulary_id, term="stone",
+        label={"de": "Stein"}, inverse_label={}, metadata_={},
+        parent_id=None, applies_from=[], applies_to=[],
+    )
+    session = AsyncMock()
+    session.execute.side_effect = [field_result, _result(items=[term])]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/schema/object/fields/material/terms")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json() == [{
+        "id": str(term.id), "term": "stone", "label": {"de": "Stein"}, "parent_id": None,
     }]
 
 

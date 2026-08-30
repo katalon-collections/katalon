@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-08-30
+
+### Added
+- Erweiterte Suche: feste Vokabularfelder bieten die zulässigen Begriffe zur Auswahl an; freie Vokabularfelder schlagen konfigurierte Begriffe vor, erlauben aber weiterhin eigene Werte.
+
+### Fixed
+- Textvergleich "enthält"/"enthält nicht" in der erweiterten Suche nutzt jetzt case-insensitive Wildcard-Matching auf dem Keyword-Wert statt eines Analyzer-abhängigen Texttreffers.
+- Vokabularfelder liefern in der erweiterten Suche zusätzlich die Begriffs-ID als Facet-/Filterwert, nicht nur das Label.
+
 ## [1.7.0] - 2026-08-29
 
 ### Added

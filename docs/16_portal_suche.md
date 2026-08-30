@@ -6,4 +6,6 @@ Unter **Erweiterte Suche** wird zuerst der gewünschte Ergebnistyp gewählt. Dan
 
 > Objekte, deren Fotograf vor 1950 geboren wurde und dessen Geburtsort Bremen ist.
 
+Bei festen Vokabularfeldern werden die zulässigen Begriffe zur Auswahl angeboten. Freie Vokabularfelder schlagen konfigurierte Begriffe vor, erlauben aber weiterhin einen eigenen Wert.
+
 Die Ergebnisliste verwendet dieselbe Seite wie die Schnellsuche. Die Suchdefinition bleibt in der URL erhalten und kann daher als Lesezeichen gespeichert oder weitergegeben werden. Bei sehr breiten Relationsbedingungen fordert das Portal dazu auf, die Suche weiter einzugrenzen.

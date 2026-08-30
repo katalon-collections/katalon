@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type PortalFieldDefinition } from '../api/client'
 import { typeLabel, useI18n } from '../i18n'
@@ -41,13 +41,58 @@ function defaultOperator(fieldType: string): string {
   return OPERATORS[fieldType]?.[0]?.[0] ?? 'eq'
 }
 
-function ValueEditor({ clause, field, onChange }: {
+function ValueEditor({ clause, field, targetType, onChange }: {
   clause: AdvancedFieldClause
   field: PortalFieldDefinition
+  targetType: string
   onChange: (clause: AdvancedFieldClause) => void
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
+  const [terms, setTerms] = useState<Awaited<ReturnType<typeof api.portal.searchFieldTerms>>>([])
+  const listId = useId()
+
+  useEffect(() => {
+    if (!['vocab', 'vocab_free'].includes(field.field_type)) return
+    let cancelled = false
+    api.portal.searchFieldTerms(targetType, field.name)
+      .then(result => { if (!cancelled) setTerms(result) })
+      .catch(() => { if (!cancelled) setTerms([]) })
+    return () => { cancelled = true }
+  }, [field.field_type, field.name, targetType])
+
   if (clause.operator === 'exists' || clause.operator === 'not_exists') return null
+  const termLabel = (term: (typeof terms)[number]) =>
+    term.label[locale] ?? term.label.de ?? term.label.en ?? term.term
+  if (field.field_type === 'vocab') {
+    return (
+      <select
+        className="advanced-value"
+        aria-label={t('advanced.value')}
+        value={String(clause.value ?? '')}
+        onChange={event => onChange({ ...clause, value: event.target.value })}
+      >
+        <option value="">{t('advanced.chooseValue')}</option>
+        {terms.map(term => <option key={term.id} value={term.id}>{termLabel(term)}</option>)}
+      </select>
+    )
+  }
+  if (field.field_type === 'vocab_free') {
+    return (
+      <>
+        <input
+          className="advanced-value"
+          aria-label={t('advanced.value')}
+          list={listId}
+          value={String(clause.value ?? '')}
+          placeholder={t('advanced.value')}
+          onChange={event => onChange({ ...clause, value: event.target.value })}
+        />
+        <datalist id={listId}>
+          {terms.map(term => <option key={term.id} value={termLabel(term)} />)}
+        </datalist>
+      </>
+    )
+  }
   if (field.field_type === 'boolean') {
     return (
       <select
@@ -194,7 +239,7 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
                         <option key={value} value={value}>{t(label)}</option>
                       ))}
                     </select>
-                    <ValueEditor clause={clause} field={field} onChange={next => replace(index, next)} />
+                    <ValueEditor clause={clause} field={field} targetType={targetType} onChange={next => replace(index, next)} />
                   </>
                 )}
 

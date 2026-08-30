@@ -124,12 +124,14 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
             raise ValueError(f"Operator '{operator}' passt nicht zu Textfeldern.")
         if not isinstance(clause.value, str) or not clause.value.strip():
             raise ValueError("Textwert darf nicht leer sein.")
-        path = "adv_fields.text_value" if operator in {"contains", "not_contains"} else "adv_fields.keyword_value"
-        value_query = (
-            {"match": {path: {"query": clause.value, "operator": "and"}}}
-            if operator in {"contains", "not_contains"}
-            else {"term": {path: clause.value}}
-        )
+        path = "adv_fields.keyword_value"
+        if operator in {"contains", "not_contains"}:
+            escaped = clause.value.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?")
+            value_query = {
+                "wildcard": {path: {"value": f"*{escaped}*", "case_insensitive": True}}
+            }
+        else:
+            value_query = {"term": {path: clause.value}}
         query = _nested_field(field.name, value_query)
         return _negate(query) if operator in {"not_contains", "neq"} else query
 

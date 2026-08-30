@@ -57,6 +57,7 @@ export default {
   'advanced.chooseField': 'Feld auswählen…',
   'advanced.operator': 'Operator',
   'advanced.value': 'Wert',
+  'advanced.chooseValue': 'Wert auswählen…',
   'advanced.from': 'Von',
   'advanced.to': 'Bis',
   'advanced.and': 'und',

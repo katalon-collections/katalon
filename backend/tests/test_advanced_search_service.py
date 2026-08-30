@@ -34,6 +34,60 @@ class _DB:
 
 
 @pytest.mark.asyncio
+async def test_text_contains_matches_case_insensitive_substrings() -> None:
+    fields = {
+        "object": [SimpleNamespace(
+            name="label", field_type="text", is_public=True,
+            is_searchable=True, parent_id=None, settings={},
+        )]
+    }
+    query = AdvancedQuery(
+        record_type="object",
+        group=AdvancedGroup(clauses=[
+            AdvancedFieldClause(field="label", operator="contains", value="beil")
+        ]),
+    )
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    value_filter = resolved["bool"]["filter"][0]["nested"]["query"]["bool"]["filter"][1]
+    assert value_filter == {
+        "wildcard": {
+            "adv_fields.keyword_value": {"value": "*beil*", "case_insensitive": True}
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_direct_field_types_compile_to_typed_index_values() -> None:
+    def field(name: str, field_type: str):
+        return SimpleNamespace(
+            name=name, field_type=field_type, is_public=True,
+            is_searchable=True, parent_id=None, settings={},
+        )
+
+    fields = {"object": [
+        field("year", "number"), field("available", "boolean"),
+        field("subject", "vocab"), field("authority", "authority"),
+        field("pid", "pid"),
+    ]}
+    query = AdvancedQuery(
+        record_type="object",
+        group=AdvancedGroup(clauses=[
+            AdvancedFieldClause(field="year", operator="between", value=[1900, 1950]),
+            AdvancedFieldClause(field="available", operator="eq", value=True),
+            AdvancedFieldClause(field="subject", operator="eq", value="term-id"),
+            AdvancedFieldClause(field="authority", operator="eq", value="Ada Lovelace"),
+            AdvancedFieldClause(field="pid", operator="eq", value="doi:example"),
+        ]),
+    )
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    assert len(resolved["bool"]["filter"]) == 5
+
+
+@pytest.mark.asyncio
 async def test_resolve_two_hop_relation_query_from_inside_out(monkeypatch) -> None:
     fields = {
         "object": [
