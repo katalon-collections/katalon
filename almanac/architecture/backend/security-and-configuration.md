@@ -18,6 +18,9 @@ sources:
   - id: users
     type: file
     path: backend/src/katalon/api/v1/users.py
+  - id: screen-users
+    type: file
+    path: frontend/admin/src/components/screens/ScreenUsers.tsx
   - id: schema-api
     type: file
     path: backend/src/katalon/api/v1/schema_admin.py
@@ -62,7 +65,7 @@ When `KATALON_BASE_URL` is empty, startup falls back to `DEFAULT_ADMIN_EMAIL` an
 
 ## JWT And API Keys
 
-Password login is handled by `/v1/auth/token`. It loads the user by email, verifies the bcrypt password hash, rejects inactive accounts, and returns an access/refresh token pair [@auth]. Tokens are JWTs signed with `settings.secret_key` and include user id, role, email, token type, and expiration [@auth]. `/v1/auth/refresh` accepts only refresh tokens and issues a new pair after the referenced active user is found [@auth].
+Password login is handled by `/v1/auth/token`. It loads the user by email, verifies the bcrypt password hash, rejects inactive accounts, updates `User.last_login_at`, and returns an access/refresh token pair [@auth] [@models]. Tokens are JWTs signed with `settings.secret_key` and include user id, role, email, token type, and expiration [@auth]. `/v1/auth/refresh` accepts only refresh tokens and issues a new pair after the referenced active user is found [@auth]. The admin user list displays `last_login_at` for admin and superuser operators; accounts that have not logged in since the column existed render an empty value [@users] [@screen-users].
 
 Authenticated dependencies try `X-API-Key` before Bearer tokens [@dependencies]. API keys must start with `ktn_`; the dependency looks up active candidates by stored prefix, bcrypt-checks the full supplied key, rejects expired keys, updates `last_used_at`, and returns the owning active user [@dependencies]. API-key management endpoints generate 192 bits of random hex, show the full key only in the creation response, and store only its bcrypt hash plus display prefix [@api-keys].
 

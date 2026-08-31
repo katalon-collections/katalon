@@ -3,6 +3,9 @@ title: "Kubernetes Helm Chart (Starter, Bring-Your-Own-Ops)"
 summary: "What the charts/katalon Helm chart covers, how it maps to docker-compose.yml, and the known pitfalls before running real traffic through it."
 topics: [operations, deployment, kubernetes]
 sources:
+  - id: agents
+    type: file
+    path: AGENTS.md
   - id: chart
     type: file
     path: charts/katalon/Chart.yaml
@@ -29,7 +32,7 @@ sources:
     path: docker/nginx.conf
 ---
 
-`charts/katalon/` is a proof-of-concept Helm chart, not the production deployment path. Katalon's fixed deployment architecture is Docker Compose, distributed via `katalon-cli` [CLAUDE.md]. This chart exists so an operator with their own Kubernetes expertise has a starting point, not a supported alternative — see [Production Deployment](production-deployment) for the actual production path.
+`charts/katalon/` is a proof-of-concept Helm chart, not the production deployment path [@chart]. Katalon's fixed deployment architecture is Docker Compose, distributed via `katalon-cli` [@agents]. This chart exists so an operator with their own Kubernetes expertise has a starting point, not a supported alternative — see [Production Deployment](production-deployment) for the actual production path.
 
 ## Service Mapping
 
@@ -39,7 +42,7 @@ Images are referenced by repo/tag from `values.image.registry`; the chart does n
 
 ## Known Pitfalls
 
-**Cantaloupe has no auth gate.** The production compose stack gates `/iiif/` behind an nginx `auth_request` so private (`is_public: false`) media isn't served unauthenticated — see the media-visibility work in `docker/nginx.prod.conf`. The Helm chart's `Ingress` routes `/iiif/` straight to the Cantaloupe service with no equivalent gate [@chart-ingress] [@chart-notes]. Do not point this chart at an instance with non-public media without adding an `auth-url` annotation (nginx-ingress) or an `oauth2-proxy`/authenticating sidecar in front of Cantaloupe first.
+**Cantaloupe has no auth gate.** The production-like Compose stack gates `/iiif/` behind an nginx `auth_request` so private (`is_public: false`) media isn't served unauthenticated; the route is in `docker/nginx.conf` [@nginx-conf]. The Helm chart's `Ingress` routes `/iiif/` straight to the Cantaloupe service with no equivalent gate [@chart-ingress] [@chart-notes]. Do not point this chart at an instance with non-public media without adding an `auth-url` annotation (nginx-ingress) or an `oauth2-proxy`/authenticating sidecar in front of Cantaloupe first.
 
 **Migration timing.** Migrations run as an `api` Deployment initContainer (`wait-for-db` then `alembic upgrade head`) rather than a Helm pre-install hook, because pre-install hooks fire before any chart-managed resource — including the `db` StatefulSet — exists, which would make a hook-based migration job fail DNS resolution on first install [@chart-api].
 

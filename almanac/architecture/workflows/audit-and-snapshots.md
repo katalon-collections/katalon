@@ -27,6 +27,9 @@ sources:
   - id: occurrences-api
     type: file
     path: backend/src/katalon/api/v1/occurrences.py
+  - id: seed-demo
+    type: file
+    path: backend/scripts/seed_demo.py
   - id: optimistic-tests
     type: file
     path: backend/tests/test_optimistic_locking.py
@@ -46,6 +49,8 @@ The global audit endpoint filters by record type, record id, user id, action, an
 ## Changed Field Payloads
 
 Create and delete actions often write an empty `changed_fields` object, while update actions store old and new values chosen by each endpoint [@audit-service] [@objects-api]. Object updates record old idno, object type, collection status, status, and metadata, then record new object type, collection status, status, and metadata [@objects-api]. Procedure updates record old scalar fields and metadata, then store the validated `ProcedureRead` output as the new state.
+
+The demo seed script bypasses HTTP CRUD endpoints, so it explicitly calls `log_change` after flushing seeded places, entities, occurrences, and objects. It chooses an existing admin or superuser as `user_id` and writes `create` actions without `changed_fields`, matching the endpoint create pattern while keeping seeded records visible in the Audit tab [@seed-demo] [@audit-service].
 
 Publishing writes an action named `publish` with `changed_fields` set to the new public status through the publish service, and procedure completion writes one audit entry for the procedure plus one object update entry for every linked object whose collection status changes. Those audit rows describe what happened; they are not the mechanism that restores state.
 
