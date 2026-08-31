@@ -9,7 +9,7 @@
 #                                nicht haben (z.B. neues Compose-Template-Feld).
 # requires                    – Fremdservice-Versionsanforderungen, ändert sich selten.
 
-compose_revision = 1
+compose_revision = 2
 minimum_installer_version = "0.1.0"
 
 [requires]

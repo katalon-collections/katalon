@@ -2,8 +2,8 @@
   "$schema": "./features.schema.json",
   "meta": {
     "title": "Katalon – Feature List",
-    "version": "1.0.0",
-    "generated": "2026-08-17",
+    "version": "1.1.0",
+    "generated": "2026-08-31",
     "description": "Vollständige Feature-Liste für das Katalon Metadata Management System, gruppiert nach Domänen von High-Level bis Low-Level."
   },
   "domains": [
@@ -110,6 +110,12 @@
               "name": "Client-seitige Formularvalidierung",
               "status": "done",
               "details": ["Pflichtfeld-Prüfung für alle Feldtypen", "Fehler-Banner mit konkreten Meldungen"]
+            },
+            {
+              "id": "records.crud.softdelete",
+              "name": "Soft-Delete, Papierkorb & Purge",
+              "status": "done",
+              "details": ["Löschen setzt deleted_at statt Hard-Delete (Object/Entity/Place/Occurrence)", "Restore- & Trash-Endpoints", "Vorgänge: Archivieren statt Soft-Delete", "Tombstones (410 Gone) für ehemals öffentliche Records", "Konfigurierbare Purge-Retention + Celery-Purge-Job"]
             }
           ]
         }
@@ -130,13 +136,13 @@
               "id": "schema.definitions.types",
               "name": "Feldtypen",
               "status": "done",
-              "details": ["text", "textarea", "richtext", "number", "date", "boolean", "geo", "vocab (kontrolliertes Vokabular)", "vocab_free (freies Vokabular)", "authority (Normdaten)", "relation", "group (Containerfeld)", "pid (Persistent Identifier)"]
+              "details": ["text", "textarea", "richtext (WYSIWYG-Editor Tiptap, speichert Markdown)", "number", "date", "boolean", "geo", "vocab (kontrolliertes Vokabular)", "vocab_free (freies Vokabular)", "authority (Normdaten)", "relation", "group (Containerfeld)", "pid (Persistent Identifier)", "url (Link mit optionalem Titel, klickbar in Admin & Portal)"]
             },
             {
               "id": "schema.definitions.properties",
               "name": "Feldeigenschaften",
               "status": "done",
-              "details": ["is_required", "is_repeatable", "is_searchable", "is_facet", "show_in_detail", "sort_order", "settings (feldtyp-spezifisch)", "default_value", "admin_only (nur Admins editierbar)", "is_translatable (übersetzbare Text-/Rich-Text-Felder)"]
+              "details": ["is_required", "is_repeatable", "is_searchable", "is_facet", "show_in_detail", "is_public (öffentliche Sichtbarkeit im Portal)", "sort_order", "settings (feldtyp-spezifisch)", "default_value", "admin_only (nur Admins editierbar)", "is_translatable (übersetzbare Text-/Rich-Text-Felder)"]
             },
             {
               "id": "schema.definitions.labels",
@@ -393,21 +399,21 @@
           "children": [
             {
               "id": "vocab.authorities.adapters",
-              "name": "6 Authority-Adapter",
+              "name": "7 Authority-Adapter",
               "status": "done",
-              "details": ["GND (lobid.org)", "Geonames", "VIAF", "Wikidata (SPARQL, konfigurierbarer User-Agent)", "Getty TGN (SPARQL)", "ICONCLASS"]
+              "details": ["GND (lobid.org)", "Geonames", "VIAF", "Wikidata (SPARQL, konfigurierbarer User-Agent)", "Getty TGN (SPARQL)", "Getty AAT (SPARQL)", "ICONCLASS"]
             },
             {
               "id": "vocab.authorities.plugin",
               "name": "Plugin-Architektur",
               "status": "done",
-              "details": ["AuthoritySource(ABC) mit search()/fetch()", "DB-Registry mit Lazy Loading", "Cache-Invalidierung", "GET /v1/authorities/, /search, /fetch"]
+              "details": ["AuthoritySource(ABC) mit search()/fetch()", "DB-Registry mit Lazy Loading", "Cache-Invalidierung", "GET /v1/authorities/, /search, /fetch", "Admin-Einstellungsseite „Normdatenquellen“ mit Aktivieren/Deaktivieren und Verbindungstest"]
             },
             {
               "id": "vocab.authorities.records",
               "name": "Normdaten an Records (AuthorityInput)",
               "status": "done",
-              "details": ["Autocomplete-Lookup im Formular", "Von Normdaten übernehmen per Klick", "Geteilte AuthorityInput-Komponente"]
+              "details": ["Autocomplete-Lookup im Formular", "Von Normdaten übernehmen per Klick", "Geteilte AuthorityInput-Komponente", "Eingetragene Normdaten verlinken im Admin direkt auf den öffentlichen Datensatz"]
             },
             {
               "id": "vocab.authorities.terms",
@@ -466,7 +472,7 @@
               "id": "media.iiif.cantaloupe",
               "name": "Cantaloupe IIIF Image Server",
               "status": "done",
-              "details": ["Tile-Generierung via Celery-Task", "info.json-Aufruf zur Dimensionsermittlung", "FilesystemSource-Konfiguration", "Korrekte https://-URLs hinter Reverse Proxy", "Health-Check beim API-Start"]
+              "details": ["Tile-Generierung via Celery-Task", "info.json-Aufruf zur Dimensionsermittlung", "FilesystemSource-Konfiguration", "Korrekte https://-URLs hinter Reverse Proxy", "Health-Check beim API-Start", "Pyramid-TIFF-Ableitung beim Upload, damit Zoom-/Tile-Anfragen nicht das Quellbild dekodieren (#333)"]
             },
             {
               "id": "media.iiif.manifest",
@@ -563,14 +569,21 @@
               "id": "search.portal.results",
               "name": "Suchergebnisse mit Facetten",
               "status": "done",
-              "details": ["Facettiertes Browsing", "Windowed Pagination mit Ellipsis", "Typ-Icons"]
+              "details": ["Facettiertes Browsing", "Zahlenfacetten als Von/Bis-Bereich mit Schiebereglern", "Mehrfach-Auswahl innerhalb einer Facette", "Windowed Pagination mit Ellipsis", "Typ-Icons", "Zusammenfassung aktiver Suchbedingungen", "Typ-Badge pro Treffer zusätzlich zum Untertitel"]
             },
             {
               "id": "search.portal.config",
-              "name": "Portal-Konfiguration (geplant)",
+              "name": "Portal-Facettenkonfiguration",
               "level": "low",
-              "status": "planned",
-              "details": ["Admin-Screen für sichtbare Felder und Facetten", "portal_config-DB-Tabelle", "Phase 8.1"]
+              "status": "done",
+              "details": ["Anzeige-Sortierung (Trefferzahl/alphabetisch) und anfänglich sichtbare Anzahl global konfigurierbar (Einstellungen → Facetten)", "Backend-Aggregation liefert bis zu 100 Werte pro Facette", "Pro-Feld-Override (sichtbare Felder) bleibt ergänzbar"]
+            },
+            {
+              "id": "search.portal.advanced",
+              "name": "Erweiterte Suche (1.7.0)",
+              "level": "mid",
+              "status": "done",
+              "details": ["Kombinierbare Feldbedingungen mit UND/ODER-Gruppen", "Bis zu zwei Relationsschritte", "Vokabularfelder bieten Begriffe zur Auswahl, freie Vokabularfelder schlagen vor", "Teilbare URL für Suchdefinitionen", "Gemeinsame Ergebnisseite für Schnell- und erweiterte Suche"]
             }
           ]
         },
@@ -610,7 +623,7 @@
               "id": "import.wizard.mapping",
               "name": "Visuelles Spalten-Mapping",
               "status": "done",
-              "details": ["idno-Pseudo-Feld (__idno__)", "Subtyp-Auswahl", "Transform-Pipeline: split, replace, regex_extract, trim, vocab_map, expression (Jinja2)", "Mehrzeilige Transform-Vorschau"]
+              "details": ["idno-Pseudo-Feld (__idno__)", "Subtyp-Auswahl", "Transform-Pipeline: split, replace, regex_extract, trim, vocab_map, expression (Jinja2)", "Mehrzeilige Transform-Vorschau", "Container-Subfelder wählbar, XML-Wiederholungen erzeugen positionsweise Container (1.4.3)"]
             },
             {
               "id": "import.wizard.dryrun",
@@ -660,13 +673,13 @@
               "id": "export.mappings.table",
               "name": "metadata_mappings-Tabelle + API",
               "status": "done",
-              "details": ["/v1/metadata-mappings", "Export-Abschnitt im Schema-Editor"]
+              "details": ["/v1/metadata-mappings", "Export-Bereich im Admin mit Tabellenansicht (Felder × Formate)", "CSV-/JSON-Datendumps je Bestandstyp"]
             },
             {
               "id": "export.mappings.formats",
-              "name": "Export-Format-Stubs",
-              "status": "partial",
-              "details": ["oai_dc (vollständig)", "LIDO (Stub)", "METS/MODS (Stub)"]
+              "name": "Metadaten-Formate als Plugin-Register",
+              "status": "done",
+              "details": ["metadata_formats-Register (analog Authority-Quellen)", "OAI-DC, LIDO und METS/MODS vollständig ab Werk", "Weitere Formate (z. B. DataCite) per DB-Eintrag + Adapterklasse ergänzbar"]
             }
           ]
         },
@@ -680,7 +693,7 @@
               "id": "export.oai.endpoint",
               "name": "OAI-PMH-Endpoint (/oai)",
               "status": "done",
-              "details": ["ListSets, ListRecords, ListIdentifiers, GetRecord", "ResumptionToken", "Dublin Core via generische Mappings", "Status-Filter (nur public)", "503 + Retry-After bei ES-Ausfall"]
+              "details": ["ListSets, ListRecords, ListIdentifiers, GetRecord", "ResumptionToken", "Dublin Core via generische Mappings", "Status-Filter (nur public)", "503 + Retry-After bei ES-Ausfall", "Format nur angeboten/ausgeliefert, wenn mindestens ein Feld gemappt ist (kein Rate-Fallback)"]
             },
             {
               "id": "export.oai.sets",
@@ -695,7 +708,7 @@
           "name": "Persistent Identifiers (PIDs)",
           "level": "mid",
           "status": "done",
-          "details": ["DNB URN PID Adapter", "Mock-Endpoint", "Nur für Object-Records"]
+          "details": ["PID-Felder für ARK und DNB-URN (konfigurierbar per Schema)", "Auto-Vergebung fehlender PIDs beim Veröffentlichen", "ARK lokal geprägt (Test-NAAN 99999), DNB-URN über Mock / Registrar", "Öffentliche ARK-Auflösung über /ark:/<NAAN>/<Suffix> → Portal-Detailseite", "n2t.net als Resolver-URL"]
         }
       ]
     },
@@ -714,13 +727,19 @@
               "id": "rights.auth.jwt",
               "name": "JWT-basierte Auth (jose)",
               "status": "done",
-              "details": ["Access + Refresh Token", "Automatische Token-Erneuerung im Admin", "bcrypt für Passwörter und API-Keys", "E-Mail im JWT-Payload"]
+              "details": ["Access + Refresh Token", "Automatische Token-Erneuerung im Admin", "bcrypt für Passwörter und API-Keys", "E-Mail im JWT-Payload", "Refresh-Token nur als HttpOnly/Secure/SameSite=Strict Cookie, kein localStorage (1.15.4)"]
             },
             {
               "id": "rights.auth.login",
               "name": "Login-Screen + Sitzungsmanagement",
               "status": "done",
-              "details": ["JWT in localStorage", "Automatischer Logout bei 401", "Korrekte Fehlermeldung bei falschen Credentials"]
+              "details": ["Automatischer Logout bei 401", "Korrekte Fehlermeldung bei falschen Credentials", "Letzter Login pro Konto sichtbar"]
+            },
+            {
+              "id": "rights.auth.email",
+              "name": "SMTP-E-Mail-Versand (1.15.0)",
+              "status": "done",
+              "details": ["E-Mail für Staff-Konten mit TLS-Konfiguration", "Sicheres Passwort-Reset", "Ergebnisbenachrichtigungen für Importe und Batch-Bearbeitungen (#86)"]
             }
           ]
         },
@@ -851,10 +870,10 @@
             },
             {
               "id": "customization.portal.facets",
-              "name": "Portal Facet Config (Phase 8.1)",
+              "name": "Portal-Facettenkonfiguration",
               "level": "low",
-              "status": "planned",
-              "details": ["Admin-Screen: sichtbare Felder und Facetten", "portal_config-DB-Tabelle", "Portal liest Konfiguration via /v1/theme"]
+              "status": "done",
+              "details": ["Anzeige-Sortierung und anfänglich sichtbare Anzahl global konfigurierbar (Einstellungen → Facetten, #321)", "Sichtbare-Felder-Override pro Feld bleibt ergänzbar"]
             }
           ]
         },
@@ -935,6 +954,13 @@
           "level": "mid",
           "status": "done",
           "details": ["Vorschaubilder in zugehörigen Objekten", "Markdown-Rendering für lange Textfelder", "Gegenrichtungslabels in Inline-Karten"]
+        },
+        {
+          "id": "portal.staff",
+          "name": "Interne Suche & Mitarbeiter-Login (1.13.0)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Bestehende Katalon-Konten für den Portal-Login nutzbar", "Berechtigte Mitarbeitende sehen interne Records, zusätzliche Schemafelder und interne Suche", "Öffentliche Registrierung bleibt deaktiviert"]
         }
       ]
     },
@@ -950,7 +976,7 @@
           "status": "done",
           "children": [
             {"id": "admin.screens.login", "name": "Login-Screen", "status": "done"},
-            {"id": "admin.screens.list", "name": "ScreenList – Listenansicht aller 5 Typen", "status": "done", "details": ["Pagination", "Status-Filter", "Sticky Action Column", "Subtyp-Filter"]},
+            {"id": "admin.screens.list", "name": "ScreenList – Listenansicht aller 5 Typen", "status": "done", "details": ["Pagination", "Status-Filter", "Sticky Action Column", "Subtyp-Filter", "Spalten sortierbar (ID-Nr./Status/Geändert)", "Aktions-Buttons immer sichtbar"]},
             {"id": "admin.screens.form", "name": "ScreenForm – Dynamisches Eingabeformular", "status": "done", "details": ["Alle Feldtypen", "Formularvarianten-Tabs", "Relationen-Panel", "Vorgangs-Panel", "Audit-Tab", "Snapshot-Tab"]},
             {"id": "admin.screens.schema", "name": "ScreenSchema – Schema-Editor", "status": "done"},
             {"id": "admin.screens.subtype", "name": "ScreenSubtype – Subtyp-Verwaltung", "status": "done"},
@@ -965,6 +991,20 @@
             {"id": "admin.screens.roles", "name": "ScreenUserRoles – Rollenrechte-Matrix (#user-roles)", "status": "done"},
             {"id": "admin.screens.variants", "name": "ScreenFormVariants – Formularvarianten", "status": "done"}
           ]
+        },
+        {
+          "id": "admin.batch",
+          "name": "Massenbearbeitung (1.4.0)",
+          "level": "mid",
+          "status": "done",
+          "details": ["Operationen: Status setzen, Feld setzen/anhängen/leeren, Relation hinzufügen/entfernen", "Auswahl per IDs oder „alle Datensätze dieser Suche“", "Asynchrone Ausführung ab 100 Datensätzen (Celery)", "Audit-Log-Einträge mit batch_job_id"]
+        },
+        {
+          "id": "admin.i18n",
+          "name": "Zweisprachige Admin-Oberfläche (1.10.0)",
+          "level": "low",
+          "status": "done",
+          "details": ["DE/EN für alle Namespaces (i18n/index.ts)", "140+ hartcodierte Strings über useTranslation() ersetzt", "Sprachumschaltung über katalon.ui_language im localStorage"]
         },
         {
           "id": "admin.onboarding",
@@ -1075,8 +1115,8 @@
             {"id": "infra.hardening.ratelimit", "name": "Rate Limiting", "status": "done", "details": ["Search/OAI: 100/min", "Authorities: 60/min"]},
             {"id": "infra.hardening.secrets", "name": "Production Secrets Guard", "status": "done", "details": ["Startup-Guard: SECRET_KEY zu kurz/Default → verweigert", "KATALON_SECRETS_KEY verpflichtend"]},
             {"id": "infra.hardening.broker", "name": "Broker-Resilienz (Redis)", "status": "done", "details": ["Fire-and-forget schluckt Broker-Ausfall", "Job-ID-Pfade liefern 503 statt 500"]},
-            {"id": "infra.hardening.tls", "name": "nginx TLS-Terminierung", "status": "planned"},
-            {"id": "infra.hardening.perf", "name": "Performance-Tests (locust)", "status": "planned"},
+            {"id": "infra.hardening.tls", "name": "nginx TLS-Terminierung", "status": "done", "details": ["Let's-Encrypt-fähige TLS-Sektion im Prod-Compose (443, Zertifikats-Mount)", "Mozilla-Intermediate-Cipher-Suite"]},
+            {"id": "infra.hardening.perf", "name": "Performance-Tests (locust)", "status": "done", "details": ["backend/tests/performance/locustfile.py + README", "Szenarien für öffentliches Portal und authentifizierte Admin-API"]},
             {"id": "infra.hardening.openapi", "name": "OpenAPI-Dokumentation finalisiert", "status": "done", "details": ["Live-Version aus importlib.metadata", "30 Router-Tags mit Beschreibungen", "149 Endpunkte mit summary + responses"]}
           ]
         },
@@ -1085,7 +1125,14 @@
           "name": "CLI-Verwaltungsbefehle",
           "level": "low",
           "status": "done",
-          "details": ["Emergency Admin Password Reset", "First-Run Superuser Bootstrap"]
+          "details": ["Emergency Admin Password Reset", "First-Run Superuser Bootstrap", "DB-Reset mit Admin-Bootstrap", "katalon-manage für Import-Mapping-Templates"]
+        },
+        {
+          "id": "infra.helm",
+          "name": "Helm-Chart (Kubernetes, 1.12.7)",
+          "level": "low",
+          "status": "done",
+          "details": ["charts/katalon als Proof-of-Concept", "Bring-your-own-ops, kein Ersatz für Compose-Produktion", "Dokumentiert unter almanac/guides/operations/kubernetes-helm-chart.md"]
         },
         {
           "id": "infra.snapshots",
