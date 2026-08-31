@@ -14,7 +14,7 @@ from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services import authority_service
-from katalon.services.pid_service import PID_PROVIDERS
+from katalon.services.pid_service import PID_PROVIDERS, available_pid_providers
 from katalon.services.schema_ai_service import schema_chat
 from katalon.services.subtype_service import ensure_subtype_exists
 
@@ -65,7 +65,9 @@ async def _validate_unique_detail_role(
         )
 
 
-async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> None:
+async def _validate_field_settings(
+    db: DBDep, data: FieldDefinitionCreate, existing: FieldDefinition | None = None
+) -> None:
     if (
         data.target_type == "vocabulary_term"
         and data.field_type not in VOCABULARY_TERM_FIELD_TYPES
@@ -98,6 +100,12 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
             raise HTTPException(
                 status_code=422,
                 detail=f"Unbekannter PID-Provider. Erlaubt: {', '.join(PID_PROVIDERS)}.",
+            )
+        current_provider = (existing.settings or {}).get("pid_provider") if existing else None
+        if provider not in available_pid_providers() and provider != current_provider:
+            raise HTTPException(
+                status_code=422,
+                detail="Dieser PID-Provider ist nicht vollständig konfiguriert.",
             )
 
     if data.field_type == "authority":
@@ -410,12 +418,6 @@ async def update_field(
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     _validate_schema_target_type(data.target_type)
-    if data.parent_id:
-        await _validate_parent(db, data.parent_id, data.field_type)
-    else:
-        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
-    await _validate_field_settings(db, data)
-    await _validate_unique_detail_role(db, data, exclude_id=field_id)
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
@@ -424,6 +426,12 @@ async def update_field(
     field = result.scalar_one_or_none()
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
+    if data.parent_id:
+        await _validate_parent(db, data.parent_id, data.field_type)
+    else:
+        await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
+    await _validate_field_settings(db, data, field)
+    await _validate_unique_detail_role(db, data, exclude_id=field_id)
     old_is_facet = field.is_facet
     old_is_public = field.is_public
     old_settings = field.settings or {}

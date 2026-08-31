@@ -57,6 +57,30 @@ Mindestens diese Werte anpassen:
 | `WIKIDATA_USER_AGENT` | Optionaler User-Agent für Wikidata. Leer = automatisch aus `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL`. |
 | `SMTP_*` | Optionaler externer SMTP-Relay für transaktionale E-Mails. Passwort nur als Betreiber-Secret setzen. |
 
+### ARKs einrichten
+
+ARKs werden in Katalon lokal geprägt, aber erst über einen eigenen, bei der
+ARK Alliance registrierten NAAN weltweit auflösbar. Vor der Aktivierung:
+
+1. Einen dauerhaften öffentlichen Domainnamen und `KATALON_BASE_URL` festlegen.
+2. Einen NAAN über das [NAAN-Antragsformular der ARK Alliance](https://arks.org/about/getting-started-implementing-arks/) beantragen.
+3. Im NAAN-Register den lokalen Resolver `https://katalog.example.org/ark:/<NAAN>/` hinterlegen. N2T leitet dann vollständige ARKs an die Instanz weiter.
+
+Danach in `.env` setzen:
+
+```env
+ARK_ENABLED=true
+ARK_NAAN=12345
+ARK_RESOLVER_URL=https://n2t.net/
+ARK_SUFFIX_LENGTH=10
+```
+
+Katalon beantwortet `https://katalog.example.org/ark:/12345/<Suffix>` mit
+einem Redirect auf die aktuelle öffentliche Portal-Detailseite. `ARK_ENABLED`
+schaltet nur neue Vergaben ab; die Auflösung bereits vergebener ARKs bleibt
+aktiv. Der Test-NAAN `99999` ist nicht für Produktionsdaten geeignet und wird
+nicht aufgelöst.
+
 ### SMTP für transaktionale E-Mails
 
 Katalon betreibt keinen eigenen Mailserver. Für Passwort-Reset und spätere Benachrichtigungen wird ein externer SMTP-Relay verwendet. Versand bleibt mit `SMTP_ENABLED=false` deaktiviert, bis Relay und Absender vollständig konfiguriert sind.

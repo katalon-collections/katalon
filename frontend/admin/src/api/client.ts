@@ -834,6 +834,7 @@ export interface AdminConfigRead {
   ai_monthly_global_token_limit: number
   media_default_license_uri: string | null
   media_default_rights_holder: { name: string; uri?: string } | null
+  pid_providers: ('ark' | 'dnb_urn')[]
   ai_secret: {
     has_key: boolean
     updated_at: string | null

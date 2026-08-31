@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from katalon.core.dependencies import DBDep, require_role
 from katalon.core.models import AdminConfig, AIUsageEvent, AppSecret, User
 from katalon.services.ai_service import call_ai_provider, extract_message_content
+from katalon.services.pid_service import available_pid_providers
 from katalon.services.secret_service import AI_API_KEY_SECRET, delete_secret, get_secret, set_secret
 
 router = APIRouter(prefix="/admin/config", tags=["admin"])
@@ -56,6 +57,7 @@ class AdminConfigRead(BaseModel):
     ai_monthly_global_token_limit: int
     media_default_license_uri: str | None
     media_default_rights_holder: dict[str, Any] | None
+    pid_providers: list[str]
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
 
@@ -141,6 +143,7 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         ai_monthly_global_token_limit=config.ai_monthly_global_token_limit,
         media_default_license_uri=config.media_default_license_uri,
         media_default_rights_holder=config.media_default_rights_holder,
+        pid_providers=list(available_pid_providers()),
         ai_secret=SecretStatus(
             has_key=secret_obj is not None,
             updated_at=secret_obj.updated_at if secret_obj is not None else None,

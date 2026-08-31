@@ -28,7 +28,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 DBDep = Annotated[AsyncSession, Depends(get_db)]
 REFRESH_COOKIE = "katalon_refresh_token"
-REFRESH_COOKIE_PATH = "/v1/auth"
+REFRESH_COOKIE_PATH = "/v1/"
 
 
 def hash_password(password: str) -> str:

@@ -46,6 +46,27 @@ class PidMintError(Exception):
     """PID-Minting ist fehlgeschlagen (Konfiguration oder Provider-Fehler)."""
 
 
+def available_pid_providers() -> tuple[str, ...]:
+    """Return providers that can mint a public record PID with this configuration."""
+    providers = []
+    if (
+        settings.ark_enabled
+        and settings.ark_naan.strip()
+        and settings.ark_naan != "99999"
+        and settings.katalon_base_url.strip()
+    ):
+        providers.append("ark")
+    if (
+        settings.dnb_urn_enabled
+        and settings.dnb_urn_namespace.strip()
+        and settings.dnb_urn_username.strip()
+        and settings.dnb_urn_password
+        and settings.katalon_base_url.strip()
+    ):
+        providers.append("dnb_urn")
+    return tuple(providers)
+
+
 def record_portal_url(record_type: str, record_id: uuid.UUID) -> str:
     base = settings.katalon_base_url.rstrip("/")
     if not base:

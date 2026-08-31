@@ -258,7 +258,7 @@ Schlägt die Vergabe fehl, wird die Veröffentlichung abgebrochen.
 
 | Schlüssel | Typ | Beschreibung |
 |---|---|---|
-| `pid_provider` | String | `ark` oder `dnb_urn`. Legt den Vergabedienst fest. |
+| `pid_provider` | String | `ark` oder `dnb_urn`. Legt den Vergabedienst fest. Nur vollständig konfigurierte Dienste sind auswählbar. |
 
 Beispiel:
 ```json
@@ -268,6 +268,10 @@ Beispiel:
 Beispiele:
 - ARK für einen öffentlichen Datensatz
 - DNB-URN für einen veröffentlichten Datensatz
+
+Ist kein Dienst betriebsbereit, steht der Feldtyp `pid` bei neuen Feldern nicht
+zur Auswahl. Bereits vergebene PIDs bleiben sichtbar, auch wenn ihr Dienst
+später abgeschaltet wird.
 
 ---
 

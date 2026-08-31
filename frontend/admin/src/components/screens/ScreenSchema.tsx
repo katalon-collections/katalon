@@ -131,6 +131,7 @@ interface FieldDetailProps {
   error: string | null
   showSubtype: boolean
   authoritySources: AuthoritySource[]
+  pidProviders: ('ark' | 'dnb_urn')[]
   onChange: (form: FieldFormState) => void
   onSave: () => void
   onDelete: () => void
@@ -150,7 +151,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
   return { name: '', label: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
-function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
   const { t } = useTranslation('screenSchema')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
@@ -314,7 +315,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   }, [form.field_type, form.relation_type_vocab, form.relation_target_type, form.target_type])
 
   const isVocabularyTerm = form.target_type === 'vocabulary_term'
-  const fieldTypes = isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES
+  const fieldTypes = (isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES)
+    .filter(type => type !== 'pid' || pidProviders.length > 0 || form.field_type === 'pid')
   const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
   useEffect(() => {
     if (!isNew || form.field_type !== 'authority') return
@@ -358,7 +360,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           </div>
           <div className="field" data-tour="field-type-select">
             <div className="lbl">{t('fieldDetail.fieldType')}</div>
-            <select className="fld" value={form.field_type} onChange={e => set('field_type', e.target.value)}>
+            <select className="fld" value={form.field_type} onChange={e => {
+              const fieldType = e.target.value
+              onChange({ ...form, field_type: fieldType, ...(fieldType === 'pid' && !pidProviders.includes(form.pid_provider as 'ark' | 'dnb_urn') ? { pid_provider: pidProviders[0] ?? '' } : {}) })
+            }}>
               {fieldTypes.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
             </select>
           </div>
@@ -412,8 +417,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <div className="field">
             <div className="lbl">{t('fieldDetail.pidProvider')}</div>
             <select className="fld" value={form.pid_provider} onChange={e => set('pid_provider', e.target.value)}>
-              <option value="dnb_urn">{t('fieldDetail.pidProviderDnbUrn')}</option>
-              <option value="ark">{t('fieldDetail.pidProviderArk')}</option>
+              {(['dnb_urn', 'ark'] as const).filter(provider => pidProviders.includes(provider) || provider === form.pid_provider).map(provider => (
+                <option key={provider} value={provider} disabled={!pidProviders.includes(provider)}>
+                  {provider === 'ark' ? t('fieldDetail.pidProviderArk') : t('fieldDetail.pidProviderDnbUrn')}
+                </option>
+              ))}
             </select>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.pidProviderHint')}</div>
           </div>
@@ -993,6 +1001,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [showImport, setShowImport] = useState(false)
   const [showAiAssist, setShowAiAssist] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(false)
+  const [pidProviders, setPidProviders] = useState<('ark' | 'dnb_urn')[]>([])
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -1034,7 +1043,13 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
 
   useEffect(() => {
     authority.list().then(setAuthoritySources).catch(() => setAuthoritySources([]))
-    adminConfig.get().then(c => setAiEnabled(c.ai_enabled)).catch(() => setAiEnabled(false))
+    adminConfig.get().then(c => {
+      setAiEnabled(c.ai_enabled)
+      setPidProviders(c.pid_providers)
+    }).catch(() => {
+      setAiEnabled(false)
+      setPidProviders([])
+    })
   }, [])
 
   const loadFields = useCallback(() => {
@@ -1072,7 +1087,9 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   function openNew() {
     setIsNew(true)
     setActiveFieldId(null)
-    setForm(emptyForm(activeType, fields.length, activeSubtype))
+    const next = emptyForm(activeType, fields.length, activeSubtype)
+    if (pidProviders.length) next.pid_provider = pidProviders[0]
+    setForm(next)
     setSaveError(null)
   }
 
@@ -1322,6 +1339,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               error={saveError}
               showSubtype={hasSubtypes && activeType !== 'vocabulary_term'}
               authoritySources={authoritySources}
+              pidProviders={pidProviders}
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}

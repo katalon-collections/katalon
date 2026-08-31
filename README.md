@@ -183,18 +183,18 @@ Wichtige Endpunkte:
 | GET            | `/v1/vocabularies`             | Vokabulare auflisten                                       |
 | POST           | `/v1/vocabularies/{id}/import` | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
 | GET            | `/v1/search`                   | Volltext- und Facettensuche                                |
-| POST           | `/v1/pids/urn/register`        | URN via DNB-API registrieren (PID-Feld)                    |
+| POST           | `/v1/pids/mint`                | ARK oder DNB-URN über den PID-Feldanbieter vergeben         |
 | GET            | `/v1/authorities/search`       | Normdaten-Suche                                            |
 | GET            | `/oai`                         | OAI-PMH Endpoint                                           |
 | GET            | `/v1/portal/config`            | Portal-Konfiguration                                       |
 | POST           | `/v1/portal/logo`              | Logo hochladen                                             |
 | GET            | `/v1/audit`                    | Audit-Log abrufen                                          |
 
-### DNB-URN (PID)
+### Persistente Identifier (PID)
 
-- URN-Vergabe ist per Umgebungsvariablen konfigurierbar (`DNB_URN_*` in `.env.example`).
-- URN-Registrierung ist derzeit auf den Record-Typ **`object`** eingeschränkt.
-- Für lokale Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
+- PID-Felder verwenden ARK oder DNB-URN; sie sind erst in der Schema-Verwaltung auswählbar, wenn ihr Dienst vollständig konfiguriert ist.
+- ARKs brauchen einen registrierten produktiven NAAN und eine dauerhafte `KATALON_BASE_URL`; die Instanz löst sie unter `/ark:/<NAAN>/<Suffix>` auf.
+- Für lokale DNB-URN-Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
 
 ## Admin-UI
 

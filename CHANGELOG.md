@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.13] - 2026-08-31
+
+### Added
+- Öffentlich konfigurierte ARKs lösen über den Instanzpfad `ark:/<NAAN>/<Suffix>` zuverlässig auf die aktuelle Portal-Detailseite auf.
+
+### Changed
+- PID-Felder stehen in der Schema-Verwaltung nur bereit, wenn mindestens ein vollständig konfigurierter Provider verfügbar ist.
+
 ## [1.15.12] - 2026-08-31
 
 ### Fixed
