@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-api
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-api
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: {{ .Values.postgres.image }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ .Release.Name }}-db -U {{ .Release.Name }}; do sleep 2; done
+        - name: migrate
+          image: {{ include "katalon.image" (dict "root" $ "repo" "katalon-backend") }}
+          command: ["alembic", "upgrade", "head"]
+          env:
+            {{- include "katalon.envCommon" . | nindent 12 }}
+      containers:
+        - name: api
+          image: {{ include "katalon.image" (dict "root" $ "repo" "katalon-backend") }}
+          env:
+            {{- include "katalon.envCommon" . | nindent 12 }}
+            - name: GEONAMES_USERNAME
+              value: {{ .Values.env.geonamesUsername | quote }}
+            - name: CORS_ORIGINS
+              value: {{ .Values.env.corsOrigins | quote }}
+            - name: MAX_UPLOAD_SIZE_MB
+              value: {{ .Values.env.maxUploadSizeMb | quote }}
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: media
+              mountPath: /var/lib/katalon/media
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+spec:
+  selector:
+    app: {{ .Release.Name }}-api
+  ports:
+    - port: 8000

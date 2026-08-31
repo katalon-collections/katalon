@@ -25,6 +25,8 @@ For local browser checks, read [Ports And Routing](../../reference/operations/po
 
 For production or production-like deploys, start with [Production Deployment](production-deployment), then use [Docker Compose Surfaces](../../reference/operations/docker-compose-surfaces) when compose files, service ports, mounts, or overrides are part of the change. If the work touches Admin build paths, nginx routing, or Vite base configuration, run [Admin Deploy Verification](admin-deploy-verification) before treating the deployment as done.
 
+For a Kubernetes deployment instead of Compose, [Kubernetes Helm Chart](kubernetes-helm-chart) covers the starter chart under `charts/katalon/`, its service mapping to `docker-compose.yml`, and known pitfalls (Cantaloupe auth gate, media RWX storage, scaling limits) — it is a bring-your-own-ops proof of concept, not the supported production path.
+
 For secrets and startup gates, read [Environment And Secrets](../../reference/operations/environment-and-secrets). That page is the lookup surface for required environment variables, first-run admin behavior, production secret checks, and the test-only `KATALON_SECRETS_KEY` requirement.
 
 ## Protect Durable State

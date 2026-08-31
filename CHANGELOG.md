@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.7] - 2026-08-31
+
+### Added
+- Starter Helm-Chart (`charts/katalon/`) für Kubernetes-Deployment: Proof-of-concept, bring-your-own-ops, kein Ersatz für die Docker-Compose-Produktionslinie. Dokumentiert unter `almanac/guides/operations/kubernetes-helm-chart.md`.
+
 ## [1.12.6] - 2026-08-31
 
 ### Added

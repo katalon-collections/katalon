@@ -1,0 +1,63 @@
+# Starter values. Build+push your own images first — this chart does not build from source.
+# Bring-your-own-ops: no HA, no autoscaling, no external secret manager wired up.
+
+image:
+  registry: ""          # e.g. ghcr.io/you
+  tag: "1.12.6"
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  className: ""
+  host: katalon.local
+  tls: []                # [{secretName: katalon-tls, hosts: [katalon.local]}]
+
+secrets:
+  # Fill these in via --set or a values-prod.yaml (do not commit real values).
+  postgresPassword: "changeme"
+  secretKey: "changeme-32-chars-min-xxxxxxxxxx"
+  katalonSecretsKey: "changeme-32-chars-min-xxxxxxxxxx"
+
+env:
+  geonamesUsername: "demo"
+  corsOrigins: '["http://katalon.local"]'
+  maxUploadSizeMb: "200"
+  cantaloupePublicUrl: "http://katalon.local"
+
+postgres:
+  image: postgis/postgis:16-3.4
+  storage: 20Gi
+  storageClassName: ""
+
+redis:
+  image: redis:7-alpine
+
+elasticsearch:
+  image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+  heapSize: 512m
+  storage: 10Gi
+  storageClassName: ""
+
+cantaloupe:
+  image: islandora/cantaloupe:main
+  mediaStorage: 50Gi
+  storageClassName: ""
+
+api:
+  replicas: 1
+  resources: {}
+
+worker:
+  replicas: 1
+  resources: {}
+
+beat:
+  resources: {}
+
+admin:
+  replicas: 1
+  resources: {}
+
+portal:
+  replicas: 1
+  resources: {}

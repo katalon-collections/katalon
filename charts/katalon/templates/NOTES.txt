@@ -1,0 +1,18 @@
+Katalon deployed as release "{{ .Release.Name }}".
+
+Ingress host: {{ .Values.ingress.host }}
+(add it to /etc/hosts or your DNS if testing locally, e.g. via OrbStack's k8s)
+
+Known gaps vs. the docker-compose deployment (bring-your-own-ops):
+  - No nginx auth_request gate for private media / Cantaloupe — the /iiif/
+    path here is open, unlike the production compose stack. Do not use this
+    chart for anything with non-public media without adding that gate
+    (e.g. an oauth2-proxy / auth-url ingress annotation).
+  - No scheduled backup job (compose has a `backup` sidecar container).
+  - No autoscaling / PodDisruptionBudget / NetworkPolicy.
+  - Elasticsearch and Postgres run as single-replica StatefulSets with no
+    HA — fine for a demo, not for production. Swap in a proper subchart
+    (bitnami/postgresql, elastic/eck-operator) for real deployments.
+  - Images referenced by {{ .Values.image.registry }}/katalon-{backend,worker,admin,portal}
+    are not built by this chart — build and push them yourself from
+    docker/Dockerfile.* first.

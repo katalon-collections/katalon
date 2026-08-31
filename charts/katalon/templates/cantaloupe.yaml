@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-media
+spec:
+  accessModes: ["ReadWriteMany"]
+  {{- if .Values.cantaloupe.storageClassName }}
+  storageClassName: {{ .Values.cantaloupe.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.cantaloupe.mediaStorage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-cantaloupe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-cantaloupe
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-cantaloupe
+    spec:
+      containers:
+        - name: cantaloupe
+          image: {{ .Values.cantaloupe.image }}
+          env:
+            - name: CANTALOUPE_SOURCE_STATIC
+              value: FilesystemSource
+            - name: CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY
+              value: BasicLookupStrategy
+            - name: CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX
+              value: /var/lib/cantaloupe/images/
+            - name: CANTALOUPE_BASE_URI
+              value: {{ .Values.env.cantaloupePublicUrl | quote }}
+            - name: CANTALOUPE_CACHE_SERVER_DERIVATIVE
+              value: FilesystemCache
+            - name: CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED
+              value: "true"
+            - name: CANTALOUPE_FILESYSTEMCACHE_PATHNAME
+              value: /var/lib/cantaloupe/cache
+            - name: CANTALOUPE_PROCESSOR_MANUALSELECTIONSTRATEGY_JPG
+              value: Java2dProcessor
+          ports:
+            - containerPort: 8182
+          volumeMounts:
+            - name: media
+              mountPath: /var/lib/cantaloupe/images
+              readOnly: true
+            - name: cache
+              mountPath: /var/lib/cantaloupe/cache
+          readinessProbe:
+            httpGet:
+              path: /iiif/3
+              port: 8182
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-media
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-cantaloupe
+spec:
+  selector:
+    app: {{ .Release.Name }}-cantaloupe
+  ports:
+    - port: 8182

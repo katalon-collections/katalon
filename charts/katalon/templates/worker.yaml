@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-worker
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-worker
+    spec:
+      containers:
+        - name: worker
+          image: {{ include "katalon.image" (dict "root" $ "repo" "katalon-worker") }}
+          env:
+            {{- include "katalon.envCommon" . | nindent 12 }}
+          volumeMounts:
+            - name: media
+              mountPath: /var/lib/katalon/media
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-media
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-beat
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-beat
+    spec:
+      containers:
+        - name: beat
+          image: {{ include "katalon.image" (dict "root" $ "repo" "katalon-worker") }}
+          command: ["celery", "-A", "katalon.workers.celery_app", "beat", "--loglevel=info"]
+          env:
+            {{- include "katalon.envCommon" . | nindent 12 }}
+          resources: {{- toYaml .Values.beat.resources | nindent 12 }}
