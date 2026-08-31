@@ -33,10 +33,12 @@ from katalon.core.models import (
     Occurrence,
     Place,
     RecordSubtype,
+    User,
     Vocabulary,
     VocabularyTerm,
 )
 from katalon.database import AsyncSessionLocal
+from katalon.services.audit_service import log_change
 from katalon.services.relation_service import sync_schema_relations
 from katalon.workers.index_tasks import reindex_all_task
 from katalon.workers.media_tasks import generate_iiif_tiles
@@ -208,6 +210,10 @@ async def add_field(
 
 async def main() -> None:
     async with AsyncSessionLocal() as db:
+        admin_user_id = (
+            await db.execute(select(User.id).where(User.role.in_(("admin", "superuser"))).limit(1))
+        ).scalar_one()
+
         # -------------------------------------------------------------- record subtypes
         # object_type/entity_type/place_type/occurrence_type values used below must have a
         # matching RecordSubtype row, or the admin UI refuses to show any schema fields
@@ -435,6 +441,8 @@ async def main() -> None:
             db.add(p)
             places[idno] = p
         await db.flush()
+        for p in places.values():
+            await log_change(db, record_type="place", record_id=p.id, user_id=admin_user_id, action="create")
 
         # ============================================================== records: entities
         entities_data = [
@@ -470,6 +478,8 @@ async def main() -> None:
             db.add(e)
             entities[idno] = e
         await db.flush()
+        for e in entities.values():
+            await log_change(db, record_type="entity", record_id=e.id, user_id=admin_user_id, action="create")
 
         # ============================================================== records: occurrences
         occ_data = [
@@ -501,6 +511,8 @@ async def main() -> None:
             db.add(o)
             occurrences[idno] = o
         await db.flush()
+        for occ in occurrences.values():
+            await log_change(db, record_type="occurrence", record_id=occ.id, user_id=admin_user_id, action="create")
 
         # ============================================================== records: objects (20)
         photographer = entities["schroeter-atelier"]
@@ -561,6 +573,8 @@ async def main() -> None:
             db.add(o)
             objects[o.idno] = o
         await db.flush()
+        for obj in objects.values():
+            await log_change(db, record_type="object", record_id=obj.id, user_id=admin_user_id, action="create")
         await db.commit()
 
         await seed_demo_images(db, objects)
