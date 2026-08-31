@@ -88,6 +88,54 @@ function resultSubtitle(
     .join(' · ')
 }
 
+function FacetPanel({ label, buckets, active, onSelect, initialCount }: {
+  label: string
+  buckets: FacetBucket[]
+  active: string[]
+  onSelect: (v: string) => void
+  initialCount: number
+}) {
+  const { t } = useI18n()
+  const [expanded, setExpanded] = useState(false)
+  if (!buckets.length) return null
+  const activeOnly = buckets.filter(b => active.includes(b.value) && !buckets.slice(0, initialCount).includes(b))
+  const visible = expanded ? buckets : [...buckets.slice(0, initialCount), ...activeOnly]
+  const hiddenCount = buckets.length - visible.length
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <h3>{label}</h3>
+      {visible.map(b => (
+        <button
+          type="button"
+          key={b.value}
+          className="facet-item"
+          onClick={() => onSelect(b.value)}
+          aria-pressed={active.includes(b.value)}
+          style={{ fontWeight: active.includes(b.value) ? 600 : undefined }}
+        >
+          <span>{typeLabel(b.value)}</span>
+          <span className="ct">{b.count}</span>
+        </button>
+      ))}
+      {hiddenCount > 0 && (
+        <button type="button" className="facet-more" onClick={() => setExpanded(true)}>
+          {t('search.showMore', { count: hiddenCount })}
+        </button>
+      )}
+      {expanded && buckets.length > initialCount && (
+        <button type="button" className="facet-more" onClick={() => setExpanded(false)}>
+          {t('search.showLess')}
+        </button>
+      )}
+      {active.length > 0 && (
+        <button type="button" className="facet-reset" onClick={() => onSelect('')}>
+          {t('search.all')}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -104,6 +152,7 @@ export function SearchPage() {
   const [error, setError] = useState('')
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
+  const [facetInitialCount, setFacetInitialCount] = useState(10)
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const { locale, t } = useI18n()
   const facetTypesKey = [...new Set(
@@ -125,6 +174,7 @@ export function SearchPage() {
       .then(c => {
         setFacetConfig(c.facet_fields ?? {})
         setSubtitleConfig(c.subtitle_fields ?? {})
+        setFacetInitialCount(c.facet_initial_count || 10)
       })
       .catch(() => {})
   }, [])
@@ -294,38 +344,6 @@ export function SearchPage() {
   const statusFacet: FacetBucket[] = data?.facets?.['by_status'] ?? []
   const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
 
-  function FacetPanel({ label, buckets, active, onSelect }: {
-    label: string
-    buckets: FacetBucket[]
-    active: string[]
-    onSelect: (v: string) => void
-  }) {
-    if (!buckets.length) return null
-    return (
-      <div style={{ marginBottom: 20 }}>
-        <h3>{label}</h3>
-        {buckets.map(b => (
-          <button
-            type="button"
-            key={b.value}
-            className="facet-item"
-            onClick={() => onSelect(b.value)}
-            aria-pressed={active.includes(b.value)}
-            style={{ fontWeight: active.includes(b.value) ? 600 : undefined }}
-          >
-            <span>{typeLabel(b.value)}</span>
-            <span className="ct">{b.count}</span>
-          </button>
-        ))}
-        {active.length > 0 && (
-          <button type="button" className="facet-reset" onClick={() => onSelect('')}>
-            {t('search.all')}
-          </button>
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="container page">
       {advancedQuery && (
@@ -366,6 +384,7 @@ export function SearchPage() {
               buckets={typesFacet}
               active={typeFilt ? [typeFilt] : []}
               onSelect={v => setFilter('type', v)}
+              initialCount={facetInitialCount}
             />
           )}
           {systemFacets.includes('status') && (
@@ -374,6 +393,7 @@ export function SearchPage() {
               buckets={statusFacet}
               active={statusFilt ? [statusFilt] : []}
               onSelect={v => setFilter('status', v)}
+              initialCount={facetInitialCount}
             />
           )}
           {configuredMetadataFacets(facetConfig, effectiveType).map(field => {
@@ -389,6 +409,7 @@ export function SearchPage() {
                 buckets={buckets}
                 active={metaFilters[field] ?? []}
                 onSelect={v => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')}
+                initialCount={facetInitialCount}
               />
             )
           })}
@@ -399,18 +420,21 @@ export function SearchPage() {
                 buckets={data?.facets?.['related_entities'] ?? []}
                 active={relEntity ? [relEntity] : []}
                 onSelect={v => setRelFilter('rel_entity', v)}
+                initialCount={facetInitialCount}
               />
               <FacetPanel
                 label={t('search.relatedPlaces')}
                 buckets={data?.facets?.['related_places'] ?? []}
                 active={relPlace ? [relPlace] : []}
                 onSelect={v => setRelFilter('rel_place', v)}
+                initialCount={facetInitialCount}
               />
               <FacetPanel
                 label={t('search.relatedOccurrences')}
                 buckets={data?.facets?.['related_occurrences'] ?? []}
                 active={relOccurrence ? [relOccurrence] : []}
                 onSelect={v => setRelFilter('rel_occurrence', v)}
+                initialCount={facetInitialCount}
               />
             </>
           )}

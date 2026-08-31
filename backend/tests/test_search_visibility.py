@@ -373,8 +373,28 @@ async def test_search_documents_filters_and_aggregates_inherited_facets(monkeypa
     assert aggregation["global"] == {}
     assert selected_values not in aggregation["aggs"]["filtered"]["filter"]["bool"]["filter"]
     assert aggregation["aggs"]["filtered"]["aggs"]["values"] == {
-        "terms": {"field": f"facet_{field}", "size": 20}
+        "terms": {"field": f"facet_{field}", "size": 100, "order": {"_count": "desc"}}
     }
+
+
+@pytest.mark.asyncio
+async def test_search_documents_facet_sort_alpha_orders_by_key(monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}})()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+
+    await elasticsearch.search_documents(
+        None, "object", "public", 0, 20,
+        facet_fields=["classification"], facet_sort="alpha",
+    )
+
+    values_agg = captured["body"]["aggs"]["meta_classification"]["aggs"]["filtered"]["aggs"]["values"]
+    assert values_agg["terms"]["order"] == {"_key": "asc"}
 
 
 @pytest.mark.asyncio

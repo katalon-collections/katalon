@@ -147,6 +147,8 @@ export interface PortalConfig {
   color_tokens: Record<string, string>
   supported_languages: string[]
   detail_sidebar_position: 'left' | 'right'
+  facet_sort: 'count' | 'alpha'
+  facet_initial_count: number
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

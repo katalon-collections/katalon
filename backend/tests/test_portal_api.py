@@ -373,6 +373,33 @@ async def test_portal_config_preserves_system_facet_visibility(
 
 
 @pytest.mark.asyncio
+async def test_portal_config_returns_facet_display_settings() -> None:
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = PortalConfig(facet_sort="alpha", facet_initial_count=25)
+    facet_result = MagicMock()
+    facet_result.all.return_value = []
+    admin_result = MagicMock()
+    admin_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.side_effect = [config_result, facet_result, admin_result]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/portal/config")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["facet_sort"] == "alpha"
+    assert body["facet_initial_count"] == 25
+
+
+@pytest.mark.asyncio
 async def test_portal_has_no_feedback_write_endpoint() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post("/portal/v1/feedback", json={})

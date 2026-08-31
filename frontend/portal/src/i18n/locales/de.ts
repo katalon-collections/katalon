@@ -34,6 +34,8 @@ export default {
   'search.resultsType': ' · {type}',
   'search.resultsAllTypes': ' · Alle Typen',
   'search.all': 'Alle',
+  'search.showMore': '{count} weitere anzeigen',
+  'search.showLess': 'Weniger anzeigen',
   'search.typeFacet': 'Typ',
   'search.statusFacet': 'Status',
   'search.relatedEntities': 'Personen/Org.',

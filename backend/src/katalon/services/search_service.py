@@ -512,6 +512,7 @@ async def search(
     record_types: tuple[str, ...] | None = None,
     subtitle_fields: dict[str, list[str]] | None = None,
     advanced_filter: dict[str, Any] | None = None,
+    facet_sort: str = "count",
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -523,6 +524,7 @@ async def search(
         active_objects_only=active_objects_only,
         record_types=record_types,
         advanced_filter=advanced_filter,
+        facet_sort=facet_sort,
     )
 
     hits = raw.get("hits", {})

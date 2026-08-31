@@ -45,6 +45,8 @@ _DEFAULTS = {
     "browse_enabled_types": ["object", "entity", "place", "occurrence"],
     "color_tokens": {},
     "detail_sidebar_position": "right",
+    "facet_sort": "count",
+    "facet_initial_count": 10,
 }
 
 
@@ -62,6 +64,8 @@ class PortalConfigRead(BaseModel):
     color_tokens: dict[str, Any]
     detail_sidebar_position: Literal["left", "right"] = "right"
     supported_languages: list[str] = ["de", "en"]
+    facet_sort: Literal["count", "alpha"] = "count"
+    facet_initial_count: int = 10
 
     class Config:
         from_attributes = True
@@ -80,6 +84,8 @@ class PortalConfigUpdate(BaseModel):
     placeholder_image_url: str | None = None
     color_tokens: dict[str, Any] | None = None
     detail_sidebar_position: Literal["left", "right"] | None = None
+    facet_sort: Literal["count", "alpha"] | None = None
+    facet_initial_count: int | None = Field(default=None, ge=1, le=100)
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:

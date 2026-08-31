@@ -15,6 +15,8 @@ const DEFAULT: PortalConfig = {
   color_tokens: {},
   supported_languages: ['de', 'en'],
   detail_sidebar_position: 'right',
+  facet_sort: 'count',
+  facet_initial_count: 10,
 }
 
 // Module-level cache so multiple components share one fetch per page load

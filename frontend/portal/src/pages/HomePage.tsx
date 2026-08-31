@@ -18,6 +18,8 @@ const DEFAULT_CONFIG: PortalConfig = {
   color_tokens: {},
   supported_languages: ['de', 'en'],
   detail_sidebar_position: 'right',
+  facet_sort: 'count',
+  facet_initial_count: 10,
 }
 
 export function HomePage() {

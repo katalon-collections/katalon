@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-08-31
+
+### Added
+- Portal-Facetten: Sortierung (nach Trefferanzahl oder alphabetisch) und Anzahl der anfangs sichtbaren Werte sind jetzt global im Portal-Admin konfigurierbar (`Einstellungen → Facetten → Anzeige`). Werteliste bietet „X weitere anzeigen"/„Weniger anzeigen"; bereits ausgewählte Werte bleiben sichtbar, auch außerhalb der sichtbaren Anzahl. Backend-Aggregation liefert bis zu 100 Werte pro Facette, damit „Mehr anzeigen" tatsächlich mehr liefern kann. Konfiguration ist global (nicht pro Feld) — reicht laut Produktentscheidung fürs Erste; Pro-Feld-Override bleibt bei Bedarf nachrüstbar. (#321)
+
 ## [1.13.6] - 2026-08-31
 
 ### Fixed

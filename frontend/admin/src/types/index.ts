@@ -282,6 +282,8 @@ export interface PortalConfigRead {
   placeholder_image_url: string
   color_tokens: Record<string, string>
   detail_sidebar_position: 'left' | 'right'
+  facet_sort: 'count' | 'alpha'
+  facet_initial_count: number
 }
 
 export interface UserRead {

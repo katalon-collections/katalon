@@ -210,6 +210,7 @@ async def search_documents(
     active_objects_only: bool = False,
     record_types: tuple[str, ...] | None = None,
     advanced_filter: dict[str, Any] | None = None,
+    facet_sort: str = "count",
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -283,6 +284,9 @@ async def search_documents(
         "related_places":      {"terms": {"field": "related_places", "size": 30}},
         "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
     }
+    # Fetch generously beyond the portal's initially visible count so "show
+    # more" can reveal further values without a second round-trip.
+    facet_order = {"_key": "asc"} if facet_sort == "alpha" else {"_count": "desc"}
     for field in facet_fields or []:
         aggregation_filters = [
             value for name, value in facet_filters.items() if name != field
@@ -296,7 +300,7 @@ async def search_documents(
                         *aggregation_filters,
                     ]}},
                     "aggs": {
-                        "values": {"terms": {"field": f"facet_{field}", "size": 20}}
+                        "values": {"terms": {"field": f"facet_{field}", "size": 100, "order": facet_order}}
                     },
                 }
             },

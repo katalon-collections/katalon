@@ -493,6 +493,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   const [systemFacets, setSystemFacets] = useState<string[]>(
     () => config.facet_fields?._system ?? ['record_type', 'status']
   )
+  const [facetSort, setFacetSort] = useState<'count' | 'alpha'>(config.facet_sort ?? 'count')
+  const [facetInitialCount, setFacetInitialCount] = useState(config.facet_initial_count ?? 10)
   const [facetFields, setFacetFields] = useState<Record<string, string[]>>(
     () => {
       const base = config.facet_fields ?? {}
@@ -597,7 +599,12 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
       updates.push(req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
         method: 'PUT',
-        body: JSON.stringify({ facet_fields: inheritedToSave, subtitle_fields: subtitleToSave }),
+        body: JSON.stringify({
+          facet_fields: inheritedToSave,
+          subtitle_fields: subtitleToSave,
+          facet_sort: facetSort,
+          facet_initial_count: facetInitialCount,
+        }),
       }))
 
       const results = await Promise.all(updates)
@@ -637,6 +644,31 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
             </label>
           ))}
+        </div>
+      </div>
+
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Anzeige</h4>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="bd" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+            Sortierung der Facettenwerte
+            <select className="fld" value={facetSort} onChange={e => setFacetSort(e.target.value as 'count' | 'alpha')}>
+              <option value="count">Nach Trefferanzahl</option>
+              <option value="alpha">Alphabetisch</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+            Anfangs sichtbare Werte
+            <input
+              className="fld mono"
+              type="number"
+              min={1}
+              max={100}
+              value={facetInitialCount}
+              onChange={e => setFacetInitialCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+              style={{ width: 80 }}
+            />
+          </label>
         </div>
       </div>
 

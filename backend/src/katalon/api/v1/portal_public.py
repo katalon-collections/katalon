@@ -400,6 +400,7 @@ async def search(
         rel_filters=rel_filters or None,
         active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
+        facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
     )
     return SearchResponse(**result)
 
@@ -449,6 +450,7 @@ async def advanced_search(
         active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         advanced_filter=advanced_filter,
+        facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
     )
     return SearchResponse(**result)
 
