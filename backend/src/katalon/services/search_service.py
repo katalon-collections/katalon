@@ -547,7 +547,7 @@ async def search(
     for agg_key, agg_val in aggs.items():
         if agg_key.startswith("numeric_"):
             values = agg_val.get("filtered", {}).get("values", {})
-            lower, upper = values.get("min", {}).get("value"), values.get("max", {}).get("value")
+            lower, upper = values.get("min"), values.get("max")
             if lower is not None and upper is not None:
                 numeric_facets[agg_key[8:]] = {"min": lower, "max": upper}
             continue

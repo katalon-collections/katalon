@@ -421,3 +421,46 @@ async def test_search_reads_self_excluding_facet_buckets(monkeypatch) -> None:
     assert result["facets"]["meta_event_date"] == [
         {"value": "Neolithikum", "count": 17}
     ]
+
+
+@pytest.mark.asyncio
+async def test_search_parses_numeric_stats_facets(monkeypatch) -> None:
+    async def search_documents(*args, **kwargs):
+        return {
+            "hits": {"total": {"value": 0}, "hits": []},
+            "aggregations": {
+                "numeric_year": {
+                    "doc_count": 10,
+                    "filtered": {
+                        "doc_count": 4,
+                        "values": {
+                            "count": 4,
+                            "min": 1900.0,
+                            "max": 1950.0,
+                            "avg": 1925.0,
+                            "sum": 7700.0,
+                        },
+                    },
+                },
+                "numeric_einwohnerzahl": {
+                    "doc_count": 10,
+                    "filtered": {
+                        "doc_count": 0,
+                        "values": {
+                            "count": 0,
+                            "min": None,
+                            "max": None,
+                            "avg": None,
+                            "sum": 0.0,
+                        },
+                    },
+                },
+            },
+        }
+
+    monkeypatch.setattr(search_service, "search_documents", search_documents)
+
+    result = await search_service.search(facet_fields=["year", "einwohnerzahl"])
+
+    assert result["numeric_facets"]["year"] == {"min": 1900.0, "max": 1950.0}
+    assert "einwohnerzahl" not in result["numeric_facets"]

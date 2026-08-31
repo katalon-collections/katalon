@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.6] - 2026-08-31
+
+### Fixed
+- Numerische Facetten (z. B. Jahr, Einwohnerzahl) liefern wieder Min/Max-Werte; die Auswertung der Elasticsearch-Stats-Aggregation erwartete ein veraltetes Antwortformat.
+
 ## [1.15.5] - 2026-08-31
 
 ### Fixed
