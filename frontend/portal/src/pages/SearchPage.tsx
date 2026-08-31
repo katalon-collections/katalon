@@ -67,31 +67,41 @@ function NumericFacetPanel({ label, bounds, from, to, onChange }: {
   onChange: (from: string, to: string) => void
 }) {
   const { t } = useI18n()
-  const [sliderRange, setSliderRange] = useState({ from, to })
+  const defaultFrom = bounds ? String(bounds.min) : ''
+  const defaultTo = bounds ? String(bounds.max) : ''
+  const [sliderRange, setSliderRange] = useState({ from: from || defaultFrom, to: to || defaultTo })
   const committedRange = useRef({ from, to })
 
   useEffect(() => {
-    setSliderRange({ from, to })
+    setSliderRange({ from: from || defaultFrom, to: to || defaultTo })
     committedRange.current = { from, to }
-  }, [from, to])
+  }, [from, to, defaultFrom, defaultTo])
 
   if (!bounds) return null
+  const sliderStep = Number.isInteger(bounds.min) && Number.isInteger(bounds.max) ? 1 : 'any'
   const lower = Number(sliderRange.from || bounds.min)
   const upper = Number(sliderRange.to || bounds.max)
+  const normalizeRange = (range: { from: string; to: string }) => ({
+    from: range.from === defaultFrom ? '' : range.from,
+    to: range.to === defaultTo ? '' : range.to,
+  })
   const commitSliderRange = () => {
-    if (sliderRange.from === committedRange.current.from && sliderRange.to === committedRange.current.to) return
-    committedRange.current = sliderRange
-    onChange(sliderRange.from, sliderRange.to)
+    const nextRange = normalizeRange(sliderRange)
+    if (nextRange.from === committedRange.current.from && nextRange.to === committedRange.current.to) return
+    committedRange.current = nextRange
+    onChange(nextRange.from, nextRange.to)
   }
   return (
     <div className="numeric-facet">
       <h3>{label}</h3>
       <div className="numeric-facet-inputs">
-        <input aria-label={`${label}: ${t('advanced.from')}`} type="number" value={from} placeholder={t('advanced.from')} onChange={event => onChange(event.target.value, to)} />
-        <input aria-label={`${label}: ${t('advanced.to')}`} type="number" value={to} placeholder={t('advanced.to')} onChange={event => onChange(from, event.target.value)} />
+        <input aria-label={`${label}: ${t('advanced.from')}`} type="number" value={from || defaultFrom} onChange={event => onChange(event.target.value === defaultFrom ? '' : event.target.value, to)} />
+        <input aria-label={`${label}: ${t('advanced.to')}`} type="number" value={to || defaultTo} onChange={event => onChange(from, event.target.value === defaultTo ? '' : event.target.value)} />
       </div>
-      <input aria-label={`${label}: ${t('advanced.from')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.min(lower, upper)} onChange={event => setSliderRange(range => ({ from: event.target.value, to: range.to && Number(event.target.value) > Number(range.to) ? event.target.value : range.to }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
-      <input aria-label={`${label}: ${t('advanced.to')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.max(lower, upper)} onChange={event => setSliderRange(range => ({ from: range.from && Number(event.target.value) < Number(range.from) ? event.target.value : range.from, to: event.target.value }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
+      <div className="numeric-facet-slider">
+        <input aria-label={`${label}: ${t('advanced.from')} slider`} className="numeric-facet-slider-lower" type="range" min={bounds.min} max={bounds.max} step={sliderStep} value={Math.min(lower, upper)} onChange={event => setSliderRange(range => ({ from: event.target.value, to: Number(event.target.value) > Number(range.to) ? event.target.value : range.to }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
+        <input aria-label={`${label}: ${t('advanced.to')} slider`} className="numeric-facet-slider-upper" type="range" min={bounds.min} max={bounds.max} step={sliderStep} value={Math.max(lower, upper)} onChange={event => setSliderRange(range => ({ from: Number(event.target.value) < Number(range.from) ? event.target.value : range.from, to: event.target.value }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
+      </div>
       {(from || to) && <button type="button" className="facet-reset" onClick={() => onChange('', '')}>{t('search.all')}</button>}
     </div>
   )

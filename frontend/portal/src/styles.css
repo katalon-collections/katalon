@@ -125,9 +125,18 @@ input, select, textarea { font-family: inherit; }
 .facet-more:hover { color: var(--accent-hover, #15296b); text-decoration: underline; }
 .numeric-facet { margin-bottom: 20px; }
 .numeric-facet-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-.numeric-facet-inputs input, .numeric-facet input[type="range"] { width: 100%; box-sizing: border-box; }
+.numeric-facet-inputs input { width: 100%; box-sizing: border-box; }
 .numeric-facet-inputs input { min-height: 32px; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; padding: 4px 7px; }
-.numeric-facet input[type="range"] { display: block; accent-color: var(--accent, #1e3a8a); }
+.numeric-facet-slider { position: relative; height: 28px; }
+.numeric-facet-slider::before { content: ''; position: absolute; top: 12px; right: 8px; left: 8px; height: 4px; border-radius: 2px; background: var(--accent, #1e3a8a); }
+.numeric-facet-slider input[type="range"] { position: absolute; top: 0; width: 100%; height: 28px; margin: 0; appearance: none; pointer-events: none; background: transparent; }
+.numeric-facet-slider input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+.numeric-facet-slider input[type="range"]::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; border: 2px solid var(--panel, #fff); border-radius: 50%; appearance: none; pointer-events: auto; background: var(--accent, #1e3a8a); cursor: grab; }
+.numeric-facet-slider input[type="range"]::-webkit-slider-thumb:active { cursor: grabbing; }
+.numeric-facet-slider input[type="range"]::-moz-range-track { height: 4px; background: transparent; }
+.numeric-facet-slider input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--panel, #fff); border-radius: 50%; pointer-events: auto; background: var(--accent, #1e3a8a); cursor: grab; }
+.numeric-facet-slider-lower { z-index: 1; }
+.numeric-facet-slider-upper { z-index: 2; }
 .result-list { display: flex; flex-direction: column; gap: 12px; }
 .result-row {
   background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb);

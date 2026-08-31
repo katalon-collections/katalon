@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.12] - 2026-08-31
+
+### Fixed
+- Zahlenregler mit ganzzahligen Grenzen erzeugen nur noch ganze Werte statt Fließkomma-Artefakten.
+
+## [1.15.11] - 2026-08-31
+
+### Changed
+- Zahlenfacetten verwenden jetzt einen gemeinsamen Zwei-Griff-Regler; die Eingabefelder zeigen ohne aktiven Filter bereits die tatsächlichen Min-/Max-Werte.
+
 ## [1.15.10] - 2026-08-31
 
 ### Added

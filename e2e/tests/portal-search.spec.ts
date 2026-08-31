@@ -157,6 +157,11 @@ test('filters a numeric facet through range controls', async ({ page }) => {
 
   await page.goto('http://127.0.0.1:5174/search?type=object&page=2')
   const from = page.getByRole('spinbutton', { name: 'Jahr: Von' })
+  const to = page.getByRole('spinbutton', { name: 'Jahr: Bis' })
+  await expect(from).toHaveValue('1900')
+  await expect(to).toHaveValue('2000')
+  await expect(page.locator('.numeric-facet-slider')).toHaveCount(1)
+  await expect(page.getByRole('slider', { name: 'Jahr: Bis slider' })).toHaveAttribute('step', '1')
   await from.fill('1950')
 
   await expect.poll(() => new URL(page.url()).searchParams.get('range_year_from')).toBe('1950')
