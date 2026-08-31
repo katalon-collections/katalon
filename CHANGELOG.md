@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.6] - 2026-08-31
+
+### Fixed
+- Portal: Datensatztyp pro Treffer war nicht zuverlässig sichtbar, wenn ein Portal-Admin `subtitle_fields` ohne `record_type` konfigurierte. Ergebnisliste zeigt jetzt zusätzlich zum konfigurierbaren Untertitel immer ein eigenes Typ-Badge pro Treffer. (#322, teilweise)
+
+### Added
+- E2E-Test, der die Kopfzeilen-Suche gezielt gegen die lokale Verfeinerung abgrenzt: Absenden im Header verwirft aktive Typ-/Metadaten-/Relationsfilter, während „Suche verfeinern…" sie behält. (#322)
+
 ## [1.13.5] - 2026-08-31
 
 ### Fixed

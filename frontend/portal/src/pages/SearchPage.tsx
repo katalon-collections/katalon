@@ -437,7 +437,10 @@ export function SearchPage() {
                   </div>
                 )}
                 <div className="body">
-                  <div className="title">{r.title || r.id}</div>
+                  <div className="title">
+                    <span className="result-type-badge">{typeLabel(r.record_type)}</span>
+                    {r.title || r.id}
+                  </div>
                   <div className="desc">{resultSubtitle(r, subtitleConfig)}</div>
                 </div>
               </Link>

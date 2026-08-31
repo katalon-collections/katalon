@@ -163,3 +163,22 @@ test('refines within the active search filters', async ({ page }) => {
   expect(params.get('rel_place')).toBe('Berlin')
   expect(params.get('page')).toBe('1')
 })
+
+test('header search starts an unfiltered, type-independent search from a filtered page', async ({ page }) => {
+  await page.route('**/portal/v1/portal/config', route => route.fulfill({ json: portalConfig }))
+  await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/pages', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/search?**', route => route.fulfill({
+    json: { total: 0, page: 1, page_size: 20, items: [], facets: {} },
+  }))
+
+  await page.goto('http://127.0.0.1:5174/search?q=stein&type=object&meta_classification=Archaeology&rel_place=Berlin')
+  await page.getByRole('textbox', { name: 'Search the collection' }).fill('beil')
+  await page.getByRole('textbox', { name: 'Search the collection' }).press('Enter')
+
+  const params = new URL(page.url()).searchParams
+  expect(params.get('q')).toBe('beil')
+  expect(params.get('type')).toBeNull()
+  expect(params.get('meta_classification')).toBeNull()
+  expect(params.get('rel_place')).toBeNull()
+})
