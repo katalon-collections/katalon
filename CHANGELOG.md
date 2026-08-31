@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.4] - 2026-08-31
+
+### Security
+- Browser speichern keine Authentifizierungs- oder Refresh-Tokens mehr in `localStorage`. Der Refresh-Token liegt nur noch als `HttpOnly`, `Secure` und `SameSite=Strict` Cookie vor; Access-Tokens bleiben ausschließlich im Speicher.
+- Bestehende Browser-Sitzungen werden beim ersten Aufruf der neuen Version einmalig abgemeldet, damit alte `localStorage`-Tokens verschwinden.
+
 ## [1.15.3] - 2026-08-31
 
 ### Fixed

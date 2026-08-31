@@ -16,8 +16,8 @@ export function LoginPage({ onLogin }: Props) {
     setError(null)
     setLoading(true)
     try {
-      const pair = await login(email, password)
-      setToken(pair.access_token, pair.refresh_token)
+      const token = await login(email, password)
+      setToken(token.access_token)
       onLogin()
       navigate('/')
     } catch (err) {

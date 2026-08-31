@@ -33,7 +33,7 @@ export function ScreenLogin({ onLogin }: Props) {
     try {
       if (mode === 'login') {
         const token = await auth.login(email, password)
-        setToken(token.access_token, token.refresh_token)
+        setToken(token.access_token)
         onLogin()
       } else if (mode === 'request') {
         const result = await auth.requestPasswordReset(email)

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, cast
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -17,7 +17,6 @@ from katalon.core.models import PasswordResetToken, User
 from katalon.core.schemas import (
     PasswordResetConfirm,
     PasswordResetRequest,
-    RefreshTokenRequest,
     Token,
 )
 from katalon.database import get_db
@@ -28,6 +27,8 @@ from katalon.workers.enqueue import enqueue
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 DBDep = Annotated[AsyncSession, Depends(get_db)]
+REFRESH_COOKIE = "katalon_refresh_token"
+REFRESH_COOKIE_PATH = "/v1/auth"
 
 
 def hash_password(password: str) -> str:
@@ -72,17 +73,23 @@ def create_refresh_token(user: User) -> str:
     )
 
 
-def issue_token_pair(user: User) -> Token:
-    return Token(
-        access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
+def issue_token_pair(user: User, response: Response) -> Token:
+    response.set_cookie(
+        key=REFRESH_COOKIE,
+        value=create_refresh_token(user),
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        httponly=True,
+        secure=not settings.debug,
+        samesite="strict",
+        path=REFRESH_COOKIE_PATH,
     )
+    return Token(access_token=create_access_token(user))
 
 
 @router.post(
     "/token",
     response_model=Token,
-    summary="Authenticate with username/password and issue an access/refresh token pair",
+    summary="Authenticate with username/password and issue an access token plus refresh cookie",
     responses={
         400: {"description": "Account deactivated"},
         401: {"description": "Invalid credentials"},
@@ -90,7 +97,7 @@ def issue_token_pair(user: User) -> Token:
 )
 @limiter.limit("10/minute")
 async def login(
-    request: Request, form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
+    request: Request, response: Response, form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBDep
 ) -> Token:
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
@@ -104,7 +111,7 @@ async def login(
         raise HTTPException(status_code=400, detail="Konto deaktiviert")
     user.last_login_at = datetime.now(UTC).replace(tzinfo=None)
     await db.commit()
-    return issue_token_pair(user)
+    return issue_token_pair(user, response)
 
 
 _RESET_RESPONSE = {"detail": "Falls ein aktives Konto zu dieser E-Mail-Adresse existiert, wurde ein Reset-Link versendet."}
@@ -191,15 +198,18 @@ async def confirm_password_reset(request: Request, data: PasswordResetConfirm, d
 @router.post(
     "/refresh",
     response_model=Token,
-    summary="Exchange a refresh token for a new access/refresh token pair",
+    summary="Exchange the refresh cookie for a new access token and refresh cookie",
     responses={
         401: {"description": "Invalid or expired refresh token"},
     },
 )
 @limiter.limit("20/minute")
-async def refresh_token(request: Request, data: RefreshTokenRequest, db: DBDep) -> Token:
+async def refresh_token(request: Request, response: Response, db: DBDep) -> Token:
     try:
-        payload = jwt.decode(data.refresh_token, settings.secret_key, algorithms=[settings.algorithm])
+        refresh_token = request.cookies.get(REFRESH_COOKIE)
+        if not refresh_token:
+            raise ValueError
+        payload = jwt.decode(refresh_token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         token_type: str | None = payload.get("typ")
         token_version = payload.get("ver", 0)
@@ -221,4 +231,11 @@ async def refresh_token(request: Request, data: RefreshTokenRequest, db: DBDep) 
             detail="Ungültiger Refresh-Token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return issue_token_pair(user)
+    return issue_token_pair(user, response)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Clear the refresh cookie")
+async def logout(response: Response) -> Response:
+    response.delete_cookie(key=REFRESH_COOKIE, path=REFRESH_COOKIE_PATH, httponly=True, samesite="strict")
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response

@@ -3,7 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
-import { api, BASE, PORTAL_API, currentUser, setToken, type PortalUser, type StaticPageSummary } from './api/client'
+import { api, BASE, PORTAL_API, currentUser, logout as endSession, restoreSession, type PortalUser, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { AdvancedSearchPage } from './pages/AdvancedSearchPage'
@@ -189,8 +189,9 @@ function Footer() {
 
 function AppInner() {
   const [user, setUser] = useState<PortalUser | null>(() => currentUser())
+  useEffect(() => { restoreSession().then(setUser).catch(() => setUser(null)) }, [])
   function logout() {
-    setToken(null)
+    void endSession()
     setUser(null)
   }
   useEffect(() => {

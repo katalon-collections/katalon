@@ -3,8 +3,9 @@ import type { ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResp
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
 
-let _token: string | null = localStorage.getItem('katalon_token')
-let _refreshToken: string | null = localStorage.getItem('katalon_refresh_token')
+localStorage.removeItem('katalon_token')
+localStorage.removeItem('katalon_refresh_token')
+let _token: string | null = null
 let _onUnauthorized: (() => void) | null = null
 let _refreshPromise: Promise<string | null> | null = null
 
@@ -16,18 +17,8 @@ function buildHeaders(init?: HeadersInit): Record<string, string> {
   return { ...(init as Record<string, string> ?? {}) }
 }
 
-export function setToken(t: string | null, refreshToken?: string | null) {
+export function setToken(t: string | null) {
   _token = t
-  if (t) localStorage.setItem('katalon_token', t)
-  else localStorage.removeItem('katalon_token')
-  if (refreshToken !== undefined) {
-    _refreshToken = refreshToken
-    if (refreshToken) localStorage.setItem('katalon_refresh_token', refreshToken)
-    else localStorage.removeItem('katalon_refresh_token')
-  } else if (t === null) {
-    _refreshToken = null
-    localStorage.removeItem('katalon_refresh_token')
-  }
 }
 
 export function hasToken(): boolean {
@@ -49,13 +40,11 @@ export function onUnauthorized(cb: () => void) {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  if (!_refreshToken) return null
   if (_refreshPromise) return _refreshPromise
   _refreshPromise = (async () => {
     const res = await fetch(resolveUrl('/v1/auth/refresh'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: _refreshToken }),
+      credentials: 'include',
     })
     if (res.status === 401) {
       setToken(null)
@@ -64,7 +53,7 @@ async function refreshAccessToken(): Promise<string | null> {
     }
     if (!res.ok) throw new Error('Sitzung konnte nicht erneuert werden.')
     const token = await res.json() as Token
-    setToken(token.access_token, token.refresh_token)
+    setToken(token.access_token)
     return token.access_token
   })().finally(() => {
     _refreshPromise = null
@@ -75,15 +64,24 @@ async function refreshAccessToken(): Promise<string | null> {
 export async function authorizedFetch(path: string, init: RequestInit = {}, allowRefresh = true): Promise<Response> {
   const headers = buildHeaders(init.headers)
   if (_token) headers['Authorization'] = `Bearer ${_token}`
-  const res = await fetch(resolveUrl(path), { ...init, headers })
-  if (res.status !== 401 || !allowRefresh || !_refreshToken || path === '/v1/auth/refresh') return res
+  const res = await fetch(resolveUrl(path), { ...init, headers, credentials: 'include' })
+  if (res.status !== 401 || !allowRefresh || path === '/v1/auth/refresh') return res
 
   const refreshedToken = await refreshAccessToken()
   if (!refreshedToken) return res
 
   const retryHeaders = buildHeaders(init.headers)
   retryHeaders['Authorization'] = `Bearer ${refreshedToken}`
-  return fetch(resolveUrl(path), { ...init, headers: retryHeaders })
+  return fetch(resolveUrl(path), { ...init, headers: retryHeaders, credentials: 'include' })
+}
+
+export function restoreSession(): Promise<string | null> {
+  return refreshAccessToken()
+}
+
+export async function logout(): Promise<void> {
+  setToken(null)
+  await fetch(resolveUrl('/v1/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => {})
 }
 
 export class ConflictError extends Error {
@@ -145,6 +143,7 @@ export const auth = {
       method: 'POST',
       body: body.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      credentials: 'include',
     })
     if (res.status === 401) throw new Error('Falsche E-Mail oder Passwort.')
     if (!res.ok) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
 import type { TourVariant } from '../tour/Tour'
@@ -273,10 +273,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
     setLogoUploading(true); setError(null)
     try {
       const fd = new FormData(); fd.append('file', file)
-      const token = localStorage.getItem('katalon_token')
-      const res = await fetch(`${BASE}/v1/portal/logo`, {
-        method: 'POST', body: fd, headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      const res = await authorizedFetch(`${BASE}/v1/portal/logo`, { method: 'POST', body: fd })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? `Fehler ${res.status}`) }
       const c: PortalConfigRead = await res.json()
       setLogoUrl(c.logo_url); onSaved(c)

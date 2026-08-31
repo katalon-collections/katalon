@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { hasToken, onUnauthorized, setToken, getTokenUser } from '../../api/client'
+import { getTokenUser, hasToken, logout, onUnauthorized, restoreSession } from '../../api/client'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ScreenList } from '../screens/ScreenList'
@@ -83,6 +83,7 @@ function Placeholder({ label }: { label: string }) {
 
 export function AppShell() {
   const [loggedIn, setLoggedIn] = useState(hasToken)
+  const [sessionChecked, setSessionChecked] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDirtyRef = useRef(false)
   const [appTitle, setAppTitle] = useState('Katalon')
@@ -97,12 +98,20 @@ export function AppShell() {
   }, [])
 
   useEffect(() => {
+    restoreSession()
+      .then(token => setLoggedIn(Boolean(token)))
+      .catch(() => setLoggedIn(false))
+      .finally(() => setSessionChecked(true))
+  }, [])
+
+  useEffect(() => {
+    if (!loggedIn) return
     req<PortalConfigRead>(`${BASE}/v1/portal/config`)
       .then(config => {
         if (config.site_title?.trim()) setAppTitle(config.site_title.trim())
       })
       .catch(() => {})
-  }, [])
+  }, [loggedIn])
 
   useEffect(() => {
     if (!loggedIn) return
@@ -140,7 +149,7 @@ export function AppShell() {
   }
 
   function handleLogout() {
-    setToken(null)
+    void logout()
     setLoggedIn(false)
   }
 
@@ -150,6 +159,8 @@ export function AppShell() {
   }, [appTitle, route])
 
   const crumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
+
+  if (!sessionChecked) return null
 
   if (!loggedIn) {
     return <ScreenLogin onLogin={() => setLoggedIn(true)} />

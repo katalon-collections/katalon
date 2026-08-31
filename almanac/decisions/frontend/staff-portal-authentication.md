@@ -24,4 +24,4 @@ The Portal reuses `/v1/auth/token` and the existing access/refresh tokens. Its r
 
 ## Consequences
 
-There is no new user table, registration endpoint, cookie/session backend, or portal-specific permission model. The Portal and Admin share the same browser token names on one origin. The login page may visibly reserve a disabled registration action, but public-account features, Procedures, and authenticated media/IIIF workspaces are not part of this decision [@portal-app] [@portal-public].
+There is no new user table, registration endpoint, or portal-specific permission model. The Portal and Admin share a host-only `HttpOnly`, `Secure`, `SameSite=Strict` refresh cookie on one origin; each application exchanges it for an in-memory access token during startup. The login page may visibly reserve a disabled registration action, but public-account features, Procedures, and authenticated media/IIIF workspaces are not part of this decision [@portal-app] [@portal-public].

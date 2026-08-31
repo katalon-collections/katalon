@@ -25,7 +25,7 @@ export function RichTextEditor({ value, onChange, placeholder, disabled, style }
   const { t } = useTranslation('richTextEditor')
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false }),
       Link.configure({ openOnClick: false, autolink: true }),
       Markdown.configure({ html: false }),
     ],

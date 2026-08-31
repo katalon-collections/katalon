@@ -37,7 +37,7 @@ The admin shell is a browser-only application frame that keeps route state in th
 
 The sidebar is a declarative navigation list that maps ids to labels, icons, active-route aliases, and role restrictions [@sidebar]. Admin-only groups and items check the decoded token role before rendering, and `AppShell` repeats the same `admin`/`superuser` gate when rendering configuration, user-management, and roles routes so direct hash navigation cannot open those screens for lower roles [@sidebar] [@app-shell]. Backend endpoints still enforce permissions independently of this frontend gate [@api-client].
 
-The shell also loads `/v1/portal/config` to replace the default `Katalon` title with the configured site title, then uses that value for breadcrumbs and `document.title` [@app-shell]. The same shell renders admin banners and import-status banners above the current screen, so cross-cutting notices stay outside individual workflow screens [@app-shell].
+The shell also loads `/v1/portal/config` to replace the default `Katalon` title with the configured site title, then uses that value for breadcrumbs and `document.title` [@app-shell]. That endpoint requires authentication, so the fetch runs only after `restoreSession()` completed and the shell switched to the logged-in state; firing it on mount would race the token refresh and log a guaranteed 401 on every reload [@app-shell]. The same shell renders admin banners and import-status banners above the current screen, so cross-cutting notices stay outside individual workflow screens [@app-shell].
 
 ## Routing And Unsaved State
 
@@ -47,7 +47,7 @@ The Vite config keeps the frontend base path configurable through `VITE_BASE_PAT
 
 ## API Client Contract
 
-The admin API client keeps access and refresh tokens in `localStorage`, exposes `setToken`, `hasToken`, and `getTokenUser`, and lets the shell register an unauthorized callback [@api-client]. `authorizedFetch` attaches the bearer token, retries one failed request after `/v1/auth/refresh`, and clears session state when refresh is rejected with `401` [@api-client].
+The admin API client keeps the access token only in memory, exposes `setToken`, `hasToken`, and `getTokenUser`, and lets the shell register an unauthorized callback [@api-client]. At startup it exchanges the host-only refresh cookie at `/v1/auth/refresh` for an access token; `authorizedFetch` retries one failed request through the same route and clears session state when refresh is rejected with `401` [@api-client].
 
 The login screen also provides password-reset request and confirmation forms. Reset links use the `#reset-password?token=...` hash route, so they remain valid under the admin deployment prefix without server-side routing [@screen-login] [@api-client].
 
