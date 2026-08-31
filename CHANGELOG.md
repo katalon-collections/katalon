@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.4] - 2026-08-31
+
+### Fixed
+- Portal: Wenn ein Admin die Standardfacette „Typ" oder „Status" in der Portal-Konfiguration deaktiviert, wurde das Panel zwar ausgeblendet, ein per URL gesetzter `type`/`status`-Filter aber weiterhin an die Suche übergeben (die deaktivierte Facette blieb so über einen Deep-Link reaktivierbar). Filter werden jetzt serverseitig nur noch übergeben, wenn die zugehörige Facette aktiv ist. (#314)
+
 ## [1.13.3] - 2026-08-31
 
 ### Fixed

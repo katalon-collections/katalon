@@ -152,10 +152,11 @@ export function SearchPage() {
     let cancelled = false
     setLoading(true)
     setError('')
+    const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
     const searchParams: Record<string, string | number | undefined> = {
       q: q || undefined,
-      type: typeFilt || undefined,
-      status: statusFilt || undefined,
+      type: systemFacets.includes('record_type') ? (typeFilt || undefined) : undefined,
+      status: systemFacets.includes('status') ? (statusFilt || undefined) : undefined,
       page,
       page_size: 20,
       facets: (() => {
