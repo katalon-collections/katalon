@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-08-31
+
+### Fixed
+- Cantaloupe-tmpfs-Cache besitzt jetzt ein konfigurierbares Größenlimit (`CANTALOUPE_CACHE_TMPFS_SIZE`, Default `512m`) statt unbegrenzt bis zu 50 % des Host-RAM zu belegen. Betrifft Hosts mit mehreren Katalon-artigen Instanzen. (#331)
+
 ## [1.13.0] - 2026-08-31
 
 ### Added

@@ -41,6 +41,8 @@ services:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
       - type: tmpfs
         target: /var/lib/cantaloupe/cache
+        tmpfs:
+          size: ${CANTALOUPE_CACHE_TMPFS_SIZE:-512m}
     environment:
       - CANTALOUPE_SOURCE_STATIC=FilesystemSource
       - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy

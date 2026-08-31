@@ -453,6 +453,10 @@ docker compose up -d --force-recreate cantaloupe
 
 Dadurch wird kein Datenbank- oder Medien-Volume gelöscht.
 
+### Mehrere Instanzen auf einem Host: tmpfs-Größe des Cantaloupe-Caches
+
+Der Cantaloupe-Derivat-Cache läuft als `tmpfs`, begrenzt über `CANTALOUPE_CACHE_TMPFS_SIZE` (Default `512m`, siehe `.env.example`). Ohne dieses Limit würde Docker pro Mount bis zu 50 % des Host-RAM erlauben. Läuft mehr als eine Katalon-artige Instanz auf demselben Host, `CANTALOUPE_CACHE_TMPFS_SIZE` je Instanz bewusst so wählen, dass die Summe aller Instanzen zusammen mit Elasticsearch- und Postgres-Speicherbedarf den verfügbaren Host-RAM nicht übersteigt.
+
 
 Bei einem alten Stack, der noch das frühere Named Volume verwendet, kann der Cache alternativ repariert werden:
 
