@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, cast
 
 from sqlalchemy import select
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from katalon.core.concurrency import flush_record
 from katalon.core.models import Entity, Object, Occurrence, Place
 from katalon.services.audit_service import log_change
+from katalon.services.pid_service import PidMintError, ensure_pids_on_publish
 from katalon.services.schema_service import validate_metadata
 from katalon.services.search_service import index_record
 
@@ -82,6 +84,15 @@ async def publish_record(
     if rec is None:
         return {"ok": False, "errors": ["Datensatz nicht gefunden"]}
 
+    # Auto-mint missing PIDs before the record becomes public. A mint failure
+    # blocks publishing instead of silently publishing without a PID.
+    try:
+        await ensure_pids_on_publish(
+            db, record_type, rec, uuid.UUID(user_id) if user_id else None
+        )
+    except PidMintError as exc:
+        return {"ok": False, "errors": [f"PID-Vergabe fehlgeschlagen: {exc}"]}
+
     rec.status = "public"
     await flush_record(db, rec)
 
@@ -91,7 +102,7 @@ async def publish_record(
             db,
             record_type=record_type,
             record_id=rec.id,
-            user_id=__import__("uuid").UUID(user_id) if user_id else None,
+            user_id=uuid.UUID(user_id) if user_id else None,
             action="publish",
             changed_fields={"status": "public"},
         )

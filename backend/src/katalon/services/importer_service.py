@@ -226,7 +226,10 @@ def apply_mapping(
 
             # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
-                record[field_name] = parts
+                if field_type == "url":
+                    record[field_name] = [{"value": part, "label": ""} for part in parts]
+                else:
+                    record[field_name] = parts
                 continue
 
             # For non-repeatable fields, store single plain value (form reads string/number/bool)
@@ -240,6 +243,8 @@ def apply_mapping(
                     record[field_name] = single
             elif field_type == "boolean":
                 record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
+            elif field_type == "url":
+                record[field_name] = {"value": single, "label": ""}
             else:
                 record[field_name] = single
         for group_name, group_values in containers.items():
@@ -292,6 +297,9 @@ def _validate_types(
                 elif fd.field_type == "boolean":
                     if not _is_boolean(raw):
                         issue = f"'{raw[:30]}' ist kein gültiger Boolean"
+                elif fd.field_type == "url":
+                    if not raw.lower().startswith(("http://", "https://")):
+                        issue = f"'{raw[:30]}' ist keine vollständige http(s)-URL"
 
                 if issue:
                     counts[fname] = counts.get(fname, 0) + 1

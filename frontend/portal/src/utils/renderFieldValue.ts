@@ -20,13 +20,27 @@ export function authorityUrl(value: unknown): string | undefined {
   return base ? base + externalId : undefined
 }
 
-/** Returns resolver URL for PID field values ({value, label}) if it looks like an URN. */
+/** Returns resolver URL for PID field values ({value, label}): URN via nbn-resolving,
+ *  ARK via n2t.net, plain http(s) URLs as-is. */
 export function pidUrl(value: unknown): string | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const obj = value as Record<string, unknown>
   const pidValue = typeof obj.value === 'string' ? obj.value.trim() : ''
-  if (!pidValue.toLowerCase().startsWith('urn:')) return undefined
-  return `${PID_RESOLVER_BASE}${pidValue}`
+  if (!pidValue) return undefined
+  const lower = pidValue.toLowerCase()
+  if (lower.startsWith('urn:')) return `${PID_RESOLVER_BASE}${pidValue}`
+  if (lower.startsWith('ark:')) return `https://n2t.net/${pidValue}`
+  if (lower.startsWith('http://') || lower.startsWith('https://')) return pidValue
+  return undefined
+}
+
+/** Returns the link target for URL field values ({value, label}), or undefined. */
+export function urlHref(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const obj = value as Record<string, unknown>
+  const url = typeof obj.value === 'string' ? obj.value.trim() : ''
+  if (!url || !/^https?:\/\//i.test(url)) return undefined
+  return url
 }
 
 /** Converts a single EDTF-lite qualified date ("1900~", "1900?", "1900~?") to display text. */

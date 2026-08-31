@@ -4,6 +4,7 @@ import re
 import uuid
 from copy import deepcopy
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -111,6 +112,47 @@ def _validate_pid_value(value: object, settings: dict[str, Any], field_name: str
         except re.error:
             pass
     return None
+
+
+def _is_http_url(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    parsed = urlsplit(value.strip())
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
+def _validate_url_value(value: object, field_name: str) -> str | None:
+    """Validate a single URL dict {"value": "https://...", "label": "optional"}. Returns error or None."""
+    if not isinstance(value, dict):
+        return f"Feld '{field_name}': URL muss ein Objekt {{value, label}} sein."
+    if not _is_http_url(value.get("value")):
+        return f"Feld '{field_name}': URL-Wert (value) muss eine vollständige http(s)-URL sein."
+    label = value.get("label")
+    if label is not None and not isinstance(label, str):
+        return f"Feld '{field_name}': Linktitel (label) muss Text sein."
+    return None
+
+
+def protect_pid_fields(
+    fields: list[FieldDefinition],
+    metadata: dict[str, Any],
+    existing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """PID fields are system-managed: keep stored values, drop manual input.
+
+    Returns a copy of ``metadata`` where every pid field carries the stored
+    value from ``existing`` (if any); client-supplied pid values are ignored.
+    Only the PID mint endpoints and publish auto-minting may write pid fields.
+    """
+    protected = dict(metadata)
+    for field in fields:
+        if field.field_type != "pid":
+            continue
+        if existing is not None and existing.get(field.name) not in (None, "", []):
+            protected[field.name] = deepcopy(existing[field.name])
+        else:
+            protected.pop(field.name, None)
+    return protected
 
 
 def _validate_relation_structure(value: object, field_name: str) -> str | None:
@@ -270,6 +312,21 @@ async def validate_metadata(
                     errors.append(err)
             continue
 
+        if field.field_type == "url":
+            if field.is_repeatable:
+                if not isinstance(value, list):
+                    errors.append(f"Feld '{field.name}' muss eine Liste sein (wiederholbar).")
+                else:
+                    for item in value:
+                        err = _validate_url_value(item, field.name)
+                        if err:
+                            errors.append(err)
+            else:
+                err = _validate_url_value(value, field.name)
+                if err:
+                    errors.append(err)
+            continue
+
         if field.field_type == "relation":
             if field.is_repeatable:
                 if not isinstance(value, list):
@@ -375,9 +432,10 @@ async def prepare_metadata(
     existing: dict[str, Any] | None = None,
     can_edit_locked: bool = False,
 ) -> dict[str, Any]:
-    """Apply schema defaults and protect locked fields."""
+    """Apply schema defaults, protect locked and system-managed fields."""
     prepared = deepcopy(metadata)
-    for field in await get_field_definitions(db, record_type, target_subtype):
+    fields = await get_field_definitions(db, record_type, target_subtype)
+    for field in fields:
         settings = field.settings or {}
         if settings.get("is_locked") and not can_edit_locked:
             if existing is not None and field.name in existing:
@@ -390,4 +448,7 @@ async def prepare_metadata(
             and "default_value" in settings
         ):
             prepared[field.name] = deepcopy(settings["default_value"])
-    return prepared
+    # PID fields are system-managed: keep stored values, drop manual input —
+    # regardless of editor role. Only the mint endpoints and publish auto-minting
+    # may write them (see pid_service).
+    return protect_pid_fields(fields, prepared, existing)

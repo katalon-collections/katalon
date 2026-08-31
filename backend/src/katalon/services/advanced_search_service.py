@@ -135,7 +135,7 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
         query = _nested_field(field.name, value_query)
         return _negate(query) if operator in {"not_contains", "neq"} else query
 
-    if field_type in {"vocab", "vocab_free", "authority", "pid"}:
+    if field_type in {"vocab", "vocab_free", "authority", "pid", "url"}:
         if operator not in {"eq", "neq"}:
             raise ValueError(f"Operator '{operator}' passt nicht zu Auswahlfeldern.")
         if not isinstance(clause.value, str) or not clause.value.strip():

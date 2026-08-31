@@ -116,7 +116,7 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
 
   return (
     <header className="site-header">
-      <Link to="/" className="logo">Katalon</Link>
+      <Link to="/" className="logo">{config.site_title}</Link>
       <nav>
         {BROWSE_NAV_ITEMS
           .filter(({ type }) => config.browse_enabled_types.includes(type))
@@ -167,11 +167,12 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
 
 function Footer() {
   const { locale } = useI18n()
+  const config = usePortalConfig()
   const [pages, setPages] = useState<StaticPageSummary[]>([])
   useEffect(() => { api.pages.list().then(ps => setPages(ps.filter(p => p.placement === 'footer'))).catch(() => {}) }, [])
   return (
     <footer className="site-footer">
-      Katalon · Metadata Management System
+      {config.site_title} · Metadata Management System
       {pages.map(p => {
         const label = pageLabel(p, locale)
         return (
@@ -189,6 +190,7 @@ function Footer() {
 
 function AppInner() {
   const [user, setUser] = useState<PortalUser | null>(() => currentUser())
+  const config = usePortalConfig()
   useEffect(() => { restoreSession().then(setUser).catch(() => setUser(null)) }, [])
   function logout() {
     void endSession()
@@ -209,7 +211,7 @@ function AppInner() {
   }, [])
   return (
     <>
-      <Helmet defaultTitle="Katalon" titleTemplate="%s – Katalon">
+      <Helmet defaultTitle={config.site_title} titleTemplate={`%s – ${config.site_title}`}>
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
       <BannerBar />

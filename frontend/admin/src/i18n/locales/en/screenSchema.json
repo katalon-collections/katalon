@@ -36,7 +36,8 @@
     "geo": "Geodata",
     "pid": "PID",
     "authority": "Authority",
-    "group": "Container (Group)"
+    "group": "Container (Group)",
+    "url": "URL (with link title)"
   },
   "subtypes": {
     "headline": "Subtypes",
@@ -121,7 +122,11 @@
     "subFieldDeleteConfirm": "Really delete sub-field?",
     "subFieldErrorNameEmpty": "Internal name must not be empty.",
     "subFieldErrorRelationVocab": "Please select a relation type vocabulary.",
-    "subFieldErrorAuthoritySource": "Please select an active authority source."
+    "subFieldErrorAuthoritySource": "Please select an active authority source.",
+    "pidProvider": "PID provider",
+    "pidProviderDnbUrn": "URN (German National Library)",
+    "pidProviderArk": "ARK (minted locally)",
+    "pidProviderHint": "PIDs are only assigned via the mint button or automatically on publish – manual entry is not possible."
   },
   "subFieldForm": {
     "internalName": "Internal Name",

@@ -59,7 +59,7 @@ The four public record-detail pages share `DetailPageLayout`. Public field defin
 
 ## Runtime Theme Layers
 
-The portal loads `/portal/v1/theme` at startup and passes the manifest to `applyTheme`; failure falls back to default tokens [@theme-loader] [@theme-inject] [@portal-client]. `applyTheme` merges default CSS tokens with manifest tokens, injects an optional body-font stylesheet, updates the favicon under `/themes/<file>`, and can set `document.title` from the theme name [@theme-inject].
+The portal loads `/portal/v1/theme` at startup and passes the manifest to `applyTheme`; failure falls back to default tokens [@theme-loader] [@theme-inject] [@portal-client]. `applyTheme` merges default CSS tokens with manifest tokens, injects an optional body-font stylesheet, and updates the favicon under `/themes/<file>` [@theme-inject]. The configured portal `site_title` owns the visible portal brand and the Helmet title template, so a theme name cannot replace the institution's browser title [@portal-app] [@theme-inject].
 
 After the base theme loads, `AppInner` reads portal config and applies `color_tokens` and `accent_color` directly to `document.documentElement` [@portal-app]. The resulting order is default theme tokens, theme manifest tokens, then portal-config overrides; that gives operators a persistent configuration layer without rebuilding the frontend [@portal-app] [@theme-inject].
 

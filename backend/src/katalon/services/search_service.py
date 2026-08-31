@@ -208,7 +208,7 @@ def _build_advanced_index(
             elif definition.field_type == "boolean" and isinstance(value, bool):
                 item["bool_value"] = value
             elif definition.field_type in {
-                "text", "richtext", "vocab", "vocab_free", "authority", "pid",
+                "text", "richtext", "vocab", "vocab_free", "authority", "pid", "url",
             }:
                 item["text_value"] = str(value)
                 item["keyword_value"] = str(value)

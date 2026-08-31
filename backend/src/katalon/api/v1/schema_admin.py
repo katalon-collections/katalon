@@ -14,6 +14,7 @@ from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services import authority_service
+from katalon.services.pid_service import PID_PROVIDERS
 from katalon.services.schema_ai_service import schema_chat
 from katalon.services.subtype_service import ensure_subtype_exists
 
@@ -89,6 +90,14 @@ async def _validate_field_settings(db: DBDep, data: FieldDefinitionCreate) -> No
             raise HTTPException(
                 status_code=422,
                 detail="Unterfelder von Containerfeldern können nicht übersetzbar sein.",
+            )
+
+    if data.field_type == "pid":
+        provider = data.settings.get("pid_provider")
+        if provider is not None and provider not in PID_PROVIDERS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unbekannter PID-Provider. Erlaubt: {', '.join(PID_PROVIDERS)}.",
             )
 
     if data.field_type == "authority":

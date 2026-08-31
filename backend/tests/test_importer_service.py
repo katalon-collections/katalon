@@ -316,3 +316,23 @@ def test_dry_run_clusters_pending_vocab_field() -> None:
     cluster = result["vocab_clusters"]["genre"][0]
     assert cluster["canonical"] == "Electronic"
     assert set(cluster["variants"]) == {"Electronic", "electronic", "Electronik"}
+
+
+def _fd(name: str, field_type: str, *, is_repeatable: bool = False) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=name,
+        field_type=field_type,
+        is_repeatable=is_repeatable,
+        label={"de": name},
+    )
+
+
+def test_apply_mapping_coerces_url_field() -> None:
+    rows = [{"link": "https://example.org/a", "links": "https://example.org/b"}]
+    field_defs = {
+        "link": _fd("link", "url"),
+        "links": _fd("links", "url", is_repeatable=True),
+    }
+    records, _ = apply_mapping(rows, {"link": "link", "links": "links"}, field_defs)
+    assert records[0]["link"] == {"value": "https://example.org/a", "label": ""}
+    assert records[0]["links"] == [{"value": "https://example.org/b", "label": ""}]

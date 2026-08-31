@@ -31,8 +31,12 @@ from katalon.core.schemas import (
     SnapshotCreate,
     SnapshotRead,
 )
-from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
-from katalon.services import search_service
+from katalon.core.visibility import (
+    PUBLIC_STATUSES,
+    apply_public_visibility,
+    ensure_publicly_visible,
+)
+from katalon.services import pid_service, search_service
 from katalon.services.audit_service import delete_label_fields, diff_fields, log_change
 from katalon.services.idno_service import (
     consume_next_idno,
@@ -52,6 +56,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
+#: Statuses that make a record publicly visible and trigger PID auto-minting.
+PUBLIC_SAVE_STATUSES = set(PUBLIC_STATUSES)
 
 
 async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
@@ -173,6 +179,11 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
     await sync_schema_relations(db, "object", obj.id, metadata)
     await db.flush()
     await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
+    if data.status in PUBLIC_SAVE_STATUSES:
+        try:
+            await pid_service.ensure_pids_on_publish(db, "object", obj, current_user.id)
+        except pid_service.PidMintError as exc:
+            raise HTTPException(status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}") from exc
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
@@ -289,6 +300,14 @@ async def update_object(
             action="update",
             changed_fields=update_diff,
         )
+    if (
+        old_fields["status"] not in PUBLIC_SAVE_STATUSES
+        and data.status in PUBLIC_SAVE_STATUSES
+    ):
+        try:
+            await pid_service.ensure_pids_on_publish(db, "object", obj, current_user.id)
+        except pid_service.PidMintError as exc:
+            raise HTTPException(status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}") from exc
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
@@ -313,6 +332,8 @@ async def publish_object(
     if not ok:
         raise HTTPException(status_code=422, detail={"errors": errors})
     result = await publish_record(db, "object", str(object_id), str(current_user.id))
+    if not result.get("ok"):
+        raise HTTPException(status_code=422, detail={"errors": result.get("errors", [])})
     await db.commit()
     return result
 

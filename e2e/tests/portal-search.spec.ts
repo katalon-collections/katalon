@@ -117,6 +117,28 @@ test('adds metadata facet values and uses the translated field label fallback', 
   await expect(page.getByRole('button', { name: /Paläolithikum/ })).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('translates boolean facet values', async ({ page }) => {
+  await page.route('**/portal/v1/portal/config', route => route.fulfill({
+    json: { ...portalConfig, facet_fields: { object: ['is_featured'] } },
+  }))
+  await page.route('**/portal/v1/schema/object', route => route.fulfill({
+    json: [{ id: 'field-1', name: 'is_featured', label: { de: 'Hervorgehoben' }, field_type: 'boolean' }],
+  }))
+  await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/pages', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/search?**', route => route.fulfill({
+    json: {
+      total: 2, page: 1, page_size: 20, items: [],
+      facets: { meta_is_featured: [{ value: 'True', count: 1 }, { value: 'False', count: 1 }] },
+    },
+  }))
+
+  await page.goto('http://127.0.0.1:5174/search?lang=de&type=object')
+  await expect(page.getByRole('heading', { name: 'Hervorgehoben' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Ja/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Nein/ })).toBeVisible()
+})
+
 test('filters a numeric facet through range controls', async ({ page }) => {
   await page.route('**/portal/v1/portal/config', route => route.fulfill({
     json: { ...portalConfig, facet_fields: { object: ['year'] } },
@@ -142,6 +164,34 @@ test('filters a numeric facet through range controls', async ({ page }) => {
   await expect(page.getByRole('slider', { name: 'Jahr: Bis slider' })).toBeVisible()
   await page.getByRole('button', { name: 'Alle' }).click()
   await expect.poll(() => new URL(page.url()).searchParams.has('range_year_from')).toBe(false)
+})
+
+test('requests numeric facet results once after a slider change is committed', async ({ page }) => {
+  await page.route('**/portal/v1/portal/config', route => route.fulfill({
+    json: { ...portalConfig, facet_fields: { object: ['year'] } },
+  }))
+  await page.route('**/portal/v1/schema/object', route => route.fulfill({
+    json: [{ id: 'field-1', name: 'year', label: { de: 'Jahr' }, field_type: 'number' }],
+  }))
+  await page.route('**/portal/v1/banners/active/portal', route => route.fulfill({ json: [] }))
+  await page.route('**/portal/v1/pages', route => route.fulfill({ json: [] }))
+  let searchRequests = 0
+  await page.route('**/portal/v1/search?**', route => {
+    searchRequests += 1
+    return route.fulfill({
+      json: { total: 1, page: 1, page_size: 20, items: [], facets: {}, numeric_facets: { year: { min: 1900, max: 2000 } } },
+    })
+  })
+
+  await page.goto('http://127.0.0.1:5174/search?type=object')
+  const slider = page.getByRole('slider', { name: 'Jahr: Von slider' })
+  await expect(slider).toBeVisible()
+  const initialRequests = searchRequests
+  await slider.press('ArrowRight')
+  await slider.press('ArrowRight')
+  await expect.poll(() => searchRequests).toBe(initialRequests)
+  await slider.dispatchEvent('pointerup')
+  await expect.poll(() => searchRequests).toBe(initialRequests + 1)
 })
 
 test('refines within the active search filters', async ({ page }) => {

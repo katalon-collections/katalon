@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
-import { authorityUrl, pidUrl, renderFieldValue } from '../utils/renderFieldValue'
+import { authorityUrl, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow } from './RelationFieldRow'
 
 export function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
@@ -66,13 +66,22 @@ function MainField({ field, value, locale }: { field: FieldDefinition; value: un
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
   if (!rendered) return null
+  const href = field.field_type === 'url'
+    ? urlHref(value)
+    : field.field_type === 'pid'
+      ? pidUrl(value)
+      : field.field_type === 'authority'
+        ? authorityUrl(value)
+        : undefined
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
         {fieldLabel(field, locale)}
       </div>
       {field.field_type === 'richtext' ? richText(rendered) : (
-        <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>{rendered}</div>
+        <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>
+          {href ? <a href={href} target="_blank" rel="noreferrer">{rendered}</a> : rendered}
+        </div>
       )}
       {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
     </div>
@@ -85,7 +94,13 @@ function SidebarField({ field, value, locale }: { field: FieldDefinition; value:
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
-  const href = field.field_type === 'authority' ? authorityUrl(value) : field.field_type === 'pid' ? pidUrl(value) : undefined
+  const href = field.field_type === 'url'
+    ? urlHref(value)
+    : field.field_type === 'authority'
+      ? authorityUrl(value)
+      : field.field_type === 'pid'
+        ? pidUrl(value)
+        : undefined
   return rendered ? <>
     <MetaRow label={fieldLabel(field, locale)} value={rendered} href={href} />
     {field.field_type === 'authority' && <GeoNamesMaps value={value} />}

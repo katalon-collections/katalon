@@ -9,6 +9,12 @@ sources:
   - id: importer-service
     type: file
     path: backend/src/katalon/services/importer_service.py
+  - id: import-tasks
+    type: file
+    path: backend/src/katalon/workers/import_tasks.py
+  - id: pid-service
+    type: file
+    path: backend/src/katalon/services/pid_service.py
   - id: format-registry
     type: file
     path: backend/src/katalon/services/importer/formats/registry.py
@@ -73,6 +79,8 @@ The metadata upload surface uses one hidden `multiple` file input for CSV, TSV, 
 Mappings use selectors as keys. For CSV and Excel the selector is a column header; for XML it is a Clark-notation tag path from the selected record element [@importer-api] [@xml-format]. Each mapping entry can target a metadata field or `__idno__`, and can include transform steps such as split, replace, regex extraction, trim, vocabulary mapping, and sandboxed Jinja expression rendering [@importer-api] [@importer-service].
 
 `dry_run()` applies mappings to parsed rows, checks missing required fields, empty values, ID number mapping, type mismatches, full schema validation, and vocabulary statistics [@importer-api] [@importer-service]. For vocabulary fields, it reports how many incoming terms already exist and clusters near-duplicates with normalized Levenshtein similarity, giving the UI material for reconciliation before import [@importer-service] [@importer-api]. This is the runtime implementation behind [Fuzzy Vocabulary Clustering](../../decisions/importer/fuzzy-vocabulary-clustering).
+
+Type coercion in `apply_mapping` converts source strings per target field type: numbers are parsed (comma-tolerant), booleans normalized, and `url` fields are wrapped into their `{value, label}` object shape (`label` left empty for the import to fill manually) [@importer-service]. PID fields are the exception: values mapped onto a `pid` field are dropped with a per-row warning, because PIDs are system-managed — they are minted through the PID endpoints or automatically on publish, never imported [@import-tasks] [@pid-service]. On upsert-replace, stored PID values are preserved from the existing record.
 
 Object imports may also carry one `media_selector`. This selector is separate from the metadata mapping and identifies a source column or XML element containing filenames. The UI can suggest a likely selector, but the user must select it explicitly. The backend rejects media selectors for non-object record types, missing selectors, and normalized filenames assigned to more than one source row [@importer-api] [@media-reference-service]. The dry-run result reports the number of rows with filenames, the total filenames, empty rows, and conflicts without writing references [@importer-api].
 

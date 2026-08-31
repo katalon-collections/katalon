@@ -20,6 +20,7 @@ from katalon.core.models import (
     Relation,
 )
 from katalon.services.audit_service import diff_fields, log_change
+from katalon.services.pid_service import ensure_pids_on_publish
 from katalon.services.relation_service import sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.search_service import index_record
@@ -167,6 +168,11 @@ async def _apply_status_change(
 
     old_fields = {"status": record.status, "metadata": record.metadata_}
     record.status = value
+
+    if value == "public" and old_fields["status"] not in ("public", "published"):
+        # Batch publishing also auto-mints missing PIDs; a mint failure rolls
+        # back this record's nested transaction and lands in the batch errors.
+        await ensure_pids_on_publish(db, record_type, record, user_id)
 
     diff = diff_fields(old_fields, {"status": record.status, "metadata": record.metadata_})
     if diff:

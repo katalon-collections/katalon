@@ -4,5 +4,17 @@
     "pickerTitleEnabled": "Open date picker",
     "pickerTitleDisabled": "Date is not a single day – edit manually",
     "pickerAriaLabel": "Pick a date"
+  },
+  "pid": {
+    "mintUrn": "Reserve URN",
+    "mintUrnPending": "Registering…",
+    "mintArk": "Assign ARK",
+    "mintArkPending": "Assigning…",
+    "mintHint": "Save the record first, then assign the PID.",
+    "systemManaged": "assigned by the system"
+  },
+  "url": {
+    "linkLabel": "Link title (optional)",
+    "add": "Add URL"
   }
 }

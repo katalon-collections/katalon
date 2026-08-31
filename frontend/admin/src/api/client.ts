@@ -546,15 +546,22 @@ export const authority = {
     req<AuthoritySource>(`/v1/authorities/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ is_enabled }) }),
 }
 
+export type PidMintResult = {
+  pid: string
+  resolver_url: string
+  provider: 'dnb_urn' | 'ark'
+  value: { value: string; label: string }
+}
+
 export const pids = {
-  registerDnbUrn: (data: {
+  mint: (data: {
     record_type: string
     record_id: string
     field_name: string
-    target_url: string
+    target_url?: string
     label?: string
-  }) => req<{ urn: string; resolver_url: string; value: { value: string; label: string } }>(
-    '/v1/pids/urn/register',
+  }) => req<PidMintResult>(
+    '/v1/pids/mint',
     { method: 'POST', body: JSON.stringify(data) },
   ),
 }

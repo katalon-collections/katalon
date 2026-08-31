@@ -5,6 +5,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.10] - 2026-08-31
+
+### Added
+- PID-Felder können ARKs oder DNB-URNs reservieren; beim Veröffentlichen werden fehlende konfigurierte PIDs automatisch vergeben.
+- URL-Felder speichern einen Link mit optionalem Titel und werden im Admin-Interface sowie im Portal klickbar angezeigt.
+
+## [1.15.9] - 2026-08-31
+
+### Fixed
+- Der konfigurierte Institutionsname bestimmt jetzt Portal-Kopfzeile, Fußzeile und alle Browser-Seitentitel; Theme-Namen können ihn nicht mehr überschreiben.
+
+## [1.15.8] - 2026-08-31
+
+### Fixed
+- Boolean-Facetten zeigen übersetzte Ja/Nein-Werte statt technischer `True`/`False`-Werte.
+
+## [1.15.7] - 2026-08-31
+
+### Fixed
+- Numerische Facetten starten beim Verschieben des Reglers nur noch eine Suche nach dem Loslassen statt für jede Zwischenposition.
+
 ## [1.15.6] - 2026-08-31
 
 ### Fixed

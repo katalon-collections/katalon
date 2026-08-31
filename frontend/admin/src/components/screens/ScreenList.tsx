@@ -43,8 +43,10 @@ function getFieldValue(metadata: Record<string, unknown>, fieldName: string): st
     return ''
   }
   if (val && typeof val === 'object') {
-    if ('label' in val) return String((val as { label?: unknown }).label ?? '')
-    if ('value' in val) return String((val as { value?: unknown }).value ?? '')
+    const obj = val as { label?: unknown; value?: unknown }
+    const labelText = 'label' in obj ? String(obj.label ?? '') : ''
+    if (labelText) return labelText
+    if ('value' in obj) return String(obj.value ?? '')
     return ''
   }
   return String(val)

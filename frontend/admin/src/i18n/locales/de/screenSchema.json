@@ -36,7 +36,8 @@
     "geo": "Geodaten",
     "pid": "PID",
     "authority": "Normdaten (Authority)",
-    "group": "Containerfeld (Gruppe)"
+    "group": "Containerfeld (Gruppe)",
+    "url": "URL (mit Linktitel)"
   },
   "subtypes": {
     "headline": "Subtypen",
@@ -121,7 +122,11 @@
     "subFieldDeleteConfirm": "Sub-Feld wirklich löschen?",
     "subFieldErrorNameEmpty": "Interner Name darf nicht leer sein.",
     "subFieldErrorRelationVocab": "Bitte ein Relationstyp-Vokabular wählen.",
-    "subFieldErrorAuthoritySource": "Bitte eine aktive Normdaten-Quelle wählen."
+    "subFieldErrorAuthoritySource": "Bitte eine aktive Normdaten-Quelle wählen.",
+    "pidProvider": "PID-Anbieter",
+    "pidProviderDnbUrn": "URN (Deutsche Nationalbibliothek)",
+    "pidProviderArk": "ARK (lokal vergeben)",
+    "pidProviderHint": "PIDs werden ausschließlich über „Reservieren“ oder automatisch beim Veröffentlichen vergeben – manuelle Eingabe ist nicht möglich."
   },
   "subFieldForm": {
     "internalName": "Interner Name",

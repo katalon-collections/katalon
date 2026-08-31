@@ -15,7 +15,7 @@ import {
 const RECORD_TYPES = ['object', 'entity', 'place', 'occurrence'] as const
 const SUPPORTED_TYPES = new Set([
   'text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free',
-  'authority', 'pid', 'relation',
+  'authority', 'pid', 'url', 'relation',
 ])
 
 const OPERATORS: Record<string, Array<[string, string]>> = {
@@ -28,6 +28,7 @@ const OPERATORS: Record<string, Array<[string, string]>> = {
   vocab_free: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
   authority: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
   pid: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  url: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
 }
 
 function blankClause(): AdvancedFieldClause {

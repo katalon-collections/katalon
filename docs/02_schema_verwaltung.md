@@ -228,25 +228,46 @@ Beispiele:
 
 ---
 
+### `url` – Weblink
+
+Speichert einen externen Link mit einem optionalen Linktitel. Die URL wird beim
+Speichern geprüft und in Admin-UI und Portal klickbar dargestellt.
+
+Beispiele:
+- Digitalisat in einem externen Repositorium
+- Projekt- oder Ausstellungsseite
+- Bereits vergebener externer Identifier mit Zielseite
+
+Ein Wert besteht aus URL und optionalem Titel:
+
+```json
+{"value": "https://example.org/digitalisat/42", "label": "Digitalisat"}
+```
+
+---
+
 ### `pid` – Persistenter Identifier
 
-Für Normdaten-IDs aus externen Quellen (GND, VIAF, Geonames, Wikidata, Getty TGN, Iconclass, Getty AAT …). Das Authority-Plugin-System ermöglicht die Suche in der externen Quelle direkt aus der Erfassung. Welche Quellen zur Auswahl stehen, legen Administratoren unter Einstellungen → Normdatenquellen fest (aktivieren/deaktivieren, Verbindung testen); nur aktivierte Quellen erscheinen hier in der Auswahl.
+Für einen von Katalon vergebenen persistenten Identifier. PID-Felder sind im
+Erfassungsformular schreibgeschützt: Mitarbeitende wählen **Reservieren**, um
+einen Identifier zu vergeben; danach wird er als Resolver-Link angezeigt.
+Beim Veröffentlichen reserviert Katalon fehlende, konfigurierte PIDs automatisch.
+Schlägt die Vergabe fehl, wird die Veröffentlichung abgebrochen.
 
 **Settings:**
 
 | Schlüssel | Typ | Beschreibung |
 |---|---|---|
-| `authority` | String | ID des Authority-Adapters, z.B. `gnd`, `viaf`, `geonames`. |
+| `pid_provider` | String | `ark` oder `dnb_urn`. Legt den Vergabedienst fest. |
 
 Beispiel:
 ```json
-{"authority": "gnd"}
+{"pid_provider": "ark"}
 ```
 
 Beispiele:
-- GND-ID einer Person
-- Geonames-ID eines Ortes
-- ORCID einer Forscherin
+- ARK für einen öffentlichen Datensatz
+- DNB-URN für einen veröffentlichten Datensatz
 
 ---
 

@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     dnb_urn_password: str = ""
     dnb_urn_resolver_url: str = "https://nbn-resolving.org/"
 
+    # ARK: lokal geprägt (kein Registrar), Test-NAAN 99999 ist von der ARK Alliance
+    # für Tests reserviert; produktiver NAAN wird später bei CDL beantragt.
+    ark_enabled: bool = True
+    ark_naan: str = "99999"
+    ark_resolver_url: str = "https://n2t.net/"
+    ark_suffix_length: int = 10
+
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 
     telegram_bot_token: str = ""

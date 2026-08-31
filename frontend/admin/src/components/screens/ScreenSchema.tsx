@@ -9,12 +9,13 @@ import { SchemaAiAssist } from './SchemaAiAssist'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority', 'group'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'url', 'authority', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
 export const FIELD_TYPE_LABELS: Record<string, string> = {
   text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
   boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
   relation: 'Relation', geo: 'Geodaten', pid: 'PID',
+  url: 'URL (mit Linktitel)',
   authority: 'Normdaten (Authority)', group: 'Containerfeld (Gruppe)',
 }
 
@@ -54,6 +55,7 @@ type FieldFormState = {
   sort_order: number
   validation_regex: string
   authority_source: string
+  pid_provider: string
   show_in_detail: boolean
   show_in_list: boolean
   detail_slot: 'main' | 'sidebar'
@@ -79,7 +81,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', show_in_detail: true, show_in_list: true, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: true, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -95,6 +97,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     sort_order: f.sort_order,
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
+    pid_provider: (f.settings?.pid_provider as string) ?? 'dnb_urn',
     show_in_detail: f.show_in_detail ?? true,
     show_in_list: f.show_in_list ?? true,
     detail_slot: f.detail_slot ?? 'sidebar',
@@ -403,6 +406,16 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 ))}
             </select>
             {!isNew && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.authorityChangeWarning')}</div>}
+          </div>
+        )}
+        {form.field_type === 'pid' && !isVocabularyTerm && (
+          <div className="field">
+            <div className="lbl">{t('fieldDetail.pidProvider')}</div>
+            <select className="fld" value={form.pid_provider} onChange={e => set('pid_provider', e.target.value)}>
+              <option value="dnb_urn">{t('fieldDetail.pidProviderDnbUrn')}</option>
+              <option value="ark">{t('fieldDetail.pidProviderArk')}</option>
+            </select>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.pidProviderHint')}</div>
           </div>
         )}
         {(form.field_type === 'vocab' || form.field_type === 'vocab_free') && (
@@ -1112,6 +1125,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       settings: {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
+        ...(form.field_type === 'pid' && form.target_type !== 'vocabulary_term' ? { pid_provider: form.pid_provider } : {}),
         ...((form.field_type === 'vocab' || form.field_type === 'vocab_free') && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
         ...(form.field_type === 'relation' ? {
           target_type: form.relation_target_type,

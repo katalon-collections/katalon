@@ -21,6 +21,12 @@ sources:
   - id: publish-service
     type: file
     path: backend/src/katalon/services/publish_service.py
+  - id: pid-service
+    type: file
+    path: backend/src/katalon/services/pid_service.py
+  - id: batch-service
+    type: file
+    path: backend/src/katalon/services/batch_service.py
   - id: delete-tests
     type: file
     path: backend/tests/test_delete_409.py
@@ -40,7 +46,7 @@ Update endpoints retrieve the row, call `check_version` against `If-Match`, repe
 
 Only objects, entities, places, and occurrences have `/publish` endpoints [@objects-api] [@entities-api] [@places-api] [@occurrences-api]. Each endpoint calls `can_publish`, raises `422` with validation errors when the record cannot be published, then calls `publish_record` and commits [@objects-api] [@publish-service].
 
-`can_publish` checks that the record type is one of the four collection models, that the row exists, that `idno` is present, and that metadata passes schema validation without skipping required fields [@publish-service]. `publish_record` sets `status` to `public`, writes a `publish` audit entry with `changed_fields={"status": "public"}`, and re-indexes the record [@publish-service]. Procedures are excluded from the publish service model map, so their lifecycle is handled by status updates and completion instead [@publish-service] [@procedures-api].
+`can_publish` checks that the record type is one of the four collection models, that the row exists, that `idno` is present, and that metadata passes schema validation without skipping required fields [@publish-service]. `publish_record` then auto-mints missing PIDs before flipping the status: every active pid field with an explicitly configured `pid_provider` (`dnb_urn` or `ark`) and no stored value gets one PID minted, with the portal record URL as target; a mint failure returns `{"ok": false}` with the reason so publishing is blocked rather than silently publishing without a PID [@pid-service]. The same auto-mint hook runs on create/update endpoints when a record enters a public status directly and on batch `set_status` operations [@objects-api] [@batch-service]. `publish_record` sets `status` to `public`, writes a `publish` audit entry with `changed_fields={"status": "public"}`, and re-indexes the record [@publish-service]. Procedures are excluded from the publish service model map, so their lifecycle is handled by status updates and completion instead [@publish-service] [@procedures-api].
 
 ## Guarded Delete
 

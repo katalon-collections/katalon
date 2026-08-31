@@ -15,6 +15,24 @@ import { MediaLightbox } from '../MediaLightbox'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
 
+function isHttpUrlString(s: unknown): s is string {
+  if (typeof s !== 'string' || !s.trim()) return false
+  try {
+    const url = new URL(s.trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** External resolver link for a stored PID value, if one is derivable. */
+function pidHref(value: string): string | undefined {
+  if (value.startsWith('urn:')) return `https://nbn-resolving.org/${value}`
+  if (value.startsWith('ark:')) return `https://n2t.net/${value}`
+  if (isHttpUrlString(value)) return value
+  return undefined
+}
+
 /** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
@@ -1162,6 +1180,7 @@ function ImageThumb({ objectId, mediaId, alt }: { objectId: string; mediaId: str
 }
 
 export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated }: Props) {
+  const { t } = useTranslation('screenForm')
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
   const api = getApi(recordType)
@@ -1574,29 +1593,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }
 
   type PidEntry = { value: string; label: string }
-  function addPid(name: string) {
+
+  function addUrl(name: string) {
     const cur = (values[name] as PidEntry[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, { value: '', label: '' }] }))
   }
-  function removePid(name: string, idx: number) {
+  function removeUrl(name: string, idx: number) {
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as PidEntry[]) ?? []).filter((_, i) => i !== idx) }))
   }
-  function updatePid(name: string, idx: number, key: 'value' | 'label', val: string) {
-    const cur = [...((values[name] as PidEntry[]) ?? [])]
+  function updateUrl(name: string, idx: number, key: 'value' | 'label', val: string) {
+    const cur = [...((values[name] as PidEntry[] | undefined) ?? [])]
     cur[idx] = { ...cur[idx], [key]: val }
     setValuesDirty(v => ({ ...v, [name]: cur }))
   }
 
-  async function registerUrn(fieldName: string, repeatable: boolean) {
+  async function mintPid(fieldName: string, repeatable: boolean) {
     if (!savedId) return
     setRegisteringPidField(fieldName)
     try {
-      const result = await pids.registerDnbUrn({
+      const result = await pids.mint({
         record_type: recordType,
         record_id: savedId,
         field_name: fieldName,
-        target_url: `${PORTAL_URL}/${PORTAL_PATH[recordType]}/${savedId}`,
-        label: 'URN',
       })
       if (repeatable) {
         const cur = (values[fieldName] as PidEntry[] | undefined) ?? []
@@ -1844,6 +1862,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               // invalid regex on backend, ignore
             }
           }
+          if (f.field_type === 'url' && item && typeof item === 'object' && !Array.isArray(item)) {
+            if (!isHttpUrlString((item as PidEntry).value)) {
+              errors[f.name] = 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.'
+              break
+            }
+          }
         }
         continue
       }
@@ -1872,6 +1896,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           } catch {
             // invalid regex on backend, ignore
           }
+        }
+      }
+      if (f.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val)) {
+        if (!isHttpUrlString((val as PidEntry).value)) {
+          errors[f.name] = 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.'
         }
       }
     }
@@ -1910,6 +1939,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         } catch {
           // ignore
         }
+      }
+    }
+    if (field.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val)) {
+      if (!isHttpUrlString((val as PidEntry).value)) {
+        return { level: 'error', message: 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.' }
       }
     }
     return null
@@ -2806,58 +2840,104 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           </button>
                         </div>
                       ) : f.field_type === 'pid' ? (
-                        repeatable ? (
-                          <>
-                            <div style={{ marginBottom: 6 }}>
-                              <button
-                                className="btn sm gh"
-                                onClick={() => registerUrn(f.name, true)}
-                                disabled={justCreated || !savedId || registeringPidField === f.name}
-                                title={!savedId ? 'Datensatz zuerst speichern, dann URN registrieren.' : undefined}
-                              >
-                                {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
-                              </button>
+                        (() => {
+                          const provider = (f.settings?.pid_provider as string) ?? 'dnb_urn'
+                          const isArk = provider === 'ark'
+                          const mintLabel = isArk ? t('pid.mintArk') : t('pid.mintUrn')
+                          const mintPending = isArk ? t('pid.mintArkPending') : t('pid.mintUrnPending')
+                          const mintHint = !savedId ? t('pid.mintHint') : undefined
+                          const href = (v: string) => pidHref(v)
+                          return (
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          {(!repeatable && pidSingle && pidSingle.value) ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 12, flex: 1, overflowWrap: 'anywhere' }}>
+                                {href(pidSingle.value) ? (
+                                  <a href={href(pidSingle.value)} target="_blank" rel="noreferrer">{pidSingle.value}</a>
+                                ) : pidSingle.value}
+                              </span>
+                              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('pid.systemManaged')}</span>
                             </div>
-                            {(pidEntries ?? []).map((entry, i) => (
-                              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                                <input className="fld mono" value={entry.value}
-                                  onChange={e => updatePid(f.name, i, 'value', e.target.value)}
-                                  placeholder="URI / ID (z.B. https://d-nb.info/…)"
-                                  disabled={justCreated} style={{ flex: 2 }} />
-                                <input className="fld" value={entry.label}
-                                  onChange={e => updatePid(f.name, i, 'label', e.target.value)}
-                                  placeholder="Anzeigebezeichnung"
-                                  disabled={justCreated} style={{ flex: 1 }} />
-                                <button className="btn sm ico gh" onClick={() => removePid(f.name, i)} disabled={justCreated}><X size={12} /></button>
-                              </div>
-                            ))}
-                            <button className="btn sm gh" onClick={() => addPid(f.name)} disabled={justCreated}>
-                              <Plus size={12} /> PID hinzufügen
-                            </button>
-                          </>
-                        ) : (
-                          <div style={{ display: 'grid', gap: 6 }}>
+                          ) : (
                             <div>
                               <button
                                 className="btn sm gh"
-                                onClick={() => registerUrn(f.name, false)}
+                                onClick={() => mintPid(f.name, repeatable)}
                                 disabled={justCreated || !savedId || registeringPidField === f.name}
-                                title={!savedId ? 'Datensatz zuerst speichern, dann URN registrieren.' : undefined}
+                                title={mintHint}
                               >
-                                {registeringPidField === f.name ? 'Registriert…' : 'URN registrieren'}
+                                {registeringPidField === f.name ? mintPending : mintLabel}
                               </button>
                             </div>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <input className="fld mono" value={pidSingle!.value}
-                                onChange={e => setField(f.name, { ...pidSingle!, value: e.target.value })}
-                                placeholder="URI / ID (z.B. https://d-nb.info/…)"
-                                disabled={justCreated} style={{ flex: 2 }} />
-                              <input className="fld" value={pidSingle!.label}
-                                onChange={e => setField(f.name, { ...pidSingle!, label: e.target.value })}
-                                placeholder="Anzeigebezeichnung"
-                                disabled={justCreated} style={{ flex: 1 }} />
+                          )}
+                          {repeatable && (pidEntries ?? []).length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {(pidEntries ?? []).map((entry, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+                                  <span style={{ fontFamily: 'var(--mono)', fontSize: 12, flex: 1, overflowWrap: 'anywhere' }}>
+                                    {href(entry.value) ? (
+                                      <a href={href(entry.value)} target="_blank" rel="noreferrer">{entry.value}</a>
+                                    ) : entry.value}
+                                  </span>
+                                  {entry.label && <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{entry.label}</span>}
+                                </div>
+                              ))}
+                              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('pid.systemManaged')}</span>
                             </div>
+                          )}
+                          {repeatable && (
+                            <div>
+                              <button
+                                className="btn sm gh"
+                                onClick={() => mintPid(f.name, repeatable)}
+                                disabled={justCreated || !savedId || registeringPidField === f.name}
+                                title={mintHint}
+                              >
+                                {registeringPidField === f.name ? mintPending : mintLabel}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                          )
+                        })()
+                      ) : f.field_type === 'url' ? (
+                        repeatable ? (
+                          <>
+                            {(((val as PidEntry[] | undefined) ?? [])).map((entry, i) => (
+                              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                <input className="fld mono" value={entry.value}
+                                  type="url"
+                                  onChange={e => updateUrl(f.name, i, 'value', e.target.value)}
+                                  placeholder="https://…"
+                                  disabled={justCreated} style={{ flex: 2 }} />
+                                <input className="fld" value={entry.label}
+                                  onChange={e => updateUrl(f.name, i, 'label', e.target.value)}
+                                  placeholder={t('url.linkLabel')}
+                                  disabled={justCreated} style={{ flex: 1 }} />
+                                <button className="btn sm ico gh" onClick={() => removeUrl(f.name, i)} disabled={justCreated}><X size={12} /></button>
+                              </div>
+                            ))}
+                            <button className="btn sm gh" onClick={() => addUrl(f.name)} disabled={justCreated}>
+                              <Plus size={12} /> {t('url.add')}
+                            </button>
+                          </>
+                        ) : (
+                          (() => {
+                            const entry = ((val as PidEntry | undefined) ?? { value: '', label: '' })
+                            return (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input className="fld mono" value={entry.value}
+                              type="url"
+                              onChange={e => setField(f.name, { ...entry, value: e.target.value })}
+                              placeholder="https://…"
+                              disabled={justCreated} style={{ flex: 2 }} />
+                            <input className="fld" value={entry.label}
+                              onChange={e => setField(f.name, { ...entry, label: e.target.value })}
+                              placeholder={t('url.linkLabel')}
+                              disabled={justCreated} style={{ flex: 1 }} />
                           </div>
+                            )
+                          })()
                         )
                       ) : repeatable ? (
                         <>

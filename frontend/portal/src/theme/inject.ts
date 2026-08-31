@@ -23,7 +23,4 @@ export function applyTheme(theme: ThemeManifest | null): void {
     document.head.appendChild(el)
   }
 
-  if (theme?.name) {
-    document.title = theme.name
-  }
 }

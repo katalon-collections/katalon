@@ -304,6 +304,23 @@ def import_records_task(
             # Resolve vocab field values: string → {id, label} by looking up/creating terms
             records = await _resolve_vocab_terms(session, field_defs, records)
 
+            # PID fields are system-managed: CSV values are dropped (PIDs are
+            # minted via the UI or automatically on publish, never imported).
+            pid_field_names = {
+                name for name, f in field_defs.items() if f.field_type == "pid"
+            }
+            for row_idx, meta in enumerate(records):
+                for pid_name in pid_field_names:
+                    if meta.get(pid_name) not in (None, "", []):
+                        meta.pop(pid_name, None)
+                        warnings.append({
+                            "row": row_idx + 1,
+                            "warning": (
+                                f"PID-Feld '{pid_name}' wird beim Import ignoriert – "
+                                "PIDs werden vom System vergeben."
+                            ),
+                        })
+
             # Load idno schema once
             cfg_result = await session.execute(select(AdminConfig).where(AdminConfig.key == "default"))
             cfg = cfg_result.scalar_one_or_none()
@@ -358,7 +375,13 @@ def import_records_task(
                                         merged[k] = v
                                 existing.metadata_ = merged
                             elif upsert_strategy == "replace":
-                                existing.metadata_ = metadata
+                                old_meta = existing.metadata_ or {}
+                                preserved_pids = {
+                                    k: v
+                                    for k, v in old_meta.items()
+                                    if k in pid_field_names and v not in (None, "", [])
+                                }
+                                existing.metadata_ = {**metadata, **preserved_pids}
                                 if subtype_field:
                                     setattr(existing, subtype_field, subtype)
                             await session.flush()

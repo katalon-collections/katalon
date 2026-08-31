@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'
 import { saveLastSearch } from '../hooks/useBackToSearch'
@@ -47,6 +47,18 @@ function isNumericFacet(
   return owners.length > 0 && owners.every(owner => labels[owner]?.[field]?.field_type === 'number')
 }
 
+function isBooleanFacet(
+  field: string,
+  labels: Record<string, Record<string, { field_type: string }>>,
+  config: Record<string, string[]>,
+  recordType: string,
+): boolean {
+  const owners = recordType
+    ? [recordType]
+    : Object.entries(config).filter(([type, fields]) => type !== '_system' && fields.includes(field)).map(([type]) => type)
+  return owners.length > 0 && owners.every(owner => labels[owner]?.[field]?.field_type === 'boolean')
+}
+
 function NumericFacetPanel({ label, bounds, from, to, onChange }: {
   label: string
   bounds: { min: number; max: number } | undefined
@@ -55,9 +67,22 @@ function NumericFacetPanel({ label, bounds, from, to, onChange }: {
   onChange: (from: string, to: string) => void
 }) {
   const { t } = useI18n()
+  const [sliderRange, setSliderRange] = useState({ from, to })
+  const committedRange = useRef({ from, to })
+
+  useEffect(() => {
+    setSliderRange({ from, to })
+    committedRange.current = { from, to }
+  }, [from, to])
+
   if (!bounds) return null
-  const lower = Number(from || bounds.min)
-  const upper = Number(to || bounds.max)
+  const lower = Number(sliderRange.from || bounds.min)
+  const upper = Number(sliderRange.to || bounds.max)
+  const commitSliderRange = () => {
+    if (sliderRange.from === committedRange.current.from && sliderRange.to === committedRange.current.to) return
+    committedRange.current = sliderRange
+    onChange(sliderRange.from, sliderRange.to)
+  }
   return (
     <div className="numeric-facet">
       <h3>{label}</h3>
@@ -65,8 +90,8 @@ function NumericFacetPanel({ label, bounds, from, to, onChange }: {
         <input aria-label={`${label}: ${t('advanced.from')}`} type="number" value={from} placeholder={t('advanced.from')} onChange={event => onChange(event.target.value, to)} />
         <input aria-label={`${label}: ${t('advanced.to')}`} type="number" value={to} placeholder={t('advanced.to')} onChange={event => onChange(from, event.target.value)} />
       </div>
-      <input aria-label={`${label}: ${t('advanced.from')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.min(lower, upper)} onChange={event => onChange(event.target.value, to && Number(event.target.value) > Number(to) ? event.target.value : to)} />
-      <input aria-label={`${label}: ${t('advanced.to')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.max(lower, upper)} onChange={event => onChange(from && Number(event.target.value) < Number(from) ? event.target.value : from, event.target.value)} />
+      <input aria-label={`${label}: ${t('advanced.from')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.min(lower, upper)} onChange={event => setSliderRange(range => ({ from: event.target.value, to: range.to && Number(event.target.value) > Number(range.to) ? event.target.value : range.to }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
+      <input aria-label={`${label}: ${t('advanced.to')} slider`} type="range" min={bounds.min} max={bounds.max} step="any" value={Math.max(lower, upper)} onChange={event => setSliderRange(range => ({ from: range.from && Number(event.target.value) < Number(range.from) ? event.target.value : range.from, to: event.target.value }))} onPointerUp={commitSliderRange} onBlur={commitSliderRange} />
       {(from || to) && <button type="button" className="facet-reset" onClick={() => onChange('', '')}>{t('search.all')}</button>}
     </div>
   )
@@ -88,12 +113,13 @@ function resultSubtitle(
     .join(' · ')
 }
 
-function FacetPanel({ label, buckets, active, onSelect, initialCount }: {
+function FacetPanel({ label, buckets, active, onSelect, initialCount, translateBooleanValues = false }: {
   label: string
   buckets: FacetBucket[]
   active: string[]
   onSelect: (v: string) => void
   initialCount: number
+  translateBooleanValues?: boolean
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
@@ -113,7 +139,7 @@ function FacetPanel({ label, buckets, active, onSelect, initialCount }: {
           aria-pressed={active.includes(b.value)}
           style={{ fontWeight: active.includes(b.value) ? 600 : undefined }}
         >
-          <span>{typeLabel(b.value)}</span>
+          <span>{translateBooleanValues && ['true', 'false'].includes(b.value.toLowerCase()) ? t(b.value.toLowerCase() === 'true' ? 'advanced.yes' : 'advanced.no') : typeLabel(b.value)}</span>
           <span className="ct">{b.count}</span>
         </button>
       ))}
@@ -410,6 +436,7 @@ export function SearchPage() {
                 active={metaFilters[field] ?? []}
                 onSelect={v => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')}
                 initialCount={facetInitialCount}
+                translateBooleanValues={isBooleanFacet(field, fieldLabels, facetConfig, effectiveType)}
               />
             )
           })}

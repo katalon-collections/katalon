@@ -74,7 +74,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
   const [result, setResult] = useState<BatchResponse | null>(null)
 
   const batchableFields = useMemo(
-    () => fields.filter(f => f.field_type !== 'group' && f.field_type !== 'pid' && f.field_type !== 'authority'),
+    () => fields.filter(f => f.field_type !== 'group' && f.field_type !== 'pid' && f.field_type !== 'url' && f.field_type !== 'authority'),
     [fields]
   )
 
