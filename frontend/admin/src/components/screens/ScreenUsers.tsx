@@ -339,6 +339,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                 <th>{t('tableRole')}</th>
                 <th>{t('tableStatus')}</th>
                 <th>{t('tableCreated')}</th>
+                <th>{t('tableLastLogin')}</th>
                 <th>{t('tableApiKeys')}</th>
                  <th className="col-act" />
                </tr>
@@ -391,6 +392,9 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                     <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>
                       {new Date(u.created_at).toLocaleDateString('de-DE')}
                     </td>
+                    <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString('de-DE') : '—'}
+                    </td>
                     <td>
                       <button
                         className="btn sm gh"
@@ -421,14 +425,14 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                   </tr>
                    {expandedKeys.has(u.id) && (
                      <tr key={`${u.id}-keys`}>
-                       <td colSpan={6} style={{ padding: '0 8px 12px' }}>
+                       <td colSpan={7} style={{ padding: '0 8px 12px' }}>
                          <ApiKeysPanel userId={u.id} />
                        </td>
                      </tr>
                    )}
                    {expandedCredentials.has(u.id) && (
                      <tr key={`${u.id}-credentials`}>
-                       <td colSpan={6} style={{ padding: '0 8px 12px' }}>
+                       <td colSpan={7} style={{ padding: '0 8px 12px' }}>
                          <div style={{ background: 'var(--bg-s, #f9fafb)', border: '1px solid var(--border-s)', borderRadius: 6, padding: '12px 16px', marginTop: 4 }}>
 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('credentialsTitle')}</div>
                             <div className="field">
@@ -452,7 +456,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                 )
                })}
                {userList.length === 0 && (
-                <tr><td colSpan={6} className="empty">{t('empty')}</td></tr>
+                <tr><td colSpan={7} className="empty">{t('empty')}</td></tr>
               )}
             </tbody>
           </table>

@@ -90,6 +90,8 @@ async def login(
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Konto deaktiviert")
+    user.last_login_at = datetime.now(UTC)
+    await db.commit()
     return issue_token_pair(user)
 
 

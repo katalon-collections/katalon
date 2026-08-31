@@ -376,6 +376,7 @@ class UserRead(BaseModel):
     is_active: bool
     created_at: datetime
     onboarding_completed_at: datetime | None = None
+    last_login_at: datetime | None = None
 
 
 class RolePermissionRead(BaseModel):

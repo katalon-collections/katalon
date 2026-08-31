@@ -605,6 +605,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
 
     api_keys: Mapped[list["ApiKey"]] = relationship(
         back_populates="user",

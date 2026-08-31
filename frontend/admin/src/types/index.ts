@@ -291,6 +291,7 @@ export interface UserRead {
   is_active: boolean
   created_at: string
   onboarding_completed_at: string | null
+  last_login_at: string | null
 }
 
 export interface RolePermission {

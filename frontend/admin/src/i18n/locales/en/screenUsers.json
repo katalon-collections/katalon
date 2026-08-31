@@ -20,6 +20,7 @@
   "tableRole": "Role",
   "tableStatus": "Status",
   "tableCreated": "Created",
+  "tableLastLogin": "Last login",
   "tableApiKeys": "API keys",
   "active": "Active",
   "inactive": "Inactive",

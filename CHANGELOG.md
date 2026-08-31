@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.12.6] - 2026-08-31
+
+### Added
+- Nutzerliste zeigt jetzt letzten Login pro Konto (Admin & Superuser).
+
 ## [1.12.5] - 2026-08-30
 
 ### Added
