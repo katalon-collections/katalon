@@ -110,6 +110,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const selectAllRef = useRef<HTMLInputElement>(null)
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
+  const [sortBy, setSortBy] = useState<'idno' | 'status' | 'updated_at' | ''>('')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectionMode, setSelectionMode] = useState<'page' | 'all'>('page')
   const [batchOpen, setBatchOpen] = useState(false)
 
@@ -183,6 +185,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       if (dueBefore) params.due_before = dueBefore
       if (referenceNumber) params.reference_number = referenceNumber
     }
+    if (sortBy) { params.sort_by = sortBy; params.sort_dir = sortDir }
     ;(api.list as (p: typeof params) => Promise<Page<AnyRecord>>)(params)
       .then(d => {
         if (requestSeq !== requestSeqRef.current) return
@@ -199,11 +202,16 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       .finally(() => {
         if (requestSeq === requestSeqRef.current) setLoading(false)
       })
-  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, api, recordType])
+  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, sortBy, sortDir, api, recordType])
 
   useEffect(() => { load() }, [load])
 
   function handleTabChange(id: string) { resetSelection(); setTab(id); setPage(1); onTabChange?.(id) }
+  function handleSort(col: 'idno' | 'status' | 'updated_at') {
+    if (sortBy === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
+    else { setSortBy(col); setSortDir('asc') }
+    setPage(1)
+  }
   function handleSearch(v: string) { resetSelection(); setQ(v); setPage(1) }
   function handleOverdue() {
     resetSelection()
@@ -392,14 +400,22 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   />
                 </label>
               </th>
-              {showIdno && <th>{t('tableIdno')}</th>}
+              {showIdno && (
+                <th className="sortable" onClick={() => handleSort('idno')}>
+                  {t('tableIdno')}{sortBy === 'idno' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                </th>
+              )}
               {showSubtype && <th>{t('tableType')}</th>}
               <th>{primaryLabel}</th>
               {extraFields.map(f => (
                 <th key={f.name}>{f.label?.de || f.label?.en || f.name}</th>
               ))}
-              <th>{t('tableStatus')}</th>
-              <th>{t('tableChanged')}</th>
+              <th className="sortable" onClick={() => handleSort('status')}>
+                {t('tableStatus')}{sortBy === 'status' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+              </th>
+              <th className="sortable" onClick={() => handleSort('updated_at')}>
+                {t('tableChanged')}{sortBy === 'updated_at' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+              </th>
               <th className="col-act" />
             </tr>
           </thead>

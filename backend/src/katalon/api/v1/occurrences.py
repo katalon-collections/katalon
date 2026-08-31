@@ -15,6 +15,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot, User
 from katalon.core.schemas import (
     AuditLogRead,
@@ -62,6 +63,8 @@ async def list_occurrences(
     occurrence_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    sort_by: SortBy | None = None,
+    sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
     query = select(Occurrence)
     if occurrence_type:
@@ -76,7 +79,7 @@ async def list_occurrences(
             | cast(Occurrence.metadata_, Text).icontains(q, autoescape=True)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
-    query = query.offset((page - 1) * page_size).limit(page_size).order_by(Occurrence.updated_at.desc())
+    query = apply_sort(query.offset((page - 1) * page_size).limit(page_size), Occurrence, sort_by, sort_dir)
     items = (await db.execute(query)).scalars().all()
     response_items = [OccurrenceRead.model_validate(i) for i in items]
     if visibility_user is None:

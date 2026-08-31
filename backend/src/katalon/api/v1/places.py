@@ -16,6 +16,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Place, RecordSnapshot, User
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
 from katalon.core.visibility import apply_public_visibility, ensure_publicly_visible
@@ -57,6 +58,8 @@ async def list_places(
     place_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    sort_by: SortBy | None = None,
+    sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
     query = select(Place)
     if place_type:
@@ -71,7 +74,7 @@ async def list_places(
             | sql_cast(Place.metadata_, Text).icontains(q, autoescape=True)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
-    query = query.offset((page - 1) * page_size).limit(page_size).order_by(Place.updated_at.desc())
+    query = apply_sort(query.offset((page - 1) * page_size).limit(page_size), Place, sort_by, sort_dir)
     items = (await db.execute(query)).scalars().all()
     response_items = [PlaceRead.model_validate(i) for i in items]
     if visibility_user is None:

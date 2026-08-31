@@ -180,7 +180,7 @@ export const users = {
 
 // Objects
 export const objects = {
-  list: (params?: { page?: number; page_size?: number; status?: string; object_type?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; object_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<KatalonObject>>(`/v1/objects${qs ? `?${qs}` : ''}`)
   },
@@ -200,7 +200,7 @@ export const objects = {
 
 // Entities
 export const entities = {
-  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Entity>>(`/v1/entities${qs ? `?${qs}` : ''}`)
   },
@@ -220,7 +220,7 @@ export const entities = {
 
 // Places
 export const places = {
-  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },
@@ -240,7 +240,7 @@ export const places = {
 
 // Occurrences
 export const occurrences = {
-  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Occurrence>>(`/v1/occurrences${qs ? `?${qs}` : ''}`)
   },
@@ -260,7 +260,7 @@ export const occurrences = {
 
 // Procedures
 export const procedures = {
-  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; q?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Procedure>>(`/v1/procedures${qs ? `?${qs}` : ''}`)
   },

@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-08-31
+
+### Fixed
+- Aktions-Buttons (Bearbeiten/Löschen) in Datensatzlisten sind nicht mehr nur bei Hover sichtbar.
+
+### Added
+- Spalten ID-Nr., Status und Geändert in Datensatzlisten sind per Klick auf den Spaltenkopf sortierbar (auf-/absteigend).
+
 ## [1.15.2] - 2026-08-31
 
 ### Added

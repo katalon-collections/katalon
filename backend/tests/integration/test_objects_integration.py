@@ -352,3 +352,24 @@ async def test_concurrent_duplicate_idno_returns_client_error(async_client, auth
         async_client.post("/v1/objects", headers=auth_headers, json=payload),
     )
     assert sorted(response.status_code for response in responses) == [201, 400]
+
+
+@pytest.mark.asyncio
+async def test_object_list_sort_by_idno(async_client, auth_headers) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    for idno in (f"SORT-B-{suffix}", f"SORT-A-{suffix}"):
+        response = await async_client.post(
+            "/v1/objects",
+            headers=auth_headers,
+            json={"idno": idno, "status": "draft", "metadata_": {}},
+        )
+        assert response.status_code == 201
+
+    asc = await async_client.get(
+        "/v1/objects",
+        headers=auth_headers,
+        params={"q": suffix, "sort_by": "idno", "sort_dir": "asc"},
+    )
+    assert asc.status_code == 200
+    items = [i for i in asc.json()["items"] if suffix in i["idno"]]
+    assert [i["idno"] for i in items] == sorted(i["idno"] for i in items)

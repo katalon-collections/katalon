@@ -8,6 +8,7 @@ from sqlalchemy import Text, cast, func, select
 
 from katalon.core.concurrency import check_version, flush_record
 from katalon.core.dependencies import DBDep, require_record_permission
+from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Object, Procedure, User
 from katalon.core.schemas import (
     AuditLogRead,
@@ -116,6 +117,8 @@ async def list_procedures(
     due_before: date | None = None,
     reference_number: str | None = None,
     q: str | None = None,
+    sort_by: SortBy | None = None,
+    sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
     query = select(Procedure)
     if procedure_type:
@@ -133,11 +136,7 @@ async def list_procedures(
             | cast(Procedure.metadata_, Text).icontains(q, autoescape=True)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
-    query = (
-        query.offset((page - 1) * page_size)
-        .limit(page_size)
-        .order_by(Procedure.updated_at.desc())
-    )
+    query = apply_sort(query.offset((page - 1) * page_size).limit(page_size), Procedure, sort_by, sort_dir)
     items = (await db.execute(query)).scalars().all()
     return {
         "total": total,

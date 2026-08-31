@@ -15,6 +15,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import (
     AdminConfig,
     FieldDefinition,
@@ -70,6 +71,8 @@ async def list_objects(
     status: str | None = None,
     object_type: str | None = None,
     q: str | None = None,
+    sort_by: SortBy | None = None,
+    sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
     query = select(Object)
     if status:
@@ -87,7 +90,7 @@ async def list_objects(
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
 
-    query = query.offset((page - 1) * page_size).limit(page_size).order_by(Object.updated_at.desc())
+    query = apply_sort(query.offset((page - 1) * page_size).limit(page_size), Object, sort_by, sort_dir)
     result = await db.execute(query)
     items = result.scalars().all()
 

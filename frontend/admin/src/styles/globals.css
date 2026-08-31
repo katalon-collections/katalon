@@ -172,8 +172,9 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-2); }
 .tbl .mono { font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-2); }
 .tbl .tt { font-weight: 500; color: var(--fg); }
-.tbl .row-actions { display: flex; gap: 1px; justify-content: flex-end; opacity: 0; transition: opacity .1s; }
-.tbl tr:hover .row-actions, .tbl tr:focus-within .row-actions { opacity: 1; }
+.tbl .row-actions { display: flex; gap: 1px; justify-content: flex-end; }
+.tbl th.sortable { cursor: pointer; }
+.tbl th.sortable:hover { color: var(--fg); }
 .thumb { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg,#cfd5e1,#a4afc4); display: inline-block; vertical-align: middle; background-size: cover; background-position: center; flex-shrink: 0; border: 1px solid rgba(0,0,0,.05); }
 
 /* Checkbox */
