@@ -10,6 +10,8 @@ from testcontainers.postgres import PostgresContainer
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 TEST_SECRETS_KEY = "test-katalon-secrets-key-32-chars"
 
+os.environ["DEBUG"] = "true"
+
 
 def _to_asyncpg(url: str) -> str:
     if url.startswith("postgresql+psycopg2://"):
