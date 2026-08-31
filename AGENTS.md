@@ -238,6 +238,10 @@ Sprachspezifische Coding-Regeln liegen nicht hier, sondern in `.agents/rules/`, 
 - Wird `frontend/admin/` oder `frontend/portal/` angefasst → vorher `.agents/rules/frontend.md` lesen.
 - Beide betroffen (siehe Full-Stack Exploration Rule unten) → beide Dateien lesen.
 
+## Admin-I18n
+
+Jede neue oder geänderte sichtbare Zeichenkette in der Admin-UI muss auf Deutsch und Englisch vorliegen. Keine fest kodierten UI-Texte nur für eine Sprache ergänzen.
+
 ## Full-Stack Exploration Rule
 
 **Any feature touches both backend AND frontend.** Before starting exploration or planning:
@@ -257,7 +261,9 @@ Key mappings:
 
 Katalon verwendet Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
-**Regel: Mit jedem Commit die Patch-Version hochziehen** (`0.1.0` → `0.1.1` → `0.1.2` …).
+**Regel: Bei jeder echten programmatischen Änderung die Patch-Version hochziehen** (`0.1.0` → `0.1.1` → `0.1.2` …).
+
+Reine Dokumentation, Agent-Anweisungen, Metadaten oder Lockfile-Nachzüge ohne Programmänderung brauchen keinen Versions-Bump, kein Release-Tag und keine vollständige Testsuite. Diff-Check genügt; weitergehende Verifikation nur auf ausdrücklichen Wunsch.
 
 Dazu bei jedem Commit:
 1. `backend/pyproject.toml` — `version = "x.y.z"`
