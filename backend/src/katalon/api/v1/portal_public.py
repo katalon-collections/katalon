@@ -314,8 +314,6 @@ def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
             model.status.in_(PUBLIC_STATUSES),
             model.deleted_at.is_(None),
         ]
-        if model is Object:
-            conditions.append(model.collection_status == "active")
         clauses.append(and_(type_column == record_type, exists(select(model.id).where(*conditions))))
     return or_(*clauses)
 
@@ -398,7 +396,6 @@ async def search(
         numeric_filters=numeric_filters or None,
         facet_fields=[field.strip() for field in facets.split(",") if field.strip()] if facets else None,
         rel_filters=rel_filters or None,
-        active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
     )
@@ -447,7 +444,6 @@ async def advanced_search(
         numeric_filters=numeric_filters or None,
         facet_fields=data.facet_fields or None,
         rel_filters=allowed_relation_filters or None,
-        active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         advanced_filter=advanced_filter,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",

@@ -94,7 +94,6 @@ async def search(
     }
     facet_fields = [f.strip() for f in facets.split(",") if f.strip()] if facets else []
     rel_filters: dict[str, str] = {}
-    active_objects_only = current_user is None
     if rel_entity:
         rel_filters["related_entities"] = rel_entity
     if rel_place:
@@ -116,7 +115,6 @@ async def search(
         numeric_filters=numeric_filters or None,
         facet_fields=facet_fields or None,
         rel_filters=rel_filters or None,
-        active_objects_only=active_objects_only,
     )
     return SearchResponse(**result)
 

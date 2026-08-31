@@ -207,7 +207,6 @@ async def search_documents(
     numeric_filters: dict[str, tuple[float | None, float | None]] | None = None,
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, str] | None = None,
-    active_objects_only: bool = False,
     record_types: tuple[str, ...] | None = None,
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
@@ -258,16 +257,6 @@ async def search_documents(
     }
     for field, value in (rel_filters or {}).items():
         filters.append({"term": {field: value}})
-    if active_objects_only:
-        filters.append({
-            "bool": {
-                "should": [
-                    {"bool": {"must_not": {"term": {"record_type": "object"}}}},
-                    {"term": {"collection_status": "active"}},
-                ],
-                "minimum_should_match": 1,
-            }
-        })
     if advanced_filter:
         filters.append(advanced_filter)
 
@@ -346,8 +335,6 @@ async def search_ids_by_filter(
         {"term": {"status": "public"}},
         advanced_filter,
     ]
-    if record_type == "object":
-        filters.append({"term": {"collection_status": "active"}})
     result = await es.search(
         index=ALIAS_NAME,
         body={
