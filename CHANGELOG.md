@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.5] - 2026-08-31
+
+### Fixed
+- Admin: Verknüpfte Datensätze in der Beziehungen-Sektion zeigten bei nicht ladbarem Zielrecord (keine Berechtigung, gelöscht, Netzwerkfehler) eine gekürzte rohe UUID an statt eines verständlichen Hinweises. Zeigt jetzt „Nicht verfügbar" bzw. „Ohne Titel" statt UUID-Fragment. (#324, teilweise — Backend-Display-API und Portal-Auflösung für `entstehung.beteiligte` weiterhin offen)
+
 ## [1.13.4] - 2026-08-31
 
 ### Fixed

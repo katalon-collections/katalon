@@ -1292,12 +1292,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         const key = `${targetType}/${targetId}`
         try {
           const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
-          titleMap[key] = formatRecordLabel(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno, targetId.slice(0, 8) + '…')
+          titleMap[key] = formatRecordLabel(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno, 'Ohne Titel')
           if (targetType === 'object') {
             statusMap[targetId] = (rec as { collection_status?: string | null }).collection_status ?? 'active'
           }
         } catch {
-          titleMap[key] = targetId.slice(0, 8) + '…'
+          titleMap[key] = 'Nicht verfügbar'
         }
       }))
       setRelTitles(titleMap)
@@ -2321,7 +2321,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
             <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
             <a href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`} onClick={e => { e.preventDefault(); navigateToRecord(targetType, targetId) }} style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
-              {relTitles[targetKey] ?? targetId.slice(0, 8) + '…'}
+              {relTitles[targetKey] ?? '…'}
             </a>
           </span>
           {!schemaBound && canManageContent && (
