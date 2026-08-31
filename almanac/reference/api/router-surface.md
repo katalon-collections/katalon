@@ -60,6 +60,7 @@ These routers are included with `prefix="/v1"` in `main.py` and a `get_current_u
 | `/v1/search` | `search.py` | Search, facets, and reindex triggers [@api-dir]. |
 | `/v1/authorities` | `authority.py` | Authority source lookup [@api-dir]. |
 | `/v1/pids` | `pids.py` | Persistent identifier minting: `POST /pids/mint` dispatches to the pid field's configured provider (`dnb_urn` or `ark`); legacy `POST /pids/urn/register` delegates to the same logic [@api-dir]. |
+| `/ark:/<NAAN>/<Suffix>` | `ark.py` | Anonymous ARK resolver: redirects a stored public record to its canonical Portal URL. |
 | `/v1/importer` | `importer.py` | Record import workflows [@api-dir]. |
 | `/v1/metadata-mappings` | `metadata_mappings.py` | Import and export mapping configuration [@api-dir]. |
 | `/v1/oai-sets` | `oai_sets.py` | OAI-PMH set configuration [@api-dir]. |

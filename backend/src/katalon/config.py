@@ -63,10 +63,9 @@ class Settings(BaseSettings):
     dnb_urn_password: str = ""
     dnb_urn_resolver_url: str = "https://nbn-resolving.org/"
 
-    # ARK: lokal geprägt (kein Registrar), Test-NAAN 99999 ist von der ARK Alliance
-    # für Tests reserviert; produktiver NAAN wird später bei CDL beantragt.
-    ark_enabled: bool = True
-    ark_naan: str = "99999"
+    # ARK: lokal geprägt. Erst nach Vergabe eines produktiven NAAN aktivieren.
+    ark_enabled: bool = False
+    ark_naan: str = ""
     ark_resolver_url: str = "https://n2t.net/"
     ark_suffix_length: int = 10
 

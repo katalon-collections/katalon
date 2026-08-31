@@ -11,6 +11,7 @@ from katalon.services.pid_service import (
     PidMintError,
     _is_empty_pid_value,
     _provider_for_field,
+    available_pid_providers,
     ensure_pids_on_publish,
     mint_pid_for_record,
     record_portal_url,
@@ -175,6 +176,27 @@ def test_provider_for_field() -> None:
     assert "ark" in PID_PROVIDERS and "dnb_urn" in PID_PROVIDERS
     with pytest.raises(PidMintError, match="unbekannter PID-Provider"):
         _provider_for_field(make_pid_field(provider="doi"))
+
+
+def test_available_pid_providers_require_complete_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import katalon.services.pid_service as svc
+
+    monkeypatch.setattr(svc.settings, "katalon_base_url", "https://catalog.example.org")
+    monkeypatch.setattr(svc.settings, "ark_enabled", True)
+    monkeypatch.setattr(svc.settings, "ark_naan", "99999")
+    monkeypatch.setattr(svc.settings, "dnb_urn_enabled", False)
+    assert available_pid_providers() == ()
+
+    monkeypatch.setattr(svc.settings, "ark_naan", "12345")
+    assert available_pid_providers() == ("ark",)
+
+    monkeypatch.setattr(svc.settings, "dnb_urn_enabled", True)
+    monkeypatch.setattr(svc.settings, "dnb_urn_namespace", "urn:nbn:de:test")
+    monkeypatch.setattr(svc.settings, "dnb_urn_username", "user")
+    monkeypatch.setattr(svc.settings, "dnb_urn_password", "secret")
+    assert available_pid_providers() == ("ark", "dnb_urn")
 
 
 def test_record_portal_url_requires_base_url(monkeypatch: pytest.MonkeyPatch) -> None:

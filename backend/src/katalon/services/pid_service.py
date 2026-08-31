@@ -87,11 +87,14 @@ def _is_empty_pid_value(value: Any) -> bool:
 
 async def _ark_already_used(db: AsyncSession, ark: str) -> bool:
     """Check whether an ARK value already exists in any record's metadata."""
-    jsonpath = f'$.*.value == "{ark}"'
     for table in _PID_TABLES:
         result = await db.execute(
-            text(f"SELECT 1 FROM {table} WHERE jsonb_path_exists(metadata_, CAST(:p AS jsonpath)) LIMIT 1"),  # noqa: S608
-            {"p": jsonpath},
+            text(
+                f"SELECT 1 FROM {table} "  # noqa: S608
+                f"WHERE jsonb_path_exists(metadata, '$.**.value ? (@ == $ark)', jsonb_build_object('ark', CAST(:ark AS text))) "
+                f"LIMIT 1"
+            ),
+            {"ark": ark},
         )
         if result.first() is not None:
             return True

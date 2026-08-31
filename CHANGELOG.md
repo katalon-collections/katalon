@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.14] - 2026-08-31
+
+### Fixed
+- ARK-Resolver und Kollisionsprüfung verwenden korrekte JSONB-Parameterbindung, damit ARKs in `metadata` zuverlässig gesucht werden.
+
 ## [1.15.13] - 2026-08-31
 
 ### Added

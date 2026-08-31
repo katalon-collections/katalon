@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from katalon.api.v1 import (
     admin_config,
+    ark,
     ai,
     audit,
     auth,
@@ -470,6 +471,7 @@ app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(feedback.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_authenticated)
+app.include_router(ark.router)
 app.include_router(portal_public.router, prefix="/portal/v1")
 
 # Mock URN registrar is a test/dev fixture only — never expose its writable
