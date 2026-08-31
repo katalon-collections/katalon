@@ -63,12 +63,12 @@ def filter_public_metadata(
     return projected
 
 
-async def project_public_record(
+async def project_public_record[T: BaseModel](
     db: AsyncSession,
-    record: BaseModel,
+    record: T,
     target_type: str,
     target_subtype: str | None = None,
-) -> BaseModel:
+) -> T:
     """Return a response-model copy with internal metadata removed."""
     fields = await load_public_fields(db, target_type)
     metadata = filter_public_metadata(

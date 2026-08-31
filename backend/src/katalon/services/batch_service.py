@@ -4,6 +4,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from typing import Any
+from typing import cast as type_cast
 
 from sqlalchemy import Text, cast, select
 from sqlalchemy.orm.attributes import flag_modified
@@ -85,7 +86,7 @@ async def resolve_record_ids(
     endpoints so the frontend can target "all records matching the current
     search/filter".
     """
-    model = get_model(record_type)
+    model: Any = get_model(record_type)
 
     if ids is not None:
         stmt = select(model.id).where(model.id.in_(list(ids)), _not_deleted_clause(model))
@@ -101,7 +102,8 @@ async def resolve_record_ids(
     if status:
         stmt = stmt.where(model.status == status)
 
-    subtype = filters.get(_SUBTYPE_KEY.get(record_type))
+    subtype_key = _SUBTYPE_KEY.get(record_type)
+    subtype = filters.get(subtype_key) if subtype_key else None
     if subtype:
         stmt = stmt.where(getattr(model, _SUBTYPE_KEY[record_type]) == subtype)
 
@@ -138,7 +140,7 @@ async def _load_field_definition(
             or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == subtype),
         )
     )
-    return result.scalar_one_or_none()
+    return type_cast(FieldDefinition | None, result.scalar_one_or_none())
 
 
 def _empty_value_for_field(field: FieldDefinition) -> Any:

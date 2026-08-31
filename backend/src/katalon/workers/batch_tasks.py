@@ -43,7 +43,8 @@ def batch_edit_task(
 
     AsyncSessionLocal, engine = _make_session()
 
-    operation = BatchRequest.model_validate(request_dict).operation
+    request = BatchRequest.model_validate(request_dict)
+    operation = request.operation
     user_uuid = uuid.UUID(user_id) if user_id else None
     batch_uuid = uuid.UUID(batch_job_id)
 
@@ -52,8 +53,8 @@ def batch_edit_task(
             record_ids = await resolve_record_ids(
                 session,
                 record_type,
-                ids=operation.ids,
-                filters=operation.filters,
+                ids=request.ids,
+                filters=request.filters,
             )
             total = len(record_ids)
             self.update_state(

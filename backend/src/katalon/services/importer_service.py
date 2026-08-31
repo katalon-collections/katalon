@@ -212,8 +212,8 @@ def apply_mapping(
             container_target = container_targets.get(field_name)
             if container_target:
                 group_name, child_name = container_target
-                parts = [part for raw in raws for part in (apply_transforms(raw, transforms) if transforms else [raw])]
-                containers.setdefault(group_name, {})[child_name] = parts
+                container_parts = [part for raw in raws for part in (apply_transforms(raw, transforms) if transforms else [raw])]
+                containers.setdefault(group_name, {})[child_name] = container_parts
                 continue
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
@@ -242,10 +242,10 @@ def apply_mapping(
                 record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
             else:
                 record[field_name] = single
-        for group_name, values in containers.items():
-            count = max(len(parts) for parts in values.values())
+        for group_name, group_values in containers.items():
+            count = max(len(parts) for parts in group_values.values())
             record[group_name] = [
-                {child_name: parts[index] if index < len(parts) else "" for child_name, parts in values.items()}
+                {child_name: parts[index] if index < len(parts) else "" for child_name, parts in group_values.items()}
                 for index in range(count)
             ]
         result.append(record)
@@ -421,13 +421,13 @@ def dry_run(
             for target in [f"{groups[field.parent_id]}.{field.name}"]
         }
         for index, row in enumerate(rows):
-            counts: dict[str, list[int]] = {}
+            group_counts: dict[str, list[int]] = {}
             for selector, value in mapping.items():
                 target = value.get("target", "") if isinstance(value, dict) else value
                 group_name = targets.get(target)
                 if group_name:
-                    counts.setdefault(group_name, []).append(len(_row_values(row, selector)))
-            for group_name, lengths in counts.items():
+                    group_counts.setdefault(group_name, []).append(len(_row_values(row, selector)))
+            for group_name, lengths in group_counts.items():
                 if len(lengths) > 1 and len(set(lengths)) > 1:
                     errors.append({"row": index + 2, "message": f"Container '{group_name}': Subfelder haben unterschiedlich viele Wiederholungen"})
 
@@ -482,8 +482,8 @@ def dry_run(
         vocab_value_counts = _collect_vocab_values(rows, mapping, field_defs)
 
     vocab_clusters: dict[str, list[dict[str, Any]]] = {}
-    for field_name, counts in vocab_value_counts.items():
-        clusters = _cluster_values(counts)
+    for field_name, value_counts in vocab_value_counts.items():
+        clusters = _cluster_values(value_counts)
         if clusters:
             vocab_clusters[field_name] = clusters
 

@@ -38,6 +38,7 @@ from katalon.core.models import (
     Vocabulary,
     VocabularyTerm,
 )
+from katalon.core.schemas import EntityRead, ObjectRead, OccurrenceRead, PlaceRead
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services import search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
@@ -257,24 +258,30 @@ async def list_objects(
 
 
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
-async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object:
+async def get_object(
+    object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Object | ObjectRead:
     return await objects.get_object(object_id, db, _staff_user(current_user))
 
 
 @router.get("/entities/{entity_id}", response_model=PortalEntityRead)
-async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity:
+async def get_entity(
+    entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Entity | EntityRead:
     return await entities.get_entity(entity_id, db, _staff_user(current_user))
 
 
 @router.get("/places/{place_id}", response_model=PortalPlaceRead)
-async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place:
+async def get_place(
+    place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Place | PlaceRead:
     return await places.get_place(place_id, db, _staff_user(current_user))
 
 
 @router.get("/occurrences/{occurrence_id}", response_model=PortalOccurrenceRead)
 async def get_occurrence(
     occurrence_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Occurrence:
+) -> Occurrence | OccurrenceRead:
     return await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
 
 

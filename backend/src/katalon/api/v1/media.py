@@ -252,8 +252,10 @@ async def serve_media_file(
         query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     media = result.scalar_one_or_none()
-    path = storage_path(media.storage_key) if media else None
-    if not media or not path.exists():
+    if not media:
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    path = storage_path(media.storage_key)
+    if not path.exists():
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     return FileResponse(path, media_type=media.mime_type, filename=media.filename)
 

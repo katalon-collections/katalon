@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
-from geoalchemy2 import Geometry
+from geoalchemy2 import Geometry, WKBElement, WKTElement
 from geoalchemy2.shape import to_shape
 from sqlalchemy import (
     Boolean,
@@ -88,7 +88,7 @@ class Place(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     place_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    geom: Mapped[str | None] = mapped_column(Geometry("POINT", srid=4326))
+    geom: Mapped[WKBElement | WKTElement | None] = mapped_column(Geometry("POINT", srid=4326))
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

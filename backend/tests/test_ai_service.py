@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 from PIL import Image
 
-from katalon.config import settings
+from katalon import config
 from katalon.services.ai_service import (
     _build_messages,
     _coerce_value,
@@ -85,7 +85,7 @@ def test_group_ai_uses_only_requested_instance() -> None:
 
 
 def test_vision_image_is_resized_to_1024px_jpeg(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(config.settings, "media_root", str(tmp_path))
     path = tmp_path / "primary.png"
     Image.new("RGB", (2048, 1024), "red").save(path)
 
@@ -97,7 +97,7 @@ def test_vision_image_is_resized_to_1024px_jpeg(tmp_path, monkeypatch) -> None:
 
 
 def test_vision_image_with_alpha_remains_png(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(config.settings, "media_root", str(tmp_path))
     path = tmp_path / "primary.png"
     Image.new("RGBA", (2048, 1024), (255, 0, 0, 128)).save(path)
 

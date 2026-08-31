@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-08-31
+
+### Added
+- Das Portal kann bestehende Katalon-Konten für die interne Recherche verwenden und zeigt berechtigten Mitarbeitenden interne Datensätze, zusätzliche Schemafelder und interne Suche. Die sichtbare Registrierung bleibt bis zur öffentlichen Kontofunktion deaktiviert.
+
+### Fixed
+- Mypy ist für das Backend wieder vollständig grün; Batch-Worker, Medienpfade, Audit-Relationen, Importer und erweiterte Suche verwenden konsistente Typen.
+- Login-Zeitstempel passen zum PostgreSQL-Feld ohne Zeitzone. AI-Bildtests verwenden nach Config-Reload die aktive Medienkonfiguration.
+
 ## [1.12.7] - 2026-08-31
 
 ### Added

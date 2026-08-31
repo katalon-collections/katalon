@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import Text, func, select
@@ -139,7 +139,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: User = requir
     )
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
-        place.geom = cast(str | None, WKTElement(f"POINT({data.lon} {data.lat})", srid=4326))
+        place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
     db.add(place)
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
@@ -232,7 +232,7 @@ async def update_place(
     place.metadata_ = metadata
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
-        place.geom = cast(str | None, WKTElement(f"POINT({data.lon} {data.lat})", srid=4326))
+        place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)
 
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)

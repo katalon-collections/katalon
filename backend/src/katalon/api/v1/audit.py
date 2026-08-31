@@ -11,6 +11,17 @@ from katalon.services.audit_service import collapse_value, extract_title, format
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
+def _related_uuid(value: object) -> uuid.UUID | None:
+    if isinstance(value, uuid.UUID):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
 async def _resolve_record_labels(db: DBDep, refs: list[tuple[str, uuid.UUID]]) -> dict[uuid.UUID, str]:
     """Fetch display labels ("title (idno)") for (record_type, record_id) pairs."""
     by_type: dict[str, list[uuid.UUID]] = {}
@@ -97,16 +108,20 @@ async def list_audit_log(
     for log in logs:
         related_type = (log.changed_fields or {}).get("related_record_type")
         related_id = (log.changed_fields or {}).get("related_record_id")
-        if related_type and related_id:
-            refs.add((related_type, uuid.UUID(related_id)))
+        related_uuid = _related_uuid(related_id)
+        if isinstance(related_type, str) and related_uuid:
+            refs.add((related_type, related_uuid))
     labels = await _resolve_record_labels(db, list(refs))
 
     out: list[AuditLogRead] = []
     for log, user_email in rows:
         changed_fields = _collapse_diff_values(log.changed_fields)
         related_id = (changed_fields or {}).get("related_record_id")
-        if related_id and uuid.UUID(related_id) in labels:
-            changed_fields = {**changed_fields, "related_record_label": labels[uuid.UUID(related_id)]}
+        related_uuid = _related_uuid(related_id)
+        if related_uuid is not None and related_uuid in labels:
+            changed_fields = {
+                **(changed_fields or {}), "related_record_label": labels[related_uuid],
+            }
         out.append(AuditLogRead(
             id=log.id,
             record_type=log.record_type,

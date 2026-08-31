@@ -89,8 +89,9 @@ def collapse_value(value: object) -> object | None:
         return label_of(value)
     if isinstance(value, list):
         parts = [label_of(item) for item in value]
-        if parts and all(part is not None for part in parts):
-            return ", ".join(parts)
+        labels = [part for part in parts if part is not None]
+        if labels and len(labels) == len(parts):
+            return ", ".join(labels)
     return None
 
 

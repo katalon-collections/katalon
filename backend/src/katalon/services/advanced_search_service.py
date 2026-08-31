@@ -127,7 +127,7 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
         path = "adv_fields.keyword_value"
         if operator in {"contains", "not_contains"}:
             escaped = clause.value.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?")
-            value_query = {
+            value_query: dict[str, Any] = {
                 "wildcard": {path: {"value": f"*{escaped}*", "case_insensitive": True}}
             }
         else:
@@ -152,10 +152,10 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
     if field_type == "number":
         if operator == "between":
             start, end = _pair(clause.value)
-            lower, upper = _number(start), _number(end)
-            if lower > upper:
+            numeric_lower, numeric_upper = _number(start), _number(end)
+            if numeric_lower > numeric_upper:
                 raise ValueError("Die untere Zahlengrenze muss vor der oberen liegen.")
-            value_query = {"range": {"adv_fields.number_value": {"gte": lower, "lte": upper}}}
+            value_query = {"range": {"adv_fields.number_value": {"gte": numeric_lower, "lte": numeric_upper}}}
         elif operator in {"eq", "neq"}:
             value_query = {"term": {"adv_fields.number_value": _number(clause.value)}}
         elif operator in {"lt", "lte", "gt", "gte"}:
@@ -168,22 +168,22 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
     if field_type == "date":
         if operator == "between":
             start, end = _pair(clause.value)
-            lower = date_bounds(str(start))[0]
-            upper = date_bounds(str(end))[1]
-            if lower is not None and upper is not None and lower > upper:
+            date_lower = date_bounds(str(start))[0]
+            date_upper = date_bounds(str(end))[1]
+            if date_lower is not None and date_upper is not None and date_lower > date_upper:
                 raise ValueError("Die untere Datumsgrenze muss vor der oberen liegen.")
-            return _date_overlap(field.name, lower, upper)
-        lower, upper = date_bounds(str(clause.value))
+            return _date_overlap(field.name, date_lower, date_upper)
+        date_lower, date_upper = date_bounds(str(clause.value))
         if operator == "before":
-            if lower is None:
+            if date_lower is None:
                 raise ValueError("'Vor' benötigt eine geschlossene Datumsgrenze.")
-            return _nested_field(field.name, {"range": {"adv_fields.date_max": {"lt": lower}}})
+            return _nested_field(field.name, {"range": {"adv_fields.date_max": {"lt": date_lower}}})
         if operator == "after":
-            if upper is None:
+            if date_upper is None:
                 raise ValueError("'Nach' benötigt eine geschlossene Datumsgrenze.")
-            return _nested_field(field.name, {"range": {"adv_fields.date_min": {"gt": upper}}})
+            return _nested_field(field.name, {"range": {"adv_fields.date_min": {"gt": date_upper}}})
         if operator == "on":
-            return _date_overlap(field.name, lower, upper)
+            return _date_overlap(field.name, date_lower, date_upper)
         raise ValueError(f"Operator '{operator}' passt nicht zu Datumsfeldern.")
 
     raise ValueError(f"Feldtyp '{field_type}' wird in der erweiterten Suche nicht unterstützt.")
