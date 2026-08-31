@@ -11,6 +11,21 @@ export type AuthorityEntry = {
   coordinates?: { lat: number; lng: number }
 }
 
+const AUTHORITY_URLS: Record<string, string> = {
+  gnd: 'https://d-nb.info/gnd/',
+  geonames: 'https://www.geonames.org/',
+  viaf: 'https://viaf.org/viaf/',
+  wikidata: 'https://www.wikidata.org/wiki/',
+  tgn: 'https://vocab.getty.edu/tgn/',
+  iconclass: 'https://iconclass.org/',
+  aat: 'https://vocab.getty.edu/aat/',
+}
+
+function authorityUrl({ source, external_id }: AuthorityEntry): string | null {
+  const baseUrl = AUTHORITY_URLS[source]
+  return baseUrl ? `${baseUrl}${encodeURIComponent(external_id)}` : null
+}
+
 function geonamesCoordinates(value: AuthorityEntry): { lat: number; lng: number } | null {
   if (value.source !== 'geonames' || !value.coordinates) return null
   const { lat, lng } = value.coordinates
@@ -125,18 +140,29 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   }
 
   if (value) {
+    const url = authorityUrl(value)
+    const chipStyle = {
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '3px 8px', borderRadius: 4,
+      background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+    }
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '3px 8px', borderRadius: 4,
-          background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
-        }}>
-          {value.label || value.external_id}
-          <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>
-            {value.source}:{value.external_id}
+        {url ? (
+          <a href={url} target="_blank" rel="noreferrer" style={chipStyle}>
+            {value.label || value.external_id}
+            <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>
+              {value.source}:{value.external_id}
+            </span>
+          </a>
+        ) : (
+          <span style={chipStyle}>
+            {value.label || value.external_id}
+            <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>
+              {value.source}:{value.external_id}
+            </span>
           </span>
-        </span>
+        )}
         {!disabled && (
           <button className="btn sm ico gh" onClick={() => onChange(null)} title={t('remove')} aria-label={t('removeAriaLabel', { label: value.label || value.external_id })}>
             <X size={12} />

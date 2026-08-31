@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-08-31
+
+### Added
+- Eingetragene Normdaten verlinken im Adminformular direkt auf ihren öffentlichen Datensatz.
+
 ## [1.15.0] - 2026-08-31
 
 ### Added

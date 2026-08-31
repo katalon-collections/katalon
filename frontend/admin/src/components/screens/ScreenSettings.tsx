@@ -412,7 +412,6 @@ function SectionDangerZone() {
   const [activeSubtype, setActiveSubtype] = useState('')
   const [summary, setSummary] = useState<number | null>(null)
   const [confirmation, setConfirmation] = useState('')
-  const { t } = useTranslation('screenSettings')
   const [resetting, setResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)

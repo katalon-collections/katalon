@@ -49,7 +49,6 @@ function colorStyle(color: Banner['color']): React.CSSProperties {
 export function ScreenBanners() {
   const { t } = useTranslation('screenBanners')
   const [banners, setBanners] = useState<Banner[]>([])
-  const colorLabel = (c: Banner['color']) => COLORS.find(x => x.value === c)?.label ?? c
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<string | null>(null)
   const [isNew, setIsNew] = useState(false)

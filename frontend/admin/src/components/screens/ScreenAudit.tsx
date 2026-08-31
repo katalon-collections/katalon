@@ -117,9 +117,6 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
     relation_add: t('actionLabels.relation_add'), relation_update: t('actionLabels.relation_update'), relation_delete: t('actionLabels.relation_delete'),
     ai_schema_assist: t('actionLabels.ai_schema_assist'),
   }
-  const TYPE_SINGULAR_LABELS: Record<string, string> = {
-    object: t('typeLabels.object'), entity: t('typeLabels.entity'), place: t('typeLabels.place'), occurrence: t('typeLabels.occurrence'), procedure: t('typeLabels.procedure'),
-  }
   const [filter, setFilter] = useState(initialFilter && ACTIONS.includes(initialFilter) ? initialFilter : 'all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
