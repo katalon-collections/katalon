@@ -40,6 +40,40 @@ def test_settings_require_katalon_secrets_key() -> None:
         Settings(katalon_secrets_key="short")
 
 
+def test_enabled_smtp_rejects_conflicting_tls_modes() -> None:
+    with pytest.raises(ValidationError, match="SMTP_STARTTLS"):
+        Settings(
+            katalon_secrets_key="x" * 32,
+            smtp_enabled=True,
+            smtp_host="smtp.example.org",
+            smtp_from="Katalon <noreply@example.org>",
+            katalon_base_url="https://katalon.example.org",
+            smtp_ssl_tls=True,
+        )
+
+
+def test_enabled_smtp_requires_a_tls_mode() -> None:
+    with pytest.raises(ValidationError, match="Exactly one"):
+        Settings(
+            katalon_secrets_key="x" * 32,
+            smtp_enabled=True,
+            smtp_host="smtp.example.org",
+            smtp_from="Katalon <noreply@example.org>",
+            katalon_base_url="https://katalon.example.org",
+            smtp_starttls=False,
+        )
+
+
+def test_enabled_smtp_requires_katalon_base_url() -> None:
+    with pytest.raises(ValidationError, match="KATALON_BASE_URL"):
+        Settings(
+            katalon_secrets_key="x" * 32,
+            smtp_enabled=True,
+            smtp_host="smtp.example.org",
+            smtp_from="Katalon <noreply@example.org>",
+        )
+
+
 def test_env_files_support_shallow_container_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "__file__", "/app/src/katalon/config.py")
 

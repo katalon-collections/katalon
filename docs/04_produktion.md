@@ -23,6 +23,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] Wikidata-Adapter: `WIKIDATA_USER_AGENT` setzen oder `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL` vollständig pflegen (Wikidata-Policy erfordert identifizierbaren User-Agent)
 - [ ] Backup-Strategie eingerichtet (Cron für DB-Dump, Media-Volume gesichert)
 - [ ] Automatische Zertifikatserneuerung (certbot-Cron) eingerichtet
+- [ ] Für transaktionale E-Mails: SMTP-Relay, Absender-Domain und SPF/DKIM/DMARC eingerichtet
 - [ ] Nach erstem Start: `alembic upgrade head` ausgeführt
 - [ ] Nach erstem Start: First-Run-`superuser`-Passwort geändert
 
@@ -54,6 +55,25 @@ Mindestens diese Werte anpassen:
 | `CORS_ORIGINS` | Komma-separierte Liste erlaubter Frontends |
 | `OAI_ADMIN_EMAIL` | Erscheint im OAI-PMH Identify-Response |
 | `WIKIDATA_USER_AGENT` | Optionaler User-Agent für Wikidata. Leer = automatisch aus `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL`. |
+| `SMTP_*` | Optionaler externer SMTP-Relay für transaktionale E-Mails. Passwort nur als Betreiber-Secret setzen. |
+
+### SMTP für transaktionale E-Mails
+
+Katalon betreibt keinen eigenen Mailserver. Für Passwort-Reset und spätere Benachrichtigungen wird ein externer SMTP-Relay verwendet. Versand bleibt mit `SMTP_ENABLED=false` deaktiviert, bis Relay und Absender vollständig konfiguriert sind.
+
+```env
+SMTP_ENABLED=true
+SMTP_HOST=smtp.example.org
+SMTP_PORT=587
+SMTP_USERNAME=noreply@example.org
+SMTP_PASSWORD=BETREIBER_SECRET
+SMTP_FROM=Katalon <noreply@example.org>
+SMTP_STARTTLS=true
+SMTP_SSL_TLS=false
+KATALON_BASE_URL=https://katalon.example.org
+```
+
+Port 587 verwendet üblicherweise STARTTLS. Für implizites TLS (meist Port 465) `SMTP_STARTTLS=false` und `SMTP_SSL_TLS=true` setzen. Bei aktiviertem SMTP muss genau ein TLS-Modus aktiv sein und `KATALON_BASE_URL` gesetzt sein, damit sichere Reset-Links erzeugt werden können. Die Absender-Domain benötigt SPF, DKIM und DMARC; außerdem muss der Server den SMTP-Host erreichen können. `SMTP_PASSWORD` gehört ausschließlich in die nicht versionierte Produktionsumgebung oder die Secret-Verwaltung.
 
 ### Instanzspezifische Docker-Compose-Anpassungen
 

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-08-31
+
+### Added
+- SMTP-gestützter E-Mail-Versand für Staff-Konten, mit TLS-Konfiguration, sicherem Passwort-Reset und Ergebnisbenachrichtigungen für Datensatzimporte sowie asynchrone Batch-Bearbeitungen. (#86)
+
 ## [1.14.0] - 2026-08-31
 
 ### Added

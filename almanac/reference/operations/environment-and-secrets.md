@@ -78,7 +78,13 @@ On first startup with no existing admin or superuser and a usable `KATALON_BASE_
 | `WIKIDATA_USER_AGENT` | empty | Optional authority lookup user agent; `.env.example` says to leave it empty to derive from base URL and admin email [@env-example] [@config] |
 | `DNB_URN_*` | disabled and empty credentials by default | DNB URN integration settings [@config] [@env-example] |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | Optional Telegram feedback or notification settings passed into API service [@config] [@compose] |
+| `SMTP_ENABLED` | `false` | Enables the optional external SMTP relay for transactional email [@config] [@compose] |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | empty host/credentials/from; port `587` | Relay connection and sender. Username and password must be set together; the password is an operator secret [@config] [@compose] |
+| `SMTP_STARTTLS`, `SMTP_SSL_TLS` | `true`, `false` | TLS mode. Exactly one must be enabled when SMTP is enabled; STARTTLS is the normal port-587 configuration [@config] |
+| `SMTP_TIMEOUT_SECONDS` | `10` | SMTP connection and delivery timeout in seconds [@config] [@compose] |
 | `AI_REQUEST_TIMEOUT_SECONDS` | `60` | Timeout setting for AI requests [@config] |
+
+SMTP is disabled by default. When enabled, settings require a host, sender, and `KATALON_BASE_URL`, reject half-configured credentials, and require exactly one of STARTTLS or implicit TLS. API, worker, and beat receive the same SMTP settings in Compose; the worker sends mail through a Celery task, so HTTP requests do not open SMTP connections [@config] [@compose].
 
 API startup checks Cantaloupe by requesting `<CANTALOUPE_URL>/iiif/3` and refuses to start if the image server is unreachable or returns an error response [@main].
 

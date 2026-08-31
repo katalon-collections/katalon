@@ -5,6 +5,24 @@ import uuid
 from typing import Any, cast
 
 from katalon.workers.celery_app import celery_app
+from katalon.workers.email_tasks import send_user_email
+from katalon.workers.enqueue import enqueue
+
+
+def _queue_import_notification(user_id: str | None, record_type: str, result: dict[str, Any]) -> None:
+    if not user_id:
+        return
+    if "error" in result:
+        subject = "Katalon: Import fehlgeschlagen"
+        text = f"Der Import von {record_type}-Datensätzen konnte nicht ausgeführt werden."
+    else:
+        subject = "Katalon: Import abgeschlossen"
+        text = (
+            f"Der Import von {record_type}-Datensätzen ist abgeschlossen.\n\n"
+            f"Neu: {result['created']}\nAktualisiert: {result['updated']}\n"
+            f"Übersprungen: {result['skipped']}\nFehlerhafte Zeilen: {len(result['errors'])}"
+        )
+    enqueue(send_user_email, user_id, subject, text)
 
 
 @celery_app.task(name="katalon.import_records", bind=True)
@@ -73,9 +91,13 @@ def import_records_task(
     }
     model = model_map.get(record_type)
     if model is None:
-        return {"error": f"Unknown record_type: {record_type}"}
+        result = {"error": f"Unknown record_type: {record_type}"}
+        _queue_import_notification(user_id, record_type, result)
+        return result
     if media_selector and record_type != "object":
-        return {"error": "Media references are only supported for objects"}
+        result = {"error": "Media references are only supported for objects"}
+        _queue_import_notification(user_id, record_type, result)
+        return result
 
     media_references, media_stats = (
         media_references_for_rows(cast(list[dict[str, object]], rows), media_selector)
@@ -83,9 +105,13 @@ def import_records_task(
         else ([[] for _ in rows], {"conflicts": []})
     )
     if media_selector and not media_stats["selector_found"]:
-        return {"error": f"Media selector not found: {media_selector}"}
+        result = {"error": f"Media selector not found: {media_selector}"}
+        _queue_import_notification(user_id, record_type, result)
+        return result
     if media_stats["conflicts"]:
-        return {"error": "A media filename is assigned to multiple records"}
+        result = {"error": "A media filename is assigned to multiple records"}
+        _queue_import_notification(user_id, record_type, result)
+        return result
 
     # Subtype field name varies by type
     subtype_field = {
@@ -444,7 +470,12 @@ def import_records_task(
 
     loop = asyncio.new_event_loop()
     try:
-        return loop.run_until_complete(_import())
+        result = loop.run_until_complete(_import())
+        _queue_import_notification(user_id, record_type, result)
+        return result
+    except Exception:
+        _queue_import_notification(user_id, record_type, {"error": "failed"})
+        raise
     finally:
         loop.run_until_complete(_engine.dispose())
         loop.close()

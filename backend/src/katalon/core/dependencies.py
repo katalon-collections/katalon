@@ -66,7 +66,8 @@ async def get_current_user(
         user_id_str: str | None = payload.get("sub")
         role: str | None = payload.get("role")
         token_type: str | None = payload.get("typ")
-        if user_id_str is None or role is None or token_type != "access":
+        token_version = payload.get("ver", 0)
+        if user_id_str is None or role is None or token_type != "access" or not isinstance(token_version, int):
             raise credentials_exception
         token_data = TokenData(user_id=uuid.UUID(user_id_str), role=role)
     except (JWTError, ValueError):
@@ -75,6 +76,8 @@ async def get_current_user(
     user_result = await db.execute(select(User).where(User.id == token_data.user_id))
     user = user_result.scalar_one_or_none()
     if user is None or not user.is_active:
+        raise credentials_exception
+    if token_version != (user.token_version or 0):
         raise credentials_exception
     return user
 
@@ -113,11 +116,12 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         token_type: str | None = payload.get("typ")
-        if not user_id_str or token_type != "access":
+        token_version = payload.get("ver", 0)
+        if not user_id_str or token_type != "access" or not isinstance(token_version, int):
             return None
         user_result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
         user = user_result.scalar_one_or_none()
-        return user if user and user.is_active else None
+        return user if user and user.is_active and token_version == (user.token_version or 0) else None
     except (JWTError, ValueError):
         return None
 

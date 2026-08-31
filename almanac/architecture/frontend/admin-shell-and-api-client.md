@@ -15,6 +15,9 @@ sources:
   - id: api-client
     type: file
     path: frontend/admin/src/api/client.ts
+  - id: screen-login
+    type: file
+    path: frontend/admin/src/components/screens/ScreenLogin.tsx
   - id: admin-config-api
     type: file
     path: backend/src/katalon/api/v1/admin_config.py
@@ -45,6 +48,8 @@ The Vite config keeps the frontend base path configurable through `VITE_BASE_PAT
 ## API Client Contract
 
 The admin API client keeps access and refresh tokens in `localStorage`, exposes `setToken`, `hasToken`, and `getTokenUser`, and lets the shell register an unauthorized callback [@api-client]. `authorizedFetch` attaches the bearer token, retries one failed request after `/v1/auth/refresh`, and clears session state when refresh is rejected with `401` [@api-client].
+
+The login screen also provides password-reset request and confirmation forms. Reset links use the `#reset-password?token=...` hash route, so they remain valid under the admin deployment prefix without server-side routing [@screen-login] [@api-client].
 
 `req<T>` is the shared JSON request wrapper. It adds `Content-Type: application/json`, converts `401` into a session-expired error, converts delete conflicts into `ConflictError`, and converts stale optimistic-locking saves into `VersionConflictError` when the backend returns `detail.error == "version_conflict"` [@api-client]. The record modules then expose typed methods for list, get, audit, create, update, delete, publish or complete, snapshots, media, relations, static pages, banners, importer, OAI sets, API keys, settings, PID registration, and AI completion [@api-client].
 

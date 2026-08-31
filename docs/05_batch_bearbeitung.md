@@ -31,3 +31,5 @@ Jede Massenbearbeitung wird im **Audit-Log** pro Datensatz mit einer gemeinsamen
 ## Asynchrone Verarbeitung
 
 Ab **100 ausgewählten Datensätzen** läuft die Operation im Hintergrund über Celery. Das Frontend zeigt die Task-ID an. Aktualisieren Sie die Liste, um das Ergebnis zu sehen.
+
+Nach Abschluss erhält die Person, die die Massenbearbeitung gestartet hat, zusätzlich eine E-Mail mit den Ergebniszahlen, sofern der Betreiber den E-Mail-Versand eingerichtet hat.

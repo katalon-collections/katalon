@@ -16,6 +16,8 @@ from sqlalchemy.pool import NullPool
 
 from katalon.config import settings
 from katalon.workers.celery_app import celery_app
+from katalon.workers.email_tasks import send_user_email
+from katalon.workers.enqueue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,21 @@ def _run[T](coro: Coroutine[Any, Any, T]) -> T:
 def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
+
+
+def _queue_batch_notification(user_id: str | None, record_type: str, result: dict[str, Any]) -> None:
+    if not user_id:
+        return
+    if result["errors"] and result["affected"] == 0:
+        subject = "Katalon: Batch-Bearbeitung fehlgeschlagen"
+        text = f"Die Batch-Bearbeitung von {record_type}-Datensätzen konnte nicht ausgeführt werden."
+    else:
+        subject = "Katalon: Batch-Bearbeitung abgeschlossen"
+        text = (
+            f"Die Batch-Bearbeitung von {record_type}-Datensätzen ist abgeschlossen.\n\n"
+            f"Geändert: {result['affected']}\nFehler: {len(result['errors'])}"
+        )
+    enqueue(send_user_email, user_id, subject, text)
 
 
 @celery_app.task(name="katalon.batch_edit", bind=True)
@@ -84,10 +101,10 @@ def batch_edit_task(
             }
 
     try:
-        return _run(_do())
+        result = _run(_do())
     except Exception as exc:
         logger.exception("Async batch edit failed for %s/%s", record_type, batch_job_id)
-        return {
+        result = {
             "affected": 0,
             "errors": [f"Async batch edit failed: {exc}"],
             "batch_job_id": batch_job_id,
@@ -95,3 +112,5 @@ def batch_edit_task(
         }
     finally:
         _run(engine.dispose())
+    _queue_batch_notification(user_id, record_type, result)
+    return result

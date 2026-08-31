@@ -233,6 +233,7 @@ async def update_user(
         changed_fields["is_active"] = data.is_active
     if data.password is not None:
         user.hashed_password = hash_password(data.password)
+        user.token_version = (user.token_version or 0) + 1
         changed_fields["password"] = "updated"
     if changed_fields:
         await log_change(

@@ -153,6 +153,10 @@ export const auth = {
     }
     return res.json()
   },
+  requestPasswordReset: (email: string) =>
+    req<{ detail: string }>('/v1/auth/password-reset', { method: 'POST', body: JSON.stringify({ email }) }),
+  confirmPasswordReset: (token: string, new_password: string) =>
+    req<void>('/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token, new_password }) }),
 }
 
 export const users = {

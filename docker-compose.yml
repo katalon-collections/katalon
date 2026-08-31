@@ -82,6 +82,15 @@ services:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
@@ -111,6 +120,16 @@ services:
       MEDIA_ROOT: /var/lib/katalon/media
       SECRET_KEY: ${SECRET_KEY}
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
@@ -135,6 +154,16 @@ services:
       MEDIA_ROOT: /var/lib/katalon/media
       SECRET_KEY: ${SECRET_KEY}
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
     depends_on:
       db:
         condition: service_healthy

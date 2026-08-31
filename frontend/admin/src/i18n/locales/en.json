@@ -5,7 +5,18 @@
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
-    "submitting": "Signing in…"
+    "submitting": "Please wait…",
+    "forgotPassword": "Forgot password?",
+    "resetTitle": "Reset password",
+    "newPasswordTitle": "Set new password",
+    "resetHint": "We will send a link if an active account exists for this email address.",
+    "resetSubmit": "Send reset link",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat new password",
+    "newPasswordSubmit": "Save new password",
+    "passwordMismatch": "The passwords do not match.",
+    "passwordResetComplete": "Your password was changed. Please sign in.",
+    "backToLogin": "Back to sign in"
   },
   "topbar": {
     "openNav": "Open navigation",

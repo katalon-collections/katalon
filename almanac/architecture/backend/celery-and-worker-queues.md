@@ -21,6 +21,9 @@ sources:
   - id: cleanup-tasks
     type: file
     path: backend/src/katalon/workers/cleanup_tasks.py
+  - id: email-tasks
+    type: file
+    path: backend/src/katalon/workers/email_tasks.py
   - id: compose
     type: file
     path: docker-compose.yml
@@ -30,7 +33,11 @@ Katalon uses Celery for background work that would be too slow or unreliable ins
 
 ## Queue Configuration
 
-The Celery app is named `katalon` and imports four task modules: `media_tasks`, `index_tasks`, `import_tasks`, and `cleanup_tasks` [@celery-app]. Celery beat schedules a daily reconciliation count job at 03:00 and a weekly ID-diff reconciliation job at 04:00 on Sunday [@celery-app]. Those scheduled jobs use the same task app as request-triggered background work.
+The Celery app is named `katalon` and imports media, index, import, cleanup, purge, and email task modules [@celery-app]. Celery beat schedules a daily reconciliation count job at 03:00 and a weekly ID-diff reconciliation job at 04:00 on Sunday [@celery-app]. Those scheduled jobs use the same task app as request-triggered background work.
+
+## Email Tasks
+
+`send_email` accepts JSON-serializable recipient, subject, text, and optional HTML arguments. `send_password_reset_email` accepts only a reset-token row UUID, reads and decrypts the delivery token after the broker boundary, then calls the same SMTP path. When SMTP is enabled it uses Python's standard-library SMTP client and sends a multipart text/HTML message; when SMTP is disabled it records a skipped delivery. SMTP failures are logged without credentials and fail the task rather than an HTTP request [@email-tasks].
 
 Worker tasks open their own async database sessions. Media tasks and index tasks create async SQLAlchemy engines with `NullPool` so connections are not reused across Celery event loops [@media-tasks] [@index-tasks]. Import tasks use the same pattern and explicitly dispose the engine after their event loop closes [@import-tasks].
 

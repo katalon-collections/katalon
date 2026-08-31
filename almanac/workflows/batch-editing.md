@@ -15,6 +15,9 @@ sources:
   - id: backend-worker
     type: file
     path: backend/src/katalon/workers/batch_tasks.py
+  - id: email-task
+    type: file
+    path: backend/src/katalon/workers/email_tasks.py
   - id: backend-schemas
     type: file
     path: backend/src/katalon/core/schemas.py
@@ -71,6 +74,8 @@ A warning is shown when more than 50 records are selected. The user must confirm
 ## Async Path
 
 If the resolved record count exceeds 100, the endpoint returns a `task_id` and hands the work to Celery [@backend-router] [@backend-worker]. The modal shows the task ID; polling is not implemented yet, so users refresh the list to see results [@frontend-modal].
+
+When an asynchronous batch job reaches a terminal result, it queues a concise email to its triggering active staff user. The mail states only aggregate counts, not internal worker errors; notification delivery failure does not affect the already completed batch operation [@backend-worker] [@email-task].
 
 ## Backend Flow
 

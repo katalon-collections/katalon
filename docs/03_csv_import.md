@@ -158,6 +158,8 @@ Mögliche Zustände:
 - **Abgeschlossen** — zeigt Anzahl angelegter Datensätze und eventuelle Fehler
 - **Fehlgeschlagen** — zeigt die Fehlermeldung des Tasks
 
+Nach Abschluss erhält die Person, die den Import gestartet hat, zusätzlich eine E-Mail mit den zusammengefassten Ergebnissen, sofern der Betreiber den E-Mail-Versand eingerichtet hat.
+
 Je nach Import-Option kann der Lauf neue Datensätze nachträglich veröffentlichen.
 
 Wenn eine Medienzuordnung gewählt wurde, speichert der Task die erkannten Dateinamen für neu angelegte und aktualisierte Objekte. Bei der Upsert-Strategie `skip` bleiben die vorhandenen Metadaten unverändert; die Medienzuordnungen werden trotzdem am bestehenden Objekt ergänzt. Das Ergebnis nennt die Anzahl der neu gespeicherten Medienreferenzen.

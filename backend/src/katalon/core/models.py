@@ -611,11 +611,27 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     api_keys: Mapped[list["ApiKey"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    delivery_token: Mapped[str] = mapped_column(Text)
+    request_hash: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class RolePermission(Base):

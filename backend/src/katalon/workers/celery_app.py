@@ -11,8 +11,10 @@ celery_app = Celery(
         "katalon.workers.media_tasks",
         "katalon.workers.index_tasks",
         "katalon.workers.import_tasks",
+        "katalon.workers.batch_tasks",
         "katalon.workers.cleanup_tasks",
         "katalon.workers.purge_tasks",
+        "katalon.workers.email_tasks",
     ],
 )
 

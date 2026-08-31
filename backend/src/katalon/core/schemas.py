@@ -419,6 +419,22 @@ class PasswordChange(BaseModel):
         return value
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Passwort muss Buchstaben und Zahlen enthalten")
+        return value
+
+
 class EmailChange(BaseModel):
     new_email: EmailStr
     current_password: str

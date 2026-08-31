@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from katalon.errors import KatalonSecretsKeyError
@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
     ai_request_timeout_seconds: int = 60
 
+    smtp_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    smtp_ssl_tls: bool = False
+    smtp_timeout_seconds: int = Field(default=10, gt=0)
+
     debug: bool = False
     # NoDecode: docker-compose/dotenv strippen Quotes in Umgebungswerten, wodurch
     # das Default-JSON-Parsing von pydantic-settings scheitert. Stattdessen hier
@@ -97,6 +107,18 @@ class Settings(BaseSettings):
             if isinstance(parsed, list):
                 return [str(o).strip() for o in parsed if str(o).strip()]
         return [o.strip().strip("[]") for o in raw.split(",") if o.strip().strip("[]")]
+
+    @model_validator(mode="after")
+    def _validate_smtp(self) -> "Settings":
+        if not self.smtp_enabled:
+            return self
+        if not self.smtp_host or not self.smtp_from or not self.katalon_base_url:
+            raise ValueError("SMTP_HOST, SMTP_FROM and KATALON_BASE_URL are required when SMTP_ENABLED=true")
+        if bool(self.smtp_username) != bool(self.smtp_password):
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be set together")
+        if self.smtp_starttls == self.smtp_ssl_tls:
+            raise ValueError("Exactly one of SMTP_STARTTLS and SMTP_SSL_TLS must be true")
+        return self
 
 
 

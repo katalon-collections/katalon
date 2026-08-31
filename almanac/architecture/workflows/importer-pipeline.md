@@ -39,6 +39,9 @@ sources:
   - id: import-task
     type: file
     path: backend/src/katalon/workers/import_tasks.py
+  - id: email-task
+    type: file
+    path: backend/src/katalon/workers/email_tasks.py
   - id: media-reference-service
     type: file
     path: backend/src/katalon/services/media_batch_import_service.py
@@ -82,3 +85,5 @@ During import, vocabulary field strings are resolved case-insensitively against 
 When a media selector is present, the task stores one `MediaImportReference` per normalized filename and object. References are written for new objects and for existing objects reached through `skip`, `merge`, or `replace`. In the `skip` path, metadata remains unchanged while missing media references are added. The unique object-and-filename constraint and conflict-safe inserts make repeated imports idempotent. The task result reports the number of newly inserted references in `media_references_created` [@import-task] [@models].
 
 Cancellation is cooperative. The API writes a Redis `cancel:<task_id>` key for one hour, and the task checks that key every ten rows before breaking with a warning [@importer-api] [@import-task].
+
+After a terminal import result, the worker queues a concise result email to the triggering active staff user. The worker resolves the recipient from the stored user ID, so no address is included in the import task payload; failed notification enqueueing does not change the import result [@import-task] [@email-task].

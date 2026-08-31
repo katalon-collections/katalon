@@ -25,9 +25,22 @@ def _fernet() -> Fernet:
     return Fernet(base64.urlsafe_b64encode(digest))
 
 
+def encrypt_value(value: str) -> str:
+    """Encrypt a short secret for durable storage."""
+    return _fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_value(value: str) -> str:
+    """Decrypt a value produced by :func:`encrypt_value`."""
+    try:
+        return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
+    except InvalidToken as exc:
+        raise HTTPException(status_code=500, detail="Gespeichertes Secret konnte nicht entschlüsselt werden.") from exc
+
+
 async def set_secret(db: AsyncSession, key: str, value: str) -> AppSecret:
     secret = await db.scalar(select(AppSecret).where(AppSecret.key == key))
-    encrypted = _fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+    encrypted = encrypt_value(value)
     if secret is None:
         secret = AppSecret(key=key, encrypted_value=encrypted)
         db.add(secret)
@@ -41,10 +54,7 @@ async def get_secret(db: AsyncSession, key: str) -> str | None:
     secret = await db.scalar(select(AppSecret).where(AppSecret.key == key))
     if secret is None:
         return None
-    try:
-        return _fernet().decrypt(secret.encrypted_value.encode("utf-8")).decode("utf-8")
-    except InvalidToken as exc:
-        raise HTTPException(status_code=500, detail="Gespeichertes Secret konnte nicht entschlüsselt werden.") from exc
+    return decrypt_value(secret.encrypted_value)
 
 
 async def delete_secret(db: AsyncSession, key: str) -> None:

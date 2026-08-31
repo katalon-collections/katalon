@@ -42,6 +42,9 @@ sources:
   - id: secrets
     type: file
     path: backend/src/katalon/services/secret_service.py
+  - id: email-tasks
+    type: file
+    path: backend/src/katalon/workers/email_tasks.py
   - id: limiter
     type: file
     path: backend/src/katalon/core/limiter.py
@@ -65,7 +68,9 @@ When `KATALON_BASE_URL` is empty, startup falls back to `DEFAULT_ADMIN_EMAIL` an
 
 ## JWT And API Keys
 
-Password login is handled by `/v1/auth/token`. It loads the user by email, verifies the bcrypt password hash, rejects inactive accounts, updates `User.last_login_at`, and returns an access/refresh token pair [@auth] [@models]. Tokens are JWTs signed with `settings.secret_key` and include user id, role, email, token type, and expiration [@auth]. `/v1/auth/refresh` accepts only refresh tokens and issues a new pair after the referenced active user is found [@auth]. The admin user list displays `last_login_at` for admin and superuser operators; accounts that have not logged in since the column existed render an empty value [@users] [@screen-users].
+Password login is handled by `/v1/auth/token`. It loads the user by email, verifies the bcrypt password hash, rejects inactive accounts, updates `User.last_login_at`, and returns an access/refresh token pair [@auth] [@models]. Tokens are JWTs signed with `settings.secret_key` and include user id, role, email, token type, token version, and expiration [@auth]. `/v1/auth/refresh` accepts only refresh tokens and issues a new pair after the referenced active user is found with the same token version [@auth]. The admin user list displays `last_login_at` for admin and superuser operators; accounts that have not logged in since the column existed render an empty value [@users] [@screen-users].
+
+`/v1/auth/password-reset` is unavailable before account lookup unless SMTP and `KATALON_BASE_URL` are configured. When available, it returns the same accepted response for known and unknown addresses, applies both the IP limit and a five-minute per-account SHA-256 cooldown, and stores only a SHA-256 hash of one 30-minute reset token. The delivery copy is Fernet-encrypted at rest; the request commits the row before queueing only its UUID, and the worker decrypts it after the broker boundary. `/v1/auth/password-reset/confirm` locks and consumes the token, changes the password, and increments `User.token_version`; existing access and refresh JWTs then fail validation [@auth] [@models] [@dependencies] [@secrets].
 
 Authenticated dependencies try `X-API-Key` before Bearer tokens [@dependencies]. API keys must start with `ktn_`; the dependency looks up active candidates by stored prefix, bcrypt-checks the full supplied key, rejects expired keys, updates `last_used_at`, and returns the owning active user [@dependencies]. API-key management endpoints generate 192 bits of random hex, show the full key only in the creation response, and store only its bcrypt hash plus display prefix [@api-keys].
 
@@ -81,7 +86,7 @@ The fixed editorial roles `editor`, `cataloger`, and `viewer` have a persistent 
 
 ## Stored Secrets And Rate Limits
 
-Application secrets are stored in the `app_secrets` table through `secret_service`. The service derives a Fernet key from `KATALON_SECRETS_KEY` using SHA-256, encrypts values before writing, decrypts on read, and returns a 500 error when a stored value cannot be decrypted [@secrets]. The same service defines `AI_API_KEY_SECRET` as the storage key for the AI API key [@secrets].
+Application secrets are stored in the `app_secrets` table through `secret_service`. The service derives a Fernet key from `KATALON_SECRETS_KEY` using SHA-256, encrypts values before writing, decrypts on read, and returns a 500 error when a stored value cannot be decrypted. Password-reset delivery tokens use the same encryption helper in `password_reset_tokens`, so plaintext reset tokens never enter Celery or Redis [@secrets] [@auth] [@email-tasks]. The same service defines `AI_API_KEY_SECRET` as the storage key for the AI API key [@secrets].
 
 Rate limiting is global by default. `core/limiter.py` creates a SlowAPI `Limiter` keyed by remote address with `200/minute` as the default limit, and `main.py` installs that limiter and its rate-limit exception handler on the FastAPI app [@limiter] [@app].
 

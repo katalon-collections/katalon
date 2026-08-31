@@ -5,7 +5,18 @@
     "email": "E-Mail",
     "password": "Passwort",
     "submit": "Anmelden",
-    "submitting": "Anmelden…"
+    "submitting": "Bitte warten…",
+    "forgotPassword": "Passwort vergessen?",
+    "resetTitle": "Passwort zurücksetzen",
+    "newPasswordTitle": "Neues Passwort setzen",
+    "resetHint": "Wir senden einen Link, falls ein aktives Konto zu dieser E-Mail-Adresse existiert.",
+    "resetSubmit": "Reset-Link senden",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Neues Passwort wiederholen",
+    "newPasswordSubmit": "Neues Passwort speichern",
+    "passwordMismatch": "Die Passwörter stimmen nicht überein.",
+    "passwordResetComplete": "Das Passwort wurde geändert. Bitte melde dich an.",
+    "backToLogin": "Zurück zur Anmeldung"
   },
   "topbar": {
     "openNav": "Navigation öffnen",
