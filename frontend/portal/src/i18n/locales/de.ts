@@ -128,4 +128,15 @@ export default {
   'page.notFoundBody': 'Die angeforderte Seite existiert nicht oder ist nicht veröffentlicht.',
 
   'banner.close': 'Schließen',
+
+  'account.login': 'Anmelden',
+  'account.logout': 'Abmelden',
+
+  'login.title': 'Anmelden',
+  'login.intro': 'Mit deinem Katalon-Konto anmelden.',
+  'login.email': 'E-Mail',
+  'login.password': 'Passwort',
+  'login.submitting': 'Anmeldung läuft …',
+  'login.noAccount': 'Noch kein Konto?',
+  'login.register': 'Registrieren (demnächst)',
 }

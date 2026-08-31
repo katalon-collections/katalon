@@ -159,8 +159,8 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
       </div>
       <Link className="advanced-search-link" to="/advanced-search">{t('advanced.link')}</Link>
       <LanguageSwitcher />
-      {user ? <button className="portal-account" type="button" onClick={onLogout}>Abmelden</button>
-        : <Link className="portal-account" to="/login">Anmelden</Link>}
+      {user ? <button className="portal-account" type="button" onClick={onLogout}>{t('account.logout')}</button>
+        : <Link className="portal-account" to="/login">{t('account.login')}</Link>}
     </header>
   )
 }

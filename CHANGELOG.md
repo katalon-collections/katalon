@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.5] - 2026-08-31
+
+### Fixed
+- Portal-Header zeigt „Abmelden"/„Anmelden" und die Login-Seite jetzt in der aktiven Portalsprache statt fest auf Deutsch.
+
 ## [1.15.4] - 2026-08-31
 
 ### Security

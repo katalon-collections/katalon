@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login, setToken } from '../api/client'
+import { useI18n } from '../i18n'
 
 interface Props { onLogin: () => void }
 
 export function LoginPage({ onLogin }: Props) {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -28,15 +30,15 @@ export function LoginPage({ onLogin }: Props) {
   }
 
   return <section className="login-page"><form className="login-card" onSubmit={submit}>
-    <h1>Anmelden</h1>
-    <p>Mit deinem Katalon-Konto anmelden.</p>
-    <label>E-Mail<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus /></label>
-    <label>Passwort<input type="password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
+    <h1>{t('login.title')}</h1>
+    <p>{t('login.intro')}</p>
+    <label>{t('login.email')}<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus /></label>
+    <label>{t('login.password')}<input type="password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
     {error && <p className="login-error" role="alert">{error}</p>}
-    <button type="submit" disabled={loading}>{loading ? 'Anmeldung läuft …' : 'Anmelden'}</button>
+    <button type="submit" disabled={loading}>{loading ? t('login.submitting') : t('login.title')}</button>
     <div className="login-register">
-      <span>Noch kein Konto?</span>
-      <button type="button" disabled>Registrieren (demnächst)</button>
+      <span>{t('login.noAccount')}</span>
+      <button type="button" disabled>{t('login.register')}</button>
     </div>
   </form></section>
 }
