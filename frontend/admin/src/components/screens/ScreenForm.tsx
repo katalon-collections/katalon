@@ -7,7 +7,7 @@ import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityIn
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
-import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box } from '../ui/Icons'
+import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { RichTextEditor } from '../ui/RichTextEditor'
@@ -1136,6 +1136,31 @@ function VideoThumb({ objectId, mediaId }: { objectId: string; mediaId: string }
   return <video src={url} muted preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
 }
 
+/** Thumbnails go through the auth-protected redirect endpoint, not a plain <img src> to Cantoloupe —
+ * nginx gates /iiif/ behind the caller's identity, and a bare <img> tag can't send the bearer token. */
+function ImageThumb({ objectId, mediaId, alt }: { objectId: string; mediaId: string; alt: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl: string | null = null
+    authorizedFetch(`/v1/objects/${objectId}/media/${mediaId}/thumbnail`)
+      .then(res => { if (!res.ok) throw new Error(); return res.blob() })
+      .then(blob => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [objectId, mediaId])
+
+  if (!url) return null
+  return <img src={url} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+}
+
 export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated }: Props) {
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
@@ -2183,6 +2208,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }
   }
 
+  async function handleToggleMediaPublic(mediaId: string, isPublic: boolean) {
+    if (!savedId) return
+    try {
+      const updated = await media.patch(savedId, mediaId, { is_public: isPublic })
+      setMediaFiles(prev => prev.map(f => f.id === mediaId ? { ...f, is_public: updated.is_public } : f))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
   async function handleSetMediaType(mediaId: string, mediaType: string | null) {
     if (!savedId) return
     try {
@@ -2935,12 +2970,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                   <span style={{ fontSize: 9, color: '#dc2626' }}>Fehler</span>
                                 </div>
                               ) : f._links?.thumbnail ? (
-                                <img
-                                  src={f._links.thumbnail.href}
-                                  alt={f.filename}
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                                />
+                                <ImageThumb objectId={savedId!} mediaId={f.id} alt={f.filename} />
                               ) : f.category === 'video' ? (
                                 <div style={{ width: '100%', aspectRatio: '1' }}>
                                   <VideoThumb objectId={savedId!} mediaId={f.id} />
@@ -2976,6 +3006,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 disabled={f.is_primary}
                               >
                                 {f.is_primary ? '★' : '☆'}
+                              </button>
+                              <button
+                                className={`btn sm ico${f.is_public ? ' gh' : ' dn'}`}
+                                style={{ padding: '1px 4px', flexShrink: 0 }}
+                                onClick={() => handleToggleMediaPublic(f.id, !f.is_public)}
+                                title={f.is_public ? 'Öffentlich sichtbar – zum Verbergen im Portal klicken' : 'Im Portal verborgen – zum Freigeben klicken'}
+                              >
+                                <Eye size={10} style={f.is_public ? undefined : { opacity: 0.35 }} />
                               </button>
                               <button className="btn sm ico gh dn" style={{ padding: '1px 4px' }} onClick={() => handleDeleteMedia(f.id)} title="Löschen"><Trash size={10} /></button>
                             </div>

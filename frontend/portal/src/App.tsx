@@ -3,7 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
-import { api, BASE, PORTAL_API, type StaticPageSummary } from './api/client'
+import { api, BASE, PORTAL_API, currentUser, setToken, type PortalUser, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { AdvancedSearchPage } from './pages/AdvancedSearchPage'
@@ -12,6 +12,7 @@ import { EntityDetailPage } from './pages/EntityDetailPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
+import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
 import { useI18n, typeLabel, setSupportedLocales } from './i18n'
@@ -46,7 +47,7 @@ function LanguageSwitcher() {
   )
 }
 
-function Header() {
+function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { t, locale } = useI18n()
@@ -158,6 +159,8 @@ function Header() {
       </div>
       <Link className="advanced-search-link" to="/advanced-search">{t('advanced.link')}</Link>
       <LanguageSwitcher />
+      {user ? <button className="portal-account" type="button" onClick={onLogout}>Abmelden</button>
+        : <Link className="portal-account" to="/login">Anmelden</Link>}
     </header>
   )
 }
@@ -185,6 +188,11 @@ function Footer() {
 }
 
 function AppInner() {
+  const [user, setUser] = useState<PortalUser | null>(() => currentUser())
+  function logout() {
+    setToken(null)
+    setUser(null)
+  }
   useEffect(() => {
     loadAndApplyTheme()
     // Apply portal config color_tokens on top of the base theme
@@ -204,12 +212,13 @@ function AppInner() {
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
       <BannerBar />
-      <Header />
+      <Header user={user} onLogout={logout} />
       <main id="main-content" style={{ flex: 1, width: '100%' }}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/advanced-search" element={<AdvancedSearchPage />} />
+          <Route path="/login" element={<LoginPage onLogin={() => setUser(currentUser())} />} />
           <Route path="/objects/:id" element={<ErrorBoundary><ObjectDetailPage /></ErrorBoundary>} />
           <Route path="/entities/:id" element={<EntityDetailPage />} />
           <Route path="/places/:id" element={<PlaceDetailPage />} />

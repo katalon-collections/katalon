@@ -22,7 +22,7 @@ from katalon.api.v1 import (
     theme,
 )
 from katalon.api.v1.search import SearchResponse, _range_filters
-from katalon.core.dependencies import DBDep
+from katalon.core.dependencies import DBDep, OptionalCurrentUser
 from katalon.core.limiter import limiter
 from katalon.core.models import (
     Banner,
@@ -34,6 +34,7 @@ from katalon.core.models import (
     PortalConfig,
     Relation,
     StaticPage,
+    User,
     Vocabulary,
     VocabularyTerm,
 )
@@ -43,12 +44,18 @@ from katalon.services.advanced_search_service import AdvancedQuery, resolve_quer
 
 router = APIRouter(tags=["portal"])
 _PUBLIC_TYPES = ("object", "entity", "place", "occurrence")
+_PORTAL_STAFF_ROLES = {"superuser", "admin", "editor", "cataloger", "viewer"}
 _MODELS: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
 }
+
+
+def _staff_user(user: User | None) -> User | None:
+    """Keep future public accounts on the anonymous portal projection."""
+    return user if user and user.role in _PORTAL_STAFF_ROLES else None
 
 
 class PortalRecordRead(BaseModel):
@@ -240,53 +247,56 @@ class PortalVocabularyTermRead(BaseModel):
 @router.get("/objects", response_model=PortalObjectPage)
 async def list_objects(
     db: DBDep,
+    current_user: OptionalCurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     object_type: str | None = None,
     q: str | None = None,
 ) -> dict[str, Any]:
-    return await objects.list_objects(db, None, page, page_size, None, object_type, q)
+    return await objects.list_objects(db, _staff_user(current_user), page, page_size, None, object_type, q)
 
 
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
-async def get_object(object_id: uuid.UUID, db: DBDep) -> Object:
-    return await objects.get_object(object_id, db, None)
+async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object:
+    return await objects.get_object(object_id, db, _staff_user(current_user))
 
 
 @router.get("/entities/{entity_id}", response_model=PortalEntityRead)
-async def get_entity(entity_id: uuid.UUID, db: DBDep) -> Entity:
-    return await entities.get_entity(entity_id, db, None)
+async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity:
+    return await entities.get_entity(entity_id, db, _staff_user(current_user))
 
 
 @router.get("/places/{place_id}", response_model=PortalPlaceRead)
-async def get_place(place_id: uuid.UUID, db: DBDep) -> Place:
-    return await places.get_place(place_id, db, None)
+async def get_place(place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Place:
+    return await places.get_place(place_id, db, _staff_user(current_user))
 
 
 @router.get("/occurrences/{occurrence_id}", response_model=PortalOccurrenceRead)
-async def get_occurrence(occurrence_id: uuid.UUID, db: DBDep) -> Occurrence:
-    return await occurrences.get_occurrence(occurrence_id, db, None)
+async def get_occurrence(
+    occurrence_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Occurrence:
+    return await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
 
 
 @router.get("/objects/{object_id}/media", response_model=list[PortalMediaRead])
-async def list_media(object_id: uuid.UUID, db: DBDep) -> list[dict[str, Any]]:
-    items = await media.list_media(object_id, db, None)
+async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict[str, Any]]:
+    items = await media.list_media(object_id, db, _staff_user(current_user))
     return [{**item, "object_id": object_id} for item in items]
 
 
 @router.get("/objects/{object_id}/media/{media_id}/file")
-async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> FileResponse:
-    return await media.serve_media_file(object_id, media_id, db, None)
+async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> FileResponse:
+    return await media.serve_media_file(object_id, media_id, db, _staff_user(current_user))
 
 
 @router.get("/objects/{object_id}/media/{media_id}/thumbnail")
-async def serve_media_thumbnail(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep) -> RedirectResponse:
-    return await media.serve_media_thumbnail(object_id, media_id, db, None)
+async def serve_media_thumbnail(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> RedirectResponse:
+    return await media.serve_media_thumbnail(object_id, media_id, db, _staff_user(current_user))
 
 
 @router.get("/objects/{object_id}/iiif/manifest")
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request) -> dict[str, Any]:
-    return await objects.iiif_manifest(object_id, db, request, portal_only=True)
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser) -> dict[str, Any]:
+    return await objects.iiif_manifest(object_id, db, request, _staff_user(current_user))
 
 
 def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
@@ -336,6 +346,7 @@ async def list_relations(
 async def search(
     request: Request,
     db: DBDep,
+    current_user: OptionalCurrentUser,
     q: str | None = None,
     type: str | None = None,
     facets: str | None = None,
@@ -345,6 +356,7 @@ async def search(
     rel_place: str | None = None,
     rel_occurrence: str | None = None,
 ) -> SearchResponse:
+    staff_user = _staff_user(current_user)
     if type and type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=422, detail="Ungültiger öffentlicher Record-Typ.")
     extra_filters = {
@@ -372,14 +384,14 @@ async def search(
         query=q,
         record_type=type,
         record_types=None if type else _PUBLIC_TYPES,
-        status="public",
+        status="public" if staff_user is None else None,
         page=page,
         page_size=page_size,
         extra_filters=extra_filters or None,
         numeric_filters=numeric_filters or None,
         facet_fields=[field.strip() for field in facets.split(",") if field.strip()] if facets else None,
         rel_filters=rel_filters or None,
-        active_objects_only=True,
+        active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
     )
     return SearchResponse(**result)
@@ -391,7 +403,9 @@ async def advanced_search(
     request: Request,
     data: AdvancedSearchRequest,
     db: DBDep,
+    current_user: OptionalCurrentUser,
 ) -> SearchResponse:
+    staff_user = _staff_user(current_user)
     try:
         advanced_filter = await resolve_query(db, data.query)
     except ValueError as exc:
@@ -418,14 +432,14 @@ async def advanced_search(
     result = await search_service.search(
         query=data.q,
         record_type=data.query.record_type,
-        status="public",
+        status="public" if staff_user is None else None,
         page=data.page,
         page_size=data.page_size,
         extra_filters=data.metadata_filters or None,
         numeric_filters=numeric_filters or None,
         facet_fields=data.facet_fields or None,
         rel_filters=allowed_relation_filters or None,
-        active_objects_only=True,
+        active_objects_only=staff_user is None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         advanced_filter=advanced_filter,
     )
@@ -433,17 +447,19 @@ async def advanced_search(
 
 
 @router.get("/schema/{target_type}", response_model=list[PortalFieldDefinitionRead])
-async def list_fields(target_type: str, db: DBDep) -> list[FieldDefinition]:
+async def list_fields(
+    target_type: str, db: DBDep, current_user: OptionalCurrentUser
+) -> list[FieldDefinition]:
     if target_type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=404, detail="Schema nicht gefunden")
 
-    result = await db.execute(
-        select(FieldDefinition).where(
-            FieldDefinition.target_type == target_type,
-            FieldDefinition.is_deleted.is_(False),
-            FieldDefinition.is_public.is_(True),
-        ).order_by(FieldDefinition.sort_order)
+    query = select(FieldDefinition).where(
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.is_deleted.is_(False),
     )
+    if _staff_user(current_user) is None:
+        query = query.where(FieldDefinition.is_public.is_(True))
+    result = await db.execute(query.order_by(FieldDefinition.sort_order))
     return list(result.scalars().all())
 
 

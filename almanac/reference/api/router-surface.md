@@ -17,7 +17,7 @@ sources:
     path: backend/src/katalon/api/v1/portal_public.py
 ---
 
-Katalon's API router surface is mounted in `backend/src/katalon/main.py`. The working API under `/v1` requires a current user (JWT or API key), except for the authentication routes themselves. The anonymous, read-only Portal projection is separately mounted at `/portal/v1`; OAI-PMH is included with no global prefix so it is served at `/oai`; and the DNB URN mock router is included only when `settings.debug` is true [@app] [@api-dir] [@portal-public]. This page is a lookup map for prefixes and exceptions; startup behavior around these mounts is covered by [API Application Startup](../../architecture/backend/api-application-startup).
+Katalon's API router surface is mounted in `backend/src/katalon/main.py`. The working API under `/v1` requires a current user (JWT or API key), except for the authentication routes themselves. The Portal projection is separately mounted at `/portal/v1`: it remains anonymous by default but accepts staff JWTs for internal record, schema, and search projections. OAI-PMH is included with no global prefix so it is served at `/oai`; and the DNB URN mock router is included only when `settings.debug` is true [@app] [@api-dir] [@portal-public]. This page is a lookup map for prefixes and exceptions; startup behavior around these mounts is covered by [API Application Startup](../../architecture/backend/api-application-startup).
 
 ## Application-Level Paths
 
@@ -65,9 +65,9 @@ These routers are included with `prefix="/v1"` in `main.py` and a `get_current_u
 | `/v1/oai-sets` | `oai_sets.py` | OAI-PMH set configuration [@api-dir]. |
 | `/v1/feedback` | `feedback.py` | User feedback endpoints [@api-dir]. |
 
-## `/portal/v1` Anonymous Read Model
+## `/portal/v1` Read Model
 
-`portal_public.py` is mounted separately at `/portal/v1` with no authentication dependency. It serves only read paths the React Portal needs: Objects, Entities, Places, Occurrences, their visible relations and object media, quick and advanced portal search, public searchable field definitions, field-scoped vocabulary terms, relation-type vocabulary terms, portal configuration and logo, published pages, active portal banners, and theme data [@app] [@portal-public]. Advanced search uses `POST /portal/v1/search/advanced`; the body is a validated query description, not a stored or executable Elasticsearch query. `/portal/v1/schema/{type}/fields/{field}/terms` exposes the minimal term projection only when that field is public, searchable, and vocabulary-backed [@portal-public].
+`portal_public.py` is mounted separately at `/portal/v1` with no global authentication dependency. It serves only read paths the React Portal needs: Objects, Entities, Places, Occurrences, their visible relations and object media, quick and advanced portal search, public searchable field definitions, field-scoped vocabulary terms, relation-type vocabulary terms, portal configuration and logo, published pages, active portal banners, and theme data [@app] [@portal-public]. An anonymous request retains the public projection. A valid staff JWT (`superuser`, `admin`, `editor`, `cataloger`, or `viewer`) enables internal records where its backend read permission allows them, all schema fields, and unfiltered inventory search; unrecognised future roles retain anonymous visibility. Advanced search uses `POST /portal/v1/search/advanced`; the body is a validated query description, not a stored or executable Elasticsearch query. `/portal/v1/schema/{type}/fields/{field}/terms` exposes the minimal term projection only when that field is public, searchable, and vocabulary-backed [@portal-public].
 
 Procedures have no `/portal/v1` route. Relation results require both endpoints to be visible inventory records, so a relation to a Procedure is not exposed [@portal-public]. Portal response models are explicit projections rather than shared ORM/API schemas; they omit internal fields such as record versions and search vectors, and relation projections omit relation metadata [@portal-public].
 

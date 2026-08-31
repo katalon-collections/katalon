@@ -55,6 +55,20 @@ input, select, textarea { font-family: inherit; }
   cursor: pointer;
 }
 .site-header .lang-switcher option { color: #000; }
+.portal-account { color: rgba(255,255,255,.75); font-size: 12.5px; white-space: nowrap; background: transparent; border: 0; padding: 0; }
+.portal-account:hover { color: #fff; text-decoration: underline; }
+.login-page { flex: 1; display: grid; place-items: center; padding: 48px 24px; }
+.login-card { width: min(100%, 380px); background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 28px; }
+.login-card h1 { margin: 0; font-size: 24px; }
+.login-card p { color: var(--fg-3, #5a6173); }
+.login-card label { display: grid; gap: 6px; margin-top: 16px; font-weight: 600; font-size: 14px; }
+.login-card input { border: 1px solid var(--border, #e4e6eb); border-radius: 6px; padding: 9px 10px; }
+.login-card button { width: 100%; margin-top: 22px; padding: 10px; border: 0; border-radius: 6px; background: var(--accent, #1e3a8a); color: #fff; font-weight: 600; }
+.login-card button:disabled { opacity: .7; cursor: wait; }
+.login-card .login-error { color: #b91c1c; }
+.login-register { display: grid; gap: 8px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border, #e4e6eb); color: var(--fg-3, #5a6173); font-size: 14px; text-align: center; }
+.login-register button { margin: 0; background: transparent; border: 1px solid var(--border, #e4e6eb); color: var(--fg-3, #5a6173); }
+.login-register button:disabled { cursor: not-allowed; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .page { padding: 40px 24px 80px; }

@@ -1,14 +1,15 @@
 import io
+import re
 import shutil
 import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import aiofiles
 from celery.result import AsyncResult
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -35,6 +36,9 @@ from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_
 
 router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
 batch_router = APIRouter(prefix="/media", tags=["media"])
+# Mounted without the app-wide auth dependency (see main.py) — anonymous portal
+# visitors must be able to reach this, same as the /portal/v1 media endpoints.
+internal_router = APIRouter(prefix="/media", tags=["media"])
 
 ALLOWED_MIME = ALLOWED_MEDIA_MIME
 
@@ -66,6 +70,7 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "category": media_category(f.mime_type),
         "status": f.status,
         "is_primary": f.is_primary,
+        "is_public": f.is_public,
         "media_type": f.media_type,
         "license_uri": f.license_uri,
         "rights_holder": f.rights_holder,
@@ -88,7 +93,7 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
     query = select(MediaFile).where(MediaFile.object_id == object_id)
     if current_user is None:
-        query = query.where(MediaFile.status == "ready")
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     return [_serialize(f) for f in result.scalars().all()]
 
@@ -165,6 +170,7 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
 class MediaPatch(BaseModel):
     media_type: str | None = None
     is_primary: bool | None = None
+    is_public: bool | None = None
     license_uri: str | None = None
     rights_holder: dict[str, Any] | None = None
 
@@ -191,6 +197,7 @@ async def patch_media(
         "license_uri": media.license_uri,
         "rights_holder": media.rights_holder,
         "is_primary": media.is_primary,
+        "is_public": media.is_public,
     }
 
     if data.media_type is not None:
@@ -199,6 +206,8 @@ async def patch_media(
         media.license_uri = data.license_uri
     if "rights_holder" in data.model_fields_set:
         media.rights_holder = data.rights_holder
+    if data.is_public is not None:
+        media.is_public = data.is_public
 
     if data.is_primary is True:
         all_files = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
@@ -212,6 +221,7 @@ async def patch_media(
         "license_uri": media.license_uri,
         "rights_holder": media.rights_holder,
         "is_primary": media.is_primary,
+        "is_public": media.is_public,
     })
     if diff:
         diff["filename"] = media.filename
@@ -239,7 +249,7 @@ async def serve_media_file(
     ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
     query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
     if current_user is None:
-        query = query.where(MediaFile.status == "ready")
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     media = result.scalar_one_or_none()
     path = storage_path(media.storage_key) if media else None
@@ -264,14 +274,17 @@ async def serve_media_thumbnail(
 
     query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
     if current_user is None:
-        query = query.where(MediaFile.status == "ready")
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     media = result.scalar_one_or_none()
     if not media or media_category(media.mime_type) != "image":
         raise HTTPException(status_code=404, detail="Bild nicht gefunden")
 
     identifier = iiif_identifier(media.iiif_storage_key, media.storage_key)
-    return RedirectResponse(f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg")
+    # Host-relative redirect (not public_iiif_base()) so the browser treats it as
+    # same-origin: authorizedFetch() only keeps the Authorization header across a
+    # redirect when scheme+host+port match, which a cross-scheme absolute URL breaks.
+    return RedirectResponse(f"/iiif/3/{identifier}/full/,300/0/default.jpg")
 
 
 @router.delete(
@@ -300,6 +313,42 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
         changed_fields={"filename": media.filename},
     )
     await db.delete(media)
+
+
+@internal_router.get("/_authorize", include_in_schema=False)
+async def authorize_media(request: Request, db: DBDep, current_user: OptionalCurrentUser) -> Response:
+    """Backs the nginx auth_request in front of Cantaloupe (docker/nginx.conf).
+
+    Cantaloupe has no auth of its own, so every /iiif/ request is checked here
+    against the media file's is_public flag and the parent object's visibility
+    before nginx forwards it to Cantaloupe.
+    """
+    original_uri = request.headers.get("x-original-uri", "")
+    match = re.match(r"^/iiif/3/([^/]+)/", original_uri)
+    if not match:
+        raise HTTPException(status_code=403)
+    identifier = unquote(match.group(1))
+
+    result = await db.execute(
+        select(MediaFile).where(
+            (MediaFile.iiif_storage_key == identifier) | (MediaFile.storage_key == identifier)
+        )
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=403)
+
+    obj = await db.get(Object, media.object_id)
+    if not obj:
+        raise HTTPException(status_code=403)
+    try:
+        ensure_publicly_visible(obj, current_user, "nicht gefunden")
+    except HTTPException as exc:
+        raise HTTPException(status_code=403) from exc
+    if current_user is None and not media.is_public:
+        raise HTTPException(status_code=403)
+
+    return Response(status_code=200)
 
 
 def _safe_join(root: Path, relative: str) -> Path:

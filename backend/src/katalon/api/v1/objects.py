@@ -444,7 +444,7 @@ async def create_snapshot(
         404: {"description": "Object or IIIF manifest not found"},
     },
 )
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, portal_only: bool = False) -> dict[str, Any]:
+async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
     from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
@@ -455,33 +455,36 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, *, po
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     if obj.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
-    if obj.status not in ("public", "published") or (portal_only and obj.collection_status != "active"):
-        raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
+    visibility_user = await _visibility_user(db, current_user)
+    try:
+        ensure_publicly_visible(obj, visibility_user, "Kein IIIF-Manifest verfügbar")
+    except HTTPException as exc:
+        raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar") from exc
 
-    media_result = await db.execute(
-        select(MediaFile)
-        .where(MediaFile.object_id == object_id, MediaFile.status == "ready")
-        .order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
-    )
+    media_query = select(MediaFile).where(MediaFile.object_id == object_id, MediaFile.status == "ready")
+    if visibility_user is None:
+        media_query = media_query.where(MediaFile.is_public.is_(True))
+    media_result = await db.execute(media_query.order_by(MediaFile.is_primary.desc(), MediaFile.created_at))
     from katalon.core.media_validation import media_category
 
     media_files = [m for m in media_result.scalars().all() if media_category(m.mime_type) == "image"]
     if not media_files:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
-    field_result = await db.execute(
-        select(FieldDefinition)
-        .where(
-            FieldDefinition.target_type == "object",
-            FieldDefinition.show_in_detail == True,  # noqa: E712
-            FieldDefinition.is_public.is_(True),
-            FieldDefinition.is_deleted.is_(False),
-        )
-        .order_by(FieldDefinition.sort_order)
+    field_query = select(FieldDefinition).where(
+        FieldDefinition.target_type == "object",
+        FieldDefinition.show_in_detail == True,  # noqa: E712
+        FieldDefinition.is_deleted.is_(False),
     )
+    if visibility_user is None:
+        field_query = field_query.where(FieldDefinition.is_public.is_(True))
+    field_result = await db.execute(field_query.order_by(FieldDefinition.sort_order))
     field_defs = field_result.scalars().all()
-    public_fields = await load_public_fields(db, "object")
-    public_metadata = filter_public_metadata(obj.metadata_, public_fields, obj.object_type)
+    if visibility_user is None:
+        public_fields = await load_public_fields(db, "object")
+        public_metadata = filter_public_metadata(obj.metadata_, public_fields, obj.object_type)
+    else:
+        public_metadata = obj.metadata_ if isinstance(obj.metadata_, dict) else {}
 
     from katalon.core.media_storage import iiif_identifier
 

@@ -23,3 +23,5 @@
 * [Massenbearbeitung](batch-editing.md) - Batch-Operationen auf Record-Listen mit seitenübergreifender Auswahl, Audit-Log-Transparenz, ohne Rollback/Snapshots
 * [Export-Format-Plugin-Registry](metadata-format-plugin-registry.md) - metadata_formats-Tabelle analog authority_sources, OAI/Export liefern Format nur bei tatsächlichem Mapping, Heuristik-Fallback entfernt
 * [IIIF-Pyramid-TIFF](iiif-pyramid-tiff.md) - immer konvertieren (kein Threshold), Original bleibt + iiif_source_path zusätzlich, kein Backfill, Fehler fällt auf Original zurück (#333)
+* [Medien-Sichtbarkeit und Cantaloupe-Gate](media-visibility-und-cantaloupe-gate.md) - MediaFile.is_public + nginx auth_request vor Cantaloupe statt signierter URLs, host-relativer Thumbnail-Redirect gegen Cross-Origin-Header-Verlust
+* [Staff-Login im Portal](staff-portal-login.md) - bestehende Katalon-Konten für interne Portalsicht, öffentliche Accounts bleiben anonym

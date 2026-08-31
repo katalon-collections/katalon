@@ -11,7 +11,7 @@ sources:
     path: frontend/portal/src/api/client.ts
 ---
 
-Portal routes are browser routes rendered through React Router. `App` wraps `AppInner` in `HelmetProvider` and `BrowserRouter`, and `AppInner` mounts a fixed set of public routes below the shared banner, header, footer, and feedback button [@portal-app]. The portal API client uses `VITE_API_URL` as an optional host prefix and sends its public reads to the anonymous `/portal/v1` API surface [@portal-client].
+Portal routes are browser routes rendered through React Router. `App` wraps `AppInner` in `HelmetProvider` and `BrowserRouter`, and `AppInner` mounts a fixed set of public routes below the shared banner, header, footer, and feedback button [@portal-app]. The portal API client uses `VITE_API_URL` as an optional host prefix and sends anonymous reads or an existing staff JWT to `/portal/v1` [@portal-client].
 
 ## Browser Routes
 
@@ -20,6 +20,7 @@ Portal routes are browser routes rendered through React Router. `App` wraps `App
 | `/` | `HomePage` | Portal config and page-specific resources |
 | `/search` | `SearchPage` | `/portal/v1/search` |
 | `/advanced-search` | `AdvancedSearchPage` | `/portal/v1/schema/:type`, field-scoped vocabulary terms; results use `/portal/v1/search/advanced` |
+| `/login` | `LoginPage` | `/v1/auth/token` |
 | `/objects/:id` | `ObjectDetailPage` inside `ErrorBoundary` | `/portal/v1/objects/:id`, `/portal/v1/objects/:id/media`, `/portal/v1/relations` |
 | `/entities/:id` | `EntityDetailPage` | `/portal/v1/entities/:id`, `/portal/v1/relations` |
 | `/places/:id` | `PlaceDetailPage` | `/portal/v1/places/:id`, `/portal/v1/relations` |
@@ -33,6 +34,8 @@ The route table is declared directly in `AppInner`; there is no generated route 
 The header logo links to `/`. The fixed collection links point to `/search?q=&type=object`, `/search?q=&type=entity`, `/search?q=&type=place`, and `/search?q=&type=occurrence` [@portal-app].
 
 The header search is global. On submit it navigates to `/search?q=<term>` without inheriting a type from the current page. The adjacent advanced-search link opens `/advanced-search`, where users choose a result type explicitly [@portal-app].
+
+The header offers `Anmelden` when no valid local token is present and `Abmelden` after staff login. The login form reuses an existing Katalon user account. It visibly reserves a disabled registration action for the future public-account workflow, but creates no public account yet [@portal-app] [@portal-client].
 
 ## Autocomplete Paths
 

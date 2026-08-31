@@ -2,19 +2,77 @@ import { recordTitle } from '../utils/renderFieldValue'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_API = '/portal/v1'
+let token: string | null = localStorage.getItem('katalon_token')
+let refreshToken: string | null = localStorage.getItem('katalon_refresh_token')
 
 export function mediaThumbnailUrl(objectId: string, mediaId: string): string {
   return `${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaId}/thumbnail`
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+  const res = await portalFetch(path)
   if (!res.ok) throw new Error(res.statusText)
   return res.json()
 }
 
+async function portalFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  if (res.status !== 401 || !retry || !refreshToken) return res
+
+  const refresh = await fetch(`${BASE}/v1/auth/refresh`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+  if (!refresh.ok) {
+    setToken(null)
+    return res
+  }
+  const pair = await refresh.json() as Token
+  setToken(pair.access_token, pair.refresh_token)
+  return portalFetch(path, init, false)
+}
+
+export interface Token { access_token: string; refresh_token: string; token_type: string }
+export interface PortalUser { email: string; role: string }
+
+export function currentUser(): PortalUser | null {
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1])) as PortalUser
+    return payload.email && payload.role ? payload : null
+  } catch {
+    return null
+  }
+}
+
+export function setToken(accessToken: string | null, nextRefreshToken?: string | null) {
+  token = accessToken
+  if (accessToken) localStorage.setItem('katalon_token', accessToken)
+  else localStorage.removeItem('katalon_token')
+  if (nextRefreshToken !== undefined) {
+    refreshToken = nextRefreshToken
+    if (nextRefreshToken) localStorage.setItem('katalon_refresh_token', nextRefreshToken)
+    else localStorage.removeItem('katalon_refresh_token')
+  } else if (accessToken === null) {
+    refreshToken = null
+    localStorage.removeItem('katalon_refresh_token')
+  }
+}
+
+export async function login(email: string, password: string): Promise<Token> {
+  const body = new URLSearchParams({ username: email, password })
+  const res = await fetch(`${BASE}/v1/auth/token`, { method: 'POST', body })
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null) as { detail?: string } | null
+    throw new Error(payload?.detail ?? 'Anmeldung fehlgeschlagen')
+  }
+  return res.json()
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await portalFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -135,7 +193,7 @@ export async function fetchRecordTitle(type: string, id: string): Promise<string
 export async function fetchRecord(type: string, id: string): Promise<{ title: string | null; metadata: Record<string, unknown> }> {
   const endpoint = TYPE_ENDPOINT[type] ?? `${type}s`
   try {
-    const res = await fetch(`${BASE}${PORTAL_API}/${endpoint}/${id}`)
+    const res = await portalFetch(`${PORTAL_API}/${endpoint}/${id}`)
     if (!res.ok) return { title: null, metadata: {} }
     const rec = await res.json() as { metadata_?: Record<string, unknown>; idno?: string | null; id: string }
     const m = rec.metadata_ ?? {}

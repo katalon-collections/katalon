@@ -425,6 +425,7 @@ class MediaFile(Base):
     iiif_manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

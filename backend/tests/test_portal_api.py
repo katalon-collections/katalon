@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1 import portal_public
 from katalon.api.v1.portal import PortalConfigRead
+from katalon.core.dependencies import try_get_current_user
 from katalon.core.models import (
     Entity,
     FieldDefinition,
@@ -15,6 +16,7 @@ from katalon.core.models import (
     Place,
     PortalConfig,
     Relation,
+    User,
     VocabularyTerm,
 )
 from katalon.database import get_db
@@ -112,6 +114,34 @@ async def test_portal_record_omits_internal_metadata() -> None:
 
     assert response.status_code == 200
     assert response.json()["metadata_"] == {"label": "Public"}
+
+
+@pytest.mark.asyncio
+async def test_portal_staff_login_uses_internal_record_projection(monkeypatch) -> None:
+    record = Object(
+        id=uuid.uuid4(), idno="OBJ-1", status="draft", collection_status="active",
+        metadata_={"internal_note": "Nur intern"}, created_at=datetime.now(), updated_at=datetime.now(),
+    )
+    staff_user = User(email="staff@example.test", hashed_password="unused", role="editor")
+    get_object = AsyncMock(return_value=record)
+    monkeypatch.setattr(portal_public.objects, "get_object", get_object)
+
+    async def override_db():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: staff_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{record.id}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "draft"
+    assert response.json()["metadata_"] == {"internal_note": "Nur intern"}
+    assert get_object.await_args.args[2] is staff_user
 
 
 @pytest.mark.parametrize(
