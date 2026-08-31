@@ -17,7 +17,7 @@ Dieses Dokument beschreibt, wie Katalon auf einem Linux-Server in Produktion bet
 - [ ] URL-Layout gewählt (Subdomain oder Subpfad, → Abschnitt 4)
 - [ ] TLS-Zertifikate ausgestellt
 - [ ] `.env` vollständig ausgefüllt — insbesondere `SECRET_KEY`, Datenbankpasswort, `KATALON_BASE_URL`, `CORS_ORIGINS`
-- [ ] `MEDIA_ROOT`-Host-Verzeichnis existiert und gehört UID/GID `1000` (`mkdir -p /srv/katalon/media && chown -R 1000:1000 /srv/katalon/media`) — `api`- und `worker`-Container laufen als nicht-root User `app` (UID 1000)
+- [ ] `MEDIA_ROOT`-Host-Verzeichnis existiert und gehört UID/GID `1000` (`install -d -o 1000 -g 1000 -m 755 /srv/katalon/media`, **nicht** `mkdir -p`) — `api`- und `worker`-Container laufen als nicht-root User `app` (UID 1000). Fehlt das, schlagen Uploads still mit `Permission denied` fehl, ohne Health-Check-Alarm — siehe Abschnitt "Medien-Upload schlägt fehl" unten.
 - [ ] `docker/nginx.prod.conf` auf eigene Domain(en) angepasst
 - [ ] `.env` VITE-Build-Argumente für Admin/Portal gesetzt
 - [ ] Wikidata-Adapter: `WIKIDATA_USER_AGENT` setzen oder `KATALON_BASE_URL` + `OAI_ADMIN_EMAIL` vollständig pflegen (Wikidata-Policy erfordert identifizierbaren User-Agent)
@@ -437,11 +437,23 @@ docker compose exec api ls -la /var/lib/katalon/media/
 
 `api` und `worker` laufen als nicht-root User `app` (UID 1000). Ist das
 Host-Verzeichnis hinter `MEDIA_ROOT` nicht für UID 1000 schreibbar, schlagen
-Uploads mit `PermissionError` fehl:
+Uploads mit `PermissionError` fehl. Ein Startup-Check loggt in diesem Fall
+eine Warnung (`MEDIA_ROOT nicht beschreibbar für UID ...`) — in den
+`api`-Logs nach dieser Meldung suchen, statt erst beim ersten Upload-Fehler
+zu bemerken.
+
+Fix (nur das Verzeichnis selbst, nicht rekursiv — bei großem Medienbestand
+wäre `chown -R` potenziell sehr langsam):
 
 ```bash
-sudo chown -R 1000:1000 "${MEDIA_ROOT:-/srv/katalon/media}"
+sudo chown 1000:1000 "${MEDIA_ROOT:-/srv/katalon/media}"
 ```
+
+Neue Unterordner (`_batch_imports`, `logos`, `themes`) erben die Rechte des
+Elternverzeichnisses bei Neuanlage durch den `app`-User automatisch korrekt;
+bereits bestehende Unterordner mit falschem Owner müssen einzeln behandelt
+werden (`chown 1000:1000 <verzeichnis>`, ebenfalls nicht rekursiv nötig,
+solange nur neue Dateien hinzukommen).
 
 ### Große IIIF-Bilder bleiben leer, obwohl Thumbnails funktionieren
 

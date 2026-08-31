@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-08-31
+
+### Fixed
+- MEDIA_ROOT-Verzeichnis mit falschem Owner (z. B. `root:root` statt UID/GID 1000) ließ Uploads bisher stillschweigend mit `Permission denied` fehlschlagen — ohne Health-Check-Alarm oder Log-Warnung. Ein Startup-Check loggt jetzt eine Fehlermeldung, falls `MEDIA_ROOT` beim Start nicht beschreibbar ist. Doku (`.env.example`, `docs/04_produktion.md`) empfiehlt `install -d -o 1000 -g 1000` statt `mkdir -p`. (#330)
+
 ## [1.13.1] - 2026-08-31
 
 ### Fixed

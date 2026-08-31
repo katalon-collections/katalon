@@ -368,9 +368,23 @@ async def _check_cantaloupe_health() -> None:
         ) from exc
 
 
+def _check_media_root_writable() -> None:
+    """Log a warning if MEDIA_ROOT isn't writable; uploads would otherwise fail silently per-request."""
+    import os
+
+    media_root = Path(settings.media_root)
+    if not os.access(media_root, os.W_OK):
+        logger.error(
+            "MEDIA_ROOT %s is not writable by uid %d — uploads will fail with Permission denied. "
+            "Fix ownership: chown %d:%d %s",
+            media_root, os.getuid(), os.getuid(), os.getgid(), media_root,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _check_production_secrets()
+    _check_media_root_writable()
     await _ensure_admin()
     await _ensure_media_types_vocab()
     await _ensure_relation_types_vocab()
