@@ -148,7 +148,7 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
       sort_order: sortOrder,
       settings: substituteTmpIds(field.settings, idMap),
       show_in_detail: true,
-      show_in_list: true,
+      show_in_list: false,
       is_facet: false,
       is_searchable: true,
       ...(parentId ? { parent_id: parentId } : {}),

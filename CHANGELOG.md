@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.15] - 2026-08-31
+
+### Changed
+- Neue Felder sind in der Listenansicht standardmäßig nicht mehr sichtbar; die Option „In Listenansicht zeigen" kann pro Feld aktiviert werden. Das Label-Feld bleibt weiterhin per Default in der Liste.
+
 ## [1.15.14] - 2026-08-31
 
 ### Fixed

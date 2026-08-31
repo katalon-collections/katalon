@@ -81,7 +81,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: true, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -99,7 +99,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     authority_source: (f.settings?.source as string) ?? 'gnd',
     pid_provider: (f.settings?.pid_provider as string) ?? 'dnb_urn',
     show_in_detail: f.show_in_detail ?? true,
-    show_in_list: f.show_in_list ?? true,
+    show_in_list: f.show_in_list ?? false,
     detail_slot: f.detail_slot ?? 'sidebar',
     detail_role: f.detail_role ?? 'none',
     is_public: f.is_public ?? true,
@@ -223,7 +223,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       is_translatable: false,
       sort_order: subFieldForm.sort_order,
       show_in_detail: true,
-      show_in_list: true,
+      show_in_list: false,
       is_public: subFieldForm.is_public,
       is_facet: false,
       is_searchable: true,
@@ -1133,7 +1133,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       is_translatable: form.is_translatable,
       sort_order: form.sort_order,
       show_in_detail: form.show_in_detail,
-      show_in_list: form.show_in_list ?? true,
+      show_in_list: form.show_in_list ?? false,
       detail_slot: form.detail_slot,
       detail_role: form.detail_role,
       is_public: form.is_public,

@@ -181,7 +181,7 @@ class FieldDefinition(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     show_in_detail: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    show_in_list: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    show_in_list: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Placement on the portal detail page when show_in_detail is true: main / sidebar
     detail_slot: Mapped[str] = mapped_column(String(16), default="sidebar", server_default="sidebar")
     # Special rendering role on the portal detail page: none / description

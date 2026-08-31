@@ -39,7 +39,7 @@ class FieldDefinitionCreate(BaseModel):
     sort_order: int = 0
     settings: dict[str, Any] = {}
     show_in_detail: bool = True
-    show_in_list: bool = True
+    show_in_list: bool = False
     detail_slot: Literal["main", "sidebar"] = "sidebar"
     detail_role: Literal["none", "description"] = "none"
     is_public: bool = True

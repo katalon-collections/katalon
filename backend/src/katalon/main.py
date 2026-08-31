@@ -16,8 +16,8 @@ from sqlalchemy import select
 
 from katalon.api.v1 import (
     admin_config,
-    ark,
     ai,
+    ark,
     audit,
     auth,
     authority,
@@ -323,6 +323,7 @@ async def _ensure_label_fields() -> None:
                         is_searchable=True,
                         sort_order=0,
                         show_in_detail=True,
+                        show_in_list=True,
                     )
                 )
         await db.commit()
