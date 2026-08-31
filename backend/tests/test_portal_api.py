@@ -80,7 +80,6 @@ async def test_portal_lists_only_public_objects() -> None:
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["items"]] == [str(public_object.id)]
     assert "objects.status IN" in statements[0]
-    assert "objects.collection_status" in statements[0]
     item = response.json()["items"][0]
     assert "version" not in item
     assert "search_vector" not in item

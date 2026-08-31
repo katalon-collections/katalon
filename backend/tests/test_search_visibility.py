@@ -288,32 +288,6 @@ def test_index_health_counts_procedures() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_documents_keeps_only_active_public_objects(monkeypatch) -> None:
-    captured: dict = {}
-
-    class FakeES:
-        async def search(self, **kwargs):
-            captured.update(kwargs)
-            return type("Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}})()
-
-    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
-
-    await elasticsearch.search_documents(None, None, "public", 0, 20, active_objects_only=True)
-
-    filters = captured["body"]["query"]["bool"]["filter"]
-    assert {"term": {"status": "public"}} in filters
-    assert {
-        "bool": {
-            "should": [
-                {"bool": {"must_not": {"term": {"record_type": "object"}}}},
-                {"term": {"collection_status": "active"}},
-            ],
-            "minimum_should_match": 1,
-        }
-    } in filters
-
-
-@pytest.mark.asyncio
 async def test_intermediate_search_tracks_exact_total(monkeypatch) -> None:
     captured: dict = {}
 

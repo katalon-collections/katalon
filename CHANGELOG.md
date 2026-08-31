@@ -13,6 +13,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 ### Added
 - Spalten ID-Nr., Status und Geändert in Datensatzlisten sind per Klick auf den Spaltenkopf sortierbar (auf-/absteigend).
 
+## [1.15.1] - 2026-08-31
+
+### Fixed
+- Sammlungsstatus (`Leihgabe`, `Ausgeschieden` etc.) blendet Objekte nicht mehr automatisch aus dem Portal aus. Portal-Sichtbarkeit hängt jetzt ausschließlich vom Veröffentlichungsstatus (Entwurf/intern/öffentlich) ab.
+
 ## [1.15.2] - 2026-08-31
 
 ### Added

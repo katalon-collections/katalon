@@ -69,6 +69,6 @@ Bulk repair paths are also Celery tasks. `bulk_reindex_type_task` acquires a Red
 
 ## Visibility Contract
 
-Anonymous record access is limited to `public` or `published` statuses, and collection objects must also have `collection_status == "active"` [@visibility]. Search adds the same active-object rule when there is no current user, and a test asserts that anonymous search includes both the public status filter and the active collection-status condition [@visibility-tests].
+Anonymous record access is limited to `public` or `published` statuses [@visibility]. `collection_status` (e.g. `on_loan_out`, `deaccessioned`) is a curatorial/inventory field driven by procedure completion and is deliberately independent of portal visibility — an object on loan stays visible in the portal as long as its `status` is public.
 
-That visibility rule is an invariant for search consumers. Portal search, object media lookup, and OAI-PMH may differ in response format, but public-facing entrypoints must not expose draft records or inactive collection objects through the index.
+That visibility rule is an invariant for search consumers. Portal search, object media lookup, and OAI-PMH may differ in response format, but public-facing entrypoints must not expose draft or internal records through the index.
