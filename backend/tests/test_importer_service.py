@@ -226,6 +226,28 @@ def test_apply_transforms_split_empty_delimiter_returns_original() -> None:
     assert result == ["a;b;c"]
 
 
+def test_apply_mapping_non_string_cell_value_does_not_crash() -> None:
+    """Regression for #327: numeric/bool cell values (e.g. from Excel) must not
+    crash string transforms like trim/split."""
+    rows = [{"year": 1996, "flag": True}]
+    mapping = {
+        "year": {"target": "year", "transforms": [{"type": "trim"}]},
+        "flag": {"target": "flag", "transforms": [{"type": "split", "delimiter": ","}]},
+    }
+    records, _ = apply_mapping(rows, mapping)
+    assert records[0]["year"] == "1996"
+    assert records[0]["flag"] == "True"
+
+
+def test_apply_transforms_reverse_name_expression_stays_single_value() -> None:
+    """Regression for #327: 'Umdrehen' reorders around the separator but must
+    not split the result into multiple repeatable values."""
+    from katalon.services.importer_service import apply_transforms
+    expression = "{{ value.split(',')[1] | trim }} {{ value.split(',')[0] | trim }}"
+    result = apply_transforms("Müller, Peter", [{"type": "expression", "expression": expression}])
+    assert result == ["Peter Müller"]
+
+
 def test_dry_run_no_errors() -> None:
     rows = [{"title": "Foto 1"}]
     mapping = {"title": "title"}

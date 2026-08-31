@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.13.3] - 2026-08-31
+
+### Fixed
+- Importer-Transformationen (`trim`, `split`, `expression`) sind bereits robust gegen Nicht-String-Zellwerte (Excel-Zahlen/Booleans werden vor der Pipeline zu String normalisiert) und der Namens-Umdrehen-Ausdruck erzeugt bereits nur einen zusammengesetzten Wert statt mehrerer Repeatable-Werte. Regressionstests ergänzt, die das absichern. (#327)
+
 ## [1.13.2] - 2026-08-31
 
 ### Fixed
