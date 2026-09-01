@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Unit tests for idno_service – pure logic, no DB required."""
 from unittest.mock import AsyncMock, MagicMock
 

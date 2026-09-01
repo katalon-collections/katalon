@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch } from '../../api/client'
@@ -11,7 +14,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich'
+type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -1373,6 +1376,32 @@ function SectionAuthoritySources() {
   )
 }
 
+function SectionUeber({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: (route: string) => void }) {
+  const { t } = useTranslation('screenSettings')
+  return (
+    <div>
+      <div className="card" style={{ padding: 24 }}>
+        <h2 style={{ marginTop: 0 }}>{t('ueber.title')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t('ueber.tagline')}</p>
+        <p style={{ fontSize: 13 }}>
+          <strong>{t('ueber.licenseLabel')}:</strong> {t('ueber.licenseText')}
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t('ueber.copyright')}</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, fontSize: 13 }}>
+          <a href="https://github.com/karkraeg/Katalon" target="_blank" rel="noreferrer">{t('ueber.links.repo')}</a>
+          <a href="https://github.com/karkraeg/Katalon/blob/main/LICENSE" target="_blank" rel="noreferrer">{t('ueber.links.license')}</a>
+          <a href="https://github.com/karkraeg/katalon-docs" target="_blank" rel="noreferrer">{t('ueber.links.docs')}</a>
+        </div>
+        {isAdmin && (
+          <div style={{ marginTop: 16 }}>
+            <button className="btn sm gh" onClick={() => onNavigate('changelog')}>{t('ueber.links.changelog')}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -1445,6 +1474,7 @@ function SectionLanguages() {
 
 const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'profil',   label: 'Profil' },
+  { id: 'ueber',    label: 'Über Katalon' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
   { id: 'sprachen', label: 'Sprachen', adminOnly: true },
@@ -1505,6 +1535,10 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {loading && <div className="empty">Lade…</div>}
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
+          {!loading && section === 'ueber' && <SectionUeber isAdmin={isAdmin} onNavigate={(r) => {
+            setSection(r as Section)
+            window.history.replaceState(null, '', `#settings/${r}`)
+          }} />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'sprachen' && <SectionLanguages />}

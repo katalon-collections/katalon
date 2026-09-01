@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 export interface TourStep {
   /** Route to navigate to before showing this step (AppShell's hash-route id). */
   route: string

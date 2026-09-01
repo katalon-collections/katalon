@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Unit tests for the cleanup_relation_refs Celery task internals."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

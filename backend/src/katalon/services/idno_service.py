@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """
 IDNO schema service: format generation, atomic counter management, pattern validation.
 """

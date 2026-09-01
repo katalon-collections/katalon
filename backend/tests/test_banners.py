@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Unit tests for banner Pydantic schemas and color validation."""
 from __future__ import annotations
 

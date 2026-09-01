@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import select

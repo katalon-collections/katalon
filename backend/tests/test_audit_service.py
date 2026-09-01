@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 import json
 
 from katalon.services.audit_service import _display_value, collapse_value, diff_fields

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import de from './locales/de.json'

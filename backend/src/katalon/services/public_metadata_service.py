@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Server-side projection for metadata exposed without authentication."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Tests for media Celery task internals."""
 import uuid
 from pathlib import Path

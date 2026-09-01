@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import React, { useEffect, useReducer, useRef } from 'react'
 import { importer, schema, subtypes as subtypesApi } from '../../../api/client'
 import type { MappingEntry, UploadResult, XmlElementLevel } from '../../../api/client'

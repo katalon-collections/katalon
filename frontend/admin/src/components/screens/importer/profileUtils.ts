@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import type { MappingEntry } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
 import type { ImportProfile, PendingField, ProfileApplyResult } from './types'

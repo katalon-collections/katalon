@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Optimistic-locking version check (issue #272)."""
 import pytest
 from fastapi import HTTPException

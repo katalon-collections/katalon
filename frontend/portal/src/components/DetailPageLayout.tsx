@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import type { ReactNode } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'

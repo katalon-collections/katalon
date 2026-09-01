@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Tests for XmlFormat: sniff, list_element_levels, parse, list_selectors."""
 from katalon.services.importer.formats.xml_format import XmlFormat
 

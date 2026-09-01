@@ -1,8 +1,10 @@
-# Katalon
+# Katalon Collections
 
 >This project is 100% AI-generated. Every line of code, every architectural decision's implementation, and every commit was written by AI. The human developer serves solely as the decision-maker and product manager — defining what to build, not how to build it.
 
 Turn-key Open-Source Metadata Management System (MMS) für den GLAM-Sektor — Galerien, Bibliotheken, Archive, Museen.
+
+*Katalon Collections* (kurz "Katalon" im Code und in der Entwicklungsdokumentation) ist eigenständig und nicht mit [katalon.com](https://katalon.com/) (Test-Automatisierung) verbunden.
 
 Katalon verbindet flexible, dynamische Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
 
@@ -230,4 +232,4 @@ Für lokale Entwicklung ohne Docker siehe [`.agents/DEV.md`](.agents/DEV.md).
 
 ## Lizenz
 
-MIT
+[AGPL-3.0-or-later](LICENSE)

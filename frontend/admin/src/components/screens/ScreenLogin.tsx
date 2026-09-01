@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { auth, setToken } from '../../api/client'
@@ -64,7 +67,7 @@ export function ScreenLogin({ onLogin }: Props) {
             color: '#fff', display: 'grid', placeItems: 'center',
             fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, fontSize: 20,
           }}>K</div>
-          <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-.01em' }}>Katalon</div>
+          <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-.01em' }}>Katalon Collections</div>
           <div style={{ color: 'var(--fg-3)', fontSize: 13, marginTop: 4 }}>{t('login.tagline')}</div>
         </div>
 

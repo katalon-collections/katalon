@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 interface LabelEditorProps {
   languages: string[]
   value: Record<string, string>

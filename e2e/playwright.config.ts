@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { defineConfig } from '@playwright/test'
 
 const isCI = Boolean(process.env.CI)

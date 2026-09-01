@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 export const DEFAULT_TOKENS: Record<string, string> = {
   '--accent':       '#1e3a8a',
   '--accent-50':    '#eef2fb',

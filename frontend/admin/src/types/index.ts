@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 export type Status = 'draft' | 'internal' | 'public'
 export type ProcedureStatus = 'draft' | 'active' | 'completed' | 'cancelled'
 export type RecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'

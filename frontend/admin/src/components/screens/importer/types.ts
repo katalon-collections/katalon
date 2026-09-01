@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import type { UploadResult, DryRunResult, TaskStatus, MappingEntry, XmlElementLevel, XmlSelector } from '../../../api/client'
 
 export interface ImportProfile {

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useEffect, useRef, useState } from 'react'
 import { getTokenUser, hasToken, logout, onUnauthorized, restoreSession } from '../../api/client'
 import { Sidebar } from './Sidebar'

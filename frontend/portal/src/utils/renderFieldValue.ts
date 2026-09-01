@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 const AUTHORITY_BASE: Record<string, string> = {
   gnd:       'https://d-nb.info/gnd/',
   wikidata:  'https://www.wikidata.org/wiki/',

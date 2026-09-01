@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
 

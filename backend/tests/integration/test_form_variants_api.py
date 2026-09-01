@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Integration tests for form variants (#275): named field-selection/order
 variants per record type/subtype, with role-based defaults."""
 import pytest

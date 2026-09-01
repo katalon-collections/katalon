@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import type { AuditEntry, FieldDefinition, KatalonObject, Vocabulary, VocabularyTerm } from '../types'
 
 export const MOCK_OBJECTS: KatalonObject[] = [

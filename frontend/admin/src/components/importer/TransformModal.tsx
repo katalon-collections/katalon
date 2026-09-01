@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useState, useMemo } from 'react'
 import type { TransformConfig, MappingEntry } from '../../api/client'
 

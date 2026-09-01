@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Locust performance tests for Katalon.
 
 Run locally against the dev stack (api on localhost:8000 or via nginx on 80):

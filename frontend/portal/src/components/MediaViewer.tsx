@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useEffect, useState } from 'react'
 import type { MediaFile } from '../api/client'
 import { BASE, mediaThumbnailUrl, PORTAL_API } from '../api/client'

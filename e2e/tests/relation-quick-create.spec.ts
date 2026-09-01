@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { loginAsAdmin } from './helpers'
 

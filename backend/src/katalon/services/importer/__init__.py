@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Import service module with backwards-compatible wrapper functions."""
 
 from .formats import Selector, SourceFormat, SourceRecord, get_format_for

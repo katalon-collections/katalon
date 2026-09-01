@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock, patch

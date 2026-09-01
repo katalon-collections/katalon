@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Broker-tolerant Celery enqueue helpers.
 
 Fire-and-forget background work (reindex, tile generation, relation cleanup)

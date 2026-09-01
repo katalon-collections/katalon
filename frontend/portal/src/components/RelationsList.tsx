@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useNavigate } from 'react-router-dom'
 import type { Relation } from '../api/client'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'

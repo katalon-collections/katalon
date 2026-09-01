@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse, type MediaFile } from '../api/client'

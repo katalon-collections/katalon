@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { Link } from 'react-router-dom'
 
 const TYPE_PATHS: Record<string, string> = {

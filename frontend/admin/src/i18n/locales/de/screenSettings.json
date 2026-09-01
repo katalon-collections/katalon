@@ -47,5 +47,18 @@
       "startBasic": "Tour starten",
       "startAdvanced": "Ich kenne die Grundlagen"
     }
+  },
+  "ueber": {
+    "title": "Katalon Collections",
+    "tagline": "Open-Source Metadata Management System für den GLAM-Sektor (Galerien, Bibliotheken, Archive, Museen).",
+    "licenseLabel": "Lizenz",
+    "licenseText": "GNU Affero General Public License v3.0 oder später (AGPL-3.0-or-later)",
+    "copyright": "© 2026 Karl Krägelin",
+    "links": {
+      "repo": "Quellcode auf GitHub",
+      "license": "Lizenztext (LICENSE)",
+      "docs": "Dokumentation",
+      "changelog": "Versionshinweise anzeigen"
+    }
   }
 }

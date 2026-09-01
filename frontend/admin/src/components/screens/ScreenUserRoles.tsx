@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Karl Krägelin
+
 import { Fragment, useState, useEffect } from 'react'
 import { users as usersApi } from '../../api/client'
 import type { RolePermission } from '../../types'

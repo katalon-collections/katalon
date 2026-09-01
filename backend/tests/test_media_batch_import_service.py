@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 from katalon.services.media_batch_import_service import (
     folder_or_filename_object_id,
     media_references_for_rows,

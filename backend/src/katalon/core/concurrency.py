@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Optimistic locking helper for record updates.
 
 Records carry a monotonically increasing ``version``. A client that loaded a

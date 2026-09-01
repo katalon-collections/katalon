@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 """Integration tests for group/container field creation and listing.
 
 Regression tests for MissingGreenlet errors caused by lazy-loading the

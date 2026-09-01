@@ -4,6 +4,10 @@
 
 Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sektor (Galleries, Libraries, Archives, Museums), gebaut mit Python/FastAPI-Backend und React-Frontends.
 
+**Lizenz:** AGPL-3.0-or-later (`LICENSE`). Jede Code-Datei (Backend `.py`, Frontend `.ts`/`.tsx`, E2E-Tests) trägt einen SPDX-Header (`SPDX-License-Identifier: AGPL-3.0-or-later` + `Copyright (c) 2026 Karl Krägelin`) — neue Dateien bekommen denselben Header. Details/Begründung: `almanac/decisions/operations/license-and-branding.md`.
+
+**Name:** Extern (Browser-Titel, Login-Screen, README, "Über Katalon"-Seite in der Admin-UI) heißt die Software **"Katalon Collections"** — Abgrenzung zum unabhängigen Produkt katalon.com. Intern (Code, Packages, Repo-Name, Admin-Sidebar/Breadcrumbs, alle Doku-Dateien in diesem Repo) bleibt es kurz **"Katalon"**. Keine Code-Identifier umbenennen.
+
 **Design-Ziele:**
 
 - Schema-Konfiguration über die Oberfläche statt über Konfigurationsdateien

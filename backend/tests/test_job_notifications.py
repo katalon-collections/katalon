@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
 from unittest.mock import MagicMock
 
 from katalon.workers import batch_tasks, import_tasks
