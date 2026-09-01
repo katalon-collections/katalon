@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.17] - 2026-09-01
+
+### Fixed
+- Formularvarianten: Rollen-Zuordnung (`default_for_roles`) wurde in der Listen-Antwort auf die Rolle des anfragenden Nutzers gefiltert, statt alle Zuordnungen zurückzugeben. Dadurch verschwand die Zuordnung nach dem Speichern wieder aus der Anzeige, sobald eine andere Rolle als die eigene betroffen war (z. B. Admin setzt Default für "editor").
+
 ## [1.15.16] - 2026-09-01
 
 ### Fixed

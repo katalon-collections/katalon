@@ -82,11 +82,10 @@ async def _unset_role_defaults(
         await db.delete(row)
 
 
-async def _read_with_role_defaults(db: DBDep, variant: FormVariant, current_role: str) -> FormVariantRead:
+async def _read_with_role_defaults(db: DBDep, variant: FormVariant) -> FormVariantRead:
     result = await db.execute(
         select(FormVariantRoleDefault.role).where(
             FormVariantRoleDefault.variant_id == variant.id,
-            FormVariantRoleDefault.role == current_role,
         )
     )
     default_for_roles = list(result.scalars().all())
@@ -114,7 +113,7 @@ async def list_form_variants(
     )
     result = await db.execute(q.order_by(FormVariant.sort_order, FormVariant.name))
     variants = list(result.scalars().all())
-    return [await _read_with_role_defaults(db, v, current_user.role) for v in variants]
+    return [await _read_with_role_defaults(db, v) for v in variants]
 
 
 @router.post(

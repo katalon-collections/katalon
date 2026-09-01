@@ -234,7 +234,6 @@ async def test_set_role_default_surfaces_in_list_for_that_role(async_client: Asy
     )
     assert set_r.status_code == 204
 
-    # auth_headers logs in as the admin user, so its own role-default now shows up.
     list_r = await async_client.get("/v1/form-variants?target_type=occurrence", headers=auth_headers)
     variant = next(v for v in list_r.json() if v["id"] == variant_id)
     assert variant["default_for_roles"] == ["admin"]
@@ -269,12 +268,13 @@ async def test_setting_role_default_unsets_previous_variant_for_same_role(
     await async_client.post(f"/v1/form-variants/{first_id}/role-defaults/editor", headers=auth_headers)
     await async_client.post(f"/v1/form-variants/{second_id}/role-defaults/editor", headers=auth_headers)
 
+    # Setting the "editor" default on the second variant must supersede the
+    # first — regardless of the requesting user's own role.
     list_r = await async_client.get("/v1/form-variants?target_type=procedure", headers=auth_headers)
     by_id = {v["id"]: v for v in list_r.json()}
-    # Only the second variant should still claim the "editor" default — but the
-    # requesting user is admin, so role-default visibility is scoped to *their*
-    # role and won't show "editor" here. Assert via direct role-default removal
-    # instead, which 404s once the first claim was already superseded.
+    assert by_id[first_id]["default_for_roles"] == []
+    assert by_id[second_id]["default_for_roles"] == ["editor"]
+
     remove_stale_r = await async_client.delete(
         f"/v1/form-variants/{first_id}/role-defaults/editor", headers=auth_headers
     )
@@ -283,4 +283,3 @@ async def test_setting_role_default_unsets_previous_variant_for_same_role(
         f"/v1/form-variants/{second_id}/role-defaults/editor", headers=auth_headers
     )
     assert remove_current_r.status_code == 204
-    assert by_id  # keep list_r result referenced/used
