@@ -92,6 +92,17 @@ async def create_relation(
             status_code=409,
             detail="Diese feldgebundene Beziehung wird im zugehörigen Formularfeld gepflegt.",
         )
+    duplicate = await db.scalar(
+        select(Relation.id).where(
+            Relation.from_type == data.from_type,
+            Relation.from_id == data.from_id,
+            Relation.to_type == data.to_type,
+            Relation.to_id == data.to_id,
+            Relation.relation_type == data.relation_type,
+        )
+    )
+    if duplicate is not None:
+        raise HTTPException(status_code=409, detail="Diese Beziehung existiert bereits.")
     pair = procedure_object_pair(data.from_type, data.from_id, data.to_type, data.to_id)
     if pair:
         procedure_id, object_id = pair

@@ -173,7 +173,18 @@ async def sync_schema_relations(
         )
     )
 
-    # 3. Create new derived relations from metadata_
+    # 3. Create new derived relations from metadata_, skipping any that would
+    # duplicate a manually-created (non-schema) relation to the same target
+    # with the same relation type.
+    existing_manual = await db.execute(
+        select(Relation.to_type, Relation.to_id, Relation.relation_type).where(
+            Relation.from_type == record_type,
+            Relation.from_id == record_id,
+            Relation.is_schema_derived.is_(False),
+        )
+    )
+    manual_keys = {(t, i, r) for t, i, r in existing_manual.all()}
+
     for field in rel_fields:
         raw = metadata_.get(field.name)
         if not raw:
@@ -189,13 +200,17 @@ async def sync_schema_relations(
 
         target_type = (field.settings or {}).get("target_type", "")
         for entry in entries:
+            to_id = uuid.UUID(str(entry["id"]))
+            relation_type = str(entry.get("relation_type", ""))
+            if (target_type, to_id, relation_type) in manual_keys:
+                continue
             db.add(
                 Relation(
                     from_type=record_type,
                     from_id=record_id,
                     to_type=target_type,
-                    to_id=uuid.UUID(str(entry["id"])),
-                    relation_type=str(entry.get("relation_type", "")),
+                    to_id=to_id,
+                    relation_type=relation_type,
                     metadata_={"source_field": field.name, "is_schema_relation": True},
                     is_schema_derived=True,
                 )
@@ -207,13 +222,18 @@ async def sync_schema_relations(
             entry = cast(dict[str, Any], instance.get(field.name))
             if not isinstance(entry, dict) or not entry.get("id"):
                 continue
+            target_type = (field.settings or {}).get("target_type", "")
+            to_id = uuid.UUID(str(entry["id"]))
+            relation_type = str(entry.get("relation_type", ""))
+            if (target_type, to_id, relation_type) in manual_keys:
+                continue
             db.add(
                 Relation(
                     from_type=record_type,
                     from_id=record_id,
-                    to_type=(field.settings or {}).get("target_type", ""),
-                    to_id=uuid.UUID(str(entry["id"])),
-                    relation_type=str(entry.get("relation_type", "")),
+                    to_type=target_type,
+                    to_id=to_id,
+                    relation_type=relation_type,
                     metadata_={
                         "source_field": f"{group.name}.{field.name}",
                         "is_schema_relation": True,

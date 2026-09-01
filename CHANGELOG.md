@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.20] - 2026-09-01
+
+### Fixed
+- Eine freie Relation („Weitere Beziehungen") und eine feldgebundene Relation (Formularfeld mit `relation_type_vocab`, auch innerhalb von Gruppen-Feldern) konnten dasselbe Beziehungspaar duplizieren, weil der bestehende Duplikat-Schutz in `create_relation()` nur `fixed_relation_type`-Felder erkannte und `sync_schema_relations()` beim Neuaufbau nicht gegen bestehende manuelle Relationen prüfte. Beziehungen wurden dadurch im Portal doppelt angezeigt. Beide Pfade prüfen jetzt gegenseitig auf ein bereits bestehendes identisches Beziehungspaar (from/to/relation_type). (#338)
+
 ## [1.15.19] - 2026-09-01
 
 ### Fixed
