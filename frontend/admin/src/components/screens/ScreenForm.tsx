@@ -6,7 +6,7 @@ import type { MediaFile } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { FULL_SCHEMA_CHOICE, localVariantKey, resolveActiveVariant } from '../../lib/formVariants'
+import { resolveActiveVariant } from '../../lib/formVariants'
 import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
@@ -1409,8 +1409,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
         const variantList = await formVariants.list(recordType, recSubtype).catch(() => [])
         setVariants(variantList)
-        const remembered = localStorage.getItem(localVariantKey(recordType, recSubtype))
-        const resolved = resolveActiveVariant(variantList, user?.role ?? '', remembered, variantHint)
+        const resolved = resolveActiveVariant(variantList, user?.role ?? '', variantHint)
         setActiveVariantId(resolved?.id ?? null)
       })
       .catch(e => setError(e.message))
@@ -1435,8 +1434,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }).catch(() => {})
     formVariants.list(recordType, subtype).then(variantList => {
       setVariants(variantList)
-      const remembered = localStorage.getItem(localVariantKey(recordType, subtype))
-      const resolved = resolveActiveVariant(variantList, user?.role ?? '', remembered, variantHint)
+      const resolved = resolveActiveVariant(variantList, user?.role ?? '', variantHint)
       setActiveVariantId(resolved?.id ?? null)
     }).catch(() => setVariants([]))
   }, [isNew, subtype, recordType, subtypeKey])
@@ -2375,7 +2373,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
   function selectVariant(variantId: string | null) {
     setActiveVariantId(variantId)
-    localStorage.setItem(localVariantKey(recordType, subtype), variantId ?? FULL_SCHEMA_CHOICE)
   }
 
   return (

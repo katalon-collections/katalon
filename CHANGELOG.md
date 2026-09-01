@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.19] - 2026-09-01
+
+### Fixed
+- Formularvarianten: Ein einmalig manuell gewählter „Vollständig"-Tab wurde dauerhaft pro Browser (localStorage, je Datensatztyp/Subtyp) gemerkt und überstimmte danach jeden neu gesetzten Rollen- oder Global-Default für alle Datensätze dieses Typs. Neu konfigurierte Defaults wirkten dadurch, als würden sie nicht greifen. Die manuelle Tab-Auswahl gilt jetzt nur noch für die aktuell geöffnete Formularsitzung; beim nächsten Laden greift wieder der konfigurierte Rollen-/Global-Default.
+
 ## [1.15.18] - 2026-09-01
 
 ### Fixed
