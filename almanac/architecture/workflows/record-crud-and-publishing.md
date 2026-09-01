@@ -27,6 +27,9 @@ sources:
   - id: batch-service
     type: file
     path: backend/src/katalon/services/batch_service.py
+  - id: relation-service
+    type: file
+    path: backend/src/katalon/services/relation_service.py
   - id: delete-tests
     type: file
     path: backend/tests/test_delete_409.py
@@ -38,9 +41,11 @@ Record CRUD in Katalon is implemented as five endpoint families: objects, entiti
 
 List endpoints return a page object with `total`, `page`, `page_size`, and `items`, filter by status and subtype where available, apply public visibility for collection record types, and search through `search_vector.match(q)` when a query is supplied [@objects-api] [@entities-api] [@places-api] [@occurrences-api]. Procedure lists are not public-visibility filtered and add procedure type, due date, reference number, status, and full-text filters [@procedures-api].
 
-Create endpoints resolve or validate `idno`, normalize the subtype field, prepare metadata through the schema service, validate metadata with required fields skipped for drafts, and reject duplicate identifiers [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. Object records additionally validate `collection_status`; places translate latitude and longitude into a PostGIS point; procedures validate a fixed set of procedure types and statuses [@objects-api] [@places-api] [@procedures-api].
+Create endpoints resolve or validate `idno`, normalize the subtype field, prepare metadata through the schema service, validate metadata with required fields skipped for drafts, and reject duplicate identifiers [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. Object records additionally validate `collection_status`; places translate latitude and longitude into a PostGIS point; procedures validate a fixed set of procedure types and statuses [@objects-api] [@places-api] [@procedures-api]. After the row is flushed, the four collection record endpoints mirror schema relation fields from `metadata_` into the generic relation table, write a `create` audit entry, mint PIDs only when the saved status is public, and then attempt Elasticsearch indexing [@objects-api] [@entities-api] [@places-api] [@occurrences-api].
 
-Update endpoints retrieve the row, call `check_version` against `If-Match`, repeat identifier and metadata validation, capture old values, mutate scalars and `metadata_`, increment `version`, synchronize schema-defined relations, write an audit-log update entry, and attempt to re-index the record [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. The form-side conflict resolution described in [Schema Driven Record Forms](schema-driven-record-forms) depends on that `409` version-conflict behavior; [Optimistic Locking](../../decisions/workflows/optimistic-locking) records the design boundary behind it.
+Update endpoints retrieve the row, call `check_version` against `If-Match`, repeat identifier and metadata validation, capture old values, mutate scalars and `metadata_`, increment `version`, synchronize schema-defined relations, write an audit-log update entry, mint PIDs only when the old status was not public and the new status is public, and attempt to re-index the record [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. The form-side conflict resolution described in [Schema Driven Record Forms](schema-driven-record-forms) depends on that `409` version-conflict behavior; [Optimistic Locking](../../decisions/workflows/optimistic-locking) records the design boundary behind it.
+
+`sync_schema_relations` deletes existing schema-derived outgoing relations for the record and recreates them from top-level and group-contained relation fields in current metadata, while preserving manually created relations with the same target and relation type [@relation-service]. Elasticsearch indexing is best effort on create/update for the collection endpoints: exceptions are logged as warnings, so a successful database write can temporarily diverge from the search index until a later reindex reconciles it [@objects-api] [@entities-api] [@places-api] [@occurrences-api].
 
 ## Publishing
 

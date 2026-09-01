@@ -12,6 +12,12 @@ sources:
   - id: compose
     type: file
     path: docker-compose.yml
+  - id: backend-dockerfile
+    type: file
+    path: docker/Dockerfile.backend
+  - id: migration-0051
+    type: file
+    path: backend/migrations/versions/0051_field_show_in_list_default_false.py
   - id: dev-compose
     type: file
     path: docker-compose.dev.yml
@@ -53,7 +59,7 @@ sources:
     path: backend/src/katalon/errors.py
 ---
 
-Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, reload nginx and frontend containers after route-prefix changes, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
+Katalon's durable operational gotchas are mostly about choosing the right runtime surface before checking behavior: use the correct Compose port, preserve Admin's `/admin/` asset base path, rebuild backend images when migrations change, reload nginx and frontend containers after route-prefix changes, run backend commands from `backend/`, keep the known `click-didyoumean` pin, provide `KATALON_SECRETS_KEY` for pytest, treat code-level rebranding as an operational migration, and never delete database volumes without explicit approval [@agents] [@gotcha-click] [@gotcha-secrets] [@backend-pyproject] [@compose] [@backend-dockerfile]. Use this page before following deployment, testing, or [database escalation](../../guides/operations/db-problem-escalation) work.
 
 Background-configuration details move with `.env` resolution: `Settings` now reads `backend/.env` and the repository root `.env` from absolute source-relative paths, so backend commands are no longer coupled to a particular working directory for config [@config]. `katalon-manage` runs from the repo root with `backend/.venv/bin/katalon-manage` and reports a missing or short `KATALON_SECRETS_KEY` as one readable line via `backend/src/katalon/management/runner.py` [@management-runner] [@errors].
 
@@ -82,6 +88,19 @@ docker compose exec cantaloupe sh -c 'chown -R cantaloupe:cantaloupe /var/lib/ca
 ```
 
 Verify a real IIIF derivative returns a positive byte count, not only `info.json`.
+
+## Stale Backend Images And Alembic Revisions
+
+The API image copies `backend/migrations/` at build time, so a running or locally tagged `katalon-api` image can lack a migration file that exists in the checkout [@backend-dockerfile]. If the database already records that revision, startup migrations fail before the API becomes healthy; revision `0051` is one concrete migration in the current tree and depends on `0050` [@migration-0051].
+
+When logs show an Alembic message like `Can't locate revision identified by '0051'`, compare the image build time with the checkout and rebuild the backend service images instead of changing database state:
+
+```bash
+docker compose build api worker beat
+docker compose up -d
+```
+
+This is an image/source mismatch check, not a reason to delete volumes. The database-volume rule still applies [@agents].
 
 ## Admin Asset Base Path
 
