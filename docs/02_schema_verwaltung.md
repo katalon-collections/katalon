@@ -4,6 +4,8 @@
 
 Das Schema bestimmt, welche Felder ein Datensatz eines bestimmten Primärtyps hat. Die Verwaltung erfolgt in der Admin-UI unter **Konfiguration → Schemata**. Felder können ohne Datenbankmigrationen angelegt, bearbeitet und gelöscht werden.
 
+Für eine durchgehende Beispielkonfiguration mit Relationsfeldern und einem anschließenden Vorgang siehe [Walkthrough: eine eigene Sammlung einrichten](17_walkthrough_eigene_sammlung.md). Weitere wiederverwendbare Konfigurationen stehen im [Cookbook](18_cookbook.md).
+
 Nur Benutzer mit der Rolle `admin` oder `superuser` können Felder anlegen, ändern oder löschen.
 
 ---
