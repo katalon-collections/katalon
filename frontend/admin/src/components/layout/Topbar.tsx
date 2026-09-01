@@ -6,10 +6,41 @@ import { useTranslation } from 'react-i18next'
 import { /* Bell, */ Search, Help, User } from '../ui/Icons'
 import { UI_LANGUAGES, setUiLanguage } from '../../i18n'
 import { search } from '../../api/client'
-import type { SearchResult } from '../../types'
+import type { AdminSearchResult, SearchResult } from '../../types'
 
 const TYPE_LABELS: Record<string, string> = {
   object: 'Obj', entity: 'Ent', place: 'Ort', occurrence: 'Occ', procedure: 'Vor',
+}
+
+const ADMIN_LABELS: Record<string, [string, string]> = {
+  user: ['Ben', 'User'], vocabulary: ['Vok', 'Vocab'], vocabulary_term: ['Term', 'Term'], page: ['Seite', 'Page'], oai_set: ['OAI', 'OAI'],
+  schema_field: ['Feld', 'Field'], subtype: ['Subtyp', 'Subtype'], form_variant: ['Formular', 'Form'], banner: ['Banner', 'Banner'],
+  authority_source: ['Normdaten', 'Authority'], settings: ['Einstellung', 'Settings'],
+}
+
+function typeLabel(kind: string, language: string): string {
+  return TYPE_LABELS[kind] ?? ADMIN_LABELS[kind]?.[language.startsWith('de') ? 0 : 1] ?? kind
+}
+
+function recordResult(result: SearchResult): AdminSearchResult {
+  const routes: Record<string, string> = {
+    object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
+  }
+  return { id: result.id, kind: result.record_type, title: result.title, subtitle: result.status, route: routes[result.record_type], edit_id: result.id }
+}
+
+function settingsResults(language: string): AdminSearchResult[] {
+  const german = language.startsWith('de')
+  const sections = [
+    ['profil', 'Profil', 'Profile'], ['ueber', 'Über Katalon', 'About Katalon'], ['portal', 'Portal', 'Portal'],
+    ['facetten', 'Facetten', 'Facets'], ['sprachen', 'Sprachen', 'Languages'], ['idno', 'ID-Schemas', 'ID schemas'],
+    ['ki', 'KI', 'AI'], ['medien', 'Medienrechte', 'Media rights'], ['authorities', 'Normdatenquellen', 'Authority sources'],
+    ['suche', 'Suche & Indexierung', 'Search & indexing'], ['changelog', 'Versionshinweise', 'Release notes'],
+    ['gefahrenbereich', 'Gefahrenbereich', 'Danger zone'],
+  ]
+  return sections.map(([id, de, en]) => ({
+    id: `settings-${id}`, kind: 'settings', title: german ? de : en, subtitle: german ? 'Einstellungen' : 'Settings', route: 'settings', edit_id: id,
+  }))
 }
 
 const DOCS_BASE = 'https://github.com/karkraeg/katalon-docs/blob/main'
@@ -42,7 +73,7 @@ interface Props {
 export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpenNavigation }: Props) {
   const { t, i18n } = useTranslation()
   const [q, setQ] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
+  const [results, setResults] = useState<AdminSearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -55,13 +86,24 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
     if (!q.trim()) { setResults([]); setOpen(false); return }
     debounceRef.current = setTimeout(() => {
       setLoading(true)
-      search.query(q.trim())
-        .then(r => { setResults(r.items); setOpen(true) })
+      const query = q.trim()
+      const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
+      const request = isAdmin
+        ? search.admin(query)
+        : search.query(query).then(r => ({ items: r.items.map(recordResult) }))
+      request
+        .then(r => {
+          const settings = settingsResults(i18n.language).filter(item =>
+            `${item.title} ${item.subtitle}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+          )
+          setResults([...r.items, ...settings])
+          setOpen(true)
+        })
         .catch(() => { setResults([]) })
         .finally(() => setLoading(false))
     }, 250)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [q])
+  }, [q, currentUser?.role, i18n.language])
 
   useEffect(() => {
     function onOutside(e: MouseEvent) {
@@ -72,20 +114,10 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
     return () => document.removeEventListener('mousedown', onOutside)
   }, [])
 
-  function handleSelect(r: SearchResult) {
+  function handleSelect(r: AdminSearchResult) {
     setQ('')
     setOpen(false)
-    if (r.record_type === 'object') {
-      onNavigate?.('form', r.id)
-    } else if (r.record_type === 'entity') {
-      onNavigate?.('entities-form', r.id)
-    } else if (r.record_type === 'place') {
-      onNavigate?.('places-form', r.id)
-    } else if (r.record_type === 'occurrence') {
-      onNavigate?.('occurrences-form', r.id)
-    } else if (r.record_type === 'procedure') {
-      onNavigate?.('procedures-form', r.id)
-    }
+    onNavigate?.(r.route, r.edit_id ?? undefined)
   }
 
   return (
@@ -136,13 +168,13 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', fontSize: 13, width: '100%', border: 0, background: 'transparent', textAlign: 'left' }}
                 onClick={() => handleSelect(r)}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
-                onMouseLeave={e => (e.currentTarget.style.background = '')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--accent-50)', color: 'var(--accent-ink)', padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>
-                  {TYPE_LABELS[r.record_type] ?? r.record_type}
+                  {typeLabel(r.kind, i18n.language)}
                 </span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                {r.status && <span style={{ fontSize: 11, color: 'var(--fg-3)', flexShrink: 0 }}>{r.status}</span>}
+                {r.subtitle && <span style={{ fontSize: 11, color: 'var(--fg-3)', flexShrink: 0 }}>{r.subtitle}</span>}
               </button>
             ))}
           </div>

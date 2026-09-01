@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from katalon.core.dependencies import OptionalCurrentUser, require_role
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_role
 from katalon.core.limiter import limiter
 from katalon.services import search_service
 
@@ -44,6 +44,19 @@ class SearchResponse(BaseModel):
     numeric_facets: dict[str, NumericFacetBounds] = Field(default_factory=dict)
 
 
+class AdminSearchResult(BaseModel):
+    id: str
+    kind: str
+    title: str
+    subtitle: str | None = None
+    route: str
+    edit_id: str | None = None
+
+
+class AdminSearchResponse(BaseModel):
+    items: list[AdminSearchResult]
+
+
 def _range_filters(request: Request) -> dict[str, tuple[float | None, float | None]]:
     values: dict[str, dict[str, float]] = {}
     for key, value in request.query_params.multi_items():
@@ -64,6 +77,35 @@ def _range_filters(request: Request) -> dict[str, tuple[float | None, float | No
     if any(lower is not None and upper is not None and lower > upper for lower, upper in result.values()):
         raise ValueError("Die untere Zahlengrenze muss vor der oberen liegen.")
     return result
+
+
+@router.get(
+    "/admin",
+    response_model=AdminSearchResponse,
+    dependencies=[require_role("admin")],
+    summary="Search admin records and configuration",
+)
+@limiter.limit("100/minute")
+async def admin_search(
+    request: Request,
+    db: DBDep,
+    q: Annotated[str, Query(min_length=1, description="Full-text query")],
+) -> AdminSearchResponse:
+    records = await search_service.search(query=q, page_size=8)
+    record_items = [
+        {
+            "id": item["id"], "kind": item["record_type"], "title": item["title"],
+            "subtitle": item.get("status"),
+            "route": {
+                "object": "form", "entity": "entities-form", "place": "places-form",
+                "occurrence": "occurrences-form", "procedure": "procedures-form",
+            }[item["record_type"]],
+            "edit_id": item["id"],
+        }
+        for item in records["items"]
+    ]
+    config_items = await search_service.search_admin_data(db, q)
+    return AdminSearchResponse(items=record_items + config_items)
 
 
 @router.get(

@@ -15,6 +15,9 @@ sources:
   - id: search-service
     type: file
     path: backend/src/katalon/services/search_service.py
+  - id: topbar
+    type: file
+    path: frontend/admin/src/components/layout/Topbar.tsx
   - id: advanced-search-service
     type: file
     path: backend/src/katalon/services/advanced_search_service.py
@@ -60,6 +63,8 @@ Advanced search validates every requested field against the current public searc
 Every search response includes default aggregations for type, status, and the three relation title arrays. Requested configured facets add `meta_<field>` aggregations over the matching `facet_<field>` keyword fields and self-excluding `numeric_<field>` min/max statistics over `number_facet_<field>` [@elasticsearch]. `search_service.search()` converts raw Elasticsearch hits into API items, categorical buckets, and numeric bounds for [Portal Search And Facets](portal-search-and-facets) [@search-service].
 
 The Admin record lists are a separate PostgreSQL query path. Their `q` parameter performs a case-insensitive literal substring match against the record ID and JSON metadata; procedure lists also include the reference number. Thus `axt` matches `Steinaxt` without requiring users to type wildcards, and literal `%` or `_` characters do not broaden the query [@admin-object-list] [@admin-procedure-list] [@admin-list-tests].
+
+The Admin header uses a separate, admin-only search entrypoint for configuration data. It retains Elasticsearch for collection records and directly queries the small PostgreSQL tables for users, vocabularies and their terms, static pages, OAI sets, schema fields, subtypes, form variants, banners, and configured authority sources. This avoids indexing staff-only data and lets each result navigate to its owning Admin screen. Fixed settings sections are a client-side route list because they have no separate database rows [@search-service] [@topbar].
 
 ## Reindex And Repair Paths
 

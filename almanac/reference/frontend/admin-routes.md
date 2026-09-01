@@ -25,6 +25,8 @@ Admin URLs use `#route` for list and tool screens, and `#route/id` for edit scre
 
 Navigation writes the same shape back to browser history. If an edit id is present, `navigate` writes `#<route>/<id>`; otherwise it writes `#<route>` [@app-shell].
 
+The header search can create the same deep links for matched configuration entries: vocabulary and static-page results open the named item, while schema fields, subtypes, and form variants open their corresponding type scope. Settings sections use `#settings/<section>` [@topbar].
+
 ## Content Routes
 
 | Hash route | Screen | Record type | Sidebar entry |

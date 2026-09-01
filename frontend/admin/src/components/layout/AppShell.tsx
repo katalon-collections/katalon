@@ -206,7 +206,6 @@ export function AppShell() {
       <Sidebar
         route={route}
         setRoute={(r) => safeNavigate(r)}
-        onLogout={handleLogout}
         appTitle={appTitle}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

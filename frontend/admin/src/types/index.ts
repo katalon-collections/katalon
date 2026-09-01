@@ -261,6 +261,19 @@ export interface SearchResponse {
   facets: Record<string, { value: string; count: number }[]>
 }
 
+export interface AdminSearchResult {
+  id: string
+  kind: string
+  title: string
+  subtitle: string | null
+  route: string
+  edit_id: string | null
+}
+
+export interface AdminSearchResponse {
+  items: AdminSearchResult[]
+}
+
 export interface Snapshot {
   id: string
   record_type: string

@@ -45,22 +45,14 @@ const NAV: NavItem[] = [
 interface Props {
   route: Route
   setRoute: (r: Route) => void
-  onLogout: () => void
   appTitle?: string
   open?: boolean
   onClose?: () => void
 }
 
-export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open = false, onClose }: Props) {
+export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, onClose }: Props) {
   const { t } = useTranslation()
   const user = getTokenUser()
-  const initials = user?.email ? user.email[0].toUpperCase() : 'A'
-  const roleLabel: Record<string, string> = {
-    admin: t('sidebar.roles.admin'),
-    editor: t('sidebar.roles.editor'),
-    cataloger: t('sidebar.roles.cataloger'),
-    viewer: t('sidebar.roles.viewer'),
-  }
 
   return (
     <aside className={`sb${open ? ' open' : ''}`} aria-label={t('sidebar.mainNav')}>
@@ -97,24 +89,7 @@ export function Sidebar({ route, setRoute, onLogout, appTitle = 'Katalon', open 
         <FeedbackButton />
       </div>
 
-      <div className="sb-ver">v{pkg.version}</div>
-
-      <div className="sb-foot">
-        <div className="sb-av">{initials}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {user?.email ?? '—'}
-          </b>
-          <small>{roleLabel[user?.role ?? ''] ?? user?.role ?? ''}</small>
-        </div>
-        <button
-          onClick={onLogout}
-          title={t('sidebar.logout')}
-          style={{ background: 'none', border: 0, color: 'var(--sb-mute)', cursor: 'pointer', padding: '4px', borderRadius: 4, flexShrink: 0 }}
-        >
-          ⏻
-        </button>
-      </div>
+      <div className="sb-ver">Katalon Collections v{pkg.version}</div>
     </aside>
   )
 }

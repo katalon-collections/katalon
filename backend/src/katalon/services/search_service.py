@@ -7,6 +7,21 @@ import re
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import Text, cast, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from katalon.core.models import (
+    AuthoritySource,
+    Banner,
+    FieldDefinition,
+    FormVariant,
+    OAISet,
+    RecordSubtype,
+    StaticPage,
+    User,
+    Vocabulary,
+    VocabularyTerm,
+)
 from katalon.integrations.elasticsearch import search_documents
 
 
@@ -572,3 +587,52 @@ async def search(
         "facets": facets,
         "numeric_facets": numeric_facets,
     }
+
+
+def _contains(query: str, *columns: Any) -> Any:
+    """Build a literal, case-insensitive PostgreSQL substring predicate."""
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    return or_(*(column.ilike(pattern, escape="\\") for column in columns))
+
+
+async def search_admin_data(db: AsyncSession, query: str, *, limit: int = 20) -> list[dict[str, str | None]]:
+    """Search small, admin-only configuration tables without indexing them."""
+    if not query.strip():
+        return []
+    q = query.strip()
+
+    async def rows(stmt: Any) -> list[Any]:
+        return list((await db.execute(stmt.limit(limit))).scalars().all())
+
+    vocab_terms = (await db.execute(
+        select(VocabularyTerm, Vocabulary.name)
+        .join(Vocabulary)
+        .where(_contains(q, VocabularyTerm.term, cast(VocabularyTerm.label, Text), Vocabulary.name))
+        .limit(limit)
+    )).all()
+    items: list[dict[str, str | None]] = [
+        {"id": str(term.id), "kind": "vocabulary_term", "title": term.term,
+         "subtitle": vocab_name, "route": "vocab", "edit_id": vocab_name}
+        for term, vocab_name in vocab_terms
+    ]
+
+    groups: list[tuple[Any, str, str, Any]] = [
+        (select(User).where(_contains(q, User.email)), "user", "users", lambda row: (row.email, row.role, None)),
+        (select(Vocabulary).where(_contains(q, Vocabulary.name)), "vocabulary", "vocab", lambda row: (row.name, None, row.name)),
+        (select(StaticPage).where(_contains(q, StaticPage.slug, cast(StaticPage.title, Text), cast(StaticPage.content, Text))), "page", "pages", lambda row: (row.title.get("de") or row.title.get("en") or row.slug, row.slug, row.slug)),
+        (select(OAISet).where(_contains(q, OAISet.set_spec, OAISet.set_name, OAISet.filter_q, cast(OAISet.filter_metadata, Text))), "oai_set", "oai-sets", lambda row: (row.set_name, row.set_spec, None)),
+        (select(FieldDefinition).where(_contains(q, FieldDefinition.name, cast(FieldDefinition.label, Text))), "schema_field", "schema", lambda row: (row.label.get("de") or row.label.get("en") or row.name, row.target_type, row.target_type)),
+        (select(RecordSubtype).where(_contains(q, RecordSubtype.name, RecordSubtype.description, cast(RecordSubtype.label, Text))), "subtype", "subtypes", lambda row: (row.label.get("de") or row.label.get("en") or row.name, row.primary_type, row.primary_type)),
+        (select(FormVariant).where(FormVariant.is_deleted.is_(False), _contains(q, FormVariant.name, cast(FormVariant.label, Text))), "form_variant", "form-variants", lambda row: (row.label.get("de") or row.label.get("en") or row.name, row.target_type + (f".{row.target_subtype}" if row.target_subtype else ""), row.target_type + (f".{row.target_subtype}" if row.target_subtype else ""))),
+        (select(Banner).where(_contains(q, Banner.message)), "banner", "banners", lambda row: (row.message, None, None)),
+        (select(AuthoritySource).where(_contains(q, AuthoritySource.id, AuthoritySource.label)), "authority_source", "settings", lambda row: (row.label, row.id, "authorities")),
+    ]
+    for stmt, kind, route, display in groups:
+        for row in await rows(stmt):
+            title, subtitle, edit_id = display(row)
+            items.append({
+                "id": str(row.id), "kind": kind, "title": title, "subtitle": subtitle,
+                "route": route, "edit_id": edit_id,
+            })
+    return items[:limit]
