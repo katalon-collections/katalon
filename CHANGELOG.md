@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.21] - 2026-09-01
+
+### Fixed
+- Beim Anlegen einer freien Relation über „Weitere Beziehungen" fehlte im generischen Auswahl-Dialog die Übergabe des Quelltyps (`fromType`) an die Relationstyp-Liste, wodurch nicht zum gewählten Typpaar passende Relationstypen (z. B. „Ansprechpartner" bei object → entity) auswählbar waren, obwohl der Server sie beim Anlegen ablehnt. (#339)
+
 ## [1.15.20] - 2026-09-01
 
 ### Fixed

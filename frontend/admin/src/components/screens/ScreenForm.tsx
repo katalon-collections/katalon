@@ -3302,6 +3302,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           key={addTargetType}
                           targetType={addTargetType}
                           relTypeVocabId={relTypeVocabId}
+                          fromType={recordType}
                           onAdd={handleAddGenericRelation}
                         />
                         <button className="btn gh sm" onClick={() => setGenericAddOpen(false)}>Abbrechen</button>
