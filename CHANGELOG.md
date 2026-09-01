@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.18] - 2026-09-01
+
+### Fixed
+- Verknüpfte Entities/Places/Occurrences mit einem als Gruppen-Feld konfigurierten `label`-Schema (z. B. Personen mit Vorname/Nachname-Gruppe statt Flachfeld) fielen beim Indizieren stillschweigend aus dem `related_entities`/`related_places`/`related_occurrences`-Array des referenzierenden Datensatzes heraus, weil `_load_relation_titles()` keinen idno-Fallback hatte. Im Portal angezeigte Beziehungen verschwanden dadurch, obwohl sie im Admin korrekt gepflegt waren. (#337)
+
 ## [1.15.17] - 2026-09-01
 
 ### Fixed

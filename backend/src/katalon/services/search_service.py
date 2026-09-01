@@ -413,6 +413,8 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
             public_fields = await load_public_fields(db, other_type)
             subtype = getattr(rec, f"{other_type}_type", None)
             title = _extract_title(filter_public_metadata(rec.metadata_ or {}, public_fields, subtype))
+            if not title:
+                title = getattr(rec, "idno", None) or ""
             if title:
                 related[field_name].append(title)
 
