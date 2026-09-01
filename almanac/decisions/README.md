@@ -26,7 +26,7 @@ Katalon's decision pages record choices that future changes must account for bef
 
 ## Importer Scope
 
-[Multi-Format Importer](importer/multi-format-importer) records the importer shape across CSV, Excel, and XML. [XML Importer Scope](importer/xml-importer-scope) records the XML parser boundary. [Fuzzy Vocabulary Clustering](importer/fuzzy-vocabulary-clustering) records the dry-run reconciliation approach for near-duplicate controlled terms.
+[Multi-Format Importer](importer/multi-format-importer) records the importer shape across CSV, Excel, and XML. [XML Importer Scope](importer/xml-importer-scope) records the XML parser boundary. [JSON Import YAGNI](importer/json-import-yagni) records the deliberate decision not to add JSON as a record import format. [Fuzzy Vocabulary Clustering](importer/fuzzy-vocabulary-clustering) records the dry-run reconciliation approach for near-duplicate controlled terms.
 
 ## Operations
 
