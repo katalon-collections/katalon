@@ -37,7 +37,7 @@
   "errorSelfDeactivate": "Cannot deactivate own account.",
   "errorSelfDelete": "Cannot delete own account.",
   "errorSelfRole": "Cannot change own role.",
-  "deleteConfirm": "Really delete user {email}?",
+  "deleteConfirm": "Really delete user {{email}}?",
   "errorEmailEmpty": "Email cannot be empty.",
   "errorEmailInvalid": "Please enter a valid email.",
   "errorPasswordWeak": "New password must be at least 8 characters with letters and numbers.",

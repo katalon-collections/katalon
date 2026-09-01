@@ -8,7 +8,7 @@
     "close": "Close",
     "last": "Done",
     "next": "Next",
-    "nextLabelWithProgress": "Next (step {step} of {steps})",
+    "nextLabelWithProgress": "Next (step {{step}} of {{steps}})",
     "skip": "Skip"
   }
 }

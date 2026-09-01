@@ -22,7 +22,7 @@
   "saveError": "Fehler beim Speichern.",
   "loading": "Lade…",
   "empty": "Noch keine Banner konfiguriert.",
-  "expiresAt": "Läuft ab: {date}",
+  "expiresAt": "Läuft ab: {{date}}",
   "expired": "Abgelaufen",
   "inactive": "Inaktiv",
   "activate": "Aktivieren",

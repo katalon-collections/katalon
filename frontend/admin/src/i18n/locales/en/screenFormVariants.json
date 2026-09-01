@@ -36,11 +36,11 @@
   "cancel": "Cancel",
   "loading": "Loading…",
   "empty": "No form variants for this type/subtype yet.",
-  "fieldsCount": "{n} fields",
-  "subtype": "Subtype {name}",
-  "roleDefault": "{label} default",
+  "fieldsCount": "{{n}} fields",
+  "subtype": "Subtype {{name}}",
+  "roleDefault": "{{label}} default",
   "editTitle": "Edit",
   "deleteTitle": "Delete",
-  "deleteConfirm": "Delete form variant \"{name}\"?",
+  "deleteConfirm": "Delete form variant \"{{name}}\"?",
   "globalDefaultBadge": "Global default"
 }

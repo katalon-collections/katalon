@@ -36,10 +36,10 @@
   "cancel": "Abbrechen",
   "loading": "Lade…",
   "empty": "Noch keine OAI-Sets definiert.",
-  "typeDisplay": "Typ: {label}",
-  "statusDisplay": "Status: {value}",
-  "queryDisplay": "Suche: \"{q}\"",
+  "typeDisplay": "Typ: {{label}}",
+  "statusDisplay": "Status: {{value}}",
+  "queryDisplay": "Suche: \"{{q}}\"",
   "editTitle": "Bearbeiten",
   "deleteTitle": "Löschen",
-  "deleteConfirm": "Set \"{name}\" wirklich löschen?"
+  "deleteConfirm": "Set \"{{name}}\" wirklich löschen?"
 }

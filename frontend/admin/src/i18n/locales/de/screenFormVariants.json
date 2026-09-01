@@ -36,11 +36,11 @@
   "cancel": "Abbrechen",
   "loading": "Lade…",
   "empty": "Noch keine Formularvarianten für diesen Typ/Subtyp.",
-  "fieldsCount": "{n} Felder",
-  "subtype": "Subtyp {name}",
-  "roleDefault": "{label}-Default",
+  "fieldsCount": "{{n}} Felder",
+  "subtype": "Subtyp {{name}}",
+  "roleDefault": "{{label}}-Default",
   "editTitle": "Bearbeiten",
   "deleteTitle": "Löschen",
-  "deleteConfirm": "Formularvariante \"{name}\" wirklich löschen?",
+  "deleteConfirm": "Formularvariante \"{{name}}\" wirklich löschen?",
   "globalDefaultBadge": "Global-Default"
 }

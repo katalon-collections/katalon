@@ -26,6 +26,6 @@
     "occurrence": "Occurrence",
     "procedure": "Vorgang"
   },
-  "extraFile": "Datei: {filename}",
-  "extraRelationType": "Beziehungstyp: {relationType}"
+  "extraFile": "Datei: {{filename}}",
+  "extraRelationType": "Beziehungstyp: {{relationType}}"
 }

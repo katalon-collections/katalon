@@ -22,7 +22,7 @@
   "saveError": "Error saving.",
   "loading": "Loading…",
   "empty": "No banners configured yet.",
-  "expiresAt": "Expires: {date}",
+  "expiresAt": "Expires: {{date}}",
   "expired": "Expired",
   "inactive": "Inactive",
   "activate": "Activate",

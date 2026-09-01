@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.15.16] - 2026-09-01
+
+### Fixed
+- i18n-Platzhalter in `screenFormVariants`, `screenAudit`, `screenBanners`, `screenOAISets`, `screenUsers` und `tour` (DE/EN) verwendeten einfache `{var}`-Syntax statt der von i18next erwarteten `{{var}}`-Syntax; Platzhalter wurden dadurch nicht interpoliert, sondern wörtlich angezeigt (z. B. „{label}-Default" statt des Rollennamens).
+
 ## [1.15.15] - 2026-08-31
 
 ### Changed
