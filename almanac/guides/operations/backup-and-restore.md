@@ -12,6 +12,9 @@ sources:
   - id: upgrading-doc
     type: file
     path: docs/07_upgrading.md
+  - id: migration-doc
+    type: file
+    path: docs/09_serverumzug.md
   - id: agent-rules
     type: file
     path: AGENTS.md
@@ -59,6 +62,8 @@ After a database restore, rebuild search indexes with the reindex endpoint becau
 The documented restore drill uses a fresh directory and a different `POSTGRES_DB`, starts only `db`, imports the newest dump, checks row counts, extracts media into a test directory, compares file counts, starts the full stack, checks health, and samples the Admin UI [@production-doc]. The same section records a completed drill on 2026-07-13 and recommends repeating the drill at least twice a year [@production-doc].
 
 Use [Docker Compose Surfaces](../../reference/operations/docker-compose-surfaces) when the restore environment differs from production mounts or compose files. If the issue began as a database incident, use [DB Problem Escalation](db-problem-escalation) before touching volumes.
+
+For a host move, [Server Migration](../../../docs/09_serverumzug.md) adds the cutover sequence: stop writes, run a final backup, transfer the matching database and media archives plus instance configuration, restore on the target, then rebuild the search index [@migration-doc].
 
 ## Avoid Destructive Recovery
 

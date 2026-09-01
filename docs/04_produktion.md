@@ -321,6 +321,10 @@ Für Updates, die nur Objekt-Suchfelder ändern, reicht:
 curl -X POST https://deine-domain.de/v1/search/reindex/object
 ```
 
+## Serverumzug
+
+Für den Wechsel auf einen neuen Host siehe [Katalon auf einen neuen Server umziehen](09_serverumzug.md). Die Anleitung sichert Datenbank, Medien, Instanzkonfiguration und TLS-Dateien; Elasticsearch wird auf dem Zielsystem neu indexiert.
+
 ## Backups
 
 ### Automatisch (backup-Service)
