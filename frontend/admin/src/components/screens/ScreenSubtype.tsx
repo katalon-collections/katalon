@@ -9,6 +9,14 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const TYPE_IDS: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
 
+function toSlug(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 interface FormState {
   primary_type: string
   name: string
@@ -48,6 +56,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   const [saving, setSaving] = useState(false)
   const languages = useSupportedLanguages()
   const [formError, setFormError] = useState<string | null>(null)
+  const [nameTouched, setNameTouched] = useState(false)
 
   const primaryTypes = useMemo(() => [
     { id: 'object',     label: t('typeObject') },
@@ -75,6 +84,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
     setEditId(null)
     setForm(emptyForm(activeType))
     setFormError(null)
+    setNameTouched(false)
     setShowForm(true)
   }
 
@@ -82,6 +92,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
     setEditId(s.id)
     setForm(subtypeToForm(s))
     setFormError(null)
+    setNameTouched(true)
     setShowForm(true)
   }
 
@@ -164,7 +175,11 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
               <LabelEditor
                 languages={languages}
                 value={form.label}
-                onChange={(lang, val) => set('label', { ...form.label, [lang]: val })}
+                onChange={(lang, val) => {
+                  const next = { ...form.label, [lang]: val }
+                  set('label', next)
+                  if (!editId && !nameTouched && val.trim()) set('name', toSlug(val))
+                }}
               />
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
@@ -180,8 +195,8 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
             </div>
             <div className="fg-2" style={{ marginBottom: 10 }}>
               <div className="field">
-                <div className="lbl">{t('internalNameLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('internalNameHint')})</span></div>
-                <input className="fld mono" value={form.name} onChange={e => set('name', e.target.value)} disabled={!!editId} />
+                <div className="lbl">{t('internalNameLabel')} <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span> <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('internalNameHint')})</span></div>
+                <input className="fld mono" value={form.name} onChange={e => { setNameTouched(true); set('name', e.target.value) }} disabled={!!editId} />
               </div>
               <div className="field">
                 <div className="lbl">{t('sortOrderLabel')}</div>

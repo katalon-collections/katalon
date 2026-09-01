@@ -30,6 +30,12 @@ sources:
   - id: pytest-gotcha
     type: file
     path: .agents/knowledge/gotchas/pytest-secrets-key.md
+  - id: pid-service
+    type: file
+    path: backend/src/katalon/services/pid_service.py
+  - id: ark-adapter
+    type: file
+    path: backend/src/katalon/integrations/ark_adapter.py
 ---
 
 Katalon reads backend configuration through Pydantic settings, with `.env` support and environment variables mapped to fields in `backend/src/katalon/config.py` [@config]. `.env` files are resolved relative to the source tree, not the current working directory: a source checkout reads `backend/.env` and then the repository root `.env`; the flatter Docker layout reads `/app/.env` and otherwise uses the environment supplied by Compose [@config] [@compose] [@dev-compose]. Most variables have development defaults, but `KATALON_SECRETS_KEY` is required at settings construction time and must be at least 32 characters [@config]. On the CLI, a missing or too-short `KATALON_SECRETS_KEY` surfaces as a single readable message through the `katalon-manage` launcher rather than a Pydantic stack trace [@errors] [@management-runner]. Production startup also refuses insecure `SECRET_KEY` values and well-known default admin passwords when `DEBUG` is false [@main].
@@ -77,12 +83,15 @@ On first startup with no existing admin or superuser and a usable `KATALON_BASE_
 | `GEONAMES_USERNAME` | `demo` | GeoNames webservice account name, passed through to the Compose API service [@config] [@compose] [@env-example] |
 | `WIKIDATA_USER_AGENT` | empty | Optional authority lookup user agent; `.env.example` says to leave it empty to derive from base URL and admin email [@env-example] [@config] |
 | `DNB_URN_*` | disabled and empty credentials by default | DNB URN integration settings [@config] [@env-example] |
+| `ARK_ENABLED`, `ARK_NAAN`, `ARK_RESOLVER_URL`, `ARK_SUFFIX_LENGTH` | disabled, empty NAAN, `https://n2t.net/`, suffix length `10` | Local ARK minting settings [@config] [@ark-adapter] |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | Optional Telegram feedback or notification settings passed into API service [@config] [@compose] |
 | `SMTP_ENABLED` | `false` | Enables the optional external SMTP relay for transactional email [@config] [@compose] |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | empty host/credentials/from; port `587` | Relay connection and sender. Username and password must be set together; the password is an operator secret [@config] [@compose] |
 | `SMTP_STARTTLS`, `SMTP_SSL_TLS` | `true`, `false` | TLS mode. Exactly one must be enabled when SMTP is enabled; STARTTLS is the normal port-587 configuration [@config] |
 | `SMTP_TIMEOUT_SECONDS` | `10` | SMTP connection and delivery timeout in seconds [@config] [@compose] |
 | `AI_REQUEST_TIMEOUT_SECONDS` | `60` | Timeout setting for AI requests [@config] |
+
+`available_pid_providers()` exposes `ark` only when ARK is enabled, `ARK_NAAN` is set to a non-`99999` production namespace, and `KATALON_BASE_URL` is set. It exposes `dnb_urn` only when DNB URN is enabled, namespace, username, password, and `KATALON_BASE_URL` are all present [@pid-service]. The schema UI uses that list to decide whether new PID fields can be created; existing PID fields can still be displayed when their provider is no longer available.
 
 SMTP is disabled by default. When enabled, settings require a host, sender, and `KATALON_BASE_URL`, reject half-configured credentials, and require exactly one of STARTTLS or implicit TLS. API, worker, and beat receive the same SMTP settings in Compose; the worker sends mail through a Celery task, so HTTP requests do not open SMTP connections [@config] [@compose].
 

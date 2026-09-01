@@ -18,6 +18,9 @@ sources:
   - id: schema-service-tests
     type: file
     path: backend/tests/test_schema_service.py
+  - id: pid-service
+    type: file
+    path: backend/src/katalon/services/pid_service.py
   - id: schema-container-tests
     type: file
     path: backend/tests/integration/test_schema_container_fields.py

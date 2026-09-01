@@ -17,9 +17,9 @@ Ein Datensatz ohne konfigurierten Subtyp verwendet nur das Schema des Primärtyp
 1. Admin-UI öffnen, im linken Menü unter **Konfiguration** den Punkt **Subtypen** wählen.
 2. Oben den Primärtyp wählen (Objekte, Entitäten, Orte, Occurrences, Vorgänge).
 3. **Neuer Subtyp** klicken.
-4. Deutsches und englisches Label eingeben.
+4. Deutsches und englisches Label eingeben. Daraus wird automatisch ein Vorschlag für den internen Namen abgeleitet (z. B. aus „Person" wird `person`).
 5. Optional eine Beschreibung des institutionellen Einsatzes hinterlegen – hilfreich für andere Sachbearbeiter:innen, die später denselben Subtyp verwenden.
-6. Interner Name eintragen (z. B. `person`, `organisation`). Dieser Name ist nach dem Speichern nicht mehr änderbar, da er als stabiler Schlüssel für Datensätze und Felddefinitionen dient.
+6. Den vorgeschlagenen internen Namen bei Bedarf anpassen (z. B. `person`, `organisation`). Der interne Name ist ein Pflichtfeld und nach dem Speichern nicht mehr änderbar, da er als stabiler Schlüssel für Datensätze und Felddefinitionen dient.
 7. Optional als **Standard-Subtyp** markieren – dieser wird beim Anlegen neuer Datensätze und bei der Schnellerfassung vorausgewählt.
 8. Speichern.
 

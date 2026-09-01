@@ -7,6 +7,7 @@
   },
   "headline": "Vocabulary",
   "headlineSub": "Controlled vocabularies and terms",
+  "requiredBadge": "Required",
   "relationTypeHelp": {
     "heading": "How the relation type is used",
     "source": "Source",

@@ -33,6 +33,9 @@ sources:
   - id: pid-service
     type: file
     path: backend/src/katalon/services/pid_service.py
+  - id: admin-config-api
+    type: file
+    path: backend/src/katalon/api/v1/admin_config.py
   - id: form-variants-api
     type: file
     path: backend/src/katalon/api/v1/form_variants.py
@@ -80,7 +83,7 @@ The list screen chooses an API module from `recordType`, loads records with pagi
 
 Field definitions control both default values and rendered controls. The form applies `settings.default_value` on new records, reloads subtype-specific definitions when a new record's subtype changes, and renders specialized controls for vocabularies, free vocabulary text, authority links, schema relation fields, groups, read-only PID fields, URL fields (a `type="url"` input plus an optional link title), booleans, numbers, dates, and text [@screen-form].
 
-PID fields are system-managed in the form: values are displayed read-only as resolver links (URN via nbn-resolving.org, ARK via n2t.net), with a mint button whose label follows the field's `pid_provider` (`URN reservieren` for `dnb_urn`, `ARK vergeben` for `ark`) while the field is empty; manual entry is impossible in the UI and stripped server-side by `prepare_metadata` [@screen-form] [@pid-service]. The schema UI offers the PID field type only when the server reports at least one completely configured provider; existing PID fields stay readable if a provider is later disabled. PIDs are either minted through that button or automatically when the record is published (see [Record CRUD And Publishing](record-crud-and-publishing)). `url` fields are the counterpart for resources that already carry an external identifier or link: they store `{value, label}` and remain manually editable.
+PID fields are system-managed in the form: values are displayed read-only as resolver links (URN via nbn-resolving.org, ARK via n2t.net), with a mint button whose label follows the field's `pid_provider` (`URN reservieren` for `dnb_urn`, `ARK vergeben` for `ark`) while the field is empty; manual entry is impossible in the UI and stripped server-side by `prepare_metadata` [@screen-form] [@pid-service]. The schema UI offers the PID field type only when `/v1/admin/config` reports at least one completely configured provider through `pid_providers`; existing PID fields stay readable if a provider is later disabled [@schema-screen] [@admin-config-api] [@pid-service]. PIDs are either minted through that button or automatically when the record is published (see [Record CRUD And Publishing](record-crud-and-publishing)). `url` fields are the counterpart for resources that already carry an external identifier or link: they store `{value, label}` and remain manually editable.
 
 Repeatable fields are represented as arrays in local state, while group fields are arrays of child-field objects [@screen-form]. Vocabulary and relation fields call their own lookup endpoints through the admin API client; vocabulary suggestions retain parent-before-child ordering and indentation when the returned terms have `parent_id` links, while relation-field inputs use search results and relation-type vocabularies when configured [@screen-form] [@admin-client].
 

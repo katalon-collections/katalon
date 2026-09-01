@@ -227,6 +227,7 @@ interface ScreenVocabProps {
 
 export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
   const { t } = useTranslation('screenVocab')
+  const requiredBadge = t('requiredBadge')
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [terms, setTerms] = useState<VocabularyTerm[]>([])
   const [activeVocab, setActiveVocab] = useState<string | null>(null)
@@ -543,7 +544,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   <div className="bd">
                     <div className="fg-2">
                       <div className="field">
-                        <div className="lbl">ID (intern)</div>
+                        <div className="lbl">ID (intern) <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span></div>
                         <input className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
                       </div>
                       <LabelEditor
@@ -625,7 +626,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end', padding: '8px 0' }}>
                                 <div className="field">
-                                  <div className="lbl">ID</div>
+                                  <div className="lbl">ID <span style={{ color: '#dc2626', fontSize: 11 }}>{requiredBadge}</span></div>
                                   <input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} />
                                 </div>
                                 <LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} />

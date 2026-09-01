@@ -128,6 +128,8 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
         <form className="search-bar" onSubmit={submit}>
           <input
             ref={inputRef}
+            role="combobox"
+            aria-autocomplete="list"
             aria-label={t('search.ariaLabel')}
             aria-expanded={showSuggestions}
             aria-controls="search-suggestions"
