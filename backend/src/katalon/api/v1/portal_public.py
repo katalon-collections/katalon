@@ -43,7 +43,7 @@ from katalon.core.models import (
 )
 from katalon.core.schemas import EntityRead, ObjectRead, OccurrenceRead, PlaceRead
 from katalon.core.visibility import PUBLIC_STATUSES
-from katalon.services import search_service
+from katalon.services import relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 
 router = APIRouter(tags=["portal"])
@@ -160,6 +160,8 @@ class PortalRelationRead(BaseModel):
     to_type: str
     to_id: uuid.UUID
     relation_type: str
+    from_label: str | None = None
+    to_label: str | None = None
 
 
 class PortalFieldDefinitionRead(BaseModel):
@@ -329,7 +331,7 @@ async def list_relations(
     to_type: str | None = None,
     to_id: uuid.UUID | None = None,
     limit: int = Query(100, ge=1, le=500),
-) -> list[Relation]:
+) -> list[PortalRelationRead]:
     query = select(Relation).where(
         _public_endpoint_clause(Relation.from_type, Relation.from_id),
         _public_endpoint_clause(Relation.to_type, Relation.to_id),
@@ -346,7 +348,23 @@ async def list_relations(
         query = query.where(Relation.to_type == to_type)
     if to_id:
         query = query.where(Relation.to_id == to_id)
-    return list((await db.execute(query.order_by(Relation.created_at.desc()).limit(limit))).scalars().all())
+    relations = list(
+        (await db.execute(query.order_by(Relation.created_at.desc()).limit(limit))).scalars().all()
+    )
+    labels = await relation_service.resolve_relation_labels(db, relations, public_only=True)
+    return [
+        PortalRelationRead(
+            id=rel.id,
+            from_type=rel.from_type,
+            from_id=rel.from_id,
+            to_type=rel.to_type,
+            to_id=rel.to_id,
+            relation_type=rel.relation_type,
+            from_label=labels.get((rel.from_type, rel.from_id)),
+            to_label=labels.get((rel.to_type, rel.to_id)),
+        )
+        for rel in relations
+    ]
 
 
 @router.get("/search", response_model=SearchResponse)

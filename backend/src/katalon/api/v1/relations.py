@@ -15,6 +15,7 @@ from katalon.services.relation_service import (
     get_active_loan_out_for_object,
     lock_objects,
     procedure_object_pair,
+    resolve_relation_labels,
 )
 from katalon.services.relation_type_service import validate_relation_type_applicability
 
@@ -52,7 +53,7 @@ async def list_relations(
     to_type: str | None = None,
     to_id: uuid.UUID | None = None,
     limit: int = Query(100, ge=1, le=500),
-) -> list[Relation]:
+) -> list[RelationRead]:
     query = select(Relation).limit(limit).order_by(Relation.created_at.desc())
     if from_type:
         query = query.where(Relation.from_type == from_type)
@@ -62,7 +63,15 @@ async def list_relations(
         query = query.where(Relation.to_type == to_type)
     if to_id:
         query = query.where(Relation.to_id == to_id)
-    return list((await db.execute(query)).scalars().all())
+    relations = list((await db.execute(query)).scalars().all())
+    labels = await resolve_relation_labels(db, relations)
+    return [
+        RelationRead.model_validate(rel).model_copy(update={
+            "from_label": labels.get((rel.from_type, rel.from_id)),
+            "to_label": labels.get((rel.to_type, rel.to_id)),
+        })
+        for rel in relations
+    ]
 
 
 @router.post(

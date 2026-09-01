@@ -171,6 +171,7 @@ async def test_object_draft_allows_missing_required_fields(async_client, auth_he
         },
     )
     assert field_response.status_code == 201, field_response.text
+    field_id = field_response.json()["id"]
 
     draft_response = await async_client.post(
         "/v1/objects",
@@ -194,6 +195,9 @@ async def test_object_draft_allows_missing_required_fields(async_client, auth_he
     )
     assert public_response.status_code == 422
     assert field_name in str(public_response.json()["detail"])
+
+    cleanup_response = await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)
+    assert cleanup_response.status_code == 204
 
 
 @pytest.mark.asyncio

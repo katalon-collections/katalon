@@ -154,6 +154,8 @@ export interface Relation {
   metadata_: Record<string, unknown>
   is_schema_derived: boolean
   created_at: string
+  from_label: string | null
+  to_label: string | null
 }
 
 export type BatchOperationType =

@@ -106,6 +106,7 @@ export default {
   'common.relatedObjects': 'Zugehörige Objekte',
   'common.type': 'Typ',
   'common.relations': 'Verknüpfungen',
+  'common.recordUnavailable': 'Nicht verfügbar',
   'common.coordinates': 'Koordinaten',
   'common.inventoryNo': 'Inventar-Nr.',
 

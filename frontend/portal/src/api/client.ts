@@ -127,6 +127,8 @@ export interface Relation {
   from_type: string; from_id: string
   to_type: string; to_id: string
   relation_type: string
+  from_label: string | null
+  to_label: string | null
 }
 
 export interface StaticPageSummary {

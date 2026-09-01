@@ -14,6 +14,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 ### Fixed
 - Portal-Kopfzeile: Suchfeld mit Autocomplete-Vorschlägen hatte `aria-expanded`/`aria-controls` ohne passende ARIA-Rolle gesetzt, was Screenreadern die Beziehung zur Vorschlagsliste unzugänglich machte (axe: `aria-allowed-attr`). Das Feld trägt jetzt `role="combobox"` und `aria-autocomplete="list"`.
 
+## [1.15.24] - 2026-09-01
+
+### Fixed
+- `GET /v1/relations` und `GET /portal/v1/relations` lieferten nur rohe `from_id`/`to_id`-UUIDs ohne Anzeigenamen. Beide Endpunkte liefern jetzt server-seitig aufgelöste `from_label`/`to_label`-Felder (gleiche Titel-Extraktion wie bei der Suchindizierung, mit `idno`-Fallback); `null` bedeutet dabei gezielt "Datensatz nicht mehr vorhanden/öffentlich", nicht "Anzeigefehler". Admin-Beziehungspanel und Portal-`RelationsList` lesen die Labels jetzt direkt statt pro Relation einen Zieldatensatz einzeln nachzuladen, und zeigen nie mehr eine rohe UUID. (#324)
+
 ## [1.15.21] - 2026-09-01
 
 ### Fixed

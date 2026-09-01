@@ -63,7 +63,8 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
           const targetType = isFrom ? r.to_type : r.from_type
           const targetId = isFrom ? r.to_id : r.from_id
           const titleKey = `${targetType}/${targetId}`
-          const targetLabel = titles[titleKey] ?? `[${targetId.slice(0, 8)}…]`
+          const resolvedLabel = isFrom ? r.to_label : r.from_label
+          const targetLabel = resolvedLabel ?? titles[titleKey] ?? t('common.recordUnavailable')
           const path = typePath(targetType, targetId)
 
           const inheritedFieldNames = fieldDefs

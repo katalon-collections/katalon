@@ -1306,23 +1306,25 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       const loaded = [...fromRels, ...toRels]
       setRels(loaded)
       const titleMap: Record<string, string> = {}
-      const statusMap: Record<string, string> = {}
-      await Promise.all(loaded.map(async r => {
+      const objectIds: string[] = []
+      for (const r of loaded) {
         const isFrom = r.from_id === id
         const targetType = isFrom ? r.to_type : r.from_type
         const targetId = isFrom ? r.to_id : r.from_id
-        const key = `${targetType}/${targetId}`
+        const label = isFrom ? r.to_label : r.from_label
+        titleMap[`${targetType}/${targetId}`] = label ?? 'Nicht verfügbar'
+        if (targetType === 'object') objectIds.push(targetId)
+      }
+      setRelTitles(titleMap)
+      const statusMap: Record<string, string> = {}
+      await Promise.all(objectIds.map(async targetId => {
         try {
-          const rec = await (getApi(targetType as RecordType).get as (id: string) => Promise<AnyRecord>)(targetId)
-          titleMap[key] = formatRecordLabel(rec.metadata_ as Record<string, unknown>, (rec as { idno?: string | null }).idno, 'Ohne Titel')
-          if (targetType === 'object') {
-            statusMap[targetId] = (rec as { collection_status?: string | null }).collection_status ?? 'active'
-          }
+          const rec = await objects.get(targetId)
+          statusMap[targetId] = rec.collection_status ?? 'active'
         } catch {
-          titleMap[key] = 'Nicht verfügbar'
+          // target inaccessible — status badge just stays unset
         }
       }))
-      setRelTitles(titleMap)
       setObjectStatuses(statusMap)
     } catch {
       // silently ignore

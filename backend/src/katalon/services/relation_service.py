@@ -10,7 +10,23 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import FieldDefinition, Object, Procedure, Relation
+from katalon.core.models import (
+    Entity,
+    FieldDefinition,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+    Relation,
+)
+
+_RECORD_MODELS: dict[str, Any] = {
+    "object": Object,
+    "entity": Entity,
+    "place": Place,
+    "occurrence": Occurrence,
+    "procedure": Procedure,
+}
 
 
 async def count_relations(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> int:
@@ -244,3 +260,54 @@ async def sync_schema_relations(
                     is_schema_derived=True,
                 )
             )
+
+
+async def resolve_relation_labels(
+    db: AsyncSession,
+    relations: list[Relation],
+    *,
+    public_only: bool = False,
+) -> dict[tuple[str, uuid.UUID], str | None]:
+    """Resolve a display label for every (type, id) endpoint referenced by relations.
+
+    None means the record is missing (deleted) or, with public_only, no longer
+    public — distinct from a resolvable record whose title happens to be empty
+    (which still yields the idno fallback, or "" only if neither exists).
+    """
+    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+    from katalon.services.search_service import _extract_title
+
+    ids_by_type: dict[str, set[uuid.UUID]] = {}
+    for rel in relations:
+        ids_by_type.setdefault(rel.from_type, set()).add(rel.from_id)
+        ids_by_type.setdefault(rel.to_type, set()).add(rel.to_id)
+
+    labels: dict[tuple[str, uuid.UUID], str | None] = {}
+    for record_type, ids in ids_by_type.items():
+        model = _RECORD_MODELS.get(record_type)
+        if model is None:
+            for record_id in ids:
+                labels[(record_type, record_id)] = None
+            continue
+
+        stmt = select(model).where(model.id.in_(ids))
+        if hasattr(model, "deleted_at"):
+            stmt = stmt.where(model.deleted_at.is_(None))
+        if public_only:
+            from katalon.core.visibility import PUBLIC_STATUSES
+            stmt = stmt.where(model.status.in_(PUBLIC_STATUSES))
+        records = {rec.id: rec for rec in (await db.execute(stmt)).scalars().all()}
+
+        public_fields = await load_public_fields(db, record_type) if public_only else None
+        for record_id in ids:
+            rec = records.get(record_id)
+            if rec is None:
+                labels[(record_type, record_id)] = None
+                continue
+            md = rec.metadata_ or {}
+            if public_only:
+                subtype = getattr(rec, f"{record_type}_type", None)
+                md = filter_public_metadata(md, public_fields or [], subtype)
+            title = _extract_title(md) or (rec.idno or "")
+            labels[(record_type, record_id)] = title or None
+    return labels

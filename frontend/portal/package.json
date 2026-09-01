@@ -1,6 +1,6 @@
 {
   "name": "katalon-portal",
-  "version": "1.15.23",
+  "version": "1.15.24",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",

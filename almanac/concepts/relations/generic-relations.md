@@ -36,6 +36,12 @@ sources:
   - id: dependencies
     type: file
     path: backend/src/katalon/core/dependencies.py
+  - id: portal-public-api
+    type: file
+    path: backend/src/katalon/api/v1/portal_public.py
+  - id: public-metadata-service
+    type: file
+    path: backend/src/katalon/services/public_metadata_service.py
 ---
 
 Generic relations are Katalon's shared graph table for links between records. A `Relation` row stores `from_type`, `from_id`, `to_type`, `to_id`, a string `relation_type`, JSONB relation metadata, a schema-derived flag, and creation time [@models]. The same table holds direct relations created through the relation API and relations mirrored from schema relation fields, so object, entity, place, occurrence, and procedure links can be queried through one surface [@relation-api] [@relation-service].
@@ -45,6 +51,14 @@ Generic relations are Katalon's shared graph table for links between records. A 
 The relation table does not use foreign keys to every possible record table. Instead, each endpoint is stored as a type string plus UUID pair, with indexes on `(from_type, from_id)` and `(to_type, to_id)` for directional lookup [@models]. This design fits Katalon's multi-type record model because a relation can connect any supported record type pair without adding a join table per pair.
 
 The relation API lists relations with optional endpoint filters, creates manual relations, updates `relation_type` or metadata, and deletes relation rows [@relation-api]. Create, update, and delete operations require the `manage_content` capability, which is assigned to catalogers, editors, admins, and superusers. Listing is a normal read endpoint [@relation-api] [@dependencies].
+
+## Display Labels
+
+Both list endpoints (`GET /v1/relations` for the admin API, `GET /portal/v1/relations` for the public one) resolve a `from_label`/`to_label` pair for every row server-side instead of returning bare `from_id`/`to_id` UUIDs for callers to look up themselves [@relation-api] [@portal-public-api]. `resolve_relation_labels` batches the referenced records by type, extracts a display title the same way search indexing does (checked field names, first repeatable-field entry, `idno` fallback), and returns `None` when a referenced record is missing or, for the portal caller, no longer public [@relation-service]. The portal call additionally passes `public_only=True`, which projects each record's metadata through the same public-field filter as public record reads before extracting a title, and restricts the lookup to public statuses [@relation-service] [@public-metadata-service]. `None` here means "endpoint gone", distinct from a resolvable record whose title happens to be empty (which still falls back to `idno`).
+
+A `None` label is a different situation from a relation being excluded from the portal response entirely: the portal endpoint's existing `_public_endpoint_clause` filter already drops any relation where either endpoint isn't a public record, so a non-public target never reaches label resolution in the first place — that's a permission decision, not a display bug [@portal-public-api]. A `None` label on a row the endpoint *did* return means the target existed and was public/accessible at query time but has since been deleted.
+
+Because labels now come resolved from the API, the admin relationships panel and the portal `RelationsList` no longer need to fetch every relation target record individually to build a title map — they read `r.from_label`/`r.to_label` directly and fall back to "Nicht verfügbar" / `common.recordUnavailable` when a label is `None`, never a raw UUID [@screen-form] [@relation-list].
 
 ## Admin Picker And Inline Creation
 
