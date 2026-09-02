@@ -109,9 +109,11 @@ Gedämpftes Archiv-Navy rahmt neutrale Arbeitsflächen; Sammlungsblau markiert A
 
 ## Typography
 
-**Display Font:** IBM Plex Sans (mit system-ui)
-**Body Font:** IBM Plex Sans (mit system-ui)
-**Label/Mono Font:** IBM Plex Mono (mit ui-monospace)
+**Display Font:** IBM Plex Sans (lokal gebündelt, mit system-ui)
+**Body Font:** IBM Plex Sans (lokal gebündelt, mit system-ui)
+**Label/Mono Font:** IBM Plex Mono (lokal gebündelt, mit ui-monospace)
+
+Die Oberfläche lädt keine externen Webfonts; IBM Plex wird mit dem Admin-Bundle ausgeliefert.
 
 **Character:** IBM Plex Sans wirkt sachlich und offen. IBM Plex Mono kennzeichnet IDs, Schlüssel, Zähler und technische Metadaten.
 

@@ -54,6 +54,10 @@ Katalon's backend security boundary is built from configuration validation, firs
 
 The general `/v1` working API is authenticated: its routers are mounted with `get_current_user`, apart from login and token-refresh routes below `/v1/auth`. The unauthenticated exception is the deliberately narrow `/portal/v1` read model for published Portal content; it excludes Procedures and exposes explicit public response projections rather than internal API schemas [@app] [@portal-public].
 
+The outer nginx configuration applies a CSP that permits the same-origin applications, configured HTTPS IIIF delivery endpoints, and embedded OpenStreetMap while disallowing plugins and third-party scripts. The Admin bundles IBM Plex locally instead of loading web fonts from a third party. Nginx also sends `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`; production TLS additionally sends HSTS.
+
+Operators remain responsible for the legal information of their own deployment. [`docs/datenschutzerklaerung-vorlage.md`](../../../docs/datenschutzerklaerung-vorlage.md) is a configurable German privacy-notice template for a static Portal page; it lists only the optional integrations that must be retained when enabled.
+
 ## Configuration Inputs
 
 `Settings` defines service URLs, `SECRET_KEY`, `KATALON_SECRETS_KEY`, JWT algorithm and expiration windows, upload limits, media paths, default admin values, CORS origins, and integration credentials or toggles [@config]. The default `secret_key` is explicitly a development value, while `katalon_secrets_key` has a minimum length requirement in the settings model [@config].
