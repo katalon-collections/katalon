@@ -214,13 +214,13 @@ Wichtige Endpunkte:
 
 ## Dokumentation
 
-Die Anwender- und Betriebsdokumentation liegt im separaten Docs-Repo:
+Die Anwenderdokumentation liegt im separaten Docs-Repository:
 
 ```text
-https://github.com/karkraeg/katalon-docs
+https://katalon-collections.github.io/katalon-docs/
 ```
 
-Die lokale `docs/`-Ablage bleibt vorerst als Übergangskopie im Hauptrepo.
+Die lokale `docs/`-Ablage enthält nur technische Entwickler- und Betriebsdokumentation.
 
 ---
 

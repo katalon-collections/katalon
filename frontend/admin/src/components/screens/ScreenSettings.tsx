@@ -1390,7 +1390,7 @@ function SectionUeber({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, fontSize: 13 }}>
           <a href="https://github.com/karkraeg/Katalon" target="_blank" rel="noreferrer">{t('ueber.links.repo')}</a>
           <a href="https://github.com/karkraeg/Katalon/blob/main/LICENSE" target="_blank" rel="noreferrer">{t('ueber.links.license')}</a>
-          <a href="https://github.com/karkraeg/katalon-docs" target="_blank" rel="noreferrer">{t('ueber.links.docs')}</a>
+          <a href="https://katalon-collections.github.io/katalon-docs/" target="_blank" rel="noreferrer">{t('ueber.links.docs')}</a>
         </div>
         {isAdmin && (
           <div style={{ marginTop: 16 }}>

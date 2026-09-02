@@ -19,7 +19,7 @@ Katalon ist ein Open-Source Metadata Management System (MMS) für den GLAM-Sekto
 - `KONZEPT.md` – vollständiges Konzeptdokument mit Datenmodell
 - GitHub-Roadmap (#260–#267) – Phasenstatus und Prioritäten (ersetzt IMPLEMENTIERUNGSPLAN.md)
 - `.agents/DEV.md` – Entwickler-Setup und Workflows
-- `docs/` – Übergangskopie der technischen Dokumentation; primär gepflegt in `karkraeg/katalon-docs`
+- `docs/` – technische Entwickler- und Betriebsdokumentation
 - `e2e/` – Playwright-E2E-Tests
 
 ## Fixierte Architekturentscheidungen
@@ -202,20 +202,20 @@ Always use CodeGraph before falling back to grep or sequential file reads.
 
 **Pflege**: Nach jeder Session, in der eine architektonisch relevante Entscheidung getroffen wird (neue Komponente, Trade-off zwischen Ansätzen, Abweichung von einem bestehenden Muster) — nicht bei reinen Bugfixes oder Feature-Implementierungen ohne Designfrage — ein neues Konzept unter `.agents/knowledge/decisions/` anlegen (Format wie bestehende Dateien: YAML-Frontmatter mit `type: Decision`, Sections Kontext/Entscheidung/Begründung/Citations) und in `decisions/index.md` verlinken.
 
-## Anwender-Doku (`docs/`) — Pflege
+## Anwender-Doku — Pflege
 
-`docs/` ist Übergangskopie, primär gepflegt in `karkraeg/katalon-docs` (siehe README "Dokumentation"). Nur zwei Dateien sind echte Bedienungsanleitung für Admin-UI-Nutzer (Kuratoren/Sachbearbeiter): `02_schema_verwaltung.md`, `03_csv_import.md`. Diese verlinkt die Admin-UI direkt (Hilfe-Icon in `Topbar.tsx`, `ROUTE_DOCS`-Mapping). Rest der Dateien ist technisch/Dev/Architektur und nicht für Admin-Endnutzer gedacht.
+Die Anwenderdokumentation liegt in `katalon-collections/katalon-docs` und wird unter `https://katalon-collections.github.io/katalon-docs/` veröffentlicht. Die Admin-UI verlinkt ihre Hilfeziele direkt auf diese Seiten. `docs/` in diesem Repository enthält nur technische Entwickler- und Betriebsdokumentation.
 
-**Nachpflegepflicht**: Seit MVP sind viele Features dazugekommen, die in den Docs (noch) nicht abgebildet sind (u. a. Procedure-Typ/Vorgänge, Formularvarianten, Subtypen, Onboarding-Tour, granulare Rollen, katalon-cli für Deployment, Deep-Linking). Bei Feature-Arbeit, die eine der beiden Nutzer-Doku-Dateien betrifft, oder bei größeren Feature-Batches: betroffene `docs/`-Seite(n) aktualisieren bzw. Lücke benennen. Bei neuen Bedienungs-relevanten Features prüfen, ob eine neue Nutzer-Doku-Seite + `ROUTE_DOCS`-Eintrag nötig ist.
+**Nachpflegepflicht**: Bei Feature-Arbeit, die die Admin- oder Portalbedienung betrifft, die betroffene Seite im Docs-Repository aktualisieren bzw. die Lücke benennen. Bei neuen bedienungsrelevanten Flächen prüfen, ob eine neue Seite und ein `ROUTE_DOCS`-Eintrag nötig sind.
 
 ## Doku-Pflicht (Definition of Done)
 
 **Eine Feature-Umsetzung oder ein Verhaltens-/Architekturwechsel gilt erst als abgeschlossen, wenn die betroffene Doku im Repo mitgezogen wurde — das ist kein optionaler Nachputz-Schritt, sondern Teil der Aufgabe selbst.** Vor der Abschlussmeldung an Karl prüfen, nicht danach:
 
 1. `almanac/` — betroffene Seiten identifizieren (Pfad steht meist schon in `sources:` im Frontmatter) und gegen den tatsächlichen Code korrigieren. Nicht nur ergänzen: veraltete Aussagen (alte Architektur, entfernte Fallbacks, "geplant für später" bei Dingen, die jetzt gebaut sind) explizit korrigieren oder streichen.
-2. `docs/02_schema_verwaltung.md` / `docs/03_csv_import.md` — nur wenn das Feature admin-UI-Bedienung betrifft, die Kuratoren/Sachbearbeiter direkt sehen. Neue Bedienungs-relevante Fläche → prüfen, ob eine neue Seite + `ROUTE_DOCS`-Eintrag (`Topbar.tsx`) nötig ist.
+2. `katalon-collections/katalon-docs` — nur wenn das Feature Admin- oder Portalbedienung betrifft, die Kuratoren/Sachbearbeiter direkt sehen. Neue bedienungsrelevante Fläche → prüfen, ob eine neue Seite und ein `ROUTE_DOCS`-Eintrag (`Topbar.tsx`) nötig ist.
 3. `.agents/knowledge/decisions/` (dev-only, nicht Teil des Git-Repos) — bei echter Architekturentscheidung (neue Komponente, Trade-off, Abweichung von bestehendem Muster) neues Konzept anlegen und in `decisions/index.md` verlinken.
-4. Externe Doku (`karkraeg/katalon-docs`) — **nicht** im selben Zug pflegen, macht Karl bewusst gebündelt später. Nur intern (dieses Repo) sofort.
+4. Externe Anwenderdokumentation (`katalon-collections/katalon-docs`) — im Docs-Repository pflegen und über GitHub Pages veröffentlichen.
 
 Ist eine Doku-Anpassung aus Zeit-/Scope-Gründen bewusst zurückgestellt: das explizit benennen ("Doku X ist jetzt veraltet, noch nicht nachgezogen"), nicht stillschweigend weglassen. Ein Feature ohne diesen Schritt ist unvollständig geliefert, selbst wenn Code und Tests grün sind.
 

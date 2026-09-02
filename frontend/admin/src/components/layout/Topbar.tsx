@@ -43,22 +43,18 @@ function settingsResults(language: string): AdminSearchResult[] {
   }))
 }
 
-const DOCS_BASE = 'https://github.com/karkraeg/katalon-docs/blob/main'
-const DOCS_ROOT = 'https://github.com/karkraeg/katalon-docs'
-// TODO: form-variants/subtypes docs sind noch nicht ins katalon-docs-Repo migriert,
-// deshalb übergangsweise Blob-Link ins Hauptrepo statt DOCS_BASE. Nach Migration auf DOCS_BASE umstellen.
-const MAIN_REPO_DOCS = 'https://github.com/karkraeg/Katalon/blob/main/docs'
+const DOCS_ROOT = 'https://katalon-collections.github.io/katalon-docs'
 
 const ROUTE_DOCS: Record<string, string> = {
-  schema: `${DOCS_BASE}/02_schema_verwaltung.md`,
-  import: `${DOCS_BASE}/03_csv_import.md`,
-  'form-variants': `${MAIN_REPO_DOCS}/11_formularvarianten.md`,
-  subtypes: `${MAIN_REPO_DOCS}/12_subtypen.md`,
-  list: `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
-  'entities-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
-  'places-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
-  'occurrences-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
-  'procedures-list': `${MAIN_REPO_DOCS}/05_batch_bearbeitung.md`,
+  schema: `${DOCS_ROOT}/administration/schema/`,
+  import: `${DOCS_ROOT}/administration/import/`,
+  'form-variants': `${DOCS_ROOT}/administration/formularvarianten/`,
+  subtypes: `${DOCS_ROOT}/administration/subtypen/`,
+  list: `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'entities-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'places-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'occurrences-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'procedures-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
 }
 
 interface Props {

@@ -31,8 +31,8 @@ sources:
     type: file
     path: frontend/admin/src/api/client.ts
   - id: docs
-    type: file
-    path: docs/05_batch_bearbeitung.md
+    type: web
+    url: https://katalon-collections.github.io/katalon-docs/administration/batch-bearbeitung/
 ---
 
 # Batch Editing
