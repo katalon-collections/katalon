@@ -1,0 +1,65 @@
+name: Publish public release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing private security-release tag, e.g. v1.16.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ github.repository == 'karkraeg/Katalon' && (github.event_name == 'workflow_dispatch' || endsWith(github.ref_name, '.0')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Validate release trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if [[ "$EVENT_NAME" == push ]]; then
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.0$ ]]
+          else
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          fi
+
+      - name: Clone public distribution repository
+        env:
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          test -n "$PUBLIC_REPO_TOKEN"
+          git clone "https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/katalon-collections/katalon.git" public
+          git -C public checkout -B main
+
+      - name: Create public source snapshot
+        env:
+          PUBLISH_PATCH_RELEASE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          git -C public rm -r --ignore-unmatch . || true
+          previous_public_tags=$(git -C public tag --list 'v*' | paste -sd, -)
+          PUBLIC_RELEASE_TAGS="$previous_public_tags" ./scripts/publish-open-source.sh "$TAG" public
+
+      - name: Commit and tag public release
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          git -C public config user.name "github-actions[bot]"
+          git -C public config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C public add --all
+          git -C public diff --cached --quiet && exit 0
+          git -C public commit -m "release: $TAG"
+          git -C public tag "$TAG"
+          git -C public push origin HEAD:main "$TAG"

@@ -51,8 +51,8 @@ Unique Selling Points:
 
 ```bash
 # Repository klonen
-git clone https://github.com/karkraeg/Katalon.git
-cd Katalon
+git clone https://github.com/katalon-collections/katalon.git
+cd katalon
 ./install.sh --up
 ```
 
@@ -226,10 +226,30 @@ Die lokale `docs/`-Ablage enthält nur technische Entwickler- und Betriebsdokume
 
 ## Entwicklung
 
-Für lokale Entwicklung ohne Docker siehe [`.agents/DEV.md`](.agents/DEV.md).
+Für lokale Entwicklung startet `docker compose -f docker-compose.dev.yml up` nur die Infrastruktur; Backend und Frontends laufen anschließend lokal.
 
 ---
 
 ## Lizenz
 
 [AGPL-3.0-or-later](LICENSE)
+
+### Disclaimer
+
+Katalon Collections is provided as free and open-source software under the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+The software is provided "as is" and without warranty of any kind, as further specified in the license.
+
+Katalon Collections may be used to store, manage and publish valuable, confidential or personal data. Operators are solely responsible for the secure deployment and operation of their installation, including in particular:
+
+- regular and tested backups,
+- access control and authentication,
+- TLS and network security,
+- secure configuration and secrets management,
+- installation of security and dependency updates,
+- compliance with applicable data protection and other legal requirements,
+- review and testing before use in production environments.
+
+No software can guarantee complete protection against software defects, data loss, unauthorized access or other security incidents.
+
+Please read the [LICENSE](LICENSE), [DISCLAIMER.md](DISCLAIMER.md) and [SECURITY.md](SECURITY.md) files before using Katalon Collections in production.
