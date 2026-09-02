@@ -1,0 +1,61 @@
+{
+  "types": {
+    "object": "Object",
+    "entity": "Entity",
+    "place": "Place",
+    "occurrence": "Occurrence",
+    "procedure": "Procedure"
+  },
+  "statuses": {
+    "draft": "Draft",
+    "internal": "Internal",
+    "public": "Public",
+    "active": "Active",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "errors": {
+    "unknownOperation": "Unknown operation",
+    "selectField": "Select a field",
+    "appendOnlyRepeatable": "Append only works on repeatable fields",
+    "enterValueOrTerm": "Enter a value or select a term",
+    "selectTargetRecord": "Select a target record",
+    "enterRelationType": "Enter a relation type",
+    "noRecordsSelected": "No records selected"
+  },
+  "title": "Batch edit",
+  "close": "Close",
+  "selected": "selected",
+  "allSearchResults": "(all search results)",
+  "warningTitle": "Warning: {{count}} record(s) will be changed",
+  "warningBody": "This is a large batch. Please confirm before proceeding.",
+  "warningConfirm": "I understand, continue",
+  "recordsEdited": "{{count}} record(s) edited",
+  "asyncJob": "Task {{taskId}} is still running in the background.",
+  "errorCount": "{{count}} error(s)",
+  "operation": "Operation",
+  "operations": {
+    "setStatus": "Set status",
+    "setField": "Set field value",
+    "appendField": "Append to field",
+    "clearField": "Clear field",
+    "addRelation": "Add relation",
+    "removeRelation": "Remove relation"
+  },
+  "newStatus": "New status",
+  "field": "Field",
+  "value": "Value",
+  "active": "Active",
+  "searchTermPlaceholder": "Search term…",
+  "freeValuePlaceholder": "Or enter a free value",
+  "remove": "Remove",
+  "relatedRecordIdPlaceholder": "Record ID",
+  "targetType": "Target type",
+  "targetRecord": "Target record",
+  "searchRecords": "Search…",
+  "relationType": "Relation type",
+  "relationTypePlaceholder": "e.g. isPartOf",
+  "cancel": "Cancel",
+  "executing": "Executing…",
+  "executeButton": "Run batch edit"
+}

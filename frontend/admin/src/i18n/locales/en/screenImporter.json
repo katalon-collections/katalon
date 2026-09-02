@@ -1,0 +1,39 @@
+{
+  "title": "Importer",
+  "subtitle": "Bring data into Katalon",
+  "tabs": {
+    "metadata": "Metadata",
+    "media": "Media",
+    "vocabularies": "Vocabularies"
+  },
+  "tabAriaLabel": "Show {{label}} import",
+  "typeLabel": "Type:",
+  "subtypeLabel": "Subtype:",
+  "noSubtype": "— no subtype —",
+  "continueToDryRun": "Continue → Dry run",
+  "dryRun": {
+    "totalLines": "{{count}} lines total",
+    "valid": "{{count}} valid",
+    "errors": "{{count}} errors",
+    "warnings": "{{count}} warnings",
+    "row": "Row {{row}}: ",
+    "mediaHeading": "Media assignment",
+    "mediaObjects": "{{count}} records with media",
+    "mediaFiles": "{{count}} filenames matched for assignment",
+    "mediaEmpty": "{{count}} records without filenames",
+    "mediaConflicts": "{{count}} duplicate filenames",
+    "errorTableHeading": "Error",
+    "errorPagination": "{{page}} / {{totalPages}} ({{count}} different errors)",
+    "vocabHighCardinality": "⚠ Field \"{{label}}\": {{uniqueCount}} different values, {{newCount}} new. Should this column really be used as a vocabulary?",
+    "vocabNewTerms": "Field \"{{label}}\": {{newCount}} new vocabulary terms will be created ({{uniqueCount}} unique values).",
+    "spellingVariants": "Possible spelling variants",
+    "merge": "Merge",
+    "noErrors": "No errors. {{count}} records can be imported.",
+    "importOptions": "Import options",
+    "existingRecords": "Existing records (same ID)",
+    "autoPublish": "Publish records directly (only if all required fields are filled)",
+    "autoPublishWarning": "Records without an ID cannot be published. Please choose a different ID strategy.",
+    "back": "Back",
+    "importNow": "Import now ({{count}} records)"
+  }
+}

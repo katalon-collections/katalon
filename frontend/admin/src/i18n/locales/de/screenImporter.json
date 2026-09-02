@@ -1,0 +1,39 @@
+{
+  "title": "Importer",
+  "subtitle": "Daten in Katalon übernehmen",
+  "tabs": {
+    "metadata": "Metadaten",
+    "media": "Medien",
+    "vocabularies": "Vokabulare"
+  },
+  "tabAriaLabel": "{{label}}-Import anzeigen",
+  "typeLabel": "Typ:",
+  "subtypeLabel": "Subtyp:",
+  "noSubtype": "— kein Subtyp —",
+  "continueToDryRun": "Weiter → Probelauf",
+  "dryRun": {
+    "totalLines": "{{count}} Zeilen gesamt",
+    "valid": "{{count}} gültig",
+    "errors": "{{count}} Fehler",
+    "warnings": "{{count}} Hinweise",
+    "row": "Zeile {{row}}: ",
+    "mediaHeading": "Medienzuordnung",
+    "mediaObjects": "{{count}} Datensätze mit Medien",
+    "mediaFiles": "{{count}} Dateinamen zur Zuordnung erkannt",
+    "mediaEmpty": "{{count}} Datensätze ohne Dateinamen",
+    "mediaConflicts": "{{count}} mehrfach zugeordnete Dateinamen",
+    "errorTableHeading": "Fehler",
+    "errorPagination": "{{page}} / {{totalPages}} ({{count}} verschiedene Fehler)",
+    "vocabHighCardinality": "⚠ Feld „{{label}}\": {{uniqueCount}} verschiedene Werte, davon {{newCount}} neu. Soll diese Spalte wirklich als Vokabular verwendet werden?",
+    "vocabNewTerms": "Feld „{{label}}\": {{newCount}} neue Vokabular-Terms werden angelegt ({{uniqueCount}} eindeutige Werte).",
+    "spellingVariants": "Mögliche Schreibweisen-Varianten",
+    "merge": "Zusammenführen",
+    "noErrors": "Keine Fehler. {{count}} Datensätze können importiert werden.",
+    "importOptions": "Import-Optionen",
+    "existingRecords": "Bestehende Datensätze (gleiche ID-Nr.)",
+    "autoPublish": "Datensätze direkt veröffentlichen (nur wenn alle Pflichtfelder befüllt)",
+    "autoPublishWarning": "Datensätze ohne ID-Nummer können nicht veröffentlicht werden. Bitte eine andere ID-Strategie wählen.",
+    "back": "Zurück",
+    "importNow": "Jetzt importieren ({{count}} Datensätze)"
+  }
+}

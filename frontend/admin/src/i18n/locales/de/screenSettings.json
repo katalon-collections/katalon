@@ -1,0 +1,64 @@
+{
+  "profil": {
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "intro": "API-Schlüssel ermöglichen programmatischen Lesezugriff. Den Schlüssel als",
+      "create": "Schlüssel erstellen",
+      "creating": "Erstelle…",
+      "created": "Schlüssel erstellt",
+      "namePlaceholder": "Bezeichnung für diesen Schlüssel",
+      "copy": "📋 Kopieren",
+      "revoke": "Widerrufen",
+      "revokeConfirm": "Diesen Schlüssel widerrufen? Er wird sofort ungültig.",
+      "columns": {
+        "name": "Name",
+        "prefix": "Schlüssel",
+        "created": "Erstellt",
+        "lastUsed": "Zuletzt genutzt"
+      }
+    },
+    "email": {
+      "title": "E-Mail ändern",
+      "currentPasswordLabel": "Aktuelles Passwort",
+      "newLabel": "Neue E-Mail",
+      "submit": "Speichern",
+      "success": "E-Mail erfolgreich aktualisiert.",
+      "errors": {
+        "invalid": "Ungültige E-Mail-Adresse.",
+        "newRequired": "Neue E-Mail erforderlich.",
+        "passwordRequired": "Aktuelles Passwort erforderlich."
+      }
+    },
+    "password": {
+      "title": "Passwort ändern",
+      "currentLabel": "Aktuelles Passwort",
+      "newLabel": "Neues Passwort",
+      "confirmLabel": "Neues Passwort bestätigen",
+      "submit": "Speichern",
+      "success": "Passwort erfolgreich aktualisiert.",
+      "errors": {
+        "mismatch": "Passwörter stimmen nicht überein.",
+        "weak": "Passwort ist zu schwach."
+      }
+    },
+    "tour": {
+      "title": "Onboarding-Tour",
+      "intro": "Die wichtigsten Funktionen von Katalon kennenlernen.",
+      "startBasic": "Tour starten",
+      "startAdvanced": "Ich kenne die Grundlagen"
+    }
+  },
+  "ueber": {
+    "title": "Katalon Collections",
+    "tagline": "Open-Source Metadata Management System für den GLAM-Sektor (Galerien, Bibliotheken, Archive, Museen).",
+    "licenseLabel": "Lizenz",
+    "licenseText": "GNU Affero General Public License v3.0 oder später (AGPL-3.0-or-later)",
+    "copyright": "© 2026 Karl Krägelin",
+    "links": {
+      "repo": "Quellcode auf GitHub",
+      "license": "Lizenztext (LICENSE)",
+      "docs": "Dokumentation",
+      "changelog": "Versionshinweise anzeigen"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "appliesCheckboxes": {
+    "noSelectionMeansAll": "Nichts ausgewählt = gilt für alle Typen"
+  },
+  "appliesLabel": {
+    "all": "Alle"
+  },
+  "headline": "Vokabular",
+  "headlineSub": "Kontrollierte Vokabulare und Terme",
+  "requiredBadge": "Pflicht",
+  "relationTypeHelp": {
+    "heading": "So wird der Relationstyp verwendet",
+    "source": "Quelle",
+    "target": "Ziel",
+    "example": "Beispiel: „ist Teil von“ für Objekt → Occurrence; als Gegenrichtung „hat Teil“ für Occurrence → Objekt.",
+    "preview": "Ihre Vorschau:",
+    "labelFallback": "Label"
+  }
+}

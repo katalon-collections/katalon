@@ -1,0 +1,8 @@
+{
+  "loadingSelectors": "Detecting XML elements…",
+  "heading": "Select the record element",
+  "description": "Choose the XML element that contains the individual records to be imported.",
+  "depth": "Depth: {{depth}}",
+  "selectElementHint": "Select an XML element to continue",
+  "continueToMapping": "Continue to mapping"
+}

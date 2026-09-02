@@ -1,0 +1,61 @@
+{
+  "types": {
+    "object": "Objekt",
+    "entity": "Entität",
+    "place": "Ort",
+    "occurrence": "Occurrence",
+    "procedure": "Vorgang"
+  },
+  "statuses": {
+    "draft": "Entwurf",
+    "internal": "Intern",
+    "public": "Öffentlich",
+    "active": "Aktiv",
+    "completed": "Abgeschlossen",
+    "cancelled": "Abgebrochen"
+  },
+  "errors": {
+    "unknownOperation": "Unbekannte Operation",
+    "selectField": "Feld auswählen",
+    "appendOnlyRepeatable": "Anhängen nur bei wiederholbaren Feldern möglich",
+    "enterValueOrTerm": "Wert eingeben oder Begriff auswählen",
+    "selectTargetRecord": "Ziel-Datensatz auswählen",
+    "enterRelationType": "Relationstyp eingeben",
+    "noRecordsSelected": "Keine Datensätze ausgewählt"
+  },
+  "title": "Massenbearbeitung",
+  "close": "Schließen",
+  "selected": "ausgewählt",
+  "allSearchResults": "(alle Suchergebnisse)",
+  "warningTitle": "Warnung: {{count}} Datensätze werden geändert",
+  "warningBody": "Dies ist eine große Menge. Bitte bestätige vor dem Fortfahren.",
+  "warningConfirm": "Ich verstehe, fortsetzen",
+  "recordsEdited": "{{count}} Datensätze bearbeitet",
+  "asyncJob": "Task {{taskId}} läuft noch im Hintergrund.",
+  "errorCount": "{{count}} Fehler",
+  "operation": "Operation",
+  "operations": {
+    "setStatus": "Status setzen",
+    "setField": "Feldwert setzen",
+    "appendField": "An Feld anhängen",
+    "clearField": "Feld leeren",
+    "addRelation": "Verknüpfung hinzufügen",
+    "removeRelation": "Verknüpfung entfernen"
+  },
+  "newStatus": "Neuer Status",
+  "field": "Feld",
+  "value": "Wert",
+  "active": "Aktiv",
+  "searchTermPlaceholder": "Suchbegriff…",
+  "freeValuePlaceholder": "Oder Freitext eingeben",
+  "remove": "Entfernen",
+  "relatedRecordIdPlaceholder": "Datensatz-ID",
+  "targetType": "Ziel-Typ",
+  "targetRecord": "Ziel-Datensatz",
+  "searchRecords": "Suchen…",
+  "relationType": "Relationstyp",
+  "relationTypePlaceholder": "z. B. isPartOf",
+  "cancel": "Abbrechen",
+  "executing": "Wird ausgeführt…",
+  "executeButton": "Massenbearbeitung ausführen"
+}

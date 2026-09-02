@@ -1,0 +1,66 @@
+{
+  "login": {
+    "tagline": "Digital Collection Management System",
+    "cardTitle": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Please wait…",
+    "forgotPassword": "Forgot password?",
+    "resetTitle": "Reset password",
+    "newPasswordTitle": "Set new password",
+    "resetHint": "We will send a link if an active account exists for this email address.",
+    "resetSubmit": "Send reset link",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat new password",
+    "newPasswordSubmit": "Save new password",
+    "passwordMismatch": "The passwords do not match.",
+    "passwordResetComplete": "Your password was changed. Please sign in.",
+    "backToLogin": "Back to sign in"
+  },
+  "topbar": {
+    "openNav": "Open navigation",
+    "globalSearch": "Global search",
+    "globalSearchPlaceholder": "Search everything…",
+    "noResults": "No results for \"{{query}}\"",
+    "help": "Help for this screen",
+    "account": "Account settings",
+    "logout": "Log out",
+    "user": "User"
+  },
+  "sidebar": {
+    "mainNav": "Main navigation",
+    "closeNav": "Close navigation",
+    "logout": "Log out",
+    "groups": {
+      "content": "Content",
+      "config": "Configuration",
+      "admin": "Administration"
+    },
+    "nav": {
+      "list": "Objects",
+      "entitiesList": "Entities",
+      "placesList": "Places",
+      "occurrencesList": "Occurrences",
+      "proceduresList": "Procedures",
+      "import": "Importer",
+      "audit": "Audit log",
+      "subtypes": "Subtypes",
+      "schema": "Schemas",
+      "formVariants": "Form variants",
+      "vocab": "Vocabulary",
+      "pages": "Static pages",
+      "oaiSets": "OAI-PMH sets",
+      "banners": "Banners",
+      "export": "Export",
+      "users": "Users",
+      "settings": "Settings"
+    },
+    "roles": {
+      "admin": "Administrator",
+      "editor": "Editor",
+      "cataloger": "Cataloger",
+      "viewer": "Viewer"
+    }
+  }
+}

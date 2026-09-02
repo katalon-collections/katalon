@@ -1,0 +1,7 @@
+{
+  "searchPlaceholder": "Search {{source}}…",
+  "searchAriaLabel": "Search {{source}} authority",
+  "searching": "Searching…",
+  "remove": "Remove",
+  "removeAriaLabel": "Remove {{label}}"
+}

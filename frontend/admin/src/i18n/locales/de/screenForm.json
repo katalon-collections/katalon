@@ -1,0 +1,20 @@
+{
+  "dateInput": {
+    "placeholder": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
+    "pickerTitleEnabled": "Datumsauswahl öffnen",
+    "pickerTitleDisabled": "Kein einzelner Tag – manuell bearbeiten",
+    "pickerAriaLabel": "Datum auswählen"
+  },
+  "pid": {
+    "mintUrn": "URN reservieren",
+    "mintUrnPending": "Registriert…",
+    "mintArk": "ARK vergeben",
+    "mintArkPending": "Vergebt…",
+    "mintHint": "Datensatz zuerst speichern, dann PID vergeben.",
+    "systemManaged": "vom System vergeben"
+  },
+  "url": {
+    "linkLabel": "Linktitel (optional)",
+    "add": "URL hinzufügen"
+  }
+}

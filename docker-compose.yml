@@ -1,0 +1,256 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-katalon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-katalon}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-katalon}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms${ES_HEAP_SIZE:-512m} -Xmx${ES_HEAP_SIZE:-512m}
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v red" ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  cantaloupe:
+    image: islandora/cantaloupe:main
+    volumes:
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
+      - type: tmpfs
+        target: /var/lib/cantaloupe/cache
+        tmpfs:
+          size: ${CANTALOUPE_CACHE_TMPFS_SIZE:-512m}
+    environment:
+      - CANTALOUPE_SOURCE_STATIC=FilesystemSource
+      - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
+      - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
+      - CANTALOUPE_BASE_URI=${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      - CANTALOUPE_CACHE_SERVER_DERIVATIVE=FilesystemCache
+      - CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED=true
+      - CANTALOUPE_FILESYSTEMCACHE_PATHNAME=/var/lib/cantaloupe/cache
+      - CANTALOUPE_PROCESSOR_MANUALSELECTIONSTRATEGY_JPG=Java2dProcessor
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      GEONAMES_USERNAME: ${GEONAMES_USERNAME:-demo}
+      DEBUG: ${DEBUG:-false}
+      MEDIA_ROOT: /var/lib/katalon/media
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
+      FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
+      OAI_ADMIN_EMAIL: ${OAI_ADMIN_EMAIL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+    volumes:
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cantaloupe:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.worker
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      MEDIA_ROOT: /var/lib/katalon/media
+      SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+    volumes:
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cantaloupe:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.worker
+    command: ["celery", "-A", "katalon.workers.celery_app", "beat", "--loglevel=info"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
+      CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
+      MEDIA_ROOT: /var/lib/katalon/media
+      SECRET_KEY: ${SECRET_KEY}
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      KATALON_BASE_URL: ${KATALON_BASE_URL:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cantaloupe:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.admin
+      args:
+        VITE_ADMIN_FEEDBACK_ENABLED: ${VITE_ADMIN_FEEDBACK_ENABLED:-}
+    ports:
+      - "3000:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://127.0.0.1/index.html > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  portal:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.portal
+      args:
+        VITE_PORTAL_FEEDBACK_ENABLED: ${VITE_PORTAL_FEEDBACK_ENABLED:-}
+    ports:
+      - "3001:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://127.0.0.1/index.html > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
+
+  backup:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-katalon}
+      POSTGRES_DB: ${POSTGRES_DB:-katalon}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_AT: ${BACKUP_AT:-}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    volumes:
+      - ./docker/backup.sh:/backup.sh:ro
+      - ${MEDIA_ROOT:-/srv/katalon/media}:/media:ro
+      - ${BACKUP_ROOT:-/srv/katalon/backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  es_data:

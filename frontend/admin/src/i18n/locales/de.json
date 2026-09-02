@@ -1,0 +1,66 @@
+{
+  "login": {
+    "tagline": "Digital Collection Management System",
+    "cardTitle": "Anmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Bitte warten…",
+    "forgotPassword": "Passwort vergessen?",
+    "resetTitle": "Passwort zurücksetzen",
+    "newPasswordTitle": "Neues Passwort setzen",
+    "resetHint": "Wir senden einen Link, falls ein aktives Konto zu dieser E-Mail-Adresse existiert.",
+    "resetSubmit": "Reset-Link senden",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Neues Passwort wiederholen",
+    "newPasswordSubmit": "Neues Passwort speichern",
+    "passwordMismatch": "Die Passwörter stimmen nicht überein.",
+    "passwordResetComplete": "Das Passwort wurde geändert. Bitte melde dich an.",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "topbar": {
+    "openNav": "Navigation öffnen",
+    "globalSearch": "Global suchen",
+    "globalSearchPlaceholder": "Global suchen…",
+    "noResults": "Keine Treffer für „{{query}}\"",
+    "help": "Hilfe zu diesem Screen",
+    "account": "Kontoeinstellungen",
+    "logout": "Abmelden",
+    "user": "Benutzer"
+  },
+  "sidebar": {
+    "mainNav": "Hauptnavigation",
+    "closeNav": "Navigation schließen",
+    "logout": "Abmelden",
+    "groups": {
+      "content": "Inhalte",
+      "config": "Konfiguration",
+      "admin": "Verwaltung"
+    },
+    "nav": {
+      "list": "Objekte",
+      "entitiesList": "Entitäten",
+      "placesList": "Orte",
+      "occurrencesList": "Occurrences",
+      "proceduresList": "Vorgänge",
+      "import": "Importer",
+      "audit": "Audit-Log",
+      "subtypes": "Subtypen",
+      "schema": "Schemata",
+      "formVariants": "Formularvarianten",
+      "vocab": "Vokabular",
+      "pages": "Statische Seiten",
+      "oaiSets": "OAI-PMH Sets",
+      "banners": "Banner",
+      "export": "Export",
+      "users": "Benutzer",
+      "settings": "Einstellungen"
+    },
+    "roles": {
+      "admin": "Administrator",
+      "editor": "Redakteur",
+      "cataloger": "Katalogisierer",
+      "viewer": "Betrachter"
+    }
+  }
+}
