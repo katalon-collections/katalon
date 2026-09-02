@@ -8,7 +8,7 @@ sources:
     url: https://github.com/karkraeg/Katalon/issues/286
   - id: cli-repo
     type: web
-    url: https://github.com/karkraeg/katalon-cli
+    url: https://github.com/katalon-collections/katalon-cli
   - id: release-script
     type: file
     path: scripts/gen_release_metadata.py
@@ -20,7 +20,7 @@ sources:
     path: install.sh
 ---
 
-Production Katalon instances are installed and updated with `katalon-cli`, a separate Python package (`uv tool install katalon-cli`) that pulls versioned release images and manages an instance directory — not by cloning the `Katalon` source repo [@issue] [@cli-repo].
+Production Katalon instances are installed and updated with `katalon-cli`, a separate Python package (`uv tool install katalon-cli`) whose public repository is `katalon-collections/katalon-cli`. The CLI pulls versioned release images and manages an instance directory instead of requiring operators to clone the `Katalon` source repo [@issue] [@cli-repo].
 
 ## Context
 
@@ -28,7 +28,7 @@ Production Katalon instances are installed and updated with `katalon-cli`, a sep
 
 ## Decision
 
-`katalon-cli` is its own repo and PyPI package, distributed via `uv tool install` rather than a Go binary — operators who can run Docker can run one `curl | sh` for `uv`, and the CLI can share Pydantic schemas with the backend if useful later [@cli-repo].
+`katalon-cli` is its own repo and PyPI package, distributed via `uv tool install` rather than a Go binary; operators who can run Docker can run one `curl | sh` for `uv`, and the CLI can share Pydantic schemas with the backend if useful later [@cli-repo].
 
 It manages a production instance directory (default: `/opt/katalon` on Linux, `~/katalon` on macOS) containing a generated `compose.yaml`, `.env`, and `installation.json` (the single source of truth for the installed version). `katalon update` always backs up (`pg_dump` + `.env` + `installation.json`) before pulling new images and running migrations; `katalon rollback` restores that backup rather than attempting `alembic downgrade`, since downgrades are often undefined or unsafe [@cli-repo].
 

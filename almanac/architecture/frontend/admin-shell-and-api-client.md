@@ -9,6 +9,9 @@ sources:
   - id: sidebar
     type: file
     path: frontend/admin/src/components/layout/Sidebar.tsx
+  - id: topbar
+    type: file
+    path: frontend/admin/src/components/layout/Topbar.tsx
   - id: user-roles-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenUserRoles.tsx
@@ -36,6 +39,8 @@ The admin shell is a browser-only application frame that keeps route state in th
 `AppShell` initializes the admin state from `window.location.hash`, turns hashes such as `#form/<id>` into a `route` and optional `editId`, and updates history with `pushState` when a user navigates [@app-shell]. The shell does not use React Router; it uses a switch over route ids to render list, form, schema, vocabulary, importer, audit, settings, user, role-matrix, static page, OAI set, subtype, and banner screens [@app-shell] [@user-roles-screen].
 
 The sidebar is a declarative navigation list that maps ids to labels, icons, active-route aliases, and role restrictions [@sidebar]. Admin-only groups and items check the decoded token role before rendering, and `AppShell` repeats the same `admin`/`superuser` gate when rendering configuration, user-management, and roles routes so direct hash navigation cannot open those screens for lower roles [@sidebar] [@app-shell]. Backend endpoints still enforce permissions independently of this frontend gate [@api-client].
+
+The sidebar footer shows only the product/version string, currently `Katalon Collections v{package.json version}`. Account actions live in the topbar user menu, where users can open account settings, change UI language, or log out; the sidebar no longer duplicates email, role, and logout controls [@sidebar] [@topbar].
 
 The shell also loads `/v1/portal/config` to replace the default `Katalon` title with the configured site title, then uses that value for breadcrumbs and `document.title` [@app-shell]. That endpoint requires authentication, so the fetch runs only after `restoreSession()` completed and the shell switched to the logged-in state; firing it on mount would race the token refresh and log a guaranteed 401 on every reload [@app-shell]. The same shell renders admin banners and import-status banners above the current screen, so cross-cutting notices stay outside individual workflow screens [@app-shell].
 

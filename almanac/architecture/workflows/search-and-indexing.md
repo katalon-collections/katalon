@@ -15,9 +15,15 @@ sources:
   - id: search-service
     type: file
     path: backend/src/katalon/services/search_service.py
+  - id: search-api
+    type: file
+    path: backend/src/katalon/api/v1/search.py
   - id: topbar
     type: file
     path: frontend/admin/src/components/layout/Topbar.tsx
+  - id: admin-search-test
+    type: file
+    path: backend/tests/test_admin_search.py
   - id: advanced-search-service
     type: file
     path: backend/src/katalon/services/advanced_search_service.py
@@ -64,7 +70,7 @@ Every search response includes default aggregations for type, status, and the th
 
 The Admin record lists are a separate PostgreSQL query path. Their `q` parameter performs a case-insensitive literal substring match against the record ID and JSON metadata; procedure lists also include the reference number. Thus `axt` matches `Steinaxt` without requiring users to type wildcards, and literal `%` or `_` characters do not broaden the query [@admin-object-list] [@admin-procedure-list] [@admin-list-tests].
 
-The Admin header uses a separate, admin-only search entrypoint for configuration data. It retains Elasticsearch for collection records and directly queries the small PostgreSQL tables for users, vocabularies and their terms, static pages, OAI sets, schema fields, subtypes, form variants, banners, and configured authority sources. This avoids indexing staff-only data and lets each result navigate to its owning Admin screen. Fixed settings sections are a client-side route list because they have no separate database rows [@search-service] [@topbar].
+The Admin header uses `/v1/search/admin`, a separate admin-only entrypoint, when the logged-in user is an `admin` or `superuser`; lower roles keep the ordinary record-search path [@search-api] [@topbar]. That endpoint keeps Elasticsearch for collection records, then directly queries the small PostgreSQL tables for users, vocabularies and their terms, static pages, OAI sets, schema fields, subtypes, form variants, banners, and configured authority sources [@search-api] [@search-service]. This avoids indexing staff-only data and lets each result navigate to its owning Admin screen. Fixed settings sections stay as a client-side route list because they have no separate database rows [@topbar]. The focused regression test fixes the user-result contract as `kind=user`, `route=users`, and no per-user edit id [@admin-search-test].
 
 ## Reindex And Repair Paths
 

@@ -1,6 +1,6 @@
 ---
 title: "Record CRUD And Publishing"
-summary: "Katalon record endpoints share a CRUD pattern for primary records and add publication validation, guarded deletes, relation cleanup, search indexing, and procedure completion."
+summary: "Katalon record endpoints share a CRUD pattern for primary records and add publication validation, guarded deletes, soft-delete tombstones, purge cleanup, search indexing, and procedure completion."
 topics: [architecture, workflows, backend, records, publishing]
 sources:
   - id: objects-api
@@ -30,12 +30,21 @@ sources:
   - id: relation-service
     type: file
     path: backend/src/katalon/services/relation_service.py
+  - id: visibility
+    type: file
+    path: backend/src/katalon/core/visibility.py
+  - id: purge-tasks
+    type: file
+    path: backend/src/katalon/workers/purge_tasks.py
   - id: delete-tests
     type: file
     path: backend/tests/test_delete_409.py
+  - id: soft-delete-tests
+    type: file
+    path: backend/tests/integration/test_soft_delete.py
 ---
 
-Record CRUD in Katalon is implemented as five endpoint families: objects, entities, places, occurrences, and procedures. The four public collection types share the same lifecycle: list with filters, create, read with visibility checks, update with optimistic locking, publish, delete, snapshot, restore, and per-record audit log [@objects-api] [@entities-api] [@places-api] [@occurrences-api]. Procedures use the same create/read/update/delete/snapshot/audit shape but replace publishing with domain-specific completion and procedure-state validation [@procedures-api].
+Record CRUD in Katalon is implemented as five endpoint families: objects, entities, places, occurrences, and procedures. The four public collection types share the same lifecycle: list with filters, create, read with visibility checks, update with optimistic locking, publish, soft delete, restore, trash listing, snapshot, and per-record audit log [@objects-api] [@entities-api] [@places-api] [@occurrences-api]. Procedures use create/read/update/delete/snapshot/audit routes but replace publishing with domain-specific completion and procedure-state validation; procedure archiving is the reversible status change, while procedure deletion still removes the row [@procedures-api].
 
 ## Shared Record Pattern
 
@@ -57,7 +66,11 @@ Only objects, entities, places, and occurrences have `/publish` endpoints [@obje
 
 Every delete endpoint requires an editor-or-admin user, checks whether the record exists, counts generic relations for that record, and returns `409` with `related_count` when relations exist and `force=true` was not supplied [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. The tests assert that delete routes require authentication, that `force=true` does not bypass authentication, and that object/entity relation conflicts return the expected `409` body shape [@delete-tests].
 
-When forced, delete endpoints remove generic relations first, write a delete audit entry, delete the record, attempt to remove it from search, and enqueue `cleanup_relation_refs` for schema-embedded relation references [@objects-api] [@entities-api] [@places-api] [@occurrences-api] [@procedures-api]. This makes the explicit generic relation table the first cleanup boundary, with asynchronous cleanup for metadata references after deletion [@objects-api].
+For objects, entities, places, and occurrences, delete is a tombstone operation: the endpoint sets `deleted_at`, writes a `delete` audit entry, removes the search document, and enqueues `cleanup_relation_refs` for schema-embedded relation references [@objects-api] [@entities-api] [@places-api] [@occurrences-api]. Admin restore routes clear `deleted_at`, write an `undelete` audit entry, and re-index the record; trash-list routes expose rows where `deleted_at` is set [@objects-api] [@entities-api] [@places-api] [@occurrences-api].
+
+Soft-deleted collection rows stay hidden from ordinary queries because shared public visibility adds `deleted_at IS NULL` and because `ensure_publicly_visible()` returns `410 Gone` to anonymous callers for deleted rows while authenticated detail reads see a normal not-found response [@visibility]. The integration tests lock this down: a deleted public object returns `410` on `/portal/v1/objects/{id}`, `404` on authenticated `/v1/objects/{id}`, appears in trash, restores cleanly, and is not resurrected by Elasticsearch reconciliation or bulk reindexing [@soft-delete-tests].
+
+Hard deletion is deferred to the purge worker. `purge_soft_deleted` permanently deletes soft-deleted objects, entities, places, and occurrences older than `settings.purge_after_days`; for objects it also removes original and pyramid media files, deletes generic relations, and writes a `purge` audit entry before deleting the row [@purge-tasks] [@soft-delete-tests]. Procedure delete remains different: when forced it removes generic relations, writes a delete audit entry, deletes the procedure row, removes it from search, and enqueues metadata relation cleanup [@procedures-api].
 
 ## Procedure Completion
 

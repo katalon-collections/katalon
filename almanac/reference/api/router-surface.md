@@ -80,7 +80,7 @@ Procedures have no `/portal/v1` route. Relation results require both endpoints t
 
 The authenticated `/v1` representations provide navigational `_links`: records link to themselves and relations (Objects additionally link to media); vocabularies link to themselves, terms, and trees; vocabulary terms link to themselves, their vocabulary, ancestors, and where applicable their parent; media link to their Object, file, and — when present — license URI [@api-dir]. The public Portal projections provide the same relative `_links` under `/portal/v1`, pointing at the anonymous read-model endpoints rather than the authenticated `/v1` paths [@portal-public].
 
-The ARK resolver is separate from `/portal/v1`. It stays reachable even when ARK minting is disabled, but it only accepts the configured production NAAN, rejects the reserved test NAAN `99999`, and looks up public, non-deleted inventory records; Procedures are not part of ARK resolution [@ark-api] [@ark-service].
+The ARK resolver is separate from `/portal/v1`. It stays reachable even when ARK minting is disabled, but it only accepts the configured production NAAN, rejects the reserved test NAAN `99999`, and looks up public, non-deleted inventory records; Procedures are not part of ARK resolution [@ark-api] [@ark-service]. Because `resolve_ark()` filters `deleted_at IS NULL`, a soft-deleted record's ARK currently returns the resolver's generic `404` rather than redirecting to the portal detail route that would return the collection tombstone response [@ark-api] [@ark-service].
 
 ## API Key Routes
 

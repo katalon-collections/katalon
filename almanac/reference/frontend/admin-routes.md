@@ -12,6 +12,12 @@ sources:
   - id: topbar
     type: file
     path: frontend/admin/src/components/layout/Topbar.tsx
+  - id: docs-repo
+    type: web
+    url: https://github.com/katalon-collections/katalon-docs
+  - id: docs-pages
+    type: web
+    url: https://katalon-collections.github.io/katalon-docs/
   - id: user-roles-screen
     type: file
     path: frontend/admin/src/components/screens/ScreenUserRoles.tsx
@@ -79,6 +85,6 @@ List screens receive an `onOpen` callback that navigates to the matching form ro
 
 ## Help Links
 
-`Topbar` maps only a small route set to screen-specific documentation: `schema` opens `02_schema_verwaltung.md`, `import` opens `03_csv_import.md`, `form-variants` opens `11_formularvarianten.md`, and `subtypes` opens `12_subtypen.md` [@topbar]. The first two links target the separate `katalon-docs` repository, while form variants and subtypes still target this repository's `docs/` folder until those pages are migrated [@topbar].
+`Topbar` maps a small route set to screen-specific documentation on the published GitHub Pages docs site: `schema` opens `/administration/schema/`, `import` opens `/administration/import/`, `form-variants` opens `/administration/formularvarianten/`, `subtypes` opens `/administration/subtypen/`, and all five record-list routes open `/administration/batch-bearbeitung/` [@topbar] [@docs-pages]. The batch editing workflow behind the list routes is covered by [Batch Editing](../../workflows/batch-editing).
 
-Routes without a `ROUTE_DOCS` entry fall back to the `katalon-docs` repository root when the help icon is clicked [@topbar].
+Routes without a `ROUTE_DOCS` entry fall back to the GitHub Pages docs root when the help icon is clicked [@topbar] [@docs-pages]. The public docs source repository lives at `katalon-collections/katalon-docs`, but the Admin help surface points users to the rendered Pages site rather than Markdown blobs [@docs-repo] [@docs-pages] [@topbar].
