@@ -18,6 +18,7 @@ const RECORD_TYPES: { id: RolePermission['record_type']; label: string }[] = [
   { id: 'place', label: 'Orte' },
   { id: 'occurrence', label: 'Occurrences' },
   { id: 'procedure', label: 'Vorgänge' },
+  { id: 'collection', label: 'Sammlungen' },
 ]
 const ACTIONS: { id: RolePermission['action']; label: string }[] = [
   { id: 'read', label: 'Lesen' },

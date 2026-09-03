@@ -18,6 +18,7 @@ from katalon.core.models import (
     Place,
     Procedure,
     Relation,
+    StorageLocation,
 )
 
 _RECORD_MODELS: dict[str, Any] = {
@@ -26,6 +27,7 @@ _RECORD_MODELS: dict[str, Any] = {
     "place": Place,
     "occurrence": Occurrence,
     "procedure": Procedure,
+    "storage_location": StorageLocation,
 }
 
 

@@ -291,3 +291,179 @@ async def test_hierarchical_terms_reject_cycles_and_promote_children_on_delete(
     )
     assert child_after_delete.status_code == 200, child_after_delete.text
     assert child_after_delete.json()["parent_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_vocabulary_canonical_uri_and_alignments(
+    async_client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    vocab_response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={
+            "name": f"concepts-{uuid.uuid4()}",
+            "is_hierarchical": True,
+            "kind": "term",
+            "canonical_uri": "http://vocab.getty.edu/aat/",
+        },
+    )
+    assert vocab_response.status_code == 201, vocab_response.text
+    vocab = vocab_response.json()
+    assert vocab["canonical_uri"] == "http://vocab.getty.edu/aat/"
+
+    term_response = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "monograph",
+            "label": {"de": "Monografie", "en": "Monograph"},
+            "uri": "http://vocab.getty.edu/aat/300028051",
+            "exact_match_uris": ["https://d-nb.info/gnd/4008570-3"],
+        },
+    )
+    assert term_response.status_code == 201, term_response.text
+    created_term = term_response.json()
+    assert created_term["uri"] == "http://vocab.getty.edu/aat/300028051"
+    assert created_term["exact_match_uris"] == ["https://d-nb.info/gnd/4008570-3"]
+
+    get_response = await async_client.get(
+        f"/v1/vocabularies/{vocab['id']}/terms/{created_term['id']}",
+        headers=auth_headers,
+    )
+    assert get_response.status_code == 200
+    term_data = get_response.json()
+    assert term_data["uri"] == "http://vocab.getty.edu/aat/300028051"
+    assert term_data["exact_match_uris"] == ["https://d-nb.info/gnd/4008570-3"]
+
+    tree_response = await async_client.get(
+        f"/v1/vocabularies/{vocab['id']}/tree",
+        headers=auth_headers,
+    )
+    assert tree_response.status_code == 200
+    tree_nodes = tree_response.json()
+    assert any(n["term"] == "monograph" and n["uri"] == "http://vocab.getty.edu/aat/300028051" for n in tree_nodes)
+
+    update_response = await async_client.put(
+        f"/v1/vocabularies/terms/{created_term['id']}",
+        headers=auth_headers,
+        json={
+            "uri": "http://vocab.getty.edu/aat/300028052",
+            "exact_match_uris": [
+                "https://d-nb.info/gnd/4008570-3",
+                "http://id.loc.gov/authorities/subjects/sh85015738",
+            ],
+        },
+    )
+    assert update_response.status_code == 200, update_response.text
+    updated_term = update_response.json()
+    assert updated_term["uri"] == "http://vocab.getty.edu/aat/300028052"
+    assert len(updated_term["exact_match_uris"]) == 2
+
+    import_response = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/import?dry_run=false&strategy=append",
+        headers=auth_headers,
+        data={"mapping": json.dumps({"term": "term", "label": "label:de", "uri": "uri"})},
+        files={"file": ("terms.csv", b"term;label;uri\npaper;Papier;http://vocab.getty.edu/aat/300014109\n", "text/csv")},
+    )
+    assert import_response.status_code == 200, import_response.text
+    assert import_response.json()["created"] == 1
+
+    imported_term = (await async_client.get(f"/v1/vocabularies/{vocab['id']}/terms", headers=auth_headers)).json()
+    paper = next(t for t in imported_term if t["term"] == "paper")
+    assert paper["uri"] == "http://vocab.getty.edu/aat/300014109"
+
+
+@pytest.mark.asyncio
+async def test_vocabulary_skos_import_endpoint(
+    async_client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    vocab_response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={
+            "name": f"skos-vocab-{uuid.uuid4()}",
+            "is_hierarchical": True,
+            "kind": "term",
+            "canonical_uri": "http://example.org/vocab/",
+        },
+    )
+    assert vocab_response.status_code == 201
+    vocab = vocab_response.json()
+    vocab_id = vocab["id"]
+
+    ttl_content = b"""
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix ex: <http://example.org/vocab/> .
+
+ex:scheme a skos:ConceptScheme ;
+    rdfs:label "Materialien"@de ;
+    skos:hasTopConcept ex:metal .
+
+ex:metal a skos:Concept ;
+    skos:prefLabel "Metall"@de, "Metal"@en ;
+    skos:inScheme ex:scheme ;
+    skos:topConceptOf ex:scheme ;
+    skos:narrower ex:gold ;
+    skos:exactMatch <http://vocab.getty.edu/aat/300011021> .
+
+ex:gold a skos:Concept ;
+    skos:prefLabel "Gold"@de, "Gold"@en ;
+    skos:inScheme ex:scheme ;
+    skos:broader ex:metal ;
+    skos:exactMatch <http://vocab.getty.edu/aat/300011029> .
+
+ex:stone a skos:Concept ;
+    skos:prefLabel "Stein"@de, "Stone"@en .
+"""
+
+    # 1. Dry run
+    dry_run_res = await async_client.post(
+        f"/v1/vocabularies/{vocab_id}/import-skos?dry_run=true&strategy=append",
+        headers=auth_headers,
+        files={"file": ("materials.ttl", ttl_content, "text/turtle")},
+    )
+    assert dry_run_res.status_code == 200, dry_run_res.text
+    dry_data = dry_run_res.json()
+    assert dry_data["dry_run"] is True
+    assert dry_data["total"] == 3
+    assert dry_data["created"] == 3
+    assert len(dry_data["detected_schemes"]) == 1
+    assert dry_data["detected_schemes"][0]["uri"] == "http://example.org/vocab/scheme"
+
+    # Ensure terms were NOT written
+    terms_empty = (await async_client.get(f"/v1/vocabularies/{vocab_id}/terms", headers=auth_headers)).json()
+    assert len(terms_empty) == 0
+
+    # 2. Selective import with concept_scheme
+    real_res = await async_client.post(
+        f"/v1/vocabularies/{vocab_id}/import-skos?dry_run=false&strategy=append",
+        headers=auth_headers,
+        data={"concept_scheme": "http://example.org/vocab/scheme"},
+        files={"file": ("materials.ttl", ttl_content, "text/turtle")},
+    )
+    assert real_res.status_code == 200, real_res.text
+    real_data = real_res.json()
+    assert real_data["dry_run"] is False
+    assert real_data["created"] == 2
+
+    # Verify terms and hierarchy in DB
+    terms_res = await async_client.get(f"/v1/vocabularies/{vocab_id}/terms", headers=auth_headers)
+    assert terms_res.status_code == 200
+    terms = terms_res.json()
+    assert len(terms) == 2
+
+    metal = next(t for t in terms if t["uri"] == "http://example.org/vocab/metal")
+    gold = next(t for t in terms if t["uri"] == "http://example.org/vocab/gold")
+
+    assert metal["label"] == {"de": "Metall", "en": "Metal"}
+    assert metal["parent_id"] is None
+    assert metal["exact_match_uris"] == ["http://vocab.getty.edu/aat/300011021"]
+
+    assert gold["label"] == {"de": "Gold", "en": "Gold"}
+    assert gold["parent_id"] == metal["id"]
+    assert gold["exact_match_uris"] == ["http://vocab.getty.edu/aat/300011029"]

@@ -4,7 +4,8 @@
     "object": "Objekte",
     "entity": "Entitäten",
     "place": "Orte",
-    "occurrence": "Werke/Ereignisse"
+    "occurrence": "Werke/Ereignisse",
+    "collection": "Sammlungen"
   },
   "statuses": {
     "": "Alle Status",

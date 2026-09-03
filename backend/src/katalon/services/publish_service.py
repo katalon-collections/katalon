@@ -10,17 +10,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.concurrency import flush_record
-from katalon.core.models import Entity, Object, Occurrence, Place
+from katalon.core.models import Collection, Entity, Object, Occurrence, Place
 from katalon.services.audit_service import log_change
 from katalon.services.pid_service import PidMintError, ensure_pids_on_publish
 from katalon.services.schema_service import validate_metadata
 from katalon.services.search_service import index_record
 
-MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
+MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Collection]] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
+    "collection": Collection,
 }
 
 
@@ -63,6 +64,8 @@ async def can_publish(
         subtype = getattr(rec, "place_type", None)
     elif record_type == "occurrence":
         subtype = getattr(rec, "occurrence_type", None)
+    elif record_type == "collection":
+        subtype = getattr(rec, "collection_type", None)
 
     val_errors = await validate_metadata(db, record_type, metadata, subtype)
     errors.extend(val_errors)

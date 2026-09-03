@@ -4,10 +4,10 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
-import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { resolveActiveVariant } from '../../lib/formVariants'
 import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
@@ -303,7 +303,7 @@ const COLLECTION_STATUSES = [
 ]
 
 const PORTAL_PATH: Record<RecordType, string> = {
-  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', procedure: 'procedures',
+  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', procedure: 'procedures', collection: 'collections', storage_location: 'storage-locations',
 }
 
 const TYPE_LABELS: Record<RecordType, string> = {
@@ -312,6 +312,8 @@ const TYPE_LABELS: Record<RecordType, string> = {
   place:      'Ort',
   occurrence: 'Occurrence',
   procedure:  'Vorgang',
+  collection: 'Sammlung',
+  storage_location: 'Lagerort',
 }
 
 const NEW_TYPE_LABELS: Record<RecordType, string> = {
@@ -320,10 +322,12 @@ const NEW_TYPE_LABELS: Record<RecordType, string> = {
   place:      'Neuer Ort',
   occurrence: 'Neue Occurrence',
   procedure:  'Neuer Vorgang',
+  collection: 'Neue Sammlung',
+  storage_location: 'Neuer Lagerort',
 }
 
 const TYPE_ROUTES: Record<string, string> = {
-  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form', collection: 'collections-form', storage_location: 'storage-locations',
 }
 
 function navigateToRecord(type: string, id: string) {
@@ -339,7 +343,7 @@ function procedureSearchResult(proc: AnyRecord): SearchResult {
     id: proc.id,
     record_type: 'procedure',
     title: formatRecordLabel(proc.metadata_ as Record<string, unknown>, idno, proc.id.slice(0, 8) + '…'),
-    status: proc.status,
+    status: (proc as { status?: string | null }).status ?? null,
     score: null,
   }
 }
@@ -350,12 +354,17 @@ function recordSearchResult(recordType: RecordType, record: AnyRecord): SearchRe
     id: record.id,
     record_type: recordType,
     title: formatRecordLabel(record.metadata_ as Record<string, unknown>, idno, record.id.slice(0, 8) + '…'),
-    status: record.status,
+    status: (record as { status?: string | null }).status ?? null,
     score: null,
   }
 }
 
 async function searchRecords(targetType: RecordType, q: string, targetSubtype?: string): Promise<SearchResult[]> {
+  // Storage locations aren't indexed in Elasticsearch — always query the DB list endpoint directly,
+  // which also supports an empty q (used to list all locations before the user starts typing).
+  if (targetType === 'storage_location') {
+    return (await storageLocations.list({ q: q || undefined, storage_location_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+  }
   if (!targetSubtype) {
     return (await searchApi.query(q, targetType, 8)).items
   }
@@ -370,6 +379,8 @@ async function searchRecords(targetType: RecordType, q: string, targetSubtype?: 
       return (await occurrences.list({ q, occurrence_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
     case 'procedure':
       return (await procedures.list({ q, procedure_type: targetSubtype, page_size: 8 })).items.map(procedureSearchResult)
+    case 'collection':
+      return (await collections.list({ q, collection_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
   }
 }
 
@@ -379,6 +390,8 @@ const SUBTYPE_KEY: Partial<Record<RecordType, string>> = {
   place:      'place_type',
   occurrence: 'occurrence_type',
   procedure:  'procedure_type',
+  collection: 'collection_type',
+  storage_location: 'storage_location_type',
 }
 
 export type VocabEntry = { id: string; label: string }
@@ -848,9 +861,11 @@ function RelationInput({
     return () => window.removeEventListener('resize', updateDropPosition)
   }, [showDrop, updateDropPosition])
 
+  const minQueryLen = targetType === 'storage_location' ? 0 : 2
+
   useEffect(() => {
     clearTimeout(timer.current)
-    if (q.trim().length < 2) { setResults([]); setSearching(false); return }
+    if (q.trim().length < minQueryLen) { setResults([]); setSearching(false); return }
     timer.current = setTimeout(() => {
       setSearching(true)
       searchRecords(targetType as RecordType, q.trim(), targetSubtype)
@@ -866,7 +881,7 @@ function RelationInput({
 
   function openSuggestions() {
     if (!targetType) return
-    if (q.trim().length < 2) { setSearching(false); return }
+    if (q.trim().length < minQueryLen) { setSearching(false); return }
     setSearching(true)
     searchRecords(targetType as RecordType, q.trim(), targetSubtype)
       .then(items => {
@@ -953,7 +968,7 @@ function RelationInput({
             value={q}
             onChange={e => setQ(e.target.value)}
             onFocus={openSuggestions}
-            placeholder={targetType ? `${targetType} suchen (mind. 2 Zeichen)…` : 'Kein Ziel-Typ konfiguriert'}
+            placeholder={targetType ? (minQueryLen === 0 ? `${targetType} suchen…` : `${targetType} suchen (mind. ${minQueryLen} Zeichen)…`) : 'Kein Ziel-Typ konfiguriert'}
             disabled={disabled || !targetType}
           />
           {searching && (
@@ -1034,6 +1049,8 @@ function getApi(recordType: RecordType) {
     case 'place':      return places
     case 'occurrence': return occurrences
     case 'procedure':  return procedures
+    case 'collection': return collections
+    case 'storage_location': return storageLocations
   }
 }
 
@@ -1126,6 +1143,7 @@ interface Props {
   lockSubtype?: boolean
   initialLabel?: string
   onCreated?: (record: AnyRecord) => void
+  initialParentId?: string | null
 }
 
 function VideoThumb({ objectId, mediaId }: { objectId: string; mediaId: string }) {
@@ -1182,7 +1200,7 @@ function ImageThumb({ objectId, mediaId, alt }: { objectId: string; mediaId: str
   return <img src={url} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
 }
 
-export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated }: Props) {
+export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChange, variantHint, quickCreate = false, initialSubtype, lockSubtype = false, initialLabel, onCreated, initialParentId }: Props) {
   const { t } = useTranslation('screenForm')
   const isNew = !recordId || recordId === 'new'
   const currentId = isNew ? null : recordId!
@@ -1191,6 +1209,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : recordType === 'entity' ? entities.snapshots
     : recordType === 'place' ? places.snapshots
     : recordType === 'occurrence' ? occurrences.snapshots
+    : recordType === 'collection' ? collections.snapshots
     : null
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
@@ -1200,6 +1219,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showProcedureFields = recordType === 'procedure'
   const showSnapshotsForRecord = recordType !== 'procedure'
   const showCollectionStatus = recordType === 'object'
+  const showParentCollection = recordType === 'collection'
+  const [parentId, setParentId] = useState<string | null>(initialParentId ?? null)
+  const [availableParents, setAvailableParents] = useState<Array<{ id: string; title: string }>>([])
+  const [availableCollections, setAvailableCollections] = useState<Array<{ id: string; title: string }>>([])
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
   const user = getTokenUser()
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
   const canManageContent = Boolean(user && user.role !== 'viewer')
@@ -1269,6 +1293,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null)
   const [openRightsMediaId, setOpenRightsMediaId] = useState<string | null>(null)
   const [highlightedField, setHighlightedField] = useState<string | null>(null)
+  const [hasStorageLocations, setHasStorageLocations] = useState(false)
+  const [addLocationOpen, setAddLocationOpen] = useState(false)
 
   function jumpToField(name: string) {
     document.getElementById(`field-${name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -1326,6 +1352,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
       }))
       setObjectStatuses(statusMap)
+      if (recordType === 'object') {
+        const colRel = fromRels.find(r => r.to_type === 'collection' && r.relation_type === 'member_of')
+        setSelectedCollectionId(colRel ? colRel.to_id : '')
+      }
     } catch {
       // silently ignore
     }
@@ -1364,14 +1394,35 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (isNew) setSubtype(current => current || initialSubtype || items.find(item => item.is_default)?.name || '')
     })
 
+    if (showParentCollection) {
+      collections.list({ page_size: 100 }).then(res => {
+        setAvailableParents(res.items.map(c => ({
+          id: c.id,
+          title: formatRecordLabel(c.metadata_ as Record<string, unknown>, c.idno, c.id.slice(0, 8) + '…'),
+        })))
+      }).catch(() => {})
+    }
+
+    if (recordType === 'object') {
+      collections.list({ page_size: 100 }).then(res => {
+        setAvailableCollections(res.items.map(c => ({
+          id: c.id,
+          title: formatRecordLabel(c.metadata_ as Record<string, unknown>, c.idno, c.id.slice(0, 8) + '…'),
+        })))
+      }).catch(() => {})
+    }
+    if (isNew && initialParentId) {
+      setParentId(initialParentId)
+    }
+
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
 
     loadRecP
       .then(async rec => {
         let recSubtype: string | undefined = isNew ? initialSubtype : undefined
         if (rec) {
-          setStatus(rec.status as Status)
-          setLoadedStatus(rec.status as Status)
+          setStatus((rec as { status?: string }).status as Status)
+          setLoadedStatus((rec as { status?: string }).status as Status)
           setValues(rec.metadata_)
           setVersion(rec.version)
           setBaseValues(rec.metadata_ ?? {})
@@ -1388,6 +1439,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           }
           if (showCollectionStatus) {
             setCollectionStatus((rec as { collection_status?: string | null }).collection_status ?? 'active')
+          }
+          if (showParentCollection) {
+            setParentId((rec as KatalonCollection).parent_id ?? null)
           }
           if (showProcedureFields) {
             const p = rec as { start_date?: string | null; end_date?: string | null; due_date?: string | null; reference_number?: string | null }
@@ -1488,6 +1542,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (recordType !== 'object') return
+    storageLocations.list({ page_size: 1 }).then(page => setHasStorageLocations(page.total > 0)).catch(() => {})
+  }, [recordType])
+
   async function handleAddObjectRelation(result: SearchResult) {
     if (!savedId) return
     const duplicate = rels.some(r => {
@@ -1553,6 +1612,27 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setRels(prev => [...prev, created])
     setRelTitles(prev => ({ ...prev, [`${addTargetType}/${entry.id}`]: entry.label }))
     setGenericAddOpen(false)
+  }
+
+  async function handleAddLocationRelation(entry: RelationEntry) {
+    if (!savedId) return
+    const duplicate = rels.some(r => {
+      const isFrom = r.from_id === savedId
+      return (isFrom ? r.to_type : r.from_type) === 'storage_location'
+        && (isFrom ? r.to_id : r.from_id) === entry.id
+        && r.relation_type === entry.relation_type
+    })
+    if (duplicate) throw new Error('Diese Beziehung besteht bereits.')
+    const created = await relationsApi.create({
+      from_type: recordType,
+      from_id: savedId,
+      to_type: 'storage_location',
+      to_id: entry.id,
+      relation_type: entry.relation_type,
+    })
+    setRels(prev => [...prev, created])
+    setRelTitles(prev => ({ ...prev, [`storage_location/${entry.id}`]: entry.label }))
+    setAddLocationOpen(false)
   }
 
   async function handleDeleteRelation(id: string) {
@@ -2050,6 +2130,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (showIdno)   payload.idno = idno || null
       if (subtypeKey) payload[subtypeKey] = subtype
       if (showCollectionStatus) payload.collection_status = collectionStatus
+      if (showParentCollection) payload.parent_id = parentId || null
       if (showGeo) {
         payload.lat = lat ? parseFloat(lat) : null
         payload.lon = lon ? parseFloat(lon) : null
@@ -2060,6 +2141,25 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         payload.due_date = dueDate || null
         payload.reference_number = referenceNumber || null
       }
+      async function syncCollectionMembership(objectId: string) {
+        if (recordType !== 'object') return
+        const existing = rels.find(r => r.from_id === objectId && r.to_type === 'collection' && r.relation_type === 'member_of')
+        const existingTarget = existing?.to_id ?? null
+        const desired = selectedCollectionId || null
+        if (existingTarget === desired) return
+        if (existing) await relationsApi.delete(existing.id)
+        if (desired) {
+          const created = await relationsApi.create({
+            from_type: 'object', from_id: objectId,
+            to_type: 'collection', to_id: desired,
+            relation_type: 'member_of',
+          })
+          setRels(prev => [...prev.filter(r => r.id !== existing?.id), created])
+        } else {
+          setRels(prev => prev.filter(r => r.id !== existing?.id))
+        }
+      }
+
 
       if (isNew) {
         const created = await (api.create as (d: typeof payload) => Promise<AnyRecord>)(payload)
@@ -2068,9 +2168,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           return
         }
         setSavedId(created.id)
-        setLoadedStatus(created.status as Status)
+        setLoadedStatus((created as { status?: string }).status as Status)
         onSaved?.(created.id)
         if (showMedia) loadMedia(created.id)
+        await syncCollectionMembership(created.id)
         setIsDirty(false)
         setSaveOk(true)
         setSaveNotice(
@@ -2091,6 +2192,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           }
           throw e
         }
+        await syncCollectionMembership(recordId!)
         if (completingProcedure) {
           const objectCount = rels.filter(r => {
             const targetType = r.from_id === recordId ? r.to_type : r.from_type
@@ -2164,7 +2266,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       setValues(mergedMetadata)
       setBaseValues(mergedMetadata)
       setVersion(updated.version)
-      setLoadedStatus(updated.status as Status)
+      setLoadedStatus((updated as { status?: string }).status as Status)
       setConflict(null)
       setIsDirty(false)
       setSaveOk(true)
@@ -2291,11 +2393,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showTwoCol   = !quickCreate && (showMedia || !isNew)
   const objectRels = showProcedureFields ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'object') : []
   const procedureRels = showCollectionStatus ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'procedure') : []
-  const otherRels = showProcedureFields
-    ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'object')
-    : showCollectionStatus
-      ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) !== 'procedure')
-      : rels
+  const showStorageLocationCard = recordType === 'object' && hasStorageLocations
+  const storageLocationRels = showStorageLocationCard ? rels.filter(r => (r.from_id === savedId ? r.to_type : r.from_type) === 'storage_location') : []
+  const otherRels = rels.filter(r => {
+    const otherType = r.from_id === savedId ? r.to_type : r.from_type
+    if (showProcedureFields && otherType === 'object') return false
+    if (showCollectionStatus && otherType === 'procedure') return false
+    if (showStorageLocationCard && otherType === 'storage_location') return false
+    return true
+  })
   const schemaRels = otherRels.filter(r => r.is_schema_derived)
   const freeRels = otherRels.filter(r => !r.is_schema_derived)
   const statusOptions = recordType === 'procedure' ? PROCEDURE_STATUSES : STATUSES
@@ -2324,7 +2430,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }
 
   function renderRelation(r: Relation, schemaBound = false) {
-    const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
+    const typeLabel: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang', collection: 'Sammlung', storage_location: 'Lagerort' }
     const relTypeTerm = relTypeTerms.find(t => t.term === r.relation_type)
     const isFrom = r.from_id === savedId
     const relTypeLabel = relTypeTerm
@@ -2517,7 +2623,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
                     <select
                       className="fld"
                       value={subtype}
@@ -2525,7 +2631,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
-                      <option value="">— {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : 'Occurrence-Typ'} wählen —</option>
+                      <option value="">— {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} wählen —</option>
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
@@ -2545,7 +2651,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {showCollectionStatus && (
                   <div className="field">
-                    <div className="lbl">Sammlungsstatus</div>
+                    <div className="lbl">Bestandsstatus</div>
                     <select
                       className="fld"
                       value={collectionStatus}
@@ -2553,6 +2659,38 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       disabled={justCreated}
                     >
                       {COLLECTION_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {recordType === 'object' && availableCollections.length > 0 && (
+                  <div className="field">
+                    <div className="lbl">Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                    <select
+                      className="fld"
+                      value={selectedCollectionId}
+                      onChange={e => { setSelectedCollectionId(e.target.value); setIsDirty(true) }}
+                      disabled={justCreated}
+                    >
+                      <option value="">— Keine —</option>
+                      {availableCollections.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {showParentCollection && (
+                  <div className="field">
+                    <div className="lbl">Übergeordnete Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                    <select
+                      className="fld"
+                      value={parentId ?? ''}
+                      onChange={e => { setParentId(e.target.value || null); setIsDirty(true) }}
+                      disabled={justCreated}
+                    >
+                      <option value="">— Keine (oberste Ebene) —</option>
+                      {availableParents
+                        .filter(p => p.id !== currentId)
+                        .map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
                     </select>
                   </div>
                 )}
@@ -3223,6 +3361,45 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </div>
               )}
 
+              {showStorageLocationCard && !isNew && (
+                <div className="card" style={{ marginBottom: 14, overflow: addLocationOpen ? 'visible' : undefined }}>
+                  <div className="hd">
+                    <span>Zugeordnete Lagerorte</span>
+                    {storageLocationRels.length > 0 && <span className="sub">{storageLocationRels.length}</span>}
+                    <div className="grow" />
+                    {!addLocationOpen && hasSavedId && canManageContent && (
+                      <button className="btn sm gh" onClick={() => setAddLocationOpen(true)}>
+                        <Plus size={12} /> Hinzufügen
+                      </button>
+                    )}
+                  </div>
+                  <div className="bd">
+                    {storageLocationRels.length > 0 ? (
+                      <div style={{ marginBottom: addLocationOpen ? 12 : 0 }}>
+                        {storageLocationRels.map(r => renderRelation(r))}
+                      </div>
+                    ) : (
+                      <div className="empty" style={{ padding: addLocationOpen ? '0 0 12px' : '8px 0' }}>Noch keinem Lagerort zugeordnet.</div>
+                    )}
+                    {addLocationOpen && (
+                      <div style={{ borderTop: storageLocationRels.length > 0 ? '1px solid var(--border-s)' : undefined, paddingTop: storageLocationRels.length > 0 ? 12 : 0 }}>
+                        <RelationInput
+                          targetType="storage_location"
+                          relTypeVocabId={relTypeVocabId}
+                          fromType={recordType}
+                          onAdd={handleAddLocationRelation}
+                        />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn gh sm" onClick={() => setAddLocationOpen(false)}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {showProcedureFields && !isNew && (
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div className="hd">
@@ -3376,6 +3553,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 setVersion(restored.version)
                                 if (showCollectionStatus) {
                                   setCollectionStatus((restored as { collection_status?: string | null }).collection_status ?? 'active')
+                                }
+                                if (showParentCollection && 'parent_id' in restored) {
+                                  setParentId((restored as KatalonCollection).parent_id ?? null)
                                 }
                                 setBaseValues(restored.metadata_ as Record<string, unknown>)
                                 setIsDirty(false)

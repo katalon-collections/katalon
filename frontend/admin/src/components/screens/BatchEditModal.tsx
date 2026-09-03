@@ -3,8 +3,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, search, vocabularies } from '../../api/client'
-import type { BatchOperation, BatchOperationType, BatchRequest, BatchResponse, FieldDefinition, RecordType } from '../../types'
+import { objects, entities, places, occurrences, procedures, collections, search, vocabularies } from '../../api/client'
+import type { BatchOperation, BatchOperationType, BatchRequest, BatchResponse, FieldDefinition, ListableRecordType, RecordType } from '../../types'
 import { getLabel } from '../../types'
 import { Alert, Check, X } from '../ui/Icons'
 
@@ -14,18 +14,20 @@ const API_MAP = {
   place: places,
   occurrence: occurrences,
   procedure: procedures,
+  collection: collections,
 }
 
-const STATUS_OPTIONS: Record<RecordType, string[]> = {
+const STATUS_OPTIONS: Record<ListableRecordType, string[]> = {
   object: ['draft', 'internal', 'public'],
   entity: ['draft', 'internal', 'public'],
   place: ['draft', 'internal', 'public'],
   occurrence: ['draft', 'internal', 'public'],
   procedure: ['draft', 'active', 'completed', 'cancelled'],
+  collection: ['draft', 'internal', 'public'],
 }
 
 interface Props {
-  recordType: RecordType
+  recordType: ListableRecordType
   fields: FieldDefinition[]
   selection: {
     mode: 'ids' | 'filters'
@@ -39,12 +41,13 @@ interface Props {
 
 export function BatchEditModal({ recordType, fields, selection, onClose, onSuccess }: Props) {
   const { t } = useTranslation('batchEditModal')
-  const TYPE_LABELS: Record<RecordType, string> = {
+  const TYPE_LABELS: Record<ListableRecordType, string> = {
     object: t('types.object'),
     entity: t('types.entity'),
     place: t('types.place'),
     occurrence: t('types.occurrence'),
     procedure: t('types.procedure'),
+    collection: t('types.collection'),
   }
   const STATUS_LABELS: Record<string, string> = {
     draft: t('statuses.draft'),

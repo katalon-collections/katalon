@@ -99,6 +99,7 @@ async def admin_search(
             "route": {
                 "object": "form", "entity": "entities-form", "place": "places-form",
                 "occurrence": "occurrences-form", "procedure": "procedures-form",
+                "collection": "collections-form", "storage_location": "storage-locations-form",
             }[item["record_type"]],
             "edit_id": item["id"],
         }
@@ -191,7 +192,9 @@ async def trigger_reindex() -> dict[str, str]:
     },
 )
 async def trigger_reindex_type(target_type: str) -> dict[str, str]:
-    valid = {"object", "entity", "place", "occurrence", "procedure"}
+    valid = {
+        "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+    }
     if target_type not in valid:
         from fastapi import HTTPException
         raise HTTPException(status_code=422, detail=f"Ungültiger Typ. Erlaubt: {', '.join(sorted(valid))}")

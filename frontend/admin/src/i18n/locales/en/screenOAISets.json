@@ -4,7 +4,8 @@
     "object": "Objects",
     "entity": "Entities",
     "place": "Places",
-    "occurrence": "Works/Events"
+    "occurrence": "Works/Events",
+    "collection": "Collections"
   },
   "statuses": {
     "": "All statuses",

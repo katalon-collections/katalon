@@ -41,7 +41,7 @@ jobs:
             dockerfile: ./docker/Dockerfile.backend
           - name: worker
             context: ./backend
-            dockerfile: ../docker/Dockerfile.worker
+            dockerfile: ./docker/Dockerfile.worker
           - name: admin
             context: .
             dockerfile: ./docker/Dockerfile.admin

@@ -157,7 +157,15 @@ def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
     from sqlalchemy import select
 
     from katalon.config import settings
-    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
+    from katalon.core.models import (
+        Collection,
+        Entity,
+        Object,
+        Occurrence,
+        Place,
+        Procedure,
+        StorageLocation,
+    )
     from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import build_index_doc
 
@@ -167,6 +175,8 @@ def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
         "place": Place,
         "occurrence": Occurrence,
         "procedure": Procedure,
+        "collection": Collection,
+        "storage_location": StorageLocation,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -304,7 +314,15 @@ def reindex_all_task() -> None:
     """Full reindex – replace every indexed record type from the database."""
     from sqlalchemy import select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
+    from katalon.core.models import (
+        Collection,
+        Entity,
+        Object,
+        Occurrence,
+        Place,
+        Procedure,
+        StorageLocation,
+    )
     from katalon.integrations.elasticsearch import reindex_type
     from katalon.services.search_service import build_index_doc
 
@@ -318,6 +336,8 @@ def reindex_all_task() -> None:
                 (Place, "place"),
                 (Occurrence, "occurrence"),
                 (Procedure, "procedure"),
+                (Collection, "collection"),
+                (StorageLocation, "storage_location"),
             ]
             for model, rtype in models:
                 query = select(model)

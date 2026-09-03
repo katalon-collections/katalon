@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.16.0"
+version = "1.19.2"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
@@ -32,6 +32,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "lxml>=6.1.1",
     "rapidfuzz>=3.9.0",
+    "rdflib>=7.1.0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +45,7 @@ dev = [
     "mypy>=1.10.0",
     "testcontainers[postgres]>=4.4.0",
     "locust>=2.29.0",
+    "pytest-archon>=0.0.7",
 ]
 
 [project.scripts]
@@ -61,10 +63,48 @@ packages = ["src/katalon"]
 src = ["src"]
 line-length = 100
 target-version = "py312"
-
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP"]
-ignore = ["E501"]
+select = [
+    "E", "W", "F", "I", "UP",
+    "B",       # flake8-bugbear
+    "C4",      # flake8-comprehensions
+    "SIM",     # flake8-simplify
+    "ASYNC",   # flake8-async
+    "RUF",     # ruff-specific
+    "T20",     # flake8-print
+    "S",       # flake8-bandit
+]
+ignore = [
+    "E501",      # line length
+    "B008",      # function call in argument defaults (FastAPI Depends/require_role)
+    "B904",      # raise ... from err
+    "B007",      # loop control variable not used
+    "B009",      # getattr with constant attribute
+    "C401",      # unnecessary generator (rewrite as set comprehension)
+    "C416",      # unnecessary set comprehension
+    "SIM102",    # nested if statements
+    "SIM105",    # try-except-pass instead of contextlib.suppress
+    "SIM108",    # use ternary operator
+    "SIM118",    # key in dict.keys()
+    "RUF001",    # ambiguous unicode characters in string
+    "RUF002",    # ambiguous unicode characters in docstring
+    "RUF003",    # ambiguous unicode characters in comment
+    "RUF012",    # mutable class attributes (Pydantic / SQLAlchemy models)
+    "RUF022",    # unsorted __all__
+    "RUF059",    # unpacked variable never used
+    "RUF100",    # unused noqa directive
+    "ASYNC240",  # blocking pathlib methods in async functions
+    "S101",      # assert statements
+    "S105",      # hardcoded password false positives (token_type, etc.)
+    "S110",      # try-except-pass without logging
+    "S311",      # pseudo-random generator
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "SIM", "RUF"]
+"scripts/**" = ["T201", "S", "B007"]
+"src/katalon/management/**" = ["T201", "ASYNC250", "RUF059"]
+"migrations/**" = ["S608", "RUF100"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -79,6 +119,7 @@ plugins = ["pydantic.mypy"]
 [dependency-groups]
 dev = [
     "celery-types>=0.26.0",
+    "pytest-archon>=0.0.7",
     "types-aiofiles>=25.1.0.20260518",
     "types-pyyaml>=6.0.12.20260815",
 ]

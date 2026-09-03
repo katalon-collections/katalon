@@ -264,7 +264,7 @@ def _build_doc(
 
     related_text = " ".join(
         name
-        for key in ("related_entities", "related_places", "related_occurrences")
+        for key in ("related_entities", "related_places", "related_occurrences", "related_collections")
         for name in (rel_data or {}).get(key, [])
     )
     search_text = _flatten_text(md, searchable_fields)
@@ -341,11 +341,19 @@ async def _load_linked_data(
     """
     from sqlalchemy import and_, select
 
-    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure, Relation
+    from katalon.core.models import (
+        Collection,
+        Entity,
+        Object,
+        Occurrence,
+        Place,
+        Procedure,
+        Relation,
+    )
     from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     _MODEL_MAP: dict[str, Any] = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
+        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure, "collection": Collection,
     }
     result: dict[str, list[dict[str, Any]]] = {}
     facets: dict[str, list[str]] = {}
@@ -397,13 +405,14 @@ async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> d
     """Return names of related entities/places/occurrences for denormalisation in ES."""
     from sqlalchemy import and_, or_, select
 
-    from katalon.core.models import Entity, Occurrence, Place, Relation
+    from katalon.core.models import Collection, Entity, Occurrence, Place, Relation
     from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
     TYPE_MAP: dict[str, tuple[str, Any]] = {
         "entity":     ("related_entities", Entity),
         "place":      ("related_places", Place),
         "occurrence": ("related_occurrences", Occurrence),
+        "collection": ("related_collections", Collection),
     }
     related: dict[str, list[str]] = {k: [] for k, _ in TYPE_MAP.values()}
 

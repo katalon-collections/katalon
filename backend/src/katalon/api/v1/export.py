@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+import uuid
+
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from katalon.core.dependencies import DBDep, require_role
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_role
 from katalon.core.schemas import RECORD_TYPES
 from katalon.services import export_service, metadata_format_service
 from katalon.services.metadata_mapping_service import mapped_record_types
@@ -20,7 +22,7 @@ MEDIA_TYPES = {"csv": "text/csv", "json": "application/json", "xml": "applicatio
 class FormatOut(BaseModel):
     key: str
     label: str
-    kind: str  # "flat" | "xml"
+    kind: str  # "flat" | "xml" | "graph"
 
 
 @router.get(
@@ -35,7 +37,8 @@ async def list_formats(db: DBDep, record_type: str = Query(...)) -> list[FormatO
     formats = [FormatOut(key="csv", label="CSV", kind="flat"), FormatOut(key="json", label="JSON", kind="flat")]
     for fmt in await metadata_format_service.list_formats():
         if record_type in await mapped_record_types(db, fmt.key):
-            formats.append(FormatOut(key=fmt.key, label=fmt.label, kind="xml"))
+            kind = "graph" if fmt.key == "json_ld" else "xml"
+            formats.append(FormatOut(key=fmt.key, label=fmt.label, kind=kind))
     return formats
 
 
@@ -77,4 +80,34 @@ async def export_records(
         export_service.stream_xml(db, record_type, format),
         media_type=MEDIA_TYPES["xml"],
         headers={"Content-Disposition": f'attachment; filename="{record_type}.{format}.xml"'},
+    )
+
+
+@router.get(
+    "/{record_type}/{record_id}",
+    summary="Export a single record as JSON-LD or Turtle RDF",
+)
+@router.get(
+    "/{record_type}/{record_id}/export",
+    summary="Export a single record as JSON-LD or Turtle RDF",
+)
+async def export_single_record_route(
+    record_type: str,
+    record_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        record_type,
+        record_id,
+        db,
+        request,
+        current_user=current_user,
+        format_param=format,
+        accept_header=accept,
     )

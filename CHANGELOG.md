@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [S
 
 ## [Unreleased]
 
+## [1.19.2] - 2026-09-03
+
+### Fixed
+- Backend: Relations-Label-Auflösung kannte den Datensatztyp `storage_location` nicht — verknüpfte Lagerorte zeigten im Objektformular "Nicht verfügbar" statt ihres Namens.
+- Admin-UI: Lagerort-Suche im Beziehungs-Picker lief über die Volltextsuche, die Lagerorte gar nicht indiziert — die Suche fand nie Treffer. Fragt jetzt direkt die Lagerort-Liste ab, zeigt beim Fokussieren sofort bis zu 20 Einträge (kein Mindest-Zeichen mehr nötig) und filtert bei Eingabe weiter.
+- Admin-UI: "Lagerort-Typ" hat jetzt ein Info-Popover (Zweck, wo neue Typen angelegt werden).
+
+### Changed
+- Lagerorte haben kein Entwurf/Intern/Öffentlich-Statusfeld mehr — sie waren nie im Portal oder in der öffentlichen Suche sichtbar, das Feld war wirkungslos. Die Inventarnummer/ID ist jetzt stattdessen immer Pflicht (außer bei konfigurierter automatischer Nummernvergabe), statt nur bei Nicht-Entwurf. Migration `0055` entfernt die `status`-Spalte und setzt `idno NOT NULL`.
+
 ## [1.16.0] - 2026-09-02
 
 ### Added

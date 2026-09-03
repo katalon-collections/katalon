@@ -1,6 +1,6 @@
 {
   "name": "katalon-admin",
-  "version": "1.16.0",
+  "version": "1.19.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "check:arch": "depcruise src --config .dependency-cruiser.cjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -30,6 +31,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "dependency-cruiser": "^18.2.0",
     "eslint": "^9.39.5",
     "globals": "^17.9.0",
     "typescript": "^5.4.5",

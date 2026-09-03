@@ -50,11 +50,13 @@ const ROUTE_DOCS: Record<string, string> = {
   import: `${DOCS_ROOT}/administration/import/`,
   'form-variants': `${DOCS_ROOT}/administration/formularvarianten/`,
   subtypes: `${DOCS_ROOT}/administration/subtypen/`,
+  'storage-locations': `${DOCS_ROOT}/administration/lagerorte/`,
   list: `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'entities-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'places-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'occurrences-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'procedures-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'collections-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
 }
 
 interface Props {

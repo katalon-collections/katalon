@@ -8,6 +8,7 @@
   "recordTypePlace": "Orte",
   "recordTypeOccurrence": "Occurrences",
   "recordTypeProcedure": "Vorgänge",
+  "recordTypeCollection": "Sammlungen",
   "formatLabel": "Format",
   "subtypeLabel": "Subtyp (optional)",
   "subtypeAll": "Alle",

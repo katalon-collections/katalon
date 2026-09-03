@@ -278,4 +278,4 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(async_client, auth
     reindexed_types.clear()
     await asyncio.to_thread(index_tasks.reindex_all_task)
     assert object_id not in indexed
-    assert reindexed_types == ["object", "entity", "place", "occurrence", "procedure"]
+    assert reindexed_types == ["object", "entity", "place", "occurrence", "procedure", "collection", "storage_location"]

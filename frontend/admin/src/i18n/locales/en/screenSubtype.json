@@ -4,6 +4,8 @@
   "typePlace": "Places",
   "typeOccurrence": "Occurrences",
   "typeProcedure": "Procedures",
+  "typeCollection": "Collections",
+  "typeStorageLocation": "Storage locations",
   "headline": "Subtypes",
   "subtitle": "Manage subtypes for inventory data and procedures",
   "addButton": "New subtype",

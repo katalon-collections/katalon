@@ -8,11 +8,13 @@ import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import { ChevD, ChevR, Edit, Help, Plus, Tag, Trash, X } from '../ui/Icons'
+import { ChevD, ChevR, Edit, Help, Plus, Tag, Trash, Upload, X } from '../ui/Icons'
 import { LabelEditor } from '../ui/LabelEditor'
+import { HelpPopover } from '../ui/HelpPopover'
+import { VocabularyImport } from './VocabularyImport'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
-const RECORD_TYPES: RecordType[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
+const RECORD_TYPES: RecordType[] = ['object', 'entity', 'place', 'occurrence', 'procedure', 'collection', 'storage_location']
 
 function recordTypeLabel(t: TFunction, rt: RecordType): string {
   return t(`recordTypes.${rt}`)
@@ -89,8 +91,8 @@ function AppliesPreview({ from, to }: { from: RecordType[]; to: RecordType[] }) 
   const { t } = useTranslation('screenVocab')
   return (
     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-3)' }} aria-live="polite">
-      Gilt für: <strong>{appliesLabel(t, { applies_from: from, applies_to: to })}</strong>
-      <div>Keine Auswahl in beiden Feldern gilt für alle Kombinationen; Objekt ohne Zieltyp gilt für Objekt → alle.</div>
+      {t('appliesPreview.appliesTo')}: <strong>{appliesLabel(t, { applies_from: from, applies_to: to })}</strong>
+      <div>{t('appliesPreview.hint')}</div>
     </div>
   )
 }
@@ -100,7 +102,35 @@ function typePreview(types: RecordType[]): string {
   return types.length === 0 ? t('appliesLabel.all') : types.map(type => recordTypeLabel(t, type)).join(', ')
 }
 
-function RelationTypeHelp({ label, inverseLabel, from, to }: {
+function RelationTypeOverview() {
+  const { t } = useTranslation('screenVocab')
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: '10px 14px',
+        background: 'var(--panel-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        fontSize: 12,
+        color: 'var(--fg-2)',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--fg)', fontWeight: 600 }}>
+        <Help size={14} aria-hidden="true" />
+        {t('relationTypeHelp.heading')}
+      </div>
+      <div style={{ marginTop: 4 }}>
+        {t('relationTypeHelp.description', { source: t('relationTypeHelp.source'), target: t('relationTypeHelp.target') })}
+      </div>
+      <div style={{ marginTop: 4, color: 'var(--fg-3)' }}>
+        {t('relationTypeHelp.example')}
+      </div>
+    </div>
+  )
+}
+
+function RelationTypePreview({ label, inverseLabel, from, to }: {
   label: string
   inverseLabel: string
   from: RecordType[]
@@ -111,25 +141,28 @@ function RelationTypeHelp({ label, inverseLabel, from, to }: {
   const target = typePreview(to)
   return (
     <div
-      style={{ marginTop: 8, padding: '8px 10px', background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}
+      style={{
+        marginTop: 8,
+        padding: '8px 10px',
+        background: 'var(--panel-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        fontSize: 12,
+        color: 'var(--fg-2)',
+      }}
     >
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--fg)' }}>
-        <Help size={14} aria-hidden="true" />
-        <strong>{t('relationTypeHelp.heading')}</strong>
-      </div>
-      <div style={{ marginTop: 4 }}>
-        <strong>{t('relationTypeHelp.source')}</strong> ist der Ausgangsdatensatz, <strong>{t('relationTypeHelp.target')}</strong> der verknüpfte Datensatz. Das Label gilt von Quelle → Ziel; die Gegenrichtung zeigt dieselbe Verbindung vom Ziel aus.
-      </div>
-      <div style={{ marginTop: 4 }}>
-        {t('relationTypeHelp.example')}
-      </div>
-      <div style={{ marginTop: 6, color: 'var(--fg)' }}>
-        <strong>{t('relationTypeHelp.preview')}</strong> {source} — <em>{label || t('relationTypeHelp.labelFallback')}</em> → {target}
+      <strong style={{ color: 'var(--fg)' }}>{t('relationTypeHelp.preview')}</strong>
+      <div style={{ marginTop: 4, color: 'var(--fg)' }}>
+        {source} — <em>{label || t('relationTypeHelp.labelFallback')}</em> → {target}
         <br />
-        {target} — <em>{inverseLabel || 'Gegenrichtung'}</em> → {source}
+        {target} — <em>{inverseLabel || t('relationTypeHelp.inverseFallback')}</em> → {source}
       </div>
     </div>
   )
+}
+
+function isSystemVocabulary(v: Vocabulary): boolean {
+  return v.kind === 'relation' || v.name === 'relation_types' || v.name === 'media_types'
 }
 
 function fieldLabel(field: FieldDefinition): string {
@@ -231,6 +264,18 @@ interface ScreenVocabProps {
 export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
   const { t } = useTranslation('screenVocab')
   const requiredBadge = t('requiredBadge')
+  const uriLabel = t('uri')
+  const uriPlaceholder = t('uriPlaceholder')
+  const exactMatchUrisLabel = t('exactMatchUris')
+  const exactMatchUrisHelp = t('exactMatchUrisHelp')
+  const uriHelpTitle = t('uriHelpPopover.title')
+  const uriHelpDesc = t('uriHelpPopover.description')
+  const uriHelpExample = t('uriHelpPopover.example')
+  const uriHelpExportNote = t('uriHelpPopover.exportNote')
+  const exactMatchUrisHelpTitle = t('exactMatchUrisHelpPopover.title')
+  const exactMatchUrisHelpDesc = t('exactMatchUrisHelpPopover.description')
+  const exactMatchUrisHelpExample = t('exactMatchUrisHelpPopover.example')
+  const exactMatchUrisHelpSeparatorNote = t('exactMatchUrisHelpPopover.separatorNote')
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [terms, setTerms] = useState<VocabularyTerm[]>([])
   const [activeVocab, setActiveVocab] = useState<string | null>(null)
@@ -245,10 +290,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [newVocabName, setNewVocabName] = useState('')
   const [newVocabHierarchical, setNewVocabHierarchical] = useState(false)
   const [newVocabKind, setNewVocabKind] = useState<'term' | 'relation'>('term')
+  const [newVocabCanonicalUri, setNewVocabCanonicalUri] = useState('')
   const [savingVocab, setSavingVocab] = useState(false)
 
   // new term form
   const [showNewTerm, setShowNewTerm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [newTermTerm, setNewTermTerm] = useState('')
   const [newTermLabel, setNewTermLabel] = useState<Record<string, string>>({})
   const [newTermInverseLabel, setNewTermInverseLabel] = useState<Record<string, string>>({})
@@ -257,7 +304,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [savingTerm, setSavingTerm] = useState(false)
   const [newTermMetadata, setNewTermMetadata] = useState<Record<string, unknown>>({})
   const [newTermParentId, setNewTermParentId] = useState('')
-
+  const [newTermUri, setNewTermUri] = useState('')
+  const [newTermExactMatchUris, setNewTermExactMatchUris] = useState('')
   // edit term inline
   const [editTermId, setEditTermId] = useState<string | null>(null)
   const [editTermTerm, setEditTermTerm] = useState('')
@@ -268,6 +316,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   const [savingEditTerm, setSavingEditTerm] = useState(false)
   const [editTermMetadata, setEditTermMetadata] = useState<Record<string, unknown>>({})
   const [editTermParentId, setEditTermParentId] = useState('')
+  const [editTermUri, setEditTermUri] = useState('')
+  const [editTermExactMatchUris, setEditTermExactMatchUris] = useState('')
   const [termFields, setTermFields] = useState<FieldDefinition[]>([])
   const languages = useSupportedLanguages()
 
@@ -308,6 +358,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setNewTermMetadata({})
     setNewTermParentId('')
     setEditTermId(null)
+    setShowImport(false)
   }, [activeVocab])
 
   async function createVocab() {
@@ -318,11 +369,13 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         name: newVocabName.trim(),
         is_hierarchical: newVocabKind === 'relation' ? false : newVocabHierarchical,
         kind: newVocabKind,
+        canonical_uri: newVocabCanonicalUri.trim() || undefined,
       })
       setVocabs(prev => [...prev, v])
       setActiveVocab(v.id)
       onVocabSelect?.(v.name)
       setNewVocabName('')
+      setNewVocabCanonicalUri('')
       setNewVocabHierarchical(false)
       setNewVocabKind('term')
       setShowNewVocab(false)
@@ -347,12 +400,16 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         parent_id: vocab?.is_hierarchical ? newTermParentId || null : null,
         applies_from: vocab?.kind === 'relation' ? newTermAppliesFrom : [],
         applies_to: vocab?.kind === 'relation' ? newTermAppliesTo : [],
+        uri: newTermUri.trim() || null,
+        exact_match_uris: newTermExactMatchUris.split(/[\n,]+/).map(s => s.trim()).filter(Boolean),
       })
       setNewTermTerm('')
       setNewTermLabel({})
       setNewTermInverseLabel({})
       setNewTermAppliesFrom([])
       setNewTermAppliesTo([])
+      setNewTermUri('')
+      setNewTermExactMatchUris('')
       setNewTermMetadata({})
       setNewTermParentId('')
       setShowNewTerm(false)
@@ -373,6 +430,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setEditTermAppliesTo((t.applies_to ?? []) as RecordType[])
     setEditTermMetadata({ ...(t.metadata_ ?? {}) })
     setEditTermParentId(t.parent_id ?? '')
+    setEditTermUri(t.uri ?? '')
+    setEditTermExactMatchUris((t.exact_match_uris ?? []).join(', '))
   }
 
   async function saveEditTerm(t: VocabularyTerm) {
@@ -388,6 +447,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         parent_id: vocab?.is_hierarchical ? editTermParentId || null : null,
         applies_from: vocab?.kind === 'relation' ? editTermAppliesFrom : [],
         applies_to: vocab?.kind === 'relation' ? editTermAppliesTo : [],
+        uri: editTermUri.trim() || null,
+        exact_match_uris: editTermExactMatchUris.split(/[\n,]+/).map(s => s.trim()).filter(Boolean),
       })
       setEditTermId(null)
       loadTerms()
@@ -473,6 +534,16 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   <span style={{ fontSize: 13 }}>Hierarchisch</span>
                 </label>
               </div>}
+              <div className="field">
+                <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
+                  {t('canonicalUri')}
+                  <HelpPopover
+                    title={t('canonicalUriHelpPopover.title')}
+                    content={<div>{t('canonicalUriHelpPopover.description')}</div>}
+                  />
+                </div>
+                <input className="fld mono" value={newVocabCanonicalUri} onChange={e => setNewVocabCanonicalUri(e.target.value)} placeholder={t('canonicalUriPlaceholder')} />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button className="btn pri" onClick={createVocab} disabled={savingVocab}>Anlegen</button>
@@ -505,6 +576,21 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 </button>
                 <Tag size={13} className="ic" />
                 <span style={{ flex: 1 }}>{v.name}</span>
+                {isSystemVocabulary(v) && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      background: 'var(--panel-2)',
+                      color: 'var(--fg-3)',
+                      border: '1px solid var(--border-s)',
+                      marginRight: 6,
+                    }}
+                  >
+                    {t('systemVocabBadge')}
+                  </span>
+                )}
                 {activeVocab === v.id && !termsLoading && <span className="ct">{terms.length}</span>}
               </div>
               {activeVocab === v.id && expandedVocab === v.id && !termsLoading && (
@@ -532,15 +618,45 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
             <>
               <div className="vocab-detail-head">
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{vocab.name}</div>
-                  <div style={{ color: 'var(--fg-3)', fontSize: 12 }}>
-                    {terms.length} Terme · {vocab.is_hierarchical ? 'Hierarchisch' : 'Flach'} · {vocab.kind === 'relation' ? 'Relationen' : 'Auswahlliste'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{vocab.name}</span>
+                    {isSystemVocabulary(vocab) && (
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: 11,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: 'var(--panel-2)',
+                          color: 'var(--fg-3)',
+                          border: '1px solid var(--border-s)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {t('systemVocabBadge')}
+                      </span>
+                    )}
                   </div>
+                  <div style={{ color: 'var(--fg-3)', fontSize: 12 }}>
+                    {t('vocabMeta.termsCount', { count: terms.length })} · {vocab.is_hierarchical ? t('vocabMeta.hierarchical') : t('vocabMeta.flat')} · {vocab.kind === 'relation' ? t('vocabMeta.relation') : t('vocabMeta.picklist')}
+                  </div>
+                  {vocab.canonical_uri && (
+                    <div style={{ color: 'var(--fg-3)', fontSize: 11, fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+                      <a href={vocab.canonical_uri} target="_blank" rel="noreferrer" style={{ color: 'var(--fg-3)', textDecoration: 'underline' }}>
+                        {vocab.canonical_uri}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn" onClick={() => setShowImport(true)}>
+                    <Upload size={13} /> {t('importButton')}
+                  </button>
                   <button className="btn pri" onClick={() => { setNewTermParentId(''); setShowNewTerm(v => !v) }}><Plus size={13} /> Neuer Term</button>
                 </div>
               </div>
+              {vocab.kind === 'relation' && <RelationTypeOverview />}
+
 
               {showNewTerm && (
                 <div className="card" style={{ marginBottom: 12 }}>
@@ -571,13 +687,54 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           languages={languages}
                           value={newTermInverseLabel}
                           onChange={(lang, val) => setNewTermInverseLabel({ ...newTermInverseLabel, [lang]: val })}
-                          labelPrefix="Gegenrichtung"
+                          labelPrefix={t('inverseLabelPrefix')}
                         />
                       )}
+                      <div className="field">
+                        <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
+                          {t('uri')}
+                          <HelpPopover
+                            title={t('uriHelpPopover.title')}
+                            content={(
+                              <div>
+                                <div>{t('uriHelpPopover.description')}</div>
+                                <div style={{ marginTop: 4, color: 'var(--fg-3)', fontFamily: 'monospace', fontSize: 11 }}>
+                                  {t('uriHelpPopover.example')}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 11 }}>
+                                  {t('uriHelpPopover.exportNote')}
+                                </div>
+                              </div>
+                            )}
+                          />
+                        </div>
+                        <input className="fld mono" value={newTermUri} onChange={e => setNewTermUri(e.target.value)} placeholder={t('uriPlaceholder')} />
+                      </div>
+                      <div className="field">
+                        <div className="lbl" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                          <span>{t('exactMatchUris')}</span>
+                          <span style={{ color: 'var(--fg-3)', fontSize: 11, fontWeight: 'normal' }}>({t('exactMatchUrisHelp')})</span>
+                          <HelpPopover
+                            title={t('exactMatchUrisHelpPopover.title')}
+                            content={(
+                              <div>
+                                <div>{t('exactMatchUrisHelpPopover.description')}</div>
+                                <div style={{ marginTop: 4, color: 'var(--fg-3)', fontFamily: 'monospace', fontSize: 11 }}>
+                                  {t('exactMatchUrisHelpPopover.example')}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 11 }}>
+                                  {t('exactMatchUrisHelpPopover.separatorNote')}
+                                </div>
+                              </div>
+                            )}
+                          />
+                        </div>
+                        <input className="fld mono" value={newTermExactMatchUris} onChange={e => setNewTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
+                      </div>
                     </div>
                     {vocab.kind === 'relation' && (
                       <>
-                        <RelationTypeHelp
+                        <RelationTypePreview
                           label={getLabel({ label: newTermLabel }, '')}
                           inverseLabel={getLabel({ label: newTermInverseLabel }, '')}
                           from={newTermAppliesFrom}
@@ -585,11 +742,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         />
                         <div className="fg-2" style={{ marginTop: 8 }}>
                           <div className="field">
-                            <div className="lbl">Quelltypen (Ausgangsdatensatz)</div>
+                            <div className="lbl">{t('relationFields.sourceTypes')}</div>
                             <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
                           </div>
                           <div className="field">
-                            <div className="lbl">Zieltypen (verknüpfter Datensatz)</div>
+                            <div className="lbl">{t('relationFields.targetTypes')}</div>
                             <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
                           </div>
                         </div>
@@ -611,9 +768,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     <tr>
                       <th style={{ minWidth: 160 }}>ID</th>
                       <th>Label</th>
-                      {vocab.kind === 'relation' && <th>Gegenrichtung</th>}
-                      {vocab.kind === 'relation' && <th>Typen</th>}
-                      {isHierarchical && <th>Übergeordnet</th>}
+                      {vocab.kind === 'relation' && <th>{t('tableHeaders.inverse')}</th>}
+                      {vocab.kind === 'relation' && <th>{t('tableHeaders.types')}</th>}
+                      {isHierarchical && <th>{t('tableHeaders.parent')}</th>}
                       <th className="col-act" />
                     </tr>
                   </thead>
@@ -622,9 +779,9 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                     {!termsLoading && terms.length === 0 && (
                       <tr><td colSpan={tableColumnCount} className="empty">Keine Terme.</td></tr>
                     )}
-                    {!termsLoading && displayTerms.map(({ term: t, depth }) => (
-                      editTermId === t.id ? (
-                        <Fragment key={t.id}>
+                    {!termsLoading && displayTerms.map(({ term: termItem, depth }) => (
+                      editTermId === termItem.id ? (
+                        <Fragment key={termItem.id}>
                           <tr>
                             <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end', padding: '8px 0' }}>
@@ -633,18 +790,59 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                   <input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} />
                                 </div>
                                 <LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} />
-                                {vocab.kind === 'relation' && <LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix="Gegenrichtung" />}
+                                {vocab.kind === 'relation' && <LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix={t('inverseLabelPrefix')} />}
                                 {isHierarchical && <div className="field">
-                                  <label className="lbl" htmlFor={`edit-term-parent-${t.id}`}>Übergeordneter Term</label>
-                                  <select id={`edit-term-parent-${t.id}`} className="fld" value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
+                                  <label className="lbl" htmlFor={`edit-term-parent-${termItem.id}`}>Übergeordneter Term</label>
+                                  <select id={`edit-term-parent-${termItem.id}`} className="fld" value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
                                     <option value="">Kein übergeordneter Term</option>
-                                    {parentOptions(t.id).map(({ term, depth: parentDepth }) => (
+                                    {parentOptions(termItem.id).map(({ term, depth: parentDepth }) => (
                                       <option key={term.id} value={term.id}>{`${'— '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
                                     ))}
                                   </select>
                                 </div>}
+                                <div className="field">
+                                <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
+                                  {uriLabel}
+                                  <HelpPopover
+                                    title={uriHelpTitle}
+                                    content={(
+                                      <div>
+                                        <div>{uriHelpDesc}</div>
+                                        <div style={{ marginTop: 4, color: 'var(--fg-3)', fontFamily: 'monospace', fontSize: 11 }}>
+                                          {uriHelpExample}
+                                        </div>
+                                        <div style={{ marginTop: 4, fontSize: 11 }}>
+                                          {uriHelpExportNote}
+                                        </div>
+                                      </div>
+                                    )}
+                                  />
+                                </div>
+                                <input className="fld mono" value={editTermUri} onChange={e => setEditTermUri(e.target.value)} placeholder={uriPlaceholder} />
+                              </div>
+                              <div className="field">
+                                <div className="lbl" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                                  <span>{exactMatchUrisLabel}</span>
+                                  <span style={{ color: 'var(--fg-3)', fontSize: 11, fontWeight: 'normal' }}>({exactMatchUrisHelp})</span>
+                                  <HelpPopover
+                                    title={exactMatchUrisHelpTitle}
+                                    content={(
+                                      <div>
+                                        <div>{exactMatchUrisHelpDesc}</div>
+                                        <div style={{ marginTop: 4, color: 'var(--fg-3)', fontFamily: 'monospace', fontSize: 11 }}>
+                                          {exactMatchUrisHelpExample}
+                                        </div>
+                                        <div style={{ marginTop: 4, fontSize: 11 }}>
+                                          {exactMatchUrisHelpSeparatorNote}
+                                        </div>
+                                      </div>
+                                    )}
+                                  />
+                                </div>
+                                <input className="fld mono" value={editTermExactMatchUris} onChange={e => setEditTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
+                              </div>
                                 <div style={{ display: 'flex', gap: 8 }}>
-                                  <button className="btn pri" onClick={() => saveEditTerm(t)} disabled={savingEditTerm}>Speichern</button>
+                                  <button className="btn pri" onClick={() => saveEditTerm(termItem)} disabled={savingEditTerm}>Speichern</button>
                                   <button className="btn gh" onClick={() => setEditTermId(null)}><X size={12} /> Abbrechen</button>
                                 </div>
                               </div>
@@ -654,7 +852,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
                               {vocab.kind === 'relation' && (
                                 <>
-                                  <RelationTypeHelp
+                                  <RelationTypePreview
                                     label={getLabel({ label: editTermLabel }, '')}
                                     inverseLabel={getLabel({ label: editTermInverseLabel }, '')}
                                     from={editTermAppliesFrom}
@@ -662,11 +860,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                   />
                                   <div className="fg-2" style={{ marginBottom: 8 }}>
                                     <div className="field">
-                                      <div className="lbl">Quelltypen (Ausgangsdatensatz)</div>
+                                      <div className="lbl">{t('relationFields.sourceTypes')}</div>
                                       <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
                                     </div>
                                     <div className="field">
-                                      <div className="lbl">Zieltypen (verknüpfter Datensatz)</div>
+                                      <div className="lbl">{t('relationFields.targetTypes')}</div>
                                       <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
                                     </div>
                                   </div>
@@ -678,20 +876,38 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           </tr>
                         </Fragment>
                       ) : (
-                        <tr key={t.id} style={selectedTermId === t.id ? { background: 'var(--accent-50)' } : undefined}>
-                          <td className="mono" style={{ minWidth: 160, width: 160, paddingLeft: 12 + depth * 16 }}>{t.term}</td>
-                          <td style={{ maxWidth: 220 }}>
-                            {getLabel(t, '—')}
-                            <MetadataSummary fields={termFields} metadata={t.metadata_ ?? {}} />
+                        <tr key={termItem.id} style={selectedTermId === termItem.id ? { background: 'var(--accent-50)' } : undefined}>
+                          <td className="mono" style={{ minWidth: 160, width: 160, paddingLeft: 12 + depth * 16 }}>
+                            <div>{termItem.term}</div>
+                            {termItem.uri && (
+                              <div style={{ fontSize: 11, color: 'var(--fg-3)', wordBreak: 'break-all', marginTop: 2 }}>
+                                <a href={termItem.uri} target="_blank" rel="noreferrer" title={termItem.uri} style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+                                  {termItem.uri}
+                                </a>
+                              </div>
+                            )}
+                            {termItem.exact_match_uris && termItem.exact_match_uris.length > 0 && (
+                              <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {termItem.exact_match_uris.map((u, i) => (
+                                  <a key={i} href={u} target="_blank" rel="noreferrer" title={u} style={{ color: 'var(--fg-3)', textDecoration: 'underline' }}>
+                                    ≡ {u.replace(/^https?:\/\//, '').split('/').filter(Boolean).slice(-1)[0] || u}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </td>
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: t.inverse_label }, '—')}</td>}
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{(t.applies_from?.length ?? 0) === 0 && (t.applies_to?.length ?? 0) === 0 ? 'Alle' : [...(t.applies_from ?? []), ...(t.applies_to ?? [])].join(' → ')}</td>}
-                          {isHierarchical && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{t.parent_id ? getLabel(terms.find(term => term.id === t.parent_id) ?? t, '—') : '—'}</td>}
+                          <td style={{ maxWidth: 220 }}>
+                            {getLabel(termItem, '—')}
+                            <MetadataSummary fields={termFields} metadata={termItem.metadata_ ?? {}} />
+                          </td>
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: termItem.inverse_label }, '—')}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t, termItem)}</td>}
+                          {isHierarchical && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{termItem.parent_id ? getLabel(terms.find(term => term.id === termItem.parent_id) ?? termItem, '—') : '—'}</td>}
                           <td className="col-act">
                             <div className="row-actions">
-                              <button className="btn sm ico gh" onClick={() => startEditTerm(t)}><Edit size={12} /></button>
-                              {isHierarchical && <button className="btn sm gh" onClick={() => startNewChild(t)}><Plus size={12} /> Unterterm</button>}
-                              <button className="btn sm ico gh dn" onClick={() => deleteTerm(t.id)}><Trash size={12} /></button>
+                              <button className="btn sm ico gh" onClick={() => startEditTerm(termItem)}><Edit size={12} /></button>
+                              {isHierarchical && <button className="btn sm gh" onClick={() => startNewChild(termItem)}><Plus size={12} /> Unterterm</button>}
+                              <button className="btn sm ico gh dn" onClick={() => deleteTerm(termItem.id)}><Trash size={12} /></button>
                             </div>
                           </td>
                         </tr>
@@ -700,7 +916,30 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   </tbody>
                 </table>
               </div>
+              {showImport && (
+                <div className="batch-modal-backdrop" onClick={() => setShowImport(false)} role="dialog" aria-modal="true">
+                  <div className="batch-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
+                    <div className="batch-modal-header">
+                      <h2>{t('importDialog.title', { name: vocab.name })}</h2>
+                      <button type="button" className="btn ico gh" onClick={() => setShowImport(false)} aria-label="Schließen">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="batch-modal-body">
+                      <VocabularyImport
+                        initialVocabId={vocab.id}
+                        onImportComplete={() => {
+                          loadTerms()
+                          setShowImport(false)
+                        }}
+                        onClose={() => setShowImport(false)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
+
           )}
           {!vocab && vocabs.length > 0 && (
             <div className="empty">Vokabular auswählen.</div>

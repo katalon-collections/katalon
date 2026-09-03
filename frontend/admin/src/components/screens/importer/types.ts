@@ -140,4 +140,4 @@ export const FIELD_TYPE_OPTIONS = [
 export const STEPS = ['Upload', 'Mapping', 'Dry run', 'Import'] as const
 export const STEPS_XML = ['Upload', 'Element', 'Mapping', 'Dry run', 'Import'] as const
 
-export const IMPORTER_STATE_KEY = 'katalon_importer_state'
+export { IMPORTER_STATE_KEY } from '../../../types'

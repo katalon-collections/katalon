@@ -160,6 +160,69 @@ class Procedure(Base):
     )
 
 
+class Collection(Base):
+    __tablename__ = "collections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    collection_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("collections.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version}
+
+    parent: Mapped["Collection | None"] = relationship(
+        "Collection",
+        remote_side=lambda: Collection.id,
+        backref="children",
+    )
+
+    __table_args__ = (
+        Index("ix_collections_metadata_gin", "metadata", postgresql_using="gin"),
+    )
+
+
+class StorageLocation(Base):
+    __tablename__ = "storage_locations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    idno: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    storage_location_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("storage_locations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version}
+
+    parent: Mapped["StorageLocation | None"] = relationship(
+        "StorageLocation",
+        remote_side=lambda: StorageLocation.id,
+        backref="children",
+    )
+
+    __table_args__ = (
+        Index("ix_storage_locations_metadata_gin", "metadata", postgresql_using="gin"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Schema / field definitions
 # ---------------------------------------------------------------------------
@@ -350,7 +413,7 @@ class Vocabulary(Base):
     name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     is_hierarchical: Mapped[bool] = mapped_column(Boolean, default=False)
     kind: Mapped[str] = mapped_column(String(16), default="term", server_default="term")
-
+    canonical_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     terms: Mapped[list["VocabularyTerm"]] = relationship(
         back_populates="vocabulary", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -375,7 +438,8 @@ class VocabularyTerm(Base):
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("vocabulary_terms.id", ondelete="SET NULL"), nullable=True
     )
-
+    uri: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    exact_match_uris: Mapped[list[str]] = mapped_column(JSONB, default=list[str], server_default="[]")
     vocabulary: Mapped["Vocabulary"] = relationship(back_populates="terms")
     children: Mapped[list["VocabularyTerm"]] = relationship(
         back_populates="parent", passive_deletes=True

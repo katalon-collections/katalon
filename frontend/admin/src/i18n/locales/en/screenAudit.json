@@ -24,7 +24,8 @@
     "entity": "Entity",
     "place": "Place",
     "occurrence": "Occurrence",
-    "procedure": "Procedure"
+    "procedure": "Procedure",
+    "collection": "Collection"
   },
   "extraFile": "File: {{filename}}",
   "extraRelationType": "Relation type: {{relationType}}"

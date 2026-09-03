@@ -14,13 +14,7 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'url', 'authority', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
-export const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 'Text', richtext: 'Richtext', date: 'Datum', number: 'Zahl',
-  boolean: 'Boolean', vocab: 'Vokabular (strikt)', vocab_free: 'Vokabular (Freitext)',
-  relation: 'Relation', geo: 'Geodaten', pid: 'PID',
-  url: 'URL (mit Linktitel)',
-  authority: 'Normdaten (Authority)', group: 'Containerfeld (Gruppe)',
-}
+export { FIELD_TYPE_LABELS } from './schemaConstants'
 
 // Field types allowed as sub-fields of a group (no recursion)
 const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority'] as const
@@ -581,6 +575,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
                   <option value="occurrence">{t('fieldDetail.relationTargetTypeOptions.occurrence')}</option>
                   <option value="procedure">{t('fieldDetail.relationTargetTypeOptions.procedure')}</option>
+                  <option value="collection">{t('fieldDetail.relationTargetTypeOptions.collection')}</option>
+                  <option value="storage_location">{t('fieldDetail.relationTargetTypeOptions.storage_location')}</option>
                 </select>
               </div>
               <div className="field">
@@ -802,6 +798,8 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
               <option value="entity">{t('fieldDetail.relationTargetTypeOptions.entity')}</option>
               <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
               <option value="occurrence">{t('fieldDetail.relationTargetTypeOptions.occurrence')}</option>
+              <option value="collection">{t('fieldDetail.relationTargetTypeOptions.collection')}</option>
+              <option value="storage_location">{t('fieldDetail.relationTargetTypeOptions.storage_location')}</option>
             </select>
           </div>
           <div className="field">
@@ -1014,6 +1012,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     { id: 'place',       label: t('typeLabels.place'),      key: 'place' },
     { id: 'occurrence',  label: t('typeLabels.occurrence'), key: 'occurrence' },
     { id: 'procedure',   label: t('typeLabels.procedure'),  key: 'procedure' },
+    { id: 'collection',  label: t('typeLabels.collection'), key: 'collection' },
+    { id: 'storage_location', label: t('typeLabels.storage_location'), key: 'storage_location' },
     { id: 'vocabulary_term', label: t('typeLabels.vocabulary_term'), key: 'vocabulary_term' },
   ]
 

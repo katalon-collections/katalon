@@ -1,13 +1,14 @@
 {
   "name": "katalon-portal",
-  "version": "1.16.0",
+  "version": "1.19.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:arch": "depcruise src --config .dependency-cruiser.cjs"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",
@@ -26,6 +27,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "dependency-cruiser": "^18.2.0",
     "typescript": "^5.4.5",
     "vite": "^5.2.13"
   },

@@ -44,6 +44,7 @@ export function ScreenOAISets() {
     { value: 'entity', label: t('recordTypes.entity') },
     { value: 'place', label: t('recordTypes.place') },
     { value: 'occurrence', label: t('recordTypes.occurrence') },
+    { value: 'collection', label: t('recordTypes.collection') },
   ]
 
   const STATUS_OPTIONS = [

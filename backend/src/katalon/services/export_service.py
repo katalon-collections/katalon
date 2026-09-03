@@ -13,7 +13,15 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import Entity, FieldDefinition, Object, Occurrence, Place, Procedure
+from katalon.core.models import (
+    Collection,
+    Entity,
+    FieldDefinition,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+)
 from katalon.services.metadata_format_service import get_format
 from katalon.services.metadata_mapping_service import extract_values, get_mapping_index
 
@@ -23,6 +31,7 @@ RECORD_MODELS: dict[str, tuple[type[Any], str]] = {
     "place": (Place, "place_type"),
     "occurrence": (Occurrence, "occurrence_type"),
     "procedure": (Procedure, "procedure_type"),
+    "collection": (Collection, "collection_type"),
 }
 
 

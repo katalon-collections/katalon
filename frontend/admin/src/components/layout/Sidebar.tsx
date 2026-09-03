@@ -5,7 +5,7 @@ import pkg from '../../../package.json'
 import { useTranslation } from 'react-i18next'
 import { getTokenUser } from '../../api/client'
 import { FeedbackButton } from '../feedback/FeedbackButton'
-import { Bell, Download, File, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
+import { Bell, Box, Download, File, Folder, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 
 type Route = string
 
@@ -22,6 +22,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { gKey: 'sidebar.groups.content' },
   { id: 'list',             labelKey: 'sidebar.nav.list',             Icon: Image,     routes: ['list', 'form'] },
+  { id: 'collections-list', labelKey: 'sidebar.nav.collectionsList',  Icon: Folder,    routes: ['collections-list', 'collections-form'] },
   { id: 'entities-list',    labelKey: 'sidebar.nav.entitiesList',     Icon: User,      routes: ['entities-list', 'entities-form'] },
   { id: 'places-list',      labelKey: 'sidebar.nav.placesList',       Icon: MapPin,    routes: ['places-list', 'places-form'] },
   { id: 'occurrences-list', labelKey: 'sidebar.nav.occurrencesList',  Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
@@ -30,7 +31,8 @@ const NAV: NavItem[] = [
   { id: 'audit',            labelKey: 'sidebar.nav.audit',            Icon: History },
   { gKey: 'sidebar.groups.config', roles: ['admin', 'superuser'] },
   { id: 'subtypes', labelKey: 'sidebar.nav.subtypes',       Icon: ListTree, roles: ['admin', 'superuser'] },
-  { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  ct: '5', roles: ['admin', 'superuser'] },
+  { id: 'storage-locations', labelKey: 'sidebar.nav.storageLocations', Icon: Box, roles: ['admin', 'superuser'] },
+  { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  ct: '6', roles: ['admin', 'superuser'] },
   { id: 'form-variants', labelKey: 'sidebar.nav.formVariants', Icon: Layers, roles: ['admin', 'superuser'] },
   { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     ct: '4', roles: ['admin', 'superuser'] },
   { id: 'pages',     labelKey: 'sidebar.nav.pages',         Icon: File,  roles: ['admin', 'superuser'] },

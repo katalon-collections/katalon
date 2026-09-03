@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import (
+    Collection,
     Entity,
     FieldDefinition,
     FormVariant,
@@ -17,15 +18,20 @@ from katalon.core.models import (
     Place,
     Procedure,
     RecordSubtype,
+    StorageLocation,
 )
 
-PRIMARY_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+PRIMARY_TYPES = {
+    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+}
 _TYPE_MODEL_FIELD = {
     "object": (Object, "object_type"),
     "entity": (Entity, "entity_type"),
     "place": (Place, "place_type"),
     "occurrence": (Occurrence, "occurrence_type"),
     "procedure": (Procedure, "procedure_type"),
+    "collection": (Collection, "collection_type"),
+    "storage_location": (StorageLocation, "storage_location_type"),
 }
 
 

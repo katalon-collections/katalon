@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -195,6 +195,31 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
 
 
 @router.get(
+    "/{object_id}/export",
+    summary="Export a single object record as JSON-LD or Turtle RDF",
+)
+async def export_object(
+    object_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "object",
+        object_id,
+        db,
+        request,
+        current_user=current_user,
+        format_param=format,
+        accept_header=accept,
+    )
+
+
+@router.get(
     "/{object_id}",
     response_model=ObjectRead,
     summary="Get a single object by ID",
@@ -202,7 +227,29 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
         404: {"description": "Object not found"},
     },
 )
-async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Object | ObjectRead:
+async def get_object(
+    object_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Any:
+    is_rdf_format = isinstance(format, str) and format.lower() in ("jsonld", "json-ld", "ttl", "turtle")
+    is_rdf_accept = isinstance(accept, str) and ("application/ld+json" in accept or "text/turtle" in accept)
+    if is_rdf_format or is_rdf_accept:
+        from katalon.services.rdf_service import handle_single_record_export
+
+        return await handle_single_record_export(
+            "object",
+            object_id,
+            db,
+            request,
+            current_user=current_user,
+            format_param=format if isinstance(format, str) else None,
+            accept_header=accept if isinstance(accept, str) else None,
+        )
+
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
     if not obj:
@@ -212,7 +259,6 @@ async def get_object(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     if visibility_user is None:
         return await project_public_record(db, ObjectRead.model_validate(obj), "object", obj.object_type)
     return obj
-
 
 @router.put(
     "/{object_id}",

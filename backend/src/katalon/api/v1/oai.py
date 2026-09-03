@@ -35,6 +35,11 @@ async def _available_formats(db: DBDep) -> dict[str, Any]:
     formats = await metadata_format_service.list_formats()
     return {fmt.key: fmt for fmt in formats if fmt.key in mapped_keys}
 
+def _normalize_prefix(prefix: str, available: dict[str, Any]) -> str:
+    if prefix in ("jsonld", "json-ld") and "json_ld" in available:
+        return "json_ld"
+    return prefix
+
 
 async def _es_search_for_oai(
     set_def: OAISet | None,
@@ -137,7 +142,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
         # --- ListRecords ---
         elif verb == "ListRecords":
             available = await _available_formats(db)
-            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            raw_prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            prefix = _normalize_prefix(raw_prefix, available)
 
             token_str = params.get("resumptionToken")
             if token_str:
@@ -186,7 +192,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
         # --- ListIdentifiers ---
         elif verb == "ListIdentifiers":
             available = await _available_formats(db)
-            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            raw_prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            prefix = _normalize_prefix(raw_prefix, available)
 
             token_str = params.get("resumptionToken")
             if token_str:
@@ -243,7 +250,8 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
 
             identifier = params.get("identifier", "")
             available = await _available_formats(db)
-            prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            raw_prefix = params.get("metadataPrefix", next(iter(available), "oai_dc"))
+            prefix = _normalize_prefix(raw_prefix, available)
             if prefix not in available:
                 root = oaipmh_service._root()
                 msg = f"Unsupported prefix: {prefix}"

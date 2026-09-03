@@ -235,7 +235,8 @@ class PortalVocabularyTermRead(BaseModel):
     parent_id: uuid.UUID | None
     applies_from: list[str]
     applies_to: list[str]
-
+    uri: str | None = None
+    exact_match_uris: list[str] = []
     @computed_field(alias="_links")
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/portal/v1/vocabularies/{self.vocabulary_id}/terms/{self.id}"

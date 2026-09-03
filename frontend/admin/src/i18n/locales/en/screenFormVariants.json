@@ -4,7 +4,8 @@
     "entity": "Entities",
     "place": "Places",
     "occurrence": "Occurrences",
-    "procedure": "Procedures"
+    "procedure": "Procedures",
+    "collection": "Collections"
   },
   "roles": {
     "admin": "Administrator",

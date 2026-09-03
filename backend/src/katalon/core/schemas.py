@@ -163,7 +163,7 @@ class VocabularyCreate(BaseModel):
     name: str
     is_hierarchical: bool = False
     kind: Literal["term", "relation"] = "term"
-
+    canonical_uri: str | None = None
 
 class VocabularyRead(VocabularyCreate):
     model_config = ConfigDict(from_attributes=True)
@@ -180,7 +180,7 @@ class VocabularyRead(VocabularyCreate):
         }
 
 
-RECORD_TYPES = ("object", "entity", "place", "occurrence", "procedure")
+RECORD_TYPES = ("object", "entity", "place", "occurrence", "procedure", "collection", "storage_location")
 
 
 class VocabularyTermCreate(BaseModel):
@@ -192,6 +192,8 @@ class VocabularyTermCreate(BaseModel):
     parent_id: uuid.UUID | None = None
     applies_from: list[str] = []
     applies_to: list[str] = []
+    uri: str | None = None
+    exact_match_uris: list[str] = []
 
     @field_validator("applies_from", "applies_to")
     @classmethod
@@ -201,6 +203,28 @@ class VocabularyTermCreate(BaseModel):
             raise ValueError(f"Ungültige Record-Typen: {invalid}")
         return v
 
+
+class VocabularyTermUpdate(BaseModel):
+    vocabulary_id: uuid.UUID | None = None
+    term: str | None = None
+    label: dict[str, Any] | None = None
+    inverse_label: dict[str, Any] | None = None
+    metadata_: dict[str, Any] | None = None
+    parent_id: uuid.UUID | None = None
+    applies_from: list[str] | None = None
+    applies_to: list[str] | None = None
+    uri: str | None = None
+    exact_match_uris: list[str] | None = None
+
+    @field_validator("applies_from", "applies_to")
+    @classmethod
+    def _validate_applies(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        invalid = [t for t in v if t not in RECORD_TYPES]
+        if invalid:
+            raise ValueError(f"Ungültige Record-Typen: {invalid}")
+        return v
 
 class VocabularyTermRead(VocabularyTermCreate):
     model_config = ConfigDict(from_attributes=True)
@@ -222,6 +246,9 @@ class VocabularyTermRead(VocabularyTermCreate):
         return links
 
 
+VocabularyTermResponse = VocabularyTermRead
+VocabularyResponse = VocabularyRead
+
 # ---------------------------------------------------------------------------
 # Primary record types (shared base)
 # ---------------------------------------------------------------------------
@@ -239,7 +266,9 @@ class ObjectCreate(RecordBase):
     collection_status: str = "active"
 
 
-class RecordRead(RecordBase):
+class RecordCommon(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -262,6 +291,9 @@ class RecordRead(RecordBase):
             links["media"] = {"href": f"{base}/media"}
         return links
 
+
+class RecordRead(RecordBase, RecordCommon):
+    pass
 
 class ObjectRead(ObjectCreate, RecordRead):
     _api_path: ClassVar[str] = "objects"
@@ -299,6 +331,30 @@ class OccurrenceRead(OccurrenceCreate, RecordRead):
     _api_path: ClassVar[str] = "occurrences"
     _record_type: ClassVar[str] = "occurrence"
 
+
+
+class CollectionCreate(RecordBase):
+    idno: str | None = None
+    collection_type: str | None = None
+    parent_id: uuid.UUID | None = None
+
+
+class CollectionRead(CollectionCreate, RecordRead):
+    _api_path: ClassVar[str] = "collections"
+    _record_type: ClassVar[str] = "collection"
+
+class StorageLocationCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    idno: str | None = None
+    storage_location_type: str | None = None
+    parent_id: uuid.UUID | None = None
+    metadata_: dict[str, Any] = {}
+
+
+class StorageLocationRead(StorageLocationCreate, RecordCommon):
+    _api_path: ClassVar[str] = "storage-locations"
+    _record_type: ClassVar[str] = "storage_location"
 
 class ProcedureCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

@@ -1,4 +1,12 @@
 {
+  "recordTypes": {
+    "object": "Object",
+    "entity": "Entity",
+    "place": "Place",
+    "occurrence": "Occurrence",
+    "procedure": "Procedure",
+    "collection": "Collection"
+  },
   "login": {
     "tagline": "Digital Collection Management System",
     "cardTitle": "Sign in",
@@ -39,6 +47,7 @@
     },
     "nav": {
       "list": "Objects",
+      "collectionsList": "Collections",
       "entitiesList": "Entities",
       "placesList": "Places",
       "occurrencesList": "Occurrences",
@@ -46,6 +55,7 @@
       "import": "Importer",
       "audit": "Audit log",
       "subtypes": "Subtypes",
+      "storageLocations": "Storage locations",
       "schema": "Schemas",
       "formVariants": "Form variants",
       "vocab": "Vocabulary",

@@ -22,6 +22,8 @@
     "place": "Orte",
     "occurrence": "Occurrences",
     "procedure": "Vorgänge",
+    "collection": "Sammlungen",
+    "storage_location": "Lagerorte",
     "vocabulary_term": "Vokabulare"
   },
   "fieldTypes": {
@@ -98,7 +100,9 @@
       "entity": "Entitäten",
       "place": "Orte",
       "occurrence": "Occurrences",
-      "procedure": "Vorgänge"
+      "procedure": "Vorgänge",
+      "collection": "Sammlungen",
+      "storage_location": "Lagerorte"
     },
     "relationTargetSubtype": "Ziel-Subtyp",
     "relationTargetSubtypeHint": "(optional)",

@@ -4,6 +4,7 @@
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
 
+from katalon.integrations.jsonld_format import JsonLdFormat
 from katalon.integrations.oai_dc_format import OaiDcFormat
 from katalon.services import oaipmh_service
 
@@ -237,3 +238,17 @@ def test_list_identifiers_with_resumption_token() -> None:
     assert rt.text is not None
     decoded = oaipmh_service.decode_token(rt.text)
     assert decoded["offset"] == 1
+
+
+def test_oaipmh_with_json_ld_format() -> None:
+    json_ld_fmt = JsonLdFormat()
+    xml = oaipmh_service.list_metadata_formats("http://test/oai", [OAI_DC, json_ld_fmt])
+    assert "json_ld" in xml
+    assert "http://www.w3.org/ns/json-ld" in xml
+
+    hit = _mock_hit()
+    record_xml = oaipmh_service.get_record(
+        hit, "http://test/oai", "oai:katalon:object:550e8400", "json_ld", json_ld_fmt
+    )
+    assert "<json_ld" in record_xml
+    assert "crm:E22_Human-Made_Object" in record_xml or "lrmoo:F5_Item" in record_xml

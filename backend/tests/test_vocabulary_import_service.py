@@ -114,3 +114,48 @@ def test_parse_json_terms_nested_hierarchy() -> None:
     assert len(terms) == 2
     child = [t for t in terms if t.term == "malerei"][0]
     assert child.parent_term == "kunst"
+
+
+def test_parse_csv_terms_with_uri_and_exact_match() -> None:
+    content = (
+        b"term;label_de;uri;exact_matches\n"
+        b"book;Buch;http://vocab.getty.edu/aat/300028051;https://d-nb.info/gnd/4008570-3|http://id.loc.gov/authorities/subjects/sh85015738\n"
+    )
+    mapping = {
+        "term": "term",
+        "label_de": "label:de",
+        "uri": "uri",
+        "exact_matches": "exact_match_uris",
+    }
+
+    terms, errors = parse_csv_terms(content, mapping)
+
+    assert errors == []
+    assert len(terms) == 1
+    assert terms[0].term == "book"
+    assert terms[0].uri == "http://vocab.getty.edu/aat/300028051"
+    assert terms[0].exact_match_uris == [
+        "https://d-nb.info/gnd/4008570-3",
+        "http://id.loc.gov/authorities/subjects/sh85015738",
+    ]
+
+
+def test_parse_json_terms_with_uri_and_exact_match() -> None:
+    content = b"""
+    [
+      {
+        "term": "book",
+        "label": {"de": "Buch", "en": "Book"},
+        "uri": "http://vocab.getty.edu/aat/300028051",
+        "exact_match_uris": ["https://d-nb.info/gnd/4008570-3"]
+      }
+    ]
+    """
+
+    terms, errors = parse_json_terms(content)
+
+    assert errors == []
+    assert len(terms) == 1
+    assert terms[0].uri == "http://vocab.getty.edu/aat/300028051"
+    assert terms[0].exact_match_uris == ["https://d-nb.info/gnd/4008570-3"]
+

@@ -21,7 +21,9 @@ from katalon.services.pid_service import PID_PROVIDERS, available_pid_providers
 from katalon.services.schema_ai_service import schema_chat
 from katalon.services.subtype_service import ensure_subtype_exists
 
-SCHEMA_TARGET_TYPES = {"object", "entity", "place", "occurrence", "procedure", "vocabulary_term"}
+SCHEMA_TARGET_TYPES = {
+    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location", "vocabulary_term",
+}
 VOCABULARY_TERM_FIELD_TYPES = {"text", "number", "boolean", "authority"}
 
 

@@ -9,7 +9,7 @@ import json
 import re
 import unicodedata
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import select
@@ -27,7 +27,9 @@ class ImportTerm:
     inverse_label: dict[str, str]
     parent_term: str | None
     row: int | None
-
+    uri: str | None = None
+    exact_match_uris: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 def _norm(value: str | None) -> str:
     return (value or "").strip()
@@ -80,11 +82,16 @@ def _merge_term(
     existing.label.update(item.label)
     if item.inverse_label:
         existing.inverse_label.update(item.inverse_label)
+    if item.uri and not existing.uri:
+        existing.uri = item.uri
+    if item.exact_match_uris:
+        for u in item.exact_match_uris:
+            if u not in existing.exact_match_uris:
+                existing.exact_match_uris.append(u)
     if item.parent_term and not existing.parent_term:
         existing.parent_term = item.parent_term
     if item.parent_term and existing.parent_term and item.parent_term != existing.parent_term:
         errors.append({"row": item.row, "message": f"Konflikt bei parent_term für '{item.term}'"})
-
 
 def _detect_delimiter(text: str) -> str:
     sample = text[:4096]
@@ -117,9 +124,10 @@ def parse_csv_terms(
         row_values = {_norm(k): _norm(v) for k, v in row.items() if k}
         term = ""
         parent_term = None
+        uri = None
+        exact_match_uris: list[str] = []
         label: dict[str, str] = {}
         inverse_label: dict[str, str] = {}
-
         for source_col, target_field in mapping.items():
             source_val = row_values.get(source_col, "")
             if not source_val:
@@ -128,6 +136,11 @@ def parse_csv_terms(
                 term = source_val
             elif target_field == "parent_term":
                 parent_term = source_val
+            elif target_field == "uri":
+                uri = source_val
+            elif target_field == "exact_match_uris":
+                delim = "|" if "|" in source_val else (";" if ";" in source_val else ",")
+                exact_match_uris = [u.strip() for u in source_val.split(delim) if u.strip()]
             elif target_field.startswith("label:"):
                 lang = target_field.split(":", 1)[1].strip()
                 if lang:
@@ -152,6 +165,8 @@ def parse_csv_terms(
                 inverse_label=inverse_label,
                 parent_term=parent_term,
                 row=i,
+                uri=uri,
+                exact_match_uris=exact_match_uris,
             ),
             errors,
         )
@@ -199,6 +214,14 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
             return
 
         this_parent = _norm(str(node.get("parent_term", ""))) or parent_term
+        uri = _norm(str(node.get("uri", ""))) or None
+        raw_exact = node.get("exact_match_uris", [])
+        exact_match_uris: list[str] = []
+        if isinstance(raw_exact, list):
+            exact_match_uris = [_norm(str(u)) for u in raw_exact if _norm(str(u))]
+        elif isinstance(raw_exact, str) and _norm(raw_exact):
+            delim = "|" if "|" in raw_exact else (";" if ";" in raw_exact else ",")
+            exact_match_uris = [u.strip() for u in raw_exact.split(delim) if u.strip()]
         raw_inverse = node.get("inverse_label", {})
         inverse_label: dict[str, str] = {}
         if isinstance(raw_inverse, dict):
@@ -213,6 +236,8 @@ def parse_json_terms(content: bytes) -> tuple[list[ImportTerm], list[dict[str, A
                 inverse_label=inverse_label,
                 parent_term=this_parent,
                 row=None,
+                uri=uri,
+                exact_match_uris=exact_match_uris,
             ),
             errors,
         )
@@ -301,12 +326,20 @@ async def import_vocabulary_terms(
                 label={},
                 inverse_label={},
                 parent_id=None,
+                uri=item.uri,
+                exact_match_uris=item.exact_match_uris or [],
             )
             db.add(term_model)
         if item.label:
             term_model.label = item.label
         if item.inverse_label:
             term_model.inverse_label = item.inverse_label
+        if item.uri is not None:
+            term_model.uri = item.uri
+        if item.exact_match_uris:
+            term_model.exact_match_uris = item.exact_match_uris
+        if item.metadata:
+            term_model.metadata_ = {**term_model.metadata_, **item.metadata}
         touched[item.term] = term_model
     await db.flush()
 

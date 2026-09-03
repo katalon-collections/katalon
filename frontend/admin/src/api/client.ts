@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonObject, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyTerm } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -279,6 +279,39 @@ export const procedures = {
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/procedure', { method: 'POST', body: JSON.stringify(data) }),
 }
 
+// Collections
+export const collections = {
+  list: (params?: { page?: number; page_size?: number; status?: string; collection_type?: string; parent_id?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<KatalonCollection>>(`/v1/collections${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<KatalonCollection>(`/v1/collections/${id}`),
+  audit:  (id: string) => req<AuditEntry[]>(`/v1/collections/${id}/audit-log`),
+  create: (data: Partial<KatalonCollection>) => req<KatalonCollection>('/v1/collections', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<KatalonCollection>, version?: number) => req<KatalonCollection>(`/v1/collections/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/collections/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/collections/${id}/publish`, { method: 'POST' }),
+  batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/collection', { method: 'POST', body: JSON.stringify(data) }),
+  snapshots: {
+    list:    (id: string) => req<Snapshot[]>(`/v1/collections/${id}/snapshots`),
+    create:  (id: string, label: string) => req<Snapshot>(`/v1/collections/${id}/snapshots`, { method: 'POST', body: JSON.stringify({ label }) }),
+    restore: (id: string, snapId: string, version?: number) => req<KatalonCollection>(`/v1/collections/${id}/snapshots/${snapId}/restore`, { method: 'POST', headers: ifMatch(version) }),
+  },
+}
+
+// Storage Locations
+export const storageLocations = {
+  list: (params?: { page?: number; page_size?: number; storage_location_type?: string; parent_id?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<KatalonStorageLocation>>(`/v1/storage-locations${qs ? `?${qs}` : ''}`)
+  },
+  get:    (id: string) => req<KatalonStorageLocation>(`/v1/storage-locations/${id}`),
+  audit:  (id: string) => audit.list({ record_type: 'storage_location', record_id: id }),
+  create: (data: Partial<KatalonStorageLocation>) => req<KatalonStorageLocation>('/v1/storage-locations', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<KatalonStorageLocation>, version?: number) => req<KatalonStorageLocation>(`/v1/storage-locations/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
+  delete: (id: string, force?: boolean) => req<void>(`/v1/storage-locations/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+}
+
 export interface SchemaImportResult {
   created: number
   updated: number
@@ -418,7 +451,7 @@ export const vocabularies = {
     vocabId: string,
     file: File,
     opts: { dryRun?: boolean; strategy?: 'append' | 'replace'; mapping?: Record<string, string> } = {},
-  ): Promise<{ strategy: string; dry_run: boolean; created: number; updated: number; deleted: number; errors: { row: number | null; message: string }[] }> => {
+  ): Promise<VocabularyImportResult> => {
     const formData = new FormData()
     formData.append('file', file)
     if (opts.mapping) {
@@ -428,6 +461,36 @@ export const vocabularies = {
     qs.set('dry_run', String(opts.dryRun ?? true))
     qs.set('strategy', opts.strategy ?? 'append')
     const res = await authorizedFetch(`/v1/vocabularies/${vocabId}/import?${qs}`, { method: 'POST', body: formData })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
+    if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
+    return res.json()
+  },
+  importSkos: async (
+    vocabId: string,
+    file: File,
+    opts: {
+      dryRun?: boolean
+      strategy?: 'append' | 'replace'
+      conceptScheme?: string
+      topConcept?: string
+      maxDepth?: number
+      maxTerms?: number
+      format?: string
+    } = {},
+  ): Promise<VocabularyImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (opts.conceptScheme) formData.append('concept_scheme', opts.conceptScheme)
+    if (opts.topConcept) formData.append('top_concept', opts.topConcept)
+    if (opts.maxDepth !== undefined && opts.maxDepth !== null) formData.append('max_depth', String(opts.maxDepth))
+    if (opts.maxTerms !== undefined && opts.maxTerms !== null) formData.append('max_terms', String(opts.maxTerms))
+    if (opts.format) formData.append('format', opts.format)
+
+    const qs = new URLSearchParams()
+    qs.set('dry_run', String(opts.dryRun ?? true))
+    qs.set('strategy', opts.strategy ?? 'append')
+
+    const res = await authorizedFetch(`/v1/vocabularies/${vocabId}/import-skos?${qs}`, { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
@@ -599,7 +662,7 @@ export const formVariants = {
 
 // Audit
 export const audit = {
-  list: (params?: { record_type?: string; action?: string; limit?: number }) => {
+  list: (params?: { record_type?: string; record_id?: string; action?: string; limit?: number }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<AuditEntry[]>(`/v1/audit${qs ? `?${qs}` : ''}`)
   },

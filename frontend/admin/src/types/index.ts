@@ -3,7 +3,10 @@
 
 export type Status = 'draft' | 'internal' | 'public'
 export type ProcedureStatus = 'draft' | 'active' | 'completed' | 'cancelled'
-export type RecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
+export type RecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure' | 'collection' | 'storage_location'
+/** RecordType members handled by the generic ScreenList/ScreenForm/BatchEditModal trio.
+ *  `storage_location` has its own dedicated tree screen (ScreenStorageLocation) instead. */
+export type ListableRecordType = Exclude<RecordType, 'storage_location'>
 
 export interface KatalonObject {
   id: string
@@ -67,7 +70,30 @@ export interface Procedure {
   version: number
 }
 
-export type AnyRecord = KatalonObject | Entity | Place | Occurrence | Procedure
+export interface KatalonCollection {
+  id: string
+  idno: string | null
+  collection_type: string | null
+  parent_id: string | null
+  status: Status
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export interface KatalonStorageLocation {
+  id: string
+  idno: string
+  storage_location_type: string | null
+  parent_id: string | null
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export type AnyRecord = KatalonObject | Entity | Place | Occurrence | Procedure | KatalonCollection | KatalonStorageLocation
 
 export interface FieldDefinition {
   id: string
@@ -130,6 +156,7 @@ export interface Vocabulary {
   name: string
   is_hierarchical: boolean
   kind: 'term' | 'relation'
+  canonical_uri?: string | null
 }
 
 export interface VocabularyTerm {
@@ -142,6 +169,22 @@ export interface VocabularyTerm {
   parent_id: string | null
   applies_from: string[]
   applies_to: string[]
+  uri?: string | null
+  exact_match_uris?: string[]
+}
+
+export interface VocabularyImportResult {
+  strategy: string
+  dry_run: boolean
+  total?: number
+  created: number
+  updated: number
+  deleted: number
+  errors: { row: number | null; message: string }[]
+  detected_schemes?: { uri: string; label: string }[]
+  detected_top_concepts?: { uri: string; label: string }[]
+  total_concepts_found?: number
+  total_concepts_selected?: number
 }
 
 export interface Relation {
@@ -315,7 +358,7 @@ export interface UserRead {
 
 export interface RolePermission {
   role: 'admin' | 'editor' | 'cataloger' | 'viewer'
-  record_type: 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
+  record_type: RecordType
   action: 'read' | 'create' | 'update' | 'delete'
 }
 
@@ -379,3 +422,5 @@ export function getLabel(
   }
   return fallback ?? item.term ?? item.name ?? ''
 }
+
+export const IMPORTER_STATE_KEY = 'katalon_importer_state'

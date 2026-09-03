@@ -23,6 +23,7 @@ export function ScreenExport() {
     { id: 'place', label: t('recordTypePlace') },
     { id: 'occurrence', label: t('recordTypeOccurrence') },
     { id: 'procedure', label: t('recordTypeProcedure') },
+    { id: 'collection', label: t('recordTypeCollection') },
   ]
 
   return (

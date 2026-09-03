@@ -7,7 +7,7 @@ import type { SchemaAiChatMessage, SchemaAiFieldProposal, SchemaAiProposal, Sche
 import type { FieldDefinition } from '../../types'
 import { getLabel } from '../../types'
 import { Lightning } from '../ui/Icons'
-import { FIELD_TYPE_LABELS } from './ScreenSchema'
+import { FIELD_TYPE_LABELS } from './schemaConstants'
 
 type Props = {
   targetType: string

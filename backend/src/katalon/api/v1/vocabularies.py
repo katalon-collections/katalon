@@ -15,8 +15,9 @@ from katalon.core.schemas import (
     VocabularyRead,
     VocabularyTermCreate,
     VocabularyTermRead,
+    VocabularyTermUpdate,
 )
-from katalon.services import vocabulary_import_service
+from katalon.services import skos_import_service, vocabulary_import_service
 from katalon.services.schema_service import validate_metadata
 
 router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
@@ -31,8 +32,9 @@ class VocabularyTermNode(BaseModel):
     term: str
     label: dict[str, Any]
     parent_id: uuid.UUID | None
+    uri: str | None = None
+    exact_match_uris: list[str] = []
     children: list["VocabularyTermNode"] = []
-
     model_config = {"from_attributes": True}
 
 
@@ -41,7 +43,17 @@ VocabularyTermNode.model_rebuild()
 
 def _build_tree(terms: list[VocabularyTerm]) -> list[VocabularyTermNode]:
     """Convert a flat list of terms into a nested tree (root nodes only)."""
-    by_id = {t.id: VocabularyTermNode(id=t.id, term=t.term, label=t.label, parent_id=t.parent_id) for t in terms}
+    by_id = {
+        t.id: VocabularyTermNode(
+            id=t.id,
+            term=t.term,
+            label=t.label,
+            parent_id=t.parent_id,
+            uri=t.uri,
+            exact_match_uris=t.exact_match_uris or [],
+        )
+        for t in terms
+    }
     roots: list[VocabularyTermNode] = []
     for node in by_id.values():
         if node.parent_id and node.parent_id in by_id:
@@ -289,7 +301,7 @@ async def create_term(
     },
 )
 async def update_term(
-    term_id: uuid.UUID, data: VocabularyTermCreate, db: DBDep
+    term_id: uuid.UUID, data: VocabularyTermUpdate, db: DBDep
 ) -> VocabularyTerm:
     result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
     term = result.scalar_one_or_none()
@@ -298,13 +310,16 @@ async def update_term(
     vocab = await db.get(Vocabulary, term.vocabulary_id)
     if vocab is None:
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
-    await _validate_parent(db, vocab, data.parent_id, term.id)
-    errors = await validate_metadata(
-        db, "vocabulary_term", data.metadata_, str(term.vocabulary_id)
-    )
-    if errors:
-        raise HTTPException(status_code=422, detail=errors)
-    for k, v in data.model_dump(exclude={"vocabulary_id"}).items():
+    dump = data.model_dump(exclude={"vocabulary_id"}, exclude_unset=True)
+    if "parent_id" in dump:
+        await _validate_parent(db, vocab, data.parent_id, term.id)
+    if "metadata_" in dump and dump["metadata_"] is not None:
+        errors = await validate_metadata(
+            db, "vocabulary_term", dump["metadata_"], str(term.vocabulary_id)
+        )
+        if errors:
+            raise HTTPException(status_code=422, detail=errors)
+    for k, v in dump.items():
         setattr(term, k, v)
     await db.commit()
     return term
@@ -398,4 +413,82 @@ async def import_terms(
     )
     result["strategy"] = strategy
     result["dry_run"] = dry_run
+    return result
+
+
+@router.post(
+    "/{vocab_id}/import-skos",
+    dependencies=[require_role("admin")],
+    summary="Import vocabulary terms from SKOS (Turtle, RDF/XML, JSON-LD, etc.) with optional dry-run",
+    responses={
+        404: {"description": "Vocabulary not found"},
+        422: {"description": "SKOS parsing error or unsupported options"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def import_skos_terms(
+    vocab_id: uuid.UUID,
+    file: UploadFile,
+    db: DBDep,
+    _: CurrentUser,
+    strategy: Literal["append", "replace"] = Query("append"),
+    dry_run: bool = Query(True),
+    concept_scheme: str | None = Form(None),
+    top_concept: str | None = Form(None),
+    max_depth: int | None = Form(None),
+    max_terms: int | None = Form(None),
+    format: str | None = Form(None),
+) -> dict[str, Any]:
+    """Import vocabulary terms from SKOS RDF formats (Turtle, RDF/XML, JSON-LD) with optional selective filtering."""
+    vocab_result = await db.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
+    vocab = vocab_result.scalar_one_or_none()
+    if vocab is None:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+
+    content = await file.read()
+    filename = file.filename or ""
+
+    try:
+        terms, errors, meta = skos_import_service.parse_skos_terms(
+            content=content,
+            filename=filename,
+            format_hint=format,
+            concept_scheme=concept_scheme,
+            top_concept=top_concept,
+            max_depth=max_depth,
+            max_terms=max_terms,
+            is_hierarchical=vocab.is_hierarchical and vocab.kind != "relation",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"SKOS-Datei konnte nicht verarbeitet werden: {exc}") from exc
+
+    if vocab.kind == "relation" and any(term.parent_term for term in terms):
+        raise HTTPException(status_code=422, detail="Relationstypen dürfen keine übergeordneten Terme haben")
+
+    if not terms and errors:
+        return {
+            "strategy": strategy,
+            "dry_run": dry_run,
+            "total": 0,
+            "created": 0,
+            "updated": 0,
+            "deleted": 0,
+            "errors": errors,
+            **meta,
+        }
+
+    result = await vocabulary_import_service.import_vocabulary_terms(
+        db=db,
+        vocab_id=vocab_id,
+        terms=terms,
+        strategy=strategy,
+        dry_run=dry_run,
+    )
+    result["strategy"] = strategy
+    result["dry_run"] = dry_run
+    all_errors = list(errors) + list(result.get("errors", []))
+    result["errors"] = all_errors
+    result.update(meta)
     return result

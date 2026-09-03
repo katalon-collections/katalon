@@ -22,6 +22,8 @@
     "place": "Places",
     "occurrence": "Occurrences",
     "procedure": "Procedures",
+    "collection": "Collections",
+    "storage_location": "Storage locations",
     "vocabulary_term": "Vocabularies"
   },
   "fieldTypes": {
@@ -98,7 +100,9 @@
       "entity": "Entities",
       "place": "Places",
       "occurrence": "Occurrences",
-      "procedure": "Procedures"
+      "procedure": "Procedures",
+      "collection": "Collections",
+      "storage_location": "Storage locations"
     },
     "relationTargetSubtype": "Target Subtype",
     "relationTargetSubtypeHint": "(optional)",

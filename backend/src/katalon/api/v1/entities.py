@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -168,6 +168,31 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: User = requ
 
 
 @router.get(
+    "/{entity_id}/export",
+    summary="Export a single entity record as JSON-LD or Turtle RDF",
+)
+async def export_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "entity",
+        entity_id,
+        db,
+        request,
+        current_user=current_user,
+        format_param=format,
+        accept_header=accept,
+    )
+
+
+@router.get(
     "/{entity_id}",
     response_model=EntityRead,
     summary="Get a single entity by ID",
@@ -175,7 +200,29 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: User = requ
         404: {"description": "Entity not found"},
     },
 )
-async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> Entity | EntityRead:
+async def get_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Any:
+    is_rdf_format = isinstance(format, str) and format.lower() in ("jsonld", "json-ld", "ttl", "turtle")
+    is_rdf_accept = isinstance(accept, str) and ("application/ld+json" in accept or "text/turtle" in accept)
+    if is_rdf_format or is_rdf_accept:
+        from katalon.services.rdf_service import handle_single_record_export
+
+        return await handle_single_record_export(
+            "entity",
+            entity_id,
+            db,
+            request,
+            current_user=current_user,
+            format_param=format if isinstance(format, str) else None,
+            accept_header=accept if isinstance(accept, str) else None,
+        )
+
     result = await db.execute(select(Entity).where(Entity.id == entity_id))
     entity = result.scalar_one_or_none()
     if not entity:
@@ -185,7 +232,6 @@ async def get_entity(entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     if visibility_user is None:
         return await project_public_record(db, EntityRead.model_validate(entity), "entity", entity.entity_type)
     return entity
-
 
 @router.put(
     "/{entity_id}",

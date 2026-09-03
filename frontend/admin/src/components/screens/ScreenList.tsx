@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, schema, subtypes, ConflictError } from '../../api/client'
-import type { AnyRecord, FieldDefinition, Page, RecordSubtype, RecordType } from '../../types'
+import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError } from '../../api/client'
+import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { Edit, Layers, Plus, Search, Trash } from '../ui/Icons'
@@ -12,21 +12,23 @@ import { BatchEditModal } from './BatchEditModal'
 
 const PAGE_SIZE = 50
 
-const SUBTYPE_KEYS: Record<RecordType, string | undefined> = {
+const SUBTYPE_KEYS: Record<ListableRecordType, string | undefined> = {
   object: 'object_type',
   entity: 'entity_type',
   place: 'place_type',
   occurrence: 'occurrence_type',
   procedure: 'procedure_type',
+  collection: 'collection_type',
 }
 
-function getApi(recordType: RecordType) {
+function getApi(recordType: ListableRecordType) {
   switch (recordType) {
     case 'object':     return objects
     case 'entity':     return entities
     case 'place':      return places
     case 'occurrence': return occurrences
     case 'procedure':  return procedures
+    case 'collection': return collections
   }
 }
 
@@ -55,8 +57,39 @@ function getFieldValue(metadata: Record<string, unknown>, fieldName: string): st
   return String(val)
 }
 
+/** Order collection records as a depth-first hierarchy (parent → children),
+ *  sorted alphabetically by title within each level. Records whose parent
+ *  isn't part of the loaded set (e.g. filtered out) are treated as roots. */
+function buildCollectionTree(records: AnyRecord[], titleKey: string): { list: AnyRecord[]; depth: Map<string, number> } {
+  const byParent = new Map<string, AnyRecord[]>()
+  for (const r of records) {
+    const pid = (r as { parent_id?: string | null }).parent_id ?? ''
+    if (!byParent.has(pid)) byParent.set(pid, [])
+    byParent.get(pid)!.push(r)
+  }
+  const titleOf = (r: AnyRecord) => getFieldValue(r.metadata_ as Record<string, unknown>, titleKey) || (r as { idno?: string | null }).idno || ''
+  for (const arr of byParent.values()) arr.sort((a, b) => titleOf(a).localeCompare(titleOf(b)))
+  const seen = new Set<string>()
+  const depth = new Map<string, number>()
+  const list: AnyRecord[] = []
+  function visit(pid: string, d: number) {
+    for (const c of byParent.get(pid) ?? []) {
+      if (seen.has(c.id)) continue
+      seen.add(c.id)
+      depth.set(c.id, d)
+      list.push(c)
+      visit(c.id, d + 1)
+    }
+  }
+  visit('', 0)
+  for (const r of records) {
+    if (!seen.has(r.id)) { seen.add(r.id); depth.set(r.id, 0); list.push(r) }
+  }
+  return { list, depth }
+}
+
 interface Props {
-  recordType: RecordType
+  recordType: ListableRecordType
   onOpen?: (id: string) => void
   initialTab?: string | null
   onTabChange?: (tab: string) => void
@@ -83,19 +116,21 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       ]
   const tabIds = tabs.map(t => t.id)
 
-  const typeLabels: Record<RecordType, string> = {
+  const typeLabels: Record<ListableRecordType, string> = {
     object: t('typeObject'),
     entity: t('typeEntity'),
     place: t('typePlace'),
     occurrence: t('typeOccurrence'),
     procedure: t('typeProcedure'),
+    collection: t('typeCollection'),
   }
-  const typeSingularLabels: Record<RecordType, string> = {
+  const typeSingularLabels: Record<ListableRecordType, string> = {
     object: t('typeSingularObject'),
     entity: t('typeSingularEntity'),
     place: t('typeSingularPlace'),
     occurrence: t('typeSingularOccurrence'),
     procedure: t('typeSingularProcedure'),
+    collection: t('typeSingularCollection'),
   }
 
   const [tab, setTab] = useState(initialTab && tabIds.includes(initialTab) ? initialTab : 'all')
@@ -119,6 +154,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectionMode, setSelectionMode] = useState<'page' | 'all'>('page')
   const [batchOpen, setBatchOpen] = useState(false)
+  const [treeItems, setTreeItems] = useState<AnyRecord[] | null>(null)
+
+  // Hierarchical browse: only when unfiltered/unsorted, so parent/child relations stay complete.
+  const isCollectionTree = recordType === 'collection' && tab === 'all' && !debouncedQ && !subtypeFilter && !sortBy
+
+  useEffect(() => {
+    if (!isCollectionTree) { setTreeItems(null); return }
+    let cancelled = false
+    collections.list({ page_size: 200 }).then(res => {
+      if (!cancelled) setTreeItems(res.items)
+    }).catch(() => { if (!cancelled) setTreeItems(null) })
+    return () => { cancelled = true }
+  }, [isCollectionTree])
 
   const currentFilters = useMemo<Record<string, unknown>>(() => {
     const f: Record<string, unknown> = {}
@@ -254,7 +302,15 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     }
   }
 
-  const items = data.items
+  // Primary label field: first list field, or fallback to label
+  const primaryField = listFields[0]
+  const primaryKey = primaryField?.name || 'label'
+  const collectionTree = useMemo(
+    () => (isCollectionTree && treeItems ? buildCollectionTree(treeItems, primaryKey) : null),
+    [isCollectionTree, treeItems, primaryKey],
+  )
+  const items = collectionTree ? collectionTree.list : data.items
+  const showingTree = isCollectionTree && !collectionTree
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const visiblePageCount = Math.min(totalPages, 5)
   const firstVisiblePage = Math.min(
@@ -306,10 +362,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   // Always: Checkbox, ID-Nr., [Subtype], [listFields...], Status, Geändert, Actions
   const showIdno = true
   const showSubtype = Boolean(subtypeKey)
-  // Primary label field: first list field, or fallback to label
-  const primaryField = listFields[0]
   const primaryLabel = primaryField?.label?.de || primaryField?.label?.en || primaryField?.name || 'Titel'
-  const primaryKey = primaryField?.name || 'label'
 
   // Additional list fields (after primary)
   const extraFields = listFields.slice(1)
@@ -425,19 +478,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
             </tr>
           </thead>
           <tbody>
-            {loading && (
+            {(loading || showingTree) && (
               <tr><td colSpan={colCount} className="empty">{t('loading')}</td></tr>
             )}
-            {!loading && items.length === 0 && (
+            {!loading && !showingTree && items.length === 0 && (
               <tr><td colSpan={colCount} className="empty">{t('empty')}</td></tr>
             )}
-            {!loading && items.map(rec => {
+            {!loading && !showingTree && items.map(rec => {
               const m = rec.metadata_ as Record<string, unknown>
               const subtypeVal = subtypeKey ? String((rec as unknown as Record<string, unknown>)[subtypeKey] ?? '') : ''
               const idno = (rec as { idno?: string | null }).idno
               const title = getFieldValue(m, primaryKey)
               const discriminator = idno || rec.id
               const recordLabel = title ? `${title} (${discriminator})` : discriminator
+              const depth = collectionTree?.depth.get(rec.id) ?? 0
               return (
                 <tr key={rec.id} className={sel.has(rec.id) ? 'sel' : ''}>
                   <td className="col-ck">
@@ -447,13 +501,17 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   </td>
                   {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{idno}</td>}
                   {showSubtype && <td style={{ maxWidth: 120, color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
-                  <td style={{ maxWidth: 280 }}><span className="tt">{getFieldValue(m, primaryKey)}</span></td>
+                  <td style={{ maxWidth: 280 }}>
+                    {depth > 0 && <span style={{ display: 'inline-block', width: depth * 16 }} aria-hidden="true" />}
+                    {depth > 0 && <span style={{ color: 'var(--fg-4)', marginRight: 4 }} aria-hidden="true">&#8627;</span>}
+                    <span className="tt">{getFieldValue(m, primaryKey)}</span>
+                  </td>
                   {extraFields.map(f => (
                     <td key={f.name} style={{ maxWidth: 140, color: 'var(--fg-2)' }}>
                       {getFieldValue(m, f.name)}
                     </td>
                   ))}
-                  <td style={{ maxWidth: 100 }}><StatusBadge status={rec.status} /></td>
+                  <td style={{ maxWidth: 100 }}><StatusBadge status={(rec as { status?: string }).status ?? 'draft'} /></td>
                   <td style={{ maxWidth: 120, color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">
@@ -466,7 +524,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
             })}
           </tbody>
         </table>
-        {totalPages > 1 && (
+        {!isCollectionTree && totalPages > 1 && (
           <nav className="pg" aria-label={t('paginationNavAriaLabel')}>
             <span className="pg-range">{t('paginationRange', { start: (page - 1) * PAGE_SIZE + 1, end: Math.min(page * PAGE_SIZE, data.total), total: data.total })}</span>
             <div className="pg-controls">

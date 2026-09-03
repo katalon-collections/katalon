@@ -10,7 +10,7 @@ import { Edit, Plus, Trash, X } from '../ui/Icons'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
-const TYPE_IDS: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
+const TYPE_IDS: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure', 'collection', 'storage_location']
 
 function toSlug(label: string): string {
   return label
@@ -67,6 +67,8 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
     { id: 'place',      label: t('typePlace') },
     { id: 'occurrence', label: t('typeOccurrence') },
     { id: 'procedure',  label: t('typeProcedure') },
+    { id: 'collection', label: t('typeCollection') },
+    { id: 'storage_location', label: t('typeStorageLocation') },
   ], [t])
 
   const load = useCallback(async () => {

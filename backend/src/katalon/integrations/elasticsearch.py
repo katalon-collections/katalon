@@ -64,6 +64,7 @@ INDEX_SETTINGS: dict[str, Any] = {
             "related_entities":    {"type": "keyword"},
             "related_places":      {"type": "keyword"},
             "related_occurrences": {"type": "keyword"},
+            "related_collections": {"type": "keyword"},
             "adv_fields": {
                 "type": "nested",
                 "properties": {
@@ -275,6 +276,7 @@ async def search_documents(
         "related_entities":    {"terms": {"field": "related_entities", "size": 30}},
         "related_places":      {"terms": {"field": "related_places", "size": 30}},
         "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
+        "related_collections": {"terms": {"field": "related_collections", "size": 30}},
     }
     # Fetch generously beyond the portal's initially visible count so "show
     # more" can reveal further values without a second round-trip.

@@ -14,6 +14,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.orm.exc import StaleDataError
 
 from katalon.core.models import (
+    Collection,
     Entity,
     FieldDefinition,
     Object,
@@ -30,12 +31,13 @@ from katalon.services.search_service import index_record
 
 logger = logging.getLogger(__name__)
 
-_MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]] = {
+_MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure] | type[Collection]] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
     "procedure": Procedure,
+    "collection": Collection,
 }
 
 _SUBTYPE_KEY: dict[str, str] = {
@@ -44,6 +46,7 @@ _SUBTYPE_KEY: dict[str, str] = {
     "place": "place_type",
     "occurrence": "occurrence_type",
     "procedure": "procedure_type",
+    "collection": "collection_type",
 }
 
 _STATUS_VALUES: dict[str, set[str]] = {
@@ -52,12 +55,15 @@ _STATUS_VALUES: dict[str, set[str]] = {
     "place": {"draft", "internal", "public"},
     "occurrence": {"draft", "internal", "public"},
     "procedure": {"draft", "active", "completed", "cancelled"},
+    "collection": {"draft", "internal", "public"},
 }
 
-_LOGGABLE_RECORD_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+_LOGGABLE_RECORD_TYPES = {
+    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+}
 
 
-def get_model(record_type: str) -> type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]:
+def get_model(record_type: str) -> type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure] | type[Collection]:
     model = _MODEL_MAP.get(record_type)
     if model is None:
         raise ValueError(f"Unbekannter Record-Typ: {record_type}")

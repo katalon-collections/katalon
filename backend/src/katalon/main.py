@@ -26,6 +26,7 @@ from katalon.api.v1 import (
     authority,
     banners,
     batch,
+    collections,
     dnb_urn_mock,
     entities,
     export,
@@ -50,6 +51,7 @@ from katalon.api.v1 import (
     relations,
     schema_admin,
     search,
+    storage_locations,
     theme,
     users,
     vocabularies,
@@ -247,6 +249,63 @@ async def _ensure_relation_types_vocab() -> None:
                     inverse_label={"de": "ist verknüpft mit", "en": "is related to"},
                 )
             )
+        member_of_term = (
+            await db.execute(
+                select(VocabularyTerm.id).where(
+                    VocabularyTerm.vocabulary_id == vocab.id,
+                    VocabularyTerm.term == "member_of",
+                )
+            )
+        ).scalar_one_or_none()
+        if member_of_term is None:
+            db.add(
+                VocabularyTerm(
+                    vocabulary_id=vocab.id,
+                    term="member_of",
+                    label={"de": "ist Teil von", "en": "is member of"},
+                    inverse_label={"de": "enthält", "en": "contains"},
+                    applies_from=["object"],
+                    applies_to=["collection"],
+                )
+            )
+        normal_location_term = (
+            await db.execute(
+                select(VocabularyTerm.id).where(
+                    VocabularyTerm.vocabulary_id == vocab.id,
+                    VocabularyTerm.term == "normal_location",
+                )
+            )
+        ).scalar_one_or_none()
+        if normal_location_term is None:
+            db.add(
+                VocabularyTerm(
+                    vocabulary_id=vocab.id,
+                    term="normal_location",
+                    label={"de": "Standort ist", "en": "normal location is"},
+                    inverse_label={"de": "ist Standort von", "en": "is normal location of"},
+                    applies_from=["object"],
+                    applies_to=["storage_location"],
+                )
+            )
+        current_location_term = (
+            await db.execute(
+                select(VocabularyTerm.id).where(
+                    VocabularyTerm.vocabulary_id == vocab.id,
+                    VocabularyTerm.term == "current_location",
+                )
+            )
+        ).scalar_one_or_none()
+        if current_location_term is None:
+            db.add(
+                VocabularyTerm(
+                    vocabulary_id=vocab.id,
+                    term="current_location",
+                    label={"de": "befindet sich aktuell in", "en": "current location is"},
+                    inverse_label={"de": "ist aktueller Standort von", "en": "is current location of"},
+                    applies_from=["object"],
+                    applies_to=["storage_location"],
+                )
+            )
         await sync_relation_type_terms(db, vocab)
         await db.commit()
 
@@ -304,7 +363,9 @@ async def _ensure_admin_config() -> None:
 async def _ensure_label_fields() -> None:
     """Ensure every primary type has a generic 'label' field definition."""
     async with AsyncSessionLocal() as db:
-        for target_type in ("object", "entity", "place", "occurrence", "procedure"):
+        for target_type in (
+            "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+        ):
             result = await db.execute(
                 select(FieldDefinition).where(
                     FieldDefinition.target_type == target_type,
@@ -458,6 +519,8 @@ app.include_router(entities.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(places.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(occurrences.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(procedures.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(collections.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(storage_locations.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(relations.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.batch_router, prefix="/v1", dependencies=_authenticated)

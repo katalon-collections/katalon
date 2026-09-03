@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib
 import logging
 
+from katalon.integrations.jsonld_format import JsonLdFormat
 from katalon.integrations.lido_format import LidoFormat
 from katalon.integrations.metadata_format import MetadataFormat
 from katalon.integrations.mets_mods_format import MetsModsFormat
@@ -18,6 +19,7 @@ _BUILTIN: dict[str, MetadataFormat] = {
     "oai_dc": OaiDcFormat(),
     "lido": LidoFormat(),
     "mets_mods": MetsModsFormat(),
+    "json_ld": JsonLdFormat(),
 }
 
 

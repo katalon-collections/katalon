@@ -22,6 +22,7 @@ const RECORD_TYPES = [
   { key: 'place',      label: 'Orte',        labelKey: 'recordTypes.place' },
   { key: 'occurrence', label: 'Occurrences', labelKey: 'recordTypes.occurrence' },
   { key: 'procedure',  label: 'Vorgänge',    labelKey: 'recordTypes.procedure' },
+  { key: 'collection', label: 'Sammlungen',  labelKey: 'recordTypes.collection' },
 ] as const
 
 const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {

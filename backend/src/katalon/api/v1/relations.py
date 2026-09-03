@@ -19,7 +19,9 @@ from katalon.services.relation_service import (
 )
 from katalon.services.relation_type_service import validate_relation_type_applicability
 
-_LOGGABLE_RECORD_TYPES = {"object", "entity", "place", "occurrence", "procedure"}
+_LOGGABLE_RECORD_TYPES = {
+    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+}
 
 
 async def _log_relation_change(

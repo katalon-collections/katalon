@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { importer } from '../../api/client'
 import type { TaskStatus } from '../../api/client'
-import { IMPORTER_STATE_KEY } from '../screens/importer/types'
+import { IMPORTER_STATE_KEY } from '../../types'
 
 function readTaskId(): string | null {
   try {

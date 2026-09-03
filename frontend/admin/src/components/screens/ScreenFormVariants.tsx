@@ -71,6 +71,7 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
     { id: 'place', label: t('types.place') },
     { id: 'occurrence', label: t('types.occurrence') },
     { id: 'procedure', label: t('types.procedure') },
+    { id: 'collection', label: t('types.collection') },
   ]
 
   const ROLES: Record<string, string> = {

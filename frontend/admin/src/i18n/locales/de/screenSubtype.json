@@ -4,6 +4,8 @@
   "typePlace": "Orte",
   "typeOccurrence": "Occurrences",
   "typeProcedure": "Vorgänge",
+  "typeCollection": "Sammlungen",
+  "typeStorageLocation": "Lagerorte",
   "headline": "Subtypen",
   "subtitle": "Subtypen für Bestandsdaten und Vorgänge verwalten",
   "addButton": "Neuer Subtyp",

@@ -1,19 +1,116 @@
 {
+  "recordTypes": {
+    "object": "Objekt",
+    "entity": "Entität",
+    "place": "Ort",
+    "occurrence": "Occurrence",
+    "procedure": "Vorgang",
+    "collection": "Sammlung",
+    "storage_location": "Lagerort"
+  },
+  "relationFields": {
+    "sourceTypes": "Quelltypen (Ausgangsdatensatz)",
+    "targetTypes": "Zieltypen (verknüpfter Datensatz)"
+  },
   "appliesCheckboxes": {
     "noSelectionMeansAll": "Nichts ausgewählt = gilt für alle Typen"
   },
   "appliesLabel": {
     "all": "Alle"
   },
+  "appliesPreview": {
+    "appliesTo": "Gilt für",
+    "hint": "Keine Auswahl in beiden Feldern gilt für alle Kombinationen; Objekt ohne Zieltyp gilt für Objekt → alle."
+  },
+  "inverseLabelPrefix": "Gegenrichtung",
+  "vocabMeta": {
+    "termsCount": "{{count}} Terme",
+    "hierarchical": "Hierarchisch",
+    "flat": "Flach",
+    "relation": "Relationen",
+    "picklist": "Auswahlliste"
+  },
+  "tableHeaders": {
+    "inverse": "Gegenrichtung",
+    "types": "Typen",
+    "parent": "Übergeordnet"
+  },
+  "systemVocabBadge": "Systemvokabular",
   "headline": "Vokabular",
   "headlineSub": "Kontrollierte Vokabulare und Terme",
   "requiredBadge": "Pflicht",
+  "uri": "Kanonische URI",
+  "uriPlaceholder": "z. B. http://vocab.getty.edu/aat/300028051",
+  "exactMatchUris": "Exact-Match URIs",
+  "exactMatchUrisHelp": "Komma- oder zeilengetrennte URIs (skos:exactMatch)",
+  "canonicalUri": "Kanonische Vokabular-URI / Namespace",
+  "canonicalUriPlaceholder": "z. B. http://vocab.getty.edu/aat/",
+  "uriHelpPopover": {
+    "title": "Kanonische URI",
+    "description": "Die weltweit eindeutige, persistente Linked-Data-URI dieses Begriffs in einer Normdatenbank oder einem Fach-Thesaurus (z. B. Getty AAT, GND oder Nomisma).",
+    "example": "Beispiel: http://vocab.getty.edu/aat/300028051 (Monografie)",
+    "exportNote": "Dient als stabiler globaler Identifikator beim RDF- und Linked-Data-Export."
+  },
+  "exactMatchUrisHelpPopover": {
+    "title": "Exact-Match URIs (skos:exactMatch)",
+    "description": "Externe Cross-Konkordanzen zu äquivalenten Begriffen in anderen Thesauri. Drückt aus, dass zwei Konzepte aus verschiedenen Vokabularen dieselbe Bedeutung teilen.",
+    "example": "Beispiel: https://d-nb.info/gnd/4008570-3 (GND) oder http://id.loc.gov/authorities/subjects/sh85015738 (LCSH)",
+    "separatorNote": "Mehrere URIs durch Komma oder Zeilenumbruch trennen."
+  },
+  "canonicalUriHelpPopover": {
+    "title": "Kanonische Vokabular-URI / Namespace",
+    "description": "Basis-URI oder Namensraum des gesamten Vokabulars bzw. ConceptSchemes (z. B. http://vocab.getty.edu/aat/). Term-URIs beziehen sich typischerweise auf dieses Schema."
+  },
   "relationTypeHelp": {
     "heading": "So wird der Relationstyp verwendet",
     "source": "Quelle",
     "target": "Ziel",
+    "description": "„{{source}}“ ist der Ausgangsdatensatz, „{{target}}“ der verknüpfte Datensatz. Das Label gilt von Quelle → Ziel; die Gegenrichtung zeigt dieselbe Verbindung vom Ziel aus.",
     "example": "Beispiel: „ist Teil von“ für Objekt → Occurrence; als Gegenrichtung „hat Teil“ für Occurrence → Objekt.",
-    "preview": "Ihre Vorschau:",
-    "labelFallback": "Label"
+    "preview": "Vorschau:",
+    "labelFallback": "Label",
+    "inverseFallback": "Gegenrichtung"
+  },
+  "importButton": "Importieren",
+  "importDialog": {
+    "title": "Terme in „{{name}}\" importieren",
+    "targetVocab": "Zielvokabular",
+    "selectVocab": "Vokabular auswählen",
+    "relationNotice": "Relationstypen sind flach. Ohne ID-Spalte wird die ID automatisch aus dem Label abgeleitet.",
+    "hierarchyNotice": "Hierarchische Listen: eine Spalte auf „Parent-ID“ mappen. Ohne ID-Spalte wird die ID aus dem Label abgeleitet.",
+    "dropzonePrompt": "Datei hier ablegen oder auswählen",
+    "acceptedFormats": "CSV, TSV, JSON, SKOS (Turtle .ttl, RDF/XML .rdf, JSON-LD .jsonld)",
+    "csvMapping": "CSV-Spalten zuordnen",
+    "csvRequireTermOrLabel": "Bitte mindestens eine Spalte auf 'ID' oder 'Label' mappen. Ohne ID-Spalte wird die ID aus dem Label abgeleitet.",
+    "ignore": "Ignorieren",
+    "targetId": "ID",
+    "targetParentId": "Parent-ID",
+    "targetLabelDe": "Label (de)",
+    "targetLabelEn": "Label (en)",
+    "targetInvDe": "Gegenrichtung (de)",
+    "targetInvEn": "Gegenrichtung (en)",
+    "targetUri": "URI (Kanonisch)",
+    "targetExactMatch": "Exact Match URIs",
+    "skosOptions": "SKOS-Filter & Optionen",
+    "conceptScheme": "ConceptScheme URI (Filter)",
+    "conceptSchemeHelp": "z. B. http://vocab.getty.edu/aat/ (leer lassen für gesamte Datei)",
+    "topConcept": "Top-Concept URI (Filter)",
+    "topConceptHelp": "z. B. http://vocab.getty.edu/aat/300000000 (nur dieses Konzept und Unterkonzepte)",
+    "maxDepth": "Maximale Tiefe",
+    "maxDepthHelp": "Hierarchietiefe begrenzen (z. B. 2 für Oberbegriff + direkte Unterbegriffe)",
+    "maxTerms": "Maximale Anzahl Terme",
+    "maxTermsHelp": "Schutz vor Überlauf bei sehr großen Thesauri (Standard: 50.000)",
+    "detectedSchemes": "Erkannte ConceptSchemes:",
+    "detectedTopConcepts": "Erkannte Top-Konzepte:",
+    "useAsFilter": "Als Filter setzen",
+    "strategyAppend": "Strategie: Ergänzen",
+    "strategyReplace": "Strategie: Komplett ersetzen",
+    "dryRun": "Vorschau (Dry-Run)",
+    "execute": "Import ausführen",
+    "busy": "Wird verarbeitet...",
+    "resultSummary": "{{mode}} · {{total}} Konzepte · erstellt: {{created}} · aktualisiert: {{updated}} · gelöscht: {{deleted}}",
+    "errorsHeading": "Fehler / Hinweise:",
+    "rowError": "Zeile {{row}}: {{message}}",
+    "generalError": "{{message}}"
   }
 }

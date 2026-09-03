@@ -19,6 +19,7 @@ import { ScreenPages } from '../screens/ScreenPages'
 import { ScreenOAISets } from '../screens/ScreenOAISets'
 import { ScreenExport } from '../screens/ScreenExport'
 import { ScreenSubtype } from '../screens/ScreenSubtype'
+import { ScreenStorageLocation } from '../screens/ScreenStorageLocation'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { ScreenFormVariants } from '../screens/ScreenFormVariants'
 import { BannerBar } from '../ui/BannerBar'
@@ -32,6 +33,8 @@ type Crumb = { label: string; route?: string }
 const CRUMBS: Record<string, Crumb[]> = {
   list:               [{ label: 'Katalon' }, { label: 'Objekte' }],
   form:               [{ label: 'Katalon' }, { label: 'Objekte', route: 'list' }, { label: 'Bearbeiten' }],
+  'collections-list': [{ label: 'Katalon' }, { label: 'Sammlungen' }],
+  'collections-form': [{ label: 'Katalon' }, { label: 'Sammlungen', route: 'collections-list' }, { label: 'Bearbeiten' }],
   'entities-list':    [{ label: 'Katalon' }, { label: 'Entitäten' }],
   'entities-form':    [{ label: 'Katalon' }, { label: 'Entitäten', route: 'entities-list' }, { label: 'Bearbeiten' }],
   'places-list':      [{ label: 'Katalon' }, { label: 'Orte' }],
@@ -42,6 +45,7 @@ const CRUMBS: Record<string, Crumb[]> = {
   'procedures-form':  [{ label: 'Katalon' }, { label: 'Vorgänge', route: 'procedures-list' }, { label: 'Bearbeiten' }],
   banners:            [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Banner' }],
   subtypes:           [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Subtypen' }],
+  'storage-locations': [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Lagerorte' }],
   schema:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Schemata' }],
   'form-variants':    [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Formularvarianten' }],
   vocab:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Vokabular' }],
@@ -176,6 +180,8 @@ export function AppShell() {
     switch (route) {
       case 'list':              return <ScreenList recordType="object"     onOpen={(id) => navigate('form', id)} initialTab={editId} onTabChange={(t) => navigate('list', t)} />
       case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => navigate('list')} onSaved={(id) => navigate('form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
+      case 'collections-list':  return <ScreenList recordType="collection" onOpen={(id) => navigate('collections-form', id)} initialTab={editId} onTabChange={(t) => navigate('collections-list', t)} />
+      case 'collections-form':  return <ScreenForm recordType="collection" recordId={editId ?? undefined} onBack={() => navigate('collections-list')} onSaved={(id) => navigate('collections-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'entities-list':     return <ScreenList recordType="entity"     onOpen={(id) => navigate('entities-form', id)} initialTab={editId} onTabChange={(t) => navigate('entities-list', t)} />
       case 'entities-form':     return <ScreenForm recordType="entity"     recordId={editId ?? undefined} onBack={() => navigate('entities-list')} onSaved={(id) => navigate('entities-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'places-list':       return <ScreenList recordType="place"      onOpen={(id) => navigate('places-form', id)} initialTab={editId} onTabChange={(t) => navigate('places-list', t)} />
@@ -186,6 +192,7 @@ export function AppShell() {
       case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype initialType={editId} onTypeChange={(t) => navigate('subtypes', t)} /> : <Placeholder label="Kein Zugriff" />
+      case 'storage-locations': return isAdmin ? <ScreenStorageLocation /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return isAdmin ? <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'form-variants':     return isAdmin ? <ScreenFormVariants initialPath={editId} onPathChange={(p) => navigate('form-variants', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'vocab':             return isAdmin ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
