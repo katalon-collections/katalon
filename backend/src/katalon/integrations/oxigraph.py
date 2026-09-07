@@ -265,7 +265,8 @@ def validate_read_only_sparql(query_str: str) -> None:
     or multiple chained statements.
     """
     from fastapi import HTTPException, status
-    from rdflib.plugins.sparql.parser import ParseException, parseQuery
+    from pyparsing.exceptions import ParseException
+    from rdflib.plugins.sparql.parser import parseQuery
 
     if not query_str or not query_str.strip():
         raise HTTPException(

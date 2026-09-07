@@ -4,6 +4,11 @@ All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.1] - 2026-09-07
+
+### Fixed
+- SPARQL / Validation: Import von `ParseException` aus `pyparsing.exceptions` korrigiert (statt fälschlich aus `rdflib.plugins.sparql.parser`), wodurch SPARQL-Validierungs- und Unit-Tests fehlschlugen.
+
 ## [1.20.0] - 2026-09-07
 
 ### Added
