@@ -14,9 +14,8 @@ def apply_public_visibility(query: Any, model: Any, current_user: Any | None) ->
     """Restrict record queries to statuses meant for public display; always hides soft-deleted rows."""
     if hasattr(model, "deleted_at"):
         query = query.where(model.deleted_at.is_(None))
-    if current_user is None:
+    if current_user is None and hasattr(model, "status"):
         query = query.where(model.status.in_(PUBLIC_STATUSES))
-        return query
     return query
 
 
@@ -25,5 +24,6 @@ def ensure_publicly_visible(record: Any, current_user: Any | None, detail: str) 
         if current_user is None:
             raise HTTPException(status_code=410, detail="Dieser Datensatz wurde gelöscht.")
         raise HTTPException(status_code=404, detail=detail)
-    if current_user is None and record.status not in PUBLIC_STATUSES:
+    status = getattr(record, "status", None)
+    if current_user is None and status is not None and status not in PUBLIC_STATUSES:
         raise HTTPException(status_code=404, detail=detail)

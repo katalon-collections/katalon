@@ -57,7 +57,9 @@ const ROUTE_DOCS: Record<string, string> = {
   'occurrences-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'procedures-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'collections-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
-}
+  users: `${DOCS_ROOT}/administration/benutzer-und-rollen/`,
+  'user-roles': `${DOCS_ROOT}/administration/benutzer-und-rollen/`,
+ }
 
 interface Props {
   crumbs: Array<{ label: string; route?: string }>

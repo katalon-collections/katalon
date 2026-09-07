@@ -58,6 +58,19 @@ services:
       timeout: 5s
       retries: 10
 
+  oxigraph:
+    image: oxigraph/oxigraph:latest
+    profiles:
+      - rdf
+    restart: unless-stopped
+    volumes:
+      - oxigraph_data:/data
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/oxigraph", "query", "--location", "/data", "--query", "ASK {}", "--results-format", "xml" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -79,7 +92,10 @@ services:
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
       OAI_ADMIN_EMAIL: ${OAI_ADMIN_EMAIL:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
+      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
+      OXIGRAPH_ENABLED: ${OXIGRAPH_ENABLED:-false}
+      OXIGRAPH_URL: ${OXIGRAPH_URL:-http://oxigraph:7878}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
@@ -130,6 +146,8 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       SMTP_SSL_TLS: ${SMTP_SSL_TLS:-false}
       SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+      OXIGRAPH_ENABLED: ${OXIGRAPH_ENABLED:-false}
+      OXIGRAPH_URL: ${OXIGRAPH_URL:-http://oxigraph:7878}
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/katalon/media
     depends_on:
@@ -254,3 +272,4 @@ services:
 volumes:
   db_data:
   es_data:
+  oxigraph_data:

@@ -12,6 +12,7 @@ const TYPE_PATHS: Record<string, string> = {
   entity: 'entities',
   place: 'places',
   occurrence: 'occurrences',
+  collection: 'collections',
 }
 
 function typePath(type: string, id: string): string {

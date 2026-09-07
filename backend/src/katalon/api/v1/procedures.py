@@ -473,7 +473,7 @@ async def delete_procedure(
     await db.delete(proc)
     await flush_record(db, proc)
     try:
-        await search_service.remove_record(procedure_id)
+        await search_service.remove_record(procedure_id, record_type="procedure")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 

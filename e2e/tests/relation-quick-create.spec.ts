@@ -112,7 +112,7 @@ test('generic relations picker quick-creates and links an object draft accessibl
   await targetType.selectOption('object')
   const relationType = await setRelationType(picker, `e2e-related-${Date.now()}`)
 
-  const search = picker.getByPlaceholder('object suchen (mind. 2 Zeichen)…')
+  const search = picker.getByPlaceholder('Objekt suchen…')
   await search.fill(targetIdno)
   const createButton = picker.getByRole('button', { name: `Neues Objekt „${targetIdno}“ anlegen` })
   await expect(createButton).toBeVisible()
@@ -174,14 +174,21 @@ test('quick-create relation fields offer every primary type', async ({ page }) =
     await picker.getByLabel('Zieltyp').selectOption('object')
     await setRelationType(picker, relationType)
     const query = `E2E-INLINE-TARGET-${Date.now()}`
-    await picker.getByPlaceholder('object suchen (mind. 2 Zeichen)…').fill(query)
+    await picker.getByPlaceholder('Objekt suchen…').fill(query)
     await picker.getByRole('button', { name: `Neues Objekt „${query}“ anlegen` }).click()
 
     const outerDialog = page.getByRole('dialog', { name: 'Neues Objekt anlegen' })
+    const targetPlaceholders: Record<string, string> = {
+      object: 'Objekt suchen…',
+      entity: 'Entität suchen…',
+      place: 'Ort suchen…',
+      occurrence: 'Occurrence suchen…',
+      procedure: 'Vorgang suchen…',
+    }
     for (const [targetType, label] of Object.entries({ object: 'Neues Objekt', entity: 'Neue Entität', place: 'Neuer Ort', occurrence: 'Neue Occurrence', procedure: 'Neuer Vorgang' })) {
       const fieldQuery = `${query}-${targetType}`
       const field = outerDialog.locator(`#field-${fields[targetType].name}`)
-      await field.getByPlaceholder(`${targetType} suchen (mind. 2 Zeichen)…`).fill(fieldQuery)
+      await field.getByPlaceholder(targetPlaceholders[targetType]).fill(fieldQuery)
       await expect(page.getByRole('button', { name: `${label} „${fieldQuery}“ anlegen` })).toBeVisible()
     }
 

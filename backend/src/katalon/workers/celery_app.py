@@ -18,6 +18,7 @@ celery_app = Celery(
         "katalon.workers.cleanup_tasks",
         "katalon.workers.purge_tasks",
         "katalon.workers.email_tasks",
+        "katalon.workers.rdf_tasks",
     ],
 )
 

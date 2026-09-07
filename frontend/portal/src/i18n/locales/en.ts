@@ -3,17 +3,19 @@
 
 export default {
   'nav.objects': 'Objects',
+  'nav.collections': 'Collections',
   'nav.entities': 'People',
   'nav.places': 'Places',
   'nav.works': 'Works',
   'nav.entitiesLong': 'People & Organisations',
   'nav.worksLong': 'Works & Events',
+  'nav.collectionsLong': 'Collections & Holdings',
 
   'type.object': 'Object',
+  'type.collection': 'Collection',
   'type.entity': 'Person/Org',
   'type.place': 'Place',
   'type.occurrence': 'Work/Event',
-
   'entityType.person': 'Person',
   'entityType.organisation': 'Organisation',
   'entityType.group': 'Group',
@@ -44,6 +46,7 @@ export default {
   'search.relatedEntities': 'People/Org.',
   'search.relatedPlaces': 'Places',
   'search.relatedOccurrences': 'Works/Events',
+  'search.relatedCollections': 'Collections',
   'search.linkedFacet': 'Linked: {type} – {field}',
   'search.loading': 'Loading…',
   'search.noResultsShort': 'No results.',
@@ -106,13 +109,15 @@ export default {
   'common.relatedObjects': 'Related objects',
   'common.type': 'Type',
   'common.relations': 'Relations',
-  'common.recordUnavailable': 'Not available',
+  'common.recordUnavailable': 'Unavailable',
   'common.coordinates': 'Coordinates',
-  'common.inventoryNo': 'Inventory no.',
+  'common.inventoryNo': 'Inventory No.',
+  'common.signature': 'Reference code',
 
+  'error.collectionNotFound': 'Collection not found.',
   'error.entityNotFound': 'Entity not found.',
   'error.placeNotFound': 'Place not found.',
-  'error.occurrenceNotFound': 'Entry not found.',
+  'error.occurrenceNotFound': 'Occurrence not found.',
   'error.objectNotFound': 'Object not found.',
 
   'object.noImage': 'No image available',
@@ -128,6 +133,17 @@ export default {
   'home.recent': 'Recent additions',
   'home.noObjects': 'No objects yet.',
 
+
+  'collection.searchInCollection': 'Search in this collection…',
+  'collection.parentCollection': 'Parent collection',
+  'collection.subCollections': 'Sub-collections & series',
+  'collection.hierarchy': 'Hierarchy & context',
+  'collection.objectsCount': '{count} objects',
+  'collection.viewGrid': 'Gallery',
+  'collection.viewList': 'List',
+  'collection.noObjects': 'No objects found in this collection.',
+  'collection.allInCollection': 'Open all {count} objects in search →',
+  'collection.includeSubcollections': 'Include sub-collections',
   'page.notFound': 'Page not found',
   'page.notFoundBody': 'The requested page does not exist or is not published.',
 

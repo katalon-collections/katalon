@@ -66,3 +66,39 @@ async def test_storage_location_crud_has_no_status_field(
     updated = update_res.json()
     assert updated["idno"] == new_idno
     assert "status" not in updated
+
+
+@pytest.mark.asyncio
+async def test_storage_location_create_rejects_idno_violating_configured_pattern(
+    async_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    """Regression test: validate_idno_pattern(pattern, idno) must not be called with
+    swapped arguments, or a manually supplied idno that violates the configured
+    pattern would be silently accepted."""
+    config_res = await async_client.put(
+        "/v1/admin/config",
+        headers=auth_headers,
+        json={"idno_patterns": {"storage_location": r"^LOC-\d{4}$"}},
+    )
+    assert config_res.status_code == 200
+
+    invalid_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={"idno": f"NOPE-{uuid.uuid4().hex[:8]}", "metadata_": {}},
+    )
+    assert invalid_res.status_code == 422
+
+    valid_idno = f"LOC-{uuid.uuid4().int % 10000:04d}"
+    valid_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={"idno": valid_idno, "metadata_": {"label": "Regal A"}},
+    )
+    assert valid_res.status_code == 201, valid_res.text
+
+    await async_client.put(
+        "/v1/admin/config",
+        headers=auth_headers,
+        json={"idno_patterns": {}},
+    )

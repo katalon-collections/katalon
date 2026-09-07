@@ -16,7 +16,7 @@ function facetLabel(
   config: Record<string, string[]>,
   recordType: string,
 ): string {
-  const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_(.+)$/)
+  const inherited = field.match(/^inherited_(object|entity|place|occurrence|collection|procedure)_(.+)$/)
   if (inherited) {
     return t('search.linkedFacet', {
       type: typeLabel(inherited[1]),
@@ -200,7 +200,7 @@ export function SearchPage() {
       .flatMap(([type, fields]) => [
         type,
         ...fields.flatMap(field => {
-          const inherited = field.match(/^inherited_(object|entity|place|occurrence|procedure)_/)
+          const inherited = field.match(/^inherited_(object|entity|place|occurrence|collection|procedure)_/)
           return inherited ? [inherited[1]] : []
         }),
       ])
@@ -236,7 +236,7 @@ export function SearchPage() {
   const relEntity = params.get('rel_entity') ?? ''
   const relPlace = params.get('rel_place') ?? ''
   const relOccurrence = params.get('rel_occurrence') ?? ''
-
+  const relCollection = params.get('rel_collection') ?? ''
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -255,6 +255,7 @@ export function SearchPage() {
       rel_entity: relEntity || undefined,
       rel_place: relPlace || undefined,
       rel_occurrence: relOccurrence || undefined,
+      rel_collection: relCollection || undefined,
     }
     // Pass meta_ filters as extra query params
     const qs = new URLSearchParams(
@@ -286,6 +287,7 @@ export function SearchPage() {
               related_entities: relEntity,
               related_places: relPlace,
               related_occurrences: relOccurrence,
+              related_collections: relCollection,
             },
           })
         : Promise.reject(new Error(t('advanced.invalidLink')))
@@ -324,7 +326,7 @@ export function SearchPage() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [q, typeFilt, statusFilt, encodedAdvancedQuery, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), JSON.stringify(numericFilters), relEntity, relPlace, relOccurrence])
+  }, [q, typeFilt, statusFilt, encodedAdvancedQuery, page, JSON.stringify(facetConfig), JSON.stringify(metaFilters), JSON.stringify(numericFilters), relEntity, relPlace, relOccurrence, relCollection])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -476,6 +478,13 @@ export function SearchPage() {
                 onSelect={v => setRelFilter('rel_occurrence', v)}
                 initialCount={facetInitialCount}
               />
+              <FacetPanel
+                label={t('search.relatedCollections')}
+                buckets={data?.facets?.['related_collections'] ?? []}
+                active={relCollection ? [relCollection] : []}
+                onSelect={v => setRelFilter('rel_collection', v)}
+                initialCount={facetInitialCount}
+              />
             </>
           )}
         </aside>
@@ -490,6 +499,7 @@ export function SearchPage() {
             const path = r.record_type === 'entity' ? `/entities/${r.id}`
               : r.record_type === 'place' ? `/places/${r.id}`
               : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
+              : r.record_type === 'collection' ? `/collections/${r.id}`
               : `/objects/${r.id}`
             return (
               <Link key={r.id} className="result-row" to={path} onClick={() => saveLastSearch(window.location.pathname + window.location.search)}>

@@ -216,3 +216,47 @@ async def test_collection_subtypes_and_schema(
         },
     )
     assert invalid_st_res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_collection_create_rejects_idno_violating_configured_pattern(
+    async_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    """Regression test: validate_idno_pattern(pattern, idno) must not be called with
+    swapped arguments, or a manually supplied idno that violates the configured
+    pattern would be silently accepted."""
+    config_res = await async_client.put(
+        "/v1/admin/config",
+        headers=auth_headers,
+        json={"idno_patterns": {"collection": r"^COL-\d{4}$"}},
+    )
+    assert config_res.status_code == 200
+
+    invalid_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": f"NOPE-{uuid.uuid4().hex[:8]}",
+            "status": "draft",
+            "metadata_": {},
+        },
+    )
+    assert invalid_res.status_code == 422
+
+    valid_idno = f"COL-{uuid.uuid4().int % 10000:04d}"
+    valid_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": valid_idno,
+            "status": "draft",
+            "metadata_": {},
+        },
+    )
+    assert valid_res.status_code == 201
+
+    await async_client.put(
+        "/v1/admin/config",
+        headers=auth_headers,
+        json={"idno_patterns": {}},
+    )

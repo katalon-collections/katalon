@@ -277,6 +277,7 @@ def _build_doc(
     doc: dict[str, Any] = {
         "record_type": record_type,
         "title": title,
+        "idno": getattr(record, "idno", None),
         "status": getattr(record, "status", None),
         "metadata": indexed_metadata,
         "search_text": search_text,
@@ -514,17 +515,27 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
 
 
 async def index_record(record_type: str, record: Any, db: Any = None) -> None:
-    """Build ES document and dispatch Celery task for indexed write with retry."""
+    """Build ES document and dispatch Celery tasks for indexed write with retry."""
+    from katalon.config import settings
+    from katalon.workers.enqueue import enqueue
     from katalon.workers.index_tasks import index_record_task
+    from katalon.workers.rdf_tasks import sync_rdf_record_task
 
     doc = await build_index_doc(record_type, record, db)
-    index_record_task.delay(record_type, str(record.id), doc)
+    enqueue(index_record_task, record_type, str(record.id), doc)
+    if settings.oxigraph_enabled:
+        enqueue(sync_rdf_record_task, record_type, str(record.id))
 
 
-async def remove_record(record_id: UUID) -> None:
+async def remove_record(record_id: UUID, record_type: str | None = None) -> None:
+    from katalon.config import settings
+    from katalon.workers.enqueue import enqueue
     from katalon.workers.index_tasks import remove_record_task
+    from katalon.workers.rdf_tasks import remove_rdf_record_task
 
-    remove_record_task.delay(str(record_id))
+    enqueue(remove_record_task, str(record_id))
+    if settings.oxigraph_enabled:
+        enqueue(remove_rdf_record_task, record_type, str(record_id))
 
 
 async def search(

@@ -3,12 +3,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser } from '../../api/client'
 import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
-import { Edit, Layers, Plus, Search, Trash } from '../ui/Icons'
+import { Edit, Eye, Folder, Layers, Plus, Search, Trash } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { BatchEditModal } from './BatchEditModal'
+import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 
 const PAGE_SIZE = 50
 
@@ -148,12 +150,18 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestSeqRef = useRef(0)
   const selectAllRef = useRef<HTMLInputElement>(null)
+  const user = getTokenUser()
+  const canEdit = user?.role !== 'viewer'
+  const canDelete = user?.role !== 'viewer'
+
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
   const [sortBy, setSortBy] = useState<'idno' | 'status' | 'updated_at' | ''>('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectionMode, setSelectionMode] = useState<'page' | 'all'>('page')
   const [batchOpen, setBatchOpen] = useState(false)
+  const [addToSetOpen, setAddToSetOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const [treeItems, setTreeItems] = useState<AnyRecord[] | null>(null)
 
   // Hierarchical browse: only when unfiltered/unsorted, so parent/child relations stay complete.
@@ -436,7 +444,15 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
             <button onClick={resetSelection}>{t('selectThisPage')}</button>
           )}
           <button onClick={() => setBatchOpen(true)}><Layers size={13} /> {t('batchEdit')}</button>
+          <button onClick={() => setAddToSetOpen(true)}><Folder size={13} /> {t('addToWorkingSet')}</button>
           <button onClick={resetSelection}>{t('selectionCancel')}</button>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ margin: '14px 24px 0 24px', padding: '10px 16px', background: '#dcfce7', color: '#166534', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{toast}</span>
+          <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
       )}
 
@@ -459,19 +475,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                 </label>
               </th>
               {showIdno && (
-                <th className="sortable" onClick={() => handleSort('idno')}>
+                <th className="sortable" style={{ width: 140 }} onClick={() => handleSort('idno')}>
                   {t('tableIdno')}{sortBy === 'idno' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
                 </th>
               )}
-              {showSubtype && <th>{t('tableType')}</th>}
+              {showSubtype && <th style={{ width: 120 }}>{t('tableType')}</th>}
               <th>{primaryLabel}</th>
               {extraFields.map(f => (
-                <th key={f.name}>{f.label?.de || f.label?.en || f.name}</th>
+                <th key={f.name} style={{ width: 140 }}>{f.label?.de || f.label?.en || f.name}</th>
               ))}
-              <th className="sortable" onClick={() => handleSort('status')}>
+              <th className="sortable" style={{ width: 100 }} onClick={() => handleSort('status')}>
                 {t('tableStatus')}{sortBy === 'status' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
               </th>
-              <th className="sortable" onClick={() => handleSort('updated_at')}>
+              <th className="sortable" style={{ width: 120 }} onClick={() => handleSort('updated_at')}>
                 {t('tableChanged')}{sortBy === 'updated_at' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
               </th>
               <th className="col-act" />
@@ -499,24 +515,40 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                       <input aria-label={t('selectRowAriaLabel', { label: recordLabel })} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
                     </label>
                   </td>
-                  {showIdno && <td className="mono" style={{ maxWidth: 140 }}>{idno}</td>}
-                  {showSubtype && <td style={{ maxWidth: 120, color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
-                  <td style={{ maxWidth: 280 }}>
+                  {showIdno && <td className="mono">{idno}</td>}
+                  {showSubtype && <td style={{ color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
+                  <td>
                     {depth > 0 && <span style={{ display: 'inline-block', width: depth * 16 }} aria-hidden="true" />}
                     {depth > 0 && <span style={{ color: 'var(--fg-4)', marginRight: 4 }} aria-hidden="true">&#8627;</span>}
                     <span className="tt">{getFieldValue(m, primaryKey)}</span>
                   </td>
                   {extraFields.map(f => (
-                    <td key={f.name} style={{ maxWidth: 140, color: 'var(--fg-2)' }}>
+                    <td key={f.name} style={{ color: 'var(--fg-2)' }}>
                       {getFieldValue(m, f.name)}
                     </td>
                   ))}
-                  <td style={{ maxWidth: 100 }}><StatusBadge status={(rec as { status?: string }).status ?? 'draft'} /></td>
-                  <td style={{ maxWidth: 120, color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
+                  <td><StatusBadge status={(rec as { status?: string }).status ?? 'draft'} /></td>
+                  <td style={{ color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <button aria-label={t('editRowAriaLabel', { label: recordLabel })} className="btn sm ico gh" title={t('editRowTitle')} onClick={() => onOpen?.(rec.id)}><Edit size={12} /></button>
-                      <button aria-label={t('deleteRowAriaLabel', { label: recordLabel })} className="btn sm ico gh dn" title={t('deleteRowTitle')} onClick={() => handleDelete(rec.id)}><Trash size={12} /></button>
+                      <ActionMenu
+                        ariaLabel={t('editRowAriaLabel', { label: recordLabel })}
+                        items={[
+                          {
+                            key: canEdit ? 'edit' : 'view',
+                            label: canEdit ? t('editRowTitle') : t('viewRowTitle'),
+                            icon: canEdit ? <Edit size={13} /> : <Eye size={13} />,
+                            onClick: () => onOpen?.(rec.id),
+                          },
+                          ...(canDelete ? [{
+                            key: 'delete',
+                            label: t('deleteRowTitle'),
+                            icon: <Trash size={13} />,
+                            danger: true,
+                            onClick: () => handleDelete(rec.id),
+                          }] : []),
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -564,6 +596,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
             setBatchOpen(false)
             resetSelection()
             load()
+          }}
+        />
+      )}
+
+      {addToSetOpen && (
+        <AddToWorkingSetModal
+          recordType={recordType}
+          recordIds={items.filter((it) => sel.has(it.id)).map((it) => it.id)}
+          onClose={() => setAddToSetOpen(false)}
+          onSuccess={(setName, count) => {
+            setAddToSetOpen(false)
+            resetSelection()
+            setToast(count === 1 ? t('addSuccess_one', { name: setName }) : t('addSuccess', { count, name: setName }))
+            setTimeout(() => setToast(null), 5000)
           }}
         />
       )}

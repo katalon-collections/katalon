@@ -23,5 +23,15 @@
   "delete": "Löschen",
   "deleting": "Löschen…",
   "deleteConfirm": "Lagerort „{{name}}“ wirklich löschen?",
-  "errorVersionConflict": "Der Lagerort wurde inzwischen von jemand anderem geändert. Bitte neu laden und erneut versuchen."
+  "errorVersionConflict": "Der Lagerort wurde inzwischen von jemand anderem geändert. Bitte neu laden und erneut versuchen.",
+  "objectsHeading": "Objekte an diesem Standort",
+  "includeSublocations": "Untergeordnete Standorte einbeziehen",
+  "noObjects": "Keine Objekte an diesem Standort gefunden.",
+  "colIdno": "ID-Nr.",
+  "colTitle": "Titel",
+  "colType": "Typ",
+  "colLocation": "Standort",
+  "colStatus": "Status",
+  "colRelation": "Beziehung",
+  "loadingObjects": "Lade Objekte…"
 }

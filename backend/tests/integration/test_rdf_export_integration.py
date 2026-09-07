@@ -259,6 +259,71 @@ async def test_rdf_export_single_records_and_negotiation(async_client, auth_head
     assert place_exp.json()["@type"] == "crm:E53_Place"
 
 
+    # -------------------------------------------------------------
+    # Test Canonical URI stability: KATALON_BASE_URL takes precedence over request base
+    # -------------------------------------------------------------
+    from katalon.config import settings
+    old_base = settings.katalon_base_url
+    try:
+        settings.katalon_base_url = "https://katalon.example.org"
+        stable_res = await async_client.get(
+            f"/v1/objects/{obj['id']}/export?format=jsonld",
+            headers={**auth_headers, "Host": "otherhost.local:8000"},
+        )
+        assert stable_res.status_code == 200
+        stable_doc = stable_res.json()
+        assert stable_doc["@id"] == f"https://katalon.example.org/objects/{obj['id']}"
+        assert "otherhost.local" not in stable_doc["@id"]
+    finally:
+        settings.katalon_base_url = old_base
+
+    # -------------------------------------------------------------
+    # Test Collection Export
+    # -------------------------------------------------------------
+    col_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": f"COL-{uuid.uuid4().hex[:8]}",
+            "status": "draft",
+            "metadata_": {"titel": "Sammlung Alte Musik"},
+        },
+    )
+    assert col_res.status_code == 201, col_res.text
+    col = col_res.json()
+
+    col_exp = await async_client.get(
+        f"/v1/collections/{col['id']}/export?format=jsonld",
+        headers=auth_headers,
+    )
+    assert col_exp.status_code == 200, col_exp.text
+    col_doc = col_exp.json()
+    assert col_doc["@type"] == "crm:E78_Curated_Holding"
+    assert f"/collections/{col['id']}" in col_doc["@id"]
+
+    # -------------------------------------------------------------
+    # Test Storage Location Export via generic export route
+    # -------------------------------------------------------------
+    loc_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={
+            "idno": f"LOC-{uuid.uuid4().hex[:8]}",
+            "metadata_": {"label": "Depot 1, Regal A"},
+        },
+    )
+    assert loc_res.status_code == 201, loc_res.text
+    loc = loc_res.json()
+
+    loc_exp = await async_client.get(
+        f"/v1/export/storage_location/{loc['id']}?format=jsonld",
+        headers=auth_headers,
+    )
+    assert loc_exp.status_code == 200, loc_exp.text
+    loc_doc = loc_exp.json()
+    assert loc_doc["@type"] == "crm:E53_Place"
+    assert f"/storage-locations/{loc['id']}" in loc_doc["@id"]
+
 @pytest.mark.asyncio
 async def test_oai_pmh_json_ld_integration(async_client, auth_headers) -> None:
     # 1. Fetch field definitions to find a public field for object

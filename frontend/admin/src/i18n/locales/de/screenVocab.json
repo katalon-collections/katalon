@@ -35,6 +35,10 @@
     "types": "Typen",
     "parent": "Übergeordnet"
   },
+  "editRow": "Bearbeiten",
+  "duplicateRow": "Duplizieren",
+  "addChildTerm": "Unterterm hinzufügen",
+  "deleteRow": "Löschen",
   "systemVocabBadge": "Systemvokabular",
   "headline": "Vokabular",
   "headlineSub": "Kontrollierte Vokabulare und Terme",

@@ -11,6 +11,7 @@ from sqlalchemy import Text, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import (
     DBDep,
@@ -19,6 +20,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.limiter import limiter
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Collection, RecordSnapshot, User
 from katalon.core.schemas import (
@@ -184,7 +186,7 @@ async def create_collection(
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
         idno = data.idno.strip()
-        if pattern and not validate_idno_pattern(idno, pattern):
+        if pattern and not validate_idno_pattern(pattern, idno):
             raise HTTPException(
                 status_code=422,
                 detail="ID-Nr. entspricht nicht dem vorgegebenen Muster.",
@@ -241,6 +243,7 @@ async def create_collection(
     return col
 
 
+@limiter.limit(lambda: settings.rate_limit_public_export)
 @router.get(
     "/{col_id}/export",
     summary="Export a single collection record as JSON-LD or Turtle RDF",
@@ -479,7 +482,7 @@ async def delete_collection(
     )
     await flush_record(db, col)
     try:
-        await search_service.remove_record(col.id)
+        await search_service.remove_record(col.id, record_type="collection")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 

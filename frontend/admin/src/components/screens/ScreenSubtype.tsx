@@ -7,6 +7,7 @@ import { subtypes } from '../../api/client'
 import type { RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Plus, Trash, X } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
@@ -121,7 +122,8 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
       if (editId) {
         await subtypes.update(editId, payload)
       } else {
-        await subtypes.create(payload)
+        const created = await subtypes.create(payload)
+        setItems(prev => [...prev, created])
       }
       setShowForm(false)
       await load()
@@ -135,10 +137,12 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   async function handleDelete(s: RecordSubtype) {
     if (!confirm(t('deleteConfirm', { name: s.name }))) return
     try {
+      setItems(prev => prev.filter(item => item.id !== s.id))
       await subtypes.delete(s.id)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      await load()
     }
   }
 
@@ -254,8 +258,24 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                   <td style={{ textAlign: 'right', color: 'var(--fg-3)', fontSize: 12 }}>{s.sort_order}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <button className="btn ico gh" title={t('editButtonTitle')} onClick={() => openEdit(s)}><Edit size={13} /></button>
-                      <button className="btn ico gh dn" title={t('deleteButtonTitle')} onClick={() => handleDelete(s)}><Trash size={13} /></button>
+                      <ActionMenu
+                        ariaLabel={`Aktionen für Subtyp ${s.name}`}
+                        items={[
+                          {
+                            key: 'edit',
+                            label: t('editButtonTitle'),
+                            icon: <Edit size={13} />,
+                            onClick: () => openEdit(s),
+                          },
+                          {
+                            key: 'delete',
+                            label: t('deleteButtonTitle'),
+                            icon: <Trash size={13} />,
+                            danger: true,
+                            onClick: () => handleDelete(s),
+                          },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

@@ -26,14 +26,14 @@ export default defineConfig({
       reuseExistingServer: !isCI,
     },
     {
-      command: 'npm run dev -- --host 127.0.0.1 --port 5173',
+      command: 'pnpm run dev --host 127.0.0.1 --port 5173',
       cwd: '../frontend/admin',
       url: 'http://127.0.0.1:5173',
       timeout: 120_000,
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'npm run dev -- --host 127.0.0.1 --port 5174',
+      command: 'pnpm run dev --host 127.0.0.1 --port 5174',
       cwd: '../frontend/portal',
       url: 'http://127.0.0.1:5174',
       timeout: 120_000,

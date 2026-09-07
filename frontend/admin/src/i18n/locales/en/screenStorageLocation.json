@@ -23,5 +23,15 @@
   "delete": "Delete",
   "deleting": "Deleting…",
   "deleteConfirm": "Really delete storage location \"{{name}}\"?",
-  "errorVersionConflict": "This storage location was changed by someone else in the meantime. Please reload and try again."
+  "errorVersionConflict": "This storage location was changed by someone else in the meantime. Please reload and try again.",
+  "objectsHeading": "Objects at this location",
+  "includeSublocations": "Include sub-locations",
+  "noObjects": "No objects found at this location.",
+  "colIdno": "ID no.",
+  "colTitle": "Title",
+  "colType": "Type",
+  "colLocation": "Location",
+  "colStatus": "Status",
+  "colRelation": "Relation",
+  "loadingObjects": "Loading objects…"
 }

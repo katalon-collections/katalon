@@ -3,7 +3,16 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+
+## [1.20.0] - 2026-09-07
+
+### Added
+- Admin-UI / Arbeitslisten (Working Sets): Neuer Menüpunkt „Arbeitslisten“ (`ScreenWorkingSets.tsx`) für ad-hoc, typgebundene Gruppierungen von Datensätzen für interne Workflows (Ausstellungsvorbereitungen, Prüflisten, Dublettenbereinigung, Kuration).
+- Admin-UI / Listenintegration: Auswahlen in allen Datensatzlisten (`ScreenList.tsx`) können über die Massenaktionsleiste („Zu Arbeitsliste“) direkt in bestehende oder neu angelegte Arbeitslisten übernommen werden (`AddToWorkingSetModal.tsx`).
+- Admin-UI / Detailansicht & Sortierung: Detailansicht von Arbeitslisten mit Reordering (Hoch/Runter), individuellen Notizen pro Datensatz, Thumbnails und direkter Verlinkung in die Bearbeitungsmaske.
+- Admin-UI / Batch-Editing-Brücke: Nahtlose Übergabe aller Datensätze einer Arbeitsliste in das bestehende `BatchEditModal` zur gemeinsamen Status-, Feld- oder Relationsänderung.
+- Backend / Arbeitslisten-Datenmodell: Neue PostgreSQL-Tabellen `working_sets` und `working_set_items` (Alembic-Migration `0057_working_sets.py`) mit Kaskadenlöschung und Berechtigungskontrolle (privat vs. geteilt).
+- Backend / REST-API: Vollständige Endpunkte unter `/v1/working-sets` zur Erstellung, Verwaltung, Reordering und Befüllung von Arbeitslisten inklusive automatischer Titel- und Kennungsauflösung.
 
 ## [1.19.2] - 2026-09-03
 

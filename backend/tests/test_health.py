@@ -27,3 +27,15 @@ async def test_openapi_schema() -> None:
     assert r.status_code == 200
     schema = r.json()
     assert schema["info"]["title"] == "Katalon API"
+    operation_ids = [
+        operation["operationId"]
+        for path in schema["paths"].values()
+        for operation in path.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    ]
+    assert len(operation_ids) == len(set(operation_ids))
+
+    refresh = schema["paths"]["/v1/auth/refresh"]["post"]
+    assert refresh["security"] == [{"RefreshCookie": []}]
+    assert "requestBody" not in refresh
+    assert "Set-Cookie" in refresh["responses"]["200"]["headers"]

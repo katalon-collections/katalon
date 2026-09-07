@@ -8,8 +8,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, cast
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Security, status
+from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 DBDep = Annotated[AsyncSession, Depends(get_db)]
 REFRESH_COOKIE = "katalon_refresh_token"
 REFRESH_COOKIE_PATH = "/v1/"
+refresh_cookie_scheme = APIKeyCookie(
+    name=REFRESH_COOKIE,
+    scheme_name="RefreshCookie",
+    description="HttpOnly refresh-token cookie issued by /v1/auth/token and rotated by /v1/auth/refresh.",
+    auto_error=False,
+)
+_REFRESH_COOKIE_HEADER = {
+    "Set-Cookie": {
+        "description": "Sets or clears the HttpOnly refresh-token cookie.",
+        "schema": {"type": "string"},
+    }
+}
 
 
 def hash_password(password: str) -> str:
@@ -94,6 +106,7 @@ def issue_token_pair(user: User, response: Response) -> Token:
     response_model=Token,
     summary="Authenticate with username/password and issue an access token plus refresh cookie",
     responses={
+        200: {"description": "Access token returned and refresh cookie set", "headers": _REFRESH_COOKIE_HEADER},
         400: {"description": "Account deactivated"},
         401: {"description": "Invalid credentials"},
     },
@@ -122,7 +135,12 @@ _RESET_UNAVAILABLE = "Passwort-Reset ist derzeit nicht verfügbar."
 _RESET_COOLDOWN = timedelta(minutes=5)
 
 
-@router.post("/password-reset", status_code=status.HTTP_202_ACCEPTED, summary="Request a password reset")
+@router.post(
+    "/password-reset",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Request a password reset",
+    responses={503: {"description": "Password reset is not configured"}},
+)
 @limiter.limit("3/hour")
 async def request_password_reset(request: Request, data: PasswordResetRequest, db: DBDep) -> dict[str, str]:
     if not settings.smtp_enabled or not settings.katalon_base_url:
@@ -173,7 +191,12 @@ async def request_password_reset(request: Request, data: PasswordResetRequest, d
     return _RESET_RESPONSE
 
 
-@router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT, summary="Set a new password from a reset token")
+@router.post(
+    "/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Set a new password from a reset token",
+    responses={400: {"description": "Invalid or expired reset token"}},
+)
 @limiter.limit("10/hour")
 async def confirm_password_reset(request: Request, data: PasswordResetConfirm, db: DBDep) -> None:
     token_hash = hashlib.sha256(data.token.encode()).hexdigest()
@@ -203,16 +226,21 @@ async def confirm_password_reset(request: Request, data: PasswordResetConfirm, d
     response_model=Token,
     summary="Exchange the refresh cookie for a new access token and refresh cookie",
     responses={
-        401: {"description": "Invalid or expired refresh token"},
+        200: {"description": "Access token returned and refresh cookie rotated", "headers": _REFRESH_COOKIE_HEADER},
+        401: {"description": "Missing, invalid, or expired refresh cookie"},
     },
 )
 @limiter.limit("20/minute")
-async def refresh_token(request: Request, response: Response, db: DBDep) -> Token:
+async def refresh_token(
+    request: Request,
+    response: Response,
+    db: DBDep,
+    refresh_cookie: Annotated[str | None, Security(refresh_cookie_scheme)],
+) -> Token:
     try:
-        refresh_token = request.cookies.get(REFRESH_COOKIE)
-        if not refresh_token:
+        if not refresh_cookie:
             raise ValueError
-        payload = jwt.decode(refresh_token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = jwt.decode(refresh_cookie, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         token_type: str | None = payload.get("typ")
         token_version = payload.get("ver", 0)
@@ -237,8 +265,16 @@ async def refresh_token(request: Request, response: Response, db: DBDep) -> Toke
     return issue_token_pair(user, response)
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Clear the refresh cookie")
-async def logout(response: Response) -> Response:
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Clear the refresh cookie",
+    responses={204: {"description": "Refresh cookie cleared", "headers": _REFRESH_COOKIE_HEADER}},
+)
+async def logout(
+    response: Response,
+    _refresh_cookie: Annotated[str | None, Security(refresh_cookie_scheme)],
+) -> Response:
     response.delete_cookie(key=REFRESH_COOKIE, path=REFRESH_COOKIE_PATH, httponly=True, samesite="strict")
     response.status_code = status.HTTP_204_NO_CONTENT
     return response

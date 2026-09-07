@@ -7,7 +7,8 @@ import { adminConfig, authority, schema, subtypes, vocabularies } from '../../ap
 import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { Edit, Grip, Lightning, Plus, Trash } from '../ui/Icons'
+import { Copy, Edit, Grip, Lightning, Plus, Trash } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { SchemaAiAssist } from './SchemaAiAssist'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
@@ -132,6 +133,7 @@ interface FieldDetailProps {
   onChange: (form: FieldFormState) => void
   onSave: () => void
   onDelete: () => void
+  onDuplicate?: () => void
   onClose: () => void
   onSubFieldChange: () => void  // reload field list after sub-field create/delete
 }
@@ -148,7 +150,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
   return { name: '', label: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
-function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, onChange, onSave, onDelete, onClose, onSubFieldChange }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange }: FieldDetailProps) {
   const { t } = useTranslation('screenSchema')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
@@ -628,6 +630,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <button className="btn pri" onClick={onSave} disabled={saving}>
             {saving ? t('fieldDetail.saving') : t('fieldDetail.save')}
           </button>
+          {!isNew && onDuplicate && (
+            <button type="button" className="btn gh" onClick={onDuplicate} disabled={saving}>
+              <Copy size={13} /> {t('fieldDetail.duplicate')}
+            </button>
+          )}
           {!isNew && (
             <button className="btn dn" onClick={onDelete} disabled={saving}>{t('fieldDetail.delete')}</button>
           )}
@@ -993,6 +1000,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const skipResetRef = useRef(true)
   const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
   const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [allTypeFields, setAllTypeFields] = useState<FieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -1057,9 +1065,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
 
   const loadFields = useCallback(() => {
     setLoading(true)
-    schema.list(activeType, activeSubtype || undefined)
+    const pFields = schema.list(activeType, activeSubtype || undefined)
+    const pAll = activeSubtype && activeType !== 'vocabulary_term'
+      ? schema.list(activeType)
+      : null
+
+    pFields
       .then(loaded => {
         setFields(loaded)
+        if (!pAll) setAllTypeFields(loaded)
         // Sync sub-fields into open group field form
         setForm(prev => {
           if (!prev || prev.field_type !== 'group') return prev
@@ -1070,6 +1084,10 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       })
       .catch(console.error)
       .finally(() => setLoading(false))
+
+    if (pAll) {
+      pAll.then(setAllTypeFields).catch(console.error)
+    }
   }, [activeType, activeSubtype])
 
   useEffect(() => {
@@ -1170,6 +1188,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     try {
       if (isNew) {
         const created = await schema.create(data)
+        setFields(prev => [...prev, created])
+        setAllTypeFields(prev => [...prev, created])
         closeDetail()
         loadFields()
         // Immediately open the new group field so user can add sub-fields
@@ -1242,12 +1262,29 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   async function handleDelete() {
     if (!activeFieldId || !window.confirm(t('deleteConfirm', { name: form?.name ?? '' }))) return
     setSaving(true)
+    const deletedId = activeFieldId
     try {
-      await schema.delete(activeFieldId)
+      setFields(prev => prev.filter(f => f.id !== deletedId))
+      setAllTypeFields(prev => prev.filter(f => f.id !== deletedId))
+      await schema.delete(deletedId)
       closeDetail()
       loadFields()
     } catch (e) {
       setSaveError((e as Error).message)
+      loadFields()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDuplicate(f: FieldDefinition) {
+    setSaving(true)
+    try {
+      const duplicated = await schema.duplicate(f.id)
+      await loadFields()
+      openExisting(duplicated)
+    } catch (e) {
+      alert((e as Error).message)
     } finally {
       setSaving(false)
     }
@@ -1306,7 +1343,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                 onClick={() => { setActiveSubtype(s.name); onPathChange?.(s.name ? `${activeType}.${s.name}` : activeType) }}
               >
                 <span>{s.label?.de || s.name || t('subtypes.allGlobal')}</span>
-                {s.name && <span className="ct">{fields.filter(f => f.target_subtype === s.name).length}</span>}
+                {s.name && <span className="ct">{allTypeFields.filter(f => f.target_subtype === s.name).length}</span>}
               </button>
             ))}
           </div>
@@ -1346,6 +1383,10 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}
+              onDuplicate={activeFieldId ? () => {
+                const f = fields.find(x => x.id === activeFieldId)
+                if (f) handleDuplicate(f)
+              } : undefined}
               onClose={closeDetail}
               onSubFieldChange={loadFields}
             />
@@ -1390,15 +1431,42 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                           {f.is_repeatable && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>×n</span>}
                         </button>
                         <div className="actions">
-                          <button className="btn sm ico gh dn" aria-label={`Feld ${fieldLabel} löschen`} onClick={async () => {
-                            if (!window.confirm(t('deleteConfirm', { name: fieldLabel }))) return
-                            try {
-                              await schema.delete(f.id)
-                              loadFields()
-                            } catch (err) {
-                              alert((err as Error).message)
-                            }
-                          }}><Trash size={12} /></button>
+                          <ActionMenu
+                            ariaLabel={`Aktionen für Feld ${fieldLabel}`}
+                            items={[
+                              {
+                                key: 'edit',
+                                label: t('editRow'),
+                                icon: <Edit size={13} />,
+                                onClick: () => openExisting(f),
+                              },
+                              {
+                                key: 'duplicate',
+                                label: t('duplicateRow'),
+                                icon: <Copy size={13} />,
+                                onClick: () => handleDuplicate(f),
+                              },
+                              {
+                                key: 'delete',
+                                label: t('deleteRow'),
+                                icon: <Trash size={13} />,
+                                danger: true,
+                                disabled: f.name === 'label',
+                                onClick: async () => {
+                                  if (!window.confirm(t('deleteConfirm', { name: fieldLabel }))) return
+                                  try {
+                                    setFields(prev => prev.filter(x => x.id !== f.id))
+                                    setAllTypeFields(prev => prev.filter(x => x.id !== f.id))
+                                    await schema.delete(f.id)
+                                    loadFields()
+                                  } catch (err) {
+                                    alert((err as Error).message)
+                                    loadFields()
+                                  }
+                                },
+                              },
+                            ]}
+                          />
                         </div>
                       </div>
                     )

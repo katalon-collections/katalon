@@ -16,16 +16,28 @@ from katalon.services.relation_service import (
     lock_objects,
     procedure_object_pair,
     resolve_relation_labels,
+    validate_relation_endpoint,
 )
 from katalon.services.relation_type_service import validate_relation_type_applicability
 
 _LOGGABLE_RECORD_TYPES = {
-    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+    "object",
+    "entity",
+    "place",
+    "occurrence",
+    "procedure",
+    "collection",
+    "storage_location",
 }
 
 
 async def _log_relation_change(
-    db: DBDep, rel: Relation, user_id: uuid.UUID, *, action: str, changed_fields: dict[str, Any],
+    db: DBDep,
+    rel: Relation,
+    user_id: uuid.UUID,
+    *,
+    action: str,
+    changed_fields: dict[str, Any],
 ) -> None:
     """Log a relation change against both endpoints it connects, when they're auditable record types."""
     for record_type, record_id, other_type, other_id in (
@@ -35,7 +47,11 @@ async def _log_relation_change(
         if record_type not in _LOGGABLE_RECORD_TYPES:
             continue
         await log_change(
-            db, record_type=record_type, record_id=record_id, user_id=user_id, action=action,
+            db,
+            record_type=record_type,
+            record_id=record_id,
+            user_id=user_id,
+            action=action,
             changed_fields={
                 **changed_fields,
                 "relation_id": str(rel.id),
@@ -44,10 +60,13 @@ async def _log_relation_change(
             },
         )
 
+
 router = APIRouter(prefix="/relations", tags=["relations"])
 
 
-@router.get("", response_model=list[RelationRead], summary="List relations, optionally filtered by endpoint")
+@router.get(
+    "", response_model=list[RelationRead], summary="List relations, optionally filtered by endpoint"
+)
 async def list_relations(
     db: DBDep,
     from_type: str | None = None,
@@ -55,23 +74,49 @@ async def list_relations(
     to_type: str | None = None,
     to_id: uuid.UUID | None = None,
     limit: int = Query(100, ge=1, le=500),
+    include_subcollections: bool = False,
+    include_sublocations: bool = False,
 ) -> list[RelationRead]:
     query = select(Relation).limit(limit).order_by(Relation.created_at.desc())
     if from_type:
         query = query.where(Relation.from_type == from_type)
     if from_id:
-        query = query.where(Relation.from_id == from_id)
+        if from_type == "collection" and include_subcollections:
+            from katalon.services.collection_service import get_collection_subtree_ids
+
+            sub_ids = await get_collection_subtree_ids(db, from_id, public_only=False)
+            query = query.where(Relation.from_id.in_(sub_ids))
+        elif from_type == "storage_location" and include_sublocations:
+            from katalon.services.storage_location_service import get_storage_location_subtree_ids
+
+            sub_ids = await get_storage_location_subtree_ids(db, from_id)
+            query = query.where(Relation.from_id.in_(sub_ids))
+        else:
+            query = query.where(Relation.from_id == from_id)
     if to_type:
         query = query.where(Relation.to_type == to_type)
     if to_id:
-        query = query.where(Relation.to_id == to_id)
+        if to_type == "collection" and include_subcollections:
+            from katalon.services.collection_service import get_collection_subtree_ids
+
+            sub_ids = await get_collection_subtree_ids(db, to_id, public_only=False)
+            query = query.where(Relation.to_id.in_(sub_ids))
+        elif to_type == "storage_location" and include_sublocations:
+            from katalon.services.storage_location_service import get_storage_location_subtree_ids
+
+            sub_ids = await get_storage_location_subtree_ids(db, to_id)
+            query = query.where(Relation.to_id.in_(sub_ids))
+        else:
+            query = query.where(Relation.to_id == to_id)
     relations = list((await db.execute(query)).scalars().all())
     labels = await resolve_relation_labels(db, relations)
     return [
-        RelationRead.model_validate(rel).model_copy(update={
-            "from_label": labels.get((rel.from_type, rel.from_id)),
-            "to_label": labels.get((rel.to_type, rel.to_id)),
-        })
+        RelationRead.model_validate(rel).model_copy(
+            update={
+                "from_label": labels.get((rel.from_type, rel.from_id)),
+                "to_label": labels.get((rel.to_type, rel.to_id)),
+            }
+        )
         for rel in relations
     ]
 
@@ -117,6 +162,12 @@ async def create_relation(
     )
     if duplicate is not None:
         raise HTTPException(status_code=409, detail="Diese Beziehung existiert bereits.")
+    from_error = await validate_relation_endpoint(db, data.from_type, data.from_id)
+    if from_error:
+        raise HTTPException(status_code=422, detail=from_error)
+    to_error = await validate_relation_endpoint(db, data.to_type, data.to_id)
+    if to_error:
+        raise HTTPException(status_code=422, detail=to_error)
     pair = procedure_object_pair(data.from_type, data.from_id, data.to_type, data.to_id)
     if pair:
         procedure_id, object_id = pair
@@ -141,14 +192,20 @@ async def create_relation(
     if applicability_error:
         raise HTTPException(status_code=422, detail=applicability_error)
     rel = Relation(
-        from_type=data.from_type, from_id=data.from_id,
-        to_type=data.to_type, to_id=data.to_id,
-        relation_type=data.relation_type, metadata_=data.metadata_,
+        from_type=data.from_type,
+        from_id=data.from_id,
+        to_type=data.to_type,
+        to_id=data.to_id,
+        relation_type=data.relation_type,
+        metadata_=data.metadata_,
     )
     db.add(rel)
     await db.flush()
     await _log_relation_change(
-        db, rel, current_user.id, action="relation_add",
+        db,
+        rel,
+        current_user.id,
+        action="relation_add",
         changed_fields={"relation_type": rel.relation_type},
     )
     return rel
@@ -165,7 +222,10 @@ async def create_relation(
     },
 )
 async def update_relation(
-    relation_id: uuid.UUID, data: RelationUpdate, db: DBDep, current_user: User = require_admin_or_editor()
+    relation_id: uuid.UUID,
+    data: RelationUpdate,
+    db: DBDep,
+    current_user: User = require_admin_or_editor(),
 ) -> Relation:
     result = await db.execute(select(Relation).where(Relation.id == relation_id))
     rel = result.scalar_one_or_none()
@@ -184,7 +244,9 @@ async def update_relation(
     await db.flush()
     diff = diff_fields(old_fields, {"relation_type": rel.relation_type, "metadata": rel.metadata_})
     if diff:
-        await _log_relation_change(db, rel, current_user.id, action="relation_update", changed_fields=diff)
+        await _log_relation_change(
+            db, rel, current_user.id, action="relation_update", changed_fields=diff
+        )
     return rel
 
 
@@ -207,7 +269,10 @@ async def delete_relation(
     if not rel:
         raise HTTPException(status_code=404, detail="Relation nicht gefunden")
     await _log_relation_change(
-        db, rel, current_user.id, action="relation_delete",
+        db,
+        rel,
+        current_user.id,
+        action="relation_delete",
         changed_fields={"relation_type": rel.relation_type},
     )
     await db.delete(rel)

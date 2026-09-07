@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -310,6 +310,10 @@ export const storageLocations = {
   create: (data: Partial<KatalonStorageLocation>) => req<KatalonStorageLocation>('/v1/storage-locations', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonStorageLocation>, version?: number) => req<KatalonStorageLocation>(`/v1/storage-locations/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/storage-locations/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  objects: (id: string, params?: { include_sublocations?: boolean; page?: number; page_size?: number }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<StorageLocationObject>>(`/v1/storage-locations/${id}/objects${qs ? `?${qs}` : ''}`)
+  },
 }
 
 export interface SchemaImportResult {
@@ -364,6 +368,7 @@ export const schema = {
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => req<void>(`/v1/schema/${id}`, { method: 'DELETE' }),
+  duplicate: (id: string) => req<FieldDefinition>(`/v1/schema/${id}/duplicate`, { method: 'POST' }),
   resetSummary: (targetType: string, subtype?: string) => req<{ deletable_fields: number }>(`/v1/schema/${targetType}/reset-summary${subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''}`),
   reset: (targetType: string, subtype?: string) => req<{ deletable_fields: number, deleted_fields: number }>(`/v1/schema/${targetType}/reset${subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''}`, { method: 'POST' }),
   import: async (file: File, opts: { dryRun?: boolean; overwrite?: boolean } = {}): Promise<SchemaImportResult> => {
@@ -447,6 +452,7 @@ export const vocabularies = {
   createTerm: (vocabId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/${vocabId}/terms`, { method: 'POST', body: JSON.stringify(data) }),
   updateTerm: (termId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTerm: (termId: string) => req<void>(`/v1/vocabularies/terms/${termId}`, { method: 'DELETE' }),
+  duplicateTerm: (termId: string) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}/duplicate`, { method: 'POST' }),
   importTerms: async (
     vocabId: string,
     file: File,
@@ -941,4 +947,127 @@ export interface AICompleteResponse {
 export const ai = {
   complete: (data: { field_definition_id: string; record_type: string; record_id: string; group_index?: number; group_instance?: Record<string, unknown> }) =>
     req<AICompleteResponse>('/v1/ai/complete', { method: 'POST', body: JSON.stringify(data) }),
+}
+
+export interface SparqlStatus {
+  enabled: boolean
+  reachable: boolean
+  triples_count: number | null
+  endpoint_url: string
+  require_auth: boolean
+  query_timeout: number
+}
+
+export interface SavedSparqlQuery {
+  id: string
+  title: string
+  description: string | null
+  query: string
+  tags: string[]
+  is_shared: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SavedSparqlQueryPayload {
+  title: string
+  description?: string | null
+  query: string
+  tags?: string[]
+  is_shared?: boolean
+}
+
+export interface SparqlQueryResultBinding {
+  type: 'uri' | 'literal' | 'bnode'
+  value: string
+  datatype?: string
+  'xml:lang'?: string
+}
+
+export interface SparqlQueryResults {
+  head: {
+    vars: string[]
+  }
+  results: {
+    bindings: Record<string, SparqlQueryResultBinding>[]
+  }
+  boolean?: boolean
+}
+
+export interface NL2SparqlResponse {
+  sparql: string
+  explanation?: string | null
+}
+
+export const sparql = {
+  status: () => req<SparqlStatus>('/v1/sparql/status'),
+  rebuild: () => req<{ status: string }>('/v1/sparql/rebuild', { method: 'POST' }),
+  query: (sparqlQuery: string, accept: string = 'application/sparql-results+json') =>
+    req<SparqlQueryResults>('/sparql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sparql-query',
+        'Accept': accept,
+      },
+      body: sparqlQuery,
+    }),
+  queryRaw: async (sparqlQuery: string, accept: string): Promise<string> => {
+    const res = await authorizedFetch('/sparql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sparql-query',
+        'Accept': accept,
+      },
+      body: sparqlQuery,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(typeof err.detail === 'string' ? err.detail : res.statusText)
+    }
+    return res.text()
+  },
+  listQueries: (params?: { tag?: string; q?: string }) => {
+    const sp = new URLSearchParams()
+    if (params?.tag) sp.set('tag', params.tag)
+    if (params?.q) sp.set('q', params.q)
+    const qs = sp.toString() ? `?${sp.toString()}` : ''
+    return req<SavedSparqlQuery[]>(`/v1/sparql/queries${qs}`)
+  },
+  getQuery: (id: string) => req<SavedSparqlQuery>(`/v1/sparql/queries/${id}`),
+  createQuery: (payload: SavedSparqlQueryPayload) =>
+    req<SavedSparqlQuery>('/v1/sparql/queries', { method: 'POST', body: JSON.stringify(payload) }),
+  updateQuery: (id: string, payload: Partial<SavedSparqlQueryPayload>) =>
+    req<SavedSparqlQuery>(`/v1/sparql/queries/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteQuery: (id: string) =>
+    req<void>(`/v1/sparql/queries/${id}`, { method: 'DELETE' }),
+  nl2sparql: (prompt: string) =>
+    req<NL2SparqlResponse>('/v1/sparql/nl2sparql', { method: 'POST', body: JSON.stringify({ prompt }) }),
+}
+
+export const workingSets = {
+  list: (params?: { record_type?: string; record_id?: string }) => {
+    const sp = new URLSearchParams()
+    if (params?.record_type) sp.set('record_type', params.record_type)
+    if (params?.record_id) sp.set('record_id', params.record_id)
+    const qs = sp.toString() ? `?${sp.toString()}` : ''
+    return req<WorkingSet[]>(`/v1/working-sets${qs}`)
+  },
+  get: (id: string) => req<WorkingSetDetail>(`/v1/working-sets/${id}`),
+  create: (data: WorkingSetCreate) =>
+    req<WorkingSet>('/v1/working-sets', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: WorkingSetUpdate) =>
+    req<WorkingSet>(`/v1/working-sets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    req<void>(`/v1/working-sets/${id}`, { method: 'DELETE' }),
+  addItems: (id: string, payload: { items?: WorkingSetItemCreate[]; record_ids?: string[] } | WorkingSetItemCreate[]) => {
+    const body = Array.isArray(payload) ? { items: payload } : payload
+    return req<WorkingSetItem[]>(`/v1/working-sets/${id}/items`, { method: 'POST', body: JSON.stringify(body) })
+  },
+  updateItem: (setId: string, itemId: string, data: WorkingSetItemUpdate) =>
+    req<WorkingSetItem>(`/v1/working-sets/${setId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteItem: (setId: string, itemId: string) =>
+    req<void>(`/v1/working-sets/${setId}/items/${itemId}`, { method: 'DELETE' }),
+  reorder: (setId: string, itemIds: string[]) =>
+    req<void>(`/v1/working-sets/${setId}/reorder`, { method: 'PUT', body: JSON.stringify({ item_ids: itemIds }) }),
 }

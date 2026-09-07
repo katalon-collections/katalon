@@ -35,6 +35,10 @@
     "types": "Types",
     "parent": "Parent"
   },
+  "editRow": "Edit",
+  "duplicateRow": "Duplicate",
+  "addChildTerm": "Add sub-term",
+  "deleteRow": "Delete",
   "systemVocabBadge": "System vocabulary",
   "headline": "Vocabulary",
   "headlineSub": "Controlled vocabularies and terms",

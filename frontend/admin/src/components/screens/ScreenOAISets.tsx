@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { oaiSets } from '../../api/client'
 import type { OAISet, OAISetPayload } from '../../api/client'
 import { Plus, Trash, Edit } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 
 function emptyPayload(): OAISetPayload {
   return { set_spec: '', set_name: '', filter_record_type: null, filter_q: null, filter_status: null, filter_metadata: {} }
@@ -96,9 +97,11 @@ export function ScreenOAISets() {
         filter_status: form.filter_status || null,
       }
       if (isNew) {
-        await oaiSets.create(payload)
+        const created = await oaiSets.create(payload)
+        setSets(prev => [...prev, created])
       } else if (editId) {
-        await oaiSets.update(editId, payload)
+        const updated = await oaiSets.update(editId, payload)
+        setSets(prev => prev.map(s => s.id === editId ? updated : s))
       }
       cancel()
       load()
@@ -111,6 +114,7 @@ export function ScreenOAISets() {
 
   async function del(s: OAISet) {
     if (!confirm(t('deleteConfirm', { name: s.set_name }))) return
+    setSets(prev => prev.filter(item => item.id !== s.id))
     await oaiSets.delete(s.id).catch(() => {})
     load()
   }
@@ -232,20 +236,24 @@ export function ScreenOAISets() {
                   </div>
                 </div>
                 <div className="settings-actions">
-                  <button
-                    onClick={() => startEdit(s)}
-                    title={t('editTitle')}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--fg-2)', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    onClick={() => del(s)}
-                    title={t('deleteTitle')}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Trash size={14} />
-                  </button>
+                  <ActionMenu
+                    ariaLabel={`Aktionen für OAI-Set ${s.set_name}`}
+                    items={[
+                      {
+                        key: 'edit',
+                        label: t('editTitle'),
+                        icon: <Edit size={13} />,
+                        onClick: () => startEdit(s),
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteTitle'),
+                        icon: <Trash size={13} />,
+                        danger: true,
+                        onClick: () => del(s),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             </div>

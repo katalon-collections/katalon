@@ -25,6 +25,7 @@ JSONLD_CONTEXT: dict[str, Any] = {
     "rdfs": RDFS_NS,
     "xsd": XSD_NS,
     "dcterms": DCTERMS_NS,
+    "skos:exactMatch": {"@type": "@id"},
 }
 
 JSONLD_TARGETS: set[str] = {
@@ -105,6 +106,7 @@ RELATION_PROPERTY_MAP: dict[str, str] = {
     "related_to": "crm:P67_refers_to",
 
     "contains": "crm:P46_is_composed_of",
+    "is_composed_of": "crm:P46_is_composed_of",
     "p46_is_composed_of": "crm:P46_is_composed_of",
     "enthaelt": "crm:P46_is_composed_of",
     "part_of": "crm:P46_is_composed_of",
@@ -135,6 +137,8 @@ PLURAL_TYPE_MAP: dict[str, str] = {
     "object": "objects",
     "place": "places",
     "procedure": "procedures",
+    "collection": "collections",
+    "storage_location": "storage-locations",
 }
 
 
@@ -142,7 +146,7 @@ def record_uri_path(record_type: str, record_id: str, base_url: str = "") -> str
     clean_base = base_url.rstrip("/") if base_url else ""
     plural = PLURAL_TYPE_MAP.get(record_type, f"{record_type}s")
     if clean_base:
-        return f"{clean_base}/api/v1/{plural}/{record_id}"
+        return f"{clean_base}/{plural}/{record_id}"
     return f"urn:katalon:{record_type}:{record_id}"
 
 def map_primary_type(record_type: str, subtype: str | None = None) -> list[str] | str:
@@ -190,6 +194,10 @@ def map_primary_type(record_type: str, subtype: str | None = None) -> list[str] 
 
     elif record_type == "procedure":
         return "crm:E7_Activity"
+    elif record_type == "collection":
+        return "crm:E78_Curated_Holding"
+    elif record_type == "storage_location":
+        return "crm:E53_Place"
 
     return "crm:E1_CRM_Entity"
 

@@ -115,6 +115,32 @@ export interface OccurrenceSummary {
   created_at: string; updated_at: string
 }
 
+export interface CollectionHierarchyItem {
+  id: string
+  idno: string | null
+  collection_type: string | null
+  title: string | null
+  parent_id: string | null
+}
+
+export interface CollectionSummary {
+  id: string
+  idno: string | null
+  status: string
+  collection_type: string | null
+  parent_id: string | null
+  metadata_: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CollectionDetail extends CollectionSummary {
+  parent: CollectionHierarchyItem | null
+  ancestors: CollectionHierarchyItem[]
+  children: CollectionHierarchyItem[]
+  member_objects_count: number
+}
+
 export interface MediaFile {
   id: string; filename: string; mime_type: string; category: string
   status: string; is_primary: boolean; created_at: string
@@ -190,7 +216,7 @@ export interface VocabSummary { id: string; name: string; is_hierarchical: boole
 export interface VocabTerm { id: string; term: string; label: Record<string, string>; inverse_label: Record<string, string>; parent_id: string | null }
 
 const TYPE_ENDPOINT: Record<string, string> = {
-  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences',
+  object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', collection: 'collections',
 }
 
 /** Fetch the display title of any record by type + id. Returns null on failure. */
@@ -236,13 +262,26 @@ export const api = {
   occurrences: {
     get: (id: string) => get<OccurrenceSummary>(`${PORTAL_API}/occurrences/${id}`),
   },
+  collections: {
+    list: (p?: { page?: number; q?: string; status?: string; page_size?: number; parent_id?: string }) => {
+      const qs = new URLSearchParams(
+        Object.entries({ page_size: '24', ...p })
+          .filter(([, v]) => v != null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString()
+      return get<Page<CollectionSummary>>(`${PORTAL_API}/collections?${qs}`)
+    },
+    get: (id: string) => get<CollectionDetail>(`${PORTAL_API}/collections/${id}`),
+  },
   relations: {
-    forRecord: (type: string, id: string) =>
-      get<Relation[]>(`${PORTAL_API}/relations?from_type=${type}&from_id=${id}&limit=50`)
+    forRecord: (type: string, id: string, includeSubcollections: boolean = false) => {
+      const sub = includeSubcollections ? '&include_subcollections=true' : ''
+      return get<Relation[]>(`${PORTAL_API}/relations?from_type=${type}&from_id=${id}&limit=50${sub}`)
         .then(async fromRels => {
-          const toRels = await get<Relation[]>(`${PORTAL_API}/relations?to_type=${type}&to_id=${id}&limit=50`)
+          const toRels = await get<Relation[]>(`${PORTAL_API}/relations?to_type=${type}&to_id=${id}&limit=50${sub}`)
           return [...fromRels, ...toRels]
-        }),
+        })
+    },
   },
   portal: {
     config: () => get<PortalConfig>(`${PORTAL_API}/portal/config`),
@@ -259,7 +298,7 @@ export const api = {
     terms: (id: string) => get<VocabTerm[]>(`${PORTAL_API}/vocabularies/${id}/terms`),
   },
   search: {
-    query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; [key: string]: string | number | undefined }) => {
+    query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; rel_collection?: string; [key: string]: string | number | undefined }) => {
       const qs = new URLSearchParams(
         Object.entries(p)
           .filter(([, v]) => v != null)

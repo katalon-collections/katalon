@@ -38,14 +38,14 @@ _DEFAULTS = {
     "logo_url": "",
     "placeholder_image_url": "",
     "facet_fields": {
-        "_system": ["record_type", "status"],
         "object": [],
         "entity": [],
         "place": [],
         "occurrence": [],
+        "collection": [],
     },
     "subtitle_fields": {},
-    "browse_enabled_types": ["object", "entity", "place", "occurrence"],
+    "browse_enabled_types": ["object", "entity", "place", "occurrence", "collection"],
     "color_tokens": {},
     "detail_sidebar_position": "right",
     "facet_sort": "count",
@@ -60,7 +60,7 @@ class PortalConfigRead(BaseModel):
     featured_object_ids: list[str]
     facet_fields: dict[str, list[str]]
     subtitle_fields: dict[str, list[str]] = Field(default_factory=dict)
-    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence"]]
+    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence", "collection"]]
     accent_color: str
     logo_url: str
     placeholder_image_url: str
@@ -81,7 +81,7 @@ class PortalConfigUpdate(BaseModel):
     featured_object_ids: list[str] | None = None
     facet_fields: dict[str, list[str]] | None = None
     subtitle_fields: dict[str, list[str]] | None = None
-    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence"]] | None = None
+    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence", "collection"]] | None = None
     accent_color: str | None = None
     logo_url: str | None = None
     placeholder_image_url: str | None = None
@@ -117,7 +117,7 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
             FieldDefinition.is_deleted.is_(False),
         )
     )
-    facet_fields: dict[str, list[str]] = {"object": [], "entity": [], "place": [], "occurrence": []}
+    facet_fields: dict[str, list[str]] = {"object": [], "entity": [], "place": [], "occurrence": [], "collection": []}
     for row in facet_result.all():
         facet_fields.setdefault(row.target_type, []).append(row.name)
     # Direct facets are derived from the schema. Inherited facets deliberately

@@ -6,13 +6,16 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import rdflib
+from fastapi import Response
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from katalon.config import settings
 from katalon.core.models import (
+    Collection,
     Entity,
     MediaFile,
     Object,
@@ -21,9 +24,15 @@ from katalon.core.models import (
     Procedure,
     RecordSubtype,
     Relation,
+    StorageLocation,
     Vocabulary,
     VocabularyTerm,
 )
+
+if TYPE_CHECKING:
+    from fastapi import Request
+
+    from katalon.core.models import User
 from katalon.integrations.jsonld_format import build_jsonld_doc
 from katalon.services.relation_service import resolve_relation_labels
 from katalon.services.search_service import _extract_title
@@ -36,7 +45,17 @@ RECORD_MODEL_MAP: dict[str, tuple[type[Any], str]] = {
     "place": (Place, "place_type"),
     "occurrence": (Occurrence, "occurrence_type"),
     "procedure": (Procedure, "procedure_type"),
+    "collection": (Collection, "collection_type"),
+    "storage_location": (StorageLocation, "storage_location_type"),
 }
+
+
+def get_canonical_base_url(request_base_url: str = "") -> str:
+    """Resolve the canonical base URL, preferring KATALON_BASE_URL over request host."""
+    configured = settings.katalon_base_url.strip().rstrip("/")
+    if configured:
+        return configured
+    return request_base_url.rstrip("/") if request_base_url else ""
 
 
 async def resolve_vocabulary_concepts(
@@ -286,12 +305,12 @@ async def handle_single_record_export(
     record_type: str,
     record_id: uuid.UUID,
     db: AsyncSession,
-    request: Any,
-    current_user: Any = None,
+    request: Request | None = None,
+    *,
+    current_user: User | None = None,
     format_param: str | None = None,
     accept_header: str | None = None,
-) -> Any:
-    """HTTP handler helper for single record export in JSON-LD or Turtle RDF."""
+) -> Response:
     from fastapi import HTTPException, Response
 
     from katalon.core.dependencies import has_record_permission
@@ -332,7 +351,8 @@ async def handle_single_record_export(
         elif "application/ld+json" in accept_header:
             format_choice = "jsonld"
 
-    base_url = str(request.base_url) if request else ""
+    raw_request_base = str(request.base_url) if request else ""
+    base_url = get_canonical_base_url(raw_request_base)
     content, media_type, filename = await export_single_record(
         db, norm_type, record_id, format=format_choice, base_url=base_url
     )

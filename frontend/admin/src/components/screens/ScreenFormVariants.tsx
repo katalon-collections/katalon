@@ -7,6 +7,7 @@ import { formVariants, schema, subtypes } from '../../api/client'
 import type { FormVariantData } from '../../api/client'
 import type { FieldDefinition, FormVariant } from '../../types'
 import { Edit, Plus, Trash } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
@@ -143,8 +144,13 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
       sort_order: form.sort_order,
     }
     try {
-      if (isNew) await formVariants.create(payload)
-      else if (editId) await formVariants.update(editId, payload)
+      if (isNew) {
+        const created = await formVariants.create(payload)
+        setVariants(prev => [...prev, created])
+      } else if (editId) {
+        const updated = await formVariants.update(editId, payload)
+        setVariants(prev => prev.map(item => item.id === editId ? updated : item))
+      }
       cancel()
       load()
     } catch (e: unknown) {
@@ -156,6 +162,7 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
 
   async function del(v: FormVariant) {
     if (!confirm(t('deleteConfirm', { name: v.name }))) return
+    setVariants(prev => prev.filter(item => item.id !== v.id))
     await formVariants.delete(v.id).catch(() => {})
     load()
   }
@@ -329,12 +336,24 @@ export function ScreenFormVariants({ initialPath, onPathChange }: Props = {}) {
                   </div>
                 </div>
                 <div className="settings-actions">
-                  <button onClick={() => startEdit(v)} title={t('editTitle')} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--fg-2)', display: 'flex', alignItems: 'center' }}>
-                    <Edit size={14} />
-                  </button>
-                  <button onClick={() => del(v)} title={t('deleteTitle')} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}>
-                    <Trash size={14} />
-                  </button>
+                  <ActionMenu
+                    ariaLabel={`Aktionen für Variante ${v.name}`}
+                    items={[
+                      {
+                        key: 'edit',
+                        label: t('editTitle'),
+                        icon: <Edit size={13} />,
+                        onClick: () => startEdit(v),
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteTitle'),
+                        icon: <Trash size={13} />,
+                        danger: true,
+                        onClick: () => del(v),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             </div>

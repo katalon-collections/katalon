@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { bannersApi } from '../../api/client'
 import type { Banner } from '../../types'
 import { Bell, Edit, Plus, Trash } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 
 const COLORS: { value: Banner['color']; label: string; bg: string; fg: string }[] = [
   { value: 'blue',   label: 'Blau',  bg: '#dbeafe', fg: '#1e40af' },
@@ -98,9 +99,11 @@ export function ScreenBanners() {
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
       }
       if (isNew) {
-        await bannersApi.create(payload)
+        const created = await bannersApi.create(payload)
+        setBanners(prev => [...prev, created])
       } else if (editId) {
-        await bannersApi.update(editId, payload)
+        const updated = await bannersApi.update(editId, payload)
+        setBanners(prev => prev.map(b => b.id === editId ? updated : b))
       }
       cancel()
       load()
@@ -113,6 +116,7 @@ export function ScreenBanners() {
 
   async function del(b: Banner) {
     if (!confirm(t('deleteConfirm'))) return
+    setBanners(prev => prev.filter(item => item.id !== b.id))
     await bannersApi.remove(b.id).catch(() => {})
     load()
   }
@@ -241,27 +245,29 @@ export function ScreenBanners() {
                   </div>
                 </div>
                 <div className="banner-actions">
-                  <button
-                    onClick={() => toggle(b)}
-                    title={b.is_active ? t('deactivate') : t('activate')}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--fg-2)' }}
-                  >
-                    {b.is_active ? t('toggleOff') : t('toggleOn')}
-                  </button>
-                  <button
-                    onClick={() => startEdit(b)}
-                    title={t('editTitle')}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--fg-2)', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    onClick={() => del(b)}
-                    title={t('deleteTitle')}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Trash size={14} />
-                  </button>
+                  <ActionMenu
+                    ariaLabel="Aktionen für Banner"
+                    items={[
+                      {
+                        key: 'edit',
+                        label: t('editTitle'),
+                        icon: <Edit size={13} />,
+                        onClick: () => startEdit(b),
+                      },
+                      {
+                        key: 'toggle',
+                        label: b.is_active ? t('deactivate') : t('activate'),
+                        onClick: () => toggle(b),
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteTitle'),
+                        icon: <Trash size={13} />,
+                        danger: true,
+                        onClick: () => del(b),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             )

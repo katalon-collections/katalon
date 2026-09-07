@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from katalon.config import settings
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.limiter import limiter
 from katalon.core.models import AuthoritySource as AuthoritySourceModel
@@ -84,7 +85,7 @@ async def update_source(source_id: str, body: SourceUpdate, db: DBDep) -> Source
     summary="Search an external authority source",
     responses={404: {"description": "Unknown authority source"}},
 )
-@limiter.limit("60/minute")
+@limiter.limit(lambda: settings.rate_limit_authority_proxy)
 async def search(
     request: Request,
     source: Annotated[str, Query(description="Adapter ID, e.g. gnd or geonames")],
@@ -107,7 +108,7 @@ async def search(
     summary="Fetch a single record from an external authority source",
     responses={404: {"description": "Record not found"}},
 )
-@limiter.limit("60/minute")
+@limiter.limit(lambda: settings.rate_limit_authority_proxy)
 async def fetch(
     request: Request,
     source: Annotated[str, Query()],

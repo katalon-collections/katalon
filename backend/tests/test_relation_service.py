@@ -6,8 +6,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from katalon.core.models import VocabularyTerm
-from katalon.services.relation_service import count_relations, delete_relations
+from katalon.core.models import FieldDefinition, VocabularyTerm
+from katalon.services.relation_service import (
+    count_relations,
+    delete_relations,
+    sync_schema_relations,
+    validate_relation_endpoint,
+)
 from katalon.services.relation_type_service import validate_relation_type_applicability
 
 
@@ -94,3 +99,67 @@ async def test_validate_relation_type_rejects_wrong_pair() -> None:
     error = await validate_relation_type_applicability(db, "object", "place", "published_by")
     assert error is not None
     assert "published_by" in error
+
+@pytest.mark.asyncio
+async def test_validate_relation_endpoint_unknown_type() -> None:
+    db = AsyncMock()
+    err = await validate_relation_endpoint(db, "unknown_type", uuid.uuid4())
+    assert err is not None
+    assert "Ungültiger Datensatztyp" in err
+
+
+@pytest.mark.asyncio
+async def test_validate_relation_endpoint_not_found() -> None:
+    db = AsyncMock()
+    exec_mock = MagicMock()
+    exec_mock.scalar_one_or_none.return_value = None
+    db.execute = AsyncMock(return_value=exec_mock)
+    err = await validate_relation_endpoint(db, "object", uuid.uuid4())
+    assert err is not None
+    assert "existiert nicht oder ist gelöscht" in err
+
+
+@pytest.mark.asyncio
+async def test_validate_relation_endpoint_found() -> None:
+    db = AsyncMock()
+    target_id = uuid.uuid4()
+    exec_mock = MagicMock()
+    exec_mock.scalar_one_or_none.return_value = target_id
+    db.execute = AsyncMock(return_value=exec_mock)
+    err = await validate_relation_endpoint(db, "object", target_id)
+    assert err is None
+
+
+@pytest.mark.asyncio
+async def test_sync_schema_relations_filters_unresolvable_targets() -> None:
+    field = FieldDefinition(
+        name="creator",
+        target_type="object",
+        field_type="relation",
+        is_repeatable=False,
+        settings={"target_type": "entity"},
+        is_deleted=False,
+    )
+    rel_res = MagicMock()
+    rel_res.scalars.return_value.all.return_value = [field]
+
+    group_res = MagicMock()
+    group_res.scalars.return_value.all.return_value = []
+
+    manual_res = MagicMock()
+    manual_res.all.return_value = []
+
+    # Target entity check returns None (not found)
+    target_res = MagicMock()
+    target_res.scalar_one_or_none.return_value = None
+
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=[rel_res, group_res, MagicMock(), manual_res, target_res])
+
+    missing_target_id = uuid.uuid4()
+    metadata = {"creator": {"id": str(missing_target_id), "relation_type": "created_by"}}
+
+    await sync_schema_relations(db, "object", uuid.uuid4(), metadata)
+
+    # Ensure db.add was NOT called because target did not resolve
+    db.add.assert_not_called()

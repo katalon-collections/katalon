@@ -104,11 +104,13 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
     try {
       if (isNew) {
         const slug = form.slug.trim()
-        await staticPages.create({ slug, ...payload })
+        const created = await staticPages.create({ slug, ...payload })
+        setPages(prev => [...prev.filter(p => p.slug !== slug), created])
         setIsNew(false)
         setActiveSlug(slug)
       } else {
-        await staticPages.update(activeSlug!, payload)
+        const updated = await staticPages.update(activeSlug!, payload)
+        setPages(prev => prev.map(p => p.slug === activeSlug ? updated : p))
       }
       load()
     } catch (e) {
@@ -121,11 +123,13 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
   async function handleDelete(slug: string) {
     if (!window.confirm(t('deleteConfirm', { slug }))) return
     try {
+      setPages(prev => prev.filter(p => p.slug !== slug))
       await staticPages.delete(slug)
       if (activeSlug === slug) close()
       load()
     } catch (e) {
       alert((e as Error).message)
+      load()
     }
   }
 

@@ -93,6 +93,17 @@ export interface KatalonStorageLocation {
   version: number
 }
 
+export interface StorageLocationObject {
+  id: string
+  idno: string | null
+  title: string
+  object_type: string | null
+  status: string
+  relation_type: string | null
+  storage_location_id: string
+  storage_location_idno: string | null
+}
+
 export type AnyRecord = KatalonObject | Entity | Place | Occurrence | Procedure | KatalonCollection | KatalonStorageLocation
 
 export interface FieldDefinition {
@@ -294,6 +305,7 @@ export interface SearchResult {
   id: string
   record_type: string
   title: string
+  idno?: string | null
   status: string | null
   score: number | null
 }
@@ -424,3 +436,57 @@ export function getLabel(
 }
 
 export const IMPORTER_STATE_KEY = 'katalon_importer_state'
+
+export interface WorkingSet {
+  id: string
+  name: string
+  description: string | null
+  record_type: string
+  user_id: string
+  user_name: string | null
+  is_shared: boolean
+  item_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkingSetItem {
+  id: string
+  set_id: string
+  record_id: string
+  sort_order: number
+  note: string | null
+  created_at: string
+  label: string | null
+  idno: string | null
+  status: string | null
+  thumbnail_url: string | null
+}
+
+export interface WorkingSetDetail extends WorkingSet {
+  items: WorkingSetItem[]
+}
+
+export interface WorkingSetCreate {
+  name: string
+  description?: string | null
+  record_type: string
+  is_shared?: boolean
+}
+
+export interface WorkingSetUpdate {
+  name?: string | null
+  description?: string | null
+  is_shared?: boolean | null
+}
+
+export interface WorkingSetItemCreate {
+  record_id: string
+  sort_order?: number
+  note?: string | null
+}
+
+export interface WorkingSetItemUpdate {
+  sort_order?: number | null
+  note?: string | null
+}

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
@@ -27,6 +28,7 @@ from katalon.api.v1 import (
     banners,
     batch,
     collections,
+    crawlers,
     dnb_urn_mock,
     entities,
     export,
@@ -51,10 +53,12 @@ from katalon.api.v1 import (
     relations,
     schema_admin,
     search,
+    sparql,
     storage_locations,
     theme,
     users,
     vocabularies,
+    working_sets,
 )
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
@@ -107,6 +111,7 @@ OPENAPI_TAGS = [
     {"name": "feedback", "description": "Nutzer-Feedback."},
     {"name": "ai", "description": "KI-gestützte Vorschläge (z. B. Auto-Mapping)."},
     {"name": "dnb-urn-mock", "description": "Test-Double für DNB-URN-Vergabe (nur Dev/Test)."},
+    {"name": "working-sets", "description": "Arbeitslisten / Sets für Ad-hoc-Gruppierungen von Datensätzen."},
 ]
 
 logger = logging.getLogger(__name__)
@@ -312,6 +317,8 @@ async def _ensure_relation_types_vocab() -> None:
 
 _DEFAULT_AUTHORITY_SOURCES = [
     ("gnd",       "Gemeinsame Normdatei (DNB)",        "katalon.integrations.gnd_adapter.GNDAdapter",         True),
+    ("gnd-person",  "GND – Personennormdaten",         "katalon.integrations.gnd_adapter.GNDAdapter",         False),
+    ("gnd-subject", "GND – Sachschlagwörter",          "katalon.integrations.gnd_adapter.GNDAdapter",         False),
     ("geonames",  "GeoNames",                          "katalon.integrations.geonames_adapter.GeonamesAdapter", False),
     ("viaf",      "VIAF (Virtual Int. Authority File)", "katalon.integrations.viaf_adapter.VIAFAdapter",        False),
     ("wikidata",  "Wikidata",                          "katalon.integrations.wikidata_adapter.WikidataAdapter", False),
@@ -472,15 +479,26 @@ try:
 except PackageNotFoundError:
     _api_version = "0.0.0-dev"
 
+def _openapi_operation_id(route: APIRoute) -> str:
+    """Return stable, unique, client-friendly operation IDs."""
+    tag = route.tags[0] if route.tags else "default"
+    method = min(route.methods).lower()
+    path = route.path_format.strip("/").translate(str.maketrans("/{:-}", "_____"))
+    return f"{tag}_{route.name}_{method}_{path}".replace("-", "_")
+
+
 app = FastAPI(
     lifespan=lifespan,
     title="Katalon API",
     description="Metadata Management System for GLAM collections",
     version=_api_version,
+    contact={"name": "Katalon Collections", "url": "https://github.com/katalon-collections/katalon"},
+    license_info={"name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later"},
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
     openapi_tags=OPENAPI_TAGS,
+    generate_unique_id_function=_openapi_operation_id,
 )
 
 def _rate_limit_handler(request: Request, exc: Exception) -> Response:
@@ -494,6 +512,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -538,8 +557,11 @@ app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(feedback.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_authenticated)
+app.include_router(working_sets.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(sparql.router, prefix="")
 app.include_router(ark.router)
 app.include_router(portal_public.router, prefix="/portal/v1")
+app.include_router(crawlers.router, prefix="")
 
 # Mock URN registrar is a test/dev fixture only — never expose its writable
 # in-memory endpoints in production.

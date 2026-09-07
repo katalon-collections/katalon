@@ -11,6 +11,7 @@ from sqlalchemy import Text, func, select
 from sqlalchemy import cast as sql_cast
 from sqlalchemy.orm.attributes import flag_modified
 
+from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import (
     DBDep,
@@ -19,6 +20,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.limiter import limiter
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Place, RecordSnapshot, User
 from katalon.core.schemas import AuditLogRead, PlaceCreate, PlaceRead, SnapshotCreate, SnapshotRead
@@ -173,6 +175,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: User = requir
     "/{place_id}/export",
     summary="Export a single place record as JSON-LD or Turtle RDF",
 )
+@limiter.limit(lambda: settings.rate_limit_public_export)
 async def export_place(
     place_id: uuid.UUID,
     db: DBDep,
@@ -379,7 +382,7 @@ async def delete_place(
     )
     await flush_record(db, place)
     try:
-        await search_service.remove_record(place.id)
+        await search_service.remove_record(place.id, record_type="place")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 

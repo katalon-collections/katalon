@@ -121,6 +121,93 @@ async def test_gnd_fetch_404_returns_none() -> None:
     assert hit is None
 
 
+@pytest.mark.asyncio
+async def test_gnd_search_without_filter_omits_filter_param() -> None:
+    captured: dict = {}
+
+    class _CapturingClient(_http({"member": []})):
+        async def get(self, *args, **kwargs):
+            captured.update(kwargs.get("params", {}))
+            return await super().get(*args, **kwargs)
+
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _CapturingClient):
+        await GNDAdapter().search("beethoven")
+    assert "filter" not in captured
+
+
+@pytest.mark.asyncio
+async def test_gnd_search_with_filter_passes_filter_param() -> None:
+    captured: dict = {}
+
+    class _CapturingClient(_http({"member": []})):
+        async def get(self, *args, **kwargs):
+            captured.update(kwargs.get("params", {}))
+            return await super().get(*args, **kwargs)
+
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _CapturingClient):
+        await GNDAdapter(filter_type="type:SubjectHeading").search("fotografie")
+    assert captured["filter"] == "type:SubjectHeading"
+
+
+@pytest.mark.asyncio
+async def test_gnd_search_respects_custom_source_id() -> None:
+    data = {"member": [{"gndIdentifier": "123", "preferredName": "Beethoven", "type": ["Person"]}]}
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _http(data)):
+        hits = await GNDAdapter(filter_type="type:Person", source_id="gnd-person").search("beethoven")
+    assert len(hits) == 1
+    assert hits[0].source == "gnd-person"
+
+
+@pytest.mark.asyncio
+async def test_gnd_fetch_respects_custom_source_id() -> None:
+    data = {"preferredName": "Fotografie", "type": ["SubjectHeading"]}
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _http(data)):
+        hit = await GNDAdapter(source_id="gnd-subject").fetch("4045895-7")
+    assert hit is not None
+    assert hit.source == "gnd-subject"
+
+
+@pytest.mark.asyncio
+async def test_gnd_search_handles_null_profession_and_falls_back_to_subject_category() -> None:
+    data = {
+        "member": [
+            {
+                "gndIdentifier": "1238406432",
+                "preferredName": "Beethoven, Maria Josepha van",
+                "professionOrOccupation": None,
+                "type": ["Person"],
+            },
+            {
+                "gndIdentifier": "4045895-7",
+                "preferredName": "Fotografie",
+                "professionOrOccupation": None,
+                "gndSubjectCategory": [{"id": "...", "label": "Fotografie"}],
+                "type": ["SubjectHeading"],
+            },
+        ]
+    }
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _http(data)):
+        hits = await GNDAdapter().search("test")
+    assert len(hits) == 2
+    assert hits[0].description == ""
+    assert hits[1].description == "Fotografie"
+
+
+@pytest.mark.asyncio
+async def test_gnd_fetch_falls_back_to_definition_and_category() -> None:
+    data_def = {"preferredName": "Term", "definition": ["Eine Definition."]}
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _http(data_def)):
+        hit_def = await GNDAdapter().fetch("1")
+    assert hit_def is not None
+    assert hit_def.description == "Eine Definition."
+
+    data_cat = {"preferredName": "Term", "gndSubjectCategory": [{"label": "Kategorie 1"}]}
+    with patch("katalon.integrations.gnd_adapter.httpx.AsyncClient", _http(data_cat)):
+        hit_cat = await GNDAdapter().fetch("2")
+    assert hit_cat is not None
+    assert hit_cat.description == "Kategorie 1"
+
+
 # ── VIAF ─────────────────────────────────────────────────────────────────────
 
 

@@ -662,6 +662,21 @@ class OAISet(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
+class SavedSparqlQuery(Base):
+    __tablename__ = "saved_sparql_queries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    title: Mapped[str] = mapped_column(String(256), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    query: Mapped[str] = mapped_column(Text)
+    tags: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    is_shared: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
 # ---------------------------------------------------------------------------
 # Users
 # ---------------------------------------------------------------------------
@@ -823,3 +838,46 @@ class Banner(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+# ---------------------------------------------------------------------------
+# Working Sets (Arbeitslisten / Sets)
+# ---------------------------------------------------------------------------
+
+
+class WorkingSet(Base):
+    __tablename__ = "working_sets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    record_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    is_shared: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
+    items: Mapped[list["WorkingSetItem"]] = relationship(
+        "WorkingSetItem", back_populates="working_set", cascade="all, delete-orphan", order_by="WorkingSetItem.sort_order"
+    )
+
+
+class WorkingSetItem(Base):
+    __tablename__ = "working_set_items"
+    __table_args__ = (
+        UniqueConstraint("set_id", "record_id", name="uq_working_set_items_set_record"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    set_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("working_sets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    working_set: Mapped[WorkingSet] = relationship("WorkingSet", back_populates="items")

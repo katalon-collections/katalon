@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, computed_field
-from sqlalchemy import and_, exists, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 
 from katalon.api.v1 import (
     banners,
@@ -25,10 +25,12 @@ from katalon.api.v1 import (
     theme,
 )
 from katalon.api.v1.search import SearchResponse, _range_filters
+from katalon.config import settings
 from katalon.core.dependencies import DBDep, OptionalCurrentUser
 from katalon.core.limiter import limiter
 from katalon.core.models import (
     Banner,
+    Collection,
     Entity,
     FieldDefinition,
     Object,
@@ -47,13 +49,16 @@ from katalon.services import relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 
 router = APIRouter(tags=["portal"])
-_PUBLIC_TYPES = ("object", "entity", "place", "occurrence")
+_PUBLIC_TYPES = ("object", "entity", "place", "occurrence", "collection")
 _PORTAL_STAFF_ROLES = {"superuser", "admin", "editor", "cataloger", "viewer"}
-_MODELS: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
+_MODELS: dict[
+    str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Collection]
+] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
+    "collection": Collection,
 }
 
 
@@ -120,6 +125,36 @@ class PortalOccurrenceRead(PortalRecordRead):
     _record_type: ClassVar[str] = "occurrence"
 
     occurrence_type: str | None
+
+
+class PortalCollectionRead(PortalRecordRead):
+    _api_path: ClassVar[str] = "collections"
+    _record_type: ClassVar[str] = "collection"
+
+    collection_type: str | None = None
+    parent_id: uuid.UUID | None = None
+
+
+class PortalCollectionHierarchyItem(BaseModel):
+    id: uuid.UUID
+    idno: str | None
+    collection_type: str | None
+    title: str | None = None
+    parent_id: uuid.UUID | None = None
+
+
+class PortalCollectionDetail(PortalCollectionRead):
+    parent: PortalCollectionHierarchyItem | None = None
+    ancestors: list[PortalCollectionHierarchyItem] = []
+    children: list[PortalCollectionHierarchyItem] = []
+    member_objects_count: int = 0
+
+
+class PortalCollectionPage(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[PortalCollectionRead]
 
 
 class PortalObjectPage(BaseModel):
@@ -237,6 +272,7 @@ class PortalVocabularyTermRead(BaseModel):
     applies_to: list[str]
     uri: str | None = None
     exact_match_uris: list[str] = []
+
     @computed_field(alias="_links")
     def links(self) -> dict[str, dict[str, str]]:
         base = f"/portal/v1/vocabularies/{self.vocabulary_id}/terms/{self.id}"
@@ -260,7 +296,9 @@ async def list_objects(
     object_type: str | None = None,
     q: str | None = None,
 ) -> dict[str, Any]:
-    return await objects.list_objects(db, _staff_user(current_user), page, page_size, None, object_type, q)
+    return await objects.list_objects(
+        db, _staff_user(current_user), page, page_size, None, object_type, q
+    )
 
 
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
@@ -291,24 +329,183 @@ async def get_occurrence(
     return await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
 
 
+@router.get("/collections", response_model=PortalCollectionPage)
+async def list_collections(
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+    parent_id: uuid.UUID | None = None,
+    q: str | None = None,
+) -> dict[str, Any]:
+    staff_user = _staff_user(current_user)
+    query = select(Collection).where(Collection.deleted_at.is_(None))
+    if staff_user is None:
+        query = query.where(Collection.status.in_(PUBLIC_STATUSES))
+    if parent_id is not None:
+        query = query.where(Collection.parent_id == parent_id)
+    if q:
+        from sqlalchemy import Text, cast
+
+        query = query.where(
+            Collection.idno.icontains(q, autoescape=True)
+            | cast(Collection.metadata_, Text).icontains(q, autoescape=True)
+        )
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
+    query = (
+        query.order_by(Collection.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    )
+    items = (await db.execute(query)).scalars().all()
+    response_items: list[PortalCollectionRead] = []
+    for col in items:
+        metadata = col.metadata_ or {}
+        if staff_user is None:
+            from katalon.services.public_metadata_service import (
+                filter_public_metadata,
+                load_public_fields,
+            )
+
+            pub_fields = await load_public_fields(db, "collection")
+            metadata = filter_public_metadata(metadata, pub_fields, col.collection_type)
+        response_items.append(
+            PortalCollectionRead(
+                id=col.id,
+                idno=col.idno,
+                status=col.status,
+                collection_type=col.collection_type,
+                parent_id=col.parent_id,
+                metadata_=metadata,
+                created_at=col.created_at,
+                updated_at=col.updated_at,
+            )
+        )
+    return {"total": total, "page": page, "page_size": page_size, "items": response_items}
+
+
+@router.get("/collections/{collection_id}", response_model=PortalCollectionDetail)
+async def get_collection(
+    collection_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> PortalCollectionDetail:
+    staff_user = _staff_user(current_user)
+    query = select(Collection).where(
+        Collection.id == collection_id, Collection.deleted_at.is_(None)
+    )
+    if staff_user is None:
+        query = query.where(Collection.status.in_(PUBLIC_STATUSES))
+    result = await db.execute(query)
+    col = result.scalar_one_or_none()
+    if not col:
+        raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
+
+    metadata = col.metadata_ or {}
+    if staff_user is None:
+        from katalon.services.public_metadata_service import (
+            filter_public_metadata,
+            load_public_fields,
+        )
+
+        pub_fields = await load_public_fields(db, "collection")
+        metadata = filter_public_metadata(metadata, pub_fields, col.collection_type)
+
+    from katalon.services.search_service import _extract_title
+
+    ancestors: list[PortalCollectionHierarchyItem] = []
+    curr_parent_id = col.parent_id
+    visited: set[uuid.UUID] = {col.id}
+    parent_item: PortalCollectionHierarchyItem | None = None
+    while curr_parent_id is not None and curr_parent_id not in visited:
+        visited.add(curr_parent_id)
+        p_query = select(Collection).where(
+            Collection.id == curr_parent_id, Collection.deleted_at.is_(None)
+        )
+        if staff_user is None:
+            p_query = p_query.where(Collection.status.in_(PUBLIC_STATUSES))
+        p_col = (await db.execute(p_query)).scalar_one_or_none()
+        if not p_col:
+            break
+        title = _extract_title(p_col.metadata_ or {}) or p_col.idno or str(p_col.id)[:8]
+        ancestor_item = PortalCollectionHierarchyItem(
+            id=p_col.id,
+            idno=p_col.idno,
+            collection_type=p_col.collection_type,
+            title=title,
+            parent_id=p_col.parent_id,
+        )
+        ancestors.insert(0, ancestor_item)
+        if parent_item is None:
+            parent_item = ancestor_item
+        curr_parent_id = p_col.parent_id
+
+    # Resolve immediate public child collections
+    c_query = select(Collection).where(
+        Collection.parent_id == col.id, Collection.deleted_at.is_(None)
+    )
+    if staff_user is None:
+        c_query = c_query.where(Collection.status.in_(PUBLIC_STATUSES))
+    children_cols = (
+        (await db.execute(c_query.order_by(Collection.created_at.asc()))).scalars().all()
+    )
+    children_items = [
+        PortalCollectionHierarchyItem(
+            id=c.id,
+            idno=c.idno,
+            collection_type=c.collection_type,
+            title=_extract_title(c.metadata_ or {}) or c.idno or str(c.id)[:8],
+            parent_id=c.parent_id,
+        )
+        for c in children_cols
+    ]
+
+    # Count linked member objects
+    member_count_stmt = select(func.count(Relation.id)).where(
+        Relation.to_type == "collection",
+        Relation.to_id == col.id,
+        Relation.from_type == "object",
+    )
+    member_objects_count = (await db.execute(member_count_stmt)).scalar_one() or 0
+
+    return PortalCollectionDetail(
+        id=col.id,
+        idno=col.idno,
+        status=col.status,
+        collection_type=col.collection_type,
+        parent_id=col.parent_id,
+        metadata_=metadata,
+        created_at=col.created_at,
+        updated_at=col.updated_at,
+        parent=parent_item,
+        ancestors=ancestors,
+        children=children_items,
+        member_objects_count=member_objects_count,
+    )
+
+
 @router.get("/objects/{object_id}/media", response_model=list[PortalMediaRead])
-async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict[str, Any]]:
+async def list_media(
+    object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> list[dict[str, Any]]:
     items = await media.list_media(object_id, db, _staff_user(current_user))
     return [{**item, "object_id": object_id} for item in items]
 
 
 @router.get("/objects/{object_id}/media/{media_id}/file")
-async def serve_media_file(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> FileResponse:
+async def serve_media_file(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> FileResponse:
     return await media.serve_media_file(object_id, media_id, db, _staff_user(current_user))
 
 
 @router.get("/objects/{object_id}/media/{media_id}/thumbnail")
-async def serve_media_thumbnail(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> RedirectResponse:
+async def serve_media_thumbnail(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> RedirectResponse:
     return await media.serve_media_thumbnail(object_id, media_id, db, _staff_user(current_user))
 
 
 @router.get("/objects/{object_id}/iiif/manifest")
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser) -> dict[str, Any]:
+async def iiif_manifest(
+    object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser
+) -> dict[str, Any]:
     return await objects.iiif_manifest(object_id, db, request, _staff_user(current_user))
 
 
@@ -320,7 +517,9 @@ def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
             model.status.in_(PUBLIC_STATUSES),
             model.deleted_at.is_(None),
         ]
-        clauses.append(and_(type_column == record_type, exists(select(model.id).where(*conditions))))
+        clauses.append(
+            and_(type_column == record_type, exists(select(model.id).where(*conditions)))
+        )
     return or_(*clauses)
 
 
@@ -332,6 +531,7 @@ async def list_relations(
     to_type: str | None = None,
     to_id: uuid.UUID | None = None,
     limit: int = Query(100, ge=1, le=500),
+    include_subcollections: bool = False,
 ) -> list[PortalRelationRead]:
     query = select(Relation).where(
         _public_endpoint_clause(Relation.from_type, Relation.from_id),
@@ -342,16 +542,27 @@ async def list_relations(
             return []
         query = query.where(Relation.from_type == from_type)
     if from_id:
-        query = query.where(Relation.from_id == from_id)
+        if from_type == "collection" and include_subcollections:
+            from katalon.services.collection_service import get_collection_subtree_ids
+
+            subtree_ids = await get_collection_subtree_ids(db, from_id, public_only=True)
+            query = query.where(Relation.from_id.in_(subtree_ids))
+        else:
+            query = query.where(Relation.from_id == from_id)
     if to_type:
         if to_type not in _PUBLIC_TYPES:
             return []
         query = query.where(Relation.to_type == to_type)
     if to_id:
-        query = query.where(Relation.to_id == to_id)
-    relations = list(
-        (await db.execute(query.order_by(Relation.created_at.desc()).limit(limit))).scalars().all()
-    )
+        if to_type == "collection" and include_subcollections:
+            from katalon.services.collection_service import get_collection_subtree_ids
+
+            subtree_ids = await get_collection_subtree_ids(db, to_id, public_only=True)
+            query = query.where(Relation.to_id.in_(subtree_ids))
+        else:
+            query = query.where(Relation.to_id == to_id)
+    query = query.limit(limit)
+    relations = (await db.execute(query)).scalars().all()
     labels = await relation_service.resolve_relation_labels(db, relations, public_only=True)
     return [
         PortalRelationRead(
@@ -369,7 +580,7 @@ async def list_relations(
 
 
 @router.get("/search", response_model=SearchResponse)
-@limiter.limit("100/minute")
+@limiter.limit(lambda: settings.rate_limit_public_search)
 async def search(
     request: Request,
     db: DBDep,
@@ -382,6 +593,7 @@ async def search(
     rel_entity: str | None = None,
     rel_place: str | None = None,
     rel_occurrence: str | None = None,
+    rel_collection: str | None = None,
 ) -> SearchResponse:
     staff_user = _staff_user(current_user)
     if type and type not in _PUBLIC_TYPES:
@@ -397,9 +609,15 @@ async def search(
             "related_entities": rel_entity,
             "related_places": rel_place,
             "related_occurrences": rel_occurrence,
+            "related_collections": rel_collection,
         }.items()
         if value
     }
+    if rel_collection:
+        from katalon.services.collection_service import get_collection_subtree_titles
+
+        sub_titles = await get_collection_subtree_titles(db, rel_collection, public_only=True)
+        rel_filters["related_collections"] = sub_titles
     portal_config = (
         await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
     ).scalar_one_or_none()
@@ -416,7 +634,9 @@ async def search(
         page_size=page_size,
         extra_filters=extra_filters or None,
         numeric_filters=numeric_filters or None,
-        facet_fields=[field.strip() for field in facets.split(",") if field.strip()] if facets else None,
+        facet_fields=[field.strip() for field in facets.split(",") if field.strip()]
+        if facets
+        else None,
         rel_filters=rel_filters or None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
@@ -425,7 +645,7 @@ async def search(
 
 
 @router.post("/search/advanced", response_model=SearchResponse)
-@limiter.limit("100/minute")
+@limiter.limit(lambda: settings.rate_limit_public_search)
 async def advanced_search(
     request: Request,
     data: AdvancedSearchRequest,
@@ -440,7 +660,9 @@ async def advanced_search(
     allowed_relation_filters = {
         key: value
         for key, value in data.relation_filters.items()
-        if key in {"related_entities", "related_places", "related_occurrences"} and value
+        if key
+        in {"related_entities", "related_places", "related_occurrences", "related_collections"}
+        and value
     }
     portal_config = (
         await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
@@ -547,7 +769,9 @@ async def list_terms(vocab_id: uuid.UUID, db: DBDep) -> list[VocabularyTerm]:
     if vocab is None or vocab.name != "relation_types":
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
     result = await db.execute(
-        select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id).order_by(VocabularyTerm.term)
+        select(VocabularyTerm)
+        .where(VocabularyTerm.vocabulary_id == vocab_id)
+        .order_by(VocabularyTerm.term)
     )
     return list(result.scalars().all())
 

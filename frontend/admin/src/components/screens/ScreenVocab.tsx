@@ -8,7 +8,8 @@ import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, RecordType, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import { ChevD, ChevR, Edit, Help, Plus, Tag, Trash, Upload, X } from '../ui/Icons'
+import { ChevD, ChevR, Copy, Edit, Help, Plus, Tag, Trash, Upload, X } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { LabelEditor } from '../ui/LabelEditor'
 import { HelpPopover } from '../ui/HelpPopover'
 import { VocabularyImport } from './VocabularyImport'
@@ -391,7 +392,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     setError(null)
     setSavingTerm(true)
     try {
-      await vocabularies.createTerm(activeVocab, {
+      const created = await vocabularies.createTerm(activeVocab, {
         vocabulary_id: activeVocab,
         term: newTermTerm.trim(),
         label: newTermLabel,
@@ -403,6 +404,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         uri: newTermUri.trim() || null,
         exact_match_uris: newTermExactMatchUris.split(/[\n,]+/).map(s => s.trim()).filter(Boolean),
       })
+      setTerms(prev => [...prev, created])
       setNewTermTerm('')
       setNewTermLabel({})
       setNewTermInverseLabel({})
@@ -467,8 +469,21 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
     if (!window.confirm(message)) return
     setError(null)
     try {
+      setTerms(prev => prev.filter(term => term.id !== id))
       await vocabularies.deleteTerm(id)
       loadTerms()
+    } catch (e) {
+      setError((e as Error).message)
+      loadTerms()
+    }
+  }
+
+  async function duplicateTerm(termItem: VocabularyTerm) {
+    setError(null)
+    try {
+      const dup = await vocabularies.duplicateTerm(termItem.id)
+      await loadTerms()
+      startEditTerm(dup)
     } catch (e) {
       setError((e as Error).message)
     }
@@ -766,12 +781,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 160 }}>ID</th>
+                      <th style={{ width: 160 }}>ID</th>
                       <th>Label</th>
                       {vocab.kind === 'relation' && <th>{t('tableHeaders.inverse')}</th>}
                       {vocab.kind === 'relation' && <th>{t('tableHeaders.types')}</th>}
                       {isHierarchical && <th>{t('tableHeaders.parent')}</th>}
-                      <th className="col-act" />
+                      <th className={isHierarchical ? 'col-act col-act-wide' : 'col-act'} />
                     </tr>
                   </thead>
                   <tbody>
@@ -877,7 +892,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                         </Fragment>
                       ) : (
                         <tr key={termItem.id} style={selectedTermId === termItem.id ? { background: 'var(--accent-50)' } : undefined}>
-                          <td className="mono" style={{ minWidth: 160, width: 160, paddingLeft: 12 + depth * 16 }}>
+                          <td className="mono" style={{ paddingLeft: 12 + depth * 16 }}>
                             <div>{termItem.term}</div>
                             {termItem.uri && (
                               <div style={{ fontSize: 11, color: 'var(--fg-3)', wordBreak: 'break-all', marginTop: 2 }}>
@@ -896,18 +911,45 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                               </div>
                             )}
                           </td>
-                          <td style={{ maxWidth: 220 }}>
+                          <td>
                             {getLabel(termItem, '—')}
                             <MetadataSummary fields={termFields} metadata={termItem.metadata_ ?? {}} />
                           </td>
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220 }}>{getLabel({ label: termItem.inverse_label }, '—')}</td>}
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>{appliesLabel(t, termItem)}</td>}
-                          {isHierarchical && <td style={{ color: 'var(--fg-3)', maxWidth: 160 }}>{termItem.parent_id ? getLabel(terms.find(term => term.id === termItem.parent_id) ?? termItem, '—') : '—'}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)' }}>{getLabel({ label: termItem.inverse_label }, '—')}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', fontSize: 12 }}>{appliesLabel(t, termItem)}</td>}
+                          {isHierarchical && <td style={{ color: 'var(--fg-3)' }}>{termItem.parent_id ? getLabel(terms.find(term => term.id === termItem.parent_id) ?? termItem, '—') : '—'}</td>}
                           <td className="col-act">
                             <div className="row-actions">
-                              <button className="btn sm ico gh" onClick={() => startEditTerm(termItem)}><Edit size={12} /></button>
-                              {isHierarchical && <button className="btn sm gh" onClick={() => startNewChild(termItem)}><Plus size={12} /> Unterterm</button>}
-                              <button className="btn sm ico gh dn" onClick={() => deleteTerm(termItem.id)}><Trash size={12} /></button>
+                              <ActionMenu
+                                ariaLabel={`Aktionen für ${getLabel(termItem, termItem.term)}`}
+                                items={[
+                                  {
+                                    key: 'edit',
+                                    label: t('editRow'),
+                                    icon: <Edit size={13} />,
+                                    onClick: () => startEditTerm(termItem),
+                                  },
+                                  {
+                                    key: 'duplicate',
+                                    label: t('duplicateRow'),
+                                    icon: <Copy size={13} />,
+                                    onClick: () => duplicateTerm(termItem),
+                                  },
+                                  ...(isHierarchical ? [{
+                                    key: 'add-child',
+                                    label: t('addChildTerm'),
+                                    icon: <Plus size={13} />,
+                                    onClick: () => startNewChild(termItem),
+                                  }] : []),
+                                  {
+                                    key: 'delete',
+                                    label: t('deleteRow'),
+                                    icon: <Trash size={13} />,
+                                    danger: true,
+                                    onClick: () => deleteTerm(termItem.id),
+                                  },
+                                ]}
+                              />
                             </div>
                           </td>
                         </tr>

@@ -3,13 +3,15 @@
 
 Usage:
 
-    python scripts/gen_openapi.py [OUTPUT_PATH]
+    python scripts/gen_openapi.py [OUTPUT_PATH] [--check]
 
-Defaults to writing openapi.json in the repository root.
+Defaults to writing openapi.json in the repository root. ``--check`` validates
+the generated schema and fails when the output file is stale.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -35,31 +37,30 @@ def _set_minimal_env() -> None:
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
-    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "openapi.json"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("output", nargs="?", type=Path, default=repo_root / "openapi.json")
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
 
     _set_minimal_env()
     sys.path.insert(0, str(repo_root / "backend" / "src"))
 
-    from fastapi.openapi.utils import get_openapi
+    from fastapi.openapi.models import OpenAPI
     from katalon.main import app
 
-    schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        openapi_version=app.openapi_version,
-        description=app.description,
-        routes=app.routes,
-        tags=app.openapi_tags,
-    )
+    schema = app.openapi()
+    OpenAPI.model_validate(schema)
+    rendered = json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
 
-    # Remove internal debug-only mock endpoints from the published schema.
-    paths = schema.get("paths", {})
-    for path in list(paths.keys()):
-        if path.startswith("/v1/dnb-urn-mock"):
-            del paths[path]
+    if args.check:
+        if not args.output.exists() or args.output.read_text(encoding="utf-8") != rendered:
+            print(f"{args.output} is stale; run scripts/gen_openapi.py")
+            return 1
+        print(f"Validated {len(schema.get('paths', {}))} paths in {args.output}")
+        return 0
 
-    output_path.write_text(json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Wrote {len(schema.get('paths', {}))} paths to {output_path}")
+    args.output.write_text(rendered, encoding="utf-8")
+    print(f"Wrote {len(schema.get('paths', {}))} paths to {args.output}")
     return 0
 
 

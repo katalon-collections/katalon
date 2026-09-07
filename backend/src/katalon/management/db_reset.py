@@ -37,6 +37,7 @@ _CONFIG_TABLES: set[str] = {
     "portal_config",
     "record_subtypes",
     "role_permissions",
+    "saved_sparql_queries",
     "static_pages",
     "users",
     "vocabularies",

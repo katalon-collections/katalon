@@ -11,6 +11,7 @@ frontend/portal/dist/
 frontend/admin/node_modules/.bin/
 frontend/admin/node_modules/.vite/
 frontend/admin/node_modules/
+**/.pnpm-store/
 docker-compose.log
 docker-compose.override.yml
 .claude/settings.local.json
@@ -19,6 +20,7 @@ docker-compose.override.yml
 .codegraph/
 .agents/knowledge/_site/
 first-run-credentials.txt
+Caddyfile
 reset-credentials.txt
 .media/
 media/

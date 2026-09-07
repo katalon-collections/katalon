@@ -4,17 +4,18 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
-import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
 import { resolveActiveVariant } from '../../lib/formVariants'
-import { AlertCircle, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
+import { AlertCircle, Bookmark, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { RichTextEditor } from '../ui/RichTextEditor'
 import { MediaLightbox } from '../MediaLightbox'
+import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
 
@@ -338,49 +339,71 @@ function navigateToRecord(type: string, id: string) {
 }
 
 function procedureSearchResult(proc: AnyRecord): SearchResult {
-  const idno = (proc as { idno?: string | null }).idno
+  const idno = (proc as { idno?: string | null }).idno ?? null
+  const label = extractTitle(proc.metadata_ as Record<string, unknown>, '') || idno || proc.id.slice(0, 8) + '…'
   return {
     id: proc.id,
     record_type: 'procedure',
-    title: formatRecordLabel(proc.metadata_ as Record<string, unknown>, idno, proc.id.slice(0, 8) + '…'),
+    title: label,
+    idno,
     status: (proc as { status?: string | null }).status ?? null,
     score: null,
   }
 }
 
 function recordSearchResult(recordType: RecordType, record: AnyRecord): SearchResult {
-  const idno = (record as { idno?: string | null }).idno
+  const idno = (record as { idno?: string | null }).idno ?? null
+  const label = extractTitle(record.metadata_ as Record<string, unknown>, '') || idno || record.id.slice(0, 8) + '…'
   return {
     id: record.id,
     record_type: recordType,
-    title: formatRecordLabel(record.metadata_ as Record<string, unknown>, idno, record.id.slice(0, 8) + '…'),
+    title: label,
+    idno,
     status: (record as { status?: string | null }).status ?? null,
     score: null,
   }
 }
 
-async function searchRecords(targetType: RecordType, q: string, targetSubtype?: string): Promise<SearchResult[]> {
-  // Storage locations aren't indexed in Elasticsearch — always query the DB list endpoint directly,
-  // which also supports an empty q (used to list all locations before the user starts typing).
+export async function searchRecords(targetType: RecordType, q: string, targetSubtype?: string): Promise<SearchResult[]> {
+  const trimmed = q.trim()
   if (targetType === 'storage_location') {
-    return (await storageLocations.list({ q: q || undefined, storage_location_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+    return (await storageLocations.list({ q: trimmed || undefined, storage_location_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+  }
+  if (targetType === 'procedure') {
+    return (await procedures.list({ q: trimmed || undefined, procedure_type: targetSubtype, page_size: 20 })).items.map(procedureSearchResult)
+  }
+  if (targetType === 'collection') {
+    return (await collections.list({ q: trimmed || undefined, collection_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+  }
+  if (!trimmed) {
+    switch (targetType) {
+      case 'object':
+        return (await objects.list({ object_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+      case 'entity':
+        return (await entities.list({ entity_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+      case 'place':
+        return (await places.list({ place_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+      case 'occurrence':
+        return (await occurrences.list({ occurrence_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
+    }
   }
   if (!targetSubtype) {
-    return (await searchApi.query(q, targetType, 8)).items
+    try {
+      const searchRes = await searchApi.query(trimmed, targetType, 20)
+      if (searchRes.items.length > 0) return searchRes.items
+    } catch {
+      // Fallback to direct DB list endpoint below
+    }
   }
   switch (targetType) {
     case 'object':
-      return (await objects.list({ q, object_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+      return (await objects.list({ q: trimmed || undefined, object_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
     case 'entity':
-      return (await entities.list({ q, entity_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+      return (await entities.list({ q: trimmed || undefined, entity_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
     case 'place':
-      return (await places.list({ q, place_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+      return (await places.list({ q: trimmed || undefined, place_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
     case 'occurrence':
-      return (await occurrences.list({ q, occurrence_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
-    case 'procedure':
-      return (await procedures.list({ q, procedure_type: targetSubtype, page_size: 8 })).items.map(procedureSearchResult)
-    case 'collection':
-      return (await collections.list({ q, collection_type: targetSubtype, page_size: 8 })).items.map(r => recordSearchResult(targetType, r))
+      return (await occurrences.list({ q: trimmed || undefined, occurrence_type: targetSubtype, page_size: 20 })).items.map(r => recordSearchResult(targetType, r))
   }
 }
 
@@ -459,34 +482,51 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  const updateDropPosition = useCallback(() => {
+    if (!inputRef.current) return
+    const r = inputRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+    setDropPos({
+      top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+      left: r.left,
+      width: r.width,
+      maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+    })
+  }, [])
+
   useEffect(() => {
-    if (open && inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      const spaceAbove = r.top - 8
-      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
-      setDropPos({
-        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
-        left: r.left,
-        width: r.width,
-        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
-      })
+    if (!open) return
+    updateDropPosition()
+    window.addEventListener('resize', updateDropPosition)
+    window.addEventListener('scroll', updateDropPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateDropPosition)
+      window.removeEventListener('scroll', updateDropPosition, true)
     }
-  }, [open])
+  }, [open, updateDropPosition])
 
   useEffect(() => {
     clearTimeout(timer.current)
     if (!vocabId) { setResults([]); setOpen(false); return }
-    if (q.trim().length < 1) { setResults([]); return }
+    const isFocused = document.activeElement === inputRef.current
+    if (!isFocused && !open) return
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, q.trim())
-        .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
+        .then(r => {
+          setResults(orderVocabSuggestions(r))
+          updateDropPosition()
+          if (document.activeElement === inputRef.current) {
+            setOpen(r.length > 0)
+          }
+        })
         .catch(() => setResults([]))
         .finally(() => setBusy(false))
     }, 200)
     return () => clearTimeout(timer.current)
-  }, [q, vocabId])
+  }, [q, vocabId, open, updateDropPosition])
 
   useEffect(() => {
     if (!value) {
@@ -502,9 +542,16 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
 
   function openSuggestions() {
     if (!vocabId) return
+    updateDropPosition()
     setBusy(true)
     vocabularies.searchTerms(vocabId, q.trim())
-      .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
+      .then(r => {
+        setResults(orderVocabSuggestions(r))
+        updateDropPosition()
+        if (document.activeElement === inputRef.current) {
+          setOpen(r.length > 0)
+        }
+      })
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
@@ -541,6 +588,14 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
         value={q}
         onChange={e => setQ(e.target.value)}
         onFocus={openSuggestions}
+        onClick={openSuggestions}
+        onBlur={e => {
+          if (dropRef.current?.contains(e.relatedTarget as Node)) return
+          setOpen(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { setOpen(false); setResults([]) }
+        }}
         placeholder={vocabId ? 'Tippen zum Suchen…' : 'Kein Vokabular zugewiesen'}
         disabled={disabled || !vocabId}
       />
@@ -611,39 +666,63 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  const updateDropPosition = useCallback(() => {
+    if (!inputRef.current) return
+    const r = inputRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
+    setDropPos({
+      top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
+      left: r.left, width: r.width,
+      maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
+    })
+  }, [])
+
   useEffect(() => {
-    if (open && inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      const spaceAbove = r.top - 8
-      const showBelow = spaceBelow >= 120 || spaceBelow >= spaceAbove
-      setDropPos({
-        top: showBelow ? r.bottom + 2 : r.top - Math.min(280, spaceAbove) - 2,
-        left: r.left, width: r.width,
-        maxHeight: showBelow ? Math.min(280, spaceBelow) : Math.min(280, spaceAbove),
-      })
+    if (!open) return
+    updateDropPosition()
+    window.addEventListener('resize', updateDropPosition)
+    window.addEventListener('scroll', updateDropPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateDropPosition)
+      window.removeEventListener('scroll', updateDropPosition, true)
     }
-  }, [open])
+  }, [open, updateDropPosition])
 
   useEffect(() => {
     clearTimeout(timer.current)
     if (!vocabId) { setResults([]); setOpen(false); return }
-    if (draft.trim().length < 1) { setResults([]); return }
+    const isFocused = document.activeElement === inputRef.current
+    if (!isFocused && !open) return
     timer.current = setTimeout(() => {
       setBusy(true)
       vocabularies.searchTerms(vocabId, draft.trim())
-        .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
+        .then(r => {
+          setResults(orderVocabSuggestions(r))
+          updateDropPosition()
+          if (document.activeElement === inputRef.current) {
+            setOpen(r.length > 0)
+          }
+        })
         .catch(() => setResults([]))
         .finally(() => setBusy(false))
     }, 200)
     return () => clearTimeout(timer.current)
-  }, [draft, vocabId])
+  }, [draft, vocabId, open, updateDropPosition])
 
   function openSuggestions() {
     if (!vocabId) return
+    updateDropPosition()
     setBusy(true)
     vocabularies.searchTerms(vocabId, draft.trim())
-      .then(r => { setResults(orderVocabSuggestions(r)); setOpen(r.length > 0) })
+      .then(r => {
+        setResults(orderVocabSuggestions(r))
+        updateDropPosition()
+        if (document.activeElement === inputRef.current) {
+          setOpen(r.length > 0)
+        }
+      })
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
@@ -674,6 +753,11 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
           if (!onAdd) onChange?.(e.target.value)
         }}
         onFocus={openSuggestions}
+        onClick={openSuggestions}
+        onBlur={e => {
+          if (dropRef.current?.contains(e.relatedTarget as Node)) return
+          setOpen(false)
+        }}
         onKeyDown={e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
           if (e.key === 'Escape') { setOpen(false); setResults([]) }
@@ -858,41 +942,75 @@ function RelationInput({
     if (!showDrop) return
     updateDropPosition()
     window.addEventListener('resize', updateDropPosition)
-    return () => window.removeEventListener('resize', updateDropPosition)
+    window.addEventListener('scroll', updateDropPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateDropPosition)
+      window.removeEventListener('scroll', updateDropPosition, true)
+    }
   }, [showDrop, updateDropPosition])
 
-  const minQueryLen = targetType === 'storage_location' ? 0 : 2
+  useEffect(() => {
+    if (!targetType) {
+      setResults([])
+      return
+    }
+    let active = true
+    setSearching(true)
+    searchRecords(targetType as RecordType, '', targetSubtype)
+      .then(items => {
+        if (active) setResults(items)
+      })
+      .catch(() => {
+        if (active) setResults([])
+      })
+      .finally(() => {
+        if (active) setSearching(false)
+      })
+    return () => { active = false }
+  }, [targetType, targetSubtype])
 
   useEffect(() => {
     clearTimeout(timer.current)
-    if (q.trim().length < minQueryLen) { setResults([]); setSearching(false); return }
+    if (!targetType) return
+    const isFocused = document.activeElement === inputRef.current
+    if (!isFocused && !showDrop) return
     timer.current = setTimeout(() => {
       setSearching(true)
       searchRecords(targetType as RecordType, q.trim(), targetSubtype)
         .then(items => {
           setResults(items)
-          setShowDrop(true)
+          updateDropPosition()
+          if (document.activeElement === inputRef.current) {
+            setShowDrop(true)
+          }
         })
         .catch(() => setResults([]))
         .finally(() => setSearching(false))
-    }, 300)
+    }, 250)
     return () => clearTimeout(timer.current)
-  }, [q, targetType, targetSubtype])
+  }, [q, targetType, targetSubtype, showDrop, updateDropPosition])
 
   function openSuggestions() {
     if (!targetType) return
-    if (q.trim().length < minQueryLen) { setSearching(false); return }
-    setSearching(true)
-    searchRecords(targetType as RecordType, q.trim(), targetSubtype)
-      .then(items => {
-        setResults(items)
-        setShowDrop(true)
-      })
-      .catch(() => {
-        setResults([])
-        setShowDrop(false)
-      })
-      .finally(() => setSearching(false))
+    updateDropPosition()
+    if (document.activeElement === inputRef.current) {
+      setShowDrop(true)
+    }
+    if (results.length === 0 && !searching) {
+      setSearching(true)
+      searchRecords(targetType as RecordType, q.trim(), targetSubtype)
+        .then(items => {
+          setResults(items)
+          updateDropPosition()
+          if (document.activeElement === inputRef.current) {
+            setShowDrop(true)
+          }
+        })
+        .catch(() => {
+          setResults([])
+        })
+        .finally(() => setSearching(false))
+    }
   }
 
   function pickRecord(r: SearchResult) {
@@ -968,7 +1086,13 @@ function RelationInput({
             value={q}
             onChange={e => setQ(e.target.value)}
             onFocus={openSuggestions}
-            placeholder={targetType ? (minQueryLen === 0 ? `${targetType} suchen…` : `${targetType} suchen (mind. ${minQueryLen} Zeichen)…`) : 'Kein Ziel-Typ konfiguriert'}
+            onClick={openSuggestions}
+            onBlur={e => {
+              if (dropRef.current?.contains(e.relatedTarget as Node)) return
+              setShowDrop(false)
+            }}
+            onKeyDown={e => { if (e.key === 'Escape') setShowDrop(false) }}
+            placeholder={targetType ? `${TYPE_LABELS[targetType as RecordType] ?? targetType} suchen…` : 'Kein Ziel-Typ konfiguriert'}
             disabled={disabled || !targetType}
           />
           {searching && (
@@ -989,8 +1113,19 @@ function RelationInput({
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--border)', background: 'none', cursor: 'pointer' }}
                   className="authority-hit"
                 >
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{r.title}</div>
-                  <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>{r.id.slice(0, 8)}…</div>
+                  {(() => {
+                    const match = r.title.match(/^(.*?)\s+\(([^)]+)\)$/)
+                    const displayTitle = match ? match[1] : r.title
+                    const displayId = r.idno || (match ? match[2] : null)
+                    return (
+                      <>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{displayTitle}</div>
+                        <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--mono)', marginTop: 2 }}>
+                          {displayId && displayId !== displayTitle ? displayId : `${r.id.slice(0, 8)}…`}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </button>
               )) : (
                 <div className="relation-empty">
@@ -1281,6 +1416,39 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [savedId, setSavedId] = useState<string | null>(currentId)
   const [saveOk, setSaveOk]   = useState(false)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
+
+  const [assignedWorkingSets, setAssignedWorkingSets] = useState<WorkingSet[]>([])
+  const [workingSetsDropdownOpen, setWorkingSetsDropdownOpen] = useState(false)
+  const [addToWorkingSetOpen, setAddToWorkingSetOpen] = useState(false)
+  const workingSetsDropdownRef = useRef<HTMLDivElement>(null)
+
+  const loadAssignedWorkingSets = useCallback(async () => {
+    if (isNew || !currentId) {
+      setAssignedWorkingSets([])
+      return
+    }
+    try {
+      const sets = await workingSets.list({ record_id: currentId })
+      setAssignedWorkingSets(sets)
+    } catch {
+      setAssignedWorkingSets([])
+    }
+  }, [isNew, currentId])
+
+  useEffect(() => {
+    loadAssignedWorkingSets()
+  }, [loadAssignedWorkingSets])
+
+  useEffect(() => {
+    if (!workingSetsDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (workingSetsDropdownRef.current && !workingSetsDropdownRef.current.contains(e.target as Node)) {
+        setWorkingSetsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [workingSetsDropdownOpen])
 
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
@@ -2514,6 +2682,143 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               Im Portal ansehen ↗
             </a>
           )}
+          {!isNew && currentId && (
+            <div ref={workingSetsDropdownRef} style={{ position: 'relative' }}>
+              {assignedWorkingSets.length === 0 ? (
+                <button
+                  type="button"
+                  className="btn gh"
+                  onClick={() => setAddToWorkingSetOpen(true)}
+                  title={t('workingSets.add')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Bookmark size={14} />
+                  <span>{t('workingSets.add')}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn gh"
+                  onClick={() => setWorkingSetsDropdownOpen((prev) => !prev)}
+                  title={t('workingSets.inWorkingSets', { count: assignedWorkingSets.length })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    borderColor: '#bfdbfe',
+                    fontWeight: 500,
+                  }}
+                >
+                  <Bookmark size={14} style={{ fill: 'currentColor' }} />
+                  <span>
+                    {assignedWorkingSets.length === 1
+                      ? t('workingSets.inWorkingSets_one')
+                      : t('workingSets.inWorkingSets', { count: assignedWorkingSets.length })}
+                  </span>
+                  <span style={{ fontSize: 10, marginLeft: 2 }}>▾</span>
+                </button>
+              )}
+
+              {workingSetsDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    zIndex: 200,
+                    width: 280,
+                    background: 'var(--panel, #fff)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    padding: '8px 0',
+                    fontSize: 13,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '6px 14px 4px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--fg-3)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {t('workingSets.containedTitle')}
+                  </div>
+                  {assignedWorkingSets.map((ws) => (
+                    <a
+                      key={ws.id}
+                      href={`#working-sets/${ws.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '7px 14px',
+                        color: 'var(--fg)',
+                        textDecoration: 'none',
+                      }}
+                      className="link-hover"
+                    >
+                      <span
+                        style={{
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {ws.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--fg-4)',
+                          marginLeft: 8,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {t('workingSets.openSet')} ↗
+                      </span>
+                    </a>
+                  ))}
+                  <div
+                    style={{
+                      borderTop: '1px solid var(--border)',
+                      marginTop: 6,
+                      paddingTop: 6,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWorkingSetsDropdownOpen(false)
+                        setAddToWorkingSetOpen(true)
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        padding: '6px 14px',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {t('workingSets.addToAnother')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button className="btn gh" onClick={() => {
             if (quickCreate) { onBack?.(); return }
             if (isDirty && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
@@ -3630,6 +3935,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       </div>
       {lightboxMedia && savedId && (
         <MediaLightbox objectId={savedId} media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
+      )}
+      {addToWorkingSetOpen && currentId && (
+        <AddToWorkingSetModal
+          recordType={recordType}
+          recordIds={[currentId]}
+          onClose={() => setAddToWorkingSetOpen(false)}
+          onSuccess={() => {
+            setAddToWorkingSetOpen(false)
+            loadAssignedWorkingSets()
+          }}
+        />
       )}
     </div>
   )

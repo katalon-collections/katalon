@@ -4,7 +4,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { schema, storageLocations, subtypes, VersionConflictError } from '../../api/client'
-import type { FieldDefinition, KatalonStorageLocation, RecordSubtype } from '../../types'
+import type { FieldDefinition, KatalonStorageLocation, RecordSubtype, StorageLocationObject } from '../../types'
+import { StatusBadge } from '../ui/StatusBadge'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { Box, Plus, Trash, X } from '../ui/Icons'
 import { HelpPopover } from '../ui/HelpPopover'
@@ -151,8 +152,11 @@ interface LocationForm {
 function emptyForm(parentId: string | null): LocationForm {
   return { idno: '', storage_location_type: '', parent_id: parentId ?? '', metadata_: {} }
 }
+interface Props {
+  onOpenObject?: (id: string) => void
+}
 
-export function ScreenStorageLocation() {
+export function ScreenStorageLocation({ onOpenObject }: Props = {}) {
   const { t } = useTranslation('screenStorageLocation')
 
   const [locations, setLocations] = useState<KatalonStorageLocation[]>([])
@@ -169,6 +173,40 @@ export function ScreenStorageLocation() {
   const [deleting, setDeleting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  const [locationObjects, setLocationObjects] = useState<StorageLocationObject[]>([])
+  const [objectsTotal, setObjectsTotal] = useState(0)
+  const [objectsLoading, setObjectsLoading] = useState(false)
+  const [includeSublocations, setIncludeSublocations] = useState(true)
+
+  useEffect(() => {
+    if (!selectedId || creating) {
+      setLocationObjects([])
+      setObjectsTotal(0)
+      return
+    }
+    let cancelled = false
+    setObjectsLoading(true)
+    storageLocations
+      .objects(selectedId, { include_sublocations: includeSublocations, page: 1, page_size: 50 })
+      .then(res => {
+        if (!cancelled) {
+          setLocationObjects(res.items)
+          setObjectsTotal(res.total)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocationObjects([])
+          setObjectsTotal(0)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setObjectsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, creating, includeSublocations])
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
@@ -253,11 +291,13 @@ export function ScreenStorageLocation() {
     try {
       if (creating) {
         const created = await storageLocations.create(payload)
-        await load()
+        setLocations(prev => [...prev, created])
         selectLocation(created)
+        await load()
       } else if (selectedId) {
         const updated = await storageLocations.update(selectedId, payload, version ?? undefined)
         setVersion(updated.version)
+        setLocations(prev => prev.map(l => l.id === selectedId ? updated : l))
         await load()
       }
     } catch (e) {
@@ -279,6 +319,7 @@ export function ScreenStorageLocation() {
     setDeleting(true)
     setFormError(null)
     try {
+      setLocations(prev => prev.filter(l => l.id !== selectedId))
       await storageLocations.delete(selectedId)
       cancelForm()
       await load()
@@ -388,6 +429,75 @@ export function ScreenStorageLocation() {
                   </button>
                 )}
               </div>
+
+              {!creating && selectedId && (
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{t('objectsHeading')}</span>
+                      <span className="badge" style={{ fontSize: 11 }}>{objectsTotal}</span>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', color: 'var(--fg-2)' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeSublocations}
+                        onChange={e => setIncludeSublocations(e.target.checked)}
+                      />
+                      {t('includeSublocations')}
+                    </label>
+                  </div>
+
+                  {objectsLoading ? (
+                    <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--fg-3)' }}>{t('loadingObjects')}</div>
+                  ) : locationObjects.length === 0 ? (
+                    <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--fg-3)' }}>{t('noObjects')}</div>
+                  ) : (
+                    <div className="tbl-wrap" style={{ maxHeight: 260, overflowY: 'auto' }}>
+                      <table className="tbl sm">
+                        <thead>
+                          <tr>
+                            <th>{t('colIdno')}</th>
+                            <th>{t('colTitle')}</th>
+                            <th>{t('colType')}</th>
+                            <th>{t('colLocation')}</th>
+                            <th>{t('colStatus')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {locationObjects.map(obj => (
+                            <tr key={obj.id}>
+                              <td>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenObject?.(obj.id)}
+                                  className="mono"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 0,
+                                    cursor: onOpenObject ? 'pointer' : 'default',
+                                    color: 'var(--accent)',
+                                    fontWeight: 500,
+                                    fontSize: 'inherit',
+                                  }}
+                                >
+                                  {obj.idno || obj.id.slice(0, 8)}
+                                </button>
+                              </td>
+                              <td>{obj.title || '—'}</td>
+                              <td>{obj.object_type || '—'}</td>
+                              <td className="mono" style={{ fontSize: 11 }}>{obj.storage_location_idno || '—'}</td>
+                              <td>
+                                <StatusBadge status={obj.status} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

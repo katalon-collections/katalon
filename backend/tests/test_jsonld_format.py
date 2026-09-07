@@ -105,7 +105,7 @@ def test_build_jsonld_doc_with_vocab_concepts_and_relations() -> None:
         base_url="https://katalon.example.org",
     )
 
-    assert doc["@id"] == "https://katalon.example.org/api/v1/objects/obj-789"
+    assert doc["@id"] == "https://katalon.example.org/objects/obj-789"
     assert "crm:E22_Human-Made_Object" in doc["@type"]
     assert "lrmoo:F5_Item" in doc["@type"]
     assert doc["rdfs:label"] == "Blick auf Marrakesch"
@@ -123,12 +123,12 @@ def test_build_jsonld_doc_with_vocab_concepts_and_relations() -> None:
 
     # Relations resolved
     assert "lrmoo:R7_exemplifies" in doc
-    assert doc["lrmoo:R7_exemplifies"]["@id"] == "https://katalon.example.org/api/v1/occurrences/occ-123"
+    assert doc["lrmoo:R7_exemplifies"]["@id"] == "https://katalon.example.org/occurrences/occ-123"
     assert doc["lrmoo:R7_exemplifies"]["@type"] == "lrmoo:F3_Manifestation"
     assert doc["lrmoo:R7_exemplifies"]["rdfs:label"] == "Erstausgabe 1890"
 
     assert "crm:P14_carried_out_by" in doc
-    assert doc["crm:P14_carried_out_by"]["@id"] == "https://katalon.example.org/api/v1/entities/ent-456"
+    assert doc["crm:P14_carried_out_by"]["@id"] == "https://katalon.example.org/entities/ent-456"
     assert doc["crm:P14_carried_out_by"]["@type"] == "crm:E21_Person"
     assert doc["crm:P14_carried_out_by"]["rdfs:label"] == "August Sander"
 

@@ -226,8 +226,54 @@ Die lokale `docs/`-Ablage enthält nur technische Entwickler- und Betriebsdokume
 
 ## Entwicklung
 
-Für lokale Entwicklung startet `docker compose -f docker-compose.dev.yml up` nur die Infrastruktur; Backend und Frontends laufen anschließend lokal.
+Für aktive lokale Entwicklung ist `make dev` der richtige Einstieg:
 
+```bash
+# Einmalig bzw. nach Änderungen an Dockerfiles oder Dependencies
+make dev
+```
+
+`make dev` startet den Docker-Dev-Stack aus `docker-compose.yml` und
+`docker-compose.dev.yml` im Vordergrund. Backend und beide Frontends laufen
+darin mit Live-Reload; Quellcodeänderungen brauchen normalerweise keinen
+Rebuild. Die Oberflächen sind unter
+[`http://localhost:4000`](http://localhost:4000) (Admin) und
+[`http://localhost:4001`](http://localhost:4001) (Portal) erreichbar. Die
+direkte API liegt unter
+[`http://localhost:8000/api/docs`](http://localhost:8000/api/docs).
+
+Für optionale HTTPS-Hostnamen wie
+[`https://admin.katalon.local`](https://admin.katalon.local) läuft Caddy
+zusätzlich als Host-Prozess vor dem Dev-Stack. Einrichtung und Startbefehl
+stehen in [`docs/dev_https.md`](docs/dev_https.md).
+
+Nach dem Start oder nach Änderungen an Migrationen:
+
+```bash
+make migrate
+```
+
+`make up` ist dagegen für den normalen beziehungsweise production-like
+Compose-Stack gedacht. Es führt `docker compose up -d --build` ohne das
+Dev-Override aus: Container laufen im Hintergrund, ohne Live-Reload. Der
+Zugriff erfolgt über nginx unter
+[`http://localhost/`](http://localhost/) (Portal) und
+[`http://localhost/admin/`](http://localhost/admin/) (Admin). Verwende
+`make up` zum End-to-End-Testen des gebauten Stacks, nicht als täglichen
+Entwicklungsworkflow.
+
+Kurzfassung:
+
+| Ziel | Zweck | Zugriff |
+|---|---|---|
+| `make dev` | Aktive Entwicklung mit Live-Reload | `:4000` Admin, `:4001` Portal |
+| `make up` | Production-like Stack im Hintergrund | `/admin/` Admin, `/` Portal |
+
+Die Infrastruktur für lokale Prozesse kann separat mit `make up-dev`
+gestartet werden. Das ist nur nötig, wenn Backend und Frontends direkt auf
+dem Host laufen sollen; dafür gelten die Ports `5173` (Admin), `5174`
+(Portal) und `8000` (API). Die vollständigen Varianten stehen in
+`.agents/DEV.md`.
 ---
 
 ## Lizenz

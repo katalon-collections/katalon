@@ -16,5 +16,13 @@
   "url": {
     "linkLabel": "Link title (optional)",
     "add": "Add URL"
+  },
+  "workingSets": {
+    "add": "To Worklist",
+    "inWorkingSets": "In {{count}} Worklists",
+    "inWorkingSets_one": "In 1 Worklist",
+    "containedTitle": "Assigned Worklists",
+    "openSet": "Open",
+    "addToAnother": "+ Add to worklist…"
   }
 }

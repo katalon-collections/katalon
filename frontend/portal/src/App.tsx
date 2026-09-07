@@ -15,6 +15,8 @@ import { EntityDetailPage } from './pages/EntityDetailPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { OccurrenceDetailPage } from './pages/OccurrenceDetailPage'
 import { StaticPageView } from './pages/StaticPageView'
+import { CollectionDetailPage } from './pages/CollectionDetailPage'
+import { CollectionsPage } from './pages/CollectionsPage'
 import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
@@ -23,6 +25,7 @@ import { usePortalConfig } from './hooks/usePortalConfig'
 
 const BROWSE_NAV_ITEMS = [
   { type: 'object', to: '/search?q=&type=object', label: 'nav.objects' },
+  { type: 'collection', to: '/collections', label: 'nav.collections' },
   { type: 'entity', to: '/search?q=&type=entity', label: 'nav.entities' },
   { type: 'place', to: '/search?q=&type=place', label: 'nav.places' },
   { type: 'occurrence', to: '/search?q=&type=occurrence', label: 'nav.works' },
@@ -232,6 +235,8 @@ function AppInner() {
           <Route path="/places/:id" element={<PlaceDetailPage />} />
           <Route path="/occurrences/:id" element={<OccurrenceDetailPage />} />
           <Route path="/page/:slug" element={<StaticPageView />} />
+          <Route path="/collections" element={<CollectionsPage />} />
+          <Route path="/collections/:id" element={<CollectionDetailPage />} />
         </Routes>
       </main>
       <Footer />

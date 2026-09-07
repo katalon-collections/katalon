@@ -159,7 +159,10 @@ async def test_process_raises_when_media_not_found() -> None:
 
 
 def test_make_pyramid_tiff_creates_tiled_pyramid_tiff(tmp_path: Path) -> None:
-    pyvips = pytest.importorskip("pyvips")
+    try:
+        import pyvips
+    except (ImportError, OSError) as exc:
+        pytest.skip(f"pyvips not available: {exc}")
 
     source_path = tmp_path / "source.jpg"
     pyvips.Image.black(256, 256).jpegsave(str(source_path))
@@ -180,7 +183,10 @@ def test_make_pyramid_tiff_creates_tiled_pyramid_tiff(tmp_path: Path) -> None:
 
 
 def test_make_pyramid_tiff_returns_none_for_unreadable_source(tmp_path: Path) -> None:
-    pytest.importorskip("pyvips")
+    try:
+        import pyvips  # noqa: F401
+    except (ImportError, OSError) as exc:
+        pytest.skip(f"pyvips not available: {exc}")
 
     source_path = tmp_path / "not-an-image.jpg"
     source_path.write_bytes(b"not a real image")

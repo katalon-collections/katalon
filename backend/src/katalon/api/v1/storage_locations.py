@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from sqlalchemy import Text, cast, func, select
+from pydantic import BaseModel
+from sqlalchemy import Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.concurrency import check_version, flush_record
@@ -143,7 +144,7 @@ async def create_storage_location(
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
         idno = data.idno.strip()
-        if pattern and not validate_idno_pattern(idno, pattern):
+        if pattern and not validate_idno_pattern(pattern, idno):
             raise HTTPException(
                 status_code=422,
                 detail="ID-Nr. entspricht nicht dem vorgegebenen Muster.",
@@ -162,7 +163,11 @@ async def create_storage_location(
     )
     await ensure_subtype_exists(db, "storage_location", storage_location_type)
     metadata = await prepare_metadata(
-        db, "storage_location", data.metadata_, storage_location_type, existing=None,
+        db,
+        "storage_location",
+        data.metadata_,
+        storage_location_type,
+        existing=None,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
     errors = await validate_metadata(db, "storage_location", metadata, storage_location_type)
@@ -261,7 +266,11 @@ async def update_storage_location(
     )
     await ensure_subtype_exists(db, "storage_location", storage_location_type)
     metadata = await prepare_metadata(
-        db, "storage_location", data.metadata_, storage_location_type, existing=loc.metadata_,
+        db,
+        "storage_location",
+        data.metadata_,
+        storage_location_type,
+        existing=loc.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
     errors = await validate_metadata(db, "storage_location", metadata, storage_location_type)
@@ -348,7 +357,7 @@ async def delete_storage_location(
     )
     await flush_record(db, loc)
     try:
-        await search_service.remove_record(loc.id)
+        await search_service.remove_record(loc.id, record_type="storage_location")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 
@@ -356,3 +365,126 @@ async def delete_storage_location(
     from katalon.workers.enqueue import enqueue
 
     enqueue(cleanup_relation_refs, "storage_location", str(loc_id))
+
+
+class StorageLocationObjectRead(BaseModel):
+    id: uuid.UUID
+    idno: str | None = None
+    title: str = ""
+    object_type: str | None = None
+    status: str = "draft"
+    relation_type: str | None = None
+    storage_location_id: uuid.UUID
+    storage_location_idno: str | None = None
+
+
+class StorageLocationObjectsResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[StorageLocationObjectRead]
+
+
+@router.get(
+    "/{loc_id}/objects",
+    response_model=StorageLocationObjectsResponse,
+    summary="List objects stored at this location (optionally including sublocations)",
+)
+async def list_storage_location_objects(
+    loc_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    include_sublocations: bool = True,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+) -> StorageLocationObjectsResponse:
+    from katalon.core.models import Object, Relation
+    from katalon.services.search_service import _extract_title
+    from katalon.services.storage_location_service import get_storage_location_subtree_ids
+
+    loc = await db.get(StorageLocation, loc_id)
+    if not loc or loc.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Lagerort nicht gefunden")
+
+    loc_ids = (
+        await get_storage_location_subtree_ids(db, loc_id) if include_sublocations else [loc_id]
+    )
+
+    locs_res = await db.execute(
+        select(StorageLocation.id, StorageLocation.idno).where(
+            StorageLocation.id.in_(loc_ids), StorageLocation.deleted_at.is_(None)
+        )
+    )
+    loc_idno_map = {row.id: row.idno for row in locs_res.all()}
+
+    rel_stmt = select(Relation).where(
+        or_(
+            and_(
+                Relation.from_type == "object",
+                Relation.to_type == "storage_location",
+                Relation.to_id.in_(loc_ids),
+            ),
+            and_(
+                Relation.from_type == "storage_location",
+                Relation.to_type == "object",
+                Relation.from_id.in_(loc_ids),
+            ),
+        )
+    )
+    relations = list((await db.execute(rel_stmt)).scalars().all())
+
+    obj_rel_map: dict[uuid.UUID, tuple[uuid.UUID, str | None]] = {}
+    for rel in relations:
+        if rel.from_type == "object":
+            obj_id = rel.from_id
+            l_id = rel.to_id
+        else:
+            obj_id = rel.to_id
+            l_id = rel.from_id
+        if obj_id not in obj_rel_map:
+            obj_rel_map[obj_id] = (l_id, rel.relation_type)
+
+    if not obj_rel_map:
+        return StorageLocationObjectsResponse(total=0, page=page, page_size=page_size, items=[])
+
+    obj_ids = list(obj_rel_map.keys())
+    count_stmt = select(func.count()).select_from(
+        select(Object.id)
+        .where(
+            Object.id.in_(obj_ids),
+            Object.deleted_at.is_(None),
+        )
+        .subquery()
+    )
+    total = (await db.execute(count_stmt)).scalar_one()
+
+    query = (
+        select(Object)
+        .where(
+            Object.id.in_(obj_ids),
+            Object.deleted_at.is_(None),
+        )
+        .order_by(Object.idno.asc().nulls_last(), Object.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    objects = list((await db.execute(query)).scalars().all())
+
+    items: list[StorageLocationObjectRead] = []
+    for obj in objects:
+        l_id, rel_type = obj_rel_map.get(obj.id, (loc_id, None))
+        title = _extract_title(obj.metadata_ or {})
+        items.append(
+            StorageLocationObjectRead(
+                id=obj.id,
+                idno=obj.idno,
+                title=title,
+                object_type=obj.object_type,
+                status=obj.status,
+                relation_type=rel_type,
+                storage_location_id=l_id,
+                storage_location_idno=loc_idno_map.get(l_id),
+            )
+        )
+
+    return StorageLocationObjectsResponse(total=total, page=page, page_size=page_size, items=items)

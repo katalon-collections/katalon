@@ -198,31 +198,26 @@ def _validate_authority_value(value: object, settings: dict[str, Any], field_nam
 async def _validate_relation_target(
     value: dict[str, Any], field_name: str, settings: dict[str, Any], db: AsyncSession
 ) -> str | None:
-    """Check that the referenced UUID exists in the configured target table. Returns error or None."""
+    """Check that the referenced UUID exists in the configured target table and is not deleted.
+
+    Returns error message or None.
+    """
     target_type = settings.get("target_type")
     if not target_type:
         return None
-    from katalon.core.models import Entity, Object, Occurrence, Place, Procedure
+    from katalon.services.relation_service import _RECORD_MODELS, validate_relation_endpoint
 
-    model_map: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]] = {
-        "object": Object,
-        "entity": Entity,
-        "place": Place,
-        "occurrence": Occurrence,
-        "procedure": Procedure,
-    }
-    model = model_map.get(target_type)
-    if model is None:
+    if target_type not in _RECORD_MODELS:
         return None
     try:
         record_uuid = uuid.UUID(str(value["id"]))
     except (ValueError, KeyError):
         return None
-    result = await db.execute(select(model).where(model.id == record_uuid))
-    if result.scalar_one_or_none() is None:
+
+    endpoint_error = await validate_relation_endpoint(db, target_type, record_uuid)
+    if endpoint_error is not None:
         return f"Feld '{field_name}': Datensatz '{value['id']}' nicht gefunden in '{target_type}'."
     return None
-
 
 async def validate_metadata(
     db: AsyncSession, record_type: str, metadata: dict[str, Any], target_subtype: str | None = None,

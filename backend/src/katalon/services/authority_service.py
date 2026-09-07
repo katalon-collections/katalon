@@ -16,23 +16,27 @@ from katalon.integrations.wikidata_adapter import WikidataAdapter
 
 # Built-in adapters always available (can be overridden by DB config)
 _BUILTIN: dict[str, AuthoritySource] = {
-    "gnd":       GNDAdapter(),
-    "geonames":  GeonamesAdapter(),
-    "viaf":      VIAFAdapter(),
-    "wikidata":  WikidataAdapter(),
-    "tgn":       TGNAdapter(),
-    "iconclass": ICONCLASSAdapter(),
-    "aat":       AATAdapter(),
+    "gnd":         GNDAdapter(),
+    "gnd-person":  GNDAdapter(filter_type="type:Person", source_id="gnd-person"),
+    "gnd-subject": GNDAdapter(filter_type="type:SubjectHeading", source_id="gnd-subject"),
+    "geonames":    GeonamesAdapter(),
+    "viaf":        VIAFAdapter(),
+    "wikidata":    WikidataAdapter(),
+    "tgn":         TGNAdapter(),
+    "iconclass":   ICONCLASSAdapter(),
+    "aat":         AATAdapter(),
 }
 
 _LABELS: dict[str, str] = {
-    "gnd":       "GND (Gemeinsame Normdatei)",
-    "geonames":  "GeoNames",
-    "viaf":      "VIAF",
-    "wikidata":  "Wikidata",
-    "tgn":       "Getty TGN (Thesaurus of Geographic Names)",
-    "iconclass": "Iconclass",
-    "aat":       "Getty AAT (Art & Architecture Thesaurus)",
+    "gnd":         "GND (Gemeinsame Normdatei)",
+    "gnd-person":  "GND – Personennormdaten",
+    "gnd-subject": "GND – Sachschlagwörter",
+    "geonames":    "GeoNames",
+    "viaf":        "VIAF",
+    "wikidata":    "Wikidata",
+    "tgn":         "Getty TGN (Thesaurus of Geographic Names)",
+    "iconclass":   "Iconclass",
+    "aat":         "Getty AAT (Art & Architecture Thesaurus)",
 }
 
 
@@ -84,7 +88,10 @@ async def _load_registry() -> dict[str, AuthoritySource]:
                     module_path, cls_name = src.adapter_class.rsplit(".", 1)
                     mod = importlib.import_module(module_path)
                     cls = getattr(mod, cls_name)
-                    registry[src.id] = cls(**(src.config or {}))
+                    cfg = dict(src.config or {})
+                    if issubclass(cls, GNDAdapter) and "source_id" not in cfg:
+                        cfg["source_id"] = src.id
+                    registry[src.id] = cls(**cfg)
                 except Exception:
                     pass
         _cache = registry

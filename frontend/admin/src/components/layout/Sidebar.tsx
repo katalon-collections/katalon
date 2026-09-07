@@ -5,7 +5,7 @@ import pkg from '../../../package.json'
 import { useTranslation } from 'react-i18next'
 import { getTokenUser } from '../../api/client'
 import { FeedbackButton } from '../feedback/FeedbackButton'
-import { Bell, Box, Download, File, Folder, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
+import { Bell, Bookmark, Box, Code, Download, File, Folder, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 
 type Route = string
 
@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
   { id: 'procedures-list',  labelKey: 'sidebar.nav.proceduresList',   Icon: ListTree,  routes: ['procedures-list', 'procedures-form'] },
   { id: 'import',           labelKey: 'sidebar.nav.import',           Icon: Upload },
   { id: 'audit',            labelKey: 'sidebar.nav.audit',            Icon: History },
+  { id: 'working-sets',     labelKey: 'sidebar.nav.workingSets',      Icon: Bookmark,  routes: ['working-sets'] },
   { gKey: 'sidebar.groups.config', roles: ['admin', 'superuser'] },
   { id: 'subtypes', labelKey: 'sidebar.nav.subtypes',       Icon: ListTree, roles: ['admin', 'superuser'] },
   { id: 'storage-locations', labelKey: 'sidebar.nav.storageLocations', Icon: Box, roles: ['admin', 'superuser'] },
@@ -39,6 +40,7 @@ const NAV: NavItem[] = [
   { id: 'oai-sets',  labelKey: 'sidebar.nav.oaiSets',       Icon: Globe, roles: ['admin', 'superuser'] },
   { id: 'banners',   labelKey: 'sidebar.nav.banners',       Icon: Bell,  roles: ['admin', 'superuser'] },
   { id: 'export',    labelKey: 'sidebar.nav.export',        Icon: Download, roles: ['admin', 'superuser'] },
+  { id: 'sparql',    labelKey: 'sidebar.nav.sparql',        Icon: Code, roles: ['admin', 'superuser'] },
   { gKey: 'sidebar.groups.admin', roles: ['admin', 'superuser'] },
   { id: 'users',  labelKey: 'sidebar.nav.users',         Icon: Users,   roles: ['admin', 'superuser'] },
   { id: 'settings', labelKey: 'sidebar.nav.settings',    Icon: Gear, roles: ['admin', 'superuser'] },
@@ -50,9 +52,10 @@ interface Props {
   appTitle?: string
   open?: boolean
   onClose?: () => void
+  sparqlEnabled?: boolean
 }
 
-export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, onClose }: Props) {
+export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, onClose, sparqlEnabled }: Props) {
   const { t } = useTranslation()
   const user = getTokenUser()
 
@@ -72,6 +75,7 @@ export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, o
           }
           const visible = !it.roles || it.roles.includes(user?.role ?? '')
           if (!visible) return null
+          if (it.id === 'sparql' && !sparqlEnabled) return null
           return (
             <button
               key={it.id}

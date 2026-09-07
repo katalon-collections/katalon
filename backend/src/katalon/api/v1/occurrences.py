@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm.attributes import flag_modified
 
+from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import (
     DBDep,
@@ -18,6 +19,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.limiter import limiter
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Occurrence, RecordSnapshot, User
 from katalon.core.schemas import (
@@ -170,6 +172,7 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Use
     "/{occ_id}/export",
     summary="Export a single occurrence record as JSON-LD or Turtle RDF",
 )
+@limiter.limit(lambda: settings.rate_limit_public_export)
 async def export_occurrence(
     occ_id: uuid.UUID,
     db: DBDep,
@@ -373,7 +376,7 @@ async def delete_occurrence(
     )
     await flush_record(db, occ)
     try:
-        await search_service.remove_record(occ.id)
+        await search_service.remove_record(occ.id, record_type="occurrence")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 

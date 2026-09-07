@@ -55,6 +55,10 @@ import deScreenSchema from './locales/de/screenSchema.json'
 import enScreenSchema from './locales/en/screenSchema.json'
 import deScreenStorageLocation from './locales/de/screenStorageLocation.json'
 import enScreenStorageLocation from './locales/en/screenStorageLocation.json'
+import deScreenSparql from './locales/de/screenSparql.json'
+import enScreenSparql from './locales/en/screenSparql.json'
+import deScreenWorkingSets from './locales/de/screenWorkingSets.json'
+import enScreenWorkingSets from './locales/en/screenWorkingSets.json'
 
 const STORAGE_KEY = 'katalon.ui_language'
 
@@ -95,6 +99,8 @@ i18next.use(initReactI18next).init({
       screenPages: deScreenPages,
       screenSchema: deScreenSchema,
       screenStorageLocation: deScreenStorageLocation,
+      screenSparql: deScreenSparql,
+      screenWorkingSets: deScreenWorkingSets,
     },
     en: {
       translation: en,
@@ -123,6 +129,8 @@ i18next.use(initReactI18next).init({
       screenPages: enScreenPages,
       screenSchema: enScreenSchema,
       screenStorageLocation: enScreenStorageLocation,
+      screenSparql: enScreenSparql,
+      screenWorkingSets: enScreenWorkingSets,
     },
   },
   lng: detectLanguage(),

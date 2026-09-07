@@ -339,3 +339,94 @@ async def test_recreate_soft_deleted_field_reactivates_same_id(
     assert data["name"] == payload["name"]
 
     await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_simple_field(async_client: AsyncClient, auth_headers: dict) -> None:
+    # Create simple field
+    created = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "test_dup_simple",
+            "label": {"de": "Einfaches Feld", "en": "Simple Field"},
+            "field_type": "text",
+            "is_required": True,
+            "is_repeatable": False,
+            "sort_order": 5,
+            "settings": {},
+        },
+    )
+    assert created.status_code == 201, created.text
+    orig_id = created.json()["id"]
+
+    dup = await async_client.post(f"/v1/schema/{orig_id}/duplicate", headers=auth_headers)
+    assert dup.status_code == 201, dup.text
+    data = dup.json()
+    assert data["id"] != orig_id
+    assert data["name"] == "test_dup_simple_copy"
+    assert data["label"]["de"] == "Einfaches Feld (Kopie)"
+    assert data["label"]["en"] == "Simple Field (Copy)"
+    assert data["is_required"] is True
+
+    # Clean up
+    await async_client.delete(f"/v1/schema/{orig_id}", headers=auth_headers)
+    await async_client.delete(f"/v1/schema/{data['id']}", headers=auth_headers)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_group_field_with_children(async_client: AsyncClient, auth_headers: dict) -> None:
+    # Create group field
+    group_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "test_dup_group",
+            "label": {"de": "Gruppe Original", "en": "Group Original"},
+            "field_type": "group",
+            "is_required": False,
+            "is_repeatable": True,
+            "sort_order": 10,
+            "settings": {},
+        },
+    )
+    assert group_r.status_code == 201, group_r.text
+    group_id = group_r.json()["id"]
+
+    # Add child
+    child_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "test_dup_sub",
+            "label": {"de": "Unterfeld Original", "en": "Subfield Original"},
+            "field_type": "text",
+            "is_required": False,
+            "is_repeatable": False,
+            "parent_id": group_id,
+            "sort_order": 0,
+            "settings": {},
+        },
+    )
+    assert child_r.status_code == 201, child_r.text
+
+    # Duplicate group
+    dup = await async_client.post(f"/v1/schema/{group_id}/duplicate", headers=auth_headers)
+    assert dup.status_code == 201, dup.text
+    dup_data = dup.json()
+    assert dup_data["id"] != group_id
+    assert dup_data["name"] == "test_dup_group_copy"
+    assert dup_data["label"]["de"] == "Gruppe Original (Kopie)"
+    assert dup_data["field_type"] == "group"
+    assert len(dup_data["children"]) == 1
+    child_dup = dup_data["children"][0]
+    assert child_dup["name"] == "test_dup_sub_copy"
+    assert child_dup["label"]["de"] == "Unterfeld Original (Kopie)"
+    assert child_dup["parent_id"] == dup_data["id"]
+
+    # Clean up
+    await async_client.delete(f"/v1/schema/{group_id}", headers=auth_headers)
+    await async_client.delete(f"/v1/schema/{dup_data['id']}", headers=auth_headers)

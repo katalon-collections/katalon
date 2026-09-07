@@ -348,13 +348,13 @@ if [[ "$DEV" == true ]]; then
     echo
     echo "── 3. Admin-Frontend starten (Hot-Reload) ───────────────────────────"
     echo "   cd frontend/admin"
-    echo "   npm install          # einmalig"
-    echo "   npm run dev"
+    echo "   pnpm install         # einmalig"
+    echo "   pnpm dev"
     echo
     echo "── 4. Portal-Frontend starten (Hot-Reload) ──────────────────────────"
     echo "   cd frontend/portal"
-    echo "   npm install          # einmalig"
-    echo "   npm run dev"
+    echo "   pnpm install         # einmalig"
+    echo "   pnpm dev"
     echo
     info "Zugriff im Dev-Modus:"
     echo "   • Admin UI        → http://localhost:5173"

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Karl Krägelin
 
+import copy
 import json
 import uuid
 from collections import defaultdict
@@ -504,6 +505,151 @@ async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
     await db.flush()
     _enqueue_reindex(target_type)
     return _fd_read(field)
+
+@router.post(
+    "/{field_id}/duplicate",
+    response_model=FieldDefinitionRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Duplicate a field definition including sub-fields if group",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition not found"},
+    },
+)
+async def duplicate_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
+        )
+    )
+    field = result.scalar_one_or_none()
+    if not field:
+        raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
+
+    all_names_result = await db.execute(
+        select(FieldDefinition.name).where(
+            FieldDefinition.target_type == field.target_type,
+            (
+                FieldDefinition.target_subtype.is_(None)
+                if field.target_subtype is None
+                else FieldDefinition.target_subtype == field.target_subtype
+            ),
+        )
+    )
+    used_names = set(all_names_result.scalars().all())
+
+    def _next_unique_name(base: str, used: set[str]) -> str:
+        candidate = f"{base}_copy"
+        counter = 2
+        while candidate in used:
+            candidate = f"{base}_copy_{counter}"
+            counter += 1
+        used.add(candidate)
+        return candidate
+
+    new_name = _next_unique_name(field.name, used_names)
+
+    new_label = dict(field.label or {})
+    if new_label.get("de"):
+        new_label["de"] = f"{new_label['de']} (Kopie)"
+    elif "de" not in new_label:
+        new_label["de"] = f"{field.name} (Kopie)"
+
+    if new_label.get("en"):
+        new_label["en"] = f"{new_label['en']} (Copy)"
+    elif "en" not in new_label:
+        new_label["en"] = f"{field.name} (Copy)"
+
+    for lang, val in list(new_label.items()):
+        if lang not in ("de", "en") and isinstance(val, str) and val:
+            new_label[lang] = f"{val} (Copy)"
+
+    max_sort = await db.scalar(
+        select(func.coalesce(func.max(FieldDefinition.sort_order), 0)).where(
+            FieldDefinition.target_type == field.target_type,
+            (
+                FieldDefinition.target_subtype.is_(None)
+                if field.target_subtype is None
+                else FieldDefinition.target_subtype == field.target_subtype
+            ),
+            (
+                FieldDefinition.parent_id.is_(None)
+                if field.parent_id is None
+                else FieldDefinition.parent_id == field.parent_id
+            ),
+        )
+    )
+    new_sort_order = max(field.sort_order + 1, (max_sort or 0) + 1)
+
+    new_field = FieldDefinition(
+        target_type=field.target_type,
+        target_subtype=field.target_subtype,
+        name=new_name,
+        label=new_label,
+        field_type=field.field_type,
+        is_required=field.is_required,
+        is_repeatable=field.is_repeatable,
+        is_translatable=field.is_translatable,
+        is_searchable=field.is_searchable,
+        sort_order=new_sort_order,
+        settings=copy.deepcopy(field.settings or {}),
+        show_in_detail=field.show_in_detail,
+        show_in_list=field.show_in_list,
+        detail_slot=field.detail_slot,
+        detail_role="none" if field.detail_role == "description" else field.detail_role,
+        is_public=field.is_public,
+        is_facet=field.is_facet,
+        parent_id=field.parent_id,
+    )
+    db.add(new_field)
+    await db.flush()
+
+    cloned_children: list[FieldDefinition] = []
+    if field.field_type == "group":
+        children_result = await db.execute(
+            select(FieldDefinition)
+            .where(
+                FieldDefinition.parent_id == field.id,
+                FieldDefinition.is_deleted.is_(False),
+            )
+            .order_by(FieldDefinition.sort_order)
+        )
+        original_children = list(children_result.scalars().all())
+        for child in original_children:
+            child_name = _next_unique_name(child.name, used_names)
+            child_label = dict(child.label or {})
+            if child_label.get("de"):
+                child_label["de"] = f"{child_label['de']} (Kopie)"
+            if child_label.get("en"):
+                child_label["en"] = f"{child_label['en']} (Copy)"
+            new_child = FieldDefinition(
+                target_type=child.target_type,
+                target_subtype=child.target_subtype,
+                name=child_name,
+                label=child_label,
+                field_type=child.field_type,
+                is_required=child.is_required,
+                is_repeatable=child.is_repeatable,
+                is_translatable=child.is_translatable,
+                is_searchable=child.is_searchable,
+                sort_order=child.sort_order,
+                settings=copy.deepcopy(child.settings or {}),
+                show_in_detail=child.show_in_detail,
+                show_in_list=child.show_in_list,
+                detail_slot=child.detail_slot,
+                detail_role="none" if child.detail_role == "description" else child.detail_role,
+                is_public=child.is_public,
+                is_facet=child.is_facet,
+                parent_id=new_field.id,
+            )
+            db.add(new_child)
+            cloned_children.append(new_child)
+        await db.flush()
+
+    _enqueue_reindex(field.target_type)
+    children_read = [_fd_read(c) for c in cloned_children] if field.field_type == "group" else []
+    return _fd_read(new_field, children_read)
 
 
 @router.post(

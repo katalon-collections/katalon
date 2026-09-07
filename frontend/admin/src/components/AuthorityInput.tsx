@@ -16,6 +16,8 @@ export type AuthorityEntry = {
 
 const AUTHORITY_URLS: Record<string, string> = {
   gnd: 'https://d-nb.info/gnd/',
+  'gnd-person': 'https://d-nb.info/gnd/',
+  'gnd-subject': 'https://d-nb.info/gnd/',
   geonames: 'https://www.geonames.org/',
   viaf: 'https://viaf.org/viaf/',
   wikidata: 'https://www.wikidata.org/wiki/',

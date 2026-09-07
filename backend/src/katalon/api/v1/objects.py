@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm.attributes import flag_modified
 
+from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
 from katalon.core.dependencies import (
     DBDep,
@@ -18,6 +19,7 @@ from katalon.core.dependencies import (
     require_record_permission,
     require_role,
 )
+from katalon.core.limiter import limiter
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import (
     AdminConfig,
@@ -58,7 +60,14 @@ from katalon.services.subtype_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/objects", tags=["objects"])
-COLLECTION_STATUSES = {"active", "pending", "on_loan_in", "on_loan_out", "deaccessioned", "returned"}
+COLLECTION_STATUSES = {
+    "active",
+    "pending",
+    "on_loan_in",
+    "on_loan_out",
+    "deaccessioned",
+    "returned",
+}
 #: Statuses that make a record publicly visible and trigger PID auto-minting.
 PUBLIC_SAVE_STATUSES = set(PUBLIC_STATUSES)
 
@@ -80,6 +89,8 @@ async def list_objects(
     status: str | None = None,
     object_type: str | None = None,
     q: str | None = None,
+    storage_location_id: uuid.UUID | None = None,
+    include_sublocations: bool = True,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
@@ -95,11 +106,38 @@ async def list_objects(
             Object.idno.icontains(q, autoescape=True)
             | cast(Object.metadata_, Text).icontains(q, autoescape=True)
         )
+    if storage_location_id is not None:
+        from katalon.core.models import Relation
+        from katalon.services.storage_location_service import get_storage_location_subtree_ids
+
+        loc_ids = (
+            await get_storage_location_subtree_ids(db, storage_location_id)
+            if include_sublocations
+            else [storage_location_id]
+        )
+        rel_subquery = (
+            select(Relation.from_id)
+            .where(
+                Relation.from_type == "object",
+                Relation.to_type == "storage_location",
+                Relation.to_id.in_(loc_ids),
+            )
+            .union(
+                select(Relation.to_id).where(
+                    Relation.to_type == "object",
+                    Relation.from_type == "storage_location",
+                    Relation.from_id.in_(loc_ids),
+                )
+            )
+        )
+        query = query.where(Object.id.in_(rel_subquery))
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
 
-    query = apply_sort(query.offset((page - 1) * page_size).limit(page_size), Object, sort_by, sort_dir)
+    query = apply_sort(
+        query.offset((page - 1) * page_size).limit(page_size), Object, sort_by, sort_dir
+    )
     result = await db.execute(query)
     items = result.scalars().all()
 
@@ -128,7 +166,11 @@ async def list_objects(
         422: {"description": "Idno missing/invalid pattern or metadata validation failed"},
     },
 )
-async def create_object(data: ObjectCreate, db: DBDep, current_user: User = require_record_permission("object", "create")) -> Object:
+async def create_object(
+    data: ObjectCreate,
+    db: DBDep,
+    current_user: User = require_record_permission("object", "create"),
+) -> Object:
     cfg_result = await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
     cfg = cfg_result.scalar_one_or_none()
     schema = (cfg.idno_schemas or {}).get("object") if cfg else None
@@ -144,7 +186,9 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
     else:
         idno = data.idno.strip()
         if pattern and not validate_idno_pattern(pattern, idno):
-            raise HTTPException(status_code=422, detail=f"ID-Nr. entspricht nicht dem Muster: {pattern}")
+            raise HTTPException(
+                status_code=422, detail=f"ID-Nr. entspricht nicht dem Muster: {pattern}"
+            )
         if schema:
             await maybe_advance_counter(db, "object", schema, idno)
 
@@ -154,7 +198,10 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
     )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(
-        db, "object", data.metadata_, object_type,
+        db,
+        "object",
+        data.metadata_,
+        object_type,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
     errors = await validate_metadata(
@@ -181,12 +228,16 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
     await flush_record(db, obj)
     await sync_schema_relations(db, "object", obj.id, metadata)
     await db.flush()
-    await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create")
+    await log_change(
+        db, record_type="object", record_id=obj.id, user_id=current_user.id, action="create"
+    )
     if data.status in PUBLIC_SAVE_STATUSES:
         try:
             await pid_service.ensure_pids_on_publish(db, "object", obj, current_user.id)
         except pid_service.PidMintError as exc:
-            raise HTTPException(status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}") from exc
+            raise HTTPException(
+                status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}"
+            ) from exc
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
@@ -198,6 +249,7 @@ async def create_object(data: ObjectCreate, db: DBDep, current_user: User = requ
     "/{object_id}/export",
     summary="Export a single object record as JSON-LD or Turtle RDF",
 )
+@limiter.limit(lambda: settings.rate_limit_public_export)
 async def export_object(
     object_id: uuid.UUID,
     db: DBDep,
@@ -235,8 +287,15 @@ async def get_object(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> Any:
-    is_rdf_format = isinstance(format, str) and format.lower() in ("jsonld", "json-ld", "ttl", "turtle")
-    is_rdf_accept = isinstance(accept, str) and ("application/ld+json" in accept or "text/turtle" in accept)
+    is_rdf_format = isinstance(format, str) and format.lower() in (
+        "jsonld",
+        "json-ld",
+        "ttl",
+        "turtle",
+    )
+    is_rdf_accept = isinstance(accept, str) and (
+        "application/ld+json" in accept or "text/turtle" in accept
+    )
     if is_rdf_format or is_rdf_accept:
         from katalon.services.rdf_service import handle_single_record_export
 
@@ -257,8 +316,11 @@ async def get_object(
     visibility_user = await _visibility_user(db, current_user)
     ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
     if visibility_user is None:
-        return await project_public_record(db, ObjectRead.model_validate(obj), "object", obj.object_type)
+        return await project_public_record(
+            db, ObjectRead.model_validate(obj), "object", obj.object_type
+        )
     return obj
+
 
 @router.put(
     "/{object_id}",
@@ -292,7 +354,9 @@ async def update_object(
             raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")
     else:
         idno = data.idno.strip()
-        existing = await db.execute(select(Object).where(Object.idno == idno, Object.id != object_id))
+        existing = await db.execute(
+            select(Object).where(Object.idno == idno, Object.id != object_id)
+        )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
@@ -302,7 +366,11 @@ async def update_object(
     )
     await ensure_subtype_exists(db, "object", object_type)
     metadata = await prepare_metadata(
-        db, "object", data.metadata_, object_type, existing=obj.metadata_,
+        db,
+        "object",
+        data.metadata_,
+        object_type,
+        existing=obj.metadata_,
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
     errors = await validate_metadata(
@@ -349,14 +417,13 @@ async def update_object(
             action="update",
             changed_fields=update_diff,
         )
-    if (
-        old_fields["status"] not in PUBLIC_SAVE_STATUSES
-        and data.status in PUBLIC_SAVE_STATUSES
-    ):
+    if old_fields["status"] not in PUBLIC_SAVE_STATUSES and data.status in PUBLIC_SAVE_STATUSES:
         try:
             await pid_service.ensure_pids_on_publish(db, "object", obj, current_user.id)
         except pid_service.PidMintError as exc:
-            raise HTTPException(status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}") from exc
+            raise HTTPException(
+                status_code=422, detail=f"PID-Vergabe fehlgeschlagen: {exc}"
+            ) from exc
     try:
         await search_service.index_record("object", obj, db)
     except Exception:
@@ -420,17 +487,22 @@ async def delete_object(
 
     obj.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     await log_change(
-        db, record_type="object", record_id=obj.id, user_id=current_user.id, action="delete",
+        db,
+        record_type="object",
+        record_id=obj.id,
+        user_id=current_user.id,
+        action="delete",
         changed_fields=delete_label_fields(obj.idno, obj.metadata_),
     )
     await flush_record(db, obj)
     try:
-        await search_service.remove_record(obj.id)
+        await search_service.remove_record(obj.id, record_type="object")
     except Exception:
         logger.warning("ES index/remove failed", exc_info=True)
 
     from katalon.workers.cleanup_tasks import cleanup_relation_refs
     from katalon.workers.enqueue import enqueue
+
     enqueue(cleanup_relation_refs, "object", str(object_id))
 
 
@@ -453,7 +525,9 @@ async def restore_object(
     if not obj or obj.deleted_at is None:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
     obj.deleted_at = None
-    await log_change(db, record_type="object", record_id=obj.id, user_id=current_user.id, action="undelete")
+    await log_change(
+        db, record_type="object", record_id=obj.id, user_id=current_user.id, action="undelete"
+    )
     await flush_record(db, obj)
     try:
         await search_service.index_record("object", obj, db)
@@ -467,7 +541,9 @@ async def restore_object(
     response_model=list[ObjectRead],
     summary="List soft-deleted objects",
 )
-async def list_deleted_objects(db: DBDep, current_user: User = require_role("admin")) -> list[Object]:
+async def list_deleted_objects(
+    db: DBDep, current_user: User = require_role("admin")
+) -> list[Object]:
     result = await db.execute(
         select(Object).where(Object.deleted_at.is_not(None)).order_by(Object.deleted_at.desc())
     )
@@ -485,7 +561,10 @@ async def list_deleted_objects(db: DBDep, current_user: User = require_role("adm
     },
 )
 async def create_snapshot(
-    object_id: uuid.UUID, data: SnapshotCreate, db: DBDep, current_user: User = require_record_permission("object", "update")
+    object_id: uuid.UUID,
+    data: SnapshotCreate,
+    db: DBDep,
+    current_user: User = require_record_permission("object", "update"),
 ) -> RecordSnapshot:
     result = await db.execute(select(Object).where(Object.id == object_id))
     obj = result.scalar_one_or_none()
@@ -517,7 +596,9 @@ async def create_snapshot(
         404: {"description": "Object or IIIF manifest not found"},
     },
 )
-async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser) -> dict[str, Any]:
+async def iiif_manifest(
+    object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser
+) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
     from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
@@ -534,13 +615,19 @@ async def iiif_manifest(object_id: uuid.UUID, db: DBDep, request: Request, curre
     except HTTPException as exc:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar") from exc
 
-    media_query = select(MediaFile).where(MediaFile.object_id == object_id, MediaFile.status == "ready")
+    media_query = select(MediaFile).where(
+        MediaFile.object_id == object_id, MediaFile.status == "ready"
+    )
     if visibility_user is None:
         media_query = media_query.where(MediaFile.is_public.is_(True))
-    media_result = await db.execute(media_query.order_by(MediaFile.is_primary.desc(), MediaFile.created_at))
+    media_result = await db.execute(
+        media_query.order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
+    )
     from katalon.core.media_validation import media_category
 
-    media_files = [m for m in media_result.scalars().all() if media_category(m.mime_type) == "image"]
+    media_files = [
+        m for m in media_result.scalars().all() if media_category(m.mime_type) == "image"
+    ]
     if not media_files:
         raise HTTPException(status_code=404, detail="Kein IIIF-Manifest verfügbar")
 
@@ -664,4 +751,5 @@ async def restore_snapshot(
 )
 async def list_object_audit_log(object_id: uuid.UUID, db: DBDep) -> list[AuditLogRead]:
     from katalon.api.v1.audit import list_audit_log
+
     return await list_audit_log(db, record_type="object", record_id=object_id, limit=100)

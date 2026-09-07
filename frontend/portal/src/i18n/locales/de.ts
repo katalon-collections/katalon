@@ -3,17 +3,19 @@
 
 export default {
   'nav.objects': 'Objekte',
+  'nav.collections': 'Sammlungen',
   'nav.entities': 'Personen',
   'nav.places': 'Orte',
   'nav.works': 'Werke',
   'nav.entitiesLong': 'Personen & Organisationen',
   'nav.worksLong': 'Werke & Ereignisse',
+  'nav.collectionsLong': 'Sammlungen & Bestände',
 
   'type.object': 'Objekt',
+  'type.collection': 'Sammlung',
   'type.entity': 'Person/Org',
   'type.place': 'Ort',
   'type.occurrence': 'Werk/Ereignis',
-
   'entityType.person': 'Person',
   'entityType.organisation': 'Organisation',
   'entityType.group': 'Gruppe',
@@ -44,6 +46,7 @@ export default {
   'search.relatedEntities': 'Personen/Org.',
   'search.relatedPlaces': 'Orte',
   'search.relatedOccurrences': 'Werke/Ereignisse',
+  'search.relatedCollections': 'Sammlungen',
   'search.linkedFacet': 'Verknüpft: {type} – {field}',
   'search.loading': 'Lade…',
   'search.noResultsShort': 'Keine Ergebnisse.',
@@ -109,7 +112,9 @@ export default {
   'common.recordUnavailable': 'Nicht verfügbar',
   'common.coordinates': 'Koordinaten',
   'common.inventoryNo': 'Inventar-Nr.',
+  'common.signature': 'Signatur',
 
+  'error.collectionNotFound': 'Sammlung nicht gefunden.',
   'error.entityNotFound': 'Entität nicht gefunden.',
   'error.placeNotFound': 'Ort nicht gefunden.',
   'error.occurrenceNotFound': 'Eintrag nicht gefunden.',
@@ -128,6 +133,17 @@ export default {
   'home.recent': 'Neueste Zugänge',
   'home.noObjects': 'Noch keine Objekte vorhanden.',
 
+
+  'collection.searchInCollection': 'In dieser Sammlung suchen…',
+  'collection.parentCollection': 'Übergeordnete Sammlung',
+  'collection.subCollections': 'Teilbestände & Unterserien',
+  'collection.hierarchy': 'Hierarchie & Kontext',
+  'collection.objectsCount': '{count} Objekte',
+  'collection.viewGrid': 'Galerie',
+  'collection.viewList': 'Liste',
+  'collection.noObjects': 'Keine Objekte in dieser Sammlung gefunden.',
+  'collection.allInCollection': 'Alle {count} Objekte in der Suche öffnen →',
+  'collection.includeSubcollections': 'Inklusive Unter-Sammlungen',
   'page.notFound': 'Seite nicht gefunden',
   'page.notFoundBody': 'Die angeforderte Seite existiert nicht oder ist nicht veröffentlicht.',
 

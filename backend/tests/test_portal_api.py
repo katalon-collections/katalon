@@ -55,8 +55,12 @@ async def test_portal_lists_only_public_objects() -> None:
         version=1,
     )
     public_field = FieldDefinition(
-        id=uuid.uuid4(), target_type="object", name="label", label={"de": "Titel"},
-        field_type="text", is_public=True,
+        id=uuid.uuid4(),
+        target_type="object",
+        name="label",
+        label={"de": "Titel"},
+        field_type="text",
+        is_public=True,
     )
     session = AsyncMock()
 
@@ -91,13 +95,33 @@ async def test_portal_lists_only_public_objects() -> None:
 @pytest.mark.asyncio
 async def test_portal_record_omits_internal_metadata() -> None:
     record = Object(
-        id=uuid.uuid4(), idno="OBJ-1", status="public", collection_status="active",
+        id=uuid.uuid4(),
+        idno="OBJ-1",
+        status="public",
+        collection_status="active",
         metadata_={"label": "Public", "internal_note": "Do not publish"},
-        created_at=datetime.now(), updated_at=datetime.now(), deleted_at=None, version=1,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        deleted_at=None,
+        version=1,
     )
     fields = [
-        FieldDefinition(id=uuid.uuid4(), target_type="object", name="label", label={}, field_type="text", is_public=True),
-        FieldDefinition(id=uuid.uuid4(), target_type="object", name="internal_note", label={}, field_type="text", is_public=False),
+        FieldDefinition(
+            id=uuid.uuid4(),
+            target_type="object",
+            name="label",
+            label={},
+            field_type="text",
+            is_public=True,
+        ),
+        FieldDefinition(
+            id=uuid.uuid4(),
+            target_type="object",
+            name="internal_note",
+            label={},
+            field_type="text",
+            is_public=False,
+        ),
     ]
     session = AsyncMock()
     record_result = MagicMock()
@@ -121,8 +145,13 @@ async def test_portal_record_omits_internal_metadata() -> None:
 @pytest.mark.asyncio
 async def test_portal_staff_login_uses_internal_record_projection(monkeypatch) -> None:
     record = Object(
-        id=uuid.uuid4(), idno="OBJ-1", status="draft", collection_status="active",
-        metadata_={"internal_note": "Nur intern"}, created_at=datetime.now(), updated_at=datetime.now(),
+        id=uuid.uuid4(),
+        idno="OBJ-1",
+        status="draft",
+        collection_status="active",
+        metadata_={"internal_note": "Nur intern"},
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
     )
     staff_user = User(email="staff@example.test", hashed_password="unused", role="editor")
     get_object = AsyncMock(return_value=record)
@@ -156,7 +185,9 @@ async def test_portal_staff_login_uses_internal_record_projection(monkeypatch) -
     ],
 )
 @pytest.mark.asyncio
-async def test_portal_record_responses_exclude_internal_orm_fields(path: str, record: object) -> None:
+async def test_portal_record_responses_exclude_internal_orm_fields(
+    path: str, record: object
+) -> None:
     record.id = uuid.uuid4()
     record.status = "public"
     record.metadata_ = {}
@@ -282,12 +313,20 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert response.json() == [{
-        "name": "material", "label": {"de": "Material"}, "field_type": "text",
-        "is_repeatable": True, "is_searchable": True, "parent_id": None,
-        "settings": {"hint": "visible"}, "show_in_detail": True,
-        "detail_slot": "sidebar", "detail_role": "none",
-    }]
+    assert response.json() == [
+        {
+            "name": "material",
+            "label": {"de": "Material"},
+            "field_type": "text",
+            "is_repeatable": True,
+            "is_searchable": True,
+            "parent_id": None,
+            "settings": {"hint": "visible"},
+            "show_in_detail": True,
+            "detail_slot": "sidebar",
+            "detail_role": "none",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -298,9 +337,15 @@ async def test_portal_exposes_terms_only_through_public_searchable_vocab_field()
         settings={"vocabulary_id": str(vocabulary_id)}
     )
     term = VocabularyTerm(
-        id=uuid.uuid4(), vocabulary_id=vocabulary_id, term="stone",
-        label={"de": "Stein"}, inverse_label={}, metadata_={},
-        parent_id=None, applies_from=[], applies_to=[],
+        id=uuid.uuid4(),
+        vocabulary_id=vocabulary_id,
+        term="stone",
+        label={"de": "Stein"},
+        inverse_label={},
+        metadata_={},
+        parent_id=None,
+        applies_from=[],
+        applies_to=[],
     )
     session = AsyncMock()
     session.execute.side_effect = [field_result, _result(items=[term])]
@@ -316,20 +361,33 @@ async def test_portal_exposes_terms_only_through_public_searchable_vocab_field()
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert response.json() == [{
-        "id": str(term.id), "term": "stone", "label": {"de": "Stein"}, "parent_id": None,
-    }]
+    assert response.json() == [
+        {
+            "id": str(term.id),
+            "term": "stone",
+            "label": {"de": "Stein"},
+            "parent_id": None,
+        }
+    ]
 
 
 @pytest.mark.asyncio
 async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
     config = PortalConfigRead(
-        site_title="Katalon", site_subtitle="", hero_text="", featured_object_ids=[],
-        facet_fields={}, accent_color="#1e3a8a", logo_url="/v1/portal/logo/file",
-        placeholder_image_url="", color_tokens={},
+        site_title="Katalon",
+        site_subtitle="",
+        hero_text="",
+        featured_object_ids=[],
+        facet_fields={},
+        accent_color="#1e3a8a",
+        logo_url="/v1/portal/logo/file",
+        placeholder_image_url="",
+        color_tokens={},
         browse_enabled_types=["object", "entity", "place", "occurrence"],
     )
-    monkeypatch.setattr("katalon.api.v1.portal_public.portal.get_portal_config", AsyncMock(return_value=config))
+    monkeypatch.setattr(
+        "katalon.api.v1.portal_public.portal.get_portal_config", AsyncMock(return_value=config)
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/portal/v1/portal/config")
@@ -377,7 +435,9 @@ async def test_portal_config_preserves_system_facet_visibility(
 @pytest.mark.asyncio
 async def test_portal_config_returns_facet_display_settings() -> None:
     config_result = MagicMock()
-    config_result.scalar_one_or_none.return_value = PortalConfig(facet_sort="alpha", facet_initial_count=25)
+    config_result.scalar_one_or_none.return_value = PortalConfig(
+        facet_sort="alpha", facet_initial_count=25
+    )
     facet_result = MagicMock()
     facet_result.all.return_value = []
     admin_result = MagicMock()
@@ -427,9 +487,15 @@ async def test_portal_search_rejects_procedures(monkeypatch) -> None:
 async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None:
     advanced_filter = {"bool": {"filter": [{"match_all": {}}]}}
     resolve = AsyncMock(return_value=advanced_filter)
-    search = AsyncMock(return_value={
-        "total": 0, "page": 1, "page_size": 20, "items": [], "facets": {},
-    })
+    search = AsyncMock(
+        return_value={
+            "total": 0,
+            "page": 1,
+            "page_size": 20,
+            "items": [],
+            "facets": {},
+        }
+    )
     monkeypatch.setattr(portal_public, "resolve_query", resolve)
     monkeypatch.setattr(portal_public.search_service, "search", search)
     config_result = MagicMock()
@@ -443,20 +509,27 @@ async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post("/portal/v1/search/advanced", json={
-                "query": {
-                    "version": 1,
-                    "record_type": "object",
-                    "group": {
-                        "mode": "all",
-                        "clauses": [{
-                            "kind": "field", "field": "title",
-                            "operator": "contains", "value": "Bremen",
-                        }],
+            response = await client.post(
+                "/portal/v1/search/advanced",
+                json={
+                    "query": {
+                        "version": 1,
+                        "record_type": "object",
+                        "group": {
+                            "mode": "all",
+                            "clauses": [
+                                {
+                                    "kind": "field",
+                                    "field": "title",
+                                    "operator": "contains",
+                                    "value": "Bremen",
+                                }
+                            ],
+                        },
                     },
+                    "q": "Ansicht",
                 },
-                "q": "Ansicht",
-            })
+            )
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -464,6 +537,8 @@ async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None
     assert search.await_args.kwargs["advanced_filter"] == advanced_filter
     assert search.await_args.kwargs["record_type"] == "object"
     assert search.await_args.kwargs["status"] == "public"
+
+
 @pytest.mark.asyncio
 async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeypatch) -> None:
     captured: dict = {}
@@ -492,11 +567,9 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
 
     assert response.status_code == 200
     assert captured["record_type"] is None
-    assert captured["record_types"] == ("object", "entity", "place", "occurrence")
+    assert captured["record_types"] == ("object", "entity", "place", "occurrence", "collection")
     assert captured["status"] == "public"
-    assert captured["extra_filters"] == {
-        "event_date": ["Paläolithikum", "Neolithikum"]
-    }
+    assert captured["extra_filters"] == {"event_date": ["Paläolithikum", "Neolithikum"]}
     assert captured["subtitle_fields"] == {"object": ["creator"]}
 
 
@@ -525,3 +598,30 @@ async def test_portal_search_forwards_numeric_range_filters(monkeypatch) -> None
 
     assert response.status_code == 200
     assert captured["numeric_filters"] == {"year": (1900.0, 1950.0)}
+
+
+@pytest.mark.asyncio
+async def test_portal_search_forwards_rel_collection(monkeypatch) -> None:
+    captured: dict = {}
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute.return_value = config_result
+
+    async def search(**kwargs):
+        captured.update(kwargs)
+        return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+
+    async def override_db():
+        yield session
+
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/search?rel_collection=Nachlass+Müller")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert captured["rel_filters"] == {"related_collections": ["Nachlass Müller"]}

@@ -54,6 +54,7 @@
       "proceduresList": "Procedures",
       "import": "Importer",
       "audit": "Audit log",
+      "workingSets": "Worklists",
       "subtypes": "Subtypes",
       "storageLocations": "Storage locations",
       "schema": "Schemas",
@@ -63,6 +64,7 @@
       "oaiSets": "OAI-PMH sets",
       "banners": "Banners",
       "export": "Export",
+      "sparql": "SPARQL Query Builder",
       "users": "Users",
       "settings": "Settings"
     },

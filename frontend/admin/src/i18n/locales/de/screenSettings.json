@@ -60,5 +60,30 @@
       "docs": "Dokumentation",
       "changelog": "Versionshinweise anzeigen"
     }
+  },
+  "sparql": {
+    "nav": "Linked Data & SPARQL",
+    "title": "Linked Data & SPARQL-Endpunkt",
+    "description": "Materialisierte RDF-Projektion (Oxigraph) und schreibgeschützter SPARQL 1.1 Protocol Endpoint.",
+    "status": "Verbindungsstatus",
+    "connected": "Verbunden",
+    "unreachable": "Nicht erreichbar",
+    "unreachableHelp": "Oxigraph ist aktiviert, antwortet aber nicht unter der konfigurierten URL. Bitte prüfen Sie, ob der Container läuft und das Docker-Profil 'rdf' aktiv ist.",
+    "triplesCount": "Gespeicherte Triples",
+    "endpointUrl": "SPARQL-Endpunkt",
+    "authModel": "Zugriffsschutz",
+    "authProtected": "Geschützt (JWT / API-Schlüssel)",
+    "authPublic": "Öffentlich (ohne Authentifizierung)",
+    "queryTimeout": "Abfrage-Timeout",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "rebuildTitle": "Triple Store neu aufbauen",
+    "rebuildDescription": "Synchronisiert alle veröffentlichten Datensätze der 7 Kerntypen (Objekte, Entitäten, Orte, Occurrences, Vorgänge, Sammlungen, Standorte) atomar aus PostgreSQL in Oxigraph neu.",
+    "rebuildBtn": "Triple Store neu aufbauen",
+    "rebuilding": "Wird gestartet…",
+    "rebuildConfirm": "Gesamten Triple Store aus PostgreSQL neu aufbauen? Dieser Vorgang läuft asynchron im Hintergrund.",
+    "rebuildSuccess": "Rebuild gestartet — die Synchronisation läuft im Hintergrund.",
+    "rebuildError": "Fehler beim Starten des Rebuilds",
+    "openBuilder": "Zum SPARQL Query Builder →"
   }
 }

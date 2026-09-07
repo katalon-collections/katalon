@@ -54,39 +54,43 @@ INDEX_SETTINGS: dict[str, Any] = {
             },
         ],
         "properties": {
-            "record_type":         {"type": "keyword"},
-            "title":               {"type": "text", "analyzer": "katalon_default", "fields": {"raw": {"type": "keyword"}}},
-            "status":              {"type": "keyword"},
-            "metadata":            {"type": "object", "enabled": False},
-            "search_text":         {"type": "text", "analyzer": "katalon_default"},
-            "created_at":          {"type": "date"},
-            "updated_at":          {"type": "date"},
-            "related_entities":    {"type": "keyword"},
-            "related_places":      {"type": "keyword"},
+            "record_type": {"type": "keyword"},
+            "title": {
+                "type": "text",
+                "analyzer": "katalon_default",
+                "fields": {"raw": {"type": "keyword"}},
+            },
+            "status": {"type": "keyword"},
+            "metadata": {"type": "object", "enabled": False},
+            "search_text": {"type": "text", "analyzer": "katalon_default"},
+            "created_at": {"type": "date"},
+            "updated_at": {"type": "date"},
+            "related_entities": {"type": "keyword"},
+            "related_places": {"type": "keyword"},
             "related_occurrences": {"type": "keyword"},
             "related_collections": {"type": "keyword"},
             "adv_fields": {
                 "type": "nested",
                 "properties": {
-                    "name":          {"type": "keyword"},
-                    "text_value":    {"type": "text", "analyzer": "katalon_default"},
+                    "name": {"type": "keyword"},
+                    "text_value": {"type": "text", "analyzer": "katalon_default"},
                     "keyword_value": {"type": "keyword"},
-                    "number_value":  {"type": "double"},
-                    "date_min":      {"type": "long"},
-                    "date_max":      {"type": "long"},
-                    "bool_value":    {"type": "boolean"},
+                    "number_value": {"type": "double"},
+                    "date_min": {"type": "long"},
+                    "date_max": {"type": "long"},
+                    "bool_value": {"type": "boolean"},
                 },
             },
             "adv_relations": {
                 "type": "nested",
                 "properties": {
                     "source_field": {"type": "keyword"},
-                    "target_type":  {"type": "keyword"},
-                    "target_id":    {"type": "keyword"},
+                    "target_type": {"type": "keyword"},
+                    "target_id": {"type": "keyword"},
                     "relation_type": {"type": "keyword"},
                 },
             },
-        }
+        },
     },
 }
 
@@ -223,17 +227,19 @@ async def search_documents(
     if query:
         q = query.strip()
         # Add trailing wildcard for prefix/autocomplete unless query already has operators
-        if q and not any(c in q for c in (':', '"', '*', '?', '+', '-', '~', '(')):
-            q = q + '*'
-        must.append({
-            "query_string": {
-                "query": q,
-                "fields": ["title^3", "search_text^2"],
-                "default_operator": "AND",
-                "lenient": True,
-                "allow_leading_wildcard": True,
+        if q and not any(c in q for c in (":", '"', "*", "?", "+", "-", "~", "(")):
+            q = q + "*"
+        must.append(
+            {
+                "query_string": {
+                    "query": q,
+                    "fields": ["title^3", "search_text^2"],
+                    "default_operator": "AND",
+                    "lenient": True,
+                    "allow_leading_wildcard": True,
+                }
             }
-        })
+        )
     else:
         must.append({"match_all": {}})
 
@@ -253,14 +259,23 @@ async def search_documents(
         if values
     }
     numeric_facet_filters = {
-        field: {"range": {f"number_facet_{field}": {
-            key: value for key, value in {"gte": lower, "lte": upper}.items() if value is not None
-        }}}
+        field: {
+            "range": {
+                f"number_facet_{field}": {
+                    key: value
+                    for key, value in {"gte": lower, "lte": upper}.items()
+                    if value is not None
+                }
+            }
+        }
         for field, (lower, upper) in (numeric_filters or {}).items()
         if lower is not None or upper is not None
     }
     for field, value in (rel_filters or {}).items():
-        filters.append({"term": {field: value}})
+        if isinstance(value, (list, tuple, set)):
+            filters.append({"terms": {field: list(value)}})
+        else:
+            filters.append({"term": {field: value}})
     if advanced_filter:
         filters.append(advanced_filter)
 
@@ -271,10 +286,10 @@ async def search_documents(
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
     aggs: dict[str, Any] = {
-        "by_type":             {"terms": {"field": "record_type", "size": 10}},
-        "by_status":           {"terms": {"field": "status", "size": 10}},
-        "related_entities":    {"terms": {"field": "related_entities", "size": 30}},
-        "related_places":      {"terms": {"field": "related_places", "size": 30}},
+        "by_type": {"terms": {"field": "record_type", "size": 10}},
+        "by_status": {"terms": {"field": "status", "size": 10}},
+        "related_entities": {"terms": {"field": "related_entities", "size": 30}},
+        "related_places": {"terms": {"field": "related_places", "size": 30}},
         "related_occurrences": {"terms": {"field": "related_occurrences", "size": 30}},
         "related_collections": {"terms": {"field": "related_collections", "size": 30}},
     }
@@ -282,19 +297,24 @@ async def search_documents(
     # more" can reveal further values without a second round-trip.
     facet_order = {"_key": "asc"} if facet_sort == "alpha" else {"_count": "desc"}
     for field in facet_fields or []:
-        aggregation_filters = [
-            value for name, value in facet_filters.items() if name != field
-        ]
+        aggregation_filters = [value for name, value in facet_filters.items() if name != field]
         aggs[f"meta_{field}"] = {
             "global": {},
             "aggs": {
                 "filtered": {
-                    "filter": {"bool": {"must": must, "filter": [
-                        *base_filters,
-                        *aggregation_filters,
-                    ]}},
+                    "filter": {
+                        "bool": {
+                            "must": must,
+                            "filter": [
+                                *base_filters,
+                                *aggregation_filters,
+                            ],
+                        }
+                    },
                     "aggs": {
-                        "values": {"terms": {"field": f"facet_{field}", "size": 100, "order": facet_order}}
+                        "values": {
+                            "terms": {"field": f"facet_{field}", "size": 100, "order": facet_order}
+                        }
                     },
                 }
             },
@@ -306,16 +326,17 @@ async def search_documents(
             "global": {},
             "aggs": {
                 "filtered": {
-                    "filter": {"bool": {"must": must, "filter": [
-                        *base_filters,
-                        *facet_filters.values(),
-                        *numeric_aggregation_filters,
-                    ]}},
-                    "aggs": {
-                        "values": {
-                            "stats": {"field": f"number_facet_{field}"}
+                    "filter": {
+                        "bool": {
+                            "must": must,
+                            "filter": [
+                                *base_filters,
+                                *facet_filters.values(),
+                                *numeric_aggregation_filters,
+                            ],
                         }
                     },
+                    "aggs": {"values": {"stats": {"field": f"number_facet_{field}"}}},
                 }
             },
         }

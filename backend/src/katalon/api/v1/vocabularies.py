@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Karl Krägelin
 
+import copy
 import uuid
 from typing import Any, Literal
 
@@ -342,6 +343,70 @@ async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
     await db.delete(term)
     await db.commit()
+
+
+@router.post(
+    "/terms/{term_id}/duplicate",
+    response_model=VocabularyTermRead,
+    status_code=201,
+    dependencies=[require_role("admin")],
+    summary="Duplicate a vocabulary term",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Term or vocabulary not found"},
+    },
+)
+async def duplicate_term(term_id: uuid.UUID, db: DBDep) -> VocabularyTerm:
+    result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
+    term = result.scalar_one_or_none()
+    if not term:
+        raise HTTPException(status_code=404, detail="Term nicht gefunden")
+    vocab = await db.get(Vocabulary, term.vocabulary_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+
+    existing_terms_result = await db.execute(
+        select(VocabularyTerm.term).where(VocabularyTerm.vocabulary_id == term.vocabulary_id)
+    )
+    existing_terms = set(existing_terms_result.scalars().all())
+    candidate = f"{term.term}_copy"
+    counter = 2
+    while candidate in existing_terms:
+        candidate = f"{term.term}_copy_{counter}"
+        counter += 1
+
+    new_label = dict(term.label or {})
+    if new_label.get("de"):
+        new_label["de"] = f"{new_label['de']} (Kopie)"
+    elif "de" not in new_label:
+        new_label["de"] = f"{candidate} (Kopie)"
+
+    if new_label.get("en"):
+        new_label["en"] = f"{new_label['en']} (Copy)"
+    elif "en" not in new_label:
+        new_label["en"] = f"{candidate} (Copy)"
+
+    new_inverse_label = dict(term.inverse_label or {})
+    if new_inverse_label.get("de"):
+        new_inverse_label["de"] = f"{new_inverse_label['de']} (Kopie)"
+    if new_inverse_label.get("en"):
+        new_inverse_label["en"] = f"{new_inverse_label['en']} (Copy)"
+
+    new_term = VocabularyTerm(
+        vocabulary_id=term.vocabulary_id,
+        term=candidate,
+        label=new_label,
+        inverse_label=new_inverse_label,
+        applies_from=list(term.applies_from or []),
+        applies_to=list(term.applies_to or []),
+        metadata_=copy.deepcopy(term.metadata_ or {}),
+        parent_id=term.parent_id,
+        uri=None,
+        exact_match_uris=list(term.exact_match_uris or []),
+    )
+    db.add(new_term)
+    await db.commit()
+    return new_term
 
 
 @router.post(

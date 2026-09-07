@@ -3,7 +3,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, search, vocabularies } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, vocabularies } from '../../api/client'
+import { searchRecords } from './ScreenForm'
 import type { BatchOperation, BatchOperationType, BatchRequest, BatchResponse, FieldDefinition, ListableRecordType, RecordType } from '../../types'
 import { getLabel } from '../../types'
 import { Alert, Check, X } from '../ui/Icons'
@@ -107,12 +108,12 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
   }, [selectedField])
 
   useEffect(() => {
-    if (!vocabId || vocabQuery.length < 2) {
+    if (!vocabId) {
       setVocabResults([])
       return
     }
     const t = setTimeout(() => {
-      vocabularies.searchTerms(vocabId, vocabQuery)
+      vocabularies.searchTerms(vocabId, vocabQuery.trim())
         .then(terms => setVocabResults(terms.map(t => ({ id: t.id, label: getLabel(t, t.term) }))))
         .catch(() => setVocabResults([]))
     }, 200)
@@ -120,13 +121,13 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
   }, [vocabId, vocabQuery])
 
   useEffect(() => {
-    if (recordQuery.length < 2) {
+    if (!relationToType) {
       setRecordResults([])
       return
     }
     const t = setTimeout(() => {
-      search.query(recordQuery, relationToType, 10)
-        .then(res => setRecordResults(res.items.map(i => ({ id: i.id, label: `${i.title || i.id} (${i.record_type})` }))))
+      searchRecords(relationToType, recordQuery.trim())
+        .then(items => setRecordResults(items.map(i => ({ id: i.id, label: `${i.title || i.id} (${i.record_type})` }))))
         .catch(() => setRecordResults([]))
     }, 200)
     return () => clearTimeout(t)

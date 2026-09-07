@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiKeys, getTokenUser, users as usersApi } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
+import { ActionMenu } from '../ui/ActionMenu'
+import { Edit, Trash } from '../ui/Icons'
 
 function ApiKeysPanel({ userId }: { userId: string }) {
   const { t } = useTranslation('screenUsers')
@@ -45,10 +47,12 @@ function ApiKeysPanel({ userId }: { userId: string }) {
   async function handleRevoke(keyId: string) {
     if (!window.confirm(t('apiKeyRevokeConfirm'))) return
     try {
+      setKeys(prev => prev.filter(k => k.id !== keyId))
       await apiKeys.revokeForUser(userId, keyId)
       loadKeys()
     } catch (e) {
       alert((e as Error).message)
+      loadKeys()
     }
   }
 
@@ -176,7 +180,8 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     }
     setFormLoading(true)
     try {
-      await usersApi.create({ email, password, role })
+      const created = await usersApi.create({ email, password, role })
+      setUserList(prev => [...prev, created])
       setShowForm(false)
       setEmail('')
       setPassword('')
@@ -209,10 +214,12 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     }
     if (!window.confirm(t('deleteConfirm', { email: user.email }))) return
     try {
+      setUserList(prev => prev.filter(u => u.id !== user.id))
       await usersApi.remove(user.id)
       loadUsers()
     } catch (e) {
       alert((e as Error).message)
+      loadUsers()
     }
   }
 
@@ -339,11 +346,11 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
             <thead>
               <tr>
                 <th>{t('tableEmail')}</th>
-                <th>{t('tableRole')}</th>
-                <th>{t('tableStatus')}</th>
-                <th>{t('tableCreated')}</th>
-                <th>{t('tableLastLogin')}</th>
-                <th>{t('tableApiKeys')}</th>
+                <th style={{ width: 190 }}>{t('tableRole')}</th>
+                <th style={{ width: 90 }}>{t('tableStatus')}</th>
+                <th style={{ width: 110 }}>{t('tableCreated')}</th>
+                <th style={{ width: 150 }}>{t('tableLastLogin')}</th>
+                <th style={{ width: 140 }}>{t('tableApiKeys')}</th>
                  <th className="col-act" />
                </tr>
             </thead>
@@ -410,19 +417,31 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                     </td>
                     <td className="col-act">
                       <div className="row-actions">
-                         {!isSelf && (
-                           <button className="btn sm gh" onClick={() => handleToggleActive(u)}>
-                             {u.is_active ? t('deactivate') : t('activate')}
-                           </button>
-                         )}
-                         <button className="btn sm gh" onClick={() => toggleCredentials(u)}>
-                           {expandedCredentials.has(u.id) ? t('close') : t('credentials')}
-                         </button>
-                         {!isSelf && (
-                           <button className="btn sm ico gh dn" onClick={() => handleDelete(u)} title={t('deleteTitle')}>
-                             🗑
-                           </button>
-                         )}
+                        <ActionMenu
+                          ariaLabel={`Aktionen für ${u.email}`}
+                          items={[
+                            {
+                              key: 'credentials',
+                              label: expandedCredentials.has(u.id) ? t('close') : t('credentials'),
+                              icon: <Edit size={13} />,
+                              onClick: () => toggleCredentials(u),
+                            },
+                            ...(!isSelf ? [
+                              {
+                                key: 'toggle-active',
+                                label: u.is_active ? t('deactivate') : t('activate'),
+                                onClick: () => handleToggleActive(u),
+                              },
+                              {
+                                key: 'delete',
+                                label: t('deleteTitle'),
+                                icon: <Trash size={13} />,
+                                danger: true,
+                                onClick: () => handleDelete(u),
+                              },
+                            ] : []),
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch } from '../../api/client'
-import type { AdminConfigRead, AuthoritySource } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
+import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 
@@ -14,7 +14,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -27,6 +27,8 @@ const RECORD_TYPES = [
 
 const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
   gnd: { query: 'Beethoven', href: 'https://lobid.org/gnd/search?q=Beethoven' },
+  'gnd-person': { query: 'Beethoven', href: 'https://lobid.org/gnd/search?q=Beethoven&filter=type%3APerson' },
+  'gnd-subject': { query: 'Fotografie', href: 'https://lobid.org/gnd/search?q=Fotografie&filter=type%3ASubjectHeading' },
   geonames: { query: 'Berlin', href: 'https://www.geonames.org/search.html?q=Berlin' },
   viaf: { query: 'Beethoven', href: 'https://viaf.org/viaf/search?query=local.names+all+%22Beethoven%22' },
   wikidata: { query: 'Berlin', href: 'https://www.wikidata.org/w/index.php?search=Berlin' },
@@ -998,6 +1000,194 @@ function SectionSuche() {
   )
 }
 
+function SectionSparql({
+  status,
+  onRefresh,
+  onNavigate,
+}: {
+  status: SparqlStatus
+  onRefresh: () => void
+  onNavigate?: (route: string) => void
+}) {
+  const { t } = useTranslation('screenSettings')
+  const [rebuilding, setRebuilding] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const fullEndpoint = `${origin}${status.endpoint_url}`
+
+  async function handleRebuild() {
+    if (!window.confirm(t('sparql.rebuildConfirm'))) return
+    setRebuilding(true)
+    setMsg(null)
+    try {
+      await sparql.rebuild()
+      setMsg({ type: 'ok', text: t('sparql.rebuildSuccess') })
+      setTimeout(() => {
+        onRefresh()
+      }, 3000)
+    } catch (e) {
+      setMsg({ type: 'err', text: `${t('sparql.rebuildError')}: ${(e as Error).message}` })
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(fullEndpoint).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{t('sparql.title')}</span>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 12,
+            fontWeight: 500,
+            background: status.reachable ? '#f0fdf4' : '#fef2f2',
+            color: status.reachable ? '#166534' : '#991b1b',
+            border: `1px solid ${status.reachable ? '#bbf7d0' : '#fecaca'}`,
+          }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: status.reachable ? '#16a34a' : '#dc2626',
+            }}
+          />
+          {status.reachable ? t('sparql.connected') : t('sparql.unreachable')}
+        </span>
+      </div>
+
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+          {t('sparql.description')}
+        </p>
+
+        {!status.reachable && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 6,
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              fontSize: 13,
+              marginBottom: 16,
+            }}
+          >
+            {t('sparql.unreachableHelp')}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ padding: '10px 12px', background: 'var(--bg-2, #f9fafb)', borderRadius: 6, border: '1px solid var(--border-subtle, #e5e7eb)' }}>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {t('sparql.triplesCount')}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
+              {status.triples_count != null ? status.triples_count.toLocaleString() : '—'}
+            </div>
+          </div>
+
+          <div style={{ padding: '10px 12px', background: 'var(--bg-2, #f9fafb)', borderRadius: 6, border: '1px solid var(--border-subtle, #e5e7eb)' }}>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {t('sparql.authModel')}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginTop: 6 }}>
+              {status.require_auth ? t('sparql.authProtected') : t('sparql.authPublic')}
+            </div>
+          </div>
+
+          <div style={{ padding: '10px 12px', background: 'var(--bg-2, #f9fafb)', borderRadius: 6, border: '1px solid var(--border-subtle, #e5e7eb)' }}>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {t('sparql.queryTimeout')}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginTop: 6 }}>
+              {status.query_timeout}s
+            </div>
+          </div>
+        </div>
+
+        <div className="field" style={{ marginBottom: 20 }}>
+          <div className="lbl">{t('sparql.endpointUrl')}</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="text"
+              readOnly
+              className="fld mono"
+              value={fullEndpoint}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn sm gh"
+              onClick={handleCopy}
+              style={{ minWidth: 80 }}
+            >
+              {copied ? t('sparql.copied') : t('sparql.copy')}
+            </button>
+          </div>
+          {onNavigate && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn sm"
+                onClick={() => onNavigate('sparql')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>{t('sparql.openBuilder')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle, #e5e7eb)', margin: '20px 0' }} />
+
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{t('sparql.rebuildTitle')}</div>
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+            {t('sparql.rebuildDescription')}
+          </p>
+
+          {msg && (
+            <div
+              style={{
+                fontSize: 12,
+                color: msg.type === 'err' ? '#dc2626' : '#166534',
+                marginBottom: 10,
+              }}
+            >
+              {msg.text}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="btn sm pri"
+            onClick={handleRebuild}
+            disabled={rebuilding || !status.reachable}
+          >
+            {rebuilding ? t('sparql.rebuilding') : t('sparql.rebuildBtn')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // ID-Schemas section
 // ---------------------------------------------------------------------------
@@ -1484,8 +1674,8 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'authorities', label: 'Normdatenquellen', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
+  { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
   { id: 'changelog', label: 'Versionshinweise', adminOnly: true },
-  { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true },
 ]
 
 const SECTION_IDS = NAV.map(n => n.id)
@@ -1496,9 +1686,10 @@ function initialSection(): Section {
   return (requested && SECTION_IDS.includes(requested as Section)) ? requested as Section : 'profil'
 }
 
-export function ScreenSettings({ isAdmin, onStartTour }: Props) {
+export function ScreenSettings({ isAdmin, onStartTour, onNavigate }: Props) {
   const [section, setSection] = useState<Section>(initialSection)
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
+  const [sparqlStatus, setSparqlStatus] = useState<SparqlStatus | null>(null)
   const [loading, setLoading] = useState(isAdmin)
   const [error, setError] = useState<string | null>(null)
 
@@ -1508,9 +1699,16 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
       .then(setConfig)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
+    sparql.status()
+      .then(setSparqlStatus)
+      .catch(() => setSparqlStatus({ enabled: false, reachable: false, triples_count: null, endpoint_url: '/sparql', require_auth: true, query_timeout: 30 }))
   }, [isAdmin])
 
-  const navItems = NAV.filter(n => !n.adminOnly || isAdmin)
+  const navItems = NAV.filter(n => {
+    if (n.adminOnly && !isAdmin) return false
+    if (n.id === 'sparql' && !sparqlStatus?.enabled) return false
+    return true
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1548,6 +1746,15 @@ export function ScreenSettings({ isAdmin, onStartTour }: Props) {
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'authorities' && <SectionAuthoritySources />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
+          {!loading && isAdmin && section === 'sparql' && sparqlStatus?.enabled && (
+            <SectionSparql
+              status={sparqlStatus}
+              onRefresh={() => {
+                sparql.status().then(setSparqlStatus).catch(() => {})
+              }}
+              onNavigate={onNavigate}
+            />
+          )}
           {!loading && isAdmin && section === 'changelog' && <SectionChangelog />}
           {!loading && isAdmin && section === 'gefahrenbereich' && <SectionDangerZone />}
         </div>

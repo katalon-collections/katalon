@@ -707,3 +707,75 @@ class BatchResponse(BaseModel):
     errors: list[str] = []
     batch_job_id: uuid.UUID | None = None
     task_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Working Sets
+# ---------------------------------------------------------------------------
+
+
+class WorkingSetItemBase(BaseModel):
+    record_id: uuid.UUID
+    sort_order: int = 0
+    note: str | None = None
+
+
+class WorkingSetItemCreate(WorkingSetItemBase):
+    pass
+
+
+class WorkingSetItemUpdate(BaseModel):
+    sort_order: int | None = None
+    note: str | None = None
+
+
+class WorkingSetItemRead(WorkingSetItemBase):
+    id: uuid.UUID
+    set_id: uuid.UUID
+    created_at: datetime
+    label: str | None = None
+    idno: str | None = None
+    status: str | None = None
+    thumbnail_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkingSetAddItemsRequest(BaseModel):
+    items: list[WorkingSetItemCreate] | None = None
+    record_ids: list[uuid.UUID] | None = None
+
+class WorkingSetReorderRequest(BaseModel):
+    item_ids: list[uuid.UUID]
+
+
+class WorkingSetBase(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: str | None = None
+    record_type: str = Field(..., max_length=50)
+    is_shared: bool = False
+
+
+class WorkingSetCreate(WorkingSetBase):
+    pass
+
+
+class WorkingSetUpdate(BaseModel):
+    name: str | None = Field(None, max_length=255)
+    description: str | None = None
+    is_shared: bool | None = None
+
+
+class WorkingSetRead(WorkingSetBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: str | None = None
+    item_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkingSetDetailRead(WorkingSetRead):
+    items: list[WorkingSetItemRead] = []

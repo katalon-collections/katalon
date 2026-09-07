@@ -29,11 +29,25 @@ def reset_cache():
 
 def test_list_sources_returns_all_builtins() -> None:
     sources = authority_service.list_sources()
-    assert set(sources) == {"gnd", "geonames", "viaf", "wikidata", "tgn", "iconclass", "aat"}
+    assert set(sources) == {
+        "gnd", "gnd-person", "gnd-subject", "geonames", "viaf", "wikidata", "tgn", "iconclass", "aat",
+    }
 
 
-def test_list_sources_returns_seven_entries() -> None:
-    assert len(authority_service.list_sources()) == 7
+def test_list_sources_returns_nine_entries() -> None:
+    assert len(authority_service.list_sources()) == 9
+
+
+def test_gnd_variants_configured_with_source_id_and_filters() -> None:
+    p = authority_service._BUILTIN["gnd-person"]
+    s = authority_service._BUILTIN["gnd-subject"]
+    g = authority_service._BUILTIN["gnd"]
+    assert getattr(p, "source_id", None) == "gnd-person"
+    assert getattr(p, "filter_type", None) == "type:Person"
+    assert getattr(s, "source_id", None) == "gnd-subject"
+    assert getattr(s, "filter_type", None) == "type:SubjectHeading"
+    assert getattr(g, "source_id", None) == "gnd"
+    assert getattr(g, "filter_type", None) is None
 
 
 # ── search ────────────────────────────────────────────────────────────────────

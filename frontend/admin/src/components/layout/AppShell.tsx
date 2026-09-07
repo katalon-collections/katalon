@@ -22,10 +22,12 @@ import { ScreenSubtype } from '../screens/ScreenSubtype'
 import { ScreenStorageLocation } from '../screens/ScreenStorageLocation'
 import { ScreenBanners } from '../screens/ScreenBanners'
 import { ScreenFormVariants } from '../screens/ScreenFormVariants'
+import { ScreenSparql } from '../screens/ScreenSparql'
+import { ScreenWorkingSets } from '../screens/ScreenWorkingSets'
 import { BannerBar } from '../ui/BannerBar'
 import { ImportStatusBanner } from '../ui/ImportStatusBanner'
 import { Tour, type TourVariant } from '../tour/Tour'
-import { BASE, req, users } from '../../api/client'
+import { BASE, req, sparql, users } from '../../api/client'
 import type { PortalConfigRead } from '../../types'
 
 type Crumb = { label: string; route?: string }
@@ -52,8 +54,10 @@ const CRUMBS: Record<string, Crumb[]> = {
   pages:              [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Statische Seiten' }],
   'oai-sets':         [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'OAI-PMH Sets' }],
   export:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'Export' }],
+  sparql:             [{ label: 'Katalon' }, { label: 'Konfiguration' }, { label: 'SPARQL Query Builder' }],
   import:             [{ label: 'Katalon' }, { label: 'Importer' }],
   audit:              [{ label: 'Katalon' }, { label: 'Audit-Log' }],
+  'working-sets':     [{ label: 'Katalon' }, { label: 'Arbeitslisten' }],
   users:              [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer' }],
   'user-roles':       [{ label: 'Katalon' }, { label: 'Verwaltung' }, { label: 'Benutzer', route: 'users' }, { label: 'Rollenrechte' }],
   settings:           [{ label: 'Katalon' }, { label: 'Einstellungen' }],
@@ -104,6 +108,7 @@ export function AppShell() {
     onUnauthorized(() => setLoggedIn(false))
   }, [])
 
+  const [sparqlEnabled, setSparqlEnabled] = useState(false)
   useEffect(() => {
     restoreSession()
       .then(token => setLoggedIn(Boolean(token)))
@@ -119,6 +124,13 @@ export function AppShell() {
       })
       .catch(() => {})
   }, [loggedIn])
+  useEffect(() => {
+    if (!loggedIn) return
+    sparql.status()
+      .then((s) => setSparqlEnabled(s.enabled))
+      .catch(() => setSparqlEnabled(false))
+  }, [loggedIn])
+
 
   useEffect(() => {
     if (!loggedIn) return
@@ -192,15 +204,17 @@ export function AppShell() {
       case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype initialType={editId} onTypeChange={(t) => navigate('subtypes', t)} /> : <Placeholder label="Kein Zugriff" />
-      case 'storage-locations': return isAdmin ? <ScreenStorageLocation /> : <Placeholder label="Kein Zugriff" />
+      case 'storage-locations': return isAdmin ? <ScreenStorageLocation onOpenObject={(id) => navigate('form', id)} /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return isAdmin ? <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'form-variants':     return isAdmin ? <ScreenFormVariants initialPath={editId} onPathChange={(p) => navigate('form-variants', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'vocab':             return isAdmin ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
       case 'pages':             return isAdmin ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
       case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
       case 'export':            return isAdmin ? <ScreenExport /> : <Placeholder label="Kein Zugriff" />
+      case 'sparql':            return isAdmin ? <ScreenSparql onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} />
       case 'audit':             return <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} />
+      case 'working-sets':      return <ScreenWorkingSets initialSetId={editId} onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} />
       case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
       case 'user-roles':        return isAdmin ? <ScreenUserRoles /> : <Placeholder label="Kein Zugriff" />
       case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
@@ -216,6 +230,7 @@ export function AppShell() {
         appTitle={appTitle}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        sparqlEnabled={sparqlEnabled}
       />
       {sidebarOpen && <button className="sb-backdrop" aria-label="Navigation schließen" onClick={() => setSidebarOpen(false)} />}
       <div className="main">

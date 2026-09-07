@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Karl Krägelin
 
 const AUTHORITY_BASE: Record<string, string> = {
-  gnd:       'https://d-nb.info/gnd/',
+  gnd:          'https://d-nb.info/gnd/',
+  'gnd-person':  'https://d-nb.info/gnd/',
+  'gnd-subject': 'https://d-nb.info/gnd/',
   wikidata:  'https://www.wikidata.org/wiki/',
   viaf:      'https://viaf.org/viaf/',
   geonames:  'https://www.geonames.org/',

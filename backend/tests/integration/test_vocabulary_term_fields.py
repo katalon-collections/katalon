@@ -467,3 +467,54 @@ ex:stone a skos:Concept ;
     assert gold["label"] == {"de": "Gold", "en": "Gold"}
     assert gold["parent_id"] == metal["id"]
     assert gold["exact_match_uris"] == ["http://vocab.getty.edu/aat/300011029"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_vocabulary_term(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    vocab_response = await async_client.post(
+        "/v1/vocabularies",
+        headers=auth_headers,
+        json={"name": f"dup-test-{uuid.uuid4()}", "is_hierarchical": False, "kind": "term"},
+    )
+    assert vocab_response.status_code == 201, vocab_response.text
+    vocab = vocab_response.json()
+
+    # Create initial term
+    create_res = await async_client.post(
+        f"/v1/vocabularies/{vocab['id']}/terms",
+        headers=auth_headers,
+        json={
+            "vocabulary_id": vocab["id"],
+            "term": "test_term",
+            "label": {"de": "Test Begriff", "en": "Test Term"},
+            "inverse_label": {},
+            "uri": "https://example.org/term/1",
+            "exact_match_uris": ["https://example.org/exact/1"],
+        },
+    )
+    assert create_res.status_code == 201, create_res.text
+    orig = create_res.json()
+
+    # Duplicate term
+    dup_res = await async_client.post(
+        f"/v1/vocabularies/terms/{orig['id']}/duplicate",
+        headers=auth_headers,
+    )
+    assert dup_res.status_code == 201, dup_res.text
+    dup_data = dup_res.json()
+    assert dup_data["id"] != orig["id"]
+    assert dup_data["term"] == "test_term_copy"
+    assert dup_data["label"]["de"] == "Test Begriff (Kopie)"
+    assert dup_data["label"]["en"] == "Test Term (Copy)"
+    assert dup_data["uri"] is None  # External URI reset
+    assert dup_data["exact_match_uris"] == ["https://example.org/exact/1"]
+
+    # Second duplicate should increment suffix
+    dup2_res = await async_client.post(
+        f"/v1/vocabularies/terms/{orig['id']}/duplicate",
+        headers=auth_headers,
+    )
+    assert dup2_res.status_code == 201
+    assert dup2_res.json()["term"] == "test_term_copy_2"

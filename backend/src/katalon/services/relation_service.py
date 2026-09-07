@@ -11,6 +11,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import (
+    Collection,
     Entity,
     FieldDefinition,
     Object,
@@ -27,9 +28,28 @@ _RECORD_MODELS: dict[str, Any] = {
     "place": Place,
     "occurrence": Occurrence,
     "procedure": Procedure,
+    "collection": Collection,
     "storage_location": StorageLocation,
 }
 
+
+async def validate_relation_endpoint(
+    db: AsyncSession, record_type: str, record_id: uuid.UUID
+) -> str | None:
+    """Verify that the relation endpoint type is supported and the record exists and is not deleted.
+
+    Returns an error message if invalid, or None if valid.
+    """
+    model = _RECORD_MODELS.get(record_type)
+    if model is None:
+        return f"Ungültiger Datensatztyp '{record_type}' für Beziehung."
+    stmt = select(model.id).where(model.id == record_id)
+    if hasattr(model, "deleted_at"):
+        stmt = stmt.where(model.deleted_at.is_(None))
+    result = (await db.execute(stmt)).scalar_one_or_none()
+    if result is None:
+        return f"Datensatz {record_type}:{record_id} existiert nicht oder ist gelöscht."
+    return None
 
 async def count_relations(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> int:
     result = await db.execute(
@@ -221,9 +241,14 @@ async def sync_schema_relations(
 
         target_type = (field.settings or {}).get("target_type", "")
         for entry in entries:
-            to_id = uuid.UUID(str(entry["id"]))
+            try:
+                to_id = uuid.UUID(str(entry["id"]))
+            except (ValueError, KeyError, TypeError):
+                continue
             relation_type = str(entry.get("relation_type", ""))
             if (target_type, to_id, relation_type) in manual_keys:
+                continue
+            if await validate_relation_endpoint(db, target_type, to_id) is not None:
                 continue
             db.add(
                 Relation(
@@ -244,9 +269,14 @@ async def sync_schema_relations(
             if not isinstance(entry, dict) or not entry.get("id"):
                 continue
             target_type = (field.settings or {}).get("target_type", "")
-            to_id = uuid.UUID(str(entry["id"]))
+            try:
+                to_id = uuid.UUID(str(entry["id"]))
+            except (ValueError, KeyError, TypeError):
+                continue
             relation_type = str(entry.get("relation_type", ""))
             if (target_type, to_id, relation_type) in manual_keys:
+                continue
+            if await validate_relation_endpoint(db, target_type, to_id) is not None:
                 continue
             db.add(
                 Relation(
@@ -262,7 +292,6 @@ async def sync_schema_relations(
                     is_schema_derived=True,
                 )
             )
-
 
 async def resolve_relation_labels(
     db: AsyncSession,

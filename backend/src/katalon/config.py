@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     ark_resolver_url: str = "https://n2t.net/"
     ark_suffix_length: int = 10
 
+    # Triple Store (Oxigraph) & RDF-Projektion
+    oxigraph_enabled: bool = False
+    oxigraph_url: str = "http://localhost:7878"
+    sparql_endpoint_enabled: bool = True
+    sparql_require_auth: bool = True
+    sparql_query_timeout: float = Field(default=30.0, gt=0)
+    sparql_max_query_length: int = Field(default=65536, gt=0)  # 64 KB
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 
     telegram_bot_token: str = ""
@@ -99,8 +106,32 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+    cors_origin_regex: str | None = None
 
-    @field_validator("cors_origins", mode="before")
+    # --- Rate Limiting (öffentliche/anonyme Endpunkte) ---
+    # slowapi-Syntax "N/unit" (z. B. "30/minute", "500/hour"). Login/Password-Reset
+    # bleiben bewusst hartkodiert (Brute-Force-Schutz, kein Crawler-Thema).
+    rate_limit_default: str = "200/minute"
+    rate_limit_public_export: str = "30/minute"
+    rate_limit_public_search: str = "100/minute"
+    rate_limit_oai: str = "100/minute"
+    rate_limit_authority_proxy: str = "60/minute"
+    rate_limit_sparql: str = "60/minute"
+
+    # --- Crawler-Steuerung ---
+    robots_disallow_paths: Annotated[list[str], NoDecode] = ["/v1/"]
+    llms_txt_enabled: bool = True
+    llms_txt_extra_notes: str = ""
+
+    @field_validator("cors_origin_regex", mode="before")
+    @classmethod
+    def _parse_cors_origin_regex(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
+
+    @field_validator("cors_origins", "robots_disallow_paths", mode="before")
     @classmethod
     def _parse_cors_origins(cls, v: object) -> object:
         if not isinstance(v, str):
