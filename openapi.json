@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.21.0"
+    "version": "1.22.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -3575,6 +3575,226 @@
           },
           "404": {
             "description": "Role default not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/form-sections": {
+      "get": {
+        "tags": [
+          "form-sections"
+        ],
+        "summary": "List Form Sections",
+        "operationId": "form_sections_list_form_sections_get_v1_form_sections",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Type"
+            }
+          },
+          {
+            "name": "subtype",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subtype"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormSectionRead"
+                  },
+                  "title": "Response Form Sections List Form Sections Get V1 Form Sections"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "form-sections"
+        ],
+        "summary": "Create Form Section",
+        "operationId": "form_sections_create_form_section_post_v1_form_sections",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormSectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormSectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/form-sections/{section_id}": {
+      "put": {
+        "tags": [
+          "form-sections"
+        ],
+        "summary": "Update Form Section",
+        "operationId": "form_sections_update_form_section_put_v1_form_sections__section_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "section_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Section Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormSectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormSectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "form-sections"
+        ],
+        "summary": "Delete Form Section",
+        "operationId": "form_sections_delete_form_section_delete_v1_form_sections__section_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "section_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Section Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -12048,257 +12268,6 @@
         ]
       }
     },
-    "/v1/metadata-mappings": {
-      "get": {
-        "tags": [
-          "metadata-mappings"
-        ],
-        "summary": "List metadata mappings",
-        "operationId": "metadata_mappings_list_metadata_mappings_get_v1_metadata_mappings",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "format_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Format Key"
-            }
-          },
-          {
-            "name": "field_definition_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Field Definition Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MetadataMappingRead"
-                  },
-                  "title": "Response Metadata Mappings List Metadata Mappings Get V1 Metadata Mappings"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "metadata-mappings"
-        ],
-        "summary": "Create a metadata mapping",
-        "operationId": "metadata_mappings_create_metadata_mapping_post_v1_metadata_mappings",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MetadataMappingCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MetadataMappingRead"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "422": {
-            "description": "Invalid mapping target"
-          },
-          "404": {
-            "description": "Field definition not found"
-          }
-        }
-      }
-    },
-    "/v1/metadata-mappings/field/{field_definition_id}/{format_key}": {
-      "put": {
-        "tags": [
-          "metadata-mappings"
-        ],
-        "summary": "Create, update, or clear a field-to-format mapping",
-        "operationId": "metadata_mappings_set_field_format_mapping_put_v1_metadata_mappings_field__field_definition_id___format_key_",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "field_definition_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Field Definition Id"
-            }
-          },
-          {
-            "name": "format_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Format Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MetadataMappingUpsert"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/MetadataMappingRead"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Metadata Mappings Set Field Format Mapping Put V1 Metadata Mappings Field  Field Definition Id   Format Key "
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "404": {
-            "description": "Field definition not found"
-          },
-          "422": {
-            "description": "Invalid mapping target"
-          }
-        }
-      }
-    },
-    "/v1/metadata-mappings/{mapping_id}": {
-      "delete": {
-        "tags": [
-          "metadata-mappings"
-        ],
-        "summary": "Delete a metadata mapping",
-        "operationId": "metadata_mappings_delete_metadata_mapping_delete_v1_metadata_mappings__mapping_id_",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "mapping_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Mapping Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "404": {
-            "description": "Metadata mapping not found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/export/formats": {
       "get": {
         "tags": [
@@ -12590,6 +12559,681 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets": {
+      "get": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "List export mapping sets filtered by record_type, format_key, or status",
+        "operationId": "export_mapping_sets_list_export_mapping_sets_get_v1_export_mapping_sets",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "format_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExportMappingSetDetail"
+                  },
+                  "title": "Response Export Mapping Sets List Export Mapping Sets Get V1 Export Mapping Sets"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Create a new draft export mapping set, optionally cloned from based_on_id",
+        "operationId": "export_mapping_sets_create_export_mapping_set_post_v1_export_mapping_sets",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportMappingSetCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingSetDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}": {
+      "get": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Get export mapping set detail with rules",
+        "operationId": "export_mapping_sets_get_export_mapping_set_get_v1_export_mapping_sets__set_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingSetDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Update draft export mapping set name or institution_config",
+        "operationId": "export_mapping_sets_update_export_mapping_set_patch_v1_export_mapping_sets__set_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportMappingSetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingSetRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Delete draft or archived export mapping set",
+        "operationId": "export_mapping_sets_delete_export_mapping_set_delete_v1_export_mapping_sets__set_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/rules": {
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Add a mapping rule to a draft mapping set",
+        "operationId": "export_mapping_sets_create_mapping_rule_post_v1_export_mapping_sets__set_id__rules",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportMappingRuleCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingRuleRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/rules/{rule_id}": {
+      "patch": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Update a mapping rule in a draft mapping set",
+        "operationId": "export_mapping_sets_update_mapping_rule_patch_v1_export_mapping_sets__set_id__rules__rule_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportMappingRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingRuleRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Delete a mapping rule from a draft mapping set",
+        "operationId": "export_mapping_sets_delete_mapping_rule_delete_v1_export_mapping_sets__set_id__rules__rule_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/validate": {
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Validate all rules in a mapping set against its format capability profile",
+        "operationId": "export_mapping_sets_validate_mapping_set_endpoint_post_v1_export_mapping_sets__set_id__validate",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MappingDiagnostic"
+                  },
+                  "title": "Response Export Mapping Sets Validate Mapping Set Endpoint Post V1 Export Mapping Sets  Set Id  Validate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/preview": {
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Render one record through a mapping set for live preview",
+        "operationId": "export_mapping_sets_preview_mapping_set_endpoint_post_v1_export_mapping_sets__set_id__preview",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MappingPreviewResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/publish": {
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Atomically publish a draft mapping set (archiving previously published set)",
+        "operationId": "export_mapping_sets_publish_mapping_set_endpoint_post_v1_export_mapping_sets__set_id__publish",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMappingSetRead"
+                }
               }
             }
           },
@@ -17766,6 +18410,566 @@
         ],
         "title": "EntityRead"
       },
+      "ExportMappingRuleCreate": {
+        "properties": {
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          },
+          "source_kind": {
+            "$ref": "#/components/schemas/SourceKind",
+            "default": "field"
+          },
+          "field_definition_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Definition Id"
+          },
+          "source_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Source Config"
+          },
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_key"
+        ],
+        "title": "ExportMappingRuleCreate"
+      },
+      "ExportMappingRuleRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "rule_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Key"
+          },
+          "mapping_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mapping Set Id"
+          },
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind"
+          },
+          "field_definition_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Definition Id"
+          },
+          "source_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Source Config"
+          },
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled",
+            "default": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_key",
+          "mapping_set_id",
+          "source_kind",
+          "target_key",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ExportMappingRuleRead"
+      },
+      "ExportMappingRuleUpdate": {
+        "properties": {
+          "source_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "field_definition_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Definition Id"
+          },
+          "source_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Config"
+          },
+          "target_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Key"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "is_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Enabled"
+          }
+        },
+        "type": "object",
+        "title": "ExportMappingRuleUpdate"
+      },
+      "ExportMappingSetCreate": {
+        "properties": {
+          "format_key": {
+            "type": "string",
+            "title": "Format Key"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "type": "string",
+            "title": "Profile Version",
+            "default": "1.0"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "based_on_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Id"
+          },
+          "institution_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Institution Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format_key",
+          "profile_id",
+          "record_type",
+          "name"
+        ],
+        "title": "ExportMappingSetCreate"
+      },
+      "ExportMappingSetDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "format_key": {
+            "type": "string",
+            "title": "Format Key"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "type": "string",
+            "title": "Profile Version"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "based_on_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Id"
+          },
+          "institution_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Institution Config"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/ExportMappingRuleRead"
+            },
+            "type": "array",
+            "title": "Rules",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "format_key",
+          "profile_id",
+          "profile_version",
+          "record_type",
+          "name",
+          "status",
+          "revision",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ExportMappingSetDetail"
+      },
+      "ExportMappingSetRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "format_key": {
+            "type": "string",
+            "title": "Format Key"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "type": "string",
+            "title": "Profile Version"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "based_on_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Id"
+          },
+          "institution_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Institution Config"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "format_key",
+          "profile_id",
+          "profile_version",
+          "record_type",
+          "name",
+          "status",
+          "revision",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ExportMappingSetRead"
+      },
+      "ExportMappingSetUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "institution_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Config"
+          }
+        },
+        "type": "object",
+        "title": "ExportMappingSetUpdate"
+      },
       "ExportProfileCapabilities": {
         "properties": {
           "format_key": {
@@ -18192,6 +19396,98 @@
           "id"
         ],
         "title": "FieldDefinitionRead"
+      },
+      "FormSectionCreate": {
+        "properties": {
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "label": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Label",
+            "default": {}
+          },
+          "field_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Field Names",
+            "default": []
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_type"
+        ],
+        "title": "FormSectionCreate"
+      },
+      "FormSectionRead": {
+        "properties": {
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "label": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Label",
+            "default": {}
+          },
+          "field_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Field Names",
+            "default": []
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_type",
+          "id"
+        ],
+        "title": "FormSectionRead"
       },
       "FormVariantCreate": {
         "properties": {
@@ -18693,6 +19989,57 @@
         ],
         "title": "LocalizedText"
       },
+      "MappingDiagnostic": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "title": "Level",
+            "default": "error"
+          },
+          "target_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Key"
+          },
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "MappingDiagnostic"
+      },
       "MappingEntry": {
         "properties": {
           "target": {
@@ -18712,6 +20059,40 @@
           "target"
         ],
         "title": "MappingEntry"
+      },
+      "MappingPreviewRequest": {
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Record Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_id"
+        ],
+        "title": "MappingPreviewRequest"
+      },
+      "MappingPreviewResult": {
+        "properties": {
+          "xml": {
+            "type": "string",
+            "title": "Xml"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/MappingDiagnostic"
+            },
+            "type": "array",
+            "title": "Diagnostics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "xml"
+        ],
+        "title": "MappingPreviewResult"
       },
       "MappingRequest": {
         "properties": {
@@ -18841,137 +20222,6 @@
         },
         "type": "object",
         "title": "MediaPatch"
-      },
-      "MetadataMappingCreate": {
-        "properties": {
-          "field_definition_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Field Definition Id"
-          },
-          "format_key": {
-            "type": "string",
-            "title": "Format Key"
-          },
-          "target_path": {
-            "type": "string",
-            "title": "Target Path"
-          },
-          "settings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Settings",
-            "default": {}
-          },
-          "sort_order": {
-            "type": "integer",
-            "title": "Sort Order",
-            "default": 0
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "field_definition_id",
-          "format_key",
-          "target_path"
-        ],
-        "title": "MetadataMappingCreate"
-      },
-      "MetadataMappingRead": {
-        "properties": {
-          "field_definition_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Field Definition Id"
-          },
-          "format_key": {
-            "type": "string",
-            "title": "Format Key"
-          },
-          "target_path": {
-            "type": "string",
-            "title": "Target Path"
-          },
-          "settings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Settings",
-            "default": {}
-          },
-          "sort_order": {
-            "type": "integer",
-            "title": "Sort Order",
-            "default": 0
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled",
-            "default": true
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "field_definition_id",
-          "format_key",
-          "target_path",
-          "id",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "MetadataMappingRead"
-      },
-      "MetadataMappingUpsert": {
-        "properties": {
-          "target_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target Path"
-          },
-          "settings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Settings",
-            "default": {}
-          },
-          "sort_order": {
-            "type": "integer",
-            "title": "Sort Order",
-            "default": 0
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled",
-            "default": true
-          }
-        },
-        "type": "object",
-        "title": "MetadataMappingUpsert"
       },
       "NL2SparqlRequest": {
         "properties": {

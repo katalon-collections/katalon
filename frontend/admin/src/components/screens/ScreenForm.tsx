@@ -4,10 +4,10 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets } from '../../api/client'
 import type { MediaFile } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
-import type { AnyRecord, AuditEntry, FieldDefinition, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, WorkingSet } from '../../types'
+import type { AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
 import { resolveActiveVariant } from '../../lib/formVariants'
 import { AlertCircle, Bookmark, Calendar, ChevD, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye } from '../ui/Icons'
@@ -1392,6 +1392,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const canManageContent = Boolean(user && user.role !== 'viewer')
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [sections, setSections] = useState<FormSection[]>([])
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [variants, setVariants] = useState<FormVariant[]>([])
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null)
   const [idno, setIdno]       = useState('')
@@ -1667,6 +1669,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setVariants(variantList)
         const resolved = resolveActiveVariant(variantList, user?.role ?? '', variantHint)
         setActiveVariantId(resolved?.id ?? null)
+        const sectionList = await formSections.list(recordType, recSubtype).catch(() => [])
+        setSections(sectionList)
+        setActiveSectionId(sectionList[0]?.id ?? null)
       })
       .catch(e => setError(e.message))
       .finally(() => { setLoading(false); setIsDirty(false) })
@@ -1693,6 +1698,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       const resolved = resolveActiveVariant(variantList, user?.role ?? '', variantHint)
       setActiveVariantId(resolved?.id ?? null)
     }).catch(() => setVariants([]))
+    formSections.list(recordType, subtype).then(sectionList => {
+      setSections(sectionList)
+      setActiveSectionId(sectionList[0]?.id ?? null)
+    }).catch(() => { setSections([]); setActiveSectionId(null) })
   }, [isNew, subtype, recordType, subtypeKey])
 
   useEffect(() => {
@@ -2315,6 +2324,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       console.log('[Katalon] Validierungsfehler beim Speichern:', validation.errors)
       setFieldErrors(validation.errors)
       setFieldWarnings(validation.warnings)
+      selectSectionForField(Object.keys(validation.errors)[0].split(/[.:]/)[0])
       setSaving(false)
       setError('Bitte korrigieren Sie die markierten Felder.')
       return
@@ -2682,6 +2692,27 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     ? activeVariant.field_names.map(name => fields.find(f => f.name === name)).filter((f): f is FieldDefinition => f != null)
     : fields
 
+  const assignedFieldNames = new Set<string>()
+  const sectionFields = sections.map(section => ({
+    section,
+    fields: section.field_names
+      .map(name => displayFields.find(field => field.name === name))
+      .filter((field): field is FieldDefinition => field != null && !assignedFieldNames.has(field.name))
+      .map(field => { assignedFieldNames.add(field.name); return field }),
+  })).filter(({ fields: sectionFields }) => sectionFields.length > 0)
+  const unassignedFields = displayFields.filter(field => !assignedFieldNames.has(field.name))
+  const activeSection = sectionFields.find(({ section }) => section.id === activeSectionId)
+  const visibleFields = activeSection ? activeSection.fields : unassignedFields
+
+  function sectionErrorCount(fieldNames: string[]) {
+    return Object.keys(fieldErrors).filter(key => fieldNames.includes(key.split(/[.:]/)[0])).length
+  }
+
+  function selectSectionForField(fieldName: string) {
+    const section = sectionFields.find(({ fields: sectionFields }) => sectionFields.some(field => field.name === fieldName))
+    setActiveSectionId(section?.section.id ?? null)
+  }
+
   function selectVariant(variantId: string | null) {
     setActiveVariantId(variantId)
   }
@@ -2929,7 +2960,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         <div className={showTwoCol ? 'form-grid' : 'form-single'}>
           <div>
             <div className="card">
-              <div className="hd">Metadaten</div>
+              <div className="hd">{t('cards.system')}</div>
               <div className="bd">
                 {showIdno && (
                   <div className="field">
@@ -3058,21 +3089,41 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     </div>
                   </>
                 )}
+              </div>
+            </div>
 
-                {variants.length > 0 && (
-                  <div className="tabs" style={{ marginBottom: 12 }}>
-                    <button className={`tab${activeVariant === null ? ' active' : ''}`} onClick={() => selectVariant(null)}>
-                      Vollständig
-                    </button>
-                    {variants.map(v => (
-                      <button key={v.id} className={`tab${activeVariantId === v.id ? ' active' : ''}`} onClick={() => selectVariant(v.id)}>
-                        {v.label.de || v.name}
+            {variants.length > 0 && (
+              <label className="field" style={{ display: 'block', maxWidth: 300, margin: '14px 0' }}>
+                <span className="lbl">{t('variants.label')}</span>
+                <select className="fld" value={activeVariantId ?? ''} onChange={event => selectVariant(event.target.value || null)}>
+                  <option value="">{t('variants.complete')}</option>
+                  {variants.map(variant => <option key={variant.id} value={variant.id}>{getLabel(variant, variant.name)}</option>)}
+                </select>
+              </label>
+            )}
+
+            <div className="card">
+              <div className="hd">{t('cards.metadata')}</div>
+              <div className="bd">
+                {sectionFields.length > 0 && (
+                  <div className="tabs" style={{ marginBottom: 12 }} role="tablist" aria-label={t('sections.label')}>
+                    {sectionFields.map(({ section, fields: sectionFields }) => {
+                      const count = sectionErrorCount(sectionFields.map(field => field.name))
+                      return (
+                        <button key={section.id} className={`tab${activeSection?.section.id === section.id ? ' active' : ''}`} onClick={() => setActiveSectionId(section.id)} role="tab" aria-selected={activeSection?.section.id === section.id}>
+                          {getLabel(section, section.id)}{count > 0 ? ` · ${count}` : ''}
+                        </button>
+                      )
+                    })}
+                    {unassignedFields.length > 0 && (
+                      <button className={`tab${activeSection === undefined ? ' active' : ''}`} onClick={() => setActiveSectionId(null)} role="tab" aria-selected={activeSection === undefined}>
+                        {t('sections.general')}{sectionErrorCount(unassignedFields.map(field => field.name)) > 0 ? ` · ${sectionErrorCount(unassignedFields.map(field => field.name))}` : ''}
                       </button>
-                    ))}
+                    )}
                   </div>
                 )}
 
-                {displayFields.map(f => {
+                {visibleFields.map(f => {
                   const val = values[f.name]
                   const repeatable = f.is_repeatable
                   const vals = repeatable ? ((val as string[] | undefined) ?? []) : undefined

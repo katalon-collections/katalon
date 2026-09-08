@@ -10,6 +10,7 @@ from typing import Any
 from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportProfileCapabilities,
+    ExportRecordContext,
     ExportTargetCapability,
     LocalizedText,
     MetadataFormat,
@@ -441,23 +442,34 @@ class JsonLdFormat(MetadataFormat):
             validators=[ValidatorDependency(name="JSON-LD / W3C RDF", version="1.1", available=True)],
         )
     def render(
-        self, hit: dict[str, Any], mappings: CompiledMappingSet | dict[str, list[str]]
+        self,
+        hit: ExportRecordContext | dict[str, Any],
+        mappings: CompiledMappingSet | dict[str, list[str]],
     ) -> ET.Element:
-        src = hit.get("_source", {})
-        record_id = str(hit.get("_id", ""))
-        record_type = src.get("record_type", "object")
-        title = src.get("title")
-        idno = src.get("idno")
-        metadata = src.get("metadata", {})
-        subtype = src.get("subtype") or metadata.get("subtype")
+        ctx = hit if isinstance(hit, ExportRecordContext) else ExportRecordContext.from_hit(hit)
+        record_id = ctx.record.id
+        record_type = ctx.record.record_type
+        title = ctx.record.title
+        idno = ctx.record.idno
+        metadata = ctx.fields
+        subtype = ctx.record.target_subtype
 
         relations: list[dict[str, Any]] = []
-        for adv_rel in src.get("adv_relations", []):
-            relations.append({
-                "target_type": adv_rel.get("target_type"),
-                "target_id": adv_rel.get("target_id"),
-                "relation_type": adv_rel.get("relation_type"),
-            })
+        if ctx.relations:
+            for rel in ctx.relations:
+                relations.append({
+                    "target_type": rel.target_type,
+                    "target_id": rel.target_id,
+                    "relation_type": rel.relation_type,
+                })
+        elif isinstance(hit, dict):
+            src = hit.get("_source", {}) or {}
+            for adv_rel in src.get("adv_relations", []):
+                relations.append({
+                    "target_type": adv_rel.get("target_type"),
+                    "target_id": adv_rel.get("target_id"),
+                    "relation_type": adv_rel.get("relation_type"),
+                })
 
         doc = build_jsonld_doc(
             record_type=record_type,

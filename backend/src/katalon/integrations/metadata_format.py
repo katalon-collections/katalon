@@ -63,6 +63,80 @@ class ExportProfileCapabilities(BaseModel):
     loss_boundaries: list[LocalizedText] = Field(default_factory=list)
 
 
+
+class ExportRecordSummary(BaseModel):
+    id: str
+    idno: str | None = None
+    record_type: str
+    target_subtype: str | None = None
+    title: str | None = None
+    status: str = "public"
+    created_at: str | None = None
+    updated_at: str | None = None
+    canonical_url: str | None = None
+
+
+class ExportRelation(BaseModel):
+    id: str
+    direction: Literal["outbound", "inbound"] = "outbound"
+    relation_type: str
+    target_type: str
+    target_id: str
+    target_label: str | None = None
+    target_idno: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    target_values: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportMediaItem(BaseModel):
+    id: str
+    filename: str
+    mime_type: str
+    role: str = "original"
+    is_primary: bool = False
+    is_public: bool = True
+    url: str
+    iiif_url: str | None = None
+    license_uri: str | None = None
+    rights_holder: str | None = None
+
+
+class ExportRecordContext(BaseModel):
+    record: ExportRecordSummary
+    fields: dict[str, Any] = Field(default_factory=dict)
+    relations: list[ExportRelation] = Field(default_factory=list)
+    media: list[ExportMediaItem] = Field(default_factory=list)
+
+    @classmethod
+    def from_hit(cls, hit: dict[str, Any]) -> ExportRecordContext:
+        src = hit.get("_source", {}) or {}
+        record_id = str(hit.get("_id", "") or src.get("id", ""))
+        record_type = src.get("record_type", "object")
+
+        if "export_context" in src and isinstance(src["export_context"], dict):
+            ec = src["export_context"]
+            return cls.model_validate(ec)
+
+        # Fallback for hits without precomputed export_context
+        return cls(
+            record=ExportRecordSummary(
+                id=record_id,
+                idno=src.get("idno"),
+                record_type=record_type,
+                target_subtype=src.get("subtype") or src.get("target_subtype"),
+                title=src.get("title"),
+                status=src.get("status", "public") or "public",
+                created_at=src.get("created_at"),
+                updated_at=src.get("updated_at"),
+            ),
+            fields=dict(src.get("metadata", {}) or {}),
+            relations=[],
+            media=[],
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
 class MappingSpec(BaseModel):
     rule_key: uuid.UUID = Field(default_factory=uuid.uuid4)
     source_kind: SourceKind = SourceKind.FIELD
@@ -83,6 +157,7 @@ class CompiledMappingSet(BaseModel):
     format_key: str
     record_type: str
     rules: list[MappingSpec] = Field(default_factory=list)
+    institution_config: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def from_legacy_dict(
@@ -197,10 +272,10 @@ class MetadataFormat(ABC):
     @abstractmethod
     def render(
         self,
-        hit: dict[str, Any],
+        hit: ExportRecordContext | dict[str, Any],
         mappings: CompiledMappingSet | dict[str, list[str]],
     ) -> ET.Element:
-        """Render one ES hit into a format-specific XML element."""
+        """Render one record/hit into a format-specific XML element."""
 def append_path(root: ET.Element, path: str, value: str) -> None:
     """Create the nested element chain for a slash-separated target_path and set the leaf text."""
     if not value:

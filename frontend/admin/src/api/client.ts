@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportProfileCapabilities, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FieldDefinition, FormSection, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -402,6 +402,79 @@ export const exportProfiles = {
     req<ExportProfileCapabilities>(`/v1/export-profiles/${encodeURIComponent(formatKey)}/${encodeURIComponent(profileId)}`),
 }
 
+export const exportMappingSets = {
+  list: (params?: { record_type?: string; format_key?: string; status?: string }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params ?? {}).filter(([, v]) => v).map(([k, v]) => [k, String(v)])
+    ).toString()
+    return req<ExportMappingSet[]>(`/v1/export-mapping-sets${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => req<ExportMappingSet>(`/v1/export-mapping-sets/${encodeURIComponent(id)}`),
+  create: (data: {
+    format_key: string
+    profile_id: string
+    profile_version?: string
+    record_type: string
+    target_subtype?: string | null
+    name: string
+    based_on_id?: string | null
+    institution_config?: Record<string, unknown>
+  }) =>
+    req<ExportMappingSet>('/v1/export-mapping-sets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: { name?: string; institution_config?: Record<string, unknown> }, version?: number) =>
+    req<ExportMappingSet>(`/v1/export-mapping-sets/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: version !== undefined ? { 'If-Match': String(version) } : undefined,
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    req<void>(`/v1/export-mapping-sets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createRule: (setId: string, data: {
+    rule_key?: string
+    source_kind?: SourceKind
+    field_definition_id?: string | null
+    source_config?: Record<string, unknown>
+    target_key: string
+    settings?: Record<string, unknown>
+    sort_order?: number
+    is_enabled?: boolean
+  }) =>
+    req<ExportMappingRule>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/rules`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRule: (setId: string, ruleId: string, data: Partial<{
+    source_kind: SourceKind
+    field_definition_id: string | null
+    source_config: Record<string, unknown>
+    target_key: string
+    settings: Record<string, unknown>
+    sort_order: number
+    is_enabled: boolean
+  }>) =>
+    req<ExportMappingRule>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/rules/${encodeURIComponent(ruleId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteRule: (setId: string, ruleId: string) =>
+    req<void>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/rules/${encodeURIComponent(ruleId)}`, { method: 'DELETE' }),
+  validate: (setId: string) =>
+    req<MappingDiagnostic[]>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/validate`, { method: 'POST' }),
+  preview: (setId: string, recordId: string) =>
+    req<MappingPreviewResult>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ record_id: recordId }),
+    }),
+  publish: (setId: string, version?: number) =>
+    req<ExportMappingSet>(`/v1/export-mapping-sets/${encodeURIComponent(setId)}/publish`, {
+      method: 'POST',
+      headers: version !== undefined ? { 'If-Match': String(version) } : undefined,
+    }),
+}
+
 export const metadataMappings = {
   list: (params?: { format_key?: string; field_definition_id?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v).map(([k, v]) => [k, String(v)])).toString()
@@ -671,6 +744,18 @@ export const formVariants = {
   delete: (id: string) => req<void>(`/v1/form-variants/${id}`, { method: 'DELETE' }),
   setRoleDefault: (id: string, role: string) => req<void>(`/v1/form-variants/${id}/role-defaults/${role}`, { method: 'POST' }),
   removeRoleDefault: (id: string, role: string) => req<void>(`/v1/form-variants/${id}/role-defaults/${role}`, { method: 'DELETE' }),
+}
+
+export type FormSectionData = { target_type: string; target_subtype?: string | null; label?: Record<string, string>; field_names?: string[]; sort_order?: number }
+
+export const formSections = {
+  list: (targetType: string, subtype?: string) => {
+    const qs = new URLSearchParams({ target_type: targetType, ...(subtype ? { subtype } : {}) })
+    return req<FormSection[]>(`/v1/form-sections?${qs}`)
+  },
+  create: (data: FormSectionData) => req<FormSection>('/v1/form-sections', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: FormSectionData) => req<FormSection>(`/v1/form-sections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => req<void>(`/v1/form-sections/${id}`, { method: 'DELETE' }),
 }
 
 // Audit

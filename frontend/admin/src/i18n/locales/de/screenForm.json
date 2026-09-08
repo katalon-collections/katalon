@@ -30,5 +30,17 @@
     "cancel": "Abbrechen",
     "addRelationship": "Beziehung hinzufügen",
     "hint": "Wiederholbares Feld"
+  },
+  "sections": {
+    "label": "Formularabschnitte",
+    "general": "Allgemein"
+  },
+  "variants": {
+    "label": "Formularansicht",
+    "complete": "Vollständig"
+  },
+  "cards": {
+    "system": "Stammdaten",
+    "metadata": "Metadaten"
   }
 }

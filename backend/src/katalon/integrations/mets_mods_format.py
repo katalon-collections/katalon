@@ -9,6 +9,7 @@ from typing import Any
 from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportProfileCapabilities,
+    ExportRecordContext,
     ExportTargetCapability,
     LocalizedText,
     MetadataFormat,
@@ -72,11 +73,13 @@ class MetsModsFormat(MetadataFormat):
             validators=[ValidatorDependency(name="LOC MODS 3.8 Schema", version="3.8", available=True)],
         )
     def render(
-        self, hit: dict[str, Any], mappings: CompiledMappingSet | dict[str, list[str]]
+        self,
+        hit: ExportRecordContext | dict[str, Any],
+        mappings: CompiledMappingSet | dict[str, list[str]],
     ) -> ET.Element:
-        record_id = hit["_id"]
-        src = hit["_source"]
-        record_type = src.get("record_type", "")
+        ctx = hit if isinstance(hit, ExportRecordContext) else ExportRecordContext.from_hit(hit)
+        record_id = ctx.record.id
+        record_type = ctx.record.record_type
 
         root = ET.Element("mods:mods", {"xmlns:mods": MODS_NS, "ID": str(record_id)})
 
@@ -89,12 +92,44 @@ class MetsModsFormat(MetadataFormat):
         for rule in mapping_set.rules:
             if not rule.is_enabled:
                 continue
-            field_name = rule.field_name
-            if not field_name:
-                continue
-            for value in extract_values(src, field_name):
+
+            values: list[str] = []
+            if rule.source_kind == SourceKind.FIELD:
+                field_name = rule.field_name
+                if field_name:
+                    values = extract_values(ctx, field_name)
+            elif rule.source_kind == SourceKind.RELATION:
+                rel_type = rule.source_config.get("relation_type")
+                target_field = rule.source_config.get("target_field")
+                for rel in ctx.relations:
+                    if not rel_type or rel.relation_type == rel_type:
+                        val = (
+                            rel.target_values.get(target_field)
+                            if target_field
+                            else (rel.target_label or rel.target_idno)
+                        )
+                        if val:
+                            values.append(str(val))
+            elif rule.source_kind == SourceKind.RECORD:
+                prop = rule.source_config.get("property") or rule.target_key
+                if prop == "canonical_url" and ctx.record.canonical_url:
+                    values = [ctx.record.canonical_url]
+                elif getattr(ctx.record, prop, None):
+                    values = [str(getattr(ctx.record, prop))]
+            elif rule.source_kind == SourceKind.CONSTANT:
+                if const_val := rule.source_config.get("value") or rule.settings.get("value"):
+                    values = [str(const_val)]
+            elif rule.source_kind == SourceKind.MEDIA:
+                prop = rule.source_config.get("property", "url")
+                for m in ctx.media:
+                    val = getattr(m, prop, None)
+                    if val:
+                        values.append(str(val))
+
+            for value in values:
                 if prefix := rule.settings.get("prefix"):
                     value = f"{prefix}{value}"
                 if rule.target_key in self.targets:
                     append_path(root, rule.target_key, value)
+
         return root

@@ -9,7 +9,11 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
 
-from katalon.integrations.metadata_format import CompiledMappingSet, MetadataFormat
+from katalon.integrations.metadata_format import (
+    CompiledMappingSet,
+    ExportRecordContext,
+    MetadataFormat,
+)
 from katalon.services.metadata_mapping_service import MappingIndex
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
@@ -78,22 +82,21 @@ def _hit_to_oai_record(
     metadata_format: MetadataFormat,
     mapping_index: MappingIndex | dict[str, Any] | None = None,
 ) -> ET.Element:
-    src = hit["_source"]
-    record_id = hit["_id"]
-    record_type = src.get("record_type", "")
+    ctx = ExportRecordContext.from_hit(hit)
+    record_id = ctx.record.id
+    record_type = ctx.record.record_type
     record_mappings = (mapping_index or {}).get(record_type)
     if record_mappings is None:
         record_mappings = CompiledMappingSet(format_key=metadata_format.key, record_type=record_type)
     oai_rec = ET.Element("record")
     header = ET.SubElement(oai_rec, "header")
     ET.SubElement(header, "identifier").text = f"oai:katalon:{record_type}:{record_id}"
-    ET.SubElement(header, "datestamp").text = _datestamp(src.get("updated_at"))
+    ET.SubElement(header, "datestamp").text = _datestamp(ctx.record.updated_at)
     if set_spec:
         ET.SubElement(header, "setSpec").text = set_spec
 
     metadata_el = ET.SubElement(oai_rec, "metadata")
-    metadata_el.append(metadata_format.render(hit, record_mappings))
-
+    metadata_el.append(metadata_format.render(ctx, record_mappings))
     return oai_rec
 
 

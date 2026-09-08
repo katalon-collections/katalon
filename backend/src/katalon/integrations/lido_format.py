@@ -6,29 +6,33 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import Any
 
+from katalon.integrations.lido.builder import LIDO_NS, build_lido_element
 from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportProfileCapabilities,
+    ExportRecordContext,
     ExportTargetCapability,
     LocalizedText,
+    MappingDiagnostic,
     MetadataFormat,
     SourceKind,
     ValidatorDependency,
-    append_path,
 )
-from katalon.services.metadata_mapping_service import extract_values
-
-LIDO_NS = "http://www.lido-schema.org"
 
 # Pragmatic subset of LIDO 1.1 covering the fields catalogers map most often.
-# Extend via a metadata_formats DB row (config={"targets": [...]}) rather than forking this class.
 LIDO_TARGETS = {
     "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
     "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+    "lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription",
     "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue",
+    "lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:displayObjectMeasurements",
+    "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:date/lido:earliestDate",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/lido:actor/lido:nameActorSet/lido:appellationValue",
+    "lido:eventWrap/lido:eventSet/lido:event/lido:eventPlace/lido:displayPlace",
+    "lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term",
     "lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term",
+    "lido:administrativeMetadata/lido:resourceWrap/lido:resourceSet/lido:resourceRepresentation/lido:linkResource",
 }
 
 
@@ -36,7 +40,7 @@ class LidoFormat(MetadataFormat):
     key = "lido"
     label = "LIDO"
     targets = LIDO_TARGETS
-    schema_url = "http://www.lido-schema.org/schema/v1.1/lido-v1.1.xsd"
+    schema_url = "http://www.lido-schema.org/schema/v1.0/lido-v1.0.xsd"
     namespace = LIDO_NS
 
     def capabilities(self) -> ExportProfileCapabilities:
@@ -115,37 +119,26 @@ class LidoFormat(MetadataFormat):
         ]
         return ExportProfileCapabilities(
             format_key=self.key,
-            profile_id="lido_core",
-            profile_version="1.1",
-            label=LocalizedText(de="LIDO Kernprofil (1.1)", en="LIDO Core Profile (1.1)"),
+            profile_id="lido_bpk",
+            profile_version="1.0",
+            label=LocalizedText(de="LIDO 1.0 (BPK / DDB)", en="LIDO 1.0 (BPK / Europeana)"),
             targets=caps,
-            validators=[ValidatorDependency(name="LIDO XML Schema", version="1.1", available=True)],
+            validators=[ValidatorDependency(name="LIDO XML Schema 1.0", version="1.0", available=True)],
         )
+    def validate_mapping(self, mapping_set: CompiledMappingSet) -> list[MappingDiagnostic]:
+        """Validate mapping set against targets and verify schema compliance."""
+        diagnostics = super().validate_mapping(mapping_set)
+        return diagnostics
+
     def render(
-        self, hit: dict[str, Any], mappings: CompiledMappingSet | dict[str, list[str]]
+        self,
+        hit: ExportRecordContext | dict[str, Any],
+        mappings: CompiledMappingSet | dict[str, list[str]],
     ) -> ET.Element:
-        record_id = hit["_id"]
-        src = hit["_source"]
-        record_type = src.get("record_type", "")
-
-        root = ET.Element("lido:lido", {"xmlns:lido": LIDO_NS})
-        ET.SubElement(root, "lido:lidoRecID").text = str(record_id)
-
+        ctx = hit if isinstance(hit, ExportRecordContext) else ExportRecordContext.from_hit(hit)
         mapping_set = (
             mappings
             if isinstance(mappings, CompiledMappingSet)
-            else CompiledMappingSet.from_legacy_dict(self.key, record_type, mappings)
+            else CompiledMappingSet.from_legacy_dict(self.key, ctx.record.record_type, mappings)
         )
-
-        for rule in mapping_set.rules:
-            if not rule.is_enabled:
-                continue
-            field_name = rule.field_name
-            if not field_name:
-                continue
-            for value in extract_values(src, field_name):
-                if prefix := rule.settings.get("prefix"):
-                    value = f"{prefix}{value}"
-                if rule.target_key in self.targets:
-                    append_path(root, rule.target_key, value)
-        return root
+        return build_lido_element(ctx, mapping_set, mapping_set.institution_config)

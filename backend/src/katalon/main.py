@@ -32,8 +32,10 @@ from katalon.api.v1 import (
     dnb_urn_mock,
     entities,
     export,
+    export_mapping_sets,
     export_profiles,
     feedback,
+    form_sections,
     form_variants,
     idno,
     importer,
@@ -532,6 +534,7 @@ app.include_router(objects.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(schema_admin.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(record_subtypes.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(form_variants.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(form_sections.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(vocabularies.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(audit.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(batch.router, prefix="/v1", dependencies=_authenticated)
@@ -554,6 +557,7 @@ app.include_router(pids.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(importer.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(metadata_mappings.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(export.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(export_mapping_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(export_profiles.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)

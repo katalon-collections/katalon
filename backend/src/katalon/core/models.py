@@ -273,7 +273,7 @@ class FieldDefinition(Base):
         back_populates="children",
         remote_side="FieldDefinition.id",
     )
-    metadata_mappings: Mapped[list["MetadataMapping"]] = relationship(
+    export_mapping_rules: Mapped[list["ExportMappingRule"]] = relationship(
         back_populates="field_definition",
         cascade="all, delete-orphan",
     )
@@ -283,35 +283,79 @@ class FieldDefinition(Base):
     )
 
 
-class MetadataMapping(Base):
-    __tablename__ = "metadata_mappings"
+class ExportMappingSet(Base):
+    __tablename__ = "export_mapping_sets"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    field_definition_id: Mapped[uuid.UUID] = mapped_column(
+    format_key: Mapped[str] = mapped_column(String(64), index=True)
+    profile_id: Mapped[str] = mapped_column(String(128))
+    profile_version: Mapped[str] = mapped_column(String(32), default="1.0", server_default="1.0")
+    record_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_subtype: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    name: Mapped[str] = mapped_column(String(256))
+    status: Mapped[str] = mapped_column(String(16), default="draft", server_default="draft", index=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    based_on_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("field_definitions.id", ondelete="CASCADE"),
+        ForeignKey("export_mapping_sets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    institution_config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    rules: Mapped[list["ExportMappingRule"]] = relationship(
+        back_populates="mapping_set",
+        cascade="all, delete-orphan",
+        order_by="ExportMappingRule.sort_order",
+    )
+
+    __table_args__ = (
+        Index("ix_export_mapping_sets_lookup", "format_key", "record_type", "status"),
+    )
+
+
+class ExportMappingRule(Base):
+    __tablename__ = "export_mapping_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    rule_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), default=_uuid, index=True)
+    mapping_set_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("export_mapping_sets.id", ondelete="CASCADE"),
         index=True,
     )
-    format_key: Mapped[str] = mapped_column(String(64), index=True)
-    target_path: Mapped[str] = mapped_column(String(256))
-    settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    source_kind: Mapped[str] = mapped_column(String(32), default="field", server_default="field")
+    field_definition_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("field_definitions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    target_key: Mapped[str] = mapped_column(String(256))
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
-    field_definition: Mapped[FieldDefinition] = relationship(back_populates="metadata_mappings")
+    mapping_set: Mapped[ExportMappingSet] = relationship(back_populates="rules")
+    field_definition: Mapped[FieldDefinition | None] = relationship(back_populates="export_mapping_rules")
 
     __table_args__ = (
-        UniqueConstraint(
-            "field_definition_id",
-            "format_key",
-            "target_path",
-            name="uq_metadata_mappings_field_format_target",
-        ),
-        Index("ix_metadata_mappings_format_enabled", "format_key", "is_enabled"),
+        Index("ix_export_mapping_rules_set_order", "mapping_set_id", "sort_order"),
     )
 
+
+MetadataMappingRule = ExportMappingRule
 
 class ImportMapping(Base):
     __tablename__ = "import_mappings"
@@ -398,6 +442,22 @@ class FormVariantRoleDefault(Base):
             "target_type", "target_subtype", "role",
             name="uq_form_variant_role_defaults_scope_role",
         ),
+    )
+
+
+class FormSection(Base):
+    __tablename__ = "form_sections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    target_type: Mapped[str] = mapped_column(String(32), index=True)
+    target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    # Ordered FieldDefinition.name values. Sections only affect form presentation.
+    field_names: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (
+        Index("ix_form_sections_target_type", "target_type"),
     )
 
 

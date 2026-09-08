@@ -252,6 +252,7 @@ def _build_doc(
     inherited_facets: dict[str, list[str]] | None = None,
     metadata: dict[str, Any] | None = None,
     field_definitions: list[Any] | None = None,
+    export_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # The Python attribute is metadata_ (DB column name is metadata)
     md: dict[str, Any] = _clean_metadata(
@@ -286,7 +287,8 @@ def _build_doc(
     }
     if record_type == "object":
         doc["collection_status"] = getattr(record, "collection_status", "active") or "active"
-
+    if export_context is not None:
+        doc["export_context"] = export_context
     # Build facet_* fields for fields marked as is_facet
     if facet_fields:
         field_types = {field.name: field.field_type for field in field_definitions or []}
@@ -507,10 +509,19 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
         linked_data, inherited_facets = await _load_linked_data(
             record_type, record.id, db, inherited_config
         )
+    export_context: dict[str, Any] | None = None
+    if db is not None:
+        try:
+            from katalon.services.export_context_service import build_export_context_from_db
+            ctx = await build_export_context_from_db(db, record_type, record.id)
+            export_context = ctx.to_dict()
+        except Exception:
+            export_context = None
 
     return _build_doc(
         record_type, record, rel_data, searchable_fields, facet_fields, group_fields,
         linked_data, inherited_facets, public_metadata, rows,
+        export_context=export_context,
     )
 
 

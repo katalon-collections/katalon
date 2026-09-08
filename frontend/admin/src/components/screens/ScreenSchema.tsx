@@ -10,6 +10,7 @@ import { getLabel } from '../../types'
 import { Copy, Edit, Grip, Lightning, Plus, Trash } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
 import { SchemaAiAssist } from './SchemaAiAssist'
+import { ScreenFormSections } from './ScreenFormSections'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
@@ -1013,6 +1014,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [pidProviders, setPidProviders] = useState<('ark' | 'dnb_urn')[]>([])
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
   const [dragId, setDragId] = useState<string | null>(null)
+  const [activeView, setActiveView] = useState<'fields' | 'layout'>('fields')
 
   const TYPES = [
     { id: 'object',      label: t('typeLabels.object'),     key: 'object' },
@@ -1291,6 +1293,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   }
 
   const showDetail = form !== null
+  const layoutEnabled = activeType !== 'vocabulary_term'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1310,11 +1313,13 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       <div className="ph">
         <div><h1>{t('headline')}</h1><div className="sub">{t('headlineSub')}</div></div>
         <div className="right">
+          {activeView === 'fields' && <>
           {aiEnabled && (
             <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title={t('aiAssistTitle')}><Lightning size={13} /> {t('aiAssist')}</button>
           )}
           <button className="btn gh" onClick={() => setShowImport(true)}>{t('import')}</button>
           <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> {t('addField')}</button>
+          </>}
         </div>
       </div>
 
@@ -1323,12 +1328,19 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           <button
             key={t.id}
             className={`tab${activeType === t.id ? ' active' : ''}`}
-            onClick={() => { setActiveType(t.id); onPathChange?.(t.id) }}
+            onClick={() => { setActiveType(t.id); if (t.id === 'vocabulary_term') setActiveView('fields'); onPathChange?.(t.id) }}
           >
             {t.label}
           </button>
         ))}
       </div>
+
+      {layoutEnabled && (
+        <div className="tabs" style={{ paddingLeft: 24 }}>
+          <button className={`tab${activeView === 'fields' ? ' active' : ''}`} onClick={() => setActiveView('fields')}>{t('views.fields')}</button>
+          <button className={`tab${activeView === 'layout' ? ' active' : ''}`} onClick={() => { closeDetail(); setActiveView('layout') }}>{t('views.layout')}</button>
+        </div>
+      )}
 
       <div className="schema-workspace" style={{ gridTemplateColumns: hasSubtypes ? '220px 1fr' : '1fr' }}>
         {hasSubtypes && (
@@ -1369,7 +1381,9 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               </select>
             </div>
           )}
-          {showDetail ? (
+          {activeView === 'layout' ? (
+            <ScreenFormSections targetType={activeType} targetSubtype={activeSubtype} />
+          ) : showDetail ? (
             <FieldDetail
               form={form!}
               availableFields={fields}

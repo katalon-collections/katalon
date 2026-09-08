@@ -142,6 +142,15 @@ export interface FormVariant {
   default_for_roles: string[]
 }
 
+export interface FormSection {
+  id: string
+  target_type: string
+  target_subtype: string | null
+  label: Record<string, string>
+  field_names: string[]
+  sort_order: number
+}
+
 export interface FieldAIConfig {
   enabled: boolean
   mode: 'text' | 'vision'
@@ -195,6 +204,54 @@ export interface ExportProfileCapabilities {
   targets: ExportTargetCapability[]
   validators: ValidatorDependency[]
   loss_boundaries: LocalizedText[]
+}
+
+export interface MappingDiagnostic {
+  code: string
+  message: string
+  level: 'error' | 'warning' | 'info'
+  target_key?: string | null
+  rule_key?: string | null
+}
+
+export interface MappingPreviewResult {
+  xml: string
+  diagnostics: MappingDiagnostic[]
+}
+
+export interface ExportMappingRule {
+  id: string
+  rule_key: string
+  mapping_set_id: string
+  source_kind: SourceKind
+  field_definition_id?: string | null
+  source_config: Record<string, unknown>
+  target_key: string
+  settings: Record<string, unknown>
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ExportMappingSet {
+  id: string
+  format_key: string
+  profile_id: string
+  profile_version: string
+  record_type: string
+  target_subtype?: string | null
+  name: string
+  status: 'draft' | 'published' | 'archived'
+  revision: number
+  based_on_id?: string | null
+  institution_config: Record<string, unknown>
+  version: number
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+  published_at?: string | null
+  rules?: ExportMappingRule[]
 }
 
 export interface Vocabulary {

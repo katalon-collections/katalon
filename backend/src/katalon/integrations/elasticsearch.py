@@ -85,6 +85,7 @@ INDEX_SETTINGS: dict[str, Any] = {
             },
             "status": {"type": "keyword"},
             "metadata": {"type": "object", "enabled": False},
+            "export_context": {"type": "object", "enabled": False},
             "search_text": {"type": "text", "analyzer": "katalon_default"},
             "created_at": {"type": "date"},
             "updated_at": {"type": "date"},

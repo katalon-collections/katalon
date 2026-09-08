@@ -15,7 +15,11 @@ from pydantic import (
     model_validator,
 )
 
-from katalon.integrations.metadata_format import ExportProfileCapabilities
+from katalon.integrations.metadata_format import (
+    ExportProfileCapabilities,
+    MappingDiagnostic,
+    SourceKind,
+)
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -63,30 +67,98 @@ class FieldDefinitionRead(FieldDefinitionCreate):
 FieldDefinitionRead.model_rebuild()
 
 
-class MetadataMappingCreate(BaseModel):
-    field_definition_id: uuid.UUID
-    format_key: str
-    target_path: str
-    settings: dict[str, Any] = {}
+class ExportMappingRuleCreate(BaseModel):
+    rule_key: uuid.UUID | None = None
+    source_kind: SourceKind = SourceKind.FIELD
+    field_definition_id: uuid.UUID | None = None
+    source_config: dict[str, Any] = Field(default_factory=dict)
+    target_key: str
+    settings: dict[str, Any] = Field(default_factory=dict)
     sort_order: int = 0
     is_enabled: bool = True
 
 
-class MetadataMappingRead(MetadataMappingCreate):
+class ExportMappingRuleUpdate(BaseModel):
+    source_kind: SourceKind | None = None
+    field_definition_id: uuid.UUID | None = None
+    source_config: dict[str, Any] | None = None
+    target_key: str | None = None
+    settings: dict[str, Any] | None = None
+    sort_order: int | None = None
+    is_enabled: bool | None = None
+
+
+class ExportMappingRuleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    rule_key: uuid.UUID
+    mapping_set_id: uuid.UUID
+    source_kind: str
+    field_definition_id: uuid.UUID | None = None
+    source_config: dict[str, Any] = Field(default_factory=dict)
+    target_key: str
+    settings: dict[str, Any] = Field(default_factory=dict)
+    sort_order: int = 0
+    is_enabled: bool = True
     created_at: datetime
     updated_at: datetime
 
 
-class MetadataMappingUpsert(BaseModel):
-    target_path: str | None = None
-    settings: dict[str, Any] = {}
-    sort_order: int = 0
-    is_enabled: bool = True
+class ExportMappingSetCreate(BaseModel):
+    format_key: str
+    profile_id: str
+    profile_version: str = "1.0"
+    record_type: str
+    target_subtype: str | None = None
+    name: str
+    based_on_id: uuid.UUID | None = None
+    institution_config: dict[str, Any] = Field(default_factory=dict)
 
 
+class ExportMappingSetUpdate(BaseModel):
+    name: str | None = None
+    institution_config: dict[str, Any] | None = None
+
+
+class ExportMappingSetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    format_key: str
+    profile_id: str
+    profile_version: str
+    record_type: str
+    target_subtype: str | None = None
+    name: str
+    status: str
+    revision: int
+    based_on_id: uuid.UUID | None = None
+    institution_config: dict[str, Any] = Field(default_factory=dict)
+    version: int
+    created_by: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+    published_at: datetime | None = None
+
+
+class ExportMappingSetDetail(ExportMappingSetRead):
+    rules: list[ExportMappingRuleRead] = []
+
+
+class MappingPreviewRequest(BaseModel):
+    record_id: uuid.UUID
+
+
+class MappingPreviewResult(BaseModel):
+    xml: str
+    diagnostics: list[MappingDiagnostic] = Field(default_factory=list)
+
+
+# Backwards-compatible aliases for legacy imports
+MetadataMappingCreate = ExportMappingRuleCreate
+MetadataMappingRead = ExportMappingRuleRead
+MetadataMappingUpsert = ExportMappingRuleUpdate
 class FormatOut(BaseModel):
     key: str
     label: str
@@ -162,6 +234,20 @@ class FormVariantRead(FormVariantCreate):
     # roles for which this variant is the default, scoped to target_type/target_subtype;
     # populated only from the requesting user's own role by the list endpoint
     default_for_roles: list[str] = []
+
+
+class FormSectionCreate(BaseModel):
+    target_type: str
+    target_subtype: str | None = None
+    label: dict[str, Any] = {}
+    field_names: list[str] = []
+    sort_order: int = 0
+
+
+class FormSectionRead(FormSectionCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
 
 
 # ---------------------------------------------------------------------------

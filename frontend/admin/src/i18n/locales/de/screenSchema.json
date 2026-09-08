@@ -1,6 +1,7 @@
 {
   "headline": "Schemata",
   "headlineSub": "Felddefinitionen pro Typ/Subtyp",
+  "views": { "fields": "Felder", "layout": "Formularlayout" },
   "addField": "Neues Feld",
   "importSchema": "Schema importieren",
   "import": "Import",

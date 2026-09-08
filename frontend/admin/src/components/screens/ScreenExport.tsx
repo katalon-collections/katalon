@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { schema, subtypes, exportApi, metadataMappings } from '../../api/client'
-import type { ExportFormatInfo, MetadataFormatInfo } from '../../api/client'
-import type { FieldDefinition, RecordSubtype } from '../../types'
+import { subtypes, exportApi } from '../../api/client'
+import type { ExportFormatInfo } from '../../api/client'
+import type { ExportProfileCapabilities, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { Download } from '../ui/Icons'
-
-const MAPPABLE_FIELD_TYPES = new Set(['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'authority'])
+import { FormatOverview } from './export/FormatOverview'
+import { MappingWorkspace } from './export/MappingWorkspace'
 
 const lbl: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }
 
@@ -112,83 +112,19 @@ function DumpsTab({ recordType }: { recordType: string }) {
 }
 
 function MappingTab({ recordType }: { recordType: string }) {
-  const { t } = useTranslation('screenExport')
-  const [fields, setFields] = useState<FieldDefinition[]>([])
-  const [formats, setFormats] = useState<MetadataFormatInfo[]>([])
-  const [mappings, setMappings] = useState<Record<string, Record<string, string>>>({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [activeProfile, setActiveProfile] = useState<ExportProfileCapabilities | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([
-      schema.list(recordType),
-      metadataMappings.listFormats(),
-      metadataMappings.list(),
-    ]).then(([fieldList, formatList, allMappings]) => {
-      const mappableFields = fieldList.filter(f => MAPPABLE_FIELD_TYPES.has(f.field_type))
-      setFields(mappableFields)
-      setFormats(formatList)
-      const byField: Record<string, Record<string, string>> = {}
-      for (const m of allMappings) {
-        if (!mappableFields.some(f => f.id === m.field_definition_id)) continue
-        byField[m.field_definition_id] ??= {}
-        byField[m.field_definition_id][m.format_key] = m.target_path
-      }
-      setMappings(byField)
-    }).catch(() => {}).finally(() => setLoading(false))
-  }, [recordType])
+  useEffect(() => { setActiveProfile(null) }, [recordType])
 
-  useEffect(() => { load() }, [load])
-
-  async function setTarget(fieldId: string, formatKey: string, targetPath: string) {
-    setSaving(`${fieldId}:${formatKey}`)
-    try {
-      await metadataMappings.setFieldFormat(fieldId, formatKey, { target_path: targetPath || null })
-      setMappings(m => ({ ...m, [fieldId]: { ...m[fieldId], [formatKey]: targetPath } }))
-    } catch {
-      load()
-    } finally {
-      setSaving(null)
-    }
+  if (activeProfile) {
+    return (
+      <MappingWorkspace
+        recordType={recordType}
+        profile={activeProfile}
+        onBack={() => setActiveProfile(null)}
+      />
+    )
   }
 
-  if (loading) return <div style={{ color: 'var(--fg-3)', fontSize: 13 }}>{t('mappingLoading')}</div>
-  if (fields.length === 0) return <div style={{ color: 'var(--fg-3)', fontSize: 13 }}>{t('mappingNoFields')}</div>
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>{t('mappingFieldHeader')}</th>
-            {formats.map(f => (
-              <th key={f.key} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>{f.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {fields.map(field => (
-            <tr key={field.id}>
-              <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>{getLabel(field) || field.name}</td>
-              {formats.map(fmt => (
-                <td key={fmt.key} style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
-                  <select
-                    className="fld"
-                    style={{ minWidth: 200 }}
-                    value={mappings[field.id]?.[fmt.key] ?? ''}
-                    disabled={saving === `${field.id}:${fmt.key}`}
-                    onChange={e => setTarget(field.id, fmt.key, e.target.value)}
-                  >
-                    <option value="">{t('mappingNoMapping')}</option>
-                    {fmt.targets.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+  return <FormatOverview recordType={recordType} onOpen={setActiveProfile} />
 }

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from katalon.core.models import FieldDefinition, MetadataMapping
+from katalon.core.models import ExportMappingRule, ExportMappingSet
 from katalon.integrations.jsonld_format import JsonLdFormat
 from katalon.integrations.lido_format import LidoFormat
 from katalon.integrations.metadata_format import (
@@ -260,30 +260,35 @@ def test_validate_mapping_valid_and_invalid_targets() -> None:
 
 @pytest.mark.asyncio
 async def test_get_mapping_index_preserves_settings_and_sort_order() -> None:
-    field_id = uuid.uuid4()
-    mapping_id = uuid.uuid4()
+    rule_id = uuid.uuid4()
+    rule_key = uuid.uuid4()
+    set_id = uuid.uuid4()
 
-    mock_field = MagicMock(spec=FieldDefinition)
-    mock_field.id = field_id
-    mock_field.name = "photographer"
-    mock_field.target_type = "object"
-    mock_field.field_type = "text"
-    mock_field.sort_order = 1
-    mock_field.is_public = True
-    mock_field.is_deleted = False
-
-    mock_mapping = MagicMock(spec=MetadataMapping)
-    mock_mapping.id = mapping_id
-    mock_mapping.field_definition_id = field_id
-    mock_mapping.format_key = "oai_dc"
-    mock_mapping.target_path = "dc:creator"
-    mock_mapping.settings = {"prefix": "Künstler: "}
-    mock_mapping.sort_order = 10
-    mock_mapping.is_enabled = True
+    mock_set = ExportMappingSet(
+        id=set_id,
+        format_key="oai_dc",
+        profile_id="oai_dc_simple",
+        record_type="object",
+        name="OAI-DC Object",
+        status="published",
+        revision=1,
+    )
+    mock_rule = ExportMappingRule(
+        id=rule_id,
+        rule_key=rule_key,
+        mapping_set_id=set_id,
+        source_kind="field",
+        source_config={"field_name": "photographer", "field_type": "text"},
+        target_key="dc:creator",
+        settings={"prefix": "Künstler: "},
+        sort_order=10,
+        is_enabled=True,
+    )
+    mock_set.rules = [mock_rule]
 
     mock_session = AsyncMock()
     mock_result = MagicMock()
-    mock_result.all.return_value = [(mock_mapping, mock_field)]
+    mock_result.scalars.return_value.all.return_value = [mock_set]
     mock_session.execute.return_value = mock_result
 
     index = await metadata_mapping_service.get_mapping_index(mock_session, "oai_dc")
@@ -293,12 +298,11 @@ async def test_get_mapping_index_preserves_settings_and_sort_order() -> None:
     assert isinstance(cms, CompiledMappingSet)
     assert len(cms.rules) == 1
     rule = cms.rules[0]
-    assert rule.rule_key == mapping_id
+    assert rule.rule_key == rule_key
     assert rule.target_key == "dc:creator"
     assert rule.settings == {"prefix": "Künstler: "}
     assert rule.sort_order == 10
     assert rule.field_name == "photographer"
-
 
 # ---------------------------------------------------------------------------
 # Contract tests: All declared targets must be valid and accepted by validate_mapping

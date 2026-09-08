@@ -3,6 +3,10 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.22.0] - 2026-09-08
+
+### Added
+- Admin-UI / Formulare: Konfigurierbare Formularabschnitte pro Datensatztyp und Subtyp. Admins ordnen Schemafelder benannten Abschnitten zu; das Erfassungsformular zeigt diese als Tabs, lässt nicht zugeordnete Felder unter „Allgemein“ und markiert Tabs mit Validierungsfehlern.
 
 ## [1.21.0] - 2026-09-08
 

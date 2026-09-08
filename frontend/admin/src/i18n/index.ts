@@ -17,6 +17,8 @@ import deScreenForm from './locales/de/screenForm.json'
 import enScreenForm from './locales/en/screenForm.json'
 import deScreenFormVariants from './locales/de/screenFormVariants.json'
 import enScreenFormVariants from './locales/en/screenFormVariants.json'
+import deScreenFormSections from './locales/de/screenFormSections.json'
+import enScreenFormSections from './locales/en/screenFormSections.json'
 import deScreenImporter from './locales/de/screenImporter.json'
 import enScreenImporter from './locales/en/screenImporter.json'
 import deScreenOAISets from './locales/de/screenOAISets.json'
@@ -80,6 +82,7 @@ i18next.use(initReactI18next).init({
       richTextEditor: deRichTextEditor,
       screenForm: deScreenForm,
       screenFormVariants: deScreenFormVariants,
+      screenFormSections: deScreenFormSections,
       screenImporter: deScreenImporter,
       screenOAISets: deScreenOAISets,
       screenSettings: deScreenSettings,
@@ -110,6 +113,7 @@ i18next.use(initReactI18next).init({
       richTextEditor: enRichTextEditor,
       screenForm: enScreenForm,
       screenFormVariants: enScreenFormVariants,
+      screenFormSections: enScreenFormSections,
       screenImporter: enScreenImporter,
       screenOAISets: enScreenOAISets,
       screenSettings: enScreenSettings,

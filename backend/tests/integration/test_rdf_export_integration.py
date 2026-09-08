@@ -262,10 +262,10 @@ async def test_rdf_export_single_records_and_negotiation(async_client, auth_head
     # -------------------------------------------------------------
     # Test Canonical URI stability: KATALON_BASE_URL takes precedence over request base
     # -------------------------------------------------------------
-    from katalon.config import settings
-    old_base = settings.katalon_base_url
+    import katalon.services.rdf_service as rdf_service
+    old_base = rdf_service.settings.katalon_base_url
     try:
-        settings.katalon_base_url = "https://katalon.example.org"
+        rdf_service.settings.katalon_base_url = "https://katalon.example.org"
         stable_res = await async_client.get(
             f"/v1/objects/{obj['id']}/export?format=jsonld",
             headers={**auth_headers, "Host": "otherhost.local:8000"},
@@ -275,7 +275,7 @@ async def test_rdf_export_single_records_and_negotiation(async_client, auth_head
         assert stable_doc["@id"] == f"https://katalon.example.org/objects/{obj['id']}"
         assert "otherhost.local" not in stable_doc["@id"]
     finally:
-        settings.katalon_base_url = old_base
+        rdf_service.settings.katalon_base_url = old_base
 
     # -------------------------------------------------------------
     # Test Collection Export
@@ -334,21 +334,43 @@ async def test_oai_pmh_json_ld_integration(async_client, auth_headers) -> None:
     assert fields_res.status_code == 200, fields_res.text
     fields = fields_res.json()
     assert len(fields) > 0
-    field_id = fields[0]["id"]
 
-    # 2. Create mapping for json_ld format
-    mapping_res = await async_client.post(
-        "/v1/metadata-mappings",
+    # 2. Create, populate and publish a json_ld export mapping set (Phase 3
+    # replaced the flat metadata-mappings CRUD with versioned mapping sets).
+    set_res = await async_client.post(
+        "/v1/export-mapping-sets",
         headers=auth_headers,
         json={
-            "field_definition_id": field_id,
             "format_key": "json_ld",
-            "target_path": "crm:P102_has_title",
-            "sort_order": 0,
-            "is_enabled": True,
+            "profile_id": "jsonld_cidoc_lrmoo",
+            "record_type": "object",
+            "name": "JSON-LD OAI integration test",
         },
     )
-    assert mapping_res.status_code == 201, mapping_res.text
+    assert set_res.status_code == 201, set_res.text
+    mapping_set = set_res.json()
+
+    rule_res = await async_client.post(
+        f"/v1/export-mapping-sets/{mapping_set['id']}/rules",
+        headers=auth_headers,
+        json={
+            "source_kind": "field",
+            "source_config": {"field_name": fields[0]["name"]},
+            "target_key": "crm:P102_has_title",
+            "sort_order": 0,
+        },
+    )
+    assert rule_res.status_code == 201, rule_res.text
+
+    get_res = await async_client.get(f"/v1/export-mapping-sets/{mapping_set['id']}", headers=auth_headers)
+    assert get_res.status_code == 200, get_res.text
+    current_version = get_res.json()["version"]
+
+    publish_res = await async_client.post(
+        f"/v1/export-mapping-sets/{mapping_set['id']}/publish",
+        headers={**auth_headers, "If-Match": str(current_version)},
+    )
+    assert publish_res.status_code == 200, publish_res.text
 
     # 3. Call OAI-PMH ListMetadataFormats
     oai_res = await async_client.get("/oai?verb=ListMetadataFormats")

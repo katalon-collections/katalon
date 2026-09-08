@@ -30,5 +30,17 @@
     "cancel": "Cancel",
     "addRelationship": "Add relation",
     "hint": "Repeatable field"
+  },
+  "sections": {
+    "label": "Form sections",
+    "general": "General"
+  },
+  "variants": {
+    "label": "Form view",
+    "complete": "Complete"
+  },
+  "cards": {
+    "system": "Record data",
+    "metadata": "Metadata"
   }
 }
