@@ -22,6 +22,7 @@ from katalon.core.models import (
     Place,
     Procedure,
 )
+from katalon.integrations.metadata_format import CompiledMappingSet
 from katalon.services.metadata_format_service import get_format
 from katalon.services.metadata_mapping_service import extract_values, get_mapping_index
 
@@ -119,8 +120,9 @@ async def stream_xml(db: AsyncSession, record_type: str, format_key: str) -> Asy
         raise ValueError(f"Unbekanntes Export-Format '{format_key}'.")
 
     mapping_index = await get_mapping_index(db, format_key)
-    record_mappings = mapping_index.get(record_type, {})
-
+    record_mappings = mapping_index.get(record_type)
+    if record_mappings is None:
+        record_mappings = CompiledMappingSet(format_key=format_key, record_type=record_type)
     yield '<?xml version="1.0" encoding="UTF-8"?>\n<collection>\n'
     async for hit in iter_hits_by_type(record_type):
         el = metadata_format.render(hit, record_mappings)

@@ -205,6 +205,7 @@ class PortalFieldDefinitionRead(BaseModel):
     field_type: str
     is_repeatable: bool
     is_searchable: bool
+    is_facet: bool
     parent_id: uuid.UUID | None
     settings: dict[str, Any]
     show_in_detail: bool

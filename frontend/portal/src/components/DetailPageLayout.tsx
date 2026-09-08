@@ -2,13 +2,42 @@
 // Copyright (c) 2026 Karl Krägelin
 
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
-import { authorityUrl, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
+import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow } from './RelationFieldRow'
 
-export function MetaRow({ label, value, href }: { label: string; value: string; href?: string }) {
+/** Search-page link for one facet value of a field marked `is_facet`, scoped to the
+ *  record's own type. Numeric fields use the range filter (exact value as both bounds);
+ *  everything else uses the single-value metadata filter. */
+export function facetHref(recordType: string, field: Pick<FieldDefinition, 'name' | 'field_type'>, raw: string): string {
+  const encoded = encodeURIComponent(raw)
+  const query = field.field_type === 'number'
+    ? `range_${field.name}_from=${encoded}&range_${field.name}_to=${encoded}`
+    : `meta_${field.name}=${encoded}`
+  return `/search?type=${encodeURIComponent(recordType)}&${query}`
+}
+
+export function MetaRow({ label, value, href, items }: {
+  label: string
+  value?: string
+  href?: string
+  /** Renders each value as its own click-to-filter pill instead of plain text. */
+  items?: { text: string; href: string }[]
+}) {
+  if (items) {
+    if (items.length === 0) return null
+    return (
+      <div className="meta-row">
+        <span className="key">{label}</span>
+        <span className="val" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {items.map((item, i) => <Link key={i} className="tag tag-link" to={item.href}>{item.text}</Link>)}
+        </span>
+      </div>
+    )
+  }
   if (!value) return null
   return (
     <div className="meta-row">
@@ -63,9 +92,23 @@ function richText(value: string): ReactNode {
 }
 
 /** A field placed in the main column: labeled block, markdown for richtext fields. */
-function MainField({ field, value, locale }: { field: FieldDefinition; value: unknown; locale: string }) {
+function MainField({ field, value, locale, recordType }: { field: FieldDefinition; value: unknown; locale: string; recordType: string }) {
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
+  }
+  if (field.is_facet) {
+    const items = facetItems(value, locale, field.field_type)
+    if (items.length === 0) return null
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
+          {fieldLabel(field, locale)}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, field, item.raw)}>{item.display}</Link>)}
+        </div>
+      </div>
+    )
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
   if (!rendered) return null
@@ -92,9 +135,13 @@ function MainField({ field, value, locale }: { field: FieldDefinition; value: un
 }
 
 /** A field placed in the sidebar: compact key/value row. */
-function SidebarField({ field, value, locale }: { field: FieldDefinition; value: unknown; locale: string }) {
+function SidebarField({ field, value, locale, recordType }: { field: FieldDefinition; value: unknown; locale: string; recordType: string }) {
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
+  }
+  if (field.is_facet) {
+    const items = facetItems(value, locale, field.field_type)
+    return <MetaRow label={fieldLabel(field, locale)} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw) }))} />
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
   const href = field.field_type === 'url'
@@ -116,6 +163,8 @@ interface DetailPageLayoutProps {
   fieldDefs: FieldDefinition[]
   metadata: Record<string, unknown>
   locale: string
+  /** The record's own type, used to scope facet-click filter links to matching records. */
+  recordType: string
   sidebarPosition: 'left' | 'right'
   /** Extra content rendered in the main column, after generic main fields and before relations (e.g. keyword tags, linked-objects grid). */
   mainExtra?: ReactNode
@@ -132,7 +181,7 @@ interface DetailPageLayoutProps {
  * admins control layout instead of it being hardcoded per record type.
  */
 export function DetailPageLayout({
-  media, fieldDefs, metadata, locale, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
+  media, fieldDefs, metadata, locale, recordType, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
 }: DetailPageLayoutProps) {
   const detailFields = fieldDefs.filter(f => f.show_in_detail)
   const descriptionField = detailFields.find(f => f.detail_role === 'description')
@@ -144,7 +193,7 @@ export function DetailPageLayout({
   const sidebar = (
     <aside className="detail-meta">
       {sidebarBefore}
-      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} />)}
+      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} />)}
       {sidebarExtra}
     </aside>
   )
@@ -165,7 +214,7 @@ export function DetailPageLayout({
         {description && (descriptionField!.field_type === 'richtext' ? richText(description) : (
           <div style={{ marginTop: media ? 20 : 0, fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>{description}</div>
         ))}
-        {mainFields.map(f => <MainField key={f.name} field={f} value={metadata[f.name]} locale={locale} />)}
+        {mainFields.map(f => <MainField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} />)}
         {mainExtra}
         {relations}
       </div>

@@ -297,6 +297,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
         is_required=True,
         is_repeatable=True,
         is_searchable=True,
+        is_facet=False,
         sort_order=1,
     )
     session = AsyncMock()
@@ -320,6 +321,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
             "field_type": "text",
             "is_repeatable": True,
             "is_searchable": True,
+            "is_facet": False,
             "parent_id": None,
             "settings": {"hint": "visible"},
             "show_in_detail": True,
@@ -459,6 +461,69 @@ async def test_portal_config_returns_facet_display_settings() -> None:
     body = response.json()
     assert body["facet_sort"] == "alpha"
     assert body["facet_initial_count"] == 25
+
+
+@pytest.mark.asyncio
+async def test_portal_config_update_returns_resolved_facets() -> None:
+    from katalon.core.dependencies import get_current_user
+
+    admin_user = User(
+        id=uuid.uuid4(),
+        email="admin@example.org",
+        hashed_password="x",
+        role="admin",
+        is_active=True,
+    )
+    portal_cfg = PortalConfig(
+        key="default",
+        facet_fields={"_system": ["record_type"], "object": ["inherited_entity_name"]},
+    )
+
+    config_result1 = MagicMock()
+    config_result1.scalar_one_or_none.return_value = portal_cfg
+    config_result2 = MagicMock()
+    config_result2.scalar_one_or_none.return_value = portal_cfg
+    from types import SimpleNamespace
+
+    facet_row = SimpleNamespace(target_type="object", name="material")
+    facet_result = MagicMock()
+    facet_result.all.return_value = [facet_row]
+
+    admin_result = MagicMock()
+    admin_result.scalar_one_or_none.return_value = None
+
+    session = AsyncMock()
+    session.execute.side_effect = [config_result1, config_result2, facet_result, admin_result]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.put(
+                "/v1/portal/config",
+                json={
+                    "facet_fields": {
+                        "_system": ["record_type"],
+                        "object": ["inherited_entity_name"],
+                    },
+                    "facet_sort": "alpha",
+                    "facet_initial_count": 15,
+                },
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["facet_sort"] == "alpha"
+    assert body["facet_initial_count"] == 15
+    assert "material" in body["facet_fields"]["object"]
+    assert "inherited_entity_name" in body["facet_fields"]["object"]
+    assert body["facet_fields"]["_system"] == ["record_type"]
 
 
 @pytest.mark.asyncio

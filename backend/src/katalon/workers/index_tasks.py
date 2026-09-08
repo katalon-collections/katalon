@@ -75,14 +75,19 @@ def index_record_task(self: Any, record_type: str, record_id: str, doc: dict[str
     except Exception as exc:
         logger.error(
             "index_record failed %s/%s (attempt %d): %s",
-            record_type, record_id, self.request.retries + 1, exc,
+            record_type,
+            record_id,
+            self.request.retries + 1,
+            exc,
         )
         try:
-            raise self.retry(exc=exc, countdown=10 * (2 ** self.request.retries))
+            raise self.retry(exc=exc, countdown=10 * (2**self.request.retries))
         except self.MaxRetriesExceededError:
             logger.error(
                 "index_record permanently failed %s/%s after %d retries",
-                record_type, record_id, self.max_retries,
+                record_type,
+                record_id,
+                self.max_retries,
             )
             _log_index_failure(record_type, record_id, str(exc))
 
@@ -96,10 +101,12 @@ def remove_record_task(self: Any, record_id: str) -> None:
     except Exception as exc:
         logger.error(
             "remove_record failed %s (attempt %d): %s",
-            record_id, self.request.retries + 1, exc,
+            record_id,
+            self.request.retries + 1,
+            exc,
         )
         try:
-            raise self.retry(exc=exc, countdown=10 * (2 ** self.request.retries))
+            raise self.retry(exc=exc, countdown=10 * (2**self.request.retries))
         except self.MaxRetriesExceededError:
             logger.error(
                 "remove_record permanently failed %s after %d retries", record_id, self.max_retries
@@ -120,7 +127,11 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict[str, Any]:
     from katalon.services.search_service import build_index_doc
 
     _MODEL_MAP: dict[str, Any] = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
+        "object": Object,
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+        "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -194,7 +205,15 @@ def bulk_reindex_type_task(target_type: str) -> dict[str, Any]:
             for rec in result.scalars().all():
                 doc = await build_index_doc(target_type, rec, session)
                 records.append((str(rec.id), doc))
+        logger.info(
+            "bulk_reindex_type_task: starting reindex for '%s' (%d records found)",
+            target_type,
+            len(records),
+        )
         count = await reindex_type(target_type, records)
+        logger.info(
+            "bulk_reindex_type_task: successfully indexed %d records for '%s'", count, target_type
+        )
         return {"status": "ok", "indexed": count, "target_type": target_type}
 
     redis_client = redis_lib.from_url(settings.redis_url)  # type: ignore[no-untyped-call]
@@ -226,7 +245,11 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict[st
     from katalon.integrations.elasticsearch import count_by_type, list_ids_by_type
 
     _MODEL_MAP: dict[str, Any] = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
+        "object": Object,
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+        "procedure": Procedure,
     }
 
     AsyncSessionLocal, engine = _make_session()
@@ -247,7 +270,12 @@ def reconciliation_job_task(mode: str = "count", force: bool = False) -> dict[st
                 db_count = (await session.execute(count_stmt)).scalar_one()
                 es_count = await count_by_type(record_type)
                 delta = db_count - es_count
-                entry: dict[str, Any] = {"db": db_count, "es": es_count, "delta": delta, "reindexed": 0}
+                entry: dict[str, Any] = {
+                    "db": db_count,
+                    "es": es_count,
+                    "delta": delta,
+                    "reindexed": 0,
+                }
 
                 run_id_diff = id_diff_enabled and (mode == "id_diff" or abs(delta) > threshold)
                 if run_id_diff:
@@ -285,7 +313,11 @@ def index_record_dispatch_task(record_type: str, record_id: str) -> None:
     from katalon.services.search_service import build_index_doc
 
     _MODEL_MAP: dict[str, Any] = {
-        "object": Object, "entity": Entity, "place": Place, "occurrence": Occurrence, "procedure": Procedure,
+        "object": Object,
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+        "procedure": Procedure,
     }
     model = _MODEL_MAP.get(record_type)
     if model is None:
@@ -339,6 +371,7 @@ def reindex_all_task() -> None:
                 (Collection, "collection"),
                 (StorageLocation, "storage_location"),
             ]
+            type_errors: list[str] = []
             for model, rtype in models:
                 query = select(model)
                 if hasattr(model, "deleted_at"):
@@ -348,7 +381,25 @@ def reindex_all_task() -> None:
                 for rec in result.scalars().all():
                     doc = await build_index_doc(rtype, rec, session)
                     records.append((str(rec.id), doc))
-                await reindex_type(rtype, records)
+                logger.info(
+                    "reindex_all_task: starting reindex for '%s' (%d records found)",
+                    rtype,
+                    len(records),
+                )
+                try:
+                    count = await reindex_type(rtype, records)
+                    logger.info(
+                        "reindex_all_task: successfully indexed %d records for '%s'", count, rtype
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "reindex_all_task: failed to reindex type '%s': %s", rtype, exc
+                    )
+                    type_errors.append(f"{rtype}: {exc}")
+            if type_errors:
+                raise RuntimeError(
+                    f"reindex_all_task completed with errors: {'; '.join(type_errors)}"
+                )
 
     try:
         _run(_reindex())

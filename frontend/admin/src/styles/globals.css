@@ -389,7 +389,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 
 /* Users */
 .users-table { padding: 0 24px; overflow-x: auto; }
-.users-table .col-act { width: 230px; }
+.users-table .tbl { min-width: 960px; }
 
 /* Importer */
 .importer-content { padding: 24px; }
@@ -578,9 +578,6 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .users-table { padding-inline: 12px; -webkit-overflow-scrolling: touch; }
   .users-table .tbl { min-width: max-content; }
   .users-table .tbl td { white-space: normal; overflow: visible; text-overflow: clip; }
-  .users-table .col-act { min-width: 110px; }
-  .users-table .row-actions { flex-wrap: wrap; gap: 4px; max-width: 130px; justify-content: flex-end; }
-  .users-table .row-actions .btn { height: auto; min-height: 44px; white-space: normal; padding: 6px 8px; }
   .users-table .role-cell { flex-wrap: wrap; }
   .users-table th:nth-child(4), .users-table td:nth-child(4) { display: none; }
   .importer-content { padding: 12px; }

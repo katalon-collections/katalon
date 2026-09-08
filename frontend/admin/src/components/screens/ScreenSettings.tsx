@@ -520,7 +520,16 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         schema.list(key).then(fields => [key, fields] as [string, FieldDefinition[]])
       )
     ).then(entries => {
-      setFieldsByType(Object.fromEntries(entries))
+      const byType = Object.fromEntries(entries)
+      setFieldsByType(byType)
+      setFacetFields(() => {
+        const base = config.facet_fields ?? {}
+        return Object.fromEntries(RECORD_TYPES.map(({ key }) => {
+          const direct = (byType[key] ?? []).filter(f => f.is_facet).map(f => f.name)
+          const inherited = (base[key] ?? []).filter(name => name.startsWith('inherited_'))
+          return [key, [...direct, ...inherited]]
+        }))
+      })
     }).catch(e => setError((e as Error).message))
       .finally(() => setLoadingFields(false))
   }, [])
@@ -566,7 +575,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       // source of truth and triggers a reindex when changed). Inherited facets
       // (from relation settings) have no FieldDefinition row, so they are still
       // stored in portal_config.facet_fields.
-      const updates: Promise<unknown>[] = []
+      const schemaUpdates: Promise<unknown>[] = []
       const inheritedToSave: Record<string, string[]> = { _system: systemFacets }
       const subtitleToSave: Record<string, string[]> = {}
 
@@ -579,7 +588,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           if (f.is_facet !== shouldBeFacet) {
             const { id, ...payload } = f
             delete payload.children
-            updates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
+            schemaUpdates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
           }
         }
 
@@ -599,7 +608,22 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         ]
       }
 
-      updates.push(req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+      if (schemaUpdates.length > 0) {
+        await Promise.all(schemaUpdates)
+        setFieldsByType(prev => {
+          const next = { ...prev }
+          for (const { key } of RECORD_TYPES) {
+            const selected = facetFields[key] ?? []
+            next[key] = (prev[key] ?? []).map(f => ({
+              ...f,
+              is_facet: selected.includes(f.name),
+            }))
+          }
+          return next
+        })
+      }
+
+      const portalConfig = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
         method: 'PUT',
         body: JSON.stringify({
           facet_fields: inheritedToSave,
@@ -607,10 +631,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           facet_sort: facetSort,
           facet_initial_count: facetInitialCount,
         }),
-      }))
+      })
 
-      const results = await Promise.all(updates)
-      const portalConfig = results[results.length - 1] as PortalConfigRead
       onSaved(portalConfig)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) { setError((e as Error).message) }

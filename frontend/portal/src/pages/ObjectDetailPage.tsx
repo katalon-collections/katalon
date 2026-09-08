@@ -98,7 +98,7 @@ export function ObjectDetailPage() {
   if (error || !obj) {
     return (
       <div className="container page">
-        <div style={{ color: '#dc2626' }}>{error ?? t('error.objectNotFound')}</div>
+        <div style={{ color: '#dc2626' }}>{error || t('error.objectNotFound')}</div>
       </div>
     )
   }
@@ -177,6 +177,7 @@ export function ObjectDetailPage() {
         fieldDefs={detailFieldDefs}
         metadata={m}
         locale={locale}
+        recordType="object"
         sidebarPosition={portalConfig.detail_sidebar_position}
         media={(
           <>

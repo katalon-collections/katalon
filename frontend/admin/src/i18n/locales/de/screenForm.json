@@ -24,5 +24,11 @@
     "containedTitle": "Zugeordnete Arbeitslisten",
     "openSet": "Öffnen",
     "addToAnother": "+ Zu Arbeitsliste hinzufügen…"
+  },
+  "repeatable": {
+    "add": "Hinzufügen",
+    "cancel": "Abbrechen",
+    "addRelationship": "Beziehung hinzufügen",
+    "hint": "Wiederholbares Feld"
   }
 }

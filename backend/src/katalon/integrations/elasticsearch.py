@@ -3,12 +3,35 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import itertools
+import logging
+from collections.abc import AsyncIterator, Iterable, Sized
 from typing import Any, cast
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 
 from katalon.config import settings
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_REINDEX_BATCH_SIZE: int = getattr(settings, "es_reindex_batch_size", 500)
+
+
+class ReindexBatchError(RuntimeError):
+    """Raised when one or more batches fail during reindex_type."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        target_type: str,
+        failed_batches: list[dict[str, Any]],
+        indexed_count: int,
+    ) -> None:
+        super().__init__(message)
+        self.target_type = target_type
+        self.failed_batches = failed_batches
+        self.indexed_count = indexed_count
 
 
 def get_es() -> AsyncElasticsearch:
@@ -112,27 +135,129 @@ async def ensure_index() -> None:
         await es.indices.put_alias(index=INDEX_NAME, name=ALIAS_NAME)
 
 
-async def reindex_type(target_type: str, records: list[tuple[str, dict[str, Any]]]) -> int:
-    """Delete all docs of target_type and re-index the supplied records.
+async def reindex_type(
+    target_type: str,
+    records: Iterable[tuple[str, dict[str, Any]]],
+    *,
+    batch_size: int = DEFAULT_REINDEX_BATCH_SIZE,
+    raise_on_error: bool = True,
+) -> int:
+    """Delete all docs of target_type and re-index the supplied records in batches.
 
-    Returns the number of documents indexed.
+    Returns the number of documents successfully indexed.
     """
+    if batch_size <= 0:
+        raise ValueError(f"batch_size must be positive, got {batch_size}")
+
     es = get_es()
-    # Delete existing docs for this type
-    await es.delete_by_query(
-        index=INDEX_NAME,
-        body={"query": {"term": {"record_type": target_type}}},
-        refresh=True,
-    )
-    if not records:
-        return 0
-    ops: list[dict[str, Any]] = []
-    for doc_id, body in records:
-        ops.append({"index": {"_index": INDEX_NAME, "_id": doc_id}})
-        ops.append(body)
-    resp = await es.bulk(body=ops, refresh=True)
-    errors = [item for item in resp["items"] if "error" in item.get("index", {})]
-    return len(records) - len(errors)
+    try:
+        # Delete existing docs for this type
+        await es.delete_by_query(
+            index=INDEX_NAME,
+            body={"query": {"term": {"record_type": target_type}}},
+            refresh=True,
+        )
+
+        total_records = len(records) if isinstance(records, Sized) else None
+        if total_records == 0:
+            return 0
+        total_batches = (
+            (total_records + batch_size - 1) // batch_size if total_records is not None else None
+        )
+
+        total_indexed = 0
+        failed_batches: list[dict[str, Any]] = []
+
+        for batch_idx, batch in enumerate(itertools.batched(records, batch_size), start=1):
+            batch_label = (
+                f"{batch_idx}/{total_batches}" if total_batches is not None else str(batch_idx)
+            )
+            ops: list[dict[str, Any]] = []
+            doc_ids: list[str] = []
+            for doc_id, body in batch:
+                ops.append({"index": {"_index": INDEX_NAME, "_id": doc_id}})
+                ops.append(body)
+                doc_ids.append(doc_id)
+
+            try:
+                resp = await es.bulk(body=ops, refresh=False)
+                items = resp.get("items", [])
+                item_errors = [item for item in items if "error" in item.get("index", {})]
+                if item_errors:
+                    for item in item_errors:
+                        idx_info = item.get("index", {})
+                        err_doc_id = idx_info.get("_id", "unknown")
+                        err_detail = idx_info.get("error", {})
+                        logger.error(
+                            "reindex_type(%s) item error in batch %s for record %s: %s",
+                            target_type,
+                            batch_label,
+                            err_doc_id,
+                            err_detail,
+                        )
+                    failed_batches.append(
+                        {
+                            "batch": batch_idx,
+                            "batch_label": batch_label,
+                            "error_type": "item_errors",
+                            "doc_ids": [item.get("index", {}).get("_id", "") for item in item_errors],
+                            "error": f"{len(item_errors)} item error(s) in batch",
+                        }
+                    )
+                indexed_in_batch = len(batch) - len(item_errors)
+                total_indexed += indexed_in_batch
+            except Exception as exc:
+                logger.exception(
+                    "reindex_type(%s) bulk request failed on batch %s (%d records): %s. Record IDs: %s",
+                    target_type,
+                    batch_label,
+                    len(batch),
+                    exc,
+                    doc_ids[:10],
+                )
+                failed_batches.append(
+                    {
+                        "batch": batch_idx,
+                        "batch_label": batch_label,
+                        "error_type": "bulk_exception",
+                        "doc_ids": doc_ids,
+                        "error": str(exc),
+                    }
+                )
+
+        # Always refresh the index so successfully indexed documents are searchable and not lost
+        if total_indexed > 0:
+            try:
+                await es.indices.refresh(index=INDEX_NAME)
+            except Exception:
+                logger.warning(
+                    "Failed to refresh index %s after reindex_type(%s)",
+                    INDEX_NAME,
+                    target_type,
+                    exc_info=True,
+                )
+
+        if failed_batches and raise_on_error:
+            failed_count = sum(len(fb["doc_ids"]) for fb in failed_batches)
+            details = "; ".join(
+                f"Batch {fb['batch_label']} ({len(fb['doc_ids'])} records, e.g. {fb['doc_ids'][:3]}): {fb['error']}"
+                for fb in failed_batches
+            )
+            msg = (
+                f"Reindex for '{target_type}' completed with failures: "
+                f"{len(failed_batches)} batch(es) failed ({failed_count} records not indexed). "
+                f"{total_indexed} records successfully indexed. Details: {details}"
+            )
+            raise ReindexBatchError(
+                msg,
+                target_type=target_type,
+                failed_batches=failed_batches,
+                indexed_count=total_indexed,
+            )
+
+        return total_indexed
+    finally:
+        await es.close()
 
 
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
@@ -343,7 +468,13 @@ async def search_documents(
 
     result = await es.search(
         index=INDEX_NAME,
-        body={"query": es_query, "aggs": aggs, "from": from_, "size": size},
+        body={
+            "query": es_query,
+            "aggs": aggs,
+            "from": from_,
+            "size": size,
+            "track_total_hits": True,
+        },
     )
     return cast(dict[str, Any], result.body)
 

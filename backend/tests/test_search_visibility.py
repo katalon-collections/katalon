@@ -323,6 +323,7 @@ async def test_search_documents_allows_leading_wildcards(monkeypatch) -> None:
     query = captured["body"]["query"]["bool"]["must"][0]["query_string"]
     assert query["query"] == "*fragment"
     assert query["allow_leading_wildcard"] is True
+    assert captured["body"]["track_total_hits"] is True
 
 
 @pytest.mark.asyncio

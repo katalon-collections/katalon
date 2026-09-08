@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiKeys, getTokenUser, users as usersApi } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
@@ -342,7 +342,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
 
       {!loading && !error && (
         <div className="users-table">
-          <table className="tbl">
+          <table className="tbl" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th>{t('tableEmail')}</th>
@@ -359,7 +359,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                 const isSelf = u.email === currentUser?.email
                 const roleChanged = (draftRole[u.id] ?? u.role) !== u.role
                 return (
-                <>
+                <Fragment key={u.id}>
                   <tr key={u.id}>
                     <td>{u.email}</td>
                     <td>
@@ -474,7 +474,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                        </td>
                      </tr>
                    )}
-                 </>
+                </Fragment>
                 )
                })}
                {userList.length === 0 && (

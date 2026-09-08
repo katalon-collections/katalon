@@ -456,11 +456,13 @@ function mediaRightsFromInputs(root: ParentNode | null) {
   }
 }
 
-function VocabInput({ vocabId, value, onChange, disabled }: {
+function VocabInput({ vocabId, value, onChange, disabled, autoFocus, onCancel }: {
   vocabId: string
   value: VocabEntry | null
   onChange: (v: VocabEntry | null) => void
   disabled?: boolean
+  autoFocus?: boolean
+  onCancel?: () => void
 }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<VocabSuggestion[]>([])
@@ -555,6 +557,13 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus()
+      openSuggestions()
+    }
+  }, [autoFocus])
+
 
   function pick(term: VocabularyTerm) {
     onChange({ id: term.id, label: getLabel(term) })
@@ -594,8 +603,13 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
           setOpen(false)
         }}
         onKeyDown={e => {
-          if (e.key === 'Escape') { setOpen(false); setResults([]) }
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setResults([])
+            onCancel?.()
+          }
         }}
+        autoFocus={autoFocus}
         placeholder={vocabId ? 'Tippen zum Suchen…' : 'Kein Vokabular zugewiesen'}
         disabled={disabled || !vocabId}
       />
@@ -636,13 +650,15 @@ function VocabInput({ vocabId, value, onChange, disabled }: {
  * - Non-repeatable: use `value` + `onChange` (live update on each keystroke).
  * - Repeatable: use `onAdd` (fires with committed text, then clears the input).
  */
-function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder }: {
+function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder, autoFocus, onCancel }: {
   vocabId: string
   value?: string
   onChange?: (v: string) => void
   onAdd?: (v: string) => void
   disabled?: boolean
   placeholder?: string
+  autoFocus?: boolean
+  onCancel?: () => void
 }) {
   const [draft, setDraft] = useState(value ?? '')
   const [results, setResults] = useState<VocabSuggestion[]>([])
@@ -726,6 +742,13 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
       .catch(() => { setResults([]); setOpen(false) })
       .finally(() => setBusy(false))
   }
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus()
+      openSuggestions()
+    }
+  }, [autoFocus])
+
 
   function commit(text: string) {
     if (!text.trim()) return
@@ -760,8 +783,13 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
         }}
         onKeyDown={e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
-          if (e.key === 'Escape') { setOpen(false); setResults([]) }
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setResults([])
+            onCancel?.()
+          }
         }}
+        autoFocus={autoFocus}
         placeholder={placeholder ?? (vocabId ? 'Tippen zum Suchen oder frei eingeben…' : 'Freitext eingeben')}
         disabled={disabled}
       />
@@ -1400,6 +1428,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [registeringPidField, setRegisteringPidField] = useState<string | null>(null)
+  const [addingRepeatableField, setAddingRepeatableField] = useState<string | null>(null)
   const [title, setTitle]     = useState(isNew ? NEW_TYPE_LABELS[recordType] : '…')
 
   const [mediaFiles, setMediaFiles]     = useState<MediaFile[]>([])
@@ -1886,6 +1915,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   function addAuthority(name: string, val: AuthorityEntry) {
     const cur = (values[name] as AuthorityEntry[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, val] }))
+    setAddingRepeatableField(null)
   }
   function removeAuthority(name: string, idx: number) {
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as AuthorityEntry[]) ?? []).filter((_, i) => i !== idx) }))
@@ -1898,6 +1928,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!val.trim()) return
     const cur = (values[name] as string[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, val.trim()] }))
+    setAddingRepeatableField(null)
   }
   function removeFreeVocab(name: string, idx: number) {
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
@@ -1906,6 +1937,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   function addVocab(name: string, val: VocabEntry) {
     const cur = (values[name] as VocabEntry[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, val] }))
+    setAddingRepeatableField(null)
   }
   function removeVocab(name: string, idx: number) {
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as VocabEntry[]) ?? []).filter((_, i) => i !== idx) }))
@@ -3054,10 +3086,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                   return (
                     <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: '6px 8px', margin: '0 -8px', borderRadius: 4, transition: 'background .2s', background: highlightedField === f.name ? 'rgba(30, 58, 138, .10)' : undefined }}>
-                      <div className="lbl">
+                      <div className="lbl" title={repeatable ? (t('repeatable.hint') || 'Wiederholbares Feld') : undefined}>
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
-                        {repeatable && <span className="h">wiederholbar</span>}
                         {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
                         {getFieldAiConfig(f) && !f.is_translatable && (
                           <button
@@ -3087,33 +3118,72 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         />
                       ) : f.field_type === 'vocab' ? (
                         repeatable ? (
-                          <>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                              {((val as VocabEntry[] | undefined) ?? []).map((entry, i) => (
-                                <span key={i} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                                  padding: '3px 8px', borderRadius: 4,
-                                  background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
-                                }}>
-                                  {entry.label}
-                                  <button
-                                    className="btn sm ico gh"
-                                    style={{ marginLeft: 2, padding: 0 }}
-                                    onClick={() => removeVocab(f.name, i)}
-                                    disabled={justCreated}
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
+                          ((val as VocabEntry[] | undefined) ?? []).length === 0 ? (
                             <VocabInput
                               vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                               value={null}
                               onChange={v => { if (v) addVocab(f.name, v) }}
                               disabled={justCreated}
                             />
-                          </>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                                {((val as VocabEntry[] | undefined) ?? []).map((entry, i) => (
+                                  <span key={i} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                    padding: '3px 8px', borderRadius: 4,
+                                    background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+                                  }}>
+                                    {entry.label}
+                                    <button
+                                      type="button"
+                                      className="btn sm ico gh"
+                                      style={{ marginLeft: 2, padding: 0 }}
+                                      onClick={() => removeVocab(f.name, i)}
+                                      disabled={justCreated}
+                                      title="Entfernen"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </span>
+                                ))}
+                                {addingRepeatableField !== f.name && !justCreated && (
+                                  <button
+                                    type="button"
+                                    className="btn sm gh"
+                                    style={{ height: 26, padding: '0 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => setAddingRepeatableField(f.name)}
+                                    disabled={justCreated}
+                                  >
+                                    <Plus size={12} /> {t('repeatable.add')}
+                                  </button>
+                                )}
+                              </div>
+                              {addingRepeatableField === f.name && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <VocabInput
+                                      vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                                      value={null}
+                                      onChange={v => { if (v) addVocab(f.name, v) }}
+                                      disabled={justCreated}
+                                      autoFocus
+                                      onCancel={() => setAddingRepeatableField(null)}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="btn sm ico gh"
+                                    onClick={() => setAddingRepeatableField(null)}
+                                    title={t('repeatable.cancel')}
+                                    aria-label={t('repeatable.cancel')}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )
                         ) : (
                           <VocabInput
                             vocabId={(f.settings?.vocabulary_id as string) ?? ''}
@@ -3124,33 +3194,72 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         )
                       ) : f.field_type === 'vocab_free' ? (
                         repeatable ? (
-                          <>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                              {((val as string[] | undefined) ?? []).map((entry, i) => (
-                                <span key={i} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                                  padding: '3px 8px', borderRadius: 4,
-                                  background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
-                                }}>
-                                  {entry}
-                                  <button
-                                    className="btn sm ico gh"
-                                    style={{ marginLeft: 2, padding: 0 }}
-                                    onClick={() => removeFreeVocab(f.name, i)}
-                                    disabled={justCreated}
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
+                          ((val as string[] | undefined) ?? []).length === 0 ? (
                             <VocabFreeInput
                               vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                               onAdd={v => addFreeVocab(f.name, v)}
                               disabled={justCreated}
                               placeholder="Eingeben und Enter drücken oder Vorschlag wählen"
                             />
-                          </>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                                {((val as string[] | undefined) ?? []).map((entry, i) => (
+                                  <span key={i} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                    padding: '3px 8px', borderRadius: 4,
+                                    background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+                                  }}>
+                                    {entry}
+                                    <button
+                                      type="button"
+                                      className="btn sm ico gh"
+                                      style={{ marginLeft: 2, padding: 0 }}
+                                      onClick={() => removeFreeVocab(f.name, i)}
+                                      disabled={justCreated}
+                                      title="Entfernen"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </span>
+                                ))}
+                                {addingRepeatableField !== f.name && !justCreated && (
+                                  <button
+                                    type="button"
+                                    className="btn sm gh"
+                                    style={{ height: 26, padding: '0 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => setAddingRepeatableField(f.name)}
+                                    disabled={justCreated}
+                                  >
+                                    <Plus size={12} /> {t('repeatable.add')}
+                                  </button>
+                                )}
+                              </div>
+                              {addingRepeatableField === f.name && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <VocabFreeInput
+                                      vocabId={(f.settings?.vocabulary_id as string) ?? ''}
+                                      onAdd={v => addFreeVocab(f.name, v)}
+                                      disabled={justCreated}
+                                      placeholder="Eingeben und Enter drücken oder Vorschlag wählen"
+                                      autoFocus
+                                      onCancel={() => setAddingRepeatableField(null)}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="btn sm ico gh"
+                                    onClick={() => setAddingRepeatableField(null)}
+                                    title={t('repeatable.cancel')}
+                                    aria-label={t('repeatable.cancel')}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )
                         ) : (
                           <VocabFreeInput
                             vocabId={(f.settings?.vocabulary_id as string) ?? ''}
@@ -3161,39 +3270,78 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         )
                       ) : f.field_type === 'authority' ? (
                         repeatable ? (
-                          <>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                              {((val as AuthorityEntry[] | undefined) ?? []).map((entry, i) => (
-                                <span key={i} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                                  padding: '3px 8px', borderRadius: 4,
-                                  background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
-                                }}>
-                                  {entry.label}
-                                  <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>
-                                    {entry.external_id}
-                                  </span>
-                                  <button
-                                    className="btn sm ico gh"
-                                    style={{ marginLeft: 2, padding: 0 }}
-                                    onClick={() => removeAuthority(f.name, i)}
-                                    disabled={justCreated}
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                            {((val as AuthorityEntry[] | undefined) ?? []).map((entry, i) => (
-                              <GeoNamesMap key={`${entry.external_id}-${i}`} value={entry} />
-                            ))}
+                          ((val as AuthorityEntry[] | undefined) ?? []).length === 0 ? (
                             <AuthorityInput
                               source={(f.settings?.source as string) ?? 'gnd'}
                               value={null}
                               onChange={v => { if (v) addAuthority(f.name, v) }}
                               disabled={justCreated}
                             />
-                          </>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                                {((val as AuthorityEntry[] | undefined) ?? []).map((entry, i) => (
+                                  <span key={i} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                    padding: '3px 8px', borderRadius: 4,
+                                    background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
+                                  }}>
+                                    {entry.label}
+                                    <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--mono)' }}>
+                                      {entry.external_id}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="btn sm ico gh"
+                                      style={{ marginLeft: 2, padding: 0 }}
+                                      onClick={() => removeAuthority(f.name, i)}
+                                      disabled={justCreated}
+                                      title="Entfernen"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </span>
+                                ))}
+                                {addingRepeatableField !== f.name && !justCreated && (
+                                  <button
+                                    type="button"
+                                    className="btn sm gh"
+                                    style={{ height: 26, padding: '0 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => setAddingRepeatableField(f.name)}
+                                    disabled={justCreated}
+                                  >
+                                    <Plus size={12} /> {t('repeatable.add')}
+                                  </button>
+                                )}
+                              </div>
+                              {((val as AuthorityEntry[] | undefined) ?? []).map((entry, i) => (
+                                <GeoNamesMap key={`${entry.external_id}-${i}`} value={entry} />
+                              ))}
+                              {addingRepeatableField === f.name && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <AuthorityInput
+                                      source={(f.settings?.source as string) ?? 'gnd'}
+                                      value={null}
+                                      onChange={v => { if (v) addAuthority(f.name, v) }}
+                                      disabled={justCreated}
+                                      autoFocus
+                                      onCancel={() => setAddingRepeatableField(null)}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="btn sm ico gh"
+                                    onClick={() => setAddingRepeatableField(null)}
+                                    title={t('repeatable.cancel')}
+                                    aria-label={t('repeatable.cancel')}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )
                         ) : (
                           <AuthorityInput
                             source={(f.settings?.source as string) ?? 'gnd'}
@@ -3204,16 +3352,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         )
                       ) : f.field_type === 'relation' ? (
                         repeatable ? (
-                          <>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
-                              {((val as RelationEntry[] | undefined) ?? []).map((entry, i) => (
-                                <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
-                                  <span style={{ flex: 1 }}>{entry.label}</span>
-                                  <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
-                                  <button className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
-                                </div>
-                              ))}
-                            </div>
+                          ((val as RelationEntry[] | undefined) ?? []).length === 0 ? (
                             <RelationInput
                               targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
@@ -3223,7 +3362,58 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               onAdd={entry => addRelationEntry(f.name, entry)}
                               disabled={justCreated}
                             />
-                          </>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+                                {((val as RelationEntry[] | undefined) ?? []).map((entry, i) => (
+                                  <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
+                                    <span style={{ flex: 1 }}>{entry.label}</span>
+                                    <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
+                                    <button type="button" className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
+                                  </div>
+                                ))}
+                              </div>
+                              {addingRepeatableField === f.name ? (
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <RelationInput
+                                      targetType={(f.settings?.target_type as RecordType) ?? ''}
+                                      targetSubtype={f.settings?.target_subtype as string | undefined}
+                                      relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
+                                      fixedRelationType={f.settings?.fixed_relation_type as string | undefined}
+                                      fromType={recordType}
+                                      onAdd={async entry => {
+                                        await addRelationEntry(f.name, entry)
+                                        setAddingRepeatableField(null)
+                                      }}
+                                      disabled={justCreated}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="btn sm ico gh"
+                                    onClick={() => setAddingRepeatableField(null)}
+                                    title={t('repeatable.cancel')}
+                                    aria-label={t('repeatable.cancel')}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                !justCreated && (
+                                  <button
+                                    type="button"
+                                    className="btn sm gh"
+                                    style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                                    onClick={() => setAddingRepeatableField(f.name)}
+                                    disabled={justCreated}
+                                  >
+                                    <Plus size={12} /> {t('repeatable.addRelationship')}
+                                  </button>
+                                )
+                              )}
+                            </>
+                          )
                         ) : (
                           <>
                             {val && (

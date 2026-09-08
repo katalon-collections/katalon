@@ -74,3 +74,29 @@ def test_bulk_reindex_serializes_same_record_type(monkeypatch) -> None:
 
     assert [report["status"] for report in reports] == ["ok", "ok"]
     assert max_active == 1
+
+
+def test_reindex_all_task_aggregates_errors_and_processes_all_types(monkeypatch) -> None:
+    types_attempted: list[str] = []
+
+    async def fake_reindex_type(record_type: str, _records):
+        types_attempted.append(record_type)
+        if record_type == "place":
+            raise RuntimeError("Place reindex failed")
+        return 0
+
+    monkeypatch.setattr(index_tasks, "_make_session", lambda: (lambda: _Session(), _Engine()))
+    monkeypatch.setattr("katalon.integrations.elasticsearch.reindex_type", fake_reindex_type)
+
+    import pytest
+
+    with pytest.raises(
+        RuntimeError, match="reindex_all_task completed with errors: place: Place reindex failed"
+    ):
+        index_tasks.reindex_all_task.run()
+
+    # Ensure all 7 models were still attempted despite "place" failing
+    assert "object" in types_attempted
+    assert "place" in types_attempted
+    assert "storage_location" in types_attempted
+    assert len(types_attempted) == 7

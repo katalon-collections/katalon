@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportProfileCapabilities, FieldDefinition, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -393,6 +393,13 @@ export interface MetadataFormatInfo {
   key: string
   label: string
   targets: string[]
+  capabilities?: ExportProfileCapabilities | null
+}
+
+export const exportProfiles = {
+  list: () => req<ExportProfileCapabilities[]>('/v1/export-profiles'),
+  get: (formatKey: string, profileId: string) =>
+    req<ExportProfileCapabilities>(`/v1/export-profiles/${encodeURIComponent(formatKey)}/${encodeURIComponent(profileId)}`),
 }
 
 export const metadataMappings = {

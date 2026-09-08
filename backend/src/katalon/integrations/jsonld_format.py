@@ -7,7 +7,15 @@ import json
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from katalon.integrations.metadata_format import MetadataFormat
+from katalon.integrations.metadata_format import (
+    CompiledMappingSet,
+    ExportProfileCapabilities,
+    ExportTargetCapability,
+    LocalizedText,
+    MetadataFormat,
+    SourceKind,
+    ValidatorDependency,
+)
 from katalon.services.metadata_mapping_service import extract_values
 
 CRM_NS = "http://www.cidoc-crm.org/cidoc-crm/"
@@ -227,7 +235,7 @@ def build_jsonld_doc(
     metadata: dict[str, Any] | None = None,
     relations: list[dict[str, Any]] | None = None,
     vocab_concepts: dict[str, dict[str, Any]] | None = None,
-    mappings: dict[str, list[str]] | None = None,
+    mappings: CompiledMappingSet | dict[str, list[str]] | None = None,
     base_url: str = "",
     media_files: list[dict[str, Any]] | None = None,
     geo_point: tuple[float, float] | None = None,
@@ -374,19 +382,31 @@ def build_jsonld_doc(
 
     # Explicit mappings from MetadataMapping
     if mappings:
-        for field_name, target_paths in mappings.items():
+        mapping_set = (
+            mappings
+            if isinstance(mappings, CompiledMappingSet)
+            else CompiledMappingSet.from_legacy_dict("json_ld", record_type, mappings)
+        )
+        for rule in mapping_set.rules:
+            if not rule.is_enabled:
+                continue
+            field_name = rule.field_name
+            if not field_name:
+                continue
             vals = extract_values({"metadata": md, "idno": idno}, field_name)
-            for path in target_paths:
-                if not vals:
-                    continue
-                # If path is already populated, don't overwrite with empty
-                if path in doc:
-                    existing = doc[path]
-                    if not isinstance(existing, list):
-                        existing = [existing]
-                    doc[path] = existing + vals
-                else:
-                    doc[path] = vals if len(vals) > 1 else vals[0]
+            if prefix := rule.settings.get("prefix"):
+                vals = [f"{prefix}{v}" for v in vals]
+            path = rule.target_key
+            if not vals:
+                continue
+            # If path is already populated, don't overwrite with empty
+            if path in doc:
+                existing = doc[path]
+                if not isinstance(existing, list):
+                    existing = [existing]
+                doc[path] = existing + vals
+            else:
+                doc[path] = vals if len(vals) > 1 else vals[0]
 
     return doc
 
@@ -398,7 +418,31 @@ class JsonLdFormat(MetadataFormat):
     schema_url = "http://www.w3.org/ns/json-ld"
     namespace = JSONLD_NS
 
-    def render(self, hit: dict[str, Any], mappings: dict[str, list[str]]) -> ET.Element:
+    def capabilities(self) -> ExportProfileCapabilities:
+        caps = [
+            ExportTargetCapability(
+                key=target,
+                group="lrmoo" if target.startswith("lrmoo:") else ("crm" if target.startswith("crm:") else "general"),
+                label=LocalizedText(de=target, en=target),
+                help=LocalizedText(
+                    de=f"CIDOC-CRM / LRMoo RDF-Property '{target}'",
+                    en=f"CIDOC-CRM / LRMoo RDF property '{target}'",
+                ),
+                source_kinds={SourceKind.FIELD, SourceKind.RELATION},
+            )
+            for target in sorted(self.targets)
+        ]
+        return ExportProfileCapabilities(
+            format_key=self.key,
+            profile_id="jsonld_cidoc_lrmoo",
+            profile_version="1.0",
+            label=LocalizedText(de="CIDOC-CRM & LRMoo (JSON-LD)", en="CIDOC-CRM & LRMoo (JSON-LD)"),
+            targets=caps,
+            validators=[ValidatorDependency(name="JSON-LD / W3C RDF", version="1.1", available=True)],
+        )
+    def render(
+        self, hit: dict[str, Any], mappings: CompiledMappingSet | dict[str, list[str]]
+    ) -> ET.Element:
         src = hit.get("_source", {})
         record_id = str(hit.get("_id", ""))
         record_type = src.get("record_type", "object")

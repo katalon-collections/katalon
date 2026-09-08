@@ -6,12 +6,16 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
 from sqlalchemy import select
 
 from katalon.core.dependencies import CurrentUser, DBDep
 from katalon.core.models import FieldDefinition, MetadataMapping
-from katalon.core.schemas import MetadataMappingCreate, MetadataMappingRead, MetadataMappingUpsert
+from katalon.core.schemas import (
+    FormatOut,
+    MetadataMappingCreate,
+    MetadataMappingRead,
+    MetadataMappingUpsert,
+)
 from katalon.services import metadata_format_service
 from katalon.services.metadata_mapping_service import get_mappings, validate_mapping_target
 
@@ -26,10 +30,6 @@ def _require_admin(current_user: CurrentUser) -> None:
         )
 
 
-class FormatOut(BaseModel):
-    key: str
-    label: str
-    targets: list[str]
 
 
 @router.get(
@@ -39,7 +39,15 @@ class FormatOut(BaseModel):
 )
 async def list_formats() -> list[FormatOut]:
     formats = await metadata_format_service.list_formats()
-    return [FormatOut(key=f.key, label=f.label, targets=sorted(f.targets)) for f in formats]
+    return [
+        FormatOut(
+            key=f.key,
+            label=f.label,
+            targets=sorted(f.targets),
+            capabilities=f.capabilities(),
+        )
+        for f in formats
+    ]
 
 
 @router.get(

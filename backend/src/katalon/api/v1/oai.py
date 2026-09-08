@@ -103,6 +103,7 @@ async def _es_search_for_oai(
         "sort": [{"updated_at": "asc"}, {"_doc": "asc"}],
         "from": offset,
         "size": PAGE_SIZE,
+        "track_total_hits": True,
     }
     result = await es.search(index=INDEX_NAME, body=body)
     return cast(dict[str, Any], result.body)

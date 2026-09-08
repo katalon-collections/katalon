@@ -15,8 +15,8 @@ import {
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { useBackToSearch } from '../hooks/useBackToSearch'
-import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { MetaRow } from '../components/DetailPageLayout'
+import { facetItems, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { facetHref, MetaRow } from '../components/DetailPageLayout'
 import { RelationsList } from '../components/RelationsList'
 import { useI18n } from '../i18n'
 
@@ -112,7 +112,7 @@ export function CollectionDetailPage() {
   if (error || !col) {
     return (
       <div className="container page">
-        <div style={{ color: '#dc2626' }}>{error ?? t('error.collectionNotFound')}</div>
+        <div style={{ color: '#dc2626' }}>{error || t('error.collectionNotFound')}</div>
       </div>
     )
   }
@@ -340,9 +340,13 @@ export function CollectionDetailPage() {
                   .map(f => {
                     const val = m[f.name]
                     if (val == null || val === '') return null
+                    const label = f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
+                    if (f.is_facet) {
+                      const items = facetItems(val, locale, f.field_type)
+                      return <MetaRow key={f.name} label={label} items={items.map(item => ({ text: item.display, href: facetHref('collection', f, item.raw) }))} />
+                    }
                     const rendered = renderFieldValue(val, locale, f.field_type)
                     if (!rendered) return null
-                    const label = f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
                     return <MetaRow key={f.name} label={label} value={rendered} />
                   })}
               </div>

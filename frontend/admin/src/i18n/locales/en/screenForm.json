@@ -24,5 +24,11 @@
     "containedTitle": "Assigned Worklists",
     "openSet": "Open",
     "addToAnother": "+ Add to worklist…"
+  },
+  "repeatable": {
+    "add": "Add",
+    "cancel": "Cancel",
+    "addRelationship": "Add relation",
+    "hint": "Repeatable field"
   }
 }

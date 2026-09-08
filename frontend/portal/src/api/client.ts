@@ -13,9 +13,19 @@ export function mediaThumbnailUrl(objectId: string, mediaId: string): string {
   return `${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaId}/thumbnail`
 }
 
+async function extractErrorMessage(res: Response): Promise<string> {
+  try {
+    const payload = await res.json().catch(() => null) as { detail?: string } | null
+    if (payload?.detail) return payload.detail
+  } catch {
+    // ignore JSON parse error
+  }
+  return res.statusText || `${res.status} ${res.status === 404 ? 'Not Found' : 'Error'}`
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await portalFetch(path)
-  if (!res.ok) throw new Error(res.statusText)
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
   return res.json()
 }
 
@@ -84,8 +94,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    const payload = await res.json().catch(() => null) as { detail?: string } | null
-    throw new Error(payload?.detail ?? res.statusText)
+    throw new Error(await extractErrorMessage(res))
   }
   return res.json()
 }
@@ -205,6 +214,7 @@ export interface PortalFieldDefinition {
   field_type: string
   is_repeatable: boolean
   is_searchable: boolean
+  is_facet: boolean
   parent_id: string | null
   settings: Record<string, unknown>
   show_in_detail: boolean

@@ -42,6 +42,7 @@ _DEFAULTS = {
         "entity": [],
         "place": [],
         "occurrence": [],
+        "procedure": [],
         "collection": [],
     },
     "subtitle_fields": {},
@@ -81,7 +82,9 @@ class PortalConfigUpdate(BaseModel):
     featured_object_ids: list[str] | None = None
     facet_fields: dict[str, list[str]] | None = None
     subtitle_fields: dict[str, list[str]] | None = None
-    browse_enabled_types: list[Literal["object", "entity", "place", "occurrence", "collection"]] | None = None
+    browse_enabled_types: (
+        list[Literal["object", "entity", "place", "occurrence", "collection"]] | None
+    ) = None
     accent_color: str | None = None
     logo_url: str | None = None
     placeholder_image_url: str | None = None
@@ -117,7 +120,14 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
             FieldDefinition.is_deleted.is_(False),
         )
     )
-    facet_fields: dict[str, list[str]] = {"object": [], "entity": [], "place": [], "occurrence": [], "collection": []}
+    facet_fields: dict[str, list[str]] = {
+        "object": [],
+        "entity": [],
+        "place": [],
+        "occurrence": [],
+        "procedure": [],
+        "collection": [],
+    }
     for row in facet_result.all():
         facet_fields.setdefault(row.target_type, []).append(row.name)
     # Direct facets are derived from the schema. Inherited facets deliberately
@@ -140,9 +150,13 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
     }
     result = PortalConfigRead.model_validate(values)
     result.facet_fields = facet_fields
-    lang_config = (await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))).scalar_one_or_none()
+    lang_config = (
+        await db.execute(select(AdminConfig).where(AdminConfig.key == "default"))
+    ).scalar_one_or_none()
     result.supported_languages = (
-        lang_config.supported_languages if lang_config and lang_config.supported_languages else ["de", "en"]
+        lang_config.supported_languages
+        if lang_config and lang_config.supported_languages
+        else ["de", "en"]
     )
     return result
 
@@ -155,12 +169,12 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
 )
 async def update_portal_config(
     data: PortalConfigUpdate, db: DBDep, _: User = require_role("admin")
-) -> PortalConfig:
+) -> PortalConfigRead:
     config = await _get_or_create(db)
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(config, field, value)
     await db.flush()
-    return config
+    return await get_portal_config(db)
 
 
 @router.post(
@@ -175,7 +189,9 @@ async def update_portal_config(
 )
 async def upload_logo(file: UploadFile, db: DBDep, _: User = require_role("admin")) -> PortalConfig:
     if file.content_type not in _LOGO_ALLOWED:
-        raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
+        raise HTTPException(
+            status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}"
+        )
 
     logo_dir = Path(settings.media_root) / "logos"
     logo_dir.mkdir(parents=True, exist_ok=True)

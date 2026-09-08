@@ -15,6 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from katalon.integrations.metadata_format import ExportProfileCapabilities
+
 # ---------------------------------------------------------------------------
 # Shared
 # ---------------------------------------------------------------------------
@@ -83,6 +85,13 @@ class MetadataMappingUpsert(BaseModel):
     settings: dict[str, Any] = {}
     sort_order: int = 0
     is_enabled: bool = True
+
+
+class FormatOut(BaseModel):
+    key: str
+    label: str
+    targets: list[str]
+    capabilities: ExportProfileCapabilities | None = None
 
 
 class ImportMappingCreate(BaseModel):

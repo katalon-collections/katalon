@@ -110,7 +110,7 @@ export function PlaceDetailPage() {
   if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !place) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? t('error.placeNotFound')}</div>
+      <div style={{ color: '#dc2626' }}>{error || t('error.placeNotFound')}</div>
     </div>
   )
 
@@ -155,6 +155,7 @@ export function PlaceDetailPage() {
         fieldDefs={detailFieldDefs}
         metadata={m}
         locale={locale}
+        recordType="place"
         sidebarPosition={portalConfig.detail_sidebar_position}
         media={hasCoords ? <StaticMap lat={place.lat!} lon={place.lon!} name={title} /> : undefined}
         mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}

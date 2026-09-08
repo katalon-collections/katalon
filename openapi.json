@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.20.1"
+    "version": "1.21.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -12029,7 +12029,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/katalon__api__v1__metadata_mappings__FormatOut"
+                    "$ref": "#/components/schemas/katalon__core__schemas__FormatOut"
                   },
                   "type": "array",
                   "title": "Response Metadata Mappings List Formats Get V1 Metadata Mappings Formats"
@@ -12590,6 +12590,98 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-profiles": {
+      "get": {
+        "tags": [
+          "export-profiles"
+        ],
+        "summary": "List all export capability profiles across registered formats",
+        "operationId": "export_profiles_list_export_profiles_get_v1_export_profiles",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExportProfileCapabilities"
+                  },
+                  "type": "array",
+                  "title": "Response Export Profiles List Export Profiles Get V1 Export Profiles"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/export-profiles/{format_key}/{profile_id}": {
+      "get": {
+        "tags": [
+          "export-profiles"
+        ],
+        "summary": "Get export capability profile by format_key and profile_id",
+        "operationId": "export_profiles_get_export_profile_get_v1_export_profiles__format_key___profile_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "format_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Format Key"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportProfileCapabilities"
+                }
               }
             }
           },
@@ -17674,6 +17766,121 @@
         ],
         "title": "EntityRead"
       },
+      "ExportProfileCapabilities": {
+        "properties": {
+          "format_key": {
+            "type": "string",
+            "title": "Format Key"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "type": "string",
+            "title": "Profile Version"
+          },
+          "label": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ExportTargetCapability"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "validators": {
+            "items": {
+              "$ref": "#/components/schemas/ValidatorDependency"
+            },
+            "type": "array",
+            "title": "Validators"
+          },
+          "loss_boundaries": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "type": "array",
+            "title": "Loss Boundaries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format_key",
+          "profile_id",
+          "profile_version",
+          "label",
+          "targets"
+        ],
+        "title": "ExportProfileCapabilities"
+      },
+      "ExportTargetCapability": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "label": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "help": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "source_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/SourceKind"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Source Kinds"
+          },
+          "accepted_field_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Accepted Field Types"
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "one",
+              "many"
+            ],
+            "title": "Cardinality",
+            "default": "many"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "editor_kind": {
+            "type": "string",
+            "title": "Editor Kind",
+            "default": "default"
+          },
+          "settings_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings Schema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "group",
+          "label",
+          "help"
+        ],
+        "title": "ExportTargetCapability"
+      },
       "FacetBucket": {
         "properties": {
           "value": {
@@ -18467,6 +18674,24 @@
           "types"
         ],
         "title": "IndexHealthResponse"
+      },
+      "LocalizedText": {
+        "properties": {
+          "de": {
+            "type": "string",
+            "title": "De"
+          },
+          "en": {
+            "type": "string",
+            "title": "En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "de",
+          "en"
+        ],
+        "title": "LocalizedText"
       },
       "MappingEntry": {
         "properties": {
@@ -20419,6 +20644,10 @@
             "type": "boolean",
             "title": "Is Searchable"
           },
+          "is_facet": {
+            "type": "boolean",
+            "title": "Is Facet"
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -20456,6 +20685,7 @@
           "field_type",
           "is_repeatable",
           "is_searchable",
+          "is_facet",
           "parent_id",
           "settings",
           "show_in_detail",
@@ -22099,6 +22329,17 @@
         ],
         "title": "SnapshotRead"
       },
+      "SourceKind": {
+        "type": "string",
+        "enum": [
+          "field",
+          "relation",
+          "record",
+          "constant",
+          "media"
+        ],
+        "title": "SourceKind"
+      },
       "SourceOut": {
         "properties": {
           "id": {
@@ -22749,6 +22990,35 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValidatorDependency": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ValidatorDependency"
       },
       "VocabularyCreate": {
         "properties": {
@@ -23704,7 +23974,7 @@
         ],
         "title": "FormatOut"
       },
-      "katalon__api__v1__metadata_mappings__FormatOut": {
+      "katalon__core__schemas__FormatOut": {
         "properties": {
           "key": {
             "type": "string",
@@ -23720,6 +23990,16 @@
             },
             "type": "array",
             "title": "Targets"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportProfileCapabilities"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

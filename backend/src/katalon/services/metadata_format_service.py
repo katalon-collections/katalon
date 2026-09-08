@@ -8,7 +8,7 @@ import logging
 
 from katalon.integrations.jsonld_format import JsonLdFormat
 from katalon.integrations.lido_format import LidoFormat
-from katalon.integrations.metadata_format import MetadataFormat
+from katalon.integrations.metadata_format import ExportProfileCapabilities, MetadataFormat
 from katalon.integrations.mets_mods_format import MetsModsFormat
 from katalon.integrations.oai_dc_format import OaiDcFormat
 
@@ -89,3 +89,18 @@ async def get_format(format_key: str) -> MetadataFormat | None:
 async def list_formats() -> list[MetadataFormat]:
     registry = await _load_registry()
     return list(registry.values())
+
+
+async def list_profiles() -> list[ExportProfileCapabilities]:
+    formats = await list_formats()
+    return [fmt.capabilities() for fmt in formats]
+
+
+async def get_profile(format_key: str, profile_id: str) -> ExportProfileCapabilities | None:
+    fmt = await get_format(format_key)
+    if fmt is None:
+        return None
+    caps = fmt.capabilities()
+    if caps.profile_id == profile_id or profile_id == "default":
+        return caps
+    return None

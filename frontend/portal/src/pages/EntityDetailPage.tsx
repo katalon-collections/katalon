@@ -83,7 +83,7 @@ export function EntityDetailPage() {
   if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
   if (error || !entity) return (
     <div className="container page">
-      <div style={{ color: '#dc2626' }}>{error ?? t('error.entityNotFound')}</div>
+      <div style={{ color: '#dc2626' }}>{error || t('error.entityNotFound')}</div>
     </div>
   )
 
@@ -129,6 +129,7 @@ export function EntityDetailPage() {
         fieldDefs={detailFieldDefs}
         metadata={m}
         locale={locale}
+        recordType="entity"
         sidebarPosition={portalConfig.detail_sidebar_position}
         mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={entity.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (

@@ -161,6 +161,41 @@ export interface MetadataMapping {
   created_at: string
   updated_at: string
 }
+export type SourceKind = 'field' | 'relation' | 'record' | 'constant' | 'media'
+
+export interface LocalizedText {
+  de: string
+  en: string
+}
+
+export interface ExportTargetCapability {
+  key: string
+  group: string
+  label: LocalizedText
+  help: LocalizedText
+  source_kinds: SourceKind[]
+  accepted_field_types: string[]
+  cardinality: 'one' | 'many'
+  required: boolean
+  editor_kind: string
+  settings_schema: Record<string, unknown>
+}
+
+export interface ValidatorDependency {
+  name: string
+  version?: string | null
+  available: boolean
+}
+
+export interface ExportProfileCapabilities {
+  format_key: string
+  profile_id: string
+  profile_version: string
+  label: LocalizedText
+  targets: ExportTargetCapability[]
+  validators: ValidatorDependency[]
+  loss_boundaries: LocalizedText[]
+}
 
 export interface Vocabulary {
   id: string

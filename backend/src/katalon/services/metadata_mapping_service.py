@@ -4,18 +4,17 @@
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import FieldDefinition, MetadataMapping
+from katalon.integrations.metadata_format import CompiledMappingSet, MappingSpec, SourceKind
 
 OAI_DC_FORMAT = "oai_dc"
 
-MappingIndex = dict[str, dict[str, list[str]]]
-
+MappingIndex = dict[str, CompiledMappingSet]
 
 async def validate_mapping_target(format_key: str, target_path: str) -> None:
     from katalon.services import metadata_format_service
@@ -90,10 +89,30 @@ async def get_mapping_index(db: AsyncSession, format_key: str) -> MappingIndex:
             FieldDefinition.sort_order,
         )
     )
-    index: MappingIndex = defaultdict(lambda: defaultdict(list[Any]))
+    sets: dict[str, CompiledMappingSet] = {}
     for mapping, field in result.all():
-        index[field.target_type][field.name].append(mapping.target_path)
-    return {record_type: dict(fields) for record_type, fields in index.items()}
+        record_type = field.target_type
+        if record_type not in sets:
+            sets[record_type] = CompiledMappingSet(
+                format_key=format_key,
+                record_type=record_type,
+                rules=[],
+            )
+        rule = MappingSpec(
+            rule_key=mapping.id,
+            source_kind=SourceKind.FIELD,
+            source_config={
+                "field_definition_id": str(field.id),
+                "field_name": field.name,
+                "field_type": field.field_type,
+            },
+            target_key=mapping.target_path,
+            settings=dict(mapping.settings or {}),
+            sort_order=mapping.sort_order,
+            is_enabled=mapping.is_enabled,
+        )
+        sets[record_type].rules.append(rule)
+    return sets
 
 
 def extract_values(src: dict[str, Any], field_name: str) -> list[str]:

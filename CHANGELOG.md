@@ -4,6 +4,14 @@ All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
 
+## [1.21.0] - 2026-09-08
+
+### Added
+- Portal / Detailseiten: Metadatenfelder, die im Schema als Facette (`is_facet`) markiert sind, werden auf den Objekt-, Personen-, Orts-, Werk- und Sammlungs-Detailseiten als klickbare Links dargestellt. Ein Klick führt zur Suche, gefiltert auf denselben Wert und Datensatztyp (`meta_<feld>=<wert>` bzw. bei Zahlenfeldern `range_<feld>_from/_to`). Betrifft `DetailPageLayout.tsx` (Objekt/Person/Ort/Werk) und den manuellen Feld-Loop in `CollectionDetailPage.tsx`; Backend liefert dafür `is_facet` neu über `GET /portal/v1/schema/{target_type}`.
+
+### Fixed
+- Admin-UI / Einstellungen: Das Speichern von Facetten unter „Einstellungen → Facetten“ synchronisiert direkte Schema-Facetten (`is_facet`) und geerbte Facetten nun zuverlässig mit dem Backend. `PUT /v1/portal/config` liefert die vollständig dynamisch aufgelöste Konfiguration zurück, und die UI serialisiert Schema- und Portal-Config-Updates, sodass aktive Facetten nach dem Speichern, Tab-Wechseln und Neuladen stabil erhalten bleiben.
+
 ## [1.20.1] - 2026-09-07
 
 ### Fixed

@@ -25,7 +25,9 @@ def _resolve_env_files() -> tuple[str, ...]:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=_resolve_env_files(), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_resolve_env_files(), env_file_encoding="utf-8", extra="ignore"
+    )
 
     database_url: str = "postgresql+asyncpg://katalon:katalon@localhost:5432/katalon"
     redis_url: str = "redis://localhost:6379/0"
@@ -55,6 +57,7 @@ class Settings(BaseSettings):
 
     oai_admin_email: str = "admin@katalon.dev"
     es_index_name: str = "katalon_records"
+    es_reindex_batch_size: int = 500
 
     geonames_username: str = "demo"
     wikidata_user_agent: str = ""
@@ -153,13 +156,14 @@ class Settings(BaseSettings):
         if not self.smtp_enabled:
             return self
         if not self.smtp_host or not self.smtp_from or not self.katalon_base_url:
-            raise ValueError("SMTP_HOST, SMTP_FROM and KATALON_BASE_URL are required when SMTP_ENABLED=true")
+            raise ValueError(
+                "SMTP_HOST, SMTP_FROM and KATALON_BASE_URL are required when SMTP_ENABLED=true"
+            )
         if bool(self.smtp_username) != bool(self.smtp_password):
             raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be set together")
         if self.smtp_starttls == self.smtp_ssl_tls:
             raise ValueError("Exactly one of SMTP_STARTTLS and SMTP_SSL_TLS must be true")
         return self
-
 
 
 def _build_settings() -> Settings:

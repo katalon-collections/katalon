@@ -131,6 +131,37 @@ export function renderFieldValue(value: unknown, locale?: string, fieldType?: st
   return s || null
 }
 
+/** Extracts the raw keyword-facet string for a single metadata item, mirroring the
+ *  backend's `_extract_display_value`/`_extract_facet_value` (search_service.py): dict
+ *  values use `label` then `value`; booleans stringify Python-style ("True"/"False");
+ *  everything else is the plain string form. Returns null for items with nothing to facet. */
+function facetRawValue(item: unknown): string | null {
+  if (item != null && typeof item === 'object' && !Array.isArray(item)) {
+    const o = item as Record<string, unknown>
+    if (typeof o.label === 'string' && o.label) return o.label
+    if (typeof o.value === 'string' && o.value) return o.value
+    return null
+  }
+  if (typeof item === 'boolean') return item ? 'True' : 'False'
+  if (item != null) return String(item)
+  return null
+}
+
+/** Pairs each metadata item with its facet-filter raw value (matching the `facet_<field>`
+ *  term indexed in Elasticsearch) and its human-readable display text, so detail pages can
+ *  render a click-to-filter link per value for fields marked `is_facet`. */
+export function facetItems(value: unknown, locale?: string, fieldType?: string): { display: string; raw: string }[] {
+  const entries = Array.isArray(value) ? value : [value]
+  return entries
+    .map(item => {
+      const raw = facetRawValue(item)
+      if (raw === null) return null
+      const display = renderFieldValue(item, locale, fieldType) ?? raw
+      return { display, raw }
+    })
+    .filter((entry): entry is { display: string; raw: string } => entry !== null)
+}
+
 /** Pick a human-readable display title from record metadata.
  *  Tries common label fields in order, resolves repeatable/translatable
  *  values via renderFieldValue, and falls back to id/idno when nothing matches.

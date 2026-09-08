@@ -60,11 +60,13 @@ export function GeoNamesMap({ value }: { value: AuthorityEntry }) {
   )
 }
 
-export function AuthorityInput({ source, value, onChange, disabled }: {
+export function AuthorityInput({ source, value, onChange, disabled, autoFocus, onCancel }: {
   source: string
   value: AuthorityEntry | null
   onChange: (v: AuthorityEntry | null) => void
   disabled?: boolean
+  autoFocus?: boolean
+  onCancel?: () => void
 }) {
   const { t } = useTranslation('authorityInput')
   const [q, setQ] = useState('')
@@ -77,6 +79,12 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [autoFocus])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -130,6 +138,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       setOpen(false)
+      onCancel?.()
       return
     }
     if (!results.length || !['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return
@@ -188,6 +197,7 @@ export function AuthorityInput({ source, value, onChange, disabled }: {
         onKeyDown={handleKeyDown}
         placeholder={t('searchPlaceholder', { source: source.toUpperCase() })}
         disabled={disabled}
+        autoFocus={autoFocus}
         role="combobox"
         aria-label={t('searchAriaLabel', { source: source.toUpperCase() })}
         aria-autocomplete="list"
