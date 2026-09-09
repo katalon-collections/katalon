@@ -533,6 +533,24 @@ class Relation(Base):
     )
 
 
+class EditPresence(Base):
+    """Ephemeral 'currently editing' marker, kept alive by client heartbeats."""
+
+    __tablename__ = "edit_presence"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    resource_type: Mapped[str] = mapped_column(String(32))
+    resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    session_id: Mapped[str] = mapped_column(String(64))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    __table_args__ = (
+        Index("ix_edit_presence_resource", "resource_type", "resource_id"),
+        UniqueConstraint("resource_type", "resource_id", "session_id", name="uq_edit_presence_session"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Media
 # ---------------------------------------------------------------------------
@@ -789,6 +807,18 @@ class RolePermission(Base):
     )
 
 
+class FeaturePermission(Base):
+    __tablename__ = "feature_permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    role: Mapped[str] = mapped_column(String(32), index=True)
+    feature: Mapped[str] = mapped_column(String(64))
+
+    __table_args__ = (
+        UniqueConstraint("role", "feature", name="uq_feature_permission"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # API Keys
 # ---------------------------------------------------------------------------
@@ -840,6 +870,8 @@ class AdminConfig(Base):
     ai_monthly_global_token_limit: Mapped[int] = mapped_column(Integer, default=1000000)
     media_default_license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     media_default_rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # "warning": editing anyway is allowed; "blocking": save is rejected while another user's presence is active.
+    presence_lock_mode: Mapped[str] = mapped_column(String(16), default="warning", server_default="warning")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
@@ -941,3 +973,30 @@ class WorkingSetItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     working_set: Mapped[WorkingSet] = relationship("WorkingSet", back_populates="items")
+
+
+class ResourceLock(Base):
+    """Persistent exclusive lock — owner may edit, others read-only.
+
+    Created manually by the user (unlike EditPresence which is ephemeral).
+    Auto-expires after 7 days. Force Unlock only by admin/superuser.
+    """
+
+    __tablename__ = "resource_locks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    resource_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    locked_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    locked_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    reason: Mapped[str] = mapped_column(String(256), default="")
+
+    locked_by_user: Mapped[User | None] = relationship("User", foreign_keys=[locked_by])
+
+    __table_args__ = (
+        UniqueConstraint("resource_type", "resource_id", name="uq_resource_lock"),
+        Index("ix_resource_locks_expires", "expires_at"),
+    )

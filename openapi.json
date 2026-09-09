@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.23.0"
+    "version": "1.25.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -1115,6 +1115,103 @@
                     "$ref": "#/components/schemas/RolePermissionRead"
                   },
                   "title": "Response Users Update Role Permissions Put V1 Users Permissions  Role "
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/features": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List configured feature permissions",
+        "operationId": "users_list_feature_permissions_get_v1_users_features",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FeaturePermissionRead"
+                  },
+                  "type": "array",
+                  "title": "Response Users List Feature Permissions Get V1 Users Features"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/users/features/{role}": {
+      "put": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Replace the feature permissions for one fixed role",
+        "operationId": "users_update_feature_permissions_put_v1_users_features__role_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeaturePermissionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeaturePermissionRead"
+                  },
+                  "title": "Response Users Update Feature Permissions Put V1 Users Features  Role "
                 }
               }
             }
@@ -10045,6 +10142,502 @@
         }
       }
     },
+    "/v1/presence/{resource_type}/{resource_id}/heartbeat": {
+      "post": {
+        "tags": [
+          "presence"
+        ],
+        "summary": "Send Heartbeat",
+        "operationId": "presence_send_heartbeat_post_v1_presence__resource_type___resource_id__heartbeat",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivePresenceRead"
+                  },
+                  "title": "Response Presence Send Heartbeat Post V1 Presence  Resource Type   Resource Id  Heartbeat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/presence/{resource_type}/{resource_id}": {
+      "delete": {
+        "tags": [
+          "presence"
+        ],
+        "summary": "Release Presence",
+        "operationId": "presence_release_presence_delete_v1_presence__resource_type___resource_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "presence"
+        ],
+        "summary": "List Presence",
+        "operationId": "presence_list_presence_get_v1_presence__resource_type___resource_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivePresenceRead"
+                  },
+                  "title": "Response Presence List Presence Get V1 Presence  Resource Type   Resource Id "
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/presence/batch": {
+      "post": {
+        "tags": [
+          "presence"
+        ],
+        "summary": "List Presence Batch",
+        "operationId": "presence_list_presence_batch_post_v1_presence_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchPresenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "$ref": "#/components/schemas/ActivePresenceRead"
+                    },
+                    "type": "array"
+                  },
+                  "propertyNames": {
+                    "format": "uuid"
+                  },
+                  "type": "object",
+                  "title": "Response Presence List Presence Batch Post V1 Presence Batch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/locks": {
+      "post": {
+        "tags": [
+          "locks"
+        ],
+        "summary": "Set a manual lock on a record",
+        "operationId": "locks_create_lock_post_v1_locks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LockCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LockRead"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Resource is already locked by another user"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/locks/{resource_type}/{resource_id}": {
+      "delete": {
+        "tags": [
+          "locks"
+        ],
+        "summary": "Release own lock on a record",
+        "operationId": "locks_delete_lock_delete_v1_locks__resource_type___resource_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Not the lock owner"
+          },
+          "404": {
+            "description": "No lock found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "locks"
+        ],
+        "summary": "Get lock info for a record",
+        "operationId": "locks_get_lock_endpoint_get_v1_locks__resource_type___resource_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LockRead"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Locks Get Lock Endpoint Get V1 Locks  Resource Type   Resource Id "
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locks/{resource_type}/{resource_id}/force-unlock": {
+      "post": {
+        "tags": [
+          "locks"
+        ],
+        "summary": "Force-unlock a record (admin/superuser only)",
+        "operationId": "locks_force_unlock_endpoint_post_v1_locks__resource_type___resource_id__force_unlock",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "No lock found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/objects/{object_id}/media": {
       "get": {
         "tags": [
@@ -16712,6 +17305,31 @@
         ],
         "title": "AIUsageRead"
       },
+      "ActivePresenceRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "user_email": {
+            "type": "string",
+            "title": "User Email"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "user_email",
+          "since"
+        ],
+        "title": "ActivePresenceRead"
+      },
       "AdminConfigRead": {
         "properties": {
           "idno_schemas": {
@@ -16812,6 +17430,10 @@
             ],
             "title": "Media Default Rights Holder"
           },
+          "presence_lock_mode": {
+            "type": "string",
+            "title": "Presence Lock Mode"
+          },
           "pid_providers": {
             "items": {
               "type": "string"
@@ -16843,6 +17465,7 @@
           "ai_monthly_global_token_limit",
           "media_default_license_uri",
           "media_default_rights_holder",
+          "presence_lock_mode",
           "pid_providers",
           "ai_secret",
           "ai_usage"
@@ -17031,6 +17654,17 @@
               }
             ],
             "title": "Media Default Rights Holder"
+          },
+          "presence_lock_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Lock Mode"
           }
         },
         "type": "object",
@@ -17816,6 +18450,28 @@
           "field"
         ],
         "title": "BatchClearField"
+      },
+      "BatchPresenceRequest": {
+        "properties": {
+          "resource_type": {
+            "type": "string",
+            "title": "Resource Type"
+          },
+          "resource_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Resource Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource_type",
+          "resource_ids"
+        ],
+        "title": "BatchPresenceRequest"
       },
       "BatchRemoveRelation": {
         "properties": {
@@ -19285,6 +19941,67 @@
         ],
         "title": "FacetBucket"
       },
+      "FeaturePermissionRead": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "cataloger",
+              "viewer"
+            ],
+            "title": "Role"
+          },
+          "feature": {
+            "type": "string",
+            "enum": [
+              "export",
+              "sparql",
+              "import",
+              "working_sets",
+              "audit_log",
+              "vocab_terms",
+              "vocab_structure",
+              "schema",
+              "subtypes",
+              "form_variants",
+              "storage_locations",
+              "pages",
+              "oai_sets",
+              "banners",
+              "manual_lock",
+              "force_unlock",
+              "users",
+              "settings",
+              "api_keys"
+            ],
+            "title": "Feature"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "feature"
+        ],
+        "title": "FeaturePermissionRead"
+      },
+      "FeaturePermissionUpdate": {
+        "properties": {
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/FeaturePermissionRead"
+            },
+            "type": "array",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "features"
+        ],
+        "title": "FeaturePermissionUpdate"
+      },
       "FeedbackPayload": {
         "properties": {
           "message": {
@@ -19809,6 +20526,19 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HeartbeatRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "title": "HeartbeatRequest"
+      },
       "HitOut": {
         "properties": {
           "source": {
@@ -20170,6 +20900,95 @@
           "en"
         ],
         "title": "LocalizedText"
+      },
+      "LockCreate": {
+        "properties": {
+          "resource_type": {
+            "type": "string",
+            "title": "Resource Type",
+            "description": "e.g. object, entity, place, …"
+          },
+          "resource_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Resource Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Reason",
+            "default": ""
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource_type",
+          "resource_id"
+        ],
+        "title": "LockCreate"
+      },
+      "LockRead": {
+        "properties": {
+          "resource_type": {
+            "type": "string",
+            "title": "Resource Type"
+          },
+          "resource_id": {
+            "type": "string",
+            "title": "Resource Id"
+          },
+          "locked_by": {
+            "type": "string",
+            "title": "Locked By"
+          },
+          "locked_by_email": {
+            "type": "string",
+            "title": "Locked By Email"
+          },
+          "locked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Locked At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource_type",
+          "resource_id",
+          "locked_by",
+          "locked_by_email",
+          "locked_at"
+        ],
+        "title": "LockRead"
       },
       "MappingDiagnostic": {
         "properties": {
@@ -23235,7 +24054,10 @@
               "entity",
               "place",
               "occurrence",
-              "procedure"
+              "procedure",
+              "collection",
+              "storage_location",
+              "vocabulary_term"
             ],
             "title": "Record Type"
           },

@@ -462,9 +462,20 @@ export interface UserRead {
 
 export interface RolePermission {
   role: 'admin' | 'editor' | 'cataloger' | 'viewer'
-  record_type: RecordType
+  record_type: RecordType | 'vocabulary_term'
   action: 'read' | 'create' | 'update' | 'delete'
 }
+
+export interface FeaturePermission {
+  role: 'editor' | 'cataloger' | 'viewer'
+  feature: string
+}
+
+export type FeatureId =
+  | 'export' | 'sparql' | 'import' | 'working_sets' | 'audit_log'
+  | 'vocab_terms' | 'vocab_structure' | 'schema' | 'subtypes' | 'form_variants'
+  | 'storage_locations' | 'pages' | 'oai_sets' | 'banners'
+  | 'manual_lock'
 
 export interface ApiKey {
   id: string

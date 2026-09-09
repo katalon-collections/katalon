@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select, text
 
-from katalon.core.dependencies import CurrentUser, DBDep, require_role
+from katalon.core.dependencies import CurrentUser, DBDep, require_feature, require_role
 from katalon.core.models import Vocabulary, VocabularyTerm
 from katalon.core.schemas import (
     VocabularyCreate,
@@ -264,7 +264,7 @@ async def get_ancestors(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> l
     "/{vocab_id}/terms",
     response_model=VocabularyTermRead,
     status_code=201,
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Create a new vocabulary term",
     responses={
         404: {"description": "Vocabulary not found"},
@@ -293,7 +293,7 @@ async def create_term(
 @router.put(
     "/terms/{term_id}",
     response_model=VocabularyTermRead,
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Update a vocabulary term",
     responses={
         404: {"description": "Term not found"},
@@ -329,7 +329,7 @@ async def update_term(
 @router.delete(
     "/terms/{term_id}",
     status_code=204,
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Delete a vocabulary term",
     responses={
         404: {"description": "Term not found"},
@@ -349,7 +349,7 @@ async def delete_term(term_id: uuid.UUID, db: DBDep) -> None:
     "/terms/{term_id}/duplicate",
     response_model=VocabularyTermRead,
     status_code=201,
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Duplicate a vocabulary term",
     responses={
         403: {"description": "Insufficient permissions"},
@@ -411,7 +411,7 @@ async def duplicate_term(term_id: uuid.UUID, db: DBDep) -> VocabularyTerm:
 
 @router.post(
     "/{vocab_id}/import",
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Import vocabulary terms from CSV/TSV or JSON with optional dry-run",
     responses={
         404: {"description": "Vocabulary not found"},
@@ -483,7 +483,7 @@ async def import_terms(
 
 @router.post(
     "/{vocab_id}/import-skos",
-    dependencies=[require_role("admin")],
+    dependencies=[require_feature("vocab_terms")],
     summary="Import vocabulary terms from SKOS (Turtle, RDF/XML, JSON-LD, etc.) with optional dry-run",
     responses={
         404: {"description": "Vocabulary not found"},

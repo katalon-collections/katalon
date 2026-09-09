@@ -10,6 +10,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from sqlalchemy import Text, cast, func, select
 
 from katalon.core.concurrency import check_version, flush_record
+from katalon.services.presence_service import enforce_not_blocked
+from katalon.services.lock_service import enforce_not_locked
 from katalon.core.dependencies import DBDep, require_record_permission
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, Object, Procedure, User
@@ -367,6 +369,8 @@ async def update_procedure(
     if not proc:
         raise HTTPException(status_code=404, detail="Vorgang nicht gefunden")
     check_version(proc.version, if_match)
+    await enforce_not_blocked(db, "procedure", proc.id, current_user)
+    await enforce_not_locked(db, "procedure", proc.id, current_user)
     procedure_type = data.procedure_type.strip()
     metadata = await prepare_metadata(
         db, "procedure", data.metadata_, procedure_type or None, existing=proc.metadata_,

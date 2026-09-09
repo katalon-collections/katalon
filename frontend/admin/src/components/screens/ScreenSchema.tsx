@@ -51,6 +51,7 @@ type FieldFormState = {
   is_required: boolean
   is_repeatable: boolean
   is_translatable: boolean
+  max_count: string
   sort_order: number
   validation_regex: string
   authority_source: string
@@ -80,7 +81,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -93,6 +94,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     is_required: f.is_required,
     is_repeatable: f.is_repeatable,
     is_translatable: f.is_translatable ?? false,
+    max_count: f.settings?.max_count != null ? String(f.settings.max_count) : '',
     sort_order: f.sort_order,
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
@@ -388,6 +390,15 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <input type="checkbox" className="ck" checked={form.is_repeatable} onChange={e => set('is_repeatable', e.target.checked)} />
               <span style={{ fontSize: 13 }}>{t('fieldDetail.repeatable')}</span>
             </label>
+            {form.is_repeatable && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>{t('fieldDetail.maxCount')}</span>
+                <input type="number" min={1} className="fld" style={{ width: 70 }}
+                  value={form.max_count}
+                  onChange={e => set('max_count', e.target.value)}
+                  placeholder="∞" />
+              </label>
+            )}
             {!isVocabularyTerm && (form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" className="ck" checked={form.is_translatable} onChange={e => set('is_translatable', e.target.checked)} />
@@ -1175,6 +1186,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
         } : {}),
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
+        ...(form.is_repeatable && form.max_count.trim() ? { max_count: parseInt(form.max_count, 10) } : {}),
         ...(form.is_locked ? { is_locked: true } : {}),
         ...(form.ai_enabled ? {
           ai_config: {

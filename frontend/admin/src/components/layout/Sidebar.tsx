@@ -17,6 +17,7 @@ interface NavItem {
   ct?: string
   routes?: string[]
   roles?: string[]
+  feature?: string
 }
 
 const NAV: NavItem[] = [
@@ -26,21 +27,21 @@ const NAV: NavItem[] = [
   { id: 'entities-list',    labelKey: 'sidebar.nav.entitiesList',     Icon: User,      routes: ['entities-list', 'entities-form'] },
   { id: 'places-list',      labelKey: 'sidebar.nav.placesList',       Icon: MapPin,    routes: ['places-list', 'places-form'] },
   { id: 'occurrences-list', labelKey: 'sidebar.nav.occurrencesList',  Icon: Lightning, routes: ['occurrences-list', 'occurrences-form'] },
-  { id: 'procedures-list',  labelKey: 'sidebar.nav.proceduresList',   Icon: ListTree,  routes: ['procedures-list', 'procedures-form'] },
-  { id: 'import',           labelKey: 'sidebar.nav.import',           Icon: Upload },
-  { id: 'audit',            labelKey: 'sidebar.nav.audit',            Icon: History },
-  { id: 'working-sets',     labelKey: 'sidebar.nav.workingSets',      Icon: Bookmark,  routes: ['working-sets'] },
+  { id: 'procedures-list',  labelKey: 'sidebar.nav.proceduresList',   Icon: ListTree,  routes: ['procedures-list', 'procedures-form'], roles: ['admin', 'superuser', 'editor', 'cataloger'] },
+  { id: 'import',           labelKey: 'sidebar.nav.import',           Icon: Upload, feature: 'import' },
+  { id: 'audit',            labelKey: 'sidebar.nav.audit',            Icon: History, feature: 'audit_log' },
+  { id: 'working-sets',     labelKey: 'sidebar.nav.workingSets',      Icon: Bookmark,  routes: ['working-sets'], feature: 'working_sets' },
   { gKey: 'sidebar.groups.config', roles: ['admin', 'superuser'] },
   { id: 'subtypes', labelKey: 'sidebar.nav.subtypes',       Icon: ListTree, roles: ['admin', 'superuser'] },
-  { id: 'storage-locations', labelKey: 'sidebar.nav.storageLocations', Icon: Box, roles: ['admin', 'superuser'] },
+  { id: 'storage-locations', labelKey: 'sidebar.nav.storageLocations', Icon: Box, feature: 'storage_locations' },
   { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  ct: '6', roles: ['admin', 'superuser'] },
   { id: 'form-variants', labelKey: 'sidebar.nav.formVariants', Icon: Layers, roles: ['admin', 'superuser'] },
-  { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     ct: '4', roles: ['admin', 'superuser'] },
-  { id: 'pages',     labelKey: 'sidebar.nav.pages',         Icon: File,  roles: ['admin', 'superuser'] },
-  { id: 'oai-sets',  labelKey: 'sidebar.nav.oaiSets',       Icon: Globe, roles: ['admin', 'superuser'] },
-  { id: 'banners',   labelKey: 'sidebar.nav.banners',       Icon: Bell,  roles: ['admin', 'superuser'] },
-  { id: 'export',    labelKey: 'sidebar.nav.export',        Icon: Download, roles: ['admin', 'superuser'] },
-  { id: 'sparql',    labelKey: 'sidebar.nav.sparql',        Icon: Code, roles: ['admin', 'superuser'] },
+  { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     ct: '4', feature: 'vocab_terms' },
+  { id: 'pages',     labelKey: 'sidebar.nav.pages',         Icon: File,  feature: 'pages' },
+  { id: 'oai-sets',  labelKey: 'sidebar.nav.oaiSets',       Icon: Globe, feature: 'oai_sets' },
+  { id: 'banners',   labelKey: 'sidebar.nav.banners',       Icon: Bell,  feature: 'banners' },
+  { id: 'export',    labelKey: 'sidebar.nav.export',        Icon: Download, feature: 'export' },
+  { id: 'sparql',    labelKey: 'sidebar.nav.sparql',        Icon: Code, feature: 'sparql' },
   { gKey: 'sidebar.groups.admin', roles: ['admin', 'superuser'] },
   { id: 'users',  labelKey: 'sidebar.nav.users',         Icon: Users,   roles: ['admin', 'superuser'] },
   { id: 'settings', labelKey: 'sidebar.nav.settings',    Icon: Gear, roles: ['admin', 'superuser'] },
@@ -73,8 +74,9 @@ export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, o
             const visible = !it.roles || it.roles.includes(user?.role ?? '')
             return visible ? <div key={`g${i}`} className="sb-grp">{t(it.gKey)}</div> : null
           }
-          const visible = !it.roles || it.roles.includes(user?.role ?? '')
-          if (!visible) return null
+          const roleOk = !it.roles || it.roles.includes(user?.role ?? '')
+          const featureOk = !it.feature || user?.features?.includes(it.feature)
+          if (!roleOk || !featureOk) return null
           if (it.id === 'sparql' && !sparqlEnabled) return null
           return (
             <button

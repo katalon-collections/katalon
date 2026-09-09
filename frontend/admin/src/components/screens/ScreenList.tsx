@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser, presence } from '../../api/client'
+import type { ActivePresence } from '../../api/client'
 import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
@@ -151,8 +152,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const requestSeqRef = useRef(0)
   const selectAllRef = useRef<HTMLInputElement>(null)
   const user = getTokenUser()
-  const canEdit = user?.role !== 'viewer'
-  const canDelete = user?.role !== 'viewer'
+  const canEdit = user?.features?.includes('import') || user?.role === 'admin' || user?.role === 'superuser'
+  const canDelete = user?.role === 'editor' || user?.role === 'admin' || user?.role === 'superuser'
 
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
@@ -318,6 +319,12 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     [isCollectionTree, treeItems, primaryKey],
   )
   const items = collectionTree ? collectionTree.list : data.items
+  const [presenceMap, setPresenceMap] = useState<Record<string, ActivePresence[]>>({})
+  useEffect(() => {
+    const ids = items.map(r => r.id)
+    if (ids.length === 0) { setPresenceMap({}); return }
+    presence.batch(recordType, ids).then(setPresenceMap).catch(() => {})
+  }, [items, recordType])
   const showingTree = isCollectionTree && !collectionTree
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const visiblePageCount = Math.min(totalPages, 5)
@@ -533,6 +540,14 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                       </button>
                     ) : (
                       <span className="tt">{getFieldValue(m, primaryKey)}</span>
+                    )}
+                    {presenceMap[rec.id]?.length > 0 && (
+                      <span
+                        title={t('presenceBadgeTitle', { names: presenceMap[rec.id].map(p => p.user_email).join(', ') })}
+                        style={{ marginLeft: 6, fontSize: 11, padding: '1px 6px', borderRadius: 10, background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d' }}
+                      >
+                        {t('presenceBadge')}
+                      </span>
                     )}
                   </td>
                   {extraFields.map(f => (

@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
-from katalon.core.dependencies import DBDep, require_admin
+from katalon.core.dependencies import DBDep, require_feature
 from katalon.core.models import StaticPage, User
 
 _SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -84,7 +84,7 @@ async def list_pages(db: DBDep) -> list[StaticPage]:
     summary="List all static pages including unpublished",
     responses={403: {"description": "Insufficient permissions"}},
 )
-async def list_all_pages(db: DBDep, _: User = require_admin()) -> list[StaticPage]:
+async def list_all_pages(db: DBDep, _: User = require_feature("pages")) -> list[StaticPage]:
     result = await db.execute(select(StaticPage).order_by(StaticPage.sort_order))
     return list(result.scalars().all())
 
@@ -115,7 +115,7 @@ async def get_page(slug: str, db: DBDep) -> StaticPage:
         409: {"description": "Slug already in use"},
     },
 )
-async def create_page(data: PageCreate, db: DBDep, _: User = require_admin()) -> StaticPage:
+async def create_page(data: PageCreate, db: DBDep, _: User = require_feature("pages")) -> StaticPage:
     existing = await db.execute(select(StaticPage).where(StaticPage.slug == data.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail=f"Slug '{data.slug}' bereits vergeben")
@@ -135,7 +135,7 @@ async def create_page(data: PageCreate, db: DBDep, _: User = require_admin()) ->
         409: {"description": "Slug already in use"},
     },
 )
-async def update_page(slug: str, data: PageUpdate, db: DBDep, _: User = require_admin()) -> StaticPage:
+async def update_page(slug: str, data: PageUpdate, db: DBDep, _: User = require_feature("pages")) -> StaticPage:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:
@@ -161,7 +161,7 @@ async def update_page(slug: str, data: PageUpdate, db: DBDep, _: User = require_
         404: {"description": "Page not found"},
     },
 )
-async def delete_page(slug: str, db: DBDep, _: User = require_admin()) -> None:
+async def delete_page(slug: str, db: DBDep, _: User = require_feature("pages")) -> None:
     result = await db.execute(select(StaticPage).where(StaticPage.slug == slug))
     page = result.scalar_one_or_none()
     if not page:

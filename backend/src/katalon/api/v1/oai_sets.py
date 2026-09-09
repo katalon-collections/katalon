@@ -8,8 +8,8 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from katalon.core.dependencies import CurrentUser, DBDep
-from katalon.core.models import OAISet
+from katalon.core.dependencies import CurrentUser, DBDep, require_feature
+from katalon.core.models import OAISet, User
 from katalon.core.schemas import OAISetCreate, OAISetRead
 
 router = APIRouter(prefix="/oai-sets", tags=["oai-pmh"])
@@ -35,9 +35,7 @@ async def list_oai_sets(db: DBDep) -> list[OAISet]:
         400: {"description": "set_spec already taken"},
     },
 )
-async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUser) -> OAISet:
-    if current_user.role not in {"admin", "superuser"}:
-        raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets anlegen.")
+async def create_oai_set(data: OAISetCreate, db: DBDep, current_user: CurrentUser, _: User = require_feature("oai_sets")) -> OAISet:
     existing = await db.execute(select(OAISet).where(OAISet.set_spec == data.set_spec))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail=f"set_spec '{data.set_spec}' bereits vergeben.")
@@ -63,9 +61,8 @@ async def update_oai_set(
     data: OAISetCreate,
     db: DBDep,
     current_user: CurrentUser,
+    _: User = require_feature("oai_sets"),
 ) -> OAISet:
-    if current_user.role not in {"admin", "superuser"}:
-        raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets bearbeiten.")
     result = await db.execute(select(OAISet).where(OAISet.id == set_id))
     oai_set = result.scalar_one_or_none()
     if not oai_set:
@@ -91,9 +88,7 @@ async def update_oai_set(
         404: {"description": "OAI set not found"},
     },
 )
-async def delete_oai_set(set_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
-    if current_user.role not in {"admin", "superuser"}:
-        raise HTTPException(status_code=403, detail="Nur Admins können OAI-Sets löschen.")
+async def delete_oai_set(set_id: uuid.UUID, db: DBDep, current_user: CurrentUser, _: User = require_feature("oai_sets")) -> None:
     result = await db.execute(select(OAISet).where(OAISet.id == set_id))
     oai_set = result.scalar_one_or_none()
     if not oai_set:

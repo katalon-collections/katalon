@@ -85,5 +85,14 @@
     "rebuildSuccess": "Rebuild queued — synchronization is running in the background.",
     "rebuildError": "Failed to trigger rebuild",
     "openBuilder": "Go to SPARQL Query Builder →"
+  },
+  "presenceLock": {
+    "title": "Editing Lock (Presence Lock)",
+    "description": "Controls what happens when a record is already being edited by someone else.",
+    "warningLabel": "Warning",
+    "warningDescription": "other people see a hint but can still edit the record.",
+    "blockingLabel": "Blocking",
+    "blockingDescription": "while the record is open, other people cannot save it.",
+    "saved": "Saved."
   }
 }

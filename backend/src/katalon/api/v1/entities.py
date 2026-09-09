@@ -12,6 +12,8 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
+from katalon.services.presence_service import enforce_not_blocked
+from katalon.services.lock_service import enforce_not_locked
 from katalon.core.dependencies import (
     DBDep,
     OptionalCurrentUser,
@@ -260,6 +262,8 @@ async def update_entity(
     if not entity:
         raise HTTPException(status_code=404, detail="Entität nicht gefunden")
     check_version(entity.version, if_match)
+    await enforce_not_blocked(db, "entity", entity.id, current_user)
+    await enforce_not_locked(db, "entity", entity.id, current_user)
     if not data.idno or not data.idno.strip():
         if data.status == "draft":
             idno = None

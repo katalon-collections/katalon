@@ -60,6 +60,7 @@ class AdminConfigRead(BaseModel):
     ai_monthly_global_token_limit: int
     media_default_license_uri: str | None
     media_default_rights_holder: dict[str, Any] | None
+    presence_lock_mode: str
     pid_providers: list[str]
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
@@ -84,6 +85,14 @@ class AdminConfigUpdate(BaseModel):
     ai_monthly_global_token_limit: int | None = Field(default=None, ge=1)
     media_default_license_uri: str | None = None
     media_default_rights_holder: dict[str, Any] | None = None
+    presence_lock_mode: str | None = None
+
+    @field_validator("presence_lock_mode")
+    @classmethod
+    def _validate_presence_lock_mode(cls, value: str | None) -> str | None:
+        if value is not None and value not in {"warning", "blocking"}:
+            raise ValueError("presence_lock_mode muss 'warning' oder 'blocking' sein.")
+        return value
 
     @field_validator("supported_languages")
     @classmethod
@@ -146,6 +155,7 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         ai_monthly_global_token_limit=config.ai_monthly_global_token_limit,
         media_default_license_uri=config.media_default_license_uri,
         media_default_rights_holder=config.media_default_rights_holder,
+        presence_lock_mode=config.presence_lock_mode,
         pid_providers=list(available_pid_providers()),
         ai_secret=SecretStatus(
             has_key=secret_obj is not None,
@@ -223,6 +233,8 @@ async def update_admin_config(
         config.media_default_license_uri = data.media_default_license_uri.strip() if data.media_default_license_uri else None
     if "media_default_rights_holder" in data.model_fields_set:
         config.media_default_rights_holder = _rights_holder_or_none(data.media_default_rights_holder)
+    if data.presence_lock_mode is not None:
+        config.presence_lock_mode = data.presence_lock_mode
     await db.flush()
     return await _to_read(db, config, current_user.id)
 

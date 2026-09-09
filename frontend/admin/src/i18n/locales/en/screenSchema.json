@@ -62,6 +62,7 @@
     "subtypeAll": "— all subtypes —",
     "required": "Required",
     "repeatable": "Repeatable",
+    "maxCount": "Max. count",
     "translatable": "Multilingual",
     "notTranslatableHint": "This field type is not translatable (text/rich-text only, not repeatable).",
     "authoritySource": "Authority Source",

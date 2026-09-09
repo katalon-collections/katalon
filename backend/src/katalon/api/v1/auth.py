@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
+from katalon.core.dependencies import get_user_features
 from katalon.core.limiter import limiter
 from katalon.core.models import PasswordResetToken, User
 from katalon.core.schemas import (
@@ -55,50 +56,49 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def _create_token(
-    user_id: uuid.UUID, role: str, email: str, token_type: str, expires_delta: timedelta, token_version: int
+    user_id: uuid.UUID, role: str, email: str, token_type: str, expires_delta: timedelta, token_version: int,
+    features: list[str] | None = None,
 ) -> str:
     expire = datetime.now(UTC) + expires_delta
+    payload: dict[str, object] = {
+        "sub": str(user_id), "role": role, "email": email,
+        "typ": token_type, "ver": token_version, "exp": expire,
+    }
+    if features is not None:
+        payload["features"] = features
     return cast(
         str,
-        jwt.encode(
-            {"sub": str(user_id), "role": role, "email": email, "typ": token_type, "ver": token_version, "exp": expire},
-            settings.secret_key,
-            algorithm=settings.algorithm,
-        ),
+        jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm),
     )
 
 
-def create_access_token(user: User) -> str:
+def create_access_token(user: User, features: list[str] | None = None) -> str:
     return _create_token(
-        user.id,
-        user.role,
-        user.email,
-        "access",
-        timedelta(minutes=settings.access_token_expire_minutes), user.token_version,
+        user.id, user.role, user.email,
+        "access", timedelta(minutes=settings.access_token_expire_minutes), user.token_version,
+        features=features,
     )
 
 
-def create_refresh_token(user: User) -> str:
+def create_refresh_token(user: User, features: list[str] | None = None) -> str:
     return _create_token(
-        user.id,
-        user.role,
-        user.email,
-        "refresh",
-        timedelta(days=settings.refresh_token_expire_days), user.token_version,
+        user.id, user.role, user.email,
+        "refresh", timedelta(days=settings.refresh_token_expire_days), user.token_version,
+        features=features,
     )
 
 
-def issue_token_pair(user: User, response: Response) -> Token:
+def issue_token_pair(user: User, response: Response, features: list[str] | None = None) -> Token:
     response.set_cookie(
         key=REFRESH_COOKIE,
-        value=create_refresh_token(user),
+        value=create_refresh_token(user, features=features),
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=not settings.debug,
         samesite="strict",
         path=REFRESH_COOKIE_PATH,
     )
-    return Token(access_token=create_access_token(user))
+    return Token(access_token=create_access_token(user, features=features))
 
 
 @router.post(
@@ -126,8 +126,9 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Konto deaktiviert")
     user.last_login_at = datetime.now(UTC).replace(tzinfo=None)
+    features = await get_user_features(db, user)
     await db.commit()
-    return issue_token_pair(user, response)
+    return issue_token_pair(user, response, features=features)
 
 
 _RESET_RESPONSE = {"detail": "Falls ein aktives Konto zu dieser E-Mail-Adresse existiert, wurde ein Reset-Link versendet."}
@@ -262,7 +263,8 @@ async def refresh_token(
             detail="Ungültiger Refresh-Token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return issue_token_pair(user, response)
+    features = await get_user_features(db, user)
+    return issue_token_pair(user, response, features=features)
 
 
 @router.post(

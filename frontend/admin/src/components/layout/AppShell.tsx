@@ -187,6 +187,7 @@ export function AppShell() {
 
   const currentUser = getTokenUser()
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
+  const features = currentUser?.features ?? []
 
   function renderScreen() {
     switch (route) {
@@ -202,22 +203,22 @@ export function AppShell() {
       case 'occurrences-form':  return <ScreenForm recordType="occurrence" recordId={editId ?? undefined} onBack={() => navigate('occurrences-list')} onSaved={(id) => navigate('occurrences-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'procedures-list':   return <ScreenList recordType="procedure" onOpen={(id) => navigate('procedures-form', id)} initialTab={editId} onTabChange={(t) => navigate('procedures-list', t)} />
       case 'procedures-form':   return <ScreenForm recordType="procedure" recordId={editId ?? undefined} onBack={() => navigate('procedures-list')} onSaved={(id) => navigate('procedures-form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
-      case 'banners':           return isAdmin ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
+      case 'banners':           return features.includes('banners') ? <ScreenBanners /> : <Placeholder label="Kein Zugriff" />
       case 'subtypes':          return isAdmin ? <ScreenSubtype initialType={editId} onTypeChange={(t) => navigate('subtypes', t)} /> : <Placeholder label="Kein Zugriff" />
-      case 'storage-locations': return isAdmin ? <ScreenStorageLocation onOpenObject={(id) => navigate('form', id)} /> : <Placeholder label="Kein Zugriff" />
+      case 'storage-locations': return features.includes('storage_locations') ? <ScreenStorageLocation onOpenObject={(id) => navigate('form', id)} /> : <Placeholder label="Kein Zugriff" />
       case 'schema':            return isAdmin ? <ScreenSchema initialPath={editId} onPathChange={(p) => navigate('schema', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'form-variants':     return isAdmin ? <ScreenFormVariants initialPath={editId} onPathChange={(p) => navigate('form-variants', p)} /> : <Placeholder label="Kein Zugriff" />
-      case 'vocab':             return isAdmin ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
-      case 'pages':             return isAdmin ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
-      case 'oai-sets':          return isAdmin ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
-      case 'export':            return isAdmin ? <ScreenExport /> : <Placeholder label="Kein Zugriff" />
-      case 'sparql':            return isAdmin ? <ScreenSparql onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
-      case 'import':            return <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} />
-      case 'audit':             return <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} />
-      case 'working-sets':      return <ScreenWorkingSets initialSetId={editId} onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} />
+      case 'vocab':             return features.includes('vocab_terms') ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
+      case 'pages':             return features.includes('pages') ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
+      case 'oai-sets':          return features.includes('oai_sets') ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
+      case 'export':            return features.includes('export') ? <ScreenExport /> : <Placeholder label="Kein Zugriff" />
+      case 'sparql':            return features.includes('sparql') ? <ScreenSparql onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
+      case 'import':            return features.includes('import') ? <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} /> : <Placeholder label="Kein Zugriff" />
+      case 'audit':             return features.includes('audit_log') ? <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} /> : <Placeholder label="Kein Zugriff" />
+      case 'working-sets':      return features.includes('working_sets') ? <ScreenWorkingSets initialSetId={editId} onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
       case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
       case 'user-roles':        return isAdmin ? <ScreenUserRoles /> : <Placeholder label="Kein Zugriff" />
-      case 'settings':          return <ScreenSettings isAdmin={isAdmin} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
+      case 'settings':          return <ScreenSettings isAdmin={isAdmin} features={features} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
       default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
     }
   }

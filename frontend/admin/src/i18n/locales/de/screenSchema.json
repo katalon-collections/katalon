@@ -62,6 +62,7 @@
     "subtypeAll": "— alle Subtypen —",
     "required": "Pflichtfeld",
     "repeatable": "Wiederholbar",
+    "maxCount": "Max. Anzahl",
     "translatable": "Mehrsprachig",
     "notTranslatableHint": "Dieser Feldtyp ist nicht übersetzbar (nur Text/Rich-Text, nicht wiederholbar).",
     "authoritySource": "Normdaten-Quelle",

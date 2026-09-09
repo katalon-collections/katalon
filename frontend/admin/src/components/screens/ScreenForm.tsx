@@ -4,8 +4,8 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets } from '../../api/client'
-import type { MediaFile } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks } from '../../api/client'
+import type { MediaFile, ActivePresence, LockInfo } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import type { AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
@@ -1388,8 +1388,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [availableCollections, setAvailableCollections] = useState<Array<{ id: string; title: string }>>([])
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
   const user = getTokenUser()
+  const features = user?.features ?? []
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
-  const canManageContent = Boolean(user && user.role !== 'viewer')
+  const canManageContent = !user || user.role === 'viewer' ? false : features.includes('import') || user.role === 'admin' || user.role === 'superuser'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [sections, setSections] = useState<FormSection[]>([])
@@ -1413,6 +1414,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // loaded (base), so a save conflict can be resolved field-by-field.
   const [version, setVersion] = useState<number | null>(null)
   const [baseValues, setBaseValues] = useState<Record<string, unknown>>({})
+  // Presence Lock (#371): heartbeat while an existing record is open for editing.
+  const [otherEditors, setOtherEditors] = useState<ActivePresence[]>([])
+  // Manual Exclusive Lock (#371, Phase 2): persistent lock set by the user.
+  const [manualLock, setManualLock] = useState<LockInfo | null>(null)
+  const [lockLoading, setLockLoading] = useState(false)
+  useEffect(() => {
+    if (isNew || !recordId) return
+    let cancelled = false
+    const tick = () => {
+      presence.heartbeat(recordType, recordId).then(others => {
+        if (!cancelled) setOtherEditors(others)
+      }).catch(() => {})
+    }
+    tick()
+    const interval = window.setInterval(tick, 25000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      setOtherEditors([])
+      presence.release(recordType, recordId).catch(() => {})
+    }
+  }, [recordType, recordId, isNew])
   const [conflict, setConflict] = useState<ConflictState | null>(null)
   const [showAudit, setShowAudit] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
@@ -1654,6 +1677,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           const items = await subtypeListP
           recSubtype = initialSubtype || items.find(item => item.is_default)?.name || undefined
         }
+        // Load manual lock info after record data
+        if (rec && !isNew) {
+          locks.get(recordType, rec.id).then(setManualLock).catch(() => {})
+        }
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
         if (!rec) {
@@ -1852,6 +1879,28 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setObjectStatuses(prev => { const next = { ...prev }; delete next[targetId]; return next })
       }
     } catch (e) { alert((e as Error).message) }
+  }
+
+  async function handleLockToggle() {
+    if (!currentId || lockLoading) return
+    setLockLoading(true)
+    try {
+      if (manualLock) {
+        if (manualLock.locked_by_email === user?.email) {
+          await locks.release(recordType, currentId)
+          setManualLock(null)
+        } else if (user?.role === 'admin' || user?.role === 'superuser') {
+          await locks.forceUnlock(recordType, currentId)
+          setManualLock(null)
+        }
+      } else {
+        const reason = window.prompt('Grund für die Sperre (optional):') ?? ''
+        if (reason === null) return
+        const lock = await locks.set(recordType, currentId, reason)
+        setManualLock(lock)
+      }
+    } catch (e) { setError((e as Error).message) }
+    finally { setLockLoading(false) }
   }
 
   // All user-triggered value mutations go through this wrapper to mark the form dirty
@@ -2882,6 +2931,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
             </div>
           )}
+          {!isNew && currentId && features.includes('manual_lock') && (
+            !manualLock || manualLock.locked_by_email === user?.email || user?.role === 'admin' || user?.role === 'superuser'
+              ? <button className="btn gh" onClick={handleLockToggle} disabled={lockLoading} style={{ minWidth: 90 }}>
+                  {lockLoading ? '…' : manualLock ? 'Sperre aufheben' : 'Sperren'}
+                </button>
+              : null
+          )}
           <button className="btn gh" onClick={() => {
             if (quickCreate) { onBack?.(); return }
             if (isDirty && !window.confirm('Du hast ungespeicherte Änderungen. Trotzdem verlassen?')) return
@@ -2896,6 +2952,21 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           )}
         </div>
       </div>
+
+      {otherEditors.length > 0 && (
+        <div className="record-notice" style={{ background: '#fffbeb', borderBottom: '1px solid #fcd34d', color: '#92400e' }}>
+          {t('presence.editingBy', { names: otherEditors.map(p => p.user_email).join(', ') })}
+        </div>
+      )}
+
+      {manualLock && (
+        <div className="record-notice" style={{ background: '#f3e8ff', borderBottom: '1px solid #d8b4fe', color: '#6b21a8' }}>
+          {manualLock.locked_by_email === user?.email
+            ? t('locks.youLocked', { reason: manualLock.reason || t('locks.noReason') })
+            : t('locks.lockedBy', { name: manualLock.locked_by_email, reason: manualLock.reason || t('locks.noReason') })}
+          {manualLock.expires_at && <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.7 }}>{t('locks.expiresAt', { date: new Date(manualLock.expires_at).toLocaleString() })}</span>}
+        </div>
+      )}
 
       {error && (
         <div className="record-notice" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c' }}>
@@ -3506,9 +3577,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               )}
                             </div>
                           ))}
-                          <button className="btn sm gh" onClick={() => addGroupInstance(f.name)} disabled={justCreated}>
-                            <Plus size={12} /> Eintrag hinzufügen
-                          </button>
+                          {(() => {
+                            const groupInstances = (val as Record<string, unknown>[] | undefined) ?? []
+                            const maxCount = f.settings?.max_count as number | undefined
+                            const limitReached = typeof maxCount === 'number' && groupInstances.length >= maxCount
+                            return (
+                              <button className="btn sm gh" onClick={() => addGroupInstance(f.name)} disabled={justCreated || limitReached}>
+                                <Plus size={12} /> Eintrag hinzufügen{limitReached ? ` (max. ${maxCount})` : ''}
+                              </button>
+                            )
+                          })()}
                         </div>
                       ) : f.field_type === 'pid' ? (
                         (() => {
@@ -3574,23 +3652,32 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       ) : f.field_type === 'url' ? (
                         repeatable ? (
                           <>
-                            {(((val as PidEntry[] | undefined) ?? [])).map((entry, i) => (
-                              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                                <input className="fld mono" value={entry.value}
-                                  type="url"
-                                  onChange={e => updateUrl(f.name, i, 'value', e.target.value)}
-                                  placeholder="https://…"
-                                  disabled={justCreated} style={{ flex: 2 }} />
-                                <input className="fld" value={entry.label}
-                                  onChange={e => updateUrl(f.name, i, 'label', e.target.value)}
-                                  placeholder={t('url.linkLabel')}
-                                  disabled={justCreated} style={{ flex: 1 }} />
-                                <button className="btn sm ico gh" onClick={() => removeUrl(f.name, i)} disabled={justCreated}><X size={12} /></button>
-                              </div>
-                            ))}
-                            <button className="btn sm gh" onClick={() => addUrl(f.name)} disabled={justCreated}>
-                              <Plus size={12} /> {t('url.add')}
-                            </button>
+                            {(() => {
+                              const urlEntries = ((val as PidEntry[] | undefined) ?? [])
+                              const maxCount = f.settings?.max_count as number | undefined
+                              const limitReached = typeof maxCount === 'number' && urlEntries.length >= maxCount
+                              return (
+                                <>
+                                  {urlEntries.map((entry, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                      <input className="fld mono" value={entry.value}
+                                        type="url"
+                                        onChange={e => updateUrl(f.name, i, 'value', e.target.value)}
+                                        placeholder="https://…"
+                                        disabled={justCreated} style={{ flex: 2 }} />
+                                      <input className="fld" value={entry.label}
+                                        onChange={e => updateUrl(f.name, i, 'label', e.target.value)}
+                                        placeholder={t('url.linkLabel')}
+                                        disabled={justCreated} style={{ flex: 1 }} />
+                                      <button className="btn sm ico gh" onClick={() => removeUrl(f.name, i)} disabled={justCreated}><X size={12} /></button>
+                                    </div>
+                                  ))}
+                                  <button className="btn sm gh" onClick={() => addUrl(f.name)} disabled={justCreated || limitReached}>
+                                    <Plus size={12} /> {t('url.add')}{limitReached ? ` (max. ${maxCount})` : ''}
+                                  </button>
+                                </>
+                              )
+                            })()}
                           </>
                         ) : (
                           (() => {
@@ -3627,9 +3714,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               <button className="btn sm ico gh" onClick={() => removeRepeat(f.name, i)} disabled={justCreated}><X size={12} /></button>
                             </div>
                           ))}
-                          <button className="btn sm gh" onClick={() => addRepeat(f.name)} disabled={justCreated}>
-                            <Plus size={12} /> Weiteren Wert
-                          </button>
+                          {(() => {
+                            const maxCount = f.settings?.max_count as number | undefined
+                            const limitReached = typeof maxCount === 'number' && (vals?.length ?? 0) >= maxCount
+                            return (
+                              <button className="btn sm gh" onClick={() => addRepeat(f.name)} disabled={justCreated || limitReached}>
+                                <Plus size={12} /> Weiteren Wert{limitReached ? ` (max. ${maxCount})` : ''}
+                              </button>
+                            )
+                          })()}
                         </>
                       ) : f.field_type === 'boolean' ? (
                         <label className="form-checkbox">

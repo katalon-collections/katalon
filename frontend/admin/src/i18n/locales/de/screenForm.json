@@ -42,5 +42,14 @@
   "cards": {
     "system": "Stammdaten",
     "metadata": "Metadaten"
+  },
+  "presence": {
+    "editingBy": "Wird aktuell auch bearbeitet von: {{names}}. Gleichzeitige Änderungen können zu Konflikten führen."
+  },
+  "locks": {
+    "youLocked": "Diese Aufzeichnung ist von Ihnen exklusiv gesperrt. Grund: {{reason}}",
+    "lockedBy": "Exklusiv gesperrt von {{name}}. Grund: {{reason}}",
+    "expiresAt": "Läuft ab: {{date}}",
+    "noReason": "Kein Grund angegeben"
   }
 }

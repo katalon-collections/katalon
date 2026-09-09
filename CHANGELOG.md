@@ -3,6 +3,28 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.25.0] - 2026-09-09
+
+### Added
+- Rollenkonzept (#371, Phase 2): Vollständige Überarbeitung des Berechtigungssystems.
+  - Viewer: Standard-Leseberechtigung auf 6 Typen (ohne Vorgänge und Lagerorte),
+    per Matrix abschaltbar
+  - Cataloger: CRU (kein Löschen), darf Lagerorte nur lesen
+  - Editor: CRUD + Status-Wechsel + Vokabular-Struktur + Lagerorte verwalten
+  - Admin: Force Unlock, erweiterte Konfiguration
+- `feature_permissions`-Tabelle: feingranulare Feature-Rechte (Export, SPARQL,
+  Import, Vokabular, etc.), konfigurierbar über die Admin-UI, Defaults pro Rolle
+  aus dem Rollenkonzept, Feature-Liste im JWT-Token
+- `RolePermission` um `collection`, `storage_location`, `vocabulary_term` erweitert
+- Backend Feature-Gates: Export, SPARQL, Import, Audit, Working-Sets, Vokabular,
+  Statische Seiten, OAI-Sets, Banner, Lagerorte über `require_feature()` statt
+  hartem `require_role("admin")` — Admin kann über UI konfigurieren
+- Frontend Sidebar/AppShell: Feature-basierte Anzeige statt `isAdmin`-binär-Gate
+- Manual Exclusive Lock (#371, Phase 2): Persistente exklusive Sperre mit
+  Besitzer, Grund, Ablaufdatum (max. 7 Tage). Owner-Release, Editor darf
+  Cataloger-Locks aufheben, Admin+ Force Unlock. Audit-Log. Banner im Formular.
+- Automatischer Lock-Ablauf nach 7 Tagen; Erinnerungshinweis in der UI
+
 ## [1.23.0] - 2026-09-09
 
 ### Added

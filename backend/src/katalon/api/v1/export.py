@@ -9,12 +9,12 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_role
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_feature
 from katalon.core.schemas import RECORD_TYPES
 from katalon.services import export_service, metadata_format_service
 from katalon.services.metadata_mapping_service import mapped_record_types
 
-router = APIRouter(prefix="/export", tags=["export"], dependencies=[require_role("admin")])
+router = APIRouter(prefix="/export", tags=["export"], dependencies=[require_feature("export")])
 
 MEDIA_TYPES = {"csv": "text/csv", "json": "application/json", "xml": "application/xml"}
 

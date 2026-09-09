@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FieldDefinition, FormSection, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FeaturePermission, FieldDefinition, FormSection, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -28,11 +28,11 @@ export function hasToken(): boolean {
   return Boolean(_token)
 }
 
-export function getTokenUser(): { email: string; role: string } | null {
+export function getTokenUser(): { email: string; role: string; features: string[] } | null {
   if (!_token) return null
   try {
     const payload = JSON.parse(atob(_token.split('.')[1]))
-    return { email: payload.email ?? '', role: payload.role ?? '' }
+    return { email: payload.email ?? '', role: payload.role ?? '', features: payload.features ?? [] }
   } catch {
     return null
   }
@@ -106,6 +106,28 @@ export class VersionConflictError extends Error {
   }
 }
 
+/** Blocking-mode presence lock: another user is currently editing this record. */
+export class PresenceLockedError extends Error {
+  locked_by: string
+  constructor(locked_by: string) {
+    super(`Wird aktuell von ${locked_by} bearbeitet.`)
+    this.name = 'PresenceLockedError'
+    this.locked_by = locked_by
+  }
+}
+
+/** Manual exclusive lock: another user has explicitly locked this record. */
+export class ResourceLockedError extends Error {
+  locked_by: string
+  reason: string
+  constructor(locked_by: string, reason: string) {
+    super(`Datensatz ist durch ${locked_by} exklusiv gesperrt.`)
+    this.name = 'ResourceLockedError'
+    this.locked_by = locked_by
+    this.reason = reason
+  }
+}
+
 function ifMatch(version?: number): Record<string, string> | undefined {
   return version != null ? { 'If-Match': String(version) } : undefined
 }
@@ -123,6 +145,12 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const d = body.detail ?? {}
     if (d.error === 'version_conflict') {
       throw new VersionConflictError(typeof d.current_version === 'number' ? d.current_version : 0)
+    }
+    if (d.error === 'presence_locked') {
+      throw new PresenceLockedError(typeof d.locked_by === 'string' ? d.locked_by : 'unbekannt')
+    }
+    if (d.error === 'resource_locked') {
+      throw new ResourceLockedError(typeof d.locked_by === 'string' ? d.locked_by : 'unbekannt', typeof d.reason === 'string' ? d.reason : '')
     }
     throw new ConflictError(
       typeof d === 'string' ? d : typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
@@ -178,6 +206,9 @@ export const users = {
   permissions: () => req<RolePermission[]>('/v1/users/permissions'),
   updatePermissions: (role: RolePermission['role'], permissions: RolePermission[]) =>
     req<RolePermission[]>(`/v1/users/permissions/${role}`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
+  features: () => req<FeaturePermission[]>('/v1/users/features'),
+  updateFeatures: (role: FeaturePermission['role'], features: FeaturePermission[]) =>
+    req<FeaturePermission[]>(`/v1/users/features/${role}`, { method: 'PUT', body: JSON.stringify({ features }) }),
 }
 
 // Objects
@@ -1003,6 +1034,7 @@ export interface AdminConfigRead {
   ai_monthly_global_token_limit: number
   media_default_license_uri: string | null
   media_default_rights_holder: { name: string; uri?: string } | null
+  presence_lock_mode: 'warning' | 'blocking'
   pid_providers: ('ark' | 'dnb_urn')[]
   ai_secret: {
     has_key: boolean
@@ -1027,6 +1059,66 @@ export const adminConfig = {
 
 export const idno = {
   next: (type: string) => req<{ next: string | null }>(`/v1/idno/next?type=${encodeURIComponent(type)}`),
+}
+
+export interface ActivePresence {
+  user_id: string
+  user_email: string
+  since: string
+}
+
+/** Random per-tab id so two tabs of the same user each get their own presence row. */
+export function presenceSessionId(): string {
+  const key = 'katalon_presence_session'
+  let id = sessionStorage.getItem(key)
+  if (!id) {
+    id = crypto.randomUUID()
+    sessionStorage.setItem(key, id)
+  }
+  return id
+}
+
+export const presence = {
+  heartbeat: (resourceType: string, resourceId: string) =>
+    req<ActivePresence[]>(`/v1/presence/${resourceType}/${resourceId}/heartbeat`, {
+      method: 'POST',
+      body: JSON.stringify({ session_id: presenceSessionId() }),
+    }),
+  release: (resourceType: string, resourceId: string) =>
+    req<void>(`/v1/presence/${resourceType}/${resourceId}?session_id=${encodeURIComponent(presenceSessionId())}`, {
+      method: 'DELETE',
+    }),
+  list: (resourceType: string, resourceId: string) =>
+    req<ActivePresence[]>(`/v1/presence/${resourceType}/${resourceId}`),
+  batch: (resourceType: string, resourceIds: string[]) =>
+    req<Record<string, ActivePresence[]>>('/v1/presence/batch', {
+      method: 'POST',
+      body: JSON.stringify({ resource_type: resourceType, resource_ids: resourceIds }),
+    }),
+}
+
+export interface LockInfo {
+  resource_type: string
+  resource_id: string
+  locked_by: string
+  locked_by_email: string
+  locked_at: string
+  expires_at: string | null
+  reason: string
+}
+
+export const locks = {
+  get: (resourceType: string, resourceId: string) =>
+    req<LockInfo | null>(`/v1/locks/${resourceType}/${resourceId}`),
+  set: (resourceType: string, resourceId: string, reason?: string) =>
+    req<LockInfo>('/v1/locks', {
+      method: 'POST',
+      body: JSON.stringify({ resource_type: resourceType, resource_id: resourceId, reason: reason ?? '' }),
+    }),
+  release: (resourceType: string, resourceId: string) =>
+    req<void>(`/v1/locks/${resourceType}/${resourceId}`, { method: 'DELETE' }),
+  forceUnlock: (resourceType: string, resourceId: string) =>
+    req<void>(`/v1/locks/${resourceType}/${resourceId}/force-unlock`, { method: 'POST' }),
 }
 
 export interface AICompleteResponse {

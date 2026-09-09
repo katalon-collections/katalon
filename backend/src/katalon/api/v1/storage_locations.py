@@ -12,6 +12,8 @@ from sqlalchemy import Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.concurrency import check_version, flush_record
+from katalon.services.presence_service import enforce_not_blocked
+from katalon.services.lock_service import enforce_not_locked
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_record_permission
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, StorageLocation, User
@@ -245,6 +247,8 @@ async def update_storage_location(
     if not loc:
         raise HTTPException(status_code=404, detail="Lagerort nicht gefunden")
     check_version(loc.version, if_match)
+    await enforce_not_blocked(db, "storage_location", loc.id, current_user)
+    await enforce_not_locked(db, "storage_location", loc.id, current_user)
 
     if not data.idno or not data.idno.strip():
         raise HTTPException(status_code=422, detail="ID-Nr. ist ein Pflichtfeld.")

@@ -42,5 +42,14 @@
   "cards": {
     "system": "Record data",
     "metadata": "Metadata"
+  },
+  "presence": {
+    "editingBy": "Currently also being edited by: {{names}}. Simultaneous changes may cause conflicts."
+  },
+  "locks": {
+    "youLocked": "This record is exclusively locked by you. Reason: {{reason}}",
+    "lockedBy": "Exclusively locked by {{name}}. Reason: {{reason}}",
+    "expiresAt": "Expires: {{date}}",
+    "noReason": "No reason given"
   }
 }

@@ -11,10 +11,11 @@ import type { TourVariant } from '../tour/Tour'
 interface Props {
   onNavigate?: (route: string) => void
   isAdmin: boolean
+  features: string[]
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'changelog' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -1685,7 +1686,55 @@ function SectionLanguages() {
   )
 }
 
-const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
+function SectionPresenceLock() {
+  const { t } = useTranslation('screenSettings')
+  const [mode, setMode] = useState<'warning' | 'blocking'>('warning')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminConfig.get()
+      .then(cfg => setMode(cfg.presence_lock_mode))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save(next: 'warning' | 'blocking') {
+    setMode(next)
+    setSaving(true); setError(null); setSaved(false)
+    try {
+      await adminConfig.update({ presence_lock_mode: next })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+  return (
+    <div className="card">
+      <div className="hd">{t('presenceLock.title')}</div>
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+          {t('presenceLock.description')}
+        </p>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, marginBottom: 10 }}>
+          <input type="radio" name="presence_lock_mode" checked={mode === 'warning'} disabled={saving} onChange={() => save('warning')} style={{ marginTop: 3 }} />
+          <span><strong>{t('presenceLock.warningLabel')}</strong> — {t('presenceLock.warningDescription')}</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13 }}>
+          <input type="radio" name="presence_lock_mode" checked={mode === 'blocking'} disabled={saving} onChange={() => save('blocking')} style={{ marginTop: 3 }} />
+          <span><strong>{t('presenceLock.blockingLabel')}</strong> — {t('presenceLock.blockingDescription')}</span>
+        </label>
+        {error && <div style={{ fontSize: 13, color: '#dc2626', marginTop: 10 }}>{error}</div>}
+        {saved && <div style={{ fontSize: 13, color: '#166534', marginTop: 10 }}>{t('presenceLock.saved')}</div>}
+      </div>
+    </div>
+  )
+}
+
+const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'ueber',    label: 'Über Katalon' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
@@ -1695,6 +1744,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: 'ki',       label: 'KI', adminOnly: true },
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'authorities', label: 'Normdatenquellen', adminOnly: true },
+  { id: 'sperren',  label: 'Bearbeitungssperre', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
   { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
   { id: 'changelog', label: 'Versionshinweise', adminOnly: true },
@@ -1708,7 +1758,7 @@ function initialSection(): Section {
   return (requested && SECTION_IDS.includes(requested as Section)) ? requested as Section : 'profil'
 }
 
-export function ScreenSettings({ isAdmin, onStartTour, onNavigate }: Props) {
+export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: Props) {
   const [section, setSection] = useState<Section>(initialSection)
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
   const [sparqlStatus, setSparqlStatus] = useState<SparqlStatus | null>(null)
@@ -1728,6 +1778,7 @@ export function ScreenSettings({ isAdmin, onStartTour, onNavigate }: Props) {
 
   const navItems = NAV.filter(n => {
     if (n.adminOnly && !isAdmin) return false
+    if (n.feature && !features.includes(n.feature)) return false
     if (n.id === 'sparql' && !sparqlStatus?.enabled) return false
     return true
   })
@@ -1767,6 +1818,7 @@ export function ScreenSettings({ isAdmin, onStartTour, onNavigate }: Props) {
           {!loading && isAdmin && section === 'ki' && <SectionAI />}
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'authorities' && <SectionAuthoritySources />}
+          {!loading && isAdmin && section === 'sperren' && <SectionPresenceLock />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
           {!loading && isAdmin && section === 'sparql' && sparqlStatus?.enabled && (
             <SectionSparql

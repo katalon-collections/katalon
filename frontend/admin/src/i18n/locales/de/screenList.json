@@ -60,5 +60,7 @@
   "paginationNext": "Weiter",
   "paginationSummary": "Seite {{page}} von {{totalPages}}",
   "paginationPageSize": "{{size}} pro Seite",
-  "paginationPageAriaLabel": "Seite {{number}}"
+  "paginationPageAriaLabel": "Seite {{number}}",
+  "presenceBadge": "wird bearbeitet",
+  "presenceBadgeTitle": "Wird bearbeitet von: {{names}}"
 }

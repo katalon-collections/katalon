@@ -509,6 +509,17 @@ class RelationRead(RelationCreate):
 
 PermissionAction = Literal["read", "create", "update", "delete"]
 PermissionRole = Literal["admin", "editor", "cataloger", "viewer"]
+PermissionRecordType = Literal[
+    "object", "entity", "place", "occurrence", "procedure",
+    "collection", "storage_location", "vocabulary_term",
+]
+
+Feature = Literal[
+    "export", "sparql", "import", "working_sets", "audit_log",
+    "vocab_terms", "vocab_structure", "schema", "subtypes", "form_variants",
+    "storage_locations", "pages", "oai_sets", "banners",
+    "manual_lock", "force_unlock", "users", "settings", "api_keys",
+]
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -539,12 +550,23 @@ class RolePermissionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     role: PermissionRole
-    record_type: Literal["object", "entity", "place", "occurrence", "procedure"]
+    record_type: PermissionRecordType
     action: PermissionAction
 
 
 class RolePermissionUpdate(BaseModel):
     permissions: list[RolePermissionRead]
+
+
+class FeaturePermissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: PermissionRole
+    feature: Feature
+
+
+class FeaturePermissionUpdate(BaseModel):
+    features: list[FeaturePermissionRead]
 
 
 class UserUpdate(BaseModel):

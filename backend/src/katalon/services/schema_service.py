@@ -237,6 +237,11 @@ async def validate_metadata(
         if value is None:
             continue
 
+        if field.is_repeatable and isinstance(value, list):
+            max_count = (field.settings or {}).get("max_count")
+            if isinstance(max_count, int) and len(value) > max_count:
+                errors.append(f"Feld '{field.name}': maximal {max_count} Einträge erlaubt.")
+
         if field.field_type == "group":
             if not isinstance(value, list):
                 errors.append(f"Feld '{field.name}': Containerfeld muss eine Liste sein.")

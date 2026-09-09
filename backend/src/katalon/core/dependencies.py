@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.models import ApiKey, RolePermission, User
+from katalon.core.models import ApiKey, FeaturePermission, RolePermission, User
 from katalon.core.schemas import TokenData
 from katalon.database import get_db
 
@@ -145,6 +145,9 @@ async def has_record_permission(
 ) -> bool:
     if user.role in {"admin", "superuser"}:
         return True
+    # Viewer never has access to procedure or storage_location
+    if user.role == "viewer" and record_type in {"procedure", "storage_location"}:
+        return False
     result = await db.execute(
         select(RolePermission.id).where(
             RolePermission.role == user.role,
@@ -197,3 +200,37 @@ def require_admin_or_editor() -> Any:
 
 def require_admin() -> Any:
     return require_capability("manage_config")
+
+
+async def has_feature_permission(db: AsyncSession, user: User, feature: str) -> bool:
+    if user.role in {"admin", "superuser"}:
+        return True
+    result = await db.execute(
+        select(FeaturePermission.id).where(
+            FeaturePermission.role == user.role,
+            FeaturePermission.feature == feature,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+def require_feature(feature: str) -> Any:
+    async def _check(db: DBDep, current_user: CurrentUser) -> User:
+        if not await has_feature_permission(db, current_user, feature):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return current_user
+    return Depends(_check)
+
+
+async def get_user_features(db: AsyncSession, user: User) -> list[str]:
+    if user.role in {"admin", "superuser"}:
+        return [
+            "export", "sparql", "import", "working_sets", "audit_log",
+            "vocab_terms", "vocab_structure", "schema", "subtypes", "form_variants",
+            "storage_locations", "pages", "oai_sets", "banners",
+            "manual_lock", "force_unlock", "users", "settings", "api_keys",
+        ]
+    result = await db.execute(
+        select(FeaturePermission.feature).where(FeaturePermission.role == user.role)
+    )
+    return [row[0] for row in result.all()]

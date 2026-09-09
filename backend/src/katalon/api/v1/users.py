@@ -10,9 +10,11 @@ from sqlalchemy import delete, select
 
 from katalon.api.v1.auth import hash_password, verify_password
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
-from katalon.core.models import RolePermission, User
+from katalon.core.models import FeaturePermission, RolePermission, User
 from katalon.core.schemas import (
     EmailChange,
+    FeaturePermissionRead,
+    FeaturePermissionUpdate,
     OnboardingUpdate,
     PasswordChange,
     RolePermissionRead,
@@ -104,6 +106,41 @@ async def update_role_permissions(
     permissions = [
         RolePermission(role=role, record_type=permission.record_type, action=permission.action)
         for permission in data.permissions
+    ]
+    db.add_all(permissions)
+    return permissions
+
+
+@router.get(
+    "/features",
+    response_model=list[FeaturePermissionRead],
+    dependencies=[require_role("admin")],
+    summary="List configured feature permissions",
+)
+async def list_feature_permissions(db: DBDep) -> list[FeaturePermission]:
+    result = await db.execute(select(FeaturePermission).order_by(
+        FeaturePermission.role, FeaturePermission.feature
+    ))
+    return list(result.scalars().all())
+
+
+@router.put(
+    "/features/{role}",
+    response_model=list[FeaturePermissionRead],
+    dependencies=[require_role("admin")],
+    summary="Replace the feature permissions for one fixed role",
+)
+async def update_feature_permissions(
+    role: str, data: FeaturePermissionUpdate, db: DBDep
+) -> list[FeaturePermission]:
+    if role not in _CONFIGURABLE_ROLES:
+        raise HTTPException(status_code=422, detail="Diese Rolle kann nicht konfiguriert werden.")
+    if any(permission.role != role for permission in data.features):
+        raise HTTPException(status_code=422, detail="Berechtigungen müssen zur Rolle passen.")
+    await db.execute(delete(FeaturePermission).where(FeaturePermission.role == role))
+    permissions = [
+        FeaturePermission(role=role, feature=permission.feature)
+        for permission in data.features
     ]
     db.add_all(permissions)
     return permissions

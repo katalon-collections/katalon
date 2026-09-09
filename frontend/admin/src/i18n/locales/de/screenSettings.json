@@ -85,5 +85,14 @@
     "rebuildSuccess": "Rebuild gestartet — die Synchronisation läuft im Hintergrund.",
     "rebuildError": "Fehler beim Starten des Rebuilds",
     "openBuilder": "Zum SPARQL Query Builder →"
+  },
+  "presenceLock": {
+    "title": "Bearbeitungssperre (Presence Lock)",
+    "description": "Steuert, was passiert, wenn ein Datensatz bereits von einer anderen Person bearbeitet wird.",
+    "warningLabel": "Warnung",
+    "warningDescription": "andere Personen sehen einen Hinweis, können den Datensatz aber trotzdem bearbeiten.",
+    "blockingLabel": "Blockierend",
+    "blockingDescription": "solange der Datensatz geöffnet ist, können andere Personen ihn nicht speichern.",
+    "saved": "Gespeichert."
   }
 }

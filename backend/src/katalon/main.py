@@ -40,6 +40,7 @@ from katalon.api.v1 import (
     idno,
     importer,
     index_health,
+    locks,
     media,
     metadata_mappings,
     oai,
@@ -51,6 +52,7 @@ from katalon.api.v1 import (
     places,
     portal,
     portal_public,
+    presence,
     procedures,
     record_subtypes,
     relations,
@@ -545,6 +547,8 @@ app.include_router(procedures.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(collections.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(storage_locations.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(relations.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(presence.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(locks.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.batch_router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.internal_router, prefix="/v1")
