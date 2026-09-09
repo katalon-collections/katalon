@@ -34,9 +34,9 @@
   "publishDraft": "Publish",
 
   "institutionConfigHeadline": "Institution details",
-  "institutionConfigHelp": "These values populate rights, repository, and source information in the export format (e.g. ISIL, institution name, website).",
-  "institutionConfigKey": "Key",
-  "institutionConfigValue": "Value",
+  "institutionConfigHelp": "These values are used in the export. For LIDO: isil, institution_name, website, and location.",
+  "institutionConfigKey": "Key, e.g. isil",
+  "institutionConfigValue": "Value, e.g. DE-123",
   "institutionConfigAddRow": "Add row",
   "institutionConfigSave": "Save",
 
@@ -60,8 +60,9 @@
   "sourceKindRecord": "Record",
   "sourceKindConstant": "Constant",
   "sourceKindMedia": "Media",
-  "sourceFieldLabel": "Field",
-  "sourceFieldChoose": "— choose —",
+  "sourceFieldLabel": "Search fields",
+  "sourceFieldChoose": "Choose a field",
+  "sourceFieldSearchPlaceholder": "Search by field name or label…",
   "sourcePrefixLabel": "Prefix (optional)",
   "sourceRelationTypeLabel": "Relation type",
   "sourceRelationTypePlaceholder": "e.g. photographer",
@@ -76,11 +77,10 @@
 
   "specimenSearchPlaceholder": "Search for a reference record…",
   "specimenClear": "Clear selection",
-
   "previewHeadline": "Preview",
   "previewButton": "Refresh preview",
   "previewLoading": "Rendering…",
-  "previewEmpty": "Select a reference record and refresh the preview.",
+  "previewEmpty": "Search for a reference record, then refresh the preview.",
   "previewFailed": "Preview failed.",
 
   "validationHeadline": "Validation",

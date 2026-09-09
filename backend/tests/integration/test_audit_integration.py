@@ -30,3 +30,28 @@ async def test_deleted_object_audit_entry_keeps_readable_label(async_client, aut
     entries = audit_response.json()
     assert len(entries) == 1
     assert entries[0]["record_label"] == f"Löschbares Objekt ({idno})"
+
+
+@pytest.mark.asyncio
+async def test_audit_search_finds_record_title_and_paginates(async_client, auth_headers) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    title = f"Durchsuchbares Auditobjekt {suffix}"
+    for number in range(2):
+        response = await async_client.post(
+            "/v1/objects",
+            headers=auth_headers,
+            json={"idno": f"AUDIT-SEARCH-{suffix}-{number}", "status": "draft", "metadata_": {"title": title}},
+        )
+        assert response.status_code == 201, response.text
+
+    response = await async_client.get(
+        "/v1/audit/search",
+        params={"q": title, "action": "create", "page": 1, "page_size": 1},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["total"] == 2
+    assert result["page"] == 1
+    assert len(result["items"]) == 1
+    assert result["items"][0]["record_label"].startswith(title)

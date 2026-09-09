@@ -3,6 +3,15 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.23.0] - 2026-09-09
+
+### Added
+- Admin-UI / Audit-Log: Serverseitige Suche nach Datensatz, Kennung, Bearbeiter, Aktion oder Änderungsinhalt, mit Datumsfilter und Pagination. Die Ansicht ist damit auch für große, migrierte Bestände vollständig durchsuchbar.
+- Admin-UI / Datensatzlisten: Ein Klick auf den primären Labelwert öffnet einen Datensatz direkt zur Bearbeitung; das Aktionsmenü bleibt weiterhin verfügbar.
+
+### Fixed
+- LIDO-Export: Entfernt bildpostkartenspezifische Vorgaben für Institution, Sammlung, Objekttyp, Ereignisse, Rechte und Medien. LIDO übernimmt fachliche Werte jetzt ausschließlich aus aktivierten Mapping-Regeln; die schemaerforderlichen Zielfelder Titel und Objekttyp werden vor der Veröffentlichung geprüft.
+
 ## [1.22.0] - 2026-09-08
 
 ### Added

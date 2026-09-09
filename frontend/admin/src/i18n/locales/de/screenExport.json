@@ -34,9 +34,9 @@
   "publishDraft": "Veröffentlichen",
 
   "institutionConfigHeadline": "Institutionsangaben",
-  "institutionConfigHelp": "Diese Werte werden in Rechte-, Repository- und Quellenangaben des Exportformats eingesetzt (z. B. ISIL, Institutionsname, Website).",
-  "institutionConfigKey": "Schlüssel",
-  "institutionConfigValue": "Wert",
+  "institutionConfigHelp": "Diese Angaben werden im Export verwendet. Für LIDO: isil, institution_name, website und location.",
+  "institutionConfigKey": "Schlüssel, z. B. isil",
+  "institutionConfigValue": "Wert, z. B. DE-123",
   "institutionConfigAddRow": "Zeile hinzufügen",
   "institutionConfigSave": "Speichern",
 
@@ -60,8 +60,9 @@
   "sourceKindRecord": "Datensatz",
   "sourceKindConstant": "Konstante",
   "sourceKindMedia": "Medium",
-  "sourceFieldLabel": "Feld",
-  "sourceFieldChoose": "— auswählen —",
+  "sourceFieldLabel": "Feld suchen",
+  "sourceFieldChoose": "Feld auswählen",
+  "sourceFieldSearchPlaceholder": "Nach Feldname oder Bezeichnung suchen…",
   "sourcePrefixLabel": "Präfix (optional)",
   "sourceRelationTypeLabel": "Relationsart",
   "sourceRelationTypePlaceholder": "z. B. fotograf",
@@ -76,11 +77,10 @@
 
   "specimenSearchPlaceholder": "Referenzdatensatz suchen…",
   "specimenClear": "Auswahl aufheben",
-
   "previewHeadline": "Vorschau",
   "previewButton": "Vorschau aktualisieren",
   "previewLoading": "Rendert…",
-  "previewEmpty": "Referenzdatensatz auswählen und Vorschau aktualisieren.",
+  "previewEmpty": "Referenzdatensatz suchen und anschließend die Vorschau aktualisieren.",
   "previewFailed": "Vorschau fehlgeschlagen.",
 
   "validationHeadline": "Validierung",

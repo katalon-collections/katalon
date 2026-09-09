@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any, ClassVar
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy import and_, exists, func, or_, select
@@ -698,7 +698,7 @@ async def advanced_search(
 
 @router.get("/schema/{target_type}", response_model=list[PortalFieldDefinitionRead])
 async def list_fields(
-    target_type: str, db: DBDep, current_user: OptionalCurrentUser
+    target_type: str, db: DBDep, response: Response, current_user: OptionalCurrentUser
 ) -> list[FieldDefinition]:
     if target_type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=404, detail="Schema nicht gefunden")
@@ -707,8 +707,15 @@ async def list_fields(
         FieldDefinition.target_type == target_type,
         FieldDefinition.is_deleted.is_(False),
     )
-    if _staff_user(current_user) is None:
+    staff_user = _staff_user(current_user)
+    if staff_user is None:
         query = query.where(FieldDefinition.is_public.is_(True))
+        # Anonymous projection only — the staff variant additionally contains
+        # non-public fields and must never land in a shared cache.
+        response.headers["Cache-Control"] = _CONFIG_CACHE
+        response.headers["Vary"] = "Authorization"
+    else:
+        response.headers["Cache-Control"] = "private, no-store"
     result = await db.execute(query.order_by(FieldDefinition.sort_order))
     return list(result.scalars().all())
 
@@ -791,11 +798,19 @@ async def get_term(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> Vocabu
     return term
 
 
+# Diese Antworten lädt das Portal bei jedem Seitenaufruf erneut und sie ändern
+# sich praktisch nie. Eine kurze TTL nimmt genau die Requests aus der Kette,
+# die Crawler-Traffic vervielfacht, ohne dass Redaktionsänderungen spürbar
+# verzögert sichtbar werden.
+_CONFIG_CACHE = "public, max-age=60"
+
+
 @router.get("/portal/config", response_model=portal.PortalConfigRead)
-async def get_portal_config(db: DBDep) -> portal.PortalConfigRead:
+async def get_portal_config(db: DBDep, response: Response) -> portal.PortalConfigRead:
     config = await portal.get_portal_config(db)
     if config.logo_url == "/v1/portal/logo/file":
         config.logo_url = "/portal/v1/portal/logo/file"
+    response.headers["Cache-Control"] = _CONFIG_CACHE
     return config
 
 
@@ -805,7 +820,8 @@ async def serve_logo() -> FileResponse:
 
 
 @router.get("/pages", response_model=list[pages.PageRead])
-async def list_pages(db: DBDep) -> list[StaticPage]:
+async def list_pages(db: DBDep, response: Response) -> list[StaticPage]:
+    response.headers["Cache-Control"] = _CONFIG_CACHE
     return await pages.list_pages(db)
 
 
@@ -815,10 +831,13 @@ async def get_page(slug: str, db: DBDep) -> StaticPage:
 
 
 @router.get("/banners/active/portal", response_model=list[banners.BannerRead])
-async def active_portal_banners(db: DBDep) -> list[Banner]:
+async def active_portal_banners(db: DBDep, response: Response) -> list[Banner]:
+    response.headers["Cache-Control"] = _CONFIG_CACHE
     return await banners.active_portal_banners(db)
 
 
 @router.get("/theme")
 async def get_theme() -> JSONResponse:
-    return await theme.get_theme()
+    result = await theme.get_theme()
+    result.headers["Cache-Control"] = _CONFIG_CACHE
+    return result

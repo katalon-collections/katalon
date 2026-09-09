@@ -52,6 +52,61 @@ function CommitInput({ value, placeholder, ariaLabel, onCommit, disabled }: {
   )
 }
 
+function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
+  value: string
+  fields: FieldDefinition[]
+  disabled?: boolean
+  placeholder: string
+  onChange: (value: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const selected = fields.find(f => f.name === value)
+  const filtered = fields.filter(f => {
+    const text = `${getLabel(f) || f.name} ${f.name}`.toLocaleLowerCase()
+    return text.includes(query.toLocaleLowerCase())
+  }).slice(0, 12)
+  return (
+    <div style={{ position: 'relative', minWidth: 220 }}>
+      <input
+        className="fld"
+        style={{ width: '100%' }}
+        type="search"
+        value={open ? query : (selected ? `${getLabel(selected) || selected.name} · ${selected.name}` : '')}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        disabled={disabled}
+        onFocus={() => { setQuery(''); setOpen(true) }}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}
+      />
+      {open && !disabled && (
+        <div role="listbox" style={{
+          position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: 'var(--panel, #fff)', border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,.08)', padding: 4, maxHeight: 240, overflowY: 'auto',
+        }}>
+          {filtered.map(field => (
+            <button
+              key={field.id}
+              type="button"
+              role="option"
+              aria-selected={field.name === value}
+              className="btn sm gh"
+              style={{ width: '100%', textAlign: 'left', justifyContent: 'flex-start' }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(field.name); setOpen(false) }}
+            >
+              {getLabel(field) || field.name} <span style={{ color: 'var(--fg-3)' }}>· {field.name}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && <div style={{ padding: 8, fontSize: 12, color: 'var(--fg-3)' }}>Keine Treffer</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, disabled, onChange }: SourcePickerProps) {
   const { t } = useTranslation('screenExport')
 
@@ -68,6 +123,7 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
   }
 
   const eligibleFields = fields.filter(f => acceptedFieldTypes.length === 0 || acceptedFieldTypes.includes(f.field_type))
+
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
@@ -90,16 +146,13 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
         <>
           <div>
             <label style={lbl}>{t('sourceFieldLabel')}</label>
-            <select
-              className="fld"
-              style={fld}
+            <FieldSearch
               value={String(value.source_config.field_name ?? '')}
+              fields={eligibleFields}
               disabled={disabled}
-              onChange={e => onChange({ ...value, source_config: { ...value.source_config, field_name: e.target.value } })}
-            >
-              <option value="">{t('sourceFieldChoose')}</option>
-              {eligibleFields.map(f => <option key={f.id} value={f.name}>{getLabel(f) || f.name}</option>)}
-            </select>
+              placeholder={t('sourceFieldSearchPlaceholder')}
+              onChange={field_name => onChange({ ...value, source_config: { ...value.source_config, field_name } })}
+            />
           </div>
           <div>
             <label style={lbl}>{t('sourcePrefixLabel')}</label>

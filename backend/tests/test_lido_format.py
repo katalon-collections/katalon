@@ -31,13 +31,49 @@ def bpk_fixture() -> ExportRecordContext:
 
 
 # ---------------------------------------------------------------------------
-# Full BPK LIDO 1.0 Rendering & Schema Validation
+# Generic LIDO 1.0 Rendering & Schema Validation
 # ---------------------------------------------------------------------------
 
 
-def test_bpk_fixture_lido_rendering_and_xsd_validation(bpk_fixture: ExportRecordContext) -> None:
+def test_lido_uses_only_explicit_mapping_values(bpk_fixture: ExportRecordContext) -> None:
     fmt = LidoFormat()
-    cms = CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "object_type"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.CONSTANT,
+                source_config={"value": "Herstellung"},
+                target_key="lido:eventWrap/lido:eventSet/lido:event/lido:eventType/lido:term",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.RELATION,
+                source_config={"relation_type": "creator"},
+                target_key=(
+                    "lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/"
+                    "lido:actor/lido:nameActorSet/lido:appellationValue"
+                ),
+            ),
+            MappingSpec(
+                source_kind=SourceKind.MEDIA,
+                source_config={"property": "url"},
+                target_key=(
+                    "lido:administrativeMetadata/lido:resourceWrap/lido:resourceSet/"
+                    "lido:resourceRepresentation/lido:linkResource"
+                ),
+            ),
+        ],
+    )
 
     el = fmt.render(bpk_fixture, cms)
     xml_str = ET.tostring(el, encoding="unicode")
@@ -50,52 +86,18 @@ def test_bpk_fixture_lido_rendering_and_xsd_validation(bpk_fixture: ExportRecord
     assert "lido:lidoWrap" in el.tag
     assert el.attrib.get("xmlns:lido") == LIDO_NS
 
-    # 3. Verify lidoRecID
-    assert "DE-3066--os_ub_0029908" in xml_str
+    # The LIDO core identifies the record but invents no BPK institution or collection values.
+    assert "os_ub_0029908" in xml_str
+    assert "DE-3066" not in xml_str
+    assert "Historische Bildpostkarten" not in xml_str
+    assert "Universität Osnabrück" not in xml_str
 
-    # 4. Verify category
+    # The structural category is part of the object-only LIDO envelope.
     assert "E22_Human-Made_Object" in xml_str
-
-    # 5. Verify descriptiveMetadata & classification
     assert "Postkarte" in xml_str
-    assert "Historische Bildpostkarten" in xml_str
-
-    # 6. Verify title & inscriptions
     assert "Guerre 1939-1944" in xml_str
-    assert "Dessins de Paul Barbier" in xml_str
-
-    # 7. Verify repository info
-    assert "Universität Osnabrück" in xml_str
-    assert "Osnabrück" in xml_str
-
-    # 8. Verify Event 1: Herstellung
-    assert "Herstellung" in xml_str
-    assert "Papeterie de Levallois-Clichy" in xml_str
-    assert "Paris (F)" in xml_str
-    assert "geonames.org/2988507" in xml_str
-
-    # 9. Verify Event 2: Geistige Schöpfung
-    assert "Geistige Schöpfung" in xml_str
     assert "Paul Barbier" in xml_str
-    assert "118506544" in xml_str
-
-    # 10. Verify Event 3: Gebrauch
-    assert "Gebrauch" in xml_str
-    assert "<lido:displayDate lido:label=\"Datierung\">1939 bis 1944</lido:displayDate>" in xml_str
-    assert "<lido:earliestDate>1939-01-01</lido:earliestDate>" in xml_str
-    assert "<lido:latestDate>1944-12-31</lido:latestDate>" in xml_str
-
-    # 11. Verify subjects
-    assert "<lido:term>Propaganda</lido:term>" in xml_str
-    assert "<lido:term>Zweiter Weltkrieg</lido:term>" in xml_str
-    assert "<lido:term>Frankreich</lido:term>" in xml_str
-
-    # 12. Verify administrativeMetadata: rights & public media resource
-    assert "rightsWorkWrap" in xml_str
-    assert "http://rightsstatements.org/vocab/InC/1.0/" in xml_str
-    assert "resourceWrap" in xml_str
     assert "60508_ca_object_representations_media_104088_original.jpg" in xml_str
-    assert 'lido:formatResource="image/jpeg"' in xml_str
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +119,14 @@ def test_minimal_record_renders_valid_lido_1_0() -> None:
         media=[],
     )
     fmt = LidoFormat()
-    cms = CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+            MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Objekt"}, target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"),
+        ],
+    )
 
     el = fmt.render(minimal_ctx, cms)
     xml_str = ET.tostring(el, encoding="unicode")
@@ -126,6 +135,43 @@ def test_minimal_record_renders_valid_lido_1_0() -> None:
     assert errors == [], f"Minimal LIDO record failed XSD: {errors}"
     assert "MIN-001" in xml_str
     assert "Minimales Objekt" in xml_str
+
+
+def test_lido_requires_title_and_work_type_mappings() -> None:
+    diagnostics = LidoFormat().validate_mapping(
+        CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    )
+
+    assert {diagnostic.code for diagnostic in diagnostics} == {"required_target_missing"}
+    assert len(diagnostics) == 2
+
+
+def test_lido_requires_an_event_type_for_event_mappings() -> None:
+    diagnostics = LidoFormat().validate_mapping(
+        CompiledMappingSet(
+            format_key="lido",
+            record_type="object",
+            rules=[
+                MappingSpec(
+                    source_kind=SourceKind.CONSTANT,
+                    source_config={"value": "Objekt"},
+                    target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+                ),
+                MappingSpec(
+                    source_kind=SourceKind.FIELD,
+                    source_config={"field_name": "title"},
+                    target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+                ),
+                MappingSpec(
+                    source_kind=SourceKind.FIELD,
+                    source_config={"field_name": "date"},
+                    target_key="lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate",
+                ),
+            ],
+        )
+    )
+
+    assert [diagnostic.code for diagnostic in diagnostics] == ["event_type_missing"]
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +196,15 @@ def test_html_in_fields_is_sanitized_cleanly() -> None:
         media=[],
     )
     fmt = LidoFormat()
-    cms = CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+            MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Objekt"}, target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"),
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "description"}, target_key="lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue"),
+        ],
+    )
 
     el = fmt.render(ctx, cms)
     xml_str = ET.tostring(el, encoding="unicode")
@@ -193,7 +247,8 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
     )
     assert "<GetRecord>" in get_rec_xml
     assert "<lido:lidoWrap" in get_rec_xml
-    assert "DE-3066--os_ub_0029908" in get_rec_xml
+    assert "os_ub_0029908" in get_rec_xml
+    assert "DE-3066" not in get_rec_xml
 
     # 2. OAI ListRecords
     list_rec_xml = oaipmh_service.list_records(
@@ -209,7 +264,7 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
     )
     assert "<ListRecords>" in list_rec_xml
     assert "<lido:lidoWrap" in list_rec_xml
-    assert "Paul Barbier" in list_rec_xml
+    assert "Historische Bildpostkarten" not in list_rec_xml
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +308,7 @@ def test_institution_config_reaches_lido_renderer() -> None:
         format_key="lido",
         record_type="object",
         rules=[],
-        institution_config={"isil": "DE-9999", "repository_name": "Testarchiv"},
+        institution_config={"isil": "DE-9999", "institution_name": "Testarchiv", "website": "https://example.test"},
     )
     xml_str = ET.tostring(fmt.render(minimal_ctx, mapping_set), encoding="unicode")
     assert "DE-9999" in xml_str
@@ -278,12 +333,16 @@ def test_group_vocab_rights_value_extracts_label_not_python_repr() -> None:
         },
     )
     fmt = LidoFormat()
-    cms = CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "rights"}, target_key="lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term")],
+    )
     xml_str = ET.tostring(fmt.render(ctx, cms), encoding="unicode")
 
     assert "rechtemodell" not in xml_str
     assert "098a9aa2-3ec0-4cea-9b25-f49dafa75ab8" not in xml_str
-    assert "<lido:conceptID lido:type=\"http://terminology.lido-schema.org/lido00099\" lido:source=\"URI\">CC0 1.0</lido:conceptID>" in xml_str
+    assert "<lido:term>CC0 1.0</lido:term>" in xml_str
 
 
 def test_group_vocab_value_prefers_uri_over_label() -> None:
@@ -297,7 +356,11 @@ def test_group_vocab_value_prefers_uri_over_label() -> None:
         },
     )
     fmt = LidoFormat()
-    cms = CompiledMappingSet(format_key="lido", record_type="object", rules=[])
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "rights"}, target_key="lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term")],
+    )
     xml_str = ET.tostring(fmt.render(ctx, cms), encoding="unicode")
 
     assert "http://creativecommons.org/publicdomain/zero/1.0/" in xml_str

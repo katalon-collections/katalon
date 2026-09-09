@@ -2959,6 +2959,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       <div className="scroll">
         <div className={showTwoCol ? 'form-grid' : 'form-single'}>
           <div>
+            {variants.length > 0 && (
+              <label className="field" style={{ display: 'block', maxWidth: 300, margin: '0 0 14px' }}>
+                <span className="lbl">{t('variants.label')}</span>
+                <select className="fld" value={activeVariantId ?? ''} onChange={event => selectVariant(event.target.value || null)}>
+                  <option value="">{t('variants.complete')}</option>
+                  {variants.map(variant => <option key={variant.id} value={variant.id}>{getLabel(variant, variant.name)}</option>)}
+                </select>
+              </label>
+            )}
+
             <div className="card">
               <div className="hd">{t('cards.system')}</div>
               <div className="bd">
@@ -2991,7 +3001,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} {recordType !== 'object' && <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span>}</div>
                     <select
                       className="fld"
                       value={subtype}
@@ -3027,21 +3037,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       disabled={justCreated}
                     >
                       {COLLECTION_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </div>
-                )}
-
-                {recordType === 'object' && availableCollections.length > 0 && (
-                  <div className="field">
-                    <div className="lbl">Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
-                    <select
-                      className="fld"
-                      value={selectedCollectionId}
-                      onChange={e => { setSelectedCollectionId(e.target.value); setIsDirty(true) }}
-                      disabled={justCreated}
-                    >
-                      <option value="">— Keine —</option>
-                      {availableCollections.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
                     </select>
                   </div>
                 )}
@@ -3091,16 +3086,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 )}
               </div>
             </div>
-
-            {variants.length > 0 && (
-              <label className="field" style={{ display: 'block', maxWidth: 300, margin: '14px 0' }}>
-                <span className="lbl">{t('variants.label')}</span>
-                <select className="fld" value={activeVariantId ?? ''} onChange={event => selectVariant(event.target.value || null)}>
-                  <option value="">{t('variants.complete')}</option>
-                  {variants.map(variant => <option key={variant.id} value={variant.id}>{getLabel(variant, variant.name)}</option>)}
-                </select>
-              </label>
-            )}
 
             <div className="card">
               <div className="hd">{t('cards.metadata')}</div>
@@ -3718,6 +3703,26 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
           {showTwoCol && (
             <div className="form-side">
+              {recordType === 'object' && availableCollections.length > 0 && (
+                <div className="card collection-card" style={{ marginBottom: 14 }}>
+                  <div className="hd">Sammlung</div>
+                  <div className="bd">
+                    <div className="field">
+                      <div className="lbl">Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                      <select
+                        className="fld"
+                        value={selectedCollectionId}
+                        onChange={e => { setSelectedCollectionId(e.target.value); setIsDirty(true) }}
+                        disabled={justCreated}
+                      >
+                        <option value="">— Keine —</option>
+                        {availableCollections.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {showMedia && (
                 <div className="card media-card" style={{ marginBottom: 14 }} data-tour="media-section">
                   <div className="hd">
@@ -3908,7 +3913,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {showStorageLocationCard && !isNew && (
-                <div className="card" style={{ marginBottom: 14, overflow: addLocationOpen ? 'visible' : undefined }}>
+                <div className="card storage-card" style={{ marginBottom: 14, overflow: addLocationOpen ? 'visible' : undefined }}>
                   <div className="hd">
                     <span>Zugeordnete Lagerorte</span>
                     {storageLocationRels.length > 0 && <span className="sub">{storageLocationRels.length}</span>}
@@ -4041,7 +4046,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {!isNew && savedId && showSnapshotsForRecord && (
-                <div className="card">
+                <div className="card versions-card">
                   <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowSnapshots(s => !s)}>
                     <span>Versionen ({snapshots.length})</span>
                     <div className="grow" />
@@ -4122,7 +4127,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
 
               {!isNew && (
-                <div className="card">
+                <div className="card audit-card">
                   <div className="hd" style={{ cursor: 'pointer' }} onClick={() => {
                     if (!showAudit && savedId) loadAudit(savedId)
                     setShowAudit(a => !a)

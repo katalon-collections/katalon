@@ -690,3 +690,81 @@ async def test_portal_search_forwards_rel_collection(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert captured["rel_filters"] == {"related_collections": ["Nachlass Müller"]}
+
+
+@pytest.mark.asyncio
+async def test_portal_config_endpoints_are_browser_cacheable() -> None:
+    """The portal refetches these on every page view; they must be cacheable.
+
+    Under crawler traffic these multiply per crawled page, so a short TTL keeps
+    them out of the request chain entirely.
+    """
+    session = AsyncMock()
+    session.execute.return_value = _result(items=[])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for path in (
+                "/portal/v1/pages",
+                "/portal/v1/banners/active/portal",
+                "/portal/v1/theme",
+            ):
+                response = await client.get(path)
+                assert response.status_code == 200, path
+                assert response.headers["cache-control"] == "public, max-age=60", path
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+
+@pytest.mark.asyncio
+async def test_portal_config_is_browser_cacheable() -> None:
+    result = MagicMock()
+    # First lookup is the PortalConfig row; later lookups (AdminConfig for
+    # supported languages) fall back to defaults.
+    result.scalar_one_or_none.side_effect = [PortalConfig(key="default"), None]
+    result.all.return_value = []
+    session = AsyncMock()
+    session.execute.return_value = result
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/portal/config")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=60"
+
+@pytest.mark.asyncio
+async def test_portal_schema_cache_header_depends_on_the_viewer() -> None:
+    """The staff projection contains non-public fields and must not be shared."""
+    session = AsyncMock()
+    session.execute.return_value = _result(items=[])
+
+    async def override_db():
+        yield session
+
+    staff_user = User(id=uuid.uuid4(), email="s@example.org", role="editor", is_active=True)
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            anon = await client.get("/portal/v1/schema/object")
+            assert anon.headers["cache-control"] == "public, max-age=60"
+            assert anon.headers["vary"] == "Authorization"
+
+            app.dependency_overrides[try_get_current_user] = lambda: staff_user
+            staff = await client.get("/portal/v1/schema/object")
+            assert staff.headers["cache-control"] == "private, no-store"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)

@@ -520,7 +520,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   <td>
                     {depth > 0 && <span style={{ display: 'inline-block', width: depth * 16 }} aria-hidden="true" />}
                     {depth > 0 && <span style={{ color: 'var(--fg-4)', marginRight: 4 }} aria-hidden="true">&#8627;</span>}
-                    <span className="tt">{getFieldValue(m, primaryKey)}</span>
+                    {onOpen ? (
+                      <button
+                        type="button"
+                        className="record-label-button"
+                        onClick={() => onOpen(rec.id)}
+                        aria-label={canEdit
+                          ? t('editRowAriaLabel', { label: recordLabel })
+                          : t('viewRowAriaLabel', { label: recordLabel })}
+                      >
+                        {getFieldValue(m, primaryKey)}
+                      </button>
+                    ) : (
+                      <span className="tt">{getFieldValue(m, primaryKey)}</span>
+                    )}
                   </td>
                   {extraFields.map(f => (
                     <td key={f.name} style={{ color: 'var(--fg-2)' }}>
@@ -532,7 +545,9 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   <td className="col-act">
                     <div className="row-actions">
                       <ActionMenu
-                        ariaLabel={t('editRowAriaLabel', { label: recordLabel })}
+                        ariaLabel={canEdit
+                          ? t('editRowAriaLabel', { label: recordLabel })
+                          : t('viewRowAriaLabel', { label: recordLabel })}
                         items={[
                           {
                             key: canEdit ? 'edit' : 'view',

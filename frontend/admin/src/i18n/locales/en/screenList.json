@@ -49,6 +49,7 @@
   "deleteConfirmWithConflicts": "{{message}}\n\nAll links will be removed when deleting. Continue?",
   "editRowAriaLabel": "Edit {{label}}",
   "editRowTitle": "Edit",
+  "viewRowAriaLabel": "View {{label}}",
   "viewRowTitle": "View",
   "deleteRowAriaLabel": "Delete {{label}}",
   "deleteRowTitle": "Delete",

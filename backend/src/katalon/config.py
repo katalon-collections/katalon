@@ -120,6 +120,11 @@ class Settings(BaseSettings):
     rate_limit_oai: str = "100/minute"
     rate_limit_authority_proxy: str = "60/minute"
     rate_limit_sparql: str = "60/minute"
+    # Zählerspeicher für slowapi. Leer = In-Process-Speicher, korrekt nur bei
+    # genau einem API-Worker/-Container. Produktiv auf die Redis-URL setzen,
+    # sonst hat jeder Worker seinen eigenen Zähler und das effektive Limit ist
+    # ein Vielfaches des konfigurierten Werts.
+    rate_limit_storage_uri: str = ""
 
     # --- Crawler-Steuerung ---
     robots_disallow_paths: Annotated[list[str], NoDecode] = ["/v1/"]

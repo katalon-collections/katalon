@@ -49,6 +49,7 @@
   "deleteConfirmWithConflicts": "{{message}}\n\nAlle Verknüpfungen werden beim Löschen entfernt. Fortfahren?",
   "editRowAriaLabel": "{{label}} bearbeiten",
   "editRowTitle": "Bearbeiten",
+  "viewRowAriaLabel": "{{label}} anzeigen",
   "viewRowTitle": "Anzeigen",
   "deleteRowAriaLabel": "{{label}} löschen",
   "deleteRowTitle": "Löschen",

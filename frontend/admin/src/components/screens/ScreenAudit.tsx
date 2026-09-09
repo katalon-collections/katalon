@@ -4,11 +4,11 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { audit } from '../../api/client'
-import type { AuditEntry } from '../../types'
-import { Check, Edit, Trash, Globe, Upload, Link, Lightning } from '../ui/Icons'
+import type { AuditEntry, Page } from '../../types'
+import { Check, Edit, Trash, Globe, Upload, Link, Lightning, Search } from '../ui/Icons'
 
 const TYPE_ROUTES: Record<string, string> = {
-  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form',
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form', collection: 'collections-form',
 }
 
 function navigateToRecord(type: string, id: string) {
@@ -112,7 +112,7 @@ type Props = { initialFilter?: string | null; onFilterChange?: (filter: string) 
 
 export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
   const { t } = useTranslation('screenAudit')
-  const [entries, setEntries] = useState<AuditEntry[]>([])
+  const [data, setData] = useState<Page<AuditEntry>>({ total: 0, page: 1, page_size: 50, items: [] })
 
   const ACTION_LABELS: Record<string, string> = {
     create: t('actionLabels.create'), update: t('actionLabels.update'), delete: t('actionLabels.delete'), publish: t('actionLabels.publish'),
@@ -121,29 +121,35 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
     ai_schema_assist: t('actionLabels.ai_schema_assist'),
   }
   const [filter, setFilter] = useState(initialFilter && ACTIONS.includes(initialFilter) ? initialFilter : 'all')
+  const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    audit.list({ limit: 200 })
-      .then(setEntries)
+    audit.search({
+      q: submittedQuery || undefined,
+      action: filter === 'all' ? undefined : filter,
+      created_from: createdFrom || undefined,
+      created_to: createdTo ? `${createdTo}T23:59:59` : undefined,
+      page,
+      page_size: 50,
+    })
+      .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
-
-  const filtered = filter === 'all'
-    ? entries
-    : filter === 'media' || filter === 'relation'
-      ? entries.filter(e => e.action.startsWith(`${filter}_`))
-      : entries.filter(e => e.action === filter)
+  }, [createdFrom, createdTo, filter, page, submittedQuery])
 
   // A relation change is logged once per endpoint it connects (so each record's
   // own history shows it); in this cross-record feed that'd render as two rows
   // for the same event, so keep only the first occurrence per relation+action.
   const seenRelations = new Set<string>()
-  const items = filtered.filter(evt => {
+  const items = data.items.filter(evt => {
     const relationId = (evt.changed_fields as ExtraFields)?.relation_id
     if (!relationId) return true
     const key = `${evt.action}:${relationId}`
@@ -158,9 +164,24 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
         <div><h1>{t('headline')}</h1><div className="sub">{t('subtitle')}</div></div>
       </div>
 
+      <form className="toolbar" onSubmit={event => { event.preventDefault(); setPage(1); setSubmittedQuery(query.trim()) }}>
+        <div className="search">
+          <Search className="ic" size={14} />
+          <input
+            aria-label={t('searchAriaLabel')}
+            placeholder={t('searchPlaceholder')}
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+        </div>
+        <input aria-label={t('fromDateAriaLabel')} className="fld" type="date" value={createdFrom} onChange={event => { setPage(1); setCreatedFrom(event.target.value) }} />
+        <input aria-label={t('toDateAriaLabel')} className="fld" type="date" value={createdTo} onChange={event => { setPage(1); setCreatedTo(event.target.value) }} />
+        <button className="btn gh" type="submit">{t('searchButton')}</button>
+      </form>
+
       <div className="toolbar">
         {ACTIONS.map(a => (
-          <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => { setFilter(a); onFilterChange?.(a) }}>
+          <button key={a} className={`btn${filter === a ? ' pri' : ' gh'}`} onClick={() => { setPage(1); setFilter(a); onFilterChange?.(a) }}>
             {a === 'all' ? t('actionLabels.all') : a === 'media' ? t('actionLabels.media') : a === 'relation' ? t('actionLabels.relation') : ACTION_LABELS[a]}
           </button>
         ))}
@@ -229,6 +250,16 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
             )
           })}
           {items.length === 0 && <div className="empty">{t('empty')}</div>}
+        </div>
+      )}
+      {!loading && !error && data.total > 0 && (
+        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+          <span className="sub">{t('resultCount', { count: data.total })}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn gh" disabled={page === 1} onClick={() => setPage(current => current - 1)}>{t('previousPage')}</button>
+            <span className="sub">{t('page', { page, pages: Math.ceil(data.total / data.page_size) })}</span>
+            <button className="btn gh" disabled={page * data.page_size >= data.total} onClick={() => setPage(current => current + 1)}>{t('nextPage')}</button>
+          </div>
         </div>
       )}
     </div>

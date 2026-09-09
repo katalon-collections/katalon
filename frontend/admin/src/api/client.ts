@@ -764,6 +764,10 @@ export const audit = {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<AuditEntry[]>(`/v1/audit${qs ? `?${qs}` : ''}`)
   },
+  search: (params?: { q?: string; record_type?: string; record_id?: string; user_id?: string; action?: string; created_from?: string; created_to?: string; page?: number; page_size?: number }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, String(v)])).toString()
+    return req<Page<AuditEntry>>(`/v1/audit/search${qs ? `?${qs}` : ''}`)
+  },
 }
 
 // Static Pages

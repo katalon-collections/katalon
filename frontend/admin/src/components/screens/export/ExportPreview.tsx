@@ -8,6 +8,39 @@ import type { MappingDiagnostic } from '../../../types'
 import { AlertCircle, Eye } from '../../ui/Icons'
 import { SpecimenPicker, type Specimen } from './SpecimenPicker'
 
+function formatXml(xml: string): string {
+  const normalized = xml.replace(/>\s*</g, '><').trim()
+  let depth = 0
+  return normalized
+    .split(/(<[^>]+>)/g)
+    .filter(Boolean)
+    .map(part => {
+      if (!part.startsWith('<')) return part.trim() ? `${'  '.repeat(depth)}${part.trim()}` : ''
+      if (/^<\/[^>]+>/.test(part)) depth = Math.max(0, depth - 1)
+      const line = `${'  '.repeat(depth)}${part}`
+      if (/^<[^/?!][^>]*[^/]?>$/.test(part)) depth += 1
+      return line
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function HighlightedXml({ xml }: { xml: string }) {
+  return <>
+    {formatXml(xml).split('\n').map((line, index) => {
+      const parts = line.split(/(<[^>]+>)/g)
+      return <span key={index} style={{ display: 'block' }}>
+        {parts.map((part, partIndex) => part.startsWith('<!--')
+          ? <span key={partIndex} style={{ color: 'var(--fg-3)' }}>{part}</span>
+          : part.startsWith('<')
+            ? <span key={partIndex} style={{ color: 'var(--accent)' }}>{part}</span>
+            : part)}
+      </span>
+    })}
+  </>
+}
+
+
 export function ExportPreview({ recordType, mappingSetId }: { recordType: string; mappingSetId: string }) {
   const { t } = useTranslation('screenExport')
   const [specimen, setSpecimen] = useState<Specimen | null>(null)
@@ -69,8 +102,9 @@ export function ExportPreview({ recordType, mappingSetId }: { recordType: string
         <pre style={{
           background: 'var(--panel-2, #f8fafc)', border: '1px solid var(--border)', borderRadius: 8,
           padding: 12, fontSize: 11.5, lineHeight: 1.5, maxHeight: 420, overflow: 'auto', fontFamily: 'var(--mono)',
+          tabSize: 2, whiteSpace: 'pre',
         }}>
-          {xml}
+          <HighlightedXml xml={xml} />
         </pre>
       )}
 
