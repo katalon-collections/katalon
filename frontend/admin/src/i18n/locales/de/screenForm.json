@@ -1,0 +1,67 @@
+{
+  "dateInput": {
+    "placeholder": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
+    "pickerTitleEnabled": "Datumsauswahl öffnen",
+    "pickerTitleDisabled": "Kein einzelner Tag – manuell bearbeiten",
+    "pickerAriaLabel": "Datum auswählen"
+  },
+  "vocabPicker": {
+    "searchTab": "Suche",
+    "treeTab": "Struktur",
+    "browseTitle": "Vokabular-Struktur durchsuchen",
+    "expand": "Aufklappen",
+    "collapse": "Einklappen",
+    "loading": "Laden…",
+    "empty": "Keine Begriffe vorhanden"
+  },
+  "pid": {
+    "mintUrn": "URN reservieren",
+    "mintUrnPending": "Registriert…",
+    "mintArk": "ARK vergeben",
+    "mintArkPending": "Vergebt…",
+    "mintHint": "Datensatz zuerst speichern, dann PID vergeben.",
+    "systemManaged": "vom System vergeben"
+  },
+  "url": {
+    "linkLabel": "Linktitel (optional)",
+    "add": "URL hinzufügen"
+  },
+  "workingSets": {
+    "add": "Zu Arbeitsliste",
+    "inWorkingSets": "In {{count}} Arbeitslisten",
+    "inWorkingSets_one": "In 1 Arbeitsliste",
+    "containedTitle": "Zugeordnete Arbeitslisten",
+    "openSet": "Öffnen",
+    "addToAnother": "+ Zu Arbeitsliste hinzufügen…"
+  },
+  "repeatable": {
+    "add": "Hinzufügen",
+    "cancel": "Abbrechen",
+    "addRelationship": "Beziehung hinzufügen",
+    "hint": "Wiederholbares Feld"
+  },
+  "sections": {
+    "label": "Formularabschnitte",
+    "general": "Allgemein"
+  },
+  "variants": {
+    "label": "Formularansicht",
+    "complete": "Vollständig"
+  },
+  "cards": {
+    "system": "Stammdaten",
+    "metadata": "Metadaten"
+  },
+  "presence": {
+    "editingBy": "Wird aktuell auch bearbeitet von: {{names}}. Gleichzeitige Änderungen können zu Konflikten führen."
+  },
+  "locks": {
+    "youLocked": "Diese Aufzeichnung ist von Ihnen exklusiv gesperrt. Grund: {{reason}}",
+    "lockedBy": "Exklusiv gesperrt von {{name}}. Grund: {{reason}}",
+    "expiresAt": "Läuft ab: {{date}}",
+    "noReason": "Kein Grund angegeben"
+  },
+  "preservation": {
+    "bagTitle": "Preservation Package (BagIt/ZIP) für dieses Objekt erzeugen und herunterladen"
+  }
+}

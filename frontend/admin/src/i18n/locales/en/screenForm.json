@@ -1,0 +1,67 @@
+{
+  "dateInput": {
+    "placeholder": "YYYY, YYYY-MM or YYYY-MM-DD",
+    "pickerTitleEnabled": "Open date picker",
+    "pickerTitleDisabled": "Date is not a single day – edit manually",
+    "pickerAriaLabel": "Pick a date"
+  },
+  "vocabPicker": {
+    "searchTab": "Search",
+    "treeTab": "Hierarchy",
+    "browseTitle": "Browse vocabulary hierarchy",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "loading": "Loading…",
+    "empty": "No terms available"
+  },
+  "pid": {
+    "mintUrn": "Reserve URN",
+    "mintUrnPending": "Registering…",
+    "mintArk": "Assign ARK",
+    "mintArkPending": "Assigning…",
+    "mintHint": "Save the record first, then assign the PID.",
+    "systemManaged": "assigned by the system"
+  },
+  "url": {
+    "linkLabel": "Link title (optional)",
+    "add": "Add URL"
+  },
+  "workingSets": {
+    "add": "To Worklist",
+    "inWorkingSets": "In {{count}} Worklists",
+    "inWorkingSets_one": "In 1 Worklist",
+    "containedTitle": "Assigned Worklists",
+    "openSet": "Open",
+    "addToAnother": "+ Add to worklist…"
+  },
+  "repeatable": {
+    "add": "Add",
+    "cancel": "Cancel",
+    "addRelationship": "Add relation",
+    "hint": "Repeatable field"
+  },
+  "sections": {
+    "label": "Form sections",
+    "general": "General"
+  },
+  "variants": {
+    "label": "Form view",
+    "complete": "Complete"
+  },
+  "cards": {
+    "system": "Record data",
+    "metadata": "Metadata"
+  },
+  "presence": {
+    "editingBy": "Currently also being edited by: {{names}}. Simultaneous changes may cause conflicts."
+  },
+  "locks": {
+    "youLocked": "This record is exclusively locked by you. Reason: {{reason}}",
+    "lockedBy": "Exclusively locked by {{name}}. Reason: {{reason}}",
+    "expiresAt": "Expires: {{date}}",
+    "noReason": "No reason given"
+  },
+  "preservation": {
+    "bagTitle": "Generate and download a preservation package (BagIt/ZIP) for this object"
+  }
+}

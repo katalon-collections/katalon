@@ -1,0 +1,14 @@
+{
+  "tryItOut": "Try it out",
+  "paused": "Step {{current}}/{{total}} — paused",
+  "resume": "Resume tour",
+  "cancel": "Cancel tour",
+  "locale": {
+    "back": "Back",
+    "close": "Close",
+    "last": "Done",
+    "next": "Next",
+    "nextLabelWithProgress": "Next (step {{step}} of {{steps}})",
+    "skip": "Skip"
+  }
+}

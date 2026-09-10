@@ -1,0 +1,137 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  elasticsearch:
+    ports:
+      - "9200:9200"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  cantaloupe:
+    ports:
+      - "8182:8182"
+    environment:
+      - CANTALOUPE_SOURCE_STATIC=FilesystemSource
+      - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
+      - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
+      - CANTALOUPE_BASE_URI=${CANTALOUPE_PUBLIC_URL:-http://localhost}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  oxigraph:
+    ports:
+      - "7878:7878"
+    profiles:
+      - rdf
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend.dev
+    environment:
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/migrations:/app/migrations
+      - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
+    command: uvicorn katalon.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      cantaloupe:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend.dev
+    environment:
+      SECRET_KEY: change-me-in-production
+      KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+    volumes:
+      - ./backend/src:/app/src
+      - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
+    command: watchfiles --filter python "celery -A katalon.workers.celery_app worker --pool=threads --loglevel=info" /app/src
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      cantaloupe:
+        condition: service_started
+
+  admin:
+    build:
+      context: ./frontend/admin
+      dockerfile: ../../docker/Dockerfile.admin.dev
+    volumes:
+      - ./frontend/admin:/app
+      - /app/node_modules
+    ports:
+      - "4000:5173"
+    environment:
+      - VITE_API_URL=
+      - CI=true
+      - API_PROXY_TARGET=http://api:8000
+      - VITE_PORTAL_URL=${VITE_PORTAL_URL:-http://localhost:4001}
+      - VITE_ADMIN_FEEDBACK_ENABLED=${VITE_ADMIN_FEEDBACK_ENABLED:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  portal:
+    build:
+      context: ./frontend/portal
+      dockerfile: ../../docker/Dockerfile.portal.dev
+    volumes:
+      - ./frontend/portal:/app
+      - /app/node_modules
+    ports:
+      - "4001:5174"
+    environment:
+      - VITE_API_URL=
+      - CI=true
+      - API_PROXY_TARGET=http://api:8000
+      - VITE_ADMIN_URL=${VITE_ADMIN_URL:-http://localhost:4000}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5174/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Outer nginx proxies to the production frontend ports, but the Dev
+  # containers run Vite on 5173/5174. Remove its inherited host ports so
+  # optional host-level Caddy can bind 80/443.
+  nginx:
+    ports: !reset []
+    depends_on:
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      portal:
+        condition: service_healthy

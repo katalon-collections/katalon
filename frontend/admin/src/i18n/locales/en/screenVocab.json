@@ -1,0 +1,120 @@
+{
+  "recordTypes": {
+    "object": "Object",
+    "entity": "Entity",
+    "place": "Place",
+    "occurrence": "Occurrence",
+    "procedure": "Procedure",
+    "collection": "Collection",
+    "storage_location": "Storage location"
+  },
+  "relationFields": {
+    "sourceTypes": "Source types (starting record)",
+    "targetTypes": "Target types (linked record)"
+  },
+  "appliesCheckboxes": {
+    "noSelectionMeansAll": "Nothing selected = applies to all types"
+  },
+  "appliesLabel": {
+    "all": "All"
+  },
+  "appliesPreview": {
+    "appliesTo": "Applies to",
+    "hint": "No selection in either field applies to all combinations; source without target type applies to source → all."
+  },
+  "inverseLabelPrefix": "Inverse label",
+  "vocabMeta": {
+    "termsCount": "{{count}} terms",
+    "hierarchical": "Hierarchical",
+    "flat": "Flat",
+    "relation": "Relations",
+    "picklist": "Choice list"
+  },
+  "tableHeaders": {
+    "inverse": "Inverse",
+    "types": "Types",
+    "parent": "Parent"
+  },
+  "editRow": "Edit",
+  "duplicateRow": "Duplicate",
+  "addChildTerm": "Add sub-term",
+  "deleteRow": "Delete",
+  "systemVocabBadge": "System vocabulary",
+  "headline": "Vocabulary",
+  "headlineSub": "Controlled vocabularies and terms",
+  "requiredBadge": "Required",
+  "uri": "Canonical URI",
+  "uriPlaceholder": "e.g. http://vocab.getty.edu/aat/300028051",
+  "exactMatchUris": "Exact Match URIs",
+  "exactMatchUrisHelp": "Comma- or newline-separated URIs (skos:exactMatch)",
+  "canonicalUri": "Canonical Vocabulary URI / Namespace",
+  "canonicalUriPlaceholder": "e.g. http://vocab.getty.edu/aat/",
+  "uriHelpPopover": {
+    "title": "Canonical URI",
+    "description": "The globally unique, persistent Linked Data URI of this concept in an authority database or thesaurus (e.g. Getty AAT, GND, or Nomisma).",
+    "example": "Example: http://vocab.getty.edu/aat/300028051 (Monograph)",
+    "exportNote": "Serves as a stable global identifier in RDF and Linked Data exports."
+  },
+  "exactMatchUrisHelpPopover": {
+    "title": "Exact Match URIs (skos:exactMatch)",
+    "description": "External cross-concordances to equivalent concepts in other thesauri. Indicates that concepts from different vocabularies share the exact same meaning.",
+    "example": "Example: https://d-nb.info/gnd/4008570-3 (GND) or http://id.loc.gov/authorities/subjects/sh85015738 (LCSH)",
+    "separatorNote": "Separate multiple URIs with commas or line breaks."
+  },
+  "canonicalUriHelpPopover": {
+    "title": "Canonical Vocabulary URI / Namespace",
+    "description": "Base URI or namespace of the entire vocabulary or ConceptScheme (e.g. http://vocab.getty.edu/aat/). Term URIs typically relate to this scheme."
+  },
+  "relationTypeHelp": {
+    "heading": "How the relation type is used",
+    "source": "Source",
+    "target": "Target",
+    "description": "“{{source}}” is the starting record, “{{target}}” the linked record. The label applies from Source → Target; the inverse direction shows the same connection from the Target.",
+    "example": "Example: \"is part of\" for Object → Occurrence; as inverse \"has part\" for Occurrence → Object.",
+    "preview": "Preview:",
+    "labelFallback": "Label",
+    "inverseFallback": "Inverse"
+  },
+  "importButton": "Import",
+  "importDialog": {
+    "title": "Import terms into \"{{name}}\"",
+    "targetVocab": "Target vocabulary",
+    "selectVocab": "Select vocabulary",
+    "relationNotice": "Relation types are flat. Without an ID column, the ID is derived automatically from the label.",
+    "hierarchyNotice": "Hierarchical lists: map one column to \"Parent-ID\". Without an ID column, the ID is derived from the label.",
+    "dropzonePrompt": "Drop file here or browse",
+    "acceptedFormats": "CSV, TSV, JSON, SKOS (Turtle .ttl, RDF/XML .rdf, JSON-LD .jsonld)",
+    "csvMapping": "Map CSV columns",
+    "csvRequireTermOrLabel": "Please map at least one column to 'ID' or 'Label'. Without an ID column, the ID is derived from the label.",
+    "ignore": "Ignore",
+    "targetId": "ID",
+    "targetParentId": "Parent-ID",
+    "targetLabelDe": "Label (de)",
+    "targetLabelEn": "Label (en)",
+    "targetInvDe": "Inverse label (de)",
+    "targetInvEn": "Inverse label (en)",
+    "targetUri": "URI (Canonical)",
+    "targetExactMatch": "Exact Match URIs",
+    "skosOptions": "SKOS Filters & Options",
+    "conceptScheme": "ConceptScheme URI (filter)",
+    "conceptSchemeHelp": "e.g. http://vocab.getty.edu/aat/ (leave empty for entire file)",
+    "topConcept": "Top-Concept URI (filter)",
+    "topConceptHelp": "e.g. http://vocab.getty.edu/aat/300000000 (only this concept and its descendants)",
+    "maxDepth": "Maximum depth",
+    "maxDepthHelp": "Limit hierarchy depth (e.g. 2 for root + direct children)",
+    "maxTerms": "Maximum number of terms",
+    "maxTermsHelp": "Safety limit for large thesauri (default: 50,000)",
+    "detectedSchemes": "Detected ConceptSchemes:",
+    "detectedTopConcepts": "Detected Top Concepts:",
+    "useAsFilter": "Use as filter",
+    "strategyAppend": "Strategy: Append",
+    "strategyReplace": "Strategy: Replace all",
+    "dryRun": "Preview (Dry run)",
+    "execute": "Run import",
+    "busy": "Processing...",
+    "resultSummary": "{{mode}} · {{total}} concepts · created: {{created}} · updated: {{updated}} · deleted: {{deleted}}",
+    "errorsHeading": "Errors / Warnings:",
+    "rowError": "Row {{row}}: {{message}}",
+    "generalError": "{{message}}"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "record": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "idno": "os_ub_0029908",
+    "record_type": "object",
+    "target_subtype": "postcard",
+    "title": "Künstler-Postkarte 'Guerre 1939-1944'",
+    "status": "public",
+    "created_at": "2024-01-10T10:00:00Z",
+    "updated_at": "2026-07-08T10:24:32Z",
+    "canonical_url": "https://bildpostkarten.uni-osnabrueck.de/frontend/index.php/Detail/objects/os_ub_0029908"
+  },
+  "fields": {
+    "title": "Künstler-Postkarte 'Guerre 1939-1944'",
+    "object_type": "Postkarte",
+    "collection_name": "Historische Bildpostkarten",
+    "inscriptions": "Guerre 1939-1944. Dessins de Paul Barbier",
+    "description": "Propagandapostkarte aus Frankreich im Zweiten Weltkrieg.",
+    "measurements": "9 x 14 cm",
+    "usage_date": "1939 bis 1944",
+    "usage_date_earliest": "1939-01-01",
+    "usage_date_latest": "1944-12-31",
+    "subjects": ["Propaganda", "Zweiter Weltkrieg", "Frankreich"],
+    "rights": "http://rightsstatements.org/vocab/InC/1.0/"
+  },
+  "relations": [
+    {
+      "id": "rel-paul-barbier",
+      "direction": "outbound",
+      "relation_type": "creator",
+      "target_type": "entity",
+      "target_id": "entity-paul-barbier",
+      "target_label": "Paul Barbier",
+      "target_idno": "GND-118506544",
+      "metadata": {
+        "role": "Künstler"
+      },
+      "target_values": {
+        "preferred_name": "Barbier, Paul",
+        "gnd_id": "https://d-nb.info/gnd/118506544"
+      }
+    },
+    {
+      "id": "rel-papeterie",
+      "direction": "outbound",
+      "relation_type": "publisher",
+      "target_type": "entity",
+      "target_id": "entity-papeterie",
+      "target_label": "Papeterie de Levallois-Clichy",
+      "target_idno": null,
+      "metadata": {
+        "role": "Verlag, Herausgeber"
+      },
+      "target_values": {
+        "preferred_name": "Papeterie de Levallois-Clichy"
+      }
+    },
+    {
+      "id": "rel-paris",
+      "direction": "outbound",
+      "relation_type": "place_of_publication",
+      "target_type": "place",
+      "target_id": "place-paris",
+      "target_label": "Paris (F)",
+      "target_idno": "https://www.geonames.org/2988507",
+      "metadata": {
+        "role": "Verlagsort"
+      },
+      "target_values": {
+        "name": "Paris",
+        "geonames_id": "https://www.geonames.org/2988507"
+      }
+    }
+  ],
+  "media": [
+    {
+      "id": "media-104088",
+      "filename": "60508_ca_object_representations_media_104088_original.jpg",
+      "mime_type": "image/jpeg",
+      "role": "primary",
+      "is_primary": true,
+      "is_public": true,
+      "url": "https://bildpostkarten.uni-osnabrueck.de/frontend/media/bildpostkarten/images/1/0/4/0/60508_ca_object_representations_media_104088_original.jpg",
+      "iiif_url": "https://bildpostkarten.uni-osnabrueck.de/iiif/3/104088/full/max/0/default.jpg",
+      "license_uri": "http://rightsstatements.org/vocab/InC/1.0/",
+      "rights_holder": "Historische Bildpostkarten - Universität Osnabrück"
+    }
+  ]
+}

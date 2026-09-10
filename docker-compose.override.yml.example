@@ -1,0 +1,16 @@
+# docker-compose.override.yml
+# Instanzspezifische Anpassungen hier eintragen.
+# Diese Datei wird von Docker Compose automatisch mit docker-compose.yml zusammengeführt
+# und bei Updates nicht überschrieben.
+services:
+  nginx:
+    ports:
+      - "8443:443" # eigener HTTPS-Port
+
+  api:
+    environment:
+      - EXTRA_VAR=value
+
+  db:
+    volumes:
+      - /mnt/external-disk/katalon-db:/var/lib/postgresql/data # eigener Volume-Pfad

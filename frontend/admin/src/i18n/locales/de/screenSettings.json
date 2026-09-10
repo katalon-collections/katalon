@@ -1,0 +1,98 @@
+{
+  "profil": {
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "intro": "API-Schlüssel ermöglichen programmatischen Lesezugriff. Den Schlüssel als",
+      "create": "Schlüssel erstellen",
+      "creating": "Erstelle…",
+      "created": "Schlüssel erstellt",
+      "namePlaceholder": "Bezeichnung für diesen Schlüssel",
+      "copy": "📋 Kopieren",
+      "revoke": "Widerrufen",
+      "revokeConfirm": "Diesen Schlüssel widerrufen? Er wird sofort ungültig.",
+      "columns": {
+        "name": "Name",
+        "prefix": "Schlüssel",
+        "created": "Erstellt",
+        "lastUsed": "Zuletzt genutzt"
+      }
+    },
+    "email": {
+      "title": "E-Mail ändern",
+      "currentPasswordLabel": "Aktuelles Passwort",
+      "newLabel": "Neue E-Mail",
+      "submit": "Speichern",
+      "success": "E-Mail erfolgreich aktualisiert.",
+      "errors": {
+        "invalid": "Ungültige E-Mail-Adresse.",
+        "newRequired": "Neue E-Mail erforderlich.",
+        "passwordRequired": "Aktuelles Passwort erforderlich."
+      }
+    },
+    "password": {
+      "title": "Passwort ändern",
+      "currentLabel": "Aktuelles Passwort",
+      "newLabel": "Neues Passwort",
+      "confirmLabel": "Neues Passwort bestätigen",
+      "submit": "Speichern",
+      "success": "Passwort erfolgreich aktualisiert.",
+      "errors": {
+        "mismatch": "Passwörter stimmen nicht überein.",
+        "weak": "Passwort ist zu schwach."
+      }
+    },
+    "tour": {
+      "title": "Onboarding-Tour",
+      "intro": "Die wichtigsten Funktionen von Katalon kennenlernen.",
+      "startBasic": "Tour starten",
+      "startAdvanced": "Ich kenne die Grundlagen"
+    }
+  },
+  "ueber": {
+    "title": "Katalon Collections",
+    "tagline": "Open-Source Metadata Management System für den GLAM-Sektor (Galerien, Bibliotheken, Archive, Museen).",
+    "licenseLabel": "Lizenz",
+    "licenseText": "GNU Affero General Public License v3.0 oder später (AGPL-3.0-or-later)",
+    "copyright": "© 2026 Karl Krägelin",
+    "links": {
+      "repo": "Quellcode auf GitHub",
+      "license": "Lizenztext (LICENSE)",
+      "docs": "Dokumentation",
+      "changelog": "Versionshinweise anzeigen"
+    }
+  },
+  "sparql": {
+    "nav": "Linked Data & SPARQL",
+    "title": "Linked Data & SPARQL-Endpunkt",
+    "description": "Materialisierte RDF-Projektion (Oxigraph) und schreibgeschützter SPARQL 1.1 Protocol Endpoint.",
+    "status": "Verbindungsstatus",
+    "connected": "Verbunden",
+    "unreachable": "Nicht erreichbar",
+    "unreachableHelp": "Oxigraph ist aktiviert, antwortet aber nicht unter der konfigurierten URL. Bitte prüfen Sie, ob der Container läuft und das Docker-Profil 'rdf' aktiv ist.",
+    "triplesCount": "Gespeicherte Triples",
+    "endpointUrl": "SPARQL-Endpunkt",
+    "authModel": "Zugriffsschutz",
+    "authProtected": "Geschützt (JWT / API-Schlüssel)",
+    "authPublic": "Öffentlich (ohne Authentifizierung)",
+    "queryTimeout": "Abfrage-Timeout",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "rebuildTitle": "Triple Store neu aufbauen",
+    "rebuildDescription": "Synchronisiert alle veröffentlichten Datensätze der 7 Kerntypen (Objekte, Entitäten, Orte, Occurrences, Vorgänge, Sammlungen, Standorte) atomar aus PostgreSQL in Oxigraph neu.",
+    "rebuildBtn": "Triple Store neu aufbauen",
+    "rebuilding": "Wird gestartet…",
+    "rebuildConfirm": "Gesamten Triple Store aus PostgreSQL neu aufbauen? Dieser Vorgang läuft asynchron im Hintergrund.",
+    "rebuildSuccess": "Rebuild gestartet — die Synchronisation läuft im Hintergrund.",
+    "rebuildError": "Fehler beim Starten des Rebuilds",
+    "openBuilder": "Zum SPARQL Query Builder →"
+  },
+  "presenceLock": {
+    "title": "Bearbeitungssperre (Presence Lock)",
+    "description": "Steuert, was passiert, wenn ein Datensatz bereits von einer anderen Person bearbeitet wird.",
+    "warningLabel": "Warnung",
+    "warningDescription": "andere Personen sehen einen Hinweis, können den Datensatz aber trotzdem bearbeiten.",
+    "blockingLabel": "Blockierend",
+    "blockingDescription": "solange der Datensatz geöffnet ist, können andere Personen ihn nicht speichern.",
+    "saved": "Gespeichert."
+  }
+}
