@@ -3,6 +3,23 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.29.0] - 2026-09-10
+
+### Added
+- Portal-Terminologie pro Installation konfigurierbar (Issue #373):
+  `PortalConfig.terminology` erlaubt es, die Bezeichnung der Kerntypen
+  (Objekte, Entitäten, Orte, Occurrences, Sammlungen) im Portal zu
+  überschreiben, getrennt nach Singular/Plural und pro Sprache — z. B.
+  „Werk"/„Werke" statt „Objekt"/„Objekte" für eine bibliothekarische
+  Installation. Reine Präsentationsschicht: interne Record-Type-Keys,
+  API-Routen/Payloads und Berechtigungen bleiben unverändert. Im Portal
+  läuft die Auflösung zentral über `typeLabel()`/`t()` in `i18n/index.ts`,
+  sodass Hauptnavigation, Startseite, Suchergebnisse, Facetten und
+  Detailseiten die konfigurierten Begriffe automatisch übernehmen, ohne
+  dass jede Stelle einzeln angepasst werden musste. Fehlt eine Übersetzung
+  oder ein Override, greift die eingebaute Standardterminologie — im Admin
+  unter Einstellungen → Terminologie mit „Auf Standard zurücksetzen" pro Typ.
+
 ## [1.28.0] - 2026-09-10
 
 ### Added

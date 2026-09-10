@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype } from '../../types'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, TerminologyEntry } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'startseite' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -570,6 +570,107 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('startseite.saving') : t('startseite.save')}</button>
         {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('startseite.saved')}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Terminologie section (#373 — configurable portal record-type labels)
+// ---------------------------------------------------------------------------
+
+const TERMINOLOGY_TYPES = RECORD_TYPES.filter(({ key }) => key !== 'procedure')
+
+function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
+  const { t } = useTranslation('screenSettings')
+  const [terminology, setTerminologyState] = useState<Record<string, TerminologyEntry>>(config.terminology ?? {})
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function entryFor(key: string): TerminologyEntry {
+    return terminology[key] ?? { singular: {}, plural: {} }
+  }
+
+  function update(key: string, form: 'singular' | 'plural', lang: string, value: string) {
+    setTerminologyState(prev => {
+      const entry = prev[key] ?? { singular: {}, plural: {} }
+      return { ...prev, [key]: { ...entry, [form]: { ...entry[form], [lang]: value } } }
+    })
+  }
+
+  function reset(key: string) {
+    setTerminologyState(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      const c = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ terminology }),
+      })
+      onSaved(c)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">{t('terminologie.title')}</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('terminologie.description')}</p>
+
+          {TERMINOLOGY_TYPES.map(({ key, label }) => {
+            const entry = entryFor(key)
+            const hasOverride = Boolean(terminology[key])
+            return (
+              <div key={key} className="card" style={{ marginBottom: 12, background: 'var(--bg)' }}>
+                <div className="hd" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>{label}</span>
+                  <div className="grow" />
+                  <button className="btn sm gh" disabled={!hasOverride} onClick={() => reset(key)}>
+                    {t('terminologie.reset')}
+                  </button>
+                </div>
+                <div className="bd">
+                  <div className="fg-2">
+                    <div className="field">
+                      <div className="lbl">{t('terminologie.singularDE')}</div>
+                      <input className="fld" value={entry.singular.de ?? ''} onChange={e => update(key, 'singular', 'de', e.target.value)} />
+                    </div>
+                    <div className="field">
+                      <div className="lbl">{t('terminologie.singularEN')}</div>
+                      <input className="fld" value={entry.singular.en ?? ''} onChange={e => update(key, 'singular', 'en', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="fg-2">
+                    <div className="field">
+                      <div className="lbl">{t('terminologie.pluralDE')}</div>
+                      <input className="fld" value={entry.plural.de ?? ''} onChange={e => update(key, 'plural', 'de', e.target.value)} />
+                    </div>
+                    <div className="field">
+                      <div className="lbl">{t('terminologie.pluralEN')}</div>
+                      <input className="fld" value={entry.plural.en ?? ''} onChange={e => update(key, 'plural', 'en', e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('terminologie.saving') : t('terminologie.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('terminologie.saved')}</span>}
       </div>
     </div>
   )
@@ -1948,6 +2049,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }
   { id: 'ueber',    label: 'Über Katalon' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
   { id: 'startseite', label: 'Startseite', adminOnly: true },
+  { id: 'terminologie', label: 'Terminologie', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
   { id: 'sprachen', label: 'Sprachen', adminOnly: true },
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
@@ -2040,6 +2142,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
           }} />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'startseite' && <SectionStartseite config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && config && section === 'terminologie' && <SectionTerminologie config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'sprachen' && <SectionLanguages />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}

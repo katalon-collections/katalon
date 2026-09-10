@@ -454,6 +454,11 @@ export interface HomepageBlock {
   collection_ids?: string[] | null
 }
 
+export interface TerminologyEntry {
+  singular: Record<string, string>
+  plural: Record<string, string>
+}
+
 export interface PortalConfigRead {
   site_title: string
   site_subtitle: string
@@ -470,6 +475,7 @@ export interface PortalConfigRead {
   facet_sort: 'count' | 'alpha'
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
+  terminology: Record<string, TerminologyEntry>
 }
 
 export interface UserRead {

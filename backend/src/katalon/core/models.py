@@ -704,6 +704,10 @@ class PortalConfig(Base):
     featured_object_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # Ordered list of homepage content blocks, see api/v1/portal.py:HomepageBlock
     homepage_blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
+    # Per-record-type presentation labels overriding the portal's default
+    # terminology (#373), e.g. {"object": {"singular": {"de": "Werk"}, "plural": {"de": "Werke"}}}.
+    # Presentation only — record type keys and the API are unaffected.
+    terminology: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     # e.g. {"object": ["creator"], "entity": []}
     facet_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     # Fields shown as the result-list subtitle, per record type, in display order.

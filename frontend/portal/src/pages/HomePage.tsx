@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   facet_sort: 'count',
   facet_initial_count: 10,
   homepage_blocks: [],
+  terminology: {},
 }
 
 function objTitle(obj: ObjectSummary, locale: string) {

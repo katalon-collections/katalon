@@ -53,9 +53,24 @@ _DEFAULTS = {
     "facet_sort": "count",
     "facet_initial_count": 10,
     "homepage_blocks": [],
+    "terminology": {},
 }
 
+TerminologyRecordType = Literal["object", "entity", "place", "occurrence", "collection"]
+
 HomepageBlockType = Literal["text", "objects", "collections", "curated"]
+
+
+class TerminologyEntry(BaseModel):
+    """Portal-configurable singular/plural label override for one record type (#373).
+
+    Presentation only — leaves record type keys, API routes/payloads, and
+    permissions untouched. An empty dict for a language falls back to the
+    portal's built-in default label for that type.
+    """
+
+    singular: dict[str, str] = Field(default_factory=dict)
+    plural: dict[str, str] = Field(default_factory=dict)
 
 
 class HomepageBlock(BaseModel):
@@ -104,6 +119,7 @@ class PortalConfigRead(BaseModel):
     facet_sort: Literal["count", "alpha"] = "count"
     facet_initial_count: int = 10
     homepage_blocks: list[HomepageBlock] = Field(default_factory=list)
+    terminology: dict[TerminologyRecordType, TerminologyEntry] = Field(default_factory=dict)
 
     class Config:
         from_attributes = True
@@ -127,6 +143,7 @@ class PortalConfigUpdate(BaseModel):
     facet_sort: Literal["count", "alpha"] | None = None
     facet_initial_count: int | None = Field(default=None, ge=1, le=100)
     homepage_blocks: list[HomepageBlock] | None = None
+    terminology: dict[TerminologyRecordType, TerminologyEntry] | None = None
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:

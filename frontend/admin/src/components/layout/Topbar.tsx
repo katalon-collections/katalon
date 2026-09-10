@@ -33,7 +33,7 @@ function settingsResults(language: string): AdminSearchResult[] {
   const german = language.startsWith('de')
   const sections = [
     ['profil', 'Profil', 'Profile'], ['ueber', 'Über Katalon', 'About Katalon'], ['portal', 'Portal', 'Portal'],
-    ['startseite', 'Startseite', 'Homepage'],
+    ['startseite', 'Startseite', 'Homepage'], ['terminologie', 'Terminologie', 'Terminology'],
     ['facetten', 'Facetten', 'Facets'], ['sprachen', 'Sprachen', 'Languages'], ['idno', 'ID-Schemas', 'ID schemas'],
     ['ki', 'KI', 'AI'], ['medien', 'Medienrechte', 'Media rights'], ['authorities', 'Normdatenquellen', 'Authority sources'],
     ['suche', 'Suche & Indexierung', 'Search & indexing'], ['changelog', 'Versionshinweise', 'Release notes'],

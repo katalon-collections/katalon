@@ -19,7 +19,7 @@ import { CollectionsPage } from './pages/CollectionsPage'
 import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
-import { useI18n, typeLabel, setSupportedLocales } from './i18n'
+import { useI18n, typeLabel, setSupportedLocales, setTerminology } from './i18n'
 import { usePortalConfig } from './hooks/usePortalConfig'
 
 // Lazy: only page pulling in @samvera/clover-iiif + openseadragon; keep that chunk
@@ -212,6 +212,7 @@ function AppInner() {
     // Apply portal config color_tokens on top of the base theme
     api.portal.config().then(c => {
       setSupportedLocales(c.supported_languages ?? ['de', 'en'])
+      setTerminology(c.terminology)
       const tokens = c.color_tokens ?? {}
       const root = document.documentElement
       for (const [k, v] of Object.entries(tokens)) {

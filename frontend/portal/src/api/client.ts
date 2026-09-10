@@ -210,6 +210,11 @@ export interface HomepageBlock {
   collection_ids?: string[] | null
 }
 
+export interface TerminologyEntry {
+  singular: Record<string, string>
+  plural: Record<string, string>
+}
+
 export interface PortalConfig {
   site_title: string
   site_subtitle: string
@@ -227,6 +232,7 @@ export interface PortalConfig {
   facet_sort: 'count' | 'alpha'
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
+  terminology: Record<string, TerminologyEntry>
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

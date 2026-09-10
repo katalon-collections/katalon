@@ -124,5 +124,18 @@
     "save": "Speichern",
     "saving": "Speichert…",
     "saved": "Gespeichert."
+  },
+  "terminologie": {
+    "nav": "Terminologie",
+    "title": "Terminologie",
+    "description": "Fachbegriffe für Kerntypen pro Installation anpassen (z. B. „Werk\" statt „Objekt\"). Wirkt nur auf die Anzeige im Portal — interne Bezeichnungen, API-Routen und Berechtigungen bleiben unverändert.",
+    "singularDE": "Singular Deutsch",
+    "singularEN": "Singular Englisch",
+    "pluralDE": "Plural Deutsch",
+    "pluralEN": "Plural Englisch",
+    "reset": "Auf Standard zurücksetzen",
+    "save": "Speichern",
+    "saving": "Speichert…",
+    "saved": "Gespeichert."
   }
 }

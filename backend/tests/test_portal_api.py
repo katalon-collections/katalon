@@ -527,6 +527,86 @@ async def test_portal_config_update_returns_resolved_facets() -> None:
 
 
 @pytest.mark.asyncio
+async def test_portal_config_saves_and_returns_terminology_overrides() -> None:
+    from katalon.core.dependencies import get_current_user
+
+    admin_user = User(
+        id=uuid.uuid4(),
+        email="admin@example.org",
+        hashed_password="x",
+        role="admin",
+        is_active=True,
+    )
+    portal_cfg = PortalConfig(key="default")
+
+    config_result1 = MagicMock()
+    config_result1.scalar_one_or_none.return_value = portal_cfg
+    config_result2 = MagicMock()
+    config_result2.scalar_one_or_none.return_value = portal_cfg
+    facet_result = MagicMock()
+    facet_result.all.return_value = []
+    admin_result = MagicMock()
+    admin_result.scalar_one_or_none.return_value = None
+
+    session = AsyncMock()
+    session.execute.side_effect = [config_result1, config_result2, facet_result, admin_result]
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.put(
+                "/v1/portal/config",
+                json={
+                    "terminology": {
+                        "object": {
+                            "singular": {"de": "Werk", "en": "Work"},
+                            "plural": {"de": "Werke", "en": "Works"},
+                        }
+                    }
+                },
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    terminology = response.json()["terminology"]
+    assert terminology["object"]["singular"] == {"de": "Werk", "en": "Work"}
+    assert terminology["object"]["plural"] == {"de": "Werke", "en": "Works"}
+    assert portal_cfg.terminology["object"]["plural"]["de"] == "Werke"
+
+
+@pytest.mark.asyncio
+async def test_portal_config_rejects_unknown_terminology_record_type() -> None:
+    from katalon.core.dependencies import get_current_user
+
+    admin_user = User(
+        id=uuid.uuid4(), email="admin@example.org", hashed_password="x", role="admin", is_active=True,
+    )
+
+    async def override_db():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.put(
+                "/v1/portal/config",
+                json={"terminology": {"storage_location": {"singular": {"de": "Standort"}}}},
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_portal_config_saves_and_returns_homepage_blocks() -> None:
     from katalon.core.dependencies import get_current_user
 

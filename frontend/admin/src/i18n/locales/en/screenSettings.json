@@ -124,5 +124,18 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved."
+  },
+  "terminologie": {
+    "nav": "Terminology",
+    "title": "Terminology",
+    "description": "Customize the core-type terminology per installation (e.g. \"Work\" instead of \"Object\"). Presentation only — internal names, API routes, and permissions stay unchanged.",
+    "singularDE": "Singular German",
+    "singularEN": "Singular English",
+    "pluralDE": "Plural German",
+    "pluralEN": "Plural English",
+    "reset": "Reset to default",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved."
   }
 }

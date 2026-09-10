@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.28.0"
+    "version": "1.29.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -22918,6 +22918,22 @@
             },
             "type": "array",
             "title": "Homepage Blocks"
+          },
+          "terminology": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TerminologyEntry"
+            },
+            "propertyNames": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence",
+                "collection"
+              ]
+            },
+            "type": "object",
+            "title": "Terminology"
           }
         },
         "type": "object",
@@ -23140,6 +23156,29 @@
               }
             ],
             "title": "Homepage Blocks"
+          },
+          "terminology": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/TerminologyEntry"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "object",
+                    "entity",
+                    "place",
+                    "occurrence",
+                    "collection"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminology"
           }
         },
         "type": "object",
@@ -25298,6 +25337,27 @@
           "_links"
         ],
         "title": "StorageLocationRead"
+      },
+      "TerminologyEntry": {
+        "properties": {
+          "singular": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Singular"
+          },
+          "plural": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Plural"
+          }
+        },
+        "type": "object",
+        "title": "TerminologyEntry",
+        "description": "Portal-configurable singular/plural label override for one record type (#373).\n\nPresentation only — leaves record type keys, API routes/payloads, and\npermissions untouched. An empty dict for a language falls back to the\nportal's built-in default label for that type."
       },
       "Token": {
         "properties": {
