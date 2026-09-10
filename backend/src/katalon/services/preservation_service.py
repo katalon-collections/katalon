@@ -26,7 +26,6 @@ jobs — can reuse `build_bag` unchanged.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import io
 import logging
@@ -40,7 +39,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.media_storage import pyramid_storage_key, safe_filename, storage_path
+from katalon.core.media_storage import get_storage, pyramid_storage_key, safe_filename
 from katalon.core.models import AuditLog, MediaFile, Object
 from katalon.integrations.oai_dc_format import DC_NS, OaiDcFormat
 from katalon.services import export_context_service, metadata_mapping_service
@@ -362,7 +361,7 @@ async def build_object_preservation_zip(db: AsyncSession, object_id: uuid.UUID) 
     for mf in media_files:
         master_path = f"data/files/master/{mf.id}--{safe_filename(mf.filename)}"
         try:
-            content = await asyncio.to_thread(storage_path(mf.storage_key).read_bytes)
+            content = await get_storage().read_bytes(mf.storage_key)
         except FileNotFoundError:
             logger.warning("Preservation export: media file %s missing on disk, skipped", mf.id)
             continue
@@ -371,9 +370,7 @@ async def build_object_preservation_zip(db: AsyncSession, object_id: uuid.UUID) 
         if mf.iiif_storage_key:
             derivative_path = f"data/files/derivatives/{mf.id}--{safe_filename(mf.filename)}"
             try:
-                derivative = await asyncio.to_thread(
-                    storage_path(pyramid_storage_key(mf.storage_key)).read_bytes
-                )
+                derivative = await get_storage().read_bytes(pyramid_storage_key(mf.storage_key))
             except FileNotFoundError:
                 logger.warning(
                     "Preservation export: pyramid derivative for media %s missing, skipped", mf.id

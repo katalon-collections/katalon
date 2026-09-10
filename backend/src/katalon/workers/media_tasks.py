@@ -4,6 +4,7 @@
 import asyncio
 import logging
 import shutil
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
@@ -13,10 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from katalon.core.media_storage import (
+    LocalStorage,
+    get_storage,
     iiif_identifier,
     pyramid_storage_key,
     storage_key,
-    storage_path,
 )
 from katalon.workers.celery_app import celery_app
 
@@ -49,6 +51,26 @@ def _make_pyramid_tiff(source_path: Path) -> Path | None:
         return None
 
 
+async def _local_source_path(storage: Any, key: str) -> tuple[Path, list[Path]]:
+    """Resolve a media key to a local file path for pyvips (which needs random access).
+
+    Local backend: direct path, nothing to clean up. S3: download into a temp file
+    that the caller unlinks. A missing object falls back to a nonexistent temp path,
+    so _make_pyramid_tiff logs its usual warning and the task falls back to the
+    original — same behavior as a missing local file.
+    """
+    if isinstance(storage, LocalStorage):
+        return storage.local_path(key), []
+    tmp_path = Path(tempfile.mkstemp()[1])
+    try:
+        data = await storage.read_bytes(key)
+    except FileNotFoundError:
+        logger.warning("Master-Datei %s fehlt im Objektspeicher, Pyramiden-Fallback auf Original", key)
+        return tmp_path, [tmp_path]
+    await asyncio.to_thread(tmp_path.write_bytes, data)
+    return tmp_path, [tmp_path]
+
+
 def _worker_session() -> async_sessionmaker[AsyncSession]:
     from katalon.config import settings
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
@@ -65,10 +87,18 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
         if not media:
             raise ValueError(f"MediaFile {media_file_id} not found")
 
-        source_path = storage_path(media.storage_key)
-        pyramid_path = await asyncio.to_thread(_make_pyramid_tiff, source_path)
-        if pyramid_path is not None:
-            media.iiif_storage_key = pyramid_storage_key(media.storage_key)
+        storage = get_storage()
+        source_path, temp_paths = await _local_source_path(storage, media.storage_key)
+        try:
+            pyramid_path = await asyncio.to_thread(_make_pyramid_tiff, source_path)
+            if pyramid_path is not None:
+                if not isinstance(storage, LocalStorage):
+                    await storage.put_file(pyramid_storage_key(media.storage_key), pyramid_path)
+                    pyramid_path.unlink(missing_ok=True)
+                media.iiif_storage_key = pyramid_storage_key(media.storage_key)
+        finally:
+            for temp_path in temp_paths:
+                temp_path.unlink(missing_ok=True)
         filename = iiif_identifier(media.iiif_storage_key, media.storage_key)
 
         try:
@@ -299,13 +329,18 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
 
             file_id = uuid.uuid4()
             key = storage_key(file_id, file_path.name)
-            dest_path = storage_path(key)
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(file_path, dest_path)
+            storage = get_storage()
+            if isinstance(storage, LocalStorage):
+                dest_path = storage.local_path(key)
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(file_path, dest_path)
+            else:
+                await storage.put_file(key, file_path)
             try:
-                mime = verified_image_mime(dest_path)
+                # Verify the staging source — same bytes as the stored copy in both backends.
+                mime = verified_image_mime(file_path)
             except Exception:
-                dest_path.unlink(missing_ok=True)
+                await storage.delete(key)
                 failed += 1
                 report["errors"].append({
                     "row": None,
@@ -313,7 +348,7 @@ async def _import_media_batch(job_id: uuid.UUID, job_dir: Path, task: Any) -> di
                 })
                 continue
             if mime not in ALLOWED_IMAGE_MIME:
-                dest_path.unlink(missing_ok=True)
+                await storage.delete(key)
                 failed += 1
                 report["errors"].append({
                     "row": None,

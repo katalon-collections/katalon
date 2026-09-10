@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.26.13"
+version = "1.27.0"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
@@ -33,6 +33,7 @@ dependencies = [
     "lxml>=6.1.1",
     "rapidfuzz>=3.9.0",
     "rdflib>=7.1.0",
+    "boto3>=1.36.0",
 ]
 
 [project.optional-dependencies]

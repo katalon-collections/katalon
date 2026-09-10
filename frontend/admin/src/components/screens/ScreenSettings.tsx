@@ -1830,7 +1830,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
       </div>
 
       <div className="settings-layout">
-        {/* Sidebar nav */}
+        {/* Sidebar nav (desktop) */}
         <div className="settings-nav">
           {navItems.map(n => (
             <button key={n.id} className={`panel-it${section === n.id ? ' active' : ''}`} onClick={() => {
@@ -1840,6 +1840,23 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
               {n.label}
             </button>
           ))}
+        </div>
+
+        {/* Section select (mobile) */}
+        <div className="settings-select field">
+          <label className="lbl" htmlFor="settings-section">Bereich</label>
+          <select
+            id="settings-section"
+            className="fld"
+            value={section}
+            onChange={e => {
+              const next = e.target.value as Section
+              setSection(next)
+              window.history.replaceState(null, '', `#settings/${next}`)
+            }}
+          >
+            {navItems.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+          </select>
         </div>
 
         {/* Content */}

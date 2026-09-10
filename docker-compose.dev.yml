@@ -89,7 +89,8 @@ services:
       - VITE_API_URL=
       - CI=true
       - API_PROXY_TARGET=http://api:8000
-      - VITE_PORTAL_URL=${VITE_PORTAL_URL:-http://localhost:4001}
+      - VITE_BASE_PATH=/admin/
+      - VITE_PORTAL_URL=https://${KATALON_LOCAL_DOMAIN:-katalon.local}
       - VITE_ADMIN_FEEDBACK_ENABLED=${VITE_ADMIN_FEEDBACK_ENABLED:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
@@ -111,9 +112,8 @@ services:
       - "4001:5174"
     environment:
       - VITE_API_URL=
-      - CI=true
       - API_PROXY_TARGET=http://api:8000
-      - VITE_ADMIN_URL=${VITE_ADMIN_URL:-http://localhost:4000}
+      - VITE_ADMIN_URL=https://${KATALON_LOCAL_DOMAIN:-katalon.local}/admin/
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5174/ > /dev/null 2>&1 || exit 1"]
       interval: 10s

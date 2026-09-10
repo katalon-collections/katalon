@@ -12,8 +12,6 @@ from sqlalchemy import Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.concurrency import check_version, flush_record
-from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.lock_service import enforce_not_locked
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_record_permission
 from katalon.core.list_query import SortBy, SortDir, apply_sort
 from katalon.core.models import AdminConfig, StorageLocation, User
@@ -25,6 +23,8 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.lock_service import enforce_not_locked
+from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name

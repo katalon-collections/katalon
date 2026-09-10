@@ -9,7 +9,7 @@ explicitly by the user, lasts until released or force-unlocked by admin.
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select

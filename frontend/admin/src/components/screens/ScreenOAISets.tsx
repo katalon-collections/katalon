@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { oaiSets } from '../../api/client'
+import { oaiSets, PORTAL_URL } from '../../api/client'
 import type { OAISet, OAISetPayload } from '../../api/client'
 import { Plus, Trash, Edit } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
@@ -123,7 +123,7 @@ export function ScreenOAISets() {
     setForm(f => f ? { ...f, [key]: value } : f)
   }
 
-  const oaiUrl = new URL('/oai', window.location.origin).href
+  const oaiUrl = new URL('/oai', PORTAL_URL).href
 
   return (
     <div className="settings-page settings-page-oai">

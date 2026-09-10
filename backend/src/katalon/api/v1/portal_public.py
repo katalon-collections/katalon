@@ -526,7 +526,7 @@ async def list_media(
 @router.get("/objects/{object_id}/media/{media_id}/file")
 async def serve_media_file(
     object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> FileResponse:
+) -> Response:
     return await media.serve_media_file(object_id, media_id, db, _staff_user(current_user))
 
 

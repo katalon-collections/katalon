@@ -448,7 +448,13 @@ async def _check_cantaloupe_health() -> None:
 
 
 def _check_media_root_writable() -> None:
-    """Log a warning if MEDIA_ROOT isn't writable; uploads would otherwise fail silently per-request."""
+    """Log a warning if MEDIA_ROOT isn't writable; uploads would otherwise fail silently per-request.
+
+    Only relevant for the default local storage backend — with STORAGE_BACKEND=s3
+    MEDIA_ROOT is unused for media files (logos/themes only).
+    """
+    if settings.storage_backend != "local":
+        return
     import os
 
     media_root = Path(settings.media_root)

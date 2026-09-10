@@ -384,6 +384,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 /* Settings layout */
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 .settings-nav { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border-s); overflow-y: auto; padding-top: 8px; }
+.settings-select { display: none; }
 .settings-content { flex: 1; overflow-y: auto; padding: 20px 24px; max-width: 680px; }
 
 /* Static pages */
@@ -568,9 +569,9 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .settings-page label:has(input[type="checkbox"]) { min-height: 44px; }
   .settings-intro a { overflow-wrap: anywhere; }
   .settings-layout { flex-direction: column; }
-  .settings-nav { width: 100%; border-right: 0; border-bottom: 1px solid var(--border-s); display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px 12px; }
-  .settings-layout .panel-it { flex: 0 0 auto; border-left: 0; border-bottom: 3px solid transparent; min-height: 44px; }
-  .settings-layout .panel-it.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .settings-nav { display: none; }
+  .settings-select { display: block; margin: 12px; }
+  .settings-select .fld { min-height: 44px; }
   .settings-content { max-width: none; padding: 12px; }
   .banners-page { padding: 12px; }
   .banner-row { flex-direction: column; gap: 8px; }

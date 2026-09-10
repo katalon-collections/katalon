@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.media_storage import storage_path
+from katalon.core.media_storage import get_storage
 from katalon.workers.celery_app import celery_app
 
 
@@ -34,9 +34,10 @@ async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutof
                 select(MediaFile).where(MediaFile.object_id == record.id)
             )
             for media in media_result.scalars().all():
-                storage_path(media.storage_key).unlink(missing_ok=True)
+                keys = [media.storage_key]
                 if media.iiif_storage_key:
-                    storage_path(media.iiif_storage_key).unlink(missing_ok=True)
+                    keys.append(media.iiif_storage_key)
+                await get_storage().delete(*keys)
         await delete_relations(session, record_type, record.id)
         await log_change(session, record_type=record_type, record_id=record.id, user_id=None, action="purge")
         await session.delete(record)

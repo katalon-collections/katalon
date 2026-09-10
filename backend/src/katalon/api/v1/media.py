@@ -4,6 +4,7 @@
 import io
 import re
 import shutil
+import tempfile
 import uuid
 import zipfile
 from pathlib import Path
@@ -13,7 +14,7 @@ from urllib.parse import unquote, urlparse
 import aiofiles
 from celery.result import AsyncResult
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -23,7 +24,12 @@ from katalon.core.dependencies import (
     OptionalCurrentUser,
     require_admin_or_editor,
 )
-from katalon.core.media_storage import iiif_identifier, storage_key, storage_path
+from katalon.core.media_storage import (
+    LocalStorage,
+    get_storage,
+    iiif_identifier,
+    storage_key,
+)
 from katalon.core.media_validation import (
     ALLOWED_MEDIA_MIME,
     media_category,
@@ -124,20 +130,37 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     file_id = uuid.uuid4()
     key = storage_key(file_id, file.filename or "upload")
-    dest_path = storage_path(key)
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-    size = 0
-    async with aiofiles.open(dest_path, "wb") as out:
-        while chunk := await file.read(65536):
-            size += len(chunk)
-            if size > max_bytes:
-                dest_path.unlink(missing_ok=True)
-                raise HTTPException(status_code=413, detail="Datei zu groß")
-            await out.write(chunk)
-
+    storage = get_storage()
     category = media_category(resolved_mime)
-    actual_mime = verified_image_mime(dest_path) if category == "image" else resolved_mime
+
+    if isinstance(storage, LocalStorage):
+        # Default path unchanged: stream directly into MEDIA_ROOT.
+        dest_path = storage.local_path(key)
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        size = 0
+        async with aiofiles.open(dest_path, "wb") as out:
+            while chunk := await file.read(65536):
+                size += len(chunk)
+                if size > max_bytes:
+                    dest_path.unlink(missing_ok=True)
+                    raise HTTPException(status_code=413, detail="Datei zu groß")
+                await out.write(chunk)
+        actual_mime = verified_image_mime(dest_path) if category == "image" else resolved_mime
+    else:
+        # S3: stage in a temp file (MIME verification needs a seekable file), then upload.
+        tmp_path = Path(tempfile.mkstemp()[1])
+        try:
+            size = 0
+            async with aiofiles.open(tmp_path, "wb") as out:
+                while chunk := await file.read(65536):
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise HTTPException(status_code=413, detail="Datei zu groß")
+                    await out.write(chunk)
+            actual_mime = verified_image_mime(tmp_path) if category == "image" else resolved_mime
+            await storage.put_file(key, tmp_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     existing = (await db.execute(select(MediaFile).where(MediaFile.object_id == object_id))).scalars().all()
     config = await db.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
@@ -255,7 +278,7 @@ async def patch_media(
 )
 async def serve_media_file(
     object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> FileResponse:
+) -> Response:
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
     if not obj:
@@ -268,10 +291,22 @@ async def serve_media_file(
     media = result.scalar_one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    path = storage_path(media.storage_key)
-    if not path.exists():
+    # Local backend keeps the efficient FileResponse sendfile path. S3 streams
+    # through the API on purpose: no presigned URLs, so private media cannot
+    # bypass the visibility check above.
+    storage = get_storage()
+    if isinstance(storage, LocalStorage):
+        path = storage.local_path(media.storage_key)
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+        return FileResponse(path, media_type=media.mime_type, filename=media.filename)
+    if not storage.exists(media.storage_key):
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    return FileResponse(path, media_type=media.mime_type, filename=media.filename)
+    return StreamingResponse(
+        storage.stream(media.storage_key),
+        media_type=media.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{media.filename}"'},
+    )
 
 
 @router.get(
@@ -317,9 +352,10 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
     media = result.scalar_one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Medium nicht gefunden")
-    storage_path(media.storage_key).unlink(missing_ok=True)
+    keys = [media.storage_key]
     if media.iiif_storage_key:
-        storage_path(media.iiif_storage_key).unlink(missing_ok=True)
+        keys.append(media.iiif_storage_key)
+    await get_storage().delete(*keys)
     await log_change(
         db,
         record_type="object",

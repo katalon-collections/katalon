@@ -12,8 +12,6 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.config import settings
 from katalon.core.concurrency import check_version, flush_record, require_version
-from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.lock_service import enforce_not_locked
 from katalon.core.dependencies import (
     DBDep,
     OptionalCurrentUser,
@@ -43,6 +41,8 @@ from katalon.services.idno_service import (
     maybe_advance_counter,
     validate_idno_pattern,
 )
+from katalon.services.lock_service import enforce_not_locked
+from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations

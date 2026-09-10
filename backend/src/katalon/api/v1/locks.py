@@ -17,8 +17,15 @@ from katalon.core.dependencies import (
 )
 from katalon.core.models import User
 from katalon.core.schemas import RECORD_TYPES
-from katalon.services.lock_service import LockInfo, force_unlock, get_lock, get_locks_batch, release_lock, set_lock
 from katalon.services.audit_service import log_change
+from katalon.services.lock_service import (
+    LockInfo,
+    force_unlock,
+    get_lock,
+    get_locks_batch,
+    release_lock,
+    set_lock,
+)
 
 router = APIRouter(prefix="/locks", tags=["locks"])
 

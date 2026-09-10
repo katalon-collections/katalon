@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.media_storage import storage_path
+from katalon.core.media_storage import get_storage
 from katalon.core.models import (
     AdminConfig,
     AIUsageEvent,
@@ -216,9 +216,9 @@ def _serialize_field_context(field: FieldDefinition, record: Any, include_fields
     return context
 
 
-def _prepare_vision_image(media: MediaFile) -> tuple[bytes, str]:
+def _prepare_vision_image(data: bytes) -> tuple[bytes, str]:
     try:
-        with Image.open(storage_path(media.storage_key)) as source:
+        with Image.open(io.BytesIO(data)) as source:
             image = ImageOps.exif_transpose(source)
             image.thumbnail((AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION), Image.Resampling.LANCZOS)
             output = io.BytesIO()
@@ -227,15 +227,23 @@ def _prepare_vision_image(media: MediaFile) -> tuple[bytes, str]:
                 return output.getvalue(), "image/png"
             image.convert("RGB").save(output, format="JPEG", quality=85, optimize=True)
             return output.getvalue(), "image/jpeg"
-    except (FileNotFoundError, UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError) as exc:
         raise HTTPException(status_code=422, detail="Primärmedium kann nicht für Vision-KI verarbeitet werden.") from exc
+
+
+async def _load_vision_image(media: MediaFile) -> tuple[bytes, str]:
+    try:
+        data = await get_storage().read_bytes(media.storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=422, detail="Primärmedium kann nicht für Vision-KI verarbeitet werden.") from exc
+    return _prepare_vision_image(data)
 
 
 def _build_messages(
     field: FieldDefinition,
     record: Any,
     ai_config: dict[str, Any],
-    media: MediaFile | None,
+    vision_image: tuple[bytes, str] | None,
     max_output_tokens: int,
     group_instance: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -280,9 +288,9 @@ def _build_messages(
         f"\n\nKontext:\n{json.dumps(context, ensure_ascii=False)}"
     )
     if ai_config.get("mode") == "vision":
-        if media is None:
+        if vision_image is None:
             raise HTTPException(status_code=422, detail="Für Vision-KI wird ein Primärmedium benötigt.")
-        file_bytes, mime_type = _prepare_vision_image(media)
+        file_bytes, mime_type = vision_image
         b64 = base64.b64encode(file_bytes).decode("ascii")
         return [
             {
@@ -362,11 +370,12 @@ async def complete_field(
         raise HTTPException(status_code=422, detail="Gruppenkontext ist nur für Subfelder erlaubt.")
     config = await get_admin_ai_config(db)
     media = await _load_primary_media(db, record_type, record_id)
+    vision_image = await _load_vision_image(media) if ai_config.get("mode") == "vision" and media else None
     messages = _build_messages(
         field,
         record,
         ai_config,
-        media,
+        vision_image,
         config.ai_max_output_tokens,
         group_instance,
     )

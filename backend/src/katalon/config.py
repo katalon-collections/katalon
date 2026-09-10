@@ -3,7 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -44,6 +44,19 @@ class Settings(BaseSettings):
     media_root: str = "/var/lib/katalon/media"
     max_upload_size_mb: int = 100
     purge_after_days: int = 30
+
+    # Medien-Speicherbackend (strikt opt-in; Default local = unverändertes Verhalten).
+    # S3Storage zielt auf alle S3-kompatiblen Implementierungen (Ceph RADOSGW,
+    # MinIO, Hetzner, Garage, AWS) — siehe media_storage.S3Storage.
+    storage_backend: Literal["local", "s3"] = "local"
+    s3_endpoint_url: str = ""  # leer = AWS-Default
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"  # RADOSGW/MinIO ignorieren die Region, SigV4 braucht aber einen Wert
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_force_path_style: bool = True  # funktioniert überall ohne DNS-Wildcard-Setup
+    s3_verify_tls: bool = True  # False nur für Dev/Test
+    s3_ca_bundle: str = ""  # optional: Pfad zu interner/self-signed CA (On-Prem-Ceph)
 
     importer_max_upload_size_mb: int = 500
     importer_upload_ttl_seconds: int = 14400  # 4 hours
@@ -155,6 +168,25 @@ class Settings(BaseSettings):
             if isinstance(parsed, list):
                 return [str(o).strip() for o in parsed if str(o).strip()]
         return [o.strip().strip("[]") for o in raw.split(",") if o.strip().strip("[]")]
+
+    @model_validator(mode="after")
+    def _validate_storage_backend(self) -> "Settings":
+        if self.storage_backend == "s3":
+            missing = [
+                name
+                for name, value in (
+                    ("S3_BUCKET", self.s3_bucket),
+                    ("S3_ACCESS_KEY", self.s3_access_key),
+                    ("S3_SECRET_KEY", self.s3_secret_key),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError(
+                    f"{', '.join(missing)} required when STORAGE_BACKEND=s3 "
+                    "(S3Storage braucht Bucket und Credentials)"
+                )
+        return self
 
     @model_validator(mode="after")
     def _validate_smtp(self) -> "Settings":

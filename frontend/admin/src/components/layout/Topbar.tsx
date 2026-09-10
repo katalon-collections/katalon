@@ -57,8 +57,19 @@ const ROUTE_DOCS: Record<string, string> = {
   'occurrences-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'procedures-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
   'collections-list': `${DOCS_ROOT}/administration/batch-bearbeitung/`,
+  'collections-form': `${DOCS_ROOT}/administration/sammlungen/`,
+  'procedures-form': `${DOCS_ROOT}/reference/procedures/`,
   users: `${DOCS_ROOT}/administration/benutzer-und-rollen/`,
   'user-roles': `${DOCS_ROOT}/administration/benutzer-und-rollen/`,
+  vocab: `${DOCS_ROOT}/administration/vokabulare/`,
+  pages: `${DOCS_ROOT}/administration/statische-seiten/`,
+  banners: `${DOCS_ROOT}/administration/banner/`,
+  audit: `${DOCS_ROOT}/administration/audit-log/`,
+  'working-sets': `${DOCS_ROOT}/administration/arbeitslisten/`,
+  settings: `${DOCS_ROOT}/administration/einstellungen/`,
+  'oai-sets': `${DOCS_ROOT}/integration/oai-pmh/`,
+  export: `${DOCS_ROOT}/integration/export-mappings/`,
+  sparql: `${DOCS_ROOT}/integration/sparql/`,
  }
 
 interface Props {

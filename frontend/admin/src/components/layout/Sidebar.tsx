@@ -14,7 +14,6 @@ interface NavItem {
   id?: string
   labelKey?: string
   Icon?: React.FC<{ size?: number; className?: string }>
-  ct?: string
   routes?: string[]
   roles?: string[]
   feature?: string
@@ -34,9 +33,9 @@ const NAV: NavItem[] = [
   { gKey: 'sidebar.groups.config', roles: ['admin', 'superuser'] },
   { id: 'subtypes', labelKey: 'sidebar.nav.subtypes',       Icon: ListTree, roles: ['admin', 'superuser'] },
   { id: 'storage-locations', labelKey: 'sidebar.nav.storageLocations', Icon: Box, feature: 'storage_locations' },
-  { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  ct: '6', roles: ['admin', 'superuser'] },
+  { id: 'schema', labelKey: 'sidebar.nav.schema',           Icon: Layers,  roles: ['admin', 'superuser'] },
   { id: 'form-variants', labelKey: 'sidebar.nav.formVariants', Icon: Layers, roles: ['admin', 'superuser'] },
-  { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     ct: '4', feature: 'vocab_terms' },
+  { id: 'vocab',  labelKey: 'sidebar.nav.vocab',            Icon: Tag,     feature: 'vocab_terms' },
   { id: 'pages',     labelKey: 'sidebar.nav.pages',         Icon: File,  feature: 'pages' },
   { id: 'oai-sets',  labelKey: 'sidebar.nav.oaiSets',       Icon: Globe, feature: 'oai_sets' },
   { id: 'banners',   labelKey: 'sidebar.nav.banners',       Icon: Bell,  feature: 'banners' },
@@ -87,7 +86,6 @@ export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, o
             >
               {it.Icon && <it.Icon className="ic" size={15} />}
               <span>{t(it.labelKey!)}</span>
-              {it.ct && <span className="ct">{it.ct}</span>}
             </button>
           )
         })}

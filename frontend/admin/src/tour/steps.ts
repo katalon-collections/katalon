@@ -153,6 +153,20 @@ export const advancedTourSteps: TourStep[] = [
     target: '[data-tour="nav-pages"]',
     placement: 'right',
     title: 'Portal-Inhalte',
-    content: 'Statische Seiten und Banner fürs Public-Portal pflegen.',
+    content: 'Statische Seiten und Banner (z. B. Hinweise oder Aktionen) fürs Public-Portal pflegen.',
+  },
+  {
+    route: 'working-sets',
+    target: '[data-tour="nav-working-sets"]',
+    placement: 'right',
+    title: 'Working Sets',
+    content: 'Datensätze aus Listen/Suche in einer gespeicherten Auswahl sammeln und per Batch-Bearbeitung gemeinsam ändern.',
+  },
+  {
+    route: 'export',
+    target: '[data-tour="nav-export"]',
+    placement: 'right',
+    title: 'Export',
+    content: 'Bestandstypen als CSV, JSON oder XML exportieren — z. B. für externe Auswertungen oder Migrationen.',
   },
 ]
