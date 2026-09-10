@@ -12,9 +12,11 @@ import { RelationsList } from '../components/RelationsList'
 import { MediaViewer, MediaThumb, RightsStatement } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
+import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
+import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
 
 function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles: MediaFile[] }) {
@@ -59,6 +61,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   const resolveRelationType = useRelationTypeLabels(locale)
   const backSearch = useBackToSearch()
   const portalConfig = usePortalConfig()
+  const subtypePlaceholder = useSubtypePlaceholder('object')
 
   useEffect(() => {
     if (!id) return
@@ -123,23 +126,21 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   // Keywords get their own tag-pill rendering below; keep them out of the generic field loop.
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
 
+  const placeholderUrl = subtypePlaceholder(obj.object_type) || portalConfig.placeholder_image_url
+
   const media = category !== 'image' && selectedMedia ? (
     <MediaViewer objectId={obj.id} media={selectedMedia} />
   ) : showViewer ? (
     <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
   ) : readyMedia.length > 0 ? (
     <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
-  ) : portalConfig.placeholder_image_url ? (
+  ) : placeholderUrl ? (
     <img
-      src={portalConfig.placeholder_image_url}
+      src={placeholderUrl}
       alt=""
       style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
     />
-  ) : (
-    <div className="detail-viewer" style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: 'var(--fg-3)', fontSize: 14 }}>
-      {t('object.noImage')}
-    </div>
-  )
+  ) : null
 
   return (
     <div className="container page">
@@ -169,7 +170,10 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         <span>{title}</span>
       </div>
 
-      <h1 style={{ margin: '0 0 6px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="object" id={obj.id} /></h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 style={{ margin: '0 0 6px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="object" id={obj.id} /></h1>
+        <SearchResultNavigation recordId={obj.id} />
+      </div>
       <div style={{ color: 'var(--fg-3)', fontSize: 13, marginBottom: 28 }}>
         {[renderFieldValue(m.creator, locale) ?? renderFieldValue(m.photographer, locale) ?? '', renderFieldValue(m.year, locale) ?? renderFieldValue(m.date, locale) ?? '', obj.idno].filter(Boolean).join(' · ')}
       </div>
@@ -180,7 +184,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         locale={locale}
         recordType="object"
         sidebarPosition={portalConfig.detail_sidebar_position}
-        media={(
+        media={media && (
           <>
             {media}
             {selectedMedia && <RightsStatement media={selectedMedia} label={t('object.rightsStatement')} />}

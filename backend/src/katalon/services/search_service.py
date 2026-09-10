@@ -307,6 +307,7 @@ def _build_doc(
         else None,
     }
     if record_type == "object":
+        doc["object_type"] = getattr(record, "object_type", None)
         doc["collection_status"] = getattr(record, "collection_status", "active") or "active"
         if media_info:
             doc["primary_media_id"] = media_info["primary_media_id"]

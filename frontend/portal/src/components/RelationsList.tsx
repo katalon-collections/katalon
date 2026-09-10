@@ -54,7 +54,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
   if (relations.length === 0) return null
 
   return (
-    <section style={{ marginTop: 24 }}>
+    <section className="detail-meta">
       <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: 'var(--fg-1)' }}>
         {t('common.relations')}
       </h2>

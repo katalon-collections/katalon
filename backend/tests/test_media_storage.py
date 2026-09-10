@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from katalon.config import settings
+from katalon import config
 from katalon.core.media_storage import (
     LocalStorage,
     S3Storage,
@@ -37,7 +37,7 @@ def test_iiif_identifier_encodes_shard_separator() -> None:
 
 
 def test_storage_path_rejects_escape_from_media_root(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(config.settings, "media_root", str(tmp_path))
 
     with pytest.raises(ValueError, match="Storage-Key"):
         storage_path("../outside.jpg")
@@ -62,13 +62,13 @@ def test_legacy_absolute_path_outside_media_root_is_rejected(tmp_path) -> None:
 
 
 def test_get_storage_defaults_to_local() -> None:
-    assert settings.storage_backend == "local"
+    assert config.settings.storage_backend == "local"
     assert isinstance(get_storage(), LocalStorage)
     assert get_storage().is_local
 
 
 def test_get_storage_returns_s3_only_when_opted_in(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "storage_backend", "s3")
+    monkeypatch.setattr(config.settings, "storage_backend", "s3")
     storage = get_storage()
     assert isinstance(storage, S3Storage)
     assert not storage.is_local
@@ -81,7 +81,7 @@ def test_get_storage_returns_s3_only_when_opted_in(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_local_storage_roundtrip_and_delete(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(config.settings, "media_root", str(tmp_path))
     storage = LocalStorage()
     source = tmp_path / "source.jpg"
     source.write_bytes(b"pixels")
@@ -108,7 +108,7 @@ def _stubbed_s3(monkeypatch):
     from botocore.config import Config as BotoConfig
     from botocore.stub import Stubber
 
-    monkeypatch.setattr(settings, "s3_bucket", "test-bucket")
+    monkeypatch.setattr(config.settings, "s3_bucket", "test-bucket")
     client = boto3.client(
         "s3",
         aws_access_key_id="test",
@@ -202,13 +202,13 @@ def test_s3_client_disables_default_checksum_and_uses_path_style(monkeypatch) ->
     """botocore >= 1.36 sends x-amz-checksum-crc32 by default, which RADOSGW and
     other compatible implementations reject with 400. Path style works without
     DNS wildcard setup. Both overrides must stay."""
-    monkeypatch.setattr(settings, "s3_endpoint_url", "https://gateway.invalid")
-    monkeypatch.setattr(settings, "s3_access_key", "test")
-    monkeypatch.setattr(settings, "s3_secret_key", "test")
-    monkeypatch.setattr(settings, "s3_region", "us-east-1")
-    monkeypatch.setattr(settings, "s3_force_path_style", True)
-    monkeypatch.setattr(settings, "s3_ca_bundle", "")
-    monkeypatch.setattr(settings, "s3_verify_tls", True)
+    monkeypatch.setattr(config.settings, "s3_endpoint_url", "https://gateway.invalid")
+    monkeypatch.setattr(config.settings, "s3_access_key", "test")
+    monkeypatch.setattr(config.settings, "s3_secret_key", "test")
+    monkeypatch.setattr(config.settings, "s3_region", "us-east-1")
+    monkeypatch.setattr(config.settings, "s3_force_path_style", True)
+    monkeypatch.setattr(config.settings, "s3_ca_bundle", "")
+    monkeypatch.setattr(config.settings, "s3_verify_tls", True)
     _s3_client.cache_clear()
 
     client = _s3_client()

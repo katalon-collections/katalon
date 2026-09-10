@@ -28,10 +28,11 @@ interface FormState {
   description: string
   sort_order: number
   is_default: boolean
+  placeholder_image_url: string
 }
 
 function emptyForm(primaryType: string): FormState {
-  return { primary_type: primaryType, name: '', label: {}, description: '', sort_order: 0, is_default: false }
+  return { primary_type: primaryType, name: '', label: {}, description: '', sort_order: 0, is_default: false, placeholder_image_url: '' }
 }
 
 function subtypeToForm(s: RecordSubtype): FormState {
@@ -42,6 +43,7 @@ function subtypeToForm(s: RecordSubtype): FormState {
     description: s.description ?? '',
     sort_order: s.sort_order,
     is_default: s.is_default,
+    placeholder_image_url: s.placeholder_image_url ?? '',
   }
 }
 
@@ -118,6 +120,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
         description: form.description.trim(),
         sort_order: form.sort_order,
         is_default: form.is_default,
+        placeholder_image_url: form.placeholder_image_url.trim(),
       }
       if (editId) {
         await subtypes.update(editId, payload)
@@ -212,6 +215,13 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                 <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
               </div>
             </div>
+            {form.primary_type === 'object' && (
+              <div className="field" style={{ marginBottom: 10 }}>
+                <div className="lbl">{t('placeholderImageLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('placeholderImageHint')})</span></div>
+                <input className="fld mono" value={form.placeholder_image_url} onChange={e => set('placeholder_image_url', e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
+                {form.placeholder_image_url && <img src={form.placeholder_image_url} alt="" style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                 <input type="checkbox" className="ck" checked={form.is_default} onChange={e => set('is_default', e.target.checked)} />

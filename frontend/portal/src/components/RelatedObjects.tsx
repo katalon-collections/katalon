@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ObjectSummary, Relation } from '../api/client'
+import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useI18n } from '../i18n'
 import { recordTitle } from '../utils/renderFieldValue'
 
@@ -18,6 +19,7 @@ interface Props {
 export function RelatedObjects({ objects, relations, currentId, thumbnails, resolveLabel }: Props) {
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const { t, locale } = useI18n()
+  const subtypePlaceholder = useSubtypePlaceholder('object')
 
   useEffect(() => setSelectedType(null), [currentId])
 
@@ -60,7 +62,10 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
           return (
             <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
               <div className="thumb">
-                {thumbnails[obj.id] && <img src={thumbnails[obj.id]} alt="" loading="lazy" />}
+                {(() => {
+                  const src = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
+                  return src ? <img src={src} alt="" loading="lazy" /> : null
+                })()}
               </div>
               <div className="info">
                 <div className="title">{recordTitle(metadata, locale, obj.idno ?? obj.id)}</div>

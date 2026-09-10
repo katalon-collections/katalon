@@ -6,12 +6,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, type CollectionSummary, type Page } from '../api/client'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useI18n } from '../i18n'
 
 export function CollectionsPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const { t, locale } = useI18n()
+  const subtypeLabel = useSubtypeLabel('collection', locale)
 
   const q = params.get('q') ?? ''
   const page = parseInt(params.get('page') ?? '1', 10)
@@ -154,13 +156,8 @@ export function CollectionsPage() {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
-                              📁 {col.collection_type || t('type.collection')}
+                              📁 {subtypeLabel(col.collection_type) ?? t('type.collection')}
                             </span>
-                            {col.idno && (
-                              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--fg-3)' }}>
-                                {col.idno}
-                              </span>
-                            )}
                           </div>
                           <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 10px', color: 'var(--fg-1)', lineHeight: 1.3 }}>
                             {title}
@@ -223,13 +220,8 @@ export function CollectionsPage() {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
-                              📂 {col.collection_type || t('type.collection')}
+                              📂 {subtypeLabel(col.collection_type) ?? t('type.collection')}
                             </span>
-                            {col.idno && (
-                              <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'monospace' }}>
-                                {col.idno}
-                              </span>
-                            )}
                           </div>
                           <h4 style={{ fontSize: 15, fontWeight: 600, margin: '4px 0 8px', color: 'var(--fg-1)' }}>
                             {title}

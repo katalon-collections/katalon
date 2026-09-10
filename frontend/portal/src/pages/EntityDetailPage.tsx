@@ -14,6 +14,7 @@ import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
+import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { entityTypeLabel, useI18n } from '../i18n'
 
 export function EntityDetailPage({ user }: { user: PortalUser | null }) {
@@ -124,7 +125,10 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
         <span className="tag" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{typeLabel}</span>
         <span className="tag">{entity.status}</span>
       </div>
-      <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="entity" id={entity.id} /></h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="entity" id={entity.id} /></h1>
+        <SearchResultNavigation recordId={entity.id} />
+      </div>
 
       <DetailPageLayout
         fieldDefs={detailFieldDefs}

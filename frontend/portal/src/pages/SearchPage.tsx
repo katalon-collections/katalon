@@ -4,8 +4,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse } from '../api/client'
-import { saveLastSearch } from '../hooks/useBackToSearch'
+import { saveLastSearch, saveSearchContext } from '../hooks/useBackToSearch'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { t, typeLabel, useI18n } from '../i18n'
 import { decodeAdvancedQuery } from '../utils/advancedSearch'
 import { QuerySummary } from './AdvancedSearchPage'
@@ -197,6 +198,7 @@ export function SearchPage() {
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [facetInitialCount, setFacetInitialCount] = useState(10)
   const { locale, t } = useI18n()
+  const subtypePlaceholder = useSubtypePlaceholder('object')
   const [viewMode, setViewMode] = useState<'list' | 'masonry' | 'grid'>(() => {
     const stored = localStorage.getItem('katalon_search_view')
     if (stored === 'masonry' || stored === 'grid') return stored
@@ -596,14 +598,30 @@ export function SearchPage() {
                     : r.record_type === 'collection' ? `/collections/${r.id}`
                     : `/objects/${r.id}`
                   const thumbUrl = r.primary_media_id ? mediaThumbnailUrl(r.id, r.primary_media_id) : null
+                  const fallbackUrl = !thumbUrl && r.record_type === 'object' ? subtypePlaceholder(r.object_type) : ''
                   const isPortrait = r.media_width != null && r.media_height != null && r.media_height > r.media_width
+                  const saveContext = () => {
+                    saveLastSearch(window.location.pathname + window.location.search)
+                    saveSearchContext({
+                      url: window.location.pathname + window.location.search,
+                      items: allItems.map(({ id, record_type }) => ({ id, record_type })),
+                      page: data.page,
+                      pageSize: data.page_size,
+                      total: data.total,
+                      index: allItems.findIndex(item => item.id === r.id),
+                    })
+                  }
 
                   if (viewMode === 'list') {
                     return (
-                      <Link key={r.id} className="result-row" to={path} onClick={() => saveLastSearch(window.location.pathname + window.location.search)}>
+                      <Link key={r.id} className="result-row" to={path} onClick={saveContext}>
                         {r.record_type === 'object' && (
                           <div className="thumb-sm">
-                            {thumbUrl ? <img src={thumbUrl} alt="" loading="lazy" /> : null}
+                            {thumbUrl || fallbackUrl ? (
+                              <img src={thumbUrl ?? fallbackUrl} alt="" loading="lazy" />
+                            ) : (
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            )}
                           </div>
                         )}
                         <div className="body">
@@ -626,10 +644,10 @@ export function SearchPage() {
                     : 'result-card'
 
                   return (
-                    <Link key={r.id} className={gridClass} to={path} onClick={() => saveLastSearch(window.location.pathname + window.location.search)}>
-                      {r.record_type === 'object' && thumbUrl ? (
+                    <Link key={r.id} className={gridClass} to={path} onClick={saveContext}>
+                      {r.record_type === 'object' && (thumbUrl || fallbackUrl) ? (
                         <div className="result-card__thumb" style={aspectRatio ? { aspectRatio: String(aspectRatio) } : undefined}>
-                          <img src={thumbUrl} alt="" loading="lazy" />
+                          <img src={thumbUrl ?? fallbackUrl} alt="" loading="lazy" />
                         </div>
                       ) : (
                         <div className="result-card__thumb result-card__thumb--empty">

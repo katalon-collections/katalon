@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -189,6 +189,12 @@ export function DetailPageLayout({
   const otherFields = detailFields.filter(f => f !== descriptionField)
   const mainFields = otherFields.filter(f => f.detail_slot === 'main')
   const sidebarFields = otherFields.filter(f => f.detail_slot !== 'main')
+  // MainField can render nothing (empty facet, no value, no relation entries) even for a
+  // configured field — resolve actual output up front so "is there main content" reflects
+  // what's really on screen, not how many fields happen to be configured for the slot.
+  const mainFieldNodes = mainFields
+    .map(f => ({ key: f.name, node: MainField({ field: f, value: metadata[f.name], locale, recordType }) }))
+    .filter((entry): entry is { key: string; node: JSX.Element } => entry.node !== null)
 
   const sidebar = (
     <aside className="detail-meta">
@@ -202,21 +208,25 @@ export function DetailPageLayout({
   // a metadata-only record (no media, nothing in the main slot, no relations) shouldn't leave
   // a wide empty column next to a narrow sidebar. Callers pass falsy (not an always-truthy
   // wrapper element) for mainExtra/relations when there's nothing to render, so this is reliable.
-  const hasMainContent = Boolean(media) || Boolean(description) || mainFields.length > 0 || Boolean(mainExtra) || Boolean(relations)
+  const hasMainContent = Boolean(media) || Boolean(description) || mainFieldNodes.length > 0 || Boolean(mainExtra) || Boolean(relations)
   if (!hasMainContent) {
     return <div className="detail-layout detail-layout--metadata-only">{sidebar}</div>
   }
 
   return (
-    <div className={`detail-layout${sidebarPosition === 'left' ? ' detail-layout--sidebar-left' : ''}`}>
+    <div className={`detail-layout${sidebarPosition === 'left' ? ' detail-layout--sidebar-left' : ''}${media ? '' : ' detail-layout--no-media'}`}>
       <div className="detail-main">
         {media}
         {description && (descriptionField!.field_type === 'richtext' ? richText(description) : (
           <div style={{ marginTop: media ? 20 : 0, fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>{description}</div>
         ))}
-        {mainFields.map(f => <MainField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} />)}
+        {mainFieldNodes.map(({ key, node }) => <Fragment key={key}>{node}</Fragment>)}
         {mainExtra}
-        {relations}
+        {relations && (
+          <div style={{ marginTop: (media || description || mainFieldNodes.length > 0 || mainExtra) ? 24 : 0 }}>
+            {relations}
+          </div>
+        )}
       </div>
       {sidebar}
     </div>

@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.29.0"
+    "version": "1.30.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -16962,6 +16962,59 @@
         }
       }
     },
+    "/portal/v1/record-subtypes": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "List Record Subtypes Public",
+        "operationId": "portal_list_record_subtypes_public_get_portal_v1_record_subtypes",
+        "parameters": [
+          {
+            "name": "primary_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Primary Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortalRecordSubtypeRead"
+                  },
+                  "title": "Response Portal List Record Subtypes Public Get Portal V1 Record Subtypes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portal/v1/vocabularies": {
       "get": {
         "tags": [
@@ -23706,6 +23759,35 @@
         ],
         "title": "PortalPlaceRead"
       },
+      "PortalRecordSubtypeRead": {
+        "properties": {
+          "primary_type": {
+            "type": "string",
+            "title": "Primary Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Label"
+          },
+          "placeholder_image_url": {
+            "type": "string",
+            "title": "Placeholder Image Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "primary_type",
+          "name",
+          "label",
+          "placeholder_image_url"
+        ],
+        "title": "PortalRecordSubtypeRead"
+      },
       "PortalRelationRead": {
         "properties": {
           "id": {
@@ -24187,6 +24269,11 @@
             "type": "boolean",
             "title": "Is Default",
             "default": false
+          },
+          "placeholder_image_url": {
+            "type": "string",
+            "title": "Placeholder Image Url",
+            "default": ""
           }
         },
         "type": "object",
@@ -24226,6 +24313,11 @@
             "type": "boolean",
             "title": "Is Default",
             "default": false
+          },
+          "placeholder_image_url": {
+            "type": "string",
+            "title": "Placeholder Image Url",
+            "default": ""
           },
           "id": {
             "type": "string",
@@ -24898,6 +24990,17 @@
               }
             ],
             "title": "Media Height"
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Type"
           }
         },
         "type": "object",

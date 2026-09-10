@@ -37,6 +37,7 @@ class SearchResult(BaseModel):
     primary_media_id: str | None = None
     media_width: int | None = None
     media_height: int | None = None
+    object_type: str | None = None
 
 
 class SearchResponse(BaseModel):

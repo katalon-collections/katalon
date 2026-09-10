@@ -151,6 +151,15 @@ export function AppShell() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
+  // Unknown/invalid hash route (e.g. a stale or hand-typed link) → redirect to the dashboard
+  // instead of silently rendering a blank placeholder.
+  useEffect(() => {
+    if (!loggedIn || route in CRUMBS) return
+    window.history.replaceState({ route: 'list', editId: null }, '', '#list')
+    setRoute('list')
+    setEditId(null)
+  }, [loggedIn, route])
+
   function navigate(r: string, id?: string | null) {
     const newId = id ?? null
     setRoute(r)
@@ -219,7 +228,7 @@ export function AppShell() {
       case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
       case 'user-roles':        return isAdmin ? <ScreenUserRoles /> : <Placeholder label="Kein Zugriff" />
       case 'settings':          return <ScreenSettings isAdmin={isAdmin} features={features} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />
-      default:                  return <Placeholder label={crumbs[crumbs.length - 1].label} />
+      default:                  return null
     }
   }
 

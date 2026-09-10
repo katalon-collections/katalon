@@ -14,6 +14,7 @@ import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
+import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
 
 function StaticMap({ lat, lon, name }: { lat: number; lon: number; name: string }) {
@@ -150,7 +151,10 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
       <div style={{ marginBottom: 6 }}>
         <span className="tag">{place.status}</span>
       </div>
-      <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="place" id={place.id} /></h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 style={{ margin: '0 0 24px', fontSize: 26, fontWeight: 700, letterSpacing: '-.015em', display: 'flex', alignItems: 'center' }}>{title}<EditRecordLink user={user} recordType="place" id={place.id} /></h1>
+        <SearchResultNavigation recordId={place.id} />
+      </div>
 
       <DetailPageLayout
         fieldDefs={detailFieldDefs}

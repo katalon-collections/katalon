@@ -1070,6 +1070,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           primary_type: 'vocabulary_term',
           sort_order: 0,
           is_default: false,
+          placeholder_image_url: '',
         })))
       : subtypes.list(activeType)
     request

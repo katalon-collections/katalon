@@ -123,7 +123,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface ObjectSummary {
-  id: string; idno: string | null; status: string
+  id: string; idno: string | null; status: string; object_type?: string | null
   metadata_: Record<string, unknown>
   created_at: string; updated_at: string
 }
@@ -247,6 +247,7 @@ export interface SearchResponse {
     primary_media_id?: string | null
     media_width?: number | null
     media_height?: number | null
+    object_type?: string | null
   }>
   facets: Record<string, FacetBucket[]>
   numeric_facets: Record<string, NumericFacetBounds>
@@ -268,6 +269,7 @@ export interface PortalFieldDefinition {
 
 export interface VocabSummary { id: string; name: string; is_hierarchical: boolean }
 export interface VocabTerm { id: string; term: string; label: Record<string, string>; inverse_label: Record<string, string>; parent_id: string | null }
+export interface RecordSubtype { primary_type: string; name: string; label: Record<string, string>; placeholder_image_url: string }
 
 const TYPE_ENDPOINT: Record<string, string> = {
   object: 'objects', entity: 'entities', place: 'places', occurrence: 'occurrences', collection: 'collections',
@@ -350,6 +352,9 @@ export const api = {
   vocabularies: {
     list: () => get<VocabSummary[]>(`${PORTAL_API}/vocabularies`),
     terms: (id: string) => get<VocabTerm[]>(`${PORTAL_API}/vocabularies/${id}/terms`),
+  },
+  recordSubtypes: {
+    list: (primaryType: string) => get<RecordSubtype[]>(`${PORTAL_API}/record-subtypes?primary_type=${encodeURIComponent(primaryType)}`),
   },
   search: {
     query: (p: { q?: string; type?: string; status?: string; page?: number; page_size?: number; facets?: string; rel_entity?: string; rel_place?: string; rel_occurrence?: string; rel_collection?: string; [key: string]: string | number | undefined }) => {

@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, mediaThumbnailUrl, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type MediaFile } from '../api/client'
 import { recordTitle } from '../utils/renderFieldValue'
+import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
+import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useI18n } from '../i18n'
 
 const DEFAULT_CONFIG: PortalConfig = {
@@ -43,25 +45,30 @@ function BlockHeading({ children }: { children: React.ReactNode }) {
 }
 
 function ObjectGrid({ objects, thumbnails, locale }: { objects: ObjectSummary[]; thumbnails: Record<string, string>; locale: string }) {
+  const subtypePlaceholder = useSubtypePlaceholder('object')
   return (
     <div className="obj-grid">
-      {objects.map(obj => (
-        <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
-          <div className="thumb">
-            {thumbnails[obj.id] ? <img src={thumbnails[obj.id]} alt="" loading="lazy" /> : null}
-          </div>
-          <div className="info">
-            <div className="title">{objTitle(obj, locale)}</div>
-            {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
-          </div>
-        </Link>
-      ))}
+      {objects.map(obj => {
+        const src = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
+        return (
+          <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
+            <div className="thumb">
+              {src ? <img src={src} alt="" loading="lazy" /> : null}
+            </div>
+            <div className="info">
+              <div className="title">{objTitle(obj, locale)}</div>
+              {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
+            </div>
+          </Link>
+        )
+      })}
     </div>
   )
 }
 
 function CollectionGrid({ collections, locale }: { collections: CollectionSummary[]; locale: string }) {
   const { t } = useI18n()
+  const subtypeLabel = useSubtypeLabel('collection', locale)
   return (
     <div className="obj-grid">
       {collections.map(col => {
@@ -70,7 +77,7 @@ function CollectionGrid({ collections, locale }: { collections: CollectionSummar
           <Link key={col.id} className="obj-card" to={`/collections/${col.id}`}>
             <div className="info">
               <div className="title">{recordTitle(m, locale, col.idno ?? col.id)}</div>
-              <div className="meta">{col.collection_type || t('type.collection')}</div>
+              <div className="meta">{subtypeLabel(col.collection_type) ?? t('type.collection')}</div>
             </div>
           </Link>
         )

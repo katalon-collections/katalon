@@ -3,6 +3,35 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.30.0] - 2026-09-10
+
+### Added
+- Pro Subtyp konfigurierbares Portal-Platzhalterbild (Admin → Subtypen, Feld
+  „Platzhalter-Bild", nur für Objekt-Subtypen): greift auf Objekt-Detailseiten,
+  in Suchergebnis-Karten, verwandten Objekten, Sammlungsansichten und der
+  Startseite, sobald ein Datensatz des Subtyps kein eigenes Medium hat. Fällt
+  auf das bestehende globale Platzhalterbild zurück, wenn kein subtyp-eigenes
+  gesetzt ist.
+- Portal-Detailseiten: Unauffällige Vor-/Zurück-Pfeile führen innerhalb der
+  ursprünglichen Suche weiter. Filter, Sortierung und Seite bleiben dabei
+  erhalten; die Navigation lädt bei paginierten Standardsuchen bei Bedarf die
+  nächste Ergebnis-Seite nach.
+
+### Changed
+- Objekt-Detailseite ohne Medien und ohne Platzhalterbild zeigt keine leere
+  Bildfläche mit „Kein Bild verfügbar" mehr; die Metadaten-Spalte übernimmt
+  stattdessen den großen Teil der Seite (statt der schmalen 400px-Sidebar),
+  da sie in diesem Fall der eigentliche Seiteninhalt ist. Verknüpfungen
+  werden dabei als eigene Karte dargestellt statt als frei stehende Liste.
+  Die Metadaten-Sidebar ist generell von 320px auf 400px verbreitert.
+- Sammlungsübersicht zeigt den konfigurierten Subtyp-Namen (Label) statt des
+  internen Subtyp-Schlüssels.
+
+### Fixed
+- Anonyme Portal-Besucher sahen in der Mitgliederzahl einer Sammlung auch
+  nicht-öffentliche (Entwurf/intern) Objekte mitgezählt; die Zahl
+  berücksichtigt jetzt nur für den jeweiligen Betrachter sichtbare Objekte.
+
 ## [1.29.0] - 2026-09-10
 
 ### Added

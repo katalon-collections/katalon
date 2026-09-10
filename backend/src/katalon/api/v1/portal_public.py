@@ -37,6 +37,7 @@ from katalon.core.models import (
     Occurrence,
     Place,
     PortalConfig,
+    RecordSubtype,
     Relation,
     StaticPage,
     User,
@@ -252,6 +253,15 @@ class PortalSearchTermRead(BaseModel):
     term: str
     label: dict[str, Any]
     parent_id: uuid.UUID | None
+
+
+class PortalRecordSubtypeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    primary_type: str
+    name: str
+    label: dict[str, Any]
+    placeholder_image_url: str
 
 
 class NumericRange(BaseModel):
@@ -494,12 +504,22 @@ async def get_collection(
         for c in children_cols
     ]
 
-    # Count linked member objects
+    # Count linked member objects (visible to the current viewer)
     member_count_stmt = select(func.count(Relation.id)).where(
         Relation.to_type == "collection",
         Relation.to_id == col.id,
         Relation.from_type == "object",
     )
+    if staff_user is None:
+        member_count_stmt = member_count_stmt.where(
+            exists(
+                select(Object.id).where(
+                    Object.id == Relation.from_id,
+                    Object.status.in_(PUBLIC_STATUSES),
+                    Object.deleted_at.is_(None),
+                )
+            )
+        )
     member_objects_count = (await db.execute(member_count_stmt)).scalar_one() or 0
 
     return PortalCollectionDetail(
@@ -809,6 +829,22 @@ async def list_search_field_terms(
         .order_by(VocabularyTerm.term)
     )
     return list(terms.scalars().all())
+
+
+@router.get("/record-subtypes", response_model=list[PortalRecordSubtypeRead])
+async def list_record_subtypes_public(
+    db: DBDep, response: Response, primary_type: str | None = None
+) -> list[RecordSubtype]:
+    if primary_type is not None and primary_type not in _PUBLIC_TYPES:
+        raise HTTPException(status_code=404, detail="Typ nicht gefunden")
+    query = select(RecordSubtype)
+    if primary_type is not None:
+        query = query.where(RecordSubtype.primary_type == primary_type)
+    result = await db.execute(
+        query.order_by(RecordSubtype.primary_type, RecordSubtype.sort_order, RecordSubtype.name)
+    )
+    response.headers["Cache-Control"] = _CONFIG_CACHE
+    return list(result.scalars().all())
 
 
 @router.get("/vocabularies", response_model=list[PortalVocabularyRead])

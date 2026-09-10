@@ -17,6 +17,8 @@
   "internalNameHint": "wird aus dem Label abgeleitet und nach dem Erstellen gesperrt",
   "requiredBadge": "Pflicht",
   "sortOrderLabel": "Sortierung",
+  "placeholderImageLabel": "Platzhalter-Bild",
+  "placeholderImageHint": "im Portal für Objekte dieses Subtyps ohne eigene Medien",
   "defaultCheckbox": "Standard-Subtyp",
   "save": "Speichern",
   "saving": "Speichern…",

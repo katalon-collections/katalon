@@ -391,6 +391,8 @@ class RecordSubtype(Base):
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Portal fallback image for records of this subtype that have no media of their own.
+    placeholder_image_url: Mapped[str] = mapped_column(String(512), default="", server_default="")
 
     __table_args__ = (
         UniqueConstraint("primary_type", "name", name="uq_record_subtypes_primary_name"),

@@ -202,6 +202,7 @@ class RecordSubtypeCreate(BaseModel):
     description: str = ""
     sort_order: int = 0
     is_default: bool = False
+    placeholder_image_url: str = ""
 
 
 class RecordSubtypeRead(RecordSubtypeCreate):

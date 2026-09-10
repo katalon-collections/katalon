@@ -17,6 +17,8 @@
   "internalNameHint": "derived from the label, locked after creation",
   "requiredBadge": "Required",
   "sortOrderLabel": "Sort order",
+  "placeholderImageLabel": "Placeholder image",
+  "placeholderImageHint": "shown in the portal for records of this subtype with no media of their own",
   "defaultCheckbox": "Default subtype",
   "save": "Save",
   "saving": "Saving…",

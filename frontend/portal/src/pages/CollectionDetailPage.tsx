@@ -15,10 +15,13 @@ import {
 } from '../api/client'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
+import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
+import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { facetItems, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { facetHref, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
+import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { RelationsList } from '../components/RelationsList'
 import { useI18n } from '../i18n'
 
@@ -27,6 +30,8 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
   const navigate = useNavigate()
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
+  const subtypeLabel = useSubtypeLabel('collection', locale)
+  const subtypePlaceholder = useSubtypePlaceholder('object')
   const backSearch = useBackToSearch()
 
   const [col, setCol] = useState<CollectionDetail | null>(null)
@@ -183,12 +188,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
             )}
             <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{title}</span>
           </div>
-
-          {col.idno && (
-            <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--fg-2)' }}>
-              {t('common.signature')}: <strong>{col.idno}</strong>
-            </span>
-          )}
+          <SearchResultNavigation recordId={col.id} />
         </div>
 
         {/* Hero & Kuratorischer Header */}
@@ -224,7 +224,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
 
           <div style={{ position: 'relative', maxWidth: '800px', zIndex: 1 }}>
             <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
-              {col.collection_type ? `${t('type.collection')} · ${col.collection_type}` : t('type.collection')}
+              {col.collection_type ? `${t('type.collection')} · ${subtypeLabel(col.collection_type)}` : t('type.collection')}
             </div>
             <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 16px', lineHeight: 1.2, color: 'var(--fg-1)', display: 'flex', alignItems: 'center' }}>
               {title}<EditRecordLink user={user} recordType="collection" id={col.id} />
@@ -332,9 +332,8 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                {col.idno && <MetaRow label={t('common.signature')} value={col.idno} />}
-                {col.collection_type && <MetaRow label={t('common.type')} value={col.collection_type} />}
-                <MetaRow label={t('collection.objectsCount', { count: col.member_objects_count })} value={String(col.member_objects_count)} />
+                {col.collection_type && <MetaRow label={t('common.type')} value={subtypeLabel(col.collection_type) ?? col.collection_type} />}
+                <MetaRow label={t('collection.objectsCount')} value={String(col.member_objects_count)} />
 
                 {/* Dynamische Schema-Felder (außer bereits dargestellter Titel/Beschreibungen) */}
                 {fieldDefs
@@ -397,7 +396,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                     >
                       <div>
                         <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)' }}>
-                          📁 {child.collection_type || t('type.collection')}
+                          📁 {subtypeLabel(child.collection_type) ?? t('type.collection')}
                         </span>
                         <h4 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 8px', color: 'var(--fg-1)' }}>
                           {child.title || child.idno || child.id.slice(0, 8)}
@@ -418,8 +417,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
             <section>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--fg-1)' }}>
-                  {t('common.relatedObjects')}
-                  {filteredObjects.length > 0 && <span style={{ fontWeight: 400, color: 'var(--fg-3)', marginLeft: 8 }}>({filteredObjects.length})</span>}
+                  {t('collection.objectsInCollection')}
                 </h2>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -488,7 +486,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
                   {filteredObjects.map(obj => {
                     const objTitle = recordTitle(obj.metadata_ as Record<string, unknown>, locale, obj.idno ?? '')
-                    const thumb = thumbnails[obj.id]
+                    const thumb = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
                     return (
                       <Link
                         key={obj.id}
@@ -513,11 +511,11 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                           e.currentTarget.style.boxShadow = 'none'
                         }}
                       >
-                        <div style={{ width: '100%', aspectRatio: '4/3', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', aspectRatio: '4/3', background: 'linear-gradient(135deg, #cfd5e1, #a4afc4)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: 'rgba(255,255,255,.5)' }}>
                           {thumb ? (
                             <img src={thumb} alt={objTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                           ) : (
-                            <span style={{ fontSize: 24, color: 'var(--fg-3)' }}>🖼️</span>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                           )}
                         </div>
                         <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -547,7 +545,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                     <tbody>
                       {filteredObjects.map(obj => {
                         const objTitle = recordTitle(obj.metadata_ as Record<string, unknown>, locale, obj.idno ?? '')
-                        const thumb = thumbnails[obj.id]
+                        const thumb = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
                         return (
                           <tr
                             key={obj.id}
@@ -555,8 +553,12 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                             onClick={() => navigate(`/objects/${obj.id}`)}
                           >
                             <td style={{ padding: '8px 14px' }}>
-                              <div style={{ width: 36, height: 36, borderRadius: 4, background: 'var(--bg)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {thumb ? <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🖼️'}
+                              <div style={{ width: 36, height: 36, borderRadius: 4, background: 'linear-gradient(135deg, #cfd5e1, #a4afc4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.5)' }}>
+                                {thumb ? (
+                                  <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                                )}
                               </div>
                             </td>
                             <td style={{ padding: '8px 14px', fontFamily: 'monospace', color: 'var(--fg-2)', fontSize: 12 }}>

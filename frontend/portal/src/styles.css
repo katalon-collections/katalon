@@ -151,7 +151,7 @@ input, select, textarea { font-family: inherit; }
   border-radius: 8px; padding: 14px 16px; display: flex; gap: 16px; align-items: flex-start; cursor: pointer;
 }
 .result-row:hover { border-color: var(--accent-100, #dde3f5); background: var(--accent-50, #eef2fb); }
-.result-row .thumb-sm { width: 64px; height: 64px; border-radius: 6px; background: linear-gradient(135deg, #cfd5e1, #a4afc4); flex-shrink: 0; overflow: hidden; }
+.result-row .thumb-sm { width: 64px; height: 64px; border-radius: 6px; background: linear-gradient(135deg, #cfd5e1, #a4afc4); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.5); }
 .result-row .thumb-sm img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .result-row .body { flex: 1; min-width: 0; }
 .result-row .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; overflow-wrap: anywhere; }
@@ -175,6 +175,18 @@ input, select, textarea { font-family: inherit; }
 }
 .view-toggle__btn:hover { border-color: var(--accent, #1e3a8a); color: var(--accent, #1e3a8a); }
 .view-toggle__btn.active { background: var(--accent, #1e3a8a); border-color: var(--accent, #1e3a8a); color: #fff; }
+.search-result-nav {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+.search-result-nav:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.search-result-nav:disabled { opacity: .35; cursor: default; }
 
 /* Card grid (shared by masonry + grid view modes) */
 .result-list__items { display: flex; flex-direction: column; gap: 12px; }
@@ -215,16 +227,23 @@ input, select, textarea { font-family: inherit; }
 .result-card__meta { font-size: 12px; color: var(--fg-3, #5a6173); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Detail page */
-.detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 32px; margin-top: 32px; }
+.detail-layout { display: grid; grid-template-columns: 1fr 400px; gap: 32px; margin-top: 32px; }
 .detail-layout > * { min-width: 0; }
 /* Sidebar position is a global setting; on small screens media/main content always comes
    first regardless — the order/column swap below only applies once there's room for two
-   columns. The sidebar stays the narrow (320px) track either side — swapping which side
+   columns. The sidebar stays the narrow (400px) track either side — swapping which side
    it's on must not swap which track is wide, or media and metadata trade sizes. */
 @media (min-width: 769px) {
-  .detail-layout--sidebar-left { grid-template-columns: 320px 1fr; }
+  .detail-layout--sidebar-left { grid-template-columns: 400px 1fr; }
   .detail-layout--sidebar-left .detail-main { order: 2; }
   .detail-layout--sidebar-left .detail-meta { order: 1; }
+}
+@media (min-width: 769px) {
+  /* Without a media viewer, the main column (relations, keywords, ...) is
+     secondary content — metadata is the actual substance of the record, so it
+     takes the large track instead of being squeezed into the usual 400px. */
+  .detail-layout--no-media { grid-template-columns: minmax(0, 460px) minmax(0, 1fr); }
+  .detail-layout--no-media.detail-layout--sidebar-left { grid-template-columns: minmax(0, 1fr) minmax(0, 460px); }
 }
 /* A record with nothing in the main column (no media, no relations, ...) shows the
    metadata panel alone instead of leaving a wide empty column beside a narrow one. */

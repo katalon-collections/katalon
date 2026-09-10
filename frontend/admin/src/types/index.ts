@@ -529,6 +529,7 @@ export interface RecordSubtype {
   description: string
   sort_order: number
   is_default: boolean
+  placeholder_image_url: string
 }
 
 export interface Banner {
