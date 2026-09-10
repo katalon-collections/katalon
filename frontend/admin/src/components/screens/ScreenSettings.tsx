@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, FieldDefinition, PortalConfigRead, RecordSubtype } from '../../types'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'startseite' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -401,6 +401,175 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
         {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Startseite section (#374 — configurable homepage content blocks)
+// ---------------------------------------------------------------------------
+
+function newBlock(type: HomepageBlock['type']): HomepageBlock {
+  const id = crypto.randomUUID()
+  if (type === 'text') return { id, type, enabled: true, title: {}, content: {} }
+  if (type === 'objects') return { id, type, enabled: true, title: {}, limit: 12 }
+  if (type === 'collections') return { id, type, enabled: true, title: {}, collections_mode: 'top', limit: 12 }
+  return { id, type: 'curated', enabled: true, title: {} }
+}
+
+function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
+  const { t } = useTranslation('screenSettings')
+  const [blocks, setBlocks] = useState<HomepageBlock[]>(config.homepage_blocks ?? [])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function update(id: string, patch: Partial<HomepageBlock>) {
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b))
+  }
+
+  function move(id: string, dir: -1 | 1) {
+    setBlocks(prev => {
+      const i = prev.findIndex(b => b.id === id)
+      const j = i + dir
+      if (i === -1 || j < 0 || j >= prev.length) return prev
+      const next = [...prev]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  }
+
+  function remove(id: string) {
+    setBlocks(prev => prev.filter(b => b.id !== id))
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      const c = await req<PortalConfigRead>(`${BASE}/v1/portal/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ homepage_blocks: blocks }),
+      })
+      onSaved(c)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">{t('startseite.title')}</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('startseite.description')}</p>
+
+          {blocks.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('startseite.empty')}</div>
+          )}
+
+          {blocks.map((block, i) => (
+            <div key={block.id} className="card" style={{ marginBottom: 12, background: 'var(--bg)' }}>
+              <div className="hd" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>
+                  {block.type === 'text' && t('startseite.typeText')}
+                  {block.type === 'curated' && t('startseite.typeCurated')}
+                  {block.type === 'objects' && t('startseite.typeObjects')}
+                  {block.type === 'collections' && t('startseite.typeCollections')}
+                </span>
+                <div className="grow" />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 400 }}>
+                  <input type="checkbox" className="ck" checked={block.enabled} onChange={e => update(block.id, { enabled: e.target.checked })} />
+                  {t('startseite.enabled')}
+                </label>
+                <button className="btn sm gh" disabled={i === 0} onClick={() => move(block.id, -1)} title={t('startseite.moveUp')}>↑</button>
+                <button className="btn sm gh" disabled={i === blocks.length - 1} onClick={() => move(block.id, 1)} title={t('startseite.moveDown')}>↓</button>
+                <button className="btn sm gh dn" onClick={() => remove(block.id)} title={t('startseite.remove')}>✕</button>
+              </div>
+              <div className="bd">
+                <div className="fg-2">
+                  <div className="field">
+                    <div className="lbl">{t('startseite.titleDE')}</div>
+                    <input className="fld" value={block.title?.de ?? ''} onChange={e => update(block.id, { title: { ...block.title, de: e.target.value } })} />
+                  </div>
+                  <div className="field">
+                    <div className="lbl">{t('startseite.titleEN')}</div>
+                    <input className="fld" value={block.title?.en ?? ''} onChange={e => update(block.id, { title: { ...block.title, en: e.target.value } })} />
+                  </div>
+                </div>
+
+                {block.type === 'text' && (
+                  <>
+                    <div className="field">
+                      <div className="lbl">{t('startseite.contentDE')}</div>
+                      <textarea className="fld" rows={4} value={block.content?.de ?? ''} onChange={e => update(block.id, { content: { ...block.content, de: e.target.value } })}
+                        style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                    </div>
+                    <div className="field">
+                      <div className="lbl">{t('startseite.contentEN')}</div>
+                      <textarea className="fld" rows={4} value={block.content?.en ?? ''} onChange={e => update(block.id, { content: { ...block.content, en: e.target.value } })}
+                        style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                    </div>
+                  </>
+                )}
+
+                {block.type === 'curated' && (
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('startseite.curatedHint')}</div>
+                )}
+
+                {block.type === 'objects' && (
+                  <div className="field">
+                    <div className="lbl">{t('startseite.limitLabel')}</div>
+                    <input className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
+                      onChange={e => update(block.id, { limit: Number(e.target.value) })} style={{ width: 90 }} />
+                  </div>
+                )}
+
+                {block.type === 'collections' && (
+                  <>
+                    <div className="field">
+                      <div className="lbl">{t('startseite.collectionsModeLabel')}</div>
+                      <select className="fld" value={block.collections_mode ?? 'top'}
+                        onChange={e => update(block.id, { collections_mode: e.target.value as HomepageBlock['collections_mode'] })}>
+                        <option value="top">{t('startseite.collectionsModeTop')}</option>
+                        <option value="all">{t('startseite.collectionsModeAll')}</option>
+                        <option value="selected">{t('startseite.collectionsModeSelected')}</option>
+                      </select>
+                    </div>
+                    {block.collections_mode === 'selected' ? (
+                      <div className="field">
+                        <div className="lbl">{t('startseite.collectionIdsLabel')}</div>
+                        <textarea className="fld mono" rows={3} value={(block.collection_ids ?? []).join('\n')}
+                          onChange={e => update(block.id, { collection_ids: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                          style={{ resize: 'vertical', fontSize: 12 }} />
+                      </div>
+                    ) : (
+                      <div className="field">
+                        <div className="lbl">{t('startseite.limitLabel')}</div>
+                        <input className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
+                          onChange={e => update(block.id, { limit: Number(e.target.value) })} style={{ width: 90 }} />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(['text', 'curated', 'objects', 'collections'] as const).map(type => (
+              <button key={type} className="btn gh sm" onClick={() => setBlocks(prev => [...prev, newBlock(type)])}>
+                + {type === 'text' ? t('startseite.typeText') : type === 'curated' ? t('startseite.typeCurated') : type === 'objects' ? t('startseite.typeObjects') : t('startseite.typeCollections')}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('startseite.saving') : t('startseite.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('startseite.saved')}</span>}
       </div>
     </div>
   )
@@ -1778,6 +1947,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }
   { id: 'profil',   label: 'Profil' },
   { id: 'ueber',    label: 'Über Katalon' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
+  { id: 'startseite', label: 'Startseite', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
   { id: 'sprachen', label: 'Sprachen', adminOnly: true },
   { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
@@ -1869,6 +2039,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
             window.history.replaceState(null, '', `#settings/${r}`)
           }} />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && config && section === 'startseite' && <SectionStartseite config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}
           {!loading && isAdmin && section === 'sprachen' && <SectionLanguages />}
           {!loading && isAdmin && section === 'idno' && <SectionIdnoSchemas />}

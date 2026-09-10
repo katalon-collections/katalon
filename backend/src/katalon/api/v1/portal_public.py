@@ -371,6 +371,7 @@ async def list_collections(
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
     parent_id: uuid.UUID | None = None,
+    top_level: bool = False,
     q: str | None = None,
 ) -> dict[str, Any]:
     staff_user = _staff_user(current_user)
@@ -379,6 +380,8 @@ async def list_collections(
         query = query.where(Collection.status.in_(PUBLIC_STATUSES))
     if parent_id is not None:
         query = query.where(Collection.parent_id == parent_id)
+    elif top_level:
+        query = query.where(Collection.parent_id.is_(None))
     if q:
         from sqlalchemy import Text, cast
 

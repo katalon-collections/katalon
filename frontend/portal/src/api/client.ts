@@ -199,6 +199,17 @@ export interface StaticPageSummary {
   sort_order: number
 }
 
+export interface HomepageBlock {
+  id: string
+  type: 'text' | 'objects' | 'collections' | 'curated'
+  enabled: boolean
+  title: Record<string, string>
+  content?: Record<string, string> | null
+  limit?: number | null
+  collections_mode?: 'selected' | 'top' | 'all' | null
+  collection_ids?: string[] | null
+}
+
 export interface PortalConfig {
   site_title: string
   site_subtitle: string
@@ -215,6 +226,7 @@ export interface PortalConfig {
   detail_sidebar_position: 'left' | 'right'
   facet_sort: 'count' | 'alpha'
   facet_initial_count: number
+  homepage_blocks: HomepageBlock[]
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
@@ -299,7 +311,7 @@ export const api = {
     get: (id: string) => get<OccurrenceSummary>(`${PORTAL_API}/occurrences/${id}`),
   },
   collections: {
-    list: (p?: { page?: number; q?: string; status?: string; page_size?: number; parent_id?: string }) => {
+    list: (p?: { page?: number; q?: string; status?: string; page_size?: number; parent_id?: string; top_level?: boolean }) => {
       const qs = new URLSearchParams(
         Object.entries({ page_size: '24', ...p })
           .filter(([, v]) => v != null)

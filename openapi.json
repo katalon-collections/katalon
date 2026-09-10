@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.27.0"
+    "version": "1.28.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -16193,6 +16193,16 @@
             }
           },
           {
+            "name": "top_level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Top Level"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -20765,6 +20775,100 @@
         ],
         "title": "HitOut"
       },
+      "HomepageBlock": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "objects",
+              "collections",
+              "curated"
+            ],
+            "title": "Type"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "title": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Title"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "collections_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "selected",
+                  "top",
+                  "all"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collections Mode"
+          },
+          "collection_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "title": "HomepageBlock",
+        "description": "One configurable homepage content block (issue #374).\n\nFields are a flat union of all block-type options rather than a\npydantic discriminated union — the set of types and options is small\nand a flat shape keeps admin-UI JSON diffing simple."
+      },
       "ImportMappingCreate": {
         "properties": {
           "name": {
@@ -22807,6 +22911,13 @@
             "type": "integer",
             "title": "Facet Initial Count",
             "default": 10
+          },
+          "homepage_blocks": {
+            "items": {
+              "$ref": "#/components/schemas/HomepageBlock"
+            },
+            "type": "array",
+            "title": "Homepage Blocks"
           }
         },
         "type": "object",
@@ -23015,6 +23126,20 @@
               }
             ],
             "title": "Facet Initial Count"
+          },
+          "homepage_blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HomepageBlock"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Homepage Blocks"
           }
         },
         "type": "object",

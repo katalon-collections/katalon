@@ -9,7 +9,7 @@ from typing import Any, Literal
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from katalon.config import settings
@@ -52,7 +52,39 @@ _DEFAULTS = {
     "detail_sidebar_position": "right",
     "facet_sort": "count",
     "facet_initial_count": 10,
+    "homepage_blocks": [],
 }
+
+HomepageBlockType = Literal["text", "objects", "collections", "curated"]
+
+
+class HomepageBlock(BaseModel):
+    """One configurable homepage content block (issue #374).
+
+    Fields are a flat union of all block-type options rather than a
+    pydantic discriminated union — the set of types and options is small
+    and a flat shape keeps admin-UI JSON diffing simple.
+    """
+
+    id: str
+    type: HomepageBlockType
+    enabled: bool = True
+    title: dict[str, str] = Field(default_factory=dict)
+    # type == "text"
+    content: dict[str, str] | None = None
+    # type == "objects" (recent) / "curated" (reads featured_object_ids)
+    limit: int | None = Field(default=None, ge=1, le=100)
+    # type == "collections"
+    collections_mode: Literal["selected", "top", "all"] | None = None
+    collection_ids: list[str] | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Block-ID darf nicht leer sein.")
+        return value
 
 
 class PortalConfigRead(BaseModel):
@@ -71,6 +103,7 @@ class PortalConfigRead(BaseModel):
     supported_languages: list[str] = ["de", "en"]
     facet_sort: Literal["count", "alpha"] = "count"
     facet_initial_count: int = 10
+    homepage_blocks: list[HomepageBlock] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -93,6 +126,7 @@ class PortalConfigUpdate(BaseModel):
     detail_sidebar_position: Literal["left", "right"] | None = None
     facet_sort: Literal["count", "alpha"] | None = None
     facet_initial_count: int | None = Field(default=None, ge=1, le=100)
+    homepage_blocks: list[HomepageBlock] | None = None
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:

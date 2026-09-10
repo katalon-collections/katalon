@@ -20,6 +20,7 @@ const DEFAULT: PortalConfig = {
   detail_sidebar_position: 'right',
   facet_sort: 'count',
   facet_initial_count: 10,
+  homepage_blocks: [],
 }
 
 // Module-level cache so multiple components share one fetch per page load

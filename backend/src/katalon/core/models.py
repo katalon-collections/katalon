@@ -702,6 +702,8 @@ class PortalConfig(Base):
     site_subtitle: Mapped[str] = mapped_column(String(512), default="")
     hero_text: Mapped[str] = mapped_column(Text, default="")
     featured_object_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
+    # Ordered list of homepage content blocks, see api/v1/portal.py:HomepageBlock
+    homepage_blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # e.g. {"object": ["creator"], "entity": []}
     facet_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     # Fields shown as the result-list subtitle, per record type, in display order.

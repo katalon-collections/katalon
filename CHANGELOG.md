@@ -3,6 +3,27 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.28.0] - 2026-09-10
+
+### Added
+- Portal-Startseite konfigurierbar über Inhaltsbausteine (Issue #374):
+  `PortalConfig.homepage_blocks` (geordnetes JSONB-Array) ersetzt die feste
+  Reihenfolge „Highlights → Neueste Objekte". Blocktypen: `text` (mehrsprachig,
+  frei formulierbar), `objects` (neueste Objekte, Anzahl konfigurierbar),
+  `curated` (nutzt die bestehenden `featured_object_ids` unter Portal &
+  Institution, keine Doppelpflege) und `collections` (oberste Sammlungen,
+  alle Sammlungen oder eine manuell gewählte Auswahl). Blöcke lassen sich im
+  Admin unter Einstellungen → Startseite hinzufügen, umsortieren
+  (Hoch/Runter), aktivieren/deaktivieren und entfernen. Bestehende
+  Installationen erhalten per Migration automatisch die bisherige
+  Blockkonfiguration (`curated` + `objects`), damit die Startseite nach dem
+  Upgrade nicht leer bleibt. Fehlende/gelöschte referenzierte Sammlungen oder
+  Objekte werden beim Rendern übersprungen statt die Seite abstürzen zu
+  lassen. Arbeitslisten wurden bewusst nicht als Quelle angebunden — das
+  Konzept ist für persönliche/geteilte Merklisten gedacht, nicht für
+  öffentliche Kuration; `curated` deckt den Anwendungsfall stattdessen über
+  das bereits vorhandene Feld ab.
+
 ## [1.27.0] - 2026-09-10
 
 ### Added
