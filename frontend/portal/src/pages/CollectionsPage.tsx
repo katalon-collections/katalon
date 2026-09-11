@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api, type CollectionSummary, type Page } from '../api/client'
-import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { markdownToPlainText, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useI18n } from '../i18n'
 
@@ -14,6 +15,19 @@ export function CollectionsPage() {
   const navigate = useNavigate()
   const { t, locale } = useI18n()
   const subtypeLabel = useSubtypeLabel('collection', locale)
+  const [fieldDefs] = useFieldDefinitions('collection')
+  const descriptionField = fieldDefs.find(f => f.name === 'description')
+  const kurzbeschreibungField = fieldDefs.find(f => f.name === 'kurzbeschreibung')
+
+  /** Teaser text for a collection card: markdown fields are stripped to plain text so
+   *  raw `**`/`#`/link syntax never leaks into the card preview. */
+  function descriptionTeaser(m: Record<string, unknown>): string | null {
+    const isRichtext = m.description != null && m.description !== ''
+      ? descriptionField?.field_type === 'richtext'
+      : kurzbeschreibungField?.field_type === 'richtext'
+    const raw = renderFieldValue(m.description || m.kurzbeschreibung, locale)
+    return raw && isRichtext ? markdownToPlainText(raw) : raw
+  }
 
   const q = params.get('q') ?? ''
   const page = parseInt(params.get('page') ?? '1', 10)
@@ -123,7 +137,7 @@ export function CollectionsPage() {
                   {topLevel.map(col => {
                     const m = col.metadata_ as Record<string, unknown>
                     const title = recordTitle(m, locale, col.idno ?? col.id)
-                    const desc = renderFieldValue(m.description || m.kurzbeschreibung, locale)
+                    const desc = descriptionTeaser(m)
                     const scope = renderFieldValue(m.scope_and_content || m.bestandsumfang, locale)
 
                     return (
@@ -196,7 +210,7 @@ export function CollectionsPage() {
                   {(!q ? subCollections : items).map(col => {
                     const m = col.metadata_ as Record<string, unknown>
                     const title = recordTitle(m, locale, col.idno ?? col.id)
-                    const desc = renderFieldValue(m.description || m.kurzbeschreibung, locale)
+                    const desc = descriptionTeaser(m)
 
                     return (
                       <Link

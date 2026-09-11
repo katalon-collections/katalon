@@ -3,10 +3,12 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
+import type { ImportMapping, MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
 import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
+import { SaveMappingModal } from '../../importer/SaveMappingModal'
+import { LoadMappingModal } from '../../importer/LoadMappingModal'
 import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult } from './types'
 
 interface Props {
@@ -15,6 +17,11 @@ interface Props {
   mapping: Record<string, MappingEntry>
   onMappingChange: (m: Record<string, MappingEntry>) => void
   recordType: string
+  subtype?: string | null
+  savedMappingId?: string | null
+  savedMappingName?: string | null
+  onSavedMappingLoaded?: (saved: ImportMapping) => void
+  onMappingSaved?: (saved: ImportMapping) => void
   mediaSelector: string | null
   onMediaSelectorChange: (selector: string | null) => void
   idnoStrategy: string
@@ -38,6 +45,7 @@ interface Props {
 
 export function StepMapping({
   uploaded, fields, mapping, onMappingChange, recordType,
+  subtype, savedMappingId, savedMappingName, onSavedMappingLoaded, onMappingSaved,
   mediaSelector, onMediaSelectorChange,
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
   pendingFields, onPendingFieldsChange,
@@ -46,6 +54,9 @@ export function StepMapping({
 }: Props) {
   const { t } = useTranslation('screenImporter')
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showLoadModal, setShowLoadModal] = useState(false)
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null)
   const [warningsExpanded, setWarningsExpanded] = useState(false)
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
   const [newFieldType, setNewFieldType] = useState('text')
@@ -432,19 +443,69 @@ export function StepMapping({
         </div>
       )}
 
-      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn" onClick={onBack}>Zurück</button>
+      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn" onClick={onBack}>{t('back', 'Zurück')}</button>
         <button className="btn pri" onClick={onDryRun} disabled={dryRunning || mappedCount === 0 || idnoMissing}>
           {dryRunning
-            ? <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .7s linear infinite', marginRight: 6 }} />Prüfe…</>
+            ? <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .7s linear infinite', marginRight: 6 }} />{t('checking', 'Prüfe…')}</>
             : t('continueToDryRun')}
         </button>
-        {onProfileExport && Object.keys(mapping).length > 0 && (
-          <button className="btn gh" onClick={onProfileExport} style={{ marginLeft: 'auto' }}>
-            Profil exportieren
+
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {saveSuccessMsg && (
+            <span style={{ fontSize: 12, color: '#166534', marginRight: 4 }}>
+              ✓ {saveSuccessMsg}
+            </span>
+          )}
+          {savedMappingName && !saveSuccessMsg && (
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', marginRight: 4, background: 'var(--panel-2)', padding: '3px 8px', borderRadius: 4 }}>
+              {t('activeTemplate', 'Vorlage: {{name}}', { name: savedMappingName })}
+            </span>
+          )}
+          <button className="btn gh" type="button" onClick={() => setShowLoadModal(true)}>
+            {t('loadTemplateButton', 'Vorlage laden')}
           </button>
-        )}
+          <button
+            className="btn gh"
+            type="button"
+            onClick={() => setShowSaveModal(true)}
+            disabled={Object.keys(mapping).length === 0}
+          >
+            {t('saveTemplateButton', 'Vorlage speichern')}
+          </button>
+          {onProfileExport && Object.keys(mapping).length > 0 && (
+            <button className="btn gh" type="button" onClick={onProfileExport}>
+              {t('exportProfileButton', 'Profil exportieren')}
+            </button>
+          )}
+        </div>
       </div>
+
+      <SaveMappingModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        recordType={recordType}
+        subtype={subtype ?? null}
+        mediaSelector={mediaSelector}
+        mapping={mapping}
+        savedMappingId={savedMappingId ?? null}
+        savedMappingName={savedMappingName ?? null}
+        onSaved={saved => {
+          onMappingSaved?.(saved)
+          setSaveSuccessMsg(t('templateSavedSuccess', 'Vorlage „{{name}}“ gespeichert.', { name: saved.name }))
+          setTimeout(() => setSaveSuccessMsg(null), 4000)
+        }}
+      />
+      <LoadMappingModal
+        isOpen={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+        recordType={recordType}
+        onSelect={saved => {
+          onSavedMappingLoaded?.(saved)
+          setSaveSuccessMsg(t('templateLoadedSuccess', 'Vorlage „{{name}}“ angewendet.', { name: saved.name }))
+          setTimeout(() => setSaveSuccessMsg(null), 4000)
+        }}
+      />
     </>
   )
 }

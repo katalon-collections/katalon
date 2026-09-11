@@ -3,6 +3,13 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.31.0] - 2026-09-11
+
+### Added
+- Importer: Import-Mappings können nun direkt in der Admin-UI als Vorlagen in der Datenbank gespeichert, aktualisiert und für den jeweiligen Datensatz-Typ geladen werden (`import_mappings`-Tabelle, `SaveMappingModal`, `LoadMappingModal`).
+- Importer: Die CLI (`katalon-manage import-xml`) akzeptiert nun direkt exportierte JSON-Profile aus der Oberfläche.
+- Doku: Neues API-Rezept `docs/16_cookbook_api_import.md` für den automatisierten und wiederverwendbaren Import von XML- und LIDO-Dateien über die REST-API.
+
 ## [1.30.0] - 2026-09-10
 
 ### Added

@@ -3,8 +3,9 @@
 
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { UploadResult } from '../../../api/client'
+import type { ImportMapping, UploadResult } from '../../../api/client'
 import { Upload } from '../../ui/Icons'
+import { LoadMappingModal } from '../../importer/LoadMappingModal'
 import type { ImportProfile } from './types'
 
 interface Props {
@@ -14,11 +15,14 @@ interface Props {
   needsReupload?: boolean
   onFile: (files: File | File[]) => void
   onProfileLoaded?: (profile: ImportProfile) => void
+  recordType?: string
+  onSavedMappingLoaded?: (saved: ImportMapping) => void
 }
 
-export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFile, onProfileLoaded }: Props) {
+export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFile, onProfileLoaded, recordType, onSavedMappingLoaded }: Props) {
   const { t } = useTranslation('stepUpload')
   const [over, setOver] = useState(false)
+  const [showLoadModal, setShowLoadModal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const profileRef = useRef<HTMLInputElement>(null)
   const [profileErr, setProfileErr] = useState<string | null>(null)
@@ -100,21 +104,46 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
       {uploadErr && <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>{uploadErr}</div>}
       {dropErr && <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>{dropErr}</div>}
 
-      {uploaded && onProfileLoaded && (
-        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            className="btn sm gh"
-            onClick={() => profileRef.current?.click()}
-          >{t('loadProfileButton')}</button>
-          <input
-            ref={profileRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleProfileFile(f); e.target.value = '' }}
-          />
+      {uploaded && (onProfileLoaded || onSavedMappingLoaded) && (
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {onSavedMappingLoaded && (
+            <button
+              className="btn sm gh"
+              type="button"
+              onClick={() => setShowLoadModal(true)}
+            >
+              {t('loadTemplateButton', 'Vorlage aus Datenbank laden')}
+            </button>
+          )}
+          {onProfileLoaded && (
+            <>
+              <button
+                className="btn sm gh"
+                type="button"
+                onClick={() => profileRef.current?.click()}
+              >{t('loadProfileButton')}</button>
+              <input
+                ref={profileRef}
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleProfileFile(f); e.target.value = '' }}
+              />
+            </>
+          )}
           {profileErr && <span style={{ fontSize: 12, color: '#dc2626' }}>{profileErr}</span>}
         </div>
+      )}
+
+      {onSavedMappingLoaded && (
+        <LoadMappingModal
+          isOpen={showLoadModal}
+          onClose={() => setShowLoadModal(false)}
+          recordType={recordType ?? 'object'}
+          onSelect={saved => {
+            onSavedMappingLoaded(saved)
+          }}
+        />
       )}
 
       {uploaded && (

@@ -9,7 +9,7 @@ export const PORTAL_API = '/portal/v1'
 // `/admin/` alongside portal at `/`, so the fallback appends that path segment; deployments
 // where admin lives on its own origin (dev Caddy subdomains, docker/nginx.prod.conf) override
 // via VITE_ADMIN_URL, mirroring admin's own VITE_PORTAL_URL.
-export const ADMIN_URL = import.meta.env.VITE_ADMIN_URL ?? (typeof window !== 'undefined' ? `${window.location.origin}/admin` : '')
+export const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || (typeof window !== 'undefined' ? `${window.location.origin}/admin` : '')
 localStorage.removeItem('katalon_token')
 localStorage.removeItem('katalon_refresh_token')
 let token: string | null = null

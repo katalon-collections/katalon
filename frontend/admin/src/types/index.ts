@@ -112,6 +112,7 @@ export interface FieldDefinition {
   target_subtype: string | null
   name: string
   label: Record<string, string>
+  help_text?: Record<string, string>
   field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'url' | 'authority' | 'group'
   is_required: boolean
   is_repeatable: boolean

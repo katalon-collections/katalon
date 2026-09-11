@@ -4,7 +4,8 @@
   "dropOrClick": "Drop a file here or click to select",
   "fileTypeHint": "Supports CSV, TSV, XLSX, and XML (LIDO, EAD, METS, DC, IIIF)",
   "folderDropNotSupported": "Folders cannot be dropped. Select them via the file dialog.",
-  "loadProfileButton": "Load mapping profile",
+  "loadProfileButton": "Load mapping profile (file)",
+  "loadTemplateButton": "Load template from database",
   "invalidProfileFormat": "Invalid profile format.",
   "profileReadFailed": "Could not read profile file.",
   "previewSummary": "{{rows}} rows · {{columns}} columns"

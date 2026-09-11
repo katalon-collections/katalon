@@ -8,6 +8,25 @@
 #                                katalon-cli voraussetzt, das ältere CLI-Versionen
 #                                nicht haben (z.B. neues Compose-Template-Feld).
 # requires                    – Fremdservice-Versionsanforderungen, ändert sich selten.
+#
+# env_vars                    – Neu hinzugekommene Umgebungsvariablen für dieses Release.
+#                               Werden von katalon-cli beim Update ausgewertet und ggf.
+#                               im .env ergänzt / abgefragt.
+#                               Objektstruktur:
+#                                 key: str (Pflicht, z.B. "OIDC_CLIENT_ID")
+#                                 description: str (Kurze Erklärung für Admins)
+#                                 required: bool (default false, bricht Start ab wenn fehlt)
+#                                 secret: bool (default false, kann zufällig generiert werden)
+#                                 default: str | null (optionaler Standardwert)
+#                               Kann top-level definiert werden ([[env_vars]]) oder
+#                               versionsspezifisch ([[releases."1.31.0".env_vars]]).
+#
+# deprecated_env_vars         – Veraltete / nicht mehr unterstützte Umgebungsvariablen.
+#                               Objektstruktur:
+#                                 key: str (Pflicht, z.B. "OLD_VAR")
+#                                 note: str (optional, Erklärung / Nachfolger)
+#                               Kann top-level definiert werden ([[deprecated_env_vars]])
+#                               oder versionsspezifisch ([[releases."1.31.0".deprecated_env_vars]]).
 
 compose_revision = 2
 minimum_installer_version = "0.1.0"

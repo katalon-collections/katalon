@@ -77,3 +77,34 @@ export function applyProfile(
 
   return { appliedMapping, mediaSelector, newPendingFields, missedSelectors, missingFieldNames }
 }
+
+export function applySavedMapping(
+  savedMapping: Record<string, MappingEntry>,
+  savedMediaSelector: string | null,
+  availableSelectors: string[],
+  existingFieldNames: Set<string>,
+): ProfileApplyResult {
+  const selectorSet = new Set(availableSelectors)
+  const appliedMapping: Record<string, MappingEntry> = {}
+  const newPendingFields: PendingField[] = []
+  const missedSelectors: string[] = []
+  const missingFieldNames: string[] = []
+  const mediaSelector = savedMediaSelector && selectorSet.has(savedMediaSelector)
+    ? savedMediaSelector
+    : null
+
+  if (savedMediaSelector && !mediaSelector) missedSelectors.push(savedMediaSelector)
+
+  for (const [selector, entry] of Object.entries(savedMapping)) {
+    if (!selectorSet.has(selector)) {
+      missedSelectors.push(selector)
+      continue
+    }
+    appliedMapping[selector] = entry
+    if (!existingFieldNames.has(entry.target)) {
+      missingFieldNames.push(entry.target)
+    }
+  }
+
+  return { appliedMapping, mediaSelector, newPendingFields, missedSelectors, missingFieldNames }
+}

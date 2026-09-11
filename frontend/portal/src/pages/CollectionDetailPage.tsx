@@ -18,8 +18,8 @@ import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useBackToSearch } from '../hooks/useBackToSearch'
-import { facetItems, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { facetHref, MetaRow } from '../components/DetailPageLayout'
+import { facetItems, markdownToPlainText, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
+import { facetHref, MetaRow, richText } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { RelationsList } from '../components/RelationsList'
@@ -126,7 +126,10 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
 
   const m = col.metadata_ as Record<string, unknown>
   const title = recordTitle(m, locale, col.idno ?? col.id)
-  const description = renderFieldValue(m.description || m.kurzbeschreibung, locale)
+  const descriptionKey = m.description != null && m.description !== '' ? 'description' : 'kurzbeschreibung'
+  const descriptionField = fieldDefs.find(f => f.name === descriptionKey)
+  const descriptionIsRichtext = descriptionField?.field_type === 'richtext'
+  const description = renderFieldValue(m.description || m.kurzbeschreibung, locale, descriptionField?.field_type)
   const scopeAndContent = renderFieldValue(m.scope_and_content || m.bestandsumfang, locale)
 
   // Filter objects by quick local search if entered
@@ -151,7 +154,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
     <>
       <Helmet>
         <title>{title}</title>
-        {description && <meta name="description" content={description} />}
+        {description && <meta name="description" content={descriptionIsRichtext ? markdownToPlainText(description) : description} />}
       </Helmet>
 
       <div className="container page collection-detail-page">
@@ -230,12 +233,6 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
               {title}<EditRecordLink user={user} recordType="collection" id={col.id} />
             </h1>
 
-            {description && (
-              <p style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--fg-2)', margin: '0 0 20px' }}>
-                {description}
-              </p>
-            )}
-
             {scopeAndContent && (
               <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--fg-2)', margin: '0 0 20px', padding: '12px 16px', background: 'var(--bg)', borderRadius: 8, borderLeft: '3px solid var(--accent)' }}>
                 <strong>Bestandsumfang & Inhalt: </strong>{scopeAndContent}
@@ -256,6 +253,16 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                 {t('search.button')}
               </button>
             </form>
+
+            {description && (
+              descriptionIsRichtext ? (
+                <div style={{ marginTop: 24 }}>{richText(description)}</div>
+              ) : (
+                <p style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--fg-2)', margin: '24px 0 0' }}>
+                  {description}
+                </p>
+              )
+            )}
           </div>
         </div>
 

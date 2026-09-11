@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+/** Strips markdown syntax down to plain text, for teaser/preview contexts (card excerpts,
+ *  <meta name="description">) where richtext fields shouldn't leak raw `**`/`#`/link syntax. */
+export function markdownToPlainText(value: string): string {
+  return DOMPurify.sanitize(marked.parse(value) as string, { ALLOWED_TAGS: [] }).trim()
+}
+
 const AUTHORITY_BASE: Record<string, string> = {
   gnd:          'https://d-nb.info/gnd/',
   'gnd-person':  'https://d-nb.info/gnd/',

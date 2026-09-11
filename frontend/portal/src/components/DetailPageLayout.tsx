@@ -85,7 +85,7 @@ function fieldLabel(f: FieldDefinition, locale: string): string {
   return f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
 }
 
-function richText(value: string): ReactNode {
+export function richText(value: string): ReactNode {
   return (
     <div className="prose" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }} />
   )

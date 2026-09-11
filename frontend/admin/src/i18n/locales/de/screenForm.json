@@ -1,4 +1,5 @@
 {
+  "helpTextAriaLabel": "Hilfe zu diesem Feld",
   "dateInput": {
     "placeholder": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
     "pickerTitleEnabled": "Datumsauswahl öffnen",

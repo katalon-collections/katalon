@@ -406,6 +406,43 @@ async def _ensure_label_fields() -> None:
         await db.commit()
 
 
+async def _ensure_collection_description_field() -> None:
+    """Ensure every installation has a 'description' field on collections, used by the
+    portal collection detail page (rendered below the in-collection search box) and
+    collection list teasers. Only created if no row of that name exists at all — not
+    just no *active* one: `(target_type, target_subtype, name)` is globally unique
+    regardless of `is_deleted`, so re-inserting after a soft delete would violate
+    `uq_field_def_type_subtype_name` and crash startup. An admin who deleted or already
+    configured a 'description' field (any field_type) keeps their own setup either way."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(FieldDefinition).where(
+                FieldDefinition.target_type == "collection",
+                FieldDefinition.target_subtype.is_(None),
+                FieldDefinition.name == "description",
+            )
+        )
+        if result.scalar_one_or_none() is None:
+            db.add(
+                FieldDefinition(
+                    target_type="collection",
+                    target_subtype=None,
+                    name="description",
+                    label={"de": "Beschreibung", "en": "Description"},
+                    field_type="richtext",
+                    is_required=False,
+                    is_repeatable=False,
+                    is_searchable=True,
+                    sort_order=1,
+                    show_in_detail=True,
+                    show_in_list=False,
+                    detail_slot="main",
+                    detail_role="description",
+                )
+            )
+            await db.commit()
+
+
 _DEFAULT_SECRETS = {
     "dev-secret-key-change-in-production",
     "change-me-in-production",
@@ -477,6 +514,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _ensure_admin_config()
     await _ensure_authority_sources()
     await _ensure_label_fields()
+    await _ensure_collection_description_field()
     await _check_cantaloupe_health()
     try:
         from katalon.integrations.elasticsearch import ensure_index

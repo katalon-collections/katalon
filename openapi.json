@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.30.0"
+    "version": "1.31.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -20317,6 +20317,12 @@
             "title": "Label",
             "default": {}
           },
+          "help_text": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Help Text",
+            "default": {}
+          },
           "field_type": {
             "type": "string",
             "title": "Field Type"
@@ -20436,6 +20442,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Label",
+            "default": {}
+          },
+          "help_text": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Help Text",
             "default": {}
           },
           "field_type": {

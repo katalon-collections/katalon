@@ -39,12 +39,15 @@ def _load_mapping(path: str) -> dict[str, Any]:
 
     Expected format:
         {"source_column": {"target": "field_name", "transforms": [...]}}
+    Or an exported profile envelope:
+        {"version": 1, "record_type": "...", "mapping": {...}}
     """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise click.ClickException("Mapping file must contain a JSON object.")
+    if "mapping" in data and isinstance(data["mapping"], dict):
+        data = data["mapping"]
     return data
-
 
 def _normalize_mapping(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Normalize mapping values to the shape the importer service expects."""

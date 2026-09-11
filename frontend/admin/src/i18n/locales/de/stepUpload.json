@@ -4,7 +4,8 @@
   "dropOrClick": "Datei hier ablegen oder zum Auswählen klicken",
   "fileTypeHint": "Unterstützt CSV, TSV, XLSX und XML (LIDO, EAD, METS, DC, IIIF)",
   "folderDropNotSupported": "Ordner können nicht per Drag & Drop abgelegt werden. Bitte über den Dateidialog auswählen.",
-  "loadProfileButton": "Mapping-Profil laden",
+  "loadProfileButton": "Mapping-Profil laden (Datei)",
+  "loadTemplateButton": "Vorlage aus Datenbank laden",
   "invalidProfileFormat": "Ungültiges Profilformat.",
   "profileReadFailed": "Profildatei konnte nicht gelesen werden.",
   "previewSummary": "{{rows}} Zeilen · {{columns}} Spalten"

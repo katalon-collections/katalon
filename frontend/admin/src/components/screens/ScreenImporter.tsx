@@ -46,6 +46,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
     profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
     handleProfileLoaded, handleProfileExport,
+    handleSavedMappingLoaded, handleMappingSaved,
   } = useImporterState()
 
   const isXml = state.sourceType === 'xml'
@@ -138,6 +139,8 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 needsReupload={needsReupload}
                 onFile={handleFile}
                 onProfileLoaded={handleProfileLoaded}
+                recordType={state.recordType}
+                onSavedMappingLoaded={handleSavedMappingLoaded}
               />
             )}
 
@@ -158,6 +161,11 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 mapping={state.mapping}
                 onMappingChange={m => dispatch({ type: 'MAPPING_CHANGED', payload: m })}
                 recordType={state.recordType}
+                subtype={state.subtype}
+                savedMappingId={state.mappingId}
+                savedMappingName={state.savedMappingName}
+                onSavedMappingLoaded={handleSavedMappingLoaded}
+                onMappingSaved={handleMappingSaved}
                 mediaSelector={state.mediaSelector}
                 onMediaSelectorChange={selector => dispatch({ type: 'MEDIA_SELECTOR_CHANGED', payload: selector })}
                 idnoStrategy={state.idnoStrategy}

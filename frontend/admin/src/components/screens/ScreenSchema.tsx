@@ -26,6 +26,7 @@ type SubFieldFormState = {
   id?: string
   name: string
   label: Record<string, string>
+  help_text: Record<string, string>
   field_type: SubFieldType
   is_required: boolean
   is_public: boolean
@@ -47,6 +48,7 @@ type FieldFormState = {
   target_subtype: string
   name: string
   label: Record<string, string>
+  help_text: Record<string, string>
   field_type: string
   is_required: boolean
   is_repeatable: boolean
@@ -81,7 +83,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -90,6 +92,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     target_subtype: f.target_subtype ?? '',
     name: f.name,
     label: { ...f.label },
+    help_text: { ...(f.help_text ?? {}) },
     field_type: f.field_type,
     is_required: f.is_required,
     is_repeatable: f.is_repeatable,
@@ -150,7 +153,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange }: FieldDetailProps) {
@@ -182,6 +185,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       id: sf.id,
       name: sf.name,
       label: { ...sf.label },
+      help_text: { ...(sf.help_text ?? {}) },
       field_type: sf.field_type as SubFieldType,
       is_required: sf.is_required,
       is_public: sf.is_public ?? true,
@@ -219,6 +223,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       target_subtype: form.target_subtype || null,
       name: subFieldForm.name,
       label: subFieldForm.label,
+      help_text: subFieldForm.help_text,
       field_type: subFieldForm.field_type,
       is_required: subFieldForm.is_required,
       is_repeatable: false,
@@ -351,6 +356,19 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               }
             }}
           />
+        </div>
+        <div className="fg-2">
+          {languages.map(lang => (
+            <div className="field" key={lang}>
+              <div className="lbl">{t('fieldDetail.helpText')} {lang.toUpperCase()}</div>
+              <textarea
+                className="fld"
+                rows={2}
+                value={form.help_text[lang] ?? ''}
+                onChange={e => onChange({ ...form, help_text: { ...form.help_text, [lang]: e.target.value } })}
+              />
+            </div>
+          ))}
         </div>
         <div className="fg-2">
           <div className="field">
@@ -789,6 +807,19 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
         />
       </div>
       <div className="fg-2">
+        {languages.map(lang => (
+          <div className="field" key={lang}>
+            <div className="lbl">{t('fieldDetail.helpText')} {lang.toUpperCase()}</div>
+            <textarea
+              className="fld"
+              rows={2}
+              value={sf.help_text[lang] ?? ''}
+              onChange={e => onChange({ ...sf, help_text: { ...sf.help_text, [lang]: e.target.value } })}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="fg-2">
         <div className="field">
           <div className="lbl">{t('subFieldForm.internalName')}</div>
           <input className="fld mono" value={sf.name} onChange={e => { onNameManual(); set('name', e.target.value) }} disabled={Boolean(sf.id)} />
@@ -1179,6 +1210,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       target_subtype: form.target_subtype.trim() || null,
       name: form.name,
       label: form.label,
+      help_text: form.help_text,
       field_type: form.field_type as FieldDefinition['field_type'],
       is_required: form.is_required,
       is_repeatable: form.is_repeatable,
@@ -1268,6 +1300,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           target_subtype: f.target_subtype,
           name: f.name,
           label: f.label,
+          help_text: f.help_text ?? {},
           field_type: f.field_type,
           is_required: f.is_required,
           is_repeatable: f.is_repeatable,

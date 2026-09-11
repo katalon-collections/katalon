@@ -238,6 +238,8 @@ class FieldDefinition(Base):
     target_subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(128))
     label: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
+    # Curator-facing help text shown next to the field in data entry forms.
+    help_text: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # {"de": "...", "en": "..."}
     # text/date/number/geo/vocab/relation/boolean/group
     field_type: Mapped[str] = mapped_column(String(32))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -12,7 +12,7 @@ export interface HelpPopoverProps {
   size?: number
 }
 
-const POPOVER_WIDTH = 320
+const POPOVER_WIDTH = 400
 
 export function HelpPopover({ title, content, ariaLabel = 'Hilfe anzeigen', size = 12 }: HelpPopoverProps) {
   const [open, setOpen] = useState(false)
@@ -39,8 +39,8 @@ export function HelpPopover({ title, content, ariaLabel = 'Hilfe anzeigen', size
     const estimatedHeight = 180
     const showBelow = spaceBelow >= estimatedHeight || spaceBelow >= spaceAbove
     const top = showBelow
-      ? rect.bottom + 6
-      : Math.max(8, rect.top - estimatedHeight - 6)
+      ? rect.bottom + 10
+      : Math.max(8, rect.top - estimatedHeight - 10)
 
     setCoords({ top, left })
   }, [])
@@ -126,13 +126,13 @@ export function HelpPopover({ title, content, ariaLabel = 'Hilfe anzeigen', size
             top: coords.top,
             left: coords.left,
             zIndex: 99999,
-            width: POPOVER_WIDTH,
-            maxWidth: 'calc(100vw - 24px)',
+            width: 'max-content',
+            maxWidth: `min(${POPOVER_WIDTH}px, calc(100vw - 24px))`,
             background: 'var(--panel, #ffffff)',
             border: '1px solid var(--border, #e5e7eb)',
             borderRadius: 8,
             boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.18), 0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-            padding: '12px 14px',
+            padding: title ? '12px 14px' : '10px 30px 10px 14px',
             fontSize: 12,
             lineHeight: 1.45,
             color: 'var(--fg-2, #374151)',
@@ -140,33 +140,56 @@ export function HelpPopover({ title, content, ariaLabel = 'Hilfe anzeigen', size
             textAlign: 'left',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 8,
-              marginBottom: title ? 6 : 4,
-              borderBottom: title ? '1px solid var(--border-s, #f3f4f6)' : 'none',
-              paddingBottom: title ? 6 : 0,
-            }}
-          >
-            {title && (
+          {title && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginBottom: 6,
+                borderBottom: '1px solid var(--border-s, #f3f4f6)',
+                paddingBottom: 6,
+              }}
+            >
               <strong style={{ color: 'var(--fg, #111827)', fontSize: 12, fontWeight: 600 }}>
                 {title}
               </strong>
-            )}
+              <button
+                type="button"
+                className="btn ico gh"
+                style={{
+                  padding: 0,
+                  width: 16,
+                  height: 16,
+                  minHeight: 16,
+                  marginLeft: 'auto',
+                  color: 'var(--fg-3, #9ca3af)',
+                  flexShrink: 0,
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setOpen(false)}
+                aria-label="Schließen"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          {!title && (
             <button
               type="button"
               className="btn ico gh"
               style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
                 padding: 0,
                 width: 16,
                 height: 16,
                 minHeight: 16,
-                marginLeft: 'auto',
                 color: 'var(--fg-3, #9ca3af)',
-                flexShrink: 0,
                 border: 'none',
                 background: 'none',
                 cursor: 'pointer',
@@ -176,7 +199,7 @@ export function HelpPopover({ title, content, ariaLabel = 'Hilfe anzeigen', size
             >
               <X size={12} />
             </button>
-          </div>
+          )}
           <div>{content}</div>
         </div>,
         document.body,

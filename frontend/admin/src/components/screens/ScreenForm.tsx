@@ -15,6 +15,7 @@ import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { TranslatableInput } from '../ui/TranslatableInput'
 import { RichTextEditor } from '../ui/RichTextEditor'
 import { MediaLightbox } from '../MediaLightbox'
+import { HelpPopover } from '../ui/HelpPopover'
 import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
@@ -3420,6 +3421,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <div className="lbl" title={repeatable ? (t('repeatable.hint') || 'Wiederholbares Feld') : undefined}>
                         {getLabel(f, f.name)}
                         {f.is_required && <span className="req">*</span>}
+                        {getLabel({ label: f.help_text }) && (
+                          <HelpPopover content={<div>{getLabel({ label: f.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
+                        )}
                         {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
                         {getFieldAiConfig(f) && !f.is_translatable && (
                           <button
@@ -3780,6 +3784,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                     <div className="lbl" style={{ marginBottom: 0, flex: 1 }}>
                                       {getLabel(sf, sf.name)}
                                       {sf.is_required && <span className="req">*</span>}
+                                      {getLabel({ label: sf.help_text }) && (
+                                        <HelpPopover content={<div>{getLabel({ label: sf.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
+                                      )}
                                     </div>
                                     {getFieldAiConfig(sf) && (
                                       <button

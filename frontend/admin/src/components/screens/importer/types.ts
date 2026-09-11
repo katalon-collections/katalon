@@ -56,10 +56,11 @@ export interface ImporterState {
   xmlSelectors: XmlSelector[] | null
   // Mapping
   mapping: Record<string, MappingEntry>
+  mappingId: string | null
+  savedMappingName: string | null
   mediaSelector: string | null
   idnoStrategy: string
   idnoColumn: string | null
-  // Options
   upsertStrategy: string
   autoPublish: boolean
   pendingFields: PendingField[]
@@ -101,18 +102,23 @@ export type ImporterAction =
       autoPublish: boolean
       idnoStrategy: string
     }}
+  | { type: 'SAVED_MAPPING_APPLIED'; payload: {
+      mapping: Record<string, MappingEntry>
+      mediaSelector: string | null
+      mappingId: string
+      savedMappingName: string
+      subtype?: string | null
+    }}
+  | { type: 'MAPPING_SAVED'; payload: { mappingId: string; savedMappingName: string } }
   | { type: 'RESET' }
 
 // ── localStorage ───────────────────────────────────────────────────────────────
 
 export type PersistedImporterState = Pick<
   ImporterState,
-  'step' | 'recordType' | 'subtype' | 'mapping' | 'idnoStrategy' | 'idnoColumn'
+  'step' | 'recordType' | 'subtype' | 'mapping' | 'mappingId' | 'savedMappingName' | 'idnoStrategy' | 'idnoColumn'
   | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields'
 >
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
 export const RECORD_TYPES = [
   { id: 'object',     label: 'Objects' },
   { id: 'entity',     label: 'Entities' },

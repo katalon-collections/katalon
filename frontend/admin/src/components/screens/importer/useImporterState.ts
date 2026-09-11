@@ -3,7 +3,7 @@
 
 import React, { useEffect, useReducer, useRef } from 'react'
 import { importer, schema, subtypes as subtypesApi } from '../../../api/client'
-import type { MappingEntry, UploadResult, XmlElementLevel } from '../../../api/client'
+import type { ImportMapping, MappingEntry, UploadResult, XmlElementLevel } from '../../../api/client'
 import type { FieldDefinition, RecordSubtype } from '../../../types'
 import {
   IMPORTER_STATE_KEY,
@@ -13,7 +13,7 @@ import {
   type PersistedImporterState,
   type ProfileApplyResult,
 } from './types'
-import { applyProfile, buildProfile, downloadProfile } from './profileUtils'
+import { applyProfile, applySavedMapping, buildProfile, downloadProfile } from './profileUtils'
 // ── Auto-Mapping-Heuristik (Issue #199) ──────────────────────────────────────
 
 // Statische Synonym-Tabelle: kanonischer Feldname → gängige CSV-/DC-Aliasnamen.
@@ -143,6 +143,8 @@ function buildInitialState(persisted: PersistedImporterState | null): ImporterSt
     xmlSelectorsLoading: false,
     xmlSelectors:   null,
     mapping:        persisted?.mapping       ?? {},
+    mappingId:      persisted?.mappingId     ?? null,
+    savedMappingName: persisted?.savedMappingName ?? null,
     mediaSelector:  persisted?.recordType === 'object' ? (persisted.mediaSelector ?? null) : null,
     idnoStrategy:   persisted?.idnoStrategy  ?? 'auto',
     idnoColumn:     persisted?.idnoColumn    ?? null,
@@ -262,6 +264,25 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       const { mapping, mediaSelector, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
       return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields, upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
     }
+    case 'SAVED_MAPPING_APPLIED': {
+      const { mapping, mediaSelector, mappingId, savedMappingName, subtype } = action.payload
+      return {
+        ...state,
+        mapping,
+        mediaSelector: state.recordType === 'object' ? mediaSelector : null,
+        mappingId,
+        savedMappingName,
+        subtype: subtype !== undefined ? subtype : state.subtype,
+        step: state.sourceType === 'xml' ? 2 : 1,
+      }
+    }
+
+    case 'MAPPING_SAVED':
+      return {
+        ...state,
+        mappingId: action.payload.mappingId,
+        savedMappingName: action.payload.savedMappingName,
+      }
 
     case 'RESET':
       return buildInitialState(null)
@@ -291,8 +312,9 @@ export interface ImporterStateAndHandlers {
   handleImport: () => Promise<void>
   handleProfileLoaded: (profile: ImportProfile) => Promise<void>
   handleProfileExport: () => Promise<void>
+  handleSavedMappingLoaded: (saved: ImportMapping) => Promise<void>
+  handleMappingSaved: (saved: ImportMapping) => void
 }
-
 export function useImporterState(): ImporterStateAndHandlers {
   const persisted = loadPersistedState()
   const [state, dispatch] = useReducer(importerReducer, persisted, buildInitialState)
@@ -310,7 +332,8 @@ export function useImporterState(): ImporterStateAndHandlers {
   useEffect(() => {
     const toSave: PersistedImporterState = {
       step: state.step, recordType: state.recordType, subtype: state.subtype,
-      mapping: state.mapping, idnoStrategy: state.idnoStrategy, idnoColumn: state.idnoColumn,
+      mapping: state.mapping, mappingId: state.mappingId, savedMappingName: state.savedMappingName,
+      idnoStrategy: state.idnoStrategy, idnoColumn: state.idnoColumn,
       mediaSelector: state.recordType === 'object' ? state.mediaSelector : null,
       upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish,
       uploaded: state.uploaded ? { ...state.uploaded, upload_id: '' } : null,
@@ -319,9 +342,9 @@ export function useImporterState(): ImporterStateAndHandlers {
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(toSave))
   }, [
-    state.step, state.recordType, state.subtype, state.mapping, state.mediaSelector, state.idnoStrategy,
-    state.idnoColumn, state.upsertStrategy, state.autoPublish, state.uploaded,
-    state.dryResult, state.taskId, state.pendingFields,
+    state.step, state.recordType, state.subtype, state.mapping, state.mappingId, state.savedMappingName,
+    state.mediaSelector, state.idnoStrategy, state.idnoColumn, state.upsertStrategy, state.autoPublish,
+    state.uploaded, state.dryResult, state.taskId, state.pendingFields,
   ])
 
   // Load fields + subtypes
@@ -453,7 +476,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -496,6 +519,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         subtype: state.subtype,
         fields_to_create: pendingFieldsPayload(),
         media_selector: state.mediaSelector,
+        mapping_id: state.mappingId,
       })
       dispatch({ type: 'IMPORT_STARTED', payload: task_id })
     } catch (e) {
@@ -534,11 +558,42 @@ export function useImporterState(): ImporterStateAndHandlers {
     downloadProfile(profile)
   }
 
+  async function handleSavedMappingLoaded(saved: ImportMapping) {
+    const fieldDefs = await schema.list(state.recordType, saved.subtype ?? state.subtype ?? undefined).catch(() => [] as FieldDefinition[])
+    const existingFieldNames = new Set(fieldDefs.filter(f => !f.id.startsWith('__pending__')).map(f => f.name))
+    const availableSelectors = state.sourceType === 'xml' && state.xmlSelectors
+      ? state.xmlSelectors.map(s => s.path)
+      : (state.uploaded?.headers ?? [])
+    const result = applySavedMapping(saved.mapping, saved.media_selector, availableSelectors, existingFieldNames)
+    setProfileWarnings(result)
+    dispatch({
+      type: 'SAVED_MAPPING_APPLIED',
+      payload: {
+        mapping: result.appliedMapping,
+        mediaSelector: result.mediaSelector,
+        mappingId: saved.id,
+        savedMappingName: saved.name,
+        subtype: saved.subtype,
+      },
+    })
+  }
+
+  function handleMappingSaved(saved: ImportMapping) {
+    dispatch({
+      type: 'MAPPING_SAVED',
+      payload: {
+        mappingId: saved.id,
+        savedMappingName: saved.name,
+      },
+    })
+  }
+
   return {
     state, needsReupload: state.needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
     handleProfileLoaded, handleProfileExport,
+    handleSavedMappingLoaded, handleMappingSaved,
   }
 }

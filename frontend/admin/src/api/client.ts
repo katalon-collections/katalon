@@ -4,7 +4,7 @@
 import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FeaturePermission, FieldDefinition, FormSection, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, VocabularyTermNode, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
-export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
+export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || (typeof window !== 'undefined' ? window.location.origin : '')
 
 localStorage.removeItem('katalon_token')
 localStorage.removeItem('katalon_refresh_token')
@@ -966,6 +966,18 @@ export interface MappingEntry {
   transforms?: TransformConfig[]
 }
 
+export interface ImportMapping {
+  id: string
+  name: string
+  record_type: string
+  subtype: string | null
+  media_selector: string | null
+  mapping: Record<string, MappingEntry>
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export const importer = {
   upload: async (files: File | File[]): Promise<UploadResult> => {
     const formData = new FormData()
@@ -975,10 +987,10 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null }) }),
-  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null }) }),
+  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null }) }),
+  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   cancelTask: (taskId: string): Promise<{ cancelled: boolean }> =>
@@ -995,6 +1007,16 @@ export const importer = {
   },
   xmlSelectors: (uploadId: string, recordXpath: string): Promise<XmlSelectorsResult> =>
     req<XmlSelectorsResult>('/v1/importer/xml-selectors', { method: 'POST', body: JSON.stringify({ upload_id: uploadId, record_xpath: recordXpath }) }),
+  listMappings: (recordType?: string): Promise<ImportMapping[]> =>
+    req<ImportMapping[]>(`/v1/importer/mappings${recordType ? `?record_type=${encodeURIComponent(recordType)}` : ''}`),
+  getMapping: (id: string): Promise<ImportMapping> =>
+    req<ImportMapping>(`/v1/importer/mappings/${id}`),
+  createMapping: (data: { name: string; record_type: string; subtype?: string | null; media_selector?: string | null; mapping: Record<string, MappingEntry> }): Promise<ImportMapping> =>
+    req<ImportMapping>('/v1/importer/mappings', { method: 'POST', body: JSON.stringify(data) }),
+  updateMapping: (id: string, data: { name?: string; subtype?: string | null; media_selector?: string | null; mapping?: Record<string, MappingEntry> }): Promise<ImportMapping> =>
+    req<ImportMapping>(`/v1/importer/mappings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteMapping: (id: string): Promise<void> =>
+    req(`/v1/importer/mappings/${id}`, { method: 'DELETE' }),
 }
 
 // OAI Sets

@@ -40,6 +40,7 @@ class FieldDefinitionCreate(BaseModel):
     target_subtype: str | None = None
     name: str
     label: dict[str, Any] = {}
+    help_text: dict[str, Any] = {}
     field_type: str
     is_required: bool = False
     is_repeatable: bool = False
