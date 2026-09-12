@@ -77,4 +77,34 @@ async def project_public_record[T: BaseModel](
     metadata = filter_public_metadata(
         getattr(record, "metadata_", None), fields, target_subtype
     )
-    return record.model_copy(update={"metadata_": metadata})
+    updates: dict[str, Any] = {"metadata_": metadata}
+    ai_provenance = getattr(record, "ai_provenance", None)
+    if ai_provenance:
+        updates["ai_provenance"] = filter_public_ai_provenance(ai_provenance, metadata)
+    return record.model_copy(update=updates)
+
+
+def filter_public_ai_provenance(
+    ai_provenance: dict[str, Any], public_metadata: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep only provenance entries whose field (or group subfield) survived
+    the public metadata projection, so AI disclosure never leaks the
+    existence of non-public field values."""
+    filtered: dict[str, Any] = {}
+    for path, info in ai_provenance.items():
+        parts = path.split(".")
+        top = public_metadata.get(parts[0])
+        if top is None:
+            continue
+        if len(parts) == 1:
+            filtered[path] = info
+            continue
+        if len(parts) == 3 and isinstance(top, list):
+            try:
+                index = int(parts[1])
+                entry = top[index]
+            except (ValueError, IndexError):
+                continue
+            if isinstance(entry, dict) and parts[2] in entry:
+                filtered[path] = info
+    return filtered

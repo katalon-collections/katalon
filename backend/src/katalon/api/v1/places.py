@@ -152,6 +152,7 @@ async def create_place(data: PlaceCreate, db: DBDep, current_user: User = requir
         place_type=place_type,
         status=data.status,
         metadata_=metadata,
+        ai_provenance=data.ai_provenance,
     )
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
@@ -300,6 +301,7 @@ async def update_place(
     place.place_type = place_type
     place.status = data.status
     place.metadata_ = metadata
+    place.ai_provenance = data.ai_provenance
     if data.lat is not None and data.lon is not None:
         from geoalchemy2.elements import WKTElement
         place.geom = WKTElement(f"POINT({data.lon} {data.lat})", srid=4326)

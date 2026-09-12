@@ -135,6 +135,7 @@ export function OccurrenceDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="occurrence"
+        aiProvenance={occurrence.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={occurrence.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (

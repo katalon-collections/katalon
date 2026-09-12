@@ -183,6 +183,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="object"
+        aiProvenance={obj.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         media={media && (
           <>
@@ -220,12 +221,20 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         )}
         sidebarBefore={obj.idno && <MetaRow label={t('common.inventoryNo')} value={obj.idno} />}
         sidebarExtra={(
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {imageMedia.length > 0 && (
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {portalConfig.show_iiif_manifest_link && imageMedia.length > 0 && (
               <>
-                <a href={manifestUrl} target="_blank" rel="noreferrer"
-                   style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                  {t('object.iiifManifest')} ({imageMedia.length} {imageMedia.length === 1 ? t('object.imageSingular') : t('object.imagePlural')}) ↗
+                <a
+                  href={manifestUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-block', textAlign: 'center', fontSize: 12, textDecoration: 'none',
+                    color: 'var(--fg-3)', border: '1px solid var(--border)', borderRadius: 5,
+                    padding: '6px 10px',
+                  }}
+                >
+                  {t('object.iiifManifest')} ({imageMedia.length} {imageMedia.length === 1 ? t('object.imageSingular') : t('object.imagePlural')})
                 </a>
                 <button
                   onClick={() => navigator.clipboard.writeText(manifestUrl)}
@@ -234,7 +243,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
                     padding: 0, cursor: 'pointer', textAlign: 'left',
                   }}
                 >
-                  📋 {t('object.copyManifest')}
+                  {t('object.copyManifest')}
                 </button>
               </>
             )}

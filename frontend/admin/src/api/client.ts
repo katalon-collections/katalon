@@ -1190,6 +1190,7 @@ export interface AICompleteResponse {
   value: unknown
   confidence: number | null
   warning: string | null
+  model: string
   usage: {
     input_tokens: number
     output_tokens: number

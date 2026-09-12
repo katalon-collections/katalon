@@ -3,6 +3,31 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.32.0] - 2026-09-12
+
+### Added
+- Admin-Einstellungen: Neuer Schalter „IIIF-Manifest-Button auf der
+  Objekt-Detailseite anzeigen“ (`PortalConfig.show_iiif_manifest_link`,
+  Migration `0069`, Default: an). Der Manifest-Link/-Button und die
+  Kopieren-Aktion auf der öffentlichen Objekt-Detailseite lassen sich damit
+  zentral ausblenden; der alternate JSON-LD-Link im `<head>` bleibt
+  unabhängig davon bestehen. Beide Elemente rendern jetzt ohne Icons.
+- Test-Infrastruktur (Issue #382): `ruff check`, `pip-audit`, `pnpm audit`
+  (Admin + Portal) und ein Secret-Scan (`gitleaks`) laufen jetzt auf jedem
+  Push/PR (`.github/workflows/security.yml`). Container-Images werden vor
+  dem Push mit Trivy auf kritische/hohe CVEs geprüft
+  (`public-container-images.yml`). Locust hat jetzt Smoke-/Normal-/Load-Profile
+  und einen Fehlerraten-Schwellenwert als CI-Gate
+  (`backend/tests/performance/locustfile.py`). Ein wöchentlicher
+  Locust-Smoke-Lauf und ein wöchentlicher OWASP-ZAP-Scan gegen die
+  Staging-Umgebung sowie ein quartalsweiser automatisierter
+  Backup/Restore-Drill laufen ausschließlich zeitgesteuert
+  (`load-smoke.yml`, `dast-staging.yml`, `backup-drill.yml`), nie bei
+  jedem Push. Neue Integrationstests sichern ab, dass ein abgebrochener
+  Import keine Karteileichen hinterlässt (`test_import_resilience.py`) und
+  dass das Löschen eines Feldes oder Vokabularterms keine Daten aus
+  bestehenden Datensätzen entfernt (`test_schema_destructive_changes.py`).
+
 ## [1.31.0] - 2026-09-11
 
 ### Added

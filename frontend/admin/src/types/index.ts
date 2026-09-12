@@ -8,6 +8,9 @@ export type RecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedu
  *  `storage_location` has its own dedicated tree screen (ScreenStorageLocation) instead. */
 export type ListableRecordType = Exclude<RecordType, 'storage_location'>
 
+/** Field-path ("field" or "group.index.subfield") -> KI-Assistent disclosure info. */
+export type AiProvenance = Record<string, { model: string; at: string }>
+
 export interface KatalonObject {
   id: string
   idno: string | null
@@ -15,6 +18,7 @@ export interface KatalonObject {
   collection_status?: string
   status: Status
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string
   updated_at: string
   version: number
@@ -26,6 +30,7 @@ export interface Entity {
   entity_type: string
   status: Status
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string
   updated_at: string
   version: number
@@ -39,6 +44,7 @@ export interface Place {
   lat: number | null
   lon: number | null
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string
   updated_at: string
   version: number
@@ -50,6 +56,7 @@ export interface Occurrence {
   occurrence_type: string
   status: Status
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string
   updated_at: string
   version: number
@@ -65,6 +72,7 @@ export interface Procedure {
   due_date: string | null
   reference_number: string | null
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string
   updated_at: string
   version: number
@@ -477,6 +485,7 @@ export interface PortalConfigRead {
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
+  show_iiif_manifest_link: boolean
 }
 
 export interface UserRead {

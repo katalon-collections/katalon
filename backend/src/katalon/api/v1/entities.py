@@ -153,7 +153,10 @@ async def create_entity(data: EntityCreate, db: DBDep, current_user: User = requ
         existing = await db.execute(select(Entity).where(Entity.idno == idno))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    entity = Entity(idno=idno, entity_type=entity_type, status=data.status, metadata_=metadata)
+    entity = Entity(
+        idno=idno, entity_type=entity_type, status=data.status,
+        metadata_=metadata, ai_provenance=data.ai_provenance,
+    )
     db.add(entity)
     await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, metadata)
@@ -298,6 +301,7 @@ async def update_entity(
     entity.entity_type = entity_type
     entity.status = data.status
     entity.metadata_ = metadata
+    entity.ai_provenance = data.ai_provenance
 
     await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, metadata)

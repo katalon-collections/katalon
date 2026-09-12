@@ -50,6 +50,7 @@ async def test_portal_lists_only_public_objects() -> None:
         status="public",
         collection_status="active",
         metadata_={},
+        ai_provenance={},
         created_at=datetime.now(),
         updated_at=datetime.now(),
         version=1,
@@ -100,6 +101,7 @@ async def test_portal_record_omits_internal_metadata() -> None:
         status="public",
         collection_status="active",
         metadata_={"label": "Public", "internal_note": "Do not publish"},
+        ai_provenance={},
         created_at=datetime.now(),
         updated_at=datetime.now(),
         deleted_at=None,
@@ -150,6 +152,7 @@ async def test_portal_staff_login_uses_internal_record_projection(monkeypatch) -
         status="draft",
         collection_status="active",
         metadata_={"internal_note": "Nur intern"},
+        ai_provenance={},
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
@@ -191,6 +194,7 @@ async def test_portal_record_responses_exclude_internal_orm_fields(
     record.id = uuid.uuid4()
     record.status = "public"
     record.metadata_ = {}
+    record.ai_provenance = {}
     record.search_vector = "internal search data"
     record.created_at = datetime.now()
     record.updated_at = datetime.now()

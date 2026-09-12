@@ -135,6 +135,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="entity"
+        aiProvenance={entity.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={entity.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (

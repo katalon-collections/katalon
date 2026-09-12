@@ -22,6 +22,7 @@ const DEFAULT: PortalConfig = {
   facet_initial_count: 10,
   homepage_blocks: [],
   terminology: {},
+  show_iiif_manifest_link: true,
 }
 
 // Module-level cache so multiple components share one fetch per page load

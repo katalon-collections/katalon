@@ -225,6 +225,7 @@ async def create_object(
         collection_status=data.collection_status,
         status=data.status,
         metadata_=metadata,
+        ai_provenance=data.ai_provenance,
     )
     db.add(obj)
     await flush_record(db, obj)
@@ -397,6 +398,7 @@ async def update_object(
     obj.collection_status = data.collection_status
     obj.status = data.status
     obj.metadata_ = metadata
+    obj.ai_provenance = data.ai_provenance
 
     await flush_record(db, obj)
 

@@ -139,7 +139,7 @@ export default {
   'object.iiifManifest': 'IIIF Manifest',
   'object.imageSingular': 'Image',
   'object.imagePlural': 'Images',
-  'object.copyManifest': '📋 Copy manifest URL',
+  'object.copyManifest': 'Copy manifest URL',
   'object.rightsStatement': 'Rights statement',
 
   'home.searchPlaceholder': 'Enter search term…',

@@ -110,9 +110,10 @@ function ItemThumbnail({ url, alt }: { url: string | null; alt: string }) {
 interface Props {
   initialSetId?: string | null
   onOpenRecord?: (recordType: string, recordId: string) => void
+  onSetIdChange?: (id: string | null) => void
 }
 
-export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
+export function ScreenWorkingSets({ initialSetId, onOpenRecord, onSetIdChange }: Props) {
   const { t } = useTranslation('screenWorkingSets')
   const { t: tRoot } = useTranslation()
 
@@ -183,6 +184,20 @@ export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
     }
   }, [activeSetId, loadDetail])
 
+  // Keep in sync with browser back/forward navigation, which changes
+  // initialSetId without remounting this component.
+  useEffect(() => {
+    setActiveSetId(initialSetId ?? null)
+  }, [initialSetId])
+
+  const openSet = useCallback(
+    (id: string | null) => {
+      setActiveSetId(id)
+      onSetIdChange?.(id)
+    },
+    [onSetIdChange]
+  )
+
   // Open modal for new set
   const openNewModal = () => {
     setEditingSet(null)
@@ -244,7 +259,7 @@ export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
       await workingSets.delete(s.id)
       setSets((prev) => prev.filter((it) => it.id !== s.id))
       if (activeSetId === s.id) {
-        setActiveSetId(null)
+        openSet(null)
       }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Fehler beim Löschen')
@@ -357,7 +372,7 @@ export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
           <div>
             <button
               className="btn sm gh"
-              onClick={() => setActiveSetId(null)}
+              onClick={() => openSet(null)}
               style={{ marginBottom: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
               <ChevL size={13} /> {t('backToList')}
@@ -708,7 +723,7 @@ export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
                   <tr key={s.id}>
                     <td>
                       <button
-                        onClick={() => setActiveSetId(s.id)}
+                        onClick={() => openSet(s.id)}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -772,7 +787,7 @@ export function ScreenWorkingSets({ initialSetId, onOpenRecord }: Props) {
                             key: 'open',
                             label: t('openRecord'),
                             icon: <Folder size={13} />,
-                            onClick: () => setActiveSetId(s.id),
+                            onClick: () => openSet(s.id),
                           },
                           {
                             key: 'edit',

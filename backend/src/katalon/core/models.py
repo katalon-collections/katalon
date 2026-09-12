@@ -46,6 +46,7 @@ class Object(Base):
     collection_status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -73,6 +74,7 @@ class Entity(Base):
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -94,6 +96,7 @@ class Place(Base):
     geom: Mapped[WKBElement | WKTElement | None] = mapped_column(Geometry("POINT", srid=4326))
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -125,6 +128,7 @@ class Occurrence(Base):
     occurrence_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -149,6 +153,7 @@ class Procedure(Base):
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     reference_number: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
@@ -730,6 +735,8 @@ class PortalConfig(Base):
     # FieldDefinition.settings can be added later if actually needed.
     facet_sort: Mapped[str] = mapped_column(String(16), default="count", server_default="count")
     facet_initial_count: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
+    # Show the public IIIF manifest link/button on the object detail page (#-).
+    show_iiif_manifest_link: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.31.0"
+    "version": "1.32.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -15989,6 +15989,38 @@
               "format": "uuid",
               "title": "Object Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
           }
         ],
         "responses": {
@@ -15999,6 +16031,79 @@
                 "schema": {
                   "$ref": "#/components/schemas/PortalObjectRead"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/objects/{object_id}/export": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Export a single object record as JSON-LD or Turtle RDF",
+        "operationId": "portal_export_object_get_portal_v1_objects__object_id__export",
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -16032,6 +16137,38 @@
               "format": "uuid",
               "title": "Entity Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
           }
         ],
         "responses": {
@@ -16042,6 +16179,79 @@
                 "schema": {
                   "$ref": "#/components/schemas/PortalEntityRead"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/entities/{entity_id}/export": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Export a single entity record as JSON-LD or Turtle RDF",
+        "operationId": "portal_export_entity_get_portal_v1_entities__entity_id__export",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -16075,6 +16285,38 @@
               "format": "uuid",
               "title": "Place Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
           }
         ],
         "responses": {
@@ -16085,6 +16327,79 @@
                 "schema": {
                   "$ref": "#/components/schemas/PortalPlaceRead"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/places/{place_id}/export": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Export a single place record as JSON-LD or Turtle RDF",
+        "operationId": "portal_export_place_get_portal_v1_places__place_id__export",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -16118,6 +16433,38 @@
               "format": "uuid",
               "title": "Occurrence Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
           }
         ],
         "responses": {
@@ -16128,6 +16475,79 @@
                 "schema": {
                   "$ref": "#/components/schemas/PortalOccurrenceRead"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/occurrences/{occurrence_id}/export": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Export a single occurrence record as JSON-LD or Turtle RDF",
+        "operationId": "portal_export_occurrence_get_portal_v1_occurrences__occurrence_id__export",
+        "parameters": [
+          {
+            "name": "occurrence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Occurrence Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -16260,6 +16680,38 @@
               "format": "uuid",
               "title": "Collection Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
           }
         ],
         "responses": {
@@ -16270,6 +16722,79 @@
                 "schema": {
                   "$ref": "#/components/schemas/PortalCollectionDetail"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/collections/{collection_id}/export": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Export a single collection record as JSON-LD or Turtle RDF",
+        "operationId": "portal_export_collection_get_portal_v1_collections__collection_id__export",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -17483,6 +18008,10 @@
             ],
             "title": "Warning"
           },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
           "usage": {
             "additionalProperties": {
               "type": "integer"
@@ -17495,6 +18024,7 @@
         "required": [
           "field_name",
           "value",
+          "model",
           "usage"
         ],
         "title": "AICompleteResponse"
@@ -19197,6 +19727,12 @@
             "title": "Metadata",
             "default": {}
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "idno": {
             "anyOf": [
               {
@@ -19277,6 +19813,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "idno": {
@@ -19389,6 +19931,12 @@
             "title": "Metadata",
             "default": {}
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "idno": {
             "anyOf": [
               {
@@ -19457,6 +20005,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "idno": {
@@ -21835,6 +22389,12 @@
             "title": "Metadata",
             "default": {}
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "idno": {
             "anyOf": [
               {
@@ -21910,6 +22470,12 @@
             "title": "Metadata",
             "default": {}
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "idno": {
             "anyOf": [
               {
@@ -21970,6 +22536,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "idno": {
@@ -22040,6 +22612,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "idno": {
@@ -22422,6 +23000,12 @@
             "title": "Metadata",
             "default": {}
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "idno": {
             "anyOf": [
               {
@@ -22512,6 +23096,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "idno": {
@@ -22606,6 +23196,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
           },
           "created_at": {
             "type": "string",
@@ -22814,6 +23410,12 @@
             "type": "object",
             "title": "Metadata"
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -22999,6 +23601,11 @@
             },
             "type": "object",
             "title": "Terminology"
+          },
+          "show_iiif_manifest_link": {
+            "type": "boolean",
+            "title": "Show Iiif Manifest Link",
+            "default": true
           }
         },
         "type": "object",
@@ -23244,6 +23851,17 @@
               }
             ],
             "title": "Terminology"
+          },
+          "show_iiif_manifest_link": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Iiif Manifest Link"
           }
         },
         "type": "object",
@@ -23275,6 +23893,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
           },
           "created_at": {
             "type": "string",
@@ -23552,6 +24176,12 @@
             "type": "object",
             "title": "Metadata"
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -23630,6 +24260,12 @@
             "type": "object",
             "title": "Metadata"
           },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -23702,6 +24338,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
           },
           "created_at": {
             "type": "string",
@@ -24138,6 +24780,12 @@
             "type": "object",
             "title": "Metadata",
             "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
           }
         },
         "type": "object",
@@ -24219,6 +24867,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "id": {

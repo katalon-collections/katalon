@@ -27,6 +27,7 @@ const DEFAULT_CONFIG: PortalConfig = {
   facet_initial_count: 10,
   homepage_blocks: [],
   terminology: {},
+  show_iiif_manifest_link: true,
 }
 
 function objTitle(obj: ObjectSummary, locale: string) {
@@ -212,7 +213,10 @@ export function HomePage() {
               onChange={e => setQ(e.target.value)}
               autoFocus
             />
-            <button type="submit">{t('home.searchButton')}</button>
+            <button type="submit" aria-label={t('home.searchButton')} title={t('home.searchButton')}>
+              <svg className="hero-search__icon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="9" cy="9" r="6" /><line x1="18" y1="18" x2="13.5" y2="13.5" /></svg>
+              <span className="hero-search__text">{t('home.searchButton')}</span>
+            </button>
           </form>
         </div>
       </div>

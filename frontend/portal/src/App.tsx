@@ -168,7 +168,14 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
           </div>
         )}
       </div>
-      <Link className="advanced-search-link" to="/advanced-search">{t('advanced.link')}</Link>
+      <Link className="advanced-search-link" to="/advanced-search" aria-label={t('advanced.link')} title={t('advanced.link')}>
+        <svg className="advanced-search-link__icon" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <line x1="3" y1="5" x2="17" y2="5" /><circle cx="13" cy="5" r="2" fill="var(--header-bg, #0b1a33)" />
+          <line x1="3" y1="10" x2="17" y2="10" /><circle cx="7" cy="10" r="2" fill="var(--header-bg, #0b1a33)" />
+          <line x1="3" y1="15" x2="17" y2="15" /><circle cx="14" cy="15" r="2" fill="var(--header-bg, #0b1a33)" />
+        </svg>
+        <span className="advanced-search-link__text">{t('advanced.link')}</span>
+      </Link>
       <LanguageSwitcher />
       {user ? <button className="portal-account" type="button" onClick={onLogout}>{t('account.logout')}</button>
         : <Link className="portal-account" to="/login">{t('account.login')}</Link>}

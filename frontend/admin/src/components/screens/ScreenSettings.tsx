@@ -244,6 +244,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [browseTypes, setBrowseTypes] = useState(config.browse_enabled_types ?? ['object', 'entity', 'place', 'occurrence'])
   const [accentColor, setAccentColor] = useState(config.accent_color)
   const [detailSidebarPosition, setDetailSidebarPosition] = useState(config.detail_sidebar_position ?? 'right')
+  const [showIiifManifestLink, setShowIiifManifestLink] = useState(config.show_iiif_manifest_link ?? true)
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
   const ct = config.color_tokens ?? {}
@@ -264,6 +265,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           browse_enabled_types: browseTypes,
           accent_color: accentColor,
           detail_sidebar_position: detailSidebarPosition,
+          show_iiif_manifest_link: showIiifManifestLink,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
               .filter(([, v]) => v.trim())
@@ -363,6 +365,19 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
               Gilt einheitlich für alle Detailseiten (Objekte, Entitäten, Orte, Occurrences). Auf kleinen Bildschirmen stehen Medien/Hauptinhalt immer zuerst.
+            </div>
+          </div>
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={showIiifManifestLink}
+                onChange={e => setShowIiifManifestLink(e.target.checked)}
+              />
+              IIIF-Manifest-Button auf der Objekt-Detailseite anzeigen
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              Zeigt bei Objekten mit Bildern einen Link auf das IIIF-Manifest sowie eine Kopieren-Aktion an, ohne Icons.
             </div>
           </div>
         </div>

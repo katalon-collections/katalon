@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi } from '../../api/client'
 import type { MediaFile, ActivePresence, LockInfo } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
-import type { AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
+import type { AiProvenance, AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
 import { resolveActiveVariant } from '../../lib/formVariants'
 import { AlertCircle, Bookmark, Calendar, ChevD, ChevR, ListTree, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye, Download } from '../ui/Icons'
@@ -228,7 +228,23 @@ type AiProposal = {
   field: FieldDefinition
   currentValue: unknown
   suggestedValue: unknown
+  model: string
   group?: { name: string; index: number }
+}
+
+/** Disclosure badge for field values populated via the KI-Assistent (Katalon
+ *  data-integrity requirement: AI involvement in a field value must be visible
+ *  to catalogers, not just logged in the audit trail). */
+function AiDisclosureBadge({ model, at }: { model: string; at: string }) {
+  return (
+    <span
+      className="h"
+      title={`KI-generiert (${model}) am ${new Date(at).toLocaleString('de')}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6, color: 'var(--accent-ink)' }}
+    >
+      <Lightning size={11} /> KI
+    </span>
+  )
 }
 
 function aiValueToText(value: unknown): string {
@@ -1598,6 +1614,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [dueDate, setDueDate] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
   const [values, setValues]   = useState<Record<string, unknown>>({})
+  const [aiProvenance, setAiProvenance] = useState<AiProvenance>({})
   const languages = useSupportedLanguages()
   // Optimistic locking (#272): version loaded with the record + the metadata as
   // loaded (base), so a save conflict can be resolved field-by-field.
@@ -1840,6 +1857,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           setStatus((rec as { status?: string }).status as Status)
           setLoadedStatus((rec as { status?: string }).status as Status)
           setValues(rec.metadata_)
+          setAiProvenance('ai_provenance' in rec ? rec.ai_provenance : {})
           setVersion(rec.version)
           setBaseValues(rec.metadata_ ?? {})
           const m = rec.metadata_ as Record<string, unknown>
@@ -2116,18 +2134,34 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // All user-triggered value mutations go through this wrapper to mark the form dirty
   const setValuesDirty: typeof setValues = (fn) => { setValues(fn); setIsDirty(true) }
 
-  function setField(name: string, value: unknown) { setValuesDirty(v => ({ ...v, [name]: value })) }
+  // Manual edits invalidate the KI-Assistent disclosure for that field path;
+  // only the explicit AI-apply call sites re-add an entry (see markAiProvenance).
+  function clearAiProvenance(path: string) {
+    setAiProvenance(prev => {
+      if (!(path in prev)) return prev
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+  }
+  function markAiProvenance(path: string, model: string) {
+    setAiProvenance(prev => ({ ...prev, [path]: { model, at: new Date().toISOString() } }))
+  }
+  function setField(name: string, value: unknown) { setValuesDirty(v => ({ ...v, [name]: value })); clearAiProvenance(name) }
   function addRepeat(name: string) {
     const cur = (values[name] as string[] | undefined) ?? []
     setValuesDirty(v => ({ ...v, [name]: [...cur, ''] }))
+    clearAiProvenance(name)
   }
   function removeRepeat(name: string, idx: number) {
     setValuesDirty(v => ({ ...v, [name]: ((v[name] as string[]) ?? []).filter((_, i) => i !== idx) }))
+    clearAiProvenance(name)
   }
   function updateRepeat(name: string, idx: number, val: string) {
     const cur = [...((values[name] as string[]) ?? [])]
     cur[idx] = val
     setValuesDirty(v => ({ ...v, [name]: cur }))
+    clearAiProvenance(name)
   }
   function updateTranslatable(name: string, lang: string, val: string) {
     const cur = { ...((values[name] as Record<string, string>) ?? {}) }
@@ -2223,6 +2257,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     const cur = [...((values[name] as GroupInstance[]) ?? [])]
     cur[idx] = { ...cur[idx], [subName]: val }
     setValuesDirty(v => ({ ...v, [name]: cur }))
+    clearAiProvenance(`${name}.${idx}.${subName}`)
   }
 
   function renderSubFieldInput(sf: FieldDefinition, val: unknown, onChange: (v: unknown) => void, disabled: boolean) {
@@ -2530,9 +2565,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         record_type: recordType,
         record_id: targetId,
       })
-      if (hasValue) setAiProposal({ field, currentValue, suggestedValue: result.value })
+      if (hasValue) setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model })
       else {
         setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
+        markAiProvenance(field.name, result.model)
         clearFieldFeedback(field.name)
       }
       if (result.warning) {
@@ -2562,8 +2598,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         group_index: groupIndex,
         group_instance: instance,
       })
-      if (isEmptyValue(currentValue)) updateGroupSubField(group.name, groupIndex, field.name, result.value)
-      else setAiProposal({ field, currentValue, suggestedValue: result.value, group: { name: group.name, index: groupIndex } })
+      if (isEmptyValue(currentValue)) {
+        updateGroupSubField(group.name, groupIndex, field.name, result.value)
+        markAiProvenance(`${group.name}.${groupIndex}.${field.name}`, result.model)
+      } else {
+        setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model, group: { name: group.name, index: groupIndex } })
+      }
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -2595,6 +2635,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       const payload: Record<string, unknown> = {
         status: quickCreate ? 'draft' : completingProcedure ? loadedStatus : status,
         metadata_: values,
+        ai_provenance: aiProvenance,
       }
       if (showIdno)   payload.idno = idno || null
       if (subtypeKey) payload[subtypeKey] = subtype
@@ -3222,9 +3263,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           proposal={aiProposal}
           onCancel={() => setAiProposal(null)}
           onApply={value => {
-            if (aiProposal.group) updateGroupSubField(aiProposal.group.name, aiProposal.group.index, aiProposal.field.name, value)
-            else {
+            if (aiProposal.group) {
+              updateGroupSubField(aiProposal.group.name, aiProposal.group.index, aiProposal.field.name, value)
+              markAiProvenance(`${aiProposal.group.name}.${aiProposal.group.index}.${aiProposal.field.name}`, aiProposal.model)
+            } else {
               setValuesDirty(previous => ({ ...previous, [aiProposal.field.name]: value }))
+              markAiProvenance(aiProposal.field.name, aiProposal.model)
               clearFieldFeedback(aiProposal.field.name)
             }
             setAiProposal(null)
@@ -3425,6 +3469,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <HelpPopover content={<div>{getLabel({ label: f.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
                         )}
                         {Boolean(f.settings?.is_locked) && <span className="h">{canEditLocked ? 'gesperrt · Admin-Bearbeitung' : 'gesperrt'}</span>}
+                        {aiProvenance[f.name] && <AiDisclosureBadge {...aiProvenance[f.name]} />}
                         {getFieldAiConfig(f) && !f.is_translatable && (
                           <button
                             type="button"
@@ -3788,6 +3833,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                         <HelpPopover content={<div>{getLabel({ label: sf.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
                                       )}
                                     </div>
+                                    {aiProvenance[`${f.name}.${i}.${sf.name}`] && <AiDisclosureBadge {...aiProvenance[`${f.name}.${i}.${sf.name}`]} />}
                                     {getFieldAiConfig(sf) && (
                                       <button
                                         type="button"
@@ -4460,6 +4506,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 setStatus(restored.status as Status)
                                 setIdno(restored.idno ?? '')
                                 setValues(restored.metadata_ as Record<string, unknown>)
+                                setAiProvenance({})
                                 setVersion(restored.version)
                                 if (showCollectionStatus) {
                                   setCollectionStatus((restored as { collection_status?: string | null }).collection_status ?? 'active')

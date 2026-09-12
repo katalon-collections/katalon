@@ -122,15 +122,20 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json()
 }
 
+/** Field-path -> KI-Assistent disclosure info; only public fields survive server-side filtering. */
+export type AiProvenance = Record<string, { model: string; at: string }>
+
 export interface ObjectSummary {
   id: string; idno: string | null; status: string; object_type?: string | null
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string; updated_at: string
 }
 
 export interface EntitySummary {
   id: string; entity_type: string; status: string
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string; updated_at: string
 }
 
@@ -138,12 +143,14 @@ export interface PlaceSummary {
   id: string; status: string
   lat: number | null; lon: number | null
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string; updated_at: string
 }
 
 export interface OccurrenceSummary {
   id: string; occurrence_type: string; status: string
   metadata_: Record<string, unknown>
+  ai_provenance: AiProvenance
   created_at: string; updated_at: string
 }
 
@@ -233,6 +240,7 @@ export interface PortalConfig {
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
+  show_iiif_manifest_link: boolean
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }

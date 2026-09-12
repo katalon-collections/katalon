@@ -21,7 +21,7 @@ export function facetHref(recordType: string, field: Pick<FieldDefinition, 'name
 }
 
 export function MetaRow({ label, value, href, items }: {
-  label: string
+  label: ReactNode
   value?: string
   href?: string
   /** Renders each value as its own click-to-filter pill instead of plain text. */
@@ -85,6 +85,20 @@ function fieldLabel(f: FieldDefinition, locale: string): string {
   return f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
 }
 
+/** Public disclosure that a field's value was populated via the KI-Assistent.
+ *  Only reaches the portal for fields that also passed public-metadata filtering
+ *  (see backend public_metadata_service.filter_public_ai_provenance). */
+function AiDisclosureNote({ model, at, locale }: { model: string; at: string; locale: string }) {
+  return (
+    <span
+      title={`KI-generiert (${model}) · ${new Date(at).toLocaleDateString(locale)}`}
+      style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--fg-3)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', marginLeft: 6, cursor: 'help' }}
+    >
+      KI
+    </span>
+  )
+}
+
 export function richText(value: string): ReactNode {
   return (
     <div className="prose" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }} />
@@ -92,7 +106,7 @@ export function richText(value: string): ReactNode {
 }
 
 /** A field placed in the main column: labeled block, markdown for richtext fields. */
-function MainField({ field, value, locale, recordType }: { field: FieldDefinition; value: unknown; locale: string; recordType: string }) {
+function MainField({ field, value, locale, recordType, aiProvenance }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string } }) {
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
   }
@@ -103,6 +117,7 @@ function MainField({ field, value, locale, recordType }: { field: FieldDefinitio
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
           {fieldLabel(field, locale)}
+          {aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, field, item.raw)}>{item.display}</Link>)}
@@ -123,6 +138,7 @@ function MainField({ field, value, locale, recordType }: { field: FieldDefinitio
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
         {fieldLabel(field, locale)}
+        {aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}
       </div>
       {field.field_type === 'richtext' ? richText(rendered) : (
         <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>
@@ -135,13 +151,14 @@ function MainField({ field, value, locale, recordType }: { field: FieldDefinitio
 }
 
 /** A field placed in the sidebar: compact key/value row. */
-function SidebarField({ field, value, locale, recordType }: { field: FieldDefinition; value: unknown; locale: string; recordType: string }) {
+function SidebarField({ field, value, locale, recordType, aiProvenance }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string } }) {
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
   }
+  const label = <>{fieldLabel(field, locale)}{aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}</>
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type)
-    return <MetaRow label={fieldLabel(field, locale)} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw) }))} />
+    return <MetaRow label={label} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw) }))} />
   }
   const rendered = renderFieldValue(value, locale, field.field_type)
   const href = field.field_type === 'url'
@@ -152,7 +169,7 @@ function SidebarField({ field, value, locale, recordType }: { field: FieldDefini
         ? pidUrl(value)
         : undefined
   return rendered ? <>
-    <MetaRow label={fieldLabel(field, locale)} value={rendered} href={href} />
+    <MetaRow label={label} value={rendered} href={href} />
     {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
   </> : null
 }
@@ -162,6 +179,8 @@ interface DetailPageLayoutProps {
   media?: ReactNode
   fieldDefs: FieldDefinition[]
   metadata: Record<string, unknown>
+  /** Field-path -> KI-Assistent disclosure info, already filtered to public fields server-side. */
+  aiProvenance?: Record<string, { model: string; at: string }>
   locale: string
   /** The record's own type, used to scope facet-click filter links to matching records. */
   recordType: string
@@ -181,7 +200,7 @@ interface DetailPageLayoutProps {
  * admins control layout instead of it being hardcoded per record type.
  */
 export function DetailPageLayout({
-  media, fieldDefs, metadata, locale, recordType, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
+  media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
 }: DetailPageLayoutProps) {
   const detailFields = fieldDefs.filter(f => f.show_in_detail)
   const descriptionField = detailFields.find(f => f.detail_role === 'description')
@@ -193,13 +212,13 @@ export function DetailPageLayout({
   // configured field — resolve actual output up front so "is there main content" reflects
   // what's really on screen, not how many fields happen to be configured for the slot.
   const mainFieldNodes = mainFields
-    .map(f => ({ key: f.name, node: MainField({ field: f, value: metadata[f.name], locale, recordType }) }))
+    .map(f => ({ key: f.name, node: MainField({ field: f, value: metadata[f.name], locale, recordType, aiProvenance: aiProvenance?.[f.name] }) }))
     .filter((entry): entry is { key: string; node: JSX.Element } => entry.node !== null)
 
   const sidebar = (
     <aside className="detail-meta">
       {sidebarBefore}
-      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} />)}
+      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} />)}
       {sidebarExtra}
     </aside>
   )

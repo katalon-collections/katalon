@@ -189,6 +189,7 @@ async def create_procedure(
         due_date=data.due_date,
         reference_number=data.reference_number,
         metadata_=data.metadata_,
+        ai_provenance=data.ai_provenance,
     )
     db.add(proc)
     await flush_record(db, proc)
@@ -409,8 +410,8 @@ async def update_procedure(
     proc.start_date = data.start_date
     proc.end_date = data.end_date
     proc.due_date = data.due_date
-    proc.reference_number = data.reference_number
     proc.metadata_ = data.metadata_
+    proc.ai_provenance = data.ai_provenance
     await flush_record(db, proc)
     await sync_schema_relations(db, "procedure", proc.id, data.metadata_)
     await log_change(

@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.31.0"
+version = "1.32.0"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
@@ -103,6 +103,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "SIM", "RUF"]
+"tests/performance/**" = ["T201"]
 "scripts/**" = ["T201", "S", "B007"]
 "src/katalon/management/**" = ["T201", "ASYNC250", "RUF059"]
 "migrations/**" = ["S608", "RUF100"]
@@ -110,6 +111,9 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "backup_drill: automated pg_dump/psql restore drill (katalon issue #382); excluded from the default integration run, see .github/workflows/backup-drill.yml",
+]
 
 [tool.mypy]
 python_version = "3.12"

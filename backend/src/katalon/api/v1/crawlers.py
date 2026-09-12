@@ -51,8 +51,9 @@ async def llms_txt(db: DBDep) -> PlainTextResponse:
         "",
         "## Structured data",
         "",
-        f"- JSON-LD (CIDOC-CRM/LRMoo): `{base}/v1/{{type}}s/{{id}}/export?format=jsonld` "
-        "or `Accept: application/ld+json` on the record's normal URL, where `{type}` is one of "
+        f"- JSON-LD (CIDOC-CRM/LRMoo): `{base}/portal/v1/{{type}}s/{{id}}/export?format=jsonld` "
+        "or `Accept: application/ld+json` on the record's normal API URL "
+        f"(`{base}/portal/v1/{{type}}s/{{id}}`), where `{{type}}` is one of "
         "object, entity, place, occurrence, collection.",
         "- Turtle RDF: same endpoints with `?format=ttl` or `Accept: text/turtle`.",
         "",

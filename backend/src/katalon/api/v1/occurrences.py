@@ -152,7 +152,10 @@ async def create_occurrence(data: OccurrenceCreate, db: DBDep, current_user: Use
         existing = await db.execute(select(Occurrence).where(Occurrence.idno == idno))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
-    occ = Occurrence(idno=idno, occurrence_type=occurrence_type, status=data.status, metadata_=metadata)
+    occ = Occurrence(
+        idno=idno, occurrence_type=occurrence_type, status=data.status,
+        metadata_=metadata, ai_provenance=data.ai_provenance,
+    )
     db.add(occ)
     await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)
@@ -297,6 +300,7 @@ async def update_occurrence(
     occ.occurrence_type = occurrence_type
     occ.status = data.status
     occ.metadata_ = metadata
+    occ.ai_provenance = data.ai_provenance
 
     await flush_record(db, occ)
     await sync_schema_relations(db, "occurrence", occ.id, metadata)

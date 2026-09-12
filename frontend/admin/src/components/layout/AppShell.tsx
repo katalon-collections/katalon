@@ -224,7 +224,7 @@ export function AppShell() {
       case 'sparql':            return features.includes('sparql') ? <ScreenSparql onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return features.includes('import') ? <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} /> : <Placeholder label="Kein Zugriff" />
       case 'audit':             return features.includes('audit_log') ? <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} /> : <Placeholder label="Kein Zugriff" />
-      case 'working-sets':      return features.includes('working_sets') ? <ScreenWorkingSets initialSetId={editId} onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
+      case 'working-sets':      return features.includes('working_sets') ? <ScreenWorkingSets initialSetId={editId} onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} onSetIdChange={(id) => navigate('working-sets', id)} /> : <Placeholder label="Kein Zugriff" />
       case 'users':             return isAdmin ? <ScreenUsers onNavigate={(r) => navigate(r)} /> : <Placeholder label="Kein Zugriff" />
       case 'user-roles':        return isAdmin ? <ScreenUserRoles /> : <Placeholder label="Kein Zugriff" />
       case 'settings':          return <ScreenSettings isAdmin={isAdmin} features={features} onNavigate={(r) => safeNavigate(r)} onStartTour={setActiveTour} />

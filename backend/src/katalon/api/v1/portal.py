@@ -54,6 +54,7 @@ _DEFAULTS = {
     "facet_initial_count": 10,
     "homepage_blocks": [],
     "terminology": {},
+    "show_iiif_manifest_link": True,
 }
 
 TerminologyRecordType = Literal["object", "entity", "place", "occurrence", "collection"]
@@ -120,6 +121,7 @@ class PortalConfigRead(BaseModel):
     facet_initial_count: int = 10
     homepage_blocks: list[HomepageBlock] = Field(default_factory=list)
     terminology: dict[TerminologyRecordType, TerminologyEntry] = Field(default_factory=dict)
+    show_iiif_manifest_link: bool = True
 
     class Config:
         from_attributes = True
@@ -144,6 +146,7 @@ class PortalConfigUpdate(BaseModel):
     facet_initial_count: int | None = Field(default=None, ge=1, le=100)
     homepage_blocks: list[HomepageBlock] | None = None
     terminology: dict[TerminologyRecordType, TerminologyEntry] | None = None
+    show_iiif_manifest_link: bool | None = None
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:

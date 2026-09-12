@@ -25,6 +25,7 @@ class AICompleteResponse(BaseModel):
     value: object
     confidence: float | None = None
     warning: str | None = None
+    model: str
     usage: dict[str, int]
 
 

@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any, ClassVar
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy import and_, exists, func, or_, select
@@ -69,6 +69,28 @@ def _staff_user(user: User | None) -> User | None:
     return user if user and user.role in _PORTAL_STAFF_ROLES else None
 
 
+async def _maybe_export_rdf(
+    record_type: str,
+    record_id: uuid.UUID,
+    db: DBDep,
+    request: Request | None,
+    staff_user: User | None,
+    format: str | None,
+    accept: str | None,
+) -> Response | None:
+    """Return a JSON-LD/Turtle RDF response when format/Accept ask for it, else None."""
+    is_rdf_format = isinstance(format, str) and format.lower() in ("jsonld", "json-ld", "ttl", "turtle")
+    is_rdf_accept = isinstance(accept, str) and ("application/ld+json" in accept or "text/turtle" in accept)
+    if not (is_rdf_format or is_rdf_accept):
+        return None
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        record_type, record_id, db, request,
+        current_user=staff_user, format_param=format, accept_header=accept,
+    )
+
+
 async def _filter_facet_names(
     db: DBDep, facet_names: list[str] | None, target_types: tuple[str, ...] | list[str]
 ) -> list[str] | None:
@@ -109,6 +131,7 @@ class PortalRecordRead(BaseModel):
     idno: str | None
     status: str
     metadata_: dict[str, Any]
+    ai_provenance: dict[str, Any] = {}
     created_at: datetime
     updated_at: datetime
 
@@ -348,30 +371,145 @@ async def list_objects(
 
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
 async def get_object(
-    object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Object | ObjectRead:
+    object_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Object | ObjectRead | Response:
+    rdf = await _maybe_export_rdf(
+        "object", object_id, db, request, _staff_user(current_user), format, accept
+    )
+    if rdf is not None:
+        return rdf
     return await objects.get_object(object_id, db, _staff_user(current_user))
+
+
+@router.get("/objects/{object_id}/export", summary="Export a single object record as JSON-LD or Turtle RDF")
+@limiter.limit(lambda: settings.rate_limit_public_export)
+async def export_object(
+    object_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "object", object_id, db, request,
+        current_user=_staff_user(current_user), format_param=format, accept_header=accept,
+    )
 
 
 @router.get("/entities/{entity_id}", response_model=PortalEntityRead)
 async def get_entity(
-    entity_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Entity | EntityRead:
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Entity | EntityRead | Response:
+    rdf = await _maybe_export_rdf(
+        "entity", entity_id, db, request, _staff_user(current_user), format, accept
+    )
+    if rdf is not None:
+        return rdf
     return await entities.get_entity(entity_id, db, _staff_user(current_user))
+
+
+@router.get("/entities/{entity_id}/export", summary="Export a single entity record as JSON-LD or Turtle RDF")
+@limiter.limit(lambda: settings.rate_limit_public_export)
+async def export_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "entity", entity_id, db, request,
+        current_user=_staff_user(current_user), format_param=format, accept_header=accept,
+    )
 
 
 @router.get("/places/{place_id}", response_model=PortalPlaceRead)
 async def get_place(
-    place_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Place | PlaceRead:
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Place | PlaceRead | Response:
+    rdf = await _maybe_export_rdf(
+        "place", place_id, db, request, _staff_user(current_user), format, accept
+    )
+    if rdf is not None:
+        return rdf
     return await places.get_place(place_id, db, _staff_user(current_user))
+
+
+@router.get("/places/{place_id}/export", summary="Export a single place record as JSON-LD or Turtle RDF")
+@limiter.limit(lambda: settings.rate_limit_public_export)
+async def export_place(
+    place_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "place", place_id, db, request,
+        current_user=_staff_user(current_user), format_param=format, accept_header=accept,
+    )
 
 
 @router.get("/occurrences/{occurrence_id}", response_model=PortalOccurrenceRead)
 async def get_occurrence(
-    occurrence_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Occurrence | OccurrenceRead:
+    occurrence_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Occurrence | OccurrenceRead | Response:
+    rdf = await _maybe_export_rdf(
+        "occurrence", occurrence_id, db, request, _staff_user(current_user), format, accept
+    )
+    if rdf is not None:
+        return rdf
     return await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
+
+
+@router.get(
+    "/occurrences/{occurrence_id}/export",
+    summary="Export a single occurrence record as JSON-LD or Turtle RDF",
+)
+@limiter.limit(lambda: settings.rate_limit_public_export)
+async def export_occurrence(
+    occurrence_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "occurrence", occurrence_id, db, request,
+        current_user=_staff_user(current_user), format_param=format, accept_header=accept,
+    )
 
 
 @router.get("/collections", response_model=PortalCollectionPage)
@@ -432,8 +570,18 @@ async def list_collections(
 
 @router.get("/collections/{collection_id}", response_model=PortalCollectionDetail)
 async def get_collection(
-    collection_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> PortalCollectionDetail:
+    collection_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    request: Request = None,  # type: ignore[assignment]
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> PortalCollectionDetail | Response:
+    rdf = await _maybe_export_rdf(
+        "collection", collection_id, db, request, _staff_user(current_user), format, accept
+    )
+    if rdf is not None:
+        return rdf
     staff_user = _staff_user(current_user)
     query = select(Collection).where(
         Collection.id == collection_id, Collection.deleted_at.is_(None)
@@ -535,6 +683,27 @@ async def get_collection(
         ancestors=ancestors,
         children=children_items,
         member_objects_count=member_objects_count,
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/export",
+    summary="Export a single collection record as JSON-LD or Turtle RDF",
+)
+@limiter.limit(lambda: settings.rate_limit_public_export)
+async def export_collection(
+    collection_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    format: str | None = Query(None),
+    accept: str | None = Header(None),
+) -> Response:
+    from katalon.services.rdf_service import handle_single_record_export
+
+    return await handle_single_record_export(
+        "collection", collection_id, db, request,
+        current_user=_staff_user(current_user), format_param=format, accept_header=accept,
     )
 
 

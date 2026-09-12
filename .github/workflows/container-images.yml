@@ -56,14 +56,28 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
+      - name: Build image (local, unpushed)
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ghcr.io/katalon-collections/katalon-${{ matrix.name }}:${{ needs.validate.outputs.version }}
+          push: false
+          load: true
+          tags: local/katalon-${{ matrix.name }}:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Scan image for critical/high CVEs
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: local/katalon-${{ matrix.name }}:scan
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+      - name: Push scanned image
+        run: |
+          docker tag local/katalon-${{ matrix.name }}:scan \
+            ghcr.io/katalon-collections/katalon-${{ matrix.name }}:${{ needs.validate.outputs.version }}
+          docker push ghcr.io/katalon-collections/katalon-${{ matrix.name }}:${{ needs.validate.outputs.version }}
 
   release:
     needs: [validate, build]

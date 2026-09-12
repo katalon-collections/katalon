@@ -12,6 +12,19 @@ Run locally against the dev stack (api on localhost:8000 or via nginx on 80):
         uv run locust -f tests/performance/locustfile.py
 
 Then open http://localhost:8089 and start a swarm.
+
+Reusable profiles (see README for the full command reference)::
+
+    KATALON_LOCUST_PROFILE=smoke uv run locust -f tests/performance/locustfile.py --headless
+    KATALON_LOCUST_PROFILE=normal uv run locust -f tests/performance/locustfile.py --headless
+    KATALON_LOCUST_PROFILE=load uv run locust -f tests/performance/locustfile.py --headless
+
+A profile sets the user count/spawn rate/duration via a ``LoadTestShape`` and
+enforces a fail-ratio threshold at the end of the run: the process exits
+non-zero (failing CI) when more than ``KATALON_LOCUST_MAX_FAIL_RATIO``
+(default 1%) of requests failed. Heavy-load, stress and soak profiles are
+intentionally not provided here — see katalon issue #382 for why they are
+deferred.
 """
 
 from __future__ import annotations
@@ -21,11 +34,50 @@ import random
 import uuid
 from typing import Any
 
-from locust import HttpUser, between, task  # type: ignore[import-untyped]
+from locust import HttpUser, LoadTestShape, between, events, task  # type: ignore[import-untyped]
 
 
 def _default_host() -> str:
     return os.getenv("KATALON_LOCUST_HOST", "http://localhost:8000")
+
+
+# name -> (users, spawn_rate, duration_seconds)
+PROFILES: dict[str, tuple[int, float, int]] = {
+    "smoke": (5, 1, 60),
+    "normal": (50, 5, 5 * 60),
+    "load": (100, 10, 10 * 60),
+}
+
+
+if os.getenv("KATALON_LOCUST_PROFILE"):
+    # Locust auto-discovers LoadTestShape subclasses by their mere presence in
+    # this module and then ignores CLI -u/-r/-t entirely. Defining the class
+    # only when a profile was requested keeps the default interactive-UI /
+    # manual -u/-r/-t workflow (README "Headless / CI" section) unaffected.
+    class ProfileShape(LoadTestShape):
+        """Fixed-stage load shape selected via ``KATALON_LOCUST_PROFILE``."""
+
+        def tick(self) -> tuple[int, float] | None:
+            users, spawn_rate, duration = PROFILES[os.environ["KATALON_LOCUST_PROFILE"]]
+            if self.get_run_time() > duration:
+                return None
+            return users, spawn_rate
+
+
+@events.quitting.add_listener
+def _enforce_fail_ratio_threshold(environment: Any, **kwargs: Any) -> None:
+    """Fail the process (and thus CI) when the error rate exceeds the threshold.
+
+    Locust has no built-in pass/fail gate; this is the documented idiom for
+    turning a load test into a CI quality gate (see almanac performance guide).
+    """
+    max_fail_ratio = float(os.getenv("KATALON_LOCUST_MAX_FAIL_RATIO", "0.01"))
+    fail_ratio = environment.runner.stats.total.fail_ratio
+    if fail_ratio > max_fail_ratio:
+        print(
+            f"Fail ratio {fail_ratio:.2%} exceeds threshold {max_fail_ratio:.2%} — failing the run"
+        )
+        environment.process_exit_code = 1
 
 
 class PublicPortalUser(HttpUser):

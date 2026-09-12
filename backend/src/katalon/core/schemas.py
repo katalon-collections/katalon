@@ -355,6 +355,9 @@ class RecordBase(BaseModel):
 
     status: str = "draft"
     metadata_: dict[str, Any] = {}
+    #: Field-path -> {"model": str, "at": iso8601} for values populated via the
+    #: KI-Assistent; disclosed in admin UI and (for public fields) the portal.
+    ai_provenance: dict[str, Any] = {}
 
 
 class ObjectCreate(RecordBase):
@@ -464,7 +467,7 @@ class ProcedureCreate(BaseModel):
     due_date: date | None = None
     reference_number: str | None = None
     metadata_: dict[str, Any] = {}
-
+    ai_provenance: dict[str, Any] = {}
 
 class ProcedureRead(ProcedureCreate):
     id: uuid.UUID

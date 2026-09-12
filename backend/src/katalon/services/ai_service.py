@@ -425,5 +425,6 @@ async def complete_field(
         "value": coerced_value,
         "confidence": parsed.get("confidence"),
         "warning": parsed.get("warning"),
+        "model": str(config.ai_model),
         "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
     }
