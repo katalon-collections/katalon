@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.32.0"
+    "version": "1.34.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -2894,7 +2894,7 @@
             "description": "Field definition not found"
           },
           "422": {
-            "description": "Field 'label' is a system field and cannot be deleted"
+            "description": "Field 'label'/'idno' is a system field and cannot be deleted"
           }
         }
       }

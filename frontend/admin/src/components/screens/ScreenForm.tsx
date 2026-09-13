@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi } from '../../api/client'
 import type { MediaFile, ActivePresence, LockInfo } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import type { AiProvenance, AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
@@ -3003,9 +3003,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // Form variants (#275): a variant filters+reorders the already-loaded field
   // definitions; no variant selected falls back to the full schema (fields as-is).
   const activeVariant = variants.find(v => v.id === activeVariantId) ?? null
-  const displayFields = activeVariant
+  const displayFields = (activeVariant
     ? activeVariant.field_names.map(name => fields.find(f => f.name === name)).filter((f): f is FieldDefinition => f != null)
     : fields
+  // "label"/"idno" are the system fields, always pinned in the Stammdaten card (see below) —
+  // they must not also show up among the customizable Metadaten sections/fields.
+  ).filter(f => f.name !== 'label' && f.name !== 'idno')
 
   const assignedFieldNames = new Set<string>()
   const sectionFields = sections.map(section => ({
@@ -3049,7 +3052,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               </button>
             ))}
           </div>}
-          {!isNew && recordType !== 'procedure' && loadedStatus === 'public' && (
+          {PORTAL_ENABLED && !isNew && recordType !== 'procedure' && loadedStatus === 'public' && (
             <a
               className="btn gh"
               href={`${PORTAL_URL}/${PORTAL_PATH[recordType]}/${recordId}`}
@@ -3312,9 +3315,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             <div className="card">
               <div className="hd">{t('cards.system')}</div>
               <div className="bd">
-                {showIdno && (
+                {showIdno && (() => {
+                  const idnoField = fields.find(f => f.name === 'idno')
+                  return (
                   <div className="field">
-                    <div className="lbl">ID-Nr. <span className="req">*</span></div>
+                    <div className="lbl">{getLabel(idnoField, 'ID-Nr.')} <span className="req">*</span></div>
                     <input
                       className="fld mono"
                       value={idno}
@@ -3337,7 +3342,63 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       </div>
                     )}
                   </div>
-                )}
+                )
+                })()}
+
+                {(() => {
+                  const labelField = fields.find(f => f.name === 'label')
+                  if (!labelField) return null
+                  const labelVal = values.label
+                  return (
+                    <div className="field">
+                      <div className="lbl">
+                        {getLabel(labelField, 'Label')} <span className="req">*</span>
+                        {getLabel({ label: labelField.help_text }) && (
+                          <HelpPopover content={<div>{getLabel({ label: labelField.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
+                        )}
+                      </div>
+                      {labelField.is_translatable ? (
+                        <TranslatableInput
+                          languages={languages}
+                          value={(labelVal as Record<string, string> | undefined) ?? {}}
+                          onChange={(lang, v) => updateTranslatable('label', lang, v)}
+                          onRemove={lang => removeTranslatable('label', lang)}
+                          richtext={false}
+                          labels={labelField.label}
+                          placeholder={getLabel(labelField, 'Label')}
+                          disabled={justCreated}
+                          style={getFeedbackStyle('label')}
+                        />
+                      ) : (
+                        <input
+                          className="fld"
+                          value={(labelVal as string | undefined) ?? ''}
+                          onChange={e => {
+                            const v = e.target.value
+                            setValues(prev => ({ ...prev, label: v }))
+                            setIsDirty(true)
+                          }}
+                          onBlur={() => {
+                            if (isEmptyValue(values.label)) {
+                              const message = `Feld '${getLabel(labelField, 'Label')}' ist ein Pflichtfeld.`
+                              if (isDraftStatus) setFieldWarnings(err => ({ ...err, label: message }))
+                              else setFieldErrors(err => ({ ...err, label: message }))
+                            } else {
+                              clearFieldFeedback('label')
+                            }
+                          }}
+                          disabled={justCreated}
+                          style={getFeedbackStyle('label')}
+                        />
+                      )}
+                      {(fieldErrors['label'] || fieldWarnings['label']) && (
+                        <div style={{ fontSize: 11, color: fieldErrors['label'] ? '#dc2626' : '#92400e', marginTop: 4 }}>
+                          {fieldErrors['label'] ?? fieldWarnings['label']}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">

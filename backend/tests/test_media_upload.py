@@ -10,7 +10,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1.media import _serialize
-from katalon.core.dependencies import get_current_user
+from katalon.core.dependencies import get_current_user, try_get_current_user
 from katalon.core.media_validation import PIL_MIME_BY_FORMAT
 from katalon.core.models import MediaFile, Object, User
 from katalon.database import get_db
@@ -325,6 +325,141 @@ async def test_portal_media_thumbnail_redirects_to_iiif() -> None:
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_portal_media_list_denied_for_staff_without_object_read_permission() -> None:
+    """Regression test: a logged-in staff user whose role has no `read`
+    permission on `object` must be treated as anonymous for media/IIIF access —
+    not automatically granted full visibility just for being authenticated."""
+    obj_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="internal", metadata_={})
+    no_permission_user = User(
+        id=uuid.uuid4(), email="editor@example.com", role="editor", hashed_password="x"
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(obj),
+        _mock_result(None),  # no matching role_permissions row -> read denied
+    ])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{obj_id}/media")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_portal_media_file_denied_for_staff_without_object_read_permission() -> None:
+    obj_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="internal", metadata_={})
+    no_permission_user = User(
+        id=uuid.uuid4(), email="editor@example.com", role="editor", hashed_password="x"
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(obj),
+        _mock_result(None),  # no matching role_permissions row -> read denied
+    ])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{obj_id}/media/{media_id}/file")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_portal_media_thumbnail_denied_for_staff_without_object_read_permission() -> None:
+    obj_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    obj = Object(id=obj_id, idno="OBJ-001", status="internal", metadata_={})
+    no_permission_user = User(
+        id=uuid.uuid4(), email="editor@example.com", role="editor", hashed_password="x"
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(obj),
+        _mock_result(None),  # no matching role_permissions row -> read denied
+    ])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{obj_id}/media/{media_id}/thumbnail")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_iiif_authorize_denied_for_staff_without_object_read_permission() -> None:
+    """Regression test for the nginx auth_request endpoint backing Cantaloupe:
+    a logged-in staff user without `read` permission on `object` must be
+    refused access to an internal object's IIIF image, same as anonymous."""
+    obj_id = uuid.uuid4()
+    media = MediaFile(
+        id=uuid.uuid4(),
+        object_id=obj_id,
+        filename="test.jpg",
+        mime_type="image/jpeg",
+        storage_key="ab/test.jpg",
+        iiif_storage_key="ab/test.jpg",
+        status="ready",
+        is_public=True,
+        created_at=datetime.now(),
+    )
+    obj = Object(id=obj_id, idno="OBJ-001", status="internal", metadata_={})
+    no_permission_user = User(
+        id=uuid.uuid4(), email="editor@example.com", role="editor", hashed_password="x"
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[
+        _mock_result(media),
+        _mock_result(None),  # no matching role_permissions row -> read denied
+    ])
+    session.get = AsyncMock(return_value=obj)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/v1/media/_authorize",
+                headers={"X-Original-Uri": "/iiif/3/ab%2Ftest.jpg/full/,300/0/default.jpg"},
+            )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
 
 
 # ---------------------------------------------------------------------------

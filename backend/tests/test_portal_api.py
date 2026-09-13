@@ -6,6 +6,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from elasticsearch import BadRequestError
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1 import portal_public
@@ -23,6 +24,7 @@ from katalon.core.models import (
     VocabularyTerm,
 )
 from katalon.database import get_db
+from katalon.integrations import elasticsearch
 from katalon.main import app
 
 
@@ -712,6 +714,41 @@ async def test_portal_search_rejects_procedures(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_portal_search_rejects_malformed_elasticsearch_query(monkeypatch) -> None:
+    class FakeES:
+        async def search(self, **kwargs):
+            raise BadRequestError("Failed to parse query", MagicMock(), {})
+
+    session = AsyncMock()
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session.execute.return_value = config_result
+
+    async def override_db():
+        yield session
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/search", params={"q": "http://www.google.com/"})
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Die Suchanfrage enthält ungültige Suchsyntax."
+
+
+@pytest.mark.asyncio
+async def test_portal_rejects_nul_query_parameters() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/portal/v1/objects?object_type=%00")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "NUL-Zeichen sind in Abfrageparametern nicht erlaubt."
+
+
+@pytest.mark.asyncio
 async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None:
     advanced_filter = {"bool": {"filter": [{"match_all": {}}]}}
     resolve = AsyncMock(return_value=advanced_filter)
@@ -829,6 +866,104 @@ async def test_portal_search_forwards_numeric_range_filters(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_portal_search_restricts_staff_without_object_read_permission(monkeypatch) -> None:
+    """Regression test: a logged-in staff user (any of the five portal-staff
+    roles) whose role has no `read` permission on `object` must not get
+    unrestricted status access via /portal/v1/search — full_visibility_types
+    must reflect the actual role_permissions, not just "is staff logged in"."""
+    from katalon.core.dependencies import try_get_current_user
+
+    captured: dict = {}
+    permission_result = MagicMock()
+    permission_result.scalars.return_value.all.return_value = []  # no read permissions
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[permission_result, config_result])
+    no_permission_user = User(email="editor@example.com", hashed_password="x", role="editor")
+
+    async def search(**kwargs):
+        captured.update(kwargs)
+        return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+
+    async def override_db():
+        yield session
+
+    monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/search?status=internal")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.status_code == 200
+    assert captured["full_visibility_types"] == ()
+
+
+@pytest.mark.asyncio
+async def test_portal_advanced_search_restricts_staff_without_object_read_permission(
+    monkeypatch,
+) -> None:
+    """Same regression as above, for POST /portal/v1/search/advanced."""
+    from katalon.core.dependencies import try_get_current_user
+
+    captured: dict = {}
+    permission_result = MagicMock()
+    permission_result.scalars.return_value.all.return_value = []  # no read permissions
+    config_result = MagicMock()
+    config_result.scalar_one_or_none.return_value = None
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[permission_result, config_result])
+    no_permission_user = User(email="editor@example.com", hashed_password="x", role="editor")
+
+    resolve = AsyncMock(return_value={"bool": {"filter": [{"match_all": {}}]}})
+    monkeypatch.setattr(portal_public, "resolve_query", resolve)
+
+    async def search(**kwargs):
+        captured.update(kwargs)
+        return {"total": 0, "page": 1, "page_size": 20, "items": [], "facets": {}}
+
+    async def override_db():
+        yield session
+
+    monkeypatch.setattr(portal_public.search_service, "search", search)
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/portal/v1/search/advanced",
+                json={
+                    "query": {
+                        "version": 1,
+                        "record_type": "object",
+                        "group": {
+                            "mode": "all",
+                            "clauses": [
+                                {
+                                    "kind": "field",
+                                    "field": "title",
+                                    "operator": "contains",
+                                    "value": "Bremen",
+                                }
+                            ],
+                        },
+                    },
+                    "status": ["internal"],
+                },
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.status_code == 200
+    assert captured["full_visibility_types"] == ()
+
+
+@pytest.mark.asyncio
 async def test_portal_search_forwards_rel_collection(monkeypatch) -> None:
     captured: dict = {}
     config_result = MagicMock()
@@ -853,6 +988,140 @@ async def test_portal_search_forwards_rel_collection(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert captured["rel_filters"] == {"related_collections": ["Nachlass Müller"]}
+
+
+@pytest.mark.asyncio
+async def test_portal_collections_list_restricted_for_staff_without_permission() -> None:
+    """Regression test: a logged-in staff user whose role has no `read`
+    permission on `collection` must only see public/published collections via
+    /portal/v1/collections, same as anonymous — being staff was not enough."""
+    from katalon.core.dependencies import try_get_current_user
+
+    no_permission_user = User(email="editor@example.com", hashed_password="x", role="editor")
+    permission_result = MagicMock()
+    permission_result.scalar_one_or_none.return_value = None  # no read permission
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 0
+    items_result = MagicMock()
+    items_result.scalars.return_value.all.return_value = []
+
+    statements: list[str] = []
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return [permission_result, count_result, items_result][len(statements) - 1]
+
+    session = AsyncMock()
+    session.execute = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/collections")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.status_code == 200
+    assert "collections.status IN" in statements[1]  # count query
+    assert "collections.status IN" in statements[2]  # items query
+
+
+@pytest.mark.asyncio
+async def test_portal_collection_detail_denied_for_staff_without_permission() -> None:
+    """Regression test: a logged-in staff user without `collection` read
+    permission must get a 404 for an internal collection via
+    /portal/v1/collections/{id}, same as anonymous."""
+    from katalon.core.dependencies import try_get_current_user
+
+    no_permission_user = User(email="editor@example.com", hashed_password="x", role="editor")
+    permission_result = MagicMock()
+    permission_result.scalar_one_or_none.return_value = None  # no read permission
+    collection_result = MagicMock()
+    collection_result.scalar_one_or_none.return_value = None  # internal row excluded by filter
+
+    statements: list[str] = []
+
+    async def execute(statement):
+        statements.append(str(statement))
+        return [permission_result, collection_result][len(statements) - 1]
+
+    session = AsyncMock()
+    session.execute = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/collections/{uuid.uuid4()}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.status_code == 404
+    assert "collections.status IN" in statements[1]
+
+
+@pytest.mark.asyncio
+async def test_search_hides_internal_collection_titles_for_user_without_permission(
+    monkeypatch,
+) -> None:
+    """Regression test: /v1/search must not expand rel_collection subtree
+    titles to internal/draft collections for a user without `collection`
+    read permission — get_collection_subtree_titles(public_only=...) must
+    follow the actual permission, not just "is logged in"."""
+    from katalon.api.v1 import search as search_module
+    from katalon.core.dependencies import get_current_user, try_get_current_user
+
+    captured_public_only: dict = {}
+
+    async def fake_subtree_titles(db, collection_id, *, public_only):
+        captured_public_only["value"] = public_only
+        return ["Public Child"]
+
+    monkeypatch.setattr(
+        "katalon.services.collection_service.get_collection_subtree_titles", fake_subtree_titles
+    )
+
+    async def fake_search(**kwargs):
+        return {
+            "total": 0, "items": [], "facets": {}, "numeric_facets": {},
+            "page": 1, "page_size": 20,
+        }
+
+    monkeypatch.setattr(search_module.search_service, "search", fake_search)
+
+    no_permission_user = User(email="editor@example.com", hashed_password="x", role="editor")
+    permission_result = MagicMock()
+    permission_result.scalars.return_value.all.return_value = []  # no read permission
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=permission_result)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: no_permission_user
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/v1/search", params={"rel_collection": str(uuid.uuid4())}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert captured_public_only["value"] is True
 
 
 @pytest.mark.asyncio

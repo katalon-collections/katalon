@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     secret_key: str = "dev-secret-key-change-in-production"
     katalon_secrets_key: str = Field(min_length=32)
-    algorithm: str = "HS256"
+    algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 60 * 8
     refresh_token_expire_days: int = 30
 

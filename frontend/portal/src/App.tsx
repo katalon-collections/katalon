@@ -66,11 +66,30 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [headerPages, setHeaderPages] = useState<StaticPageSummary[]>([])
+  const [menuOpen, setMenuOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuToggleRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     api.pages.list().then(ps => setHeaderPages(ps.filter(p => p.placement === 'header'))).catch(() => {})
+  }, [])
+
+  // Close mobile menu on route change
+  useEffect(() => { setMenuOpen(false) }, [location.pathname])
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as Node
+      if (menuToggleRef.current?.contains(target)) return
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
   // Debounced autocomplete
@@ -126,6 +145,11 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   return (
     <header className="site-header">
       <Link to="/" className="logo">{config.site_title}</Link>
+      <Link to="/" className="home-icon" aria-label={t('nav.home')} title={t('nav.home')}>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9.5 10 3l7 6.5" /><path d="M5 8v8h10V8" />
+        </svg>
+      </Link>
       <nav>
         {BROWSE_NAV_ITEMS
           .filter(({ type }) => config.browse_enabled_types.includes(type))
@@ -133,6 +157,21 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
         {headerPages.map(p => <Link key={p.slug} to={`/page/${p.slug}`}>{pageLabel(p, locale)}</Link>)}
       </nav>
       <div className="sp" />
+      <button
+        ref={menuToggleRef}
+        type="button"
+        className="menu-toggle"
+        aria-label={t('nav.menu')}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(o => !o)}
+      >
+        {menuOpen ? (
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="4" y1="4" x2="16" y2="16" /><line x1="16" y1="4" x2="4" y2="16" /></svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="3" y1="5" x2="17" y2="5" /><line x1="3" y1="10" x2="17" y2="10" /><line x1="3" y1="15" x2="17" y2="15" /></svg>
+        )}
+      </button>
+      <div ref={menuRef} className={`header-actions${menuOpen ? ' is-open' : ''}`}>
       <div ref={wrapRef} className={`search-wrap${location.pathname === '/' ? ' is-home' : ''}`} style={{ position: 'relative' }}>
         <form className="search-bar" onSubmit={submit}>
           <input
@@ -176,9 +215,12 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
         </svg>
         <span className="advanced-search-link__text">{t('advanced.link')}</span>
       </Link>
-      <LanguageSwitcher />
-      {user ? <button className="portal-account" type="button" onClick={onLogout}>{t('account.logout')}</button>
-        : <Link className="portal-account" to="/login">{t('account.login')}</Link>}
+      <div className="header-actions__bottom">
+        <LanguageSwitcher />
+        {user ? <button className="portal-account" type="button" onClick={onLogout}>{t('account.logout')}</button>
+          : <Link className="portal-account" to="/login">{t('account.login')}</Link>}
+      </div>
+      </div>
     </header>
   )
 }

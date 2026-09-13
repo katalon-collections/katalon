@@ -322,6 +322,14 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   }, [form.field_type, form.relation_type_vocab, form.relation_target_type, form.target_type])
 
   const isVocabularyTerm = form.target_type === 'vocabulary_term'
+  // "label"/"idno" are the auto-created system fields (main.py `_ensure_label_fields`/
+  // `_ensure_idno_fields`) — rendered as pinned Stammdaten inputs in ScreenForm.tsx, not
+  // through the generic Metadaten field/section machinery, so structural settings below
+  // no longer apply to them; only their display label (Anzeigename) stays editable.
+  const isSystemField = !isNew && (form.name === 'label' || form.name === 'idno')
+  // 'idno' has no free-text content worth validating/defaulting/AI-assisting (it's a
+  // structured identifier, usually machine-assigned) — 'label' keeps those three.
+  const isIdno = !isNew && form.name === 'idno'
   const fieldTypes = (isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES)
     .filter(type => type !== 'pid' || pidProviders.length > 0 || form.field_type === 'pid')
   const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
@@ -378,15 +386,17 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               set('name', e.target.value)
             }} disabled={!isNew} />
           </div>
-          <div className="field" data-tour="field-type-select">
-            <div className="lbl">{t('fieldDetail.fieldType')}</div>
-            <select className="fld" value={form.field_type} onChange={e => {
-              const fieldType = e.target.value
-              onChange({ ...form, field_type: fieldType, ...(fieldType === 'pid' && !pidProviders.includes(form.pid_provider as 'ark' | 'dnb_urn') ? { pid_provider: pidProviders[0] ?? '' } : {}) })
-            }}>
-              {fieldTypes.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
-            </select>
-          </div>
+          {!isSystemField && (
+            <div className="field" data-tour="field-type-select">
+              <div className="lbl">{t('fieldDetail.fieldType')}</div>
+              <select className="fld" value={form.field_type} onChange={e => {
+                const fieldType = e.target.value
+                onChange({ ...form, field_type: fieldType, ...(fieldType === 'pid' && !pidProviders.includes(form.pid_provider as 'ark' | 'dnb_urn') ? { pid_provider: pidProviders[0] ?? '' } : {}) })
+              }}>
+                {fieldTypes.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         {showSubtype && (
           <div className="field">
@@ -399,6 +409,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             </select>
           </div>
         )}
+        {!isSystemField && (
         <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ck" checked={form.is_required} onChange={e => set('is_required', e.target.checked)} />
@@ -427,6 +438,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>{t('fieldDetail.notTranslatableHint')}</span>
             )}
         </div>
+        )}
         {form.field_type === 'authority' && (
           <div className="field">
             <div className="lbl">{t('fieldDetail.authoritySource')}</div>
@@ -474,7 +486,10 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <div className="lbl">{t('fieldDetail.sortOrder')}</div>
               <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
             </div>
-            {!isVocabularyTerm && (
+            {isSystemField && (
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>{t('fieldDetail.systemLabelHint')}</div>
+            )}
+            {!isVocabularyTerm && !isSystemField && (
               <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
@@ -515,7 +530,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 </label>
               </div>
             )}
-          {!isVocabularyTerm && form.show_in_detail && (
+          {!isVocabularyTerm && !isSystemField && form.show_in_detail && (
             <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingTop: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13 }}>{t('fieldDetail.detailSlot')}</span>
@@ -533,7 +548,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               </label>
             </div>
           )}
-            {form.field_type === 'text' && (
+            {!isIdno && form.field_type === 'text' && (
               <div className="field">
                 <div className="lbl">{t('fieldDetail.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
                 <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
@@ -541,7 +556,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.validationExamples')}</div>
               </div>
             )}
-        {!isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
+        {!isIdno && !isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
           <div className="field">
             <div className="lbl">{t('fieldDetail.defaultValue')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.defaultValueHint')}</span></div>
             {form.field_type === 'vocab' ? (
@@ -557,13 +572,13 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             )}
           </div>
         )}
-        {!isVocabularyTerm && (
+        {!isSystemField && !isVocabularyTerm && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <input type="checkbox" className="ck" checked={form.is_locked} onChange={e => set('is_locked', e.target.checked)} />
             <span style={{ fontSize: 13 }}>{t('fieldDetail.locked')}</span>
           </label>
         )}
-        {aiEligible && (
+        {!isIdno && aiEligible && (
           <div style={{ marginBottom: 16, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--panel)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
               <input type="checkbox" className="ck" checked={form.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
@@ -1044,10 +1059,23 @@ fields:
 
 const TYPE_IDS = ['object', 'entity', 'place', 'occurrence', 'procedure', 'vocabulary_term']
 
-function parseInitial(editId?: string | null): { type: string; subtype: string } {
-  if (!editId) return { type: 'object', subtype: '' }
-  const [type, subtype = ''] = editId.split('.')
-  return TYPE_IDS.includes(type) ? { type, subtype } : { type: 'object', subtype: '' }
+function parseInitial(editId?: string | null): { type: string; subtype: string; target: string | null } {
+  if (!editId) return { type: 'object', subtype: '', target: null }
+  const slash = editId.indexOf('/')
+  const head = slash === -1 ? editId : editId.slice(0, slash)
+  const target = slash === -1 ? null : (editId.slice(slash + 1) || null)
+  const [type, subtype = ''] = head.split('.')
+  return TYPE_IDS.includes(type) ? { type, subtype, target } : { type: 'object', subtype: '', target: null }
+}
+
+/** Encode type/subtype/open-field into a single onPathChange path segment, e.g.
+ *  "object.postcard/3f2c…" — the part after "/" is the currently open field's id, or
+ *  "new" for the new-field form. Round-tripped by parseInitial so browser back/forward
+ *  closes the field editor instead of leaving the admin app entirely (see #schema route
+ *  handling in AppShell.tsx). */
+function buildPath(type: string, subtype: string, target: string | null): string {
+  const head = subtype ? `${type}.${subtype}` : type
+  return target ? `${head}/${target}` : head
 }
 
 type Props = { initialPath?: string | null; onPathChange?: (path: string) => void }
@@ -1072,7 +1100,9 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [aiEnabled, setAiEnabled] = useState(false)
   const [pidProviders, setPidProviders] = useState<('ark' | 'dnb_urn')[]>([])
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
-  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragState, setDragState] = useState<{ id: string; overIndex: number } | null>(null)
+  const fieldRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const dragGhostRef = useRef<HTMLDivElement>(null)
   const [activeView, setActiveView] = useState<'fields' | 'layout'>('fields')
 
   const TYPES = [
@@ -1088,6 +1118,16 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
 
   const activeFieldIdRef = useRef<string | null>(null)
   activeFieldIdRef.current = activeFieldId
+
+  // Browser back/forward support for the field editor: lastEmittedPathRef tracks the path
+  // this component itself last pushed via onPathChange, so the reconciliation effect below
+  // can tell "user clicked back" (initialPath changed to something we didn't emit) apart
+  // from "we just navigated ourselves" (skip, avoids double-processing/redundant history).
+  const lastEmittedPathRef = useRef<string | null>(initialPath ?? null)
+  // Field id (or 'new') to open once the next loadFields() resolves; undefined = none pending.
+  const pendingTargetRef = useRef<string | null | undefined>(initial.target)
+  const suppressEmitRef = useRef(false)
+  const isFirstPathEffectRef = useRef(true)
 
   const hasSubtypes = subtypesList.length > 0
 
@@ -1143,6 +1183,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           if (current) return { ...prev, subFields: current.children ?? [] }
           return prev
         })
+        // Reopen (or close) the field editor for a target carried over from a browser
+        // back/forward navigation or an initial deep link — see buildPath/parseInitial.
+        if (pendingTargetRef.current !== undefined) {
+          const target = pendingTargetRef.current
+          pendingTargetRef.current = undefined
+          suppressEmitRef.current = true
+          applyTarget(target, loaded)
+          suppressEmitRef.current = false
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -1159,6 +1208,27 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     loadFields()
   }, [loadFields])
 
+  // Browser back/forward (or any external onPathChange-driven navigation) lands here: the
+  // parent passes a new initialPath. If it's not the path we just emitted ourselves, resolve
+  // it — same type/subtype: open/close the field editor directly; different type/subtype:
+  // stash the target and let it apply once loadFields() resolves for the new type/subtype.
+  useEffect(() => {
+    if (isFirstPathEffectRef.current) { isFirstPathEffectRef.current = false; return }
+    if ((initialPath ?? null) === lastEmittedPathRef.current) return
+    const parsed = parseInitial(initialPath)
+    lastEmittedPathRef.current = initialPath ?? null
+    if (parsed.type !== activeType || parsed.subtype !== activeSubtype) {
+      pendingTargetRef.current = parsed.target
+      if (parsed.type !== activeType) skipResetRef.current = true
+      setActiveType(parsed.type)
+      setActiveSubtype(parsed.subtype)
+      return
+    }
+    suppressEmitRef.current = true
+    applyTarget(parsed.target, fields)
+    suppressEmitRef.current = false
+  }, [initialPath])
+
   useEffect(() => {
     if (skipResetRef.current) { skipResetRef.current = false; return }
     setActiveSubtype('')
@@ -1167,6 +1237,13 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     setForm(null)
   }, [activeType])
 
+  function emitPath(target: string | null) {
+    if (suppressEmitRef.current) return
+    const path = buildPath(activeType, activeSubtype, target)
+    lastEmittedPathRef.current = path
+    onPathChange?.(path)
+  }
+
   function openNew() {
     setIsNew(true)
     setActiveFieldId(null)
@@ -1174,6 +1251,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     if (pidProviders.length) next.pid_provider = pidProviders[0]
     setForm(next)
     setSaveError(null)
+    emitPath('new')
   }
 
   function openExisting(f: FieldDefinition) {
@@ -1181,12 +1259,23 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     setActiveFieldId(f.id)
     setForm(fieldToForm(f))
     setSaveError(null)
+    emitPath(f.id)
+  }
+
+  /** Reconciles the field editor to a path's target (a field id, 'new', or null-for-closed). */
+  function applyTarget(target: string | null, fieldsList: FieldDefinition[]) {
+    if (!target) { closeDetail(); return }
+    if (target === 'new') { openNew(); return }
+    const f = fieldsList.find(x => x.id === target)
+    if (f) openExisting(f)
+    else closeDetail()
   }
 
   function closeDetail() {
     setActiveFieldId(null)
     setIsNew(false)
     setForm(null)
+    emitPath(null)
   }
 
   async function handleSave() {
@@ -1324,6 +1413,59 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     }
   }
 
+  function handleGripPointerDown(e: React.PointerEvent, id: string) {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    e.preventDefault()
+    const startIndex = fields.findIndex(f => f.id === id)
+    if (startIndex === -1) return
+    const dragFields = fields
+    const ghost = dragGhostRef.current
+    setDragState({ id, overIndex: startIndex })
+    document.body.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+
+    const positionGhost = (clientX: number, clientY: number) => {
+      if (!ghost) return
+      ghost.style.transform = `translate(${clientX + 16}px, ${clientY - 14}px)`
+    }
+    if (ghost) {
+      ghost.textContent = getLabel(dragFields[startIndex], dragFields[startIndex].name)
+      ghost.style.display = 'flex'
+      positionGhost(e.clientX, e.clientY)
+    }
+
+    const findClosestIndex = (clientY: number) => {
+      let closestIndex = startIndex
+      let closestDist = Infinity
+      dragFields.forEach((f, i) => {
+        const el = fieldRowRefs.current.get(f.id)
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        const dist = Math.abs(clientY - (rect.top + rect.height / 2))
+        if (dist < closestDist) { closestDist = dist; closestIndex = i }
+      })
+      return closestIndex
+    }
+
+    const onMove = (ev: PointerEvent) => {
+      positionGhost(ev.clientX, ev.clientY)
+      const idx = findClosestIndex(ev.clientY)
+      setDragState(prev => (prev && prev.overIndex === idx) ? prev : { id, overIndex: idx })
+    }
+    const onUp = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      if (ghost) ghost.style.display = 'none'
+      const finalIndex = findClosestIndex(ev.clientY)
+      setDragState(null)
+      if (finalIndex !== startIndex) handleReorder(id, dragFields[finalIndex].id)
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }
+
   async function handleDelete() {
     if (!activeFieldId || !window.confirm(t('deleteConfirm', { name: form?.name ?? '' }))) return
     setSaving(true)
@@ -1359,6 +1501,15 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const layoutEnabled = activeType !== 'vocabulary_term'
 
   return (
+    <>
+    <div
+      ref={dragGhostRef}
+      style={{
+        display: 'none', position: 'fixed', top: 0, left: 0, zIndex: 1000, pointerEvents: 'none',
+        alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, background: 'var(--fg-1, #111)',
+        color: '#fff', fontSize: 12, fontWeight: 500, boxShadow: '0 4px 14px rgba(0,0,0,.25)', whiteSpace: 'nowrap',
+      }}
+    />
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadFields() }} />
@@ -1391,7 +1542,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           <button
             key={t.id}
             className={`tab${activeType === t.id ? ' active' : ''}`}
-            onClick={() => { setActiveType(t.id); if (t.id === 'vocabulary_term') setActiveView('fields'); onPathChange?.(t.id) }}
+            onClick={() => { setActiveType(t.id); if (t.id === 'vocabulary_term') setActiveView('fields'); lastEmittedPathRef.current = t.id; onPathChange?.(t.id) }}
           >
             {t.label}
           </button>
@@ -1415,7 +1566,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               <button
                 key={s.id}
                 className={`panel-it${activeSubtype === s.name ? ' active' : ''}`}
-                onClick={() => { setActiveSubtype(s.name); onPathChange?.(s.name ? `${activeType}.${s.name}` : activeType) }}
+                onClick={() => { setActiveSubtype(s.name); const path = s.name ? `${activeType}.${s.name}` : activeType; lastEmittedPathRef.current = path; onPathChange?.(path) }}
               >
                 <span>{s.label?.de || s.name || t('subtypes.allGlobal')}</span>
                 {s.name && <span className="ct">{allTypeFields.filter(f => f.target_subtype === s.name).length}</span>}
@@ -1434,7 +1585,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                 id="schema-subtype"
                 className="fld"
                 value={activeSubtype}
-                onChange={e => setActiveSubtype(e.target.value)}
+                onChange={e => { const v = e.target.value; setActiveSubtype(v); const path = v ? `${activeType}.${v}` : activeType; lastEmittedPathRef.current = path; onPathChange?.(path) }}
               >
                 {activeType === 'vocabulary_term' && <option value="">{t('subtypes.pleaseSelect')}</option>}
                 {activeType !== 'vocabulary_term' && <option value="">{t('subtypes.allGlobal')}</option>}
@@ -1479,24 +1630,61 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                       <span>{t('forSubtype', { subtype: activeSubtype })}</span>
                     )}
                   </div>
-                  {fields.map(f => {
+                  {(['idno', 'label'] as const)
+                    .map(name => fields.find(f => f.name === name))
+                    .filter((f): f is FieldDefinition => f != null)
+                    .map(f => {
+                      const fieldLabel = getLabel(f, f.name)
+                      return (
+                        <div key={f.id} className="field-row">
+                          <span className="gp" style={{ visibility: 'hidden' }}><Grip size={14} /></span>
+                          <button className="field-row-main" onClick={() => openExisting(f)}>
+                            <span className="nm">{fieldLabel}</span>
+                            <span className="key">{f.name}</span>
+                            <span
+                              style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--panel-2)', color: 'var(--fg-3)', border: '1px solid var(--border-s)' }}
+                            >
+                              {t('fieldDetail.systemFieldBadge')}
+                            </span>
+                            <span className="typ">{t(`fieldTypes.${f.field_type}`)}</span>
+                            {f.is_required && <span className="req-mark">{t('fieldDetail.subFieldRequired')}</span>}
+                          </button>
+                          <div className="actions">
+                            <ActionMenu
+                              ariaLabel={`Aktionen für Feld ${fieldLabel}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: t('editRow'),
+                                  icon: <Edit size={13} />,
+                                  onClick: () => openExisting(f),
+                                },
+                              ]}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  {fields.filter(f => f.name !== 'idno' && f.name !== 'label').map((f) => {
+                    const idx = fields.findIndex(x => x.id === f.id)
                     const fieldLabel = getLabel(f, f.name)
+                    const isDragging = dragState?.id === f.id
+                    const showDropBefore = dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx < fields.findIndex(x => x.id === dragState.id)
+                    const showDropAfter = dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx > fields.findIndex(x => x.id === dragState.id)
                     return (
                       <div
                         key={f.id}
-                        className={`field-row${dragId === f.id ? ' dragging' : ''}`}
-                        draggable
-                        onDragStart={() => setDragId(f.id)}
-                        onDragEnd={() => setDragId(null)}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={e => {
-                          e.preventDefault()
-                          if (dragId) handleReorder(dragId, f.id)
-                          setDragId(null)
-                        }}
+                        ref={el => { if (el) fieldRowRefs.current.set(f.id, el); else fieldRowRefs.current.delete(f.id) }}
+                        className={`field-row${isDragging ? ' dragging' : ''}${showDropBefore ? ' drop-before' : ''}${showDropAfter ? ' drop-after' : ''}`}
                       >
+                        <span
+                          className="gp"
+                          role="button"
+                          aria-label={t('reorderRow', { name: fieldLabel })}
+                          tabIndex={-1}
+                          onPointerDown={e => handleGripPointerDown(e, f.id)}
+                        ><Grip size={14} /></span>
                         <button className="field-row-main" onClick={() => openExisting(f)}>
-                          <span className="gp" aria-hidden="true"><Grip size={14} /></span>
                           <span className="nm">{fieldLabel}</span>
                           <span className="key">{f.name}</span>
                           {f.target_subtype && (
@@ -1528,7 +1716,6 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                                 label: t('deleteRow'),
                                 icon: <Trash size={13} />,
                                 danger: true,
-                                disabled: f.name === 'label',
                                 onClick: async () => {
                                   if (!window.confirm(t('deleteConfirm', { name: fieldLabel }))) return
                                   try {
@@ -1556,5 +1743,6 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         </div>
       </div>
     </div>
+    </>
   )
 }

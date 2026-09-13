@@ -10,7 +10,7 @@ from typing import Annotated, cast
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Security, status
 from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
+from jwt import InvalidTokenError, decode, encode
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,7 +68,7 @@ def _create_token(
         payload["features"] = features
     return cast(
         str,
-        jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm),
+        encode(payload, settings.secret_key, algorithm=settings.algorithm),
     )
 
 
@@ -241,14 +241,14 @@ async def refresh_token(
     try:
         if not refresh_cookie:
             raise ValueError
-        payload = jwt.decode(refresh_cookie, settings.secret_key, algorithms=[settings.algorithm])
+        payload = decode(refresh_cookie, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         token_type: str | None = payload.get("typ")
         token_version = payload.get("ver", 0)
         if user_id_str is None or token_type != "refresh" or not isinstance(token_version, int):
             raise ValueError
         user_id = uuid.UUID(user_id_str)
-    except (ValueError, JWTError):
+    except (InvalidTokenError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Ungültiger Refresh-Token",

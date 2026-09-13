@@ -3,6 +3,33 @@
 All notable changes to Katalon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.34.0] - 2026-09-13
+
+### Added
+- Portal: mobile Kopfzeile mit Hamburger-Menü (Sprache, Login/Logout, erweiterte
+  Suche hinter einem Menü-Toggle statt permanent sichtbarer Leiste) sowie ein
+  Home-Icon neben dem Logo. Auf der Suchseite öffnen sich Facetten/Filter auf
+  schmalen Viewports als Overlay-Panel über einen eigenen Filter-Button statt
+  dauerhaft die Seitenspalte zu belegen.
+- `idno` ("ID-Nr.") ist jetzt wie `label` ein echtes Systemfeld in der
+  Schema-Verwaltung: `_ensure_idno_fields()` legt es pro Haupttyp an, sein
+  Anzeigename bleibt EN/DE anpassbar. Im Schema-Editor stehen `idno` und
+  `label` immer ganz oben mit einem "System"-Vermerk (Look wie bei
+  Systemvokabularen), nicht per Drag verschiebbar und nicht löschbar. Ihr
+  Felddetail zeigt nur noch Anzeigename und Hilfetext — Feldtyp, Pflicht,
+  Wiederholbar, Mehrsprachig, Regex, Standardwert, Sperren und KI-Assistent
+  entfallen, da diese Einstellungen für Systemfelder ohnehin fix sind. Der
+  konfigurierte Anzeigename von `idno` erscheint jetzt auch im
+  Stammdaten-Feld des Datensatzformulars statt des zuvor hartkodierten
+  Texts "ID-Nr.".
+
+### Changed
+- Systemfeld `label` ("Titel") behält im Schema-Editor abweichend von `idno`
+  weiterhin Validierungs-Regex, Standardwert und KI-Assistent im Felddetail
+  (Titel ist Freitext und damit KI-/Regex-/Default-tauglich; `idno` als
+  strukturierter Identifikator nicht).
+
+
 ## [1.32.0] - 2026-09-12
 
 ### Added

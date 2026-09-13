@@ -342,11 +342,16 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .schema-list .item .sub { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--fg-3); margin-top: 1px; }
 .schema-list .item .ct { margin-left: auto; font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--fg-4); }
 .schema-detail { overflow-y: auto; padding: 18px 24px 60px; }
-.field-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; margin-bottom: 6px; cursor: grab; }
+.field-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; margin-bottom: 6px; position: relative; }
 .field-row:hover { border-color: var(--fg-5); background: var(--panel-2); }
 .field-row.dragging { opacity: .4; }
+.field-row.drop-before::before, .field-row.drop-after::after { content: ''; position: absolute; left: -2px; right: -2px; height: 3px; background: var(--accent-ink, #2563eb); border-radius: 2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-ink, #2563eb) 20%, transparent); }
+.field-row.drop-before::before { top: -5px; }
+.field-row.drop-after::after { bottom: -5px; }
 .field-row-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.field-row .gp { color: var(--fg-4); }
+.field-row .gp { color: var(--fg-4); cursor: grab; touch-action: none; display: inline-flex; align-items: center; padding: 4px; margin: -4px; border-radius: 4px; }
+.field-row .gp:hover { background: var(--border-soft); }
+.field-row.dragging .gp { cursor: grabbing; }
 .field-row .nm { font-weight: 500; font-size: 13px; flex: 1; }
 .field-row .key { font-family: 'IBM Plex Mono',monospace; font-size: 11.5px; color: var(--fg-3); }
 .field-row .typ { font-family: 'IBM Plex Mono',monospace; font-size: 11px; background: var(--border-soft); padding: 1px 7px; border-radius: 9px; color: var(--fg-2); }

@@ -10,6 +10,8 @@ export default {
   'nav.entitiesLong': 'Personen & Organisationen',
   'nav.worksLong': 'Werke & Ereignisse',
   'nav.collectionsLong': 'Sammlungen & Bestände',
+  'nav.menu': 'Menü',
+  'nav.home': 'Startseite',
 
   'type.object': 'Objekt',
   'type.collection': 'Sammlung',
@@ -47,6 +49,8 @@ export default {
   'search.relatedPlaces': 'Orte',
   'search.relatedOccurrences': 'Werke/Ereignisse',
   'search.relatedCollections': 'Sammlungen',
+  'search.openFilters': 'Filter',
+  'search.closeFilters': 'Filter schließen',
   'search.linkedFacet': 'Verknüpft: {type} – {field}',
   'search.loading': 'Lade…',
   'search.noResultsShort': 'Keine Ergebnisse.',

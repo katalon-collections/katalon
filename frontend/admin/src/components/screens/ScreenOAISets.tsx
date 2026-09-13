@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { oaiSets, PORTAL_URL } from '../../api/client'
+import { oaiSets, PORTAL_URL, PORTAL_ENABLED } from '../../api/client'
 import type { OAISet, OAISetPayload } from '../../api/client'
 import { Plus, Trash, Edit } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
@@ -123,7 +123,7 @@ export function ScreenOAISets() {
     setForm(f => f ? { ...f, [key]: value } : f)
   }
 
-  const oaiUrl = new URL('/oai', PORTAL_URL).href
+  const oaiUrl = PORTAL_ENABLED ? new URL('/oai', PORTAL_URL).href : null
 
   return (
     <div className="settings-page settings-page-oai">
@@ -138,8 +138,7 @@ export function ScreenOAISets() {
       </div>
 
       <p className="settings-intro" style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 20, lineHeight: 1.6 }}>
-        {t('endpointLabel')} <a href={oaiUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{oaiUrl}</a>
-        <br />
+        {oaiUrl && <>{t('endpointLabel')} <a href={oaiUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{oaiUrl}</a><br /></>}
         {t('description')}
       </p>
 

@@ -8,9 +8,10 @@ import logging
 from collections.abc import AsyncIterator, Iterable, Sized
 from typing import Any, cast
 
-from elasticsearch import AsyncElasticsearch, NotFoundError
+from elasticsearch import AsyncElasticsearch, BadRequestError, NotFoundError
 
 from katalon.config import settings
+from katalon.core.visibility import PUBLIC_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -358,6 +359,7 @@ async def search_documents(
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
     sort: str | None = None,
+    full_visibility_types: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     es = get_es()
 
@@ -395,6 +397,15 @@ async def search_documents(
         # never excluded from its own aggregation — unlike status_facet below, it
         # must not leak counts for statuses the caller is not allowed to see.
         base_filters.append({"term": {"status": status}})
+    if full_visibility_types is not None:
+        # Every hit must be either publicly visible, or of a record_type the
+        # caller has an explicit read permission for (see
+        # core.visibility.readable_record_types). This is independent from
+        # the `status` filter above, which narrows further on top of it.
+        should: list[dict[str, Any]] = [{"terms": {"status": list(PUBLIC_STATUSES)}}]
+        if full_visibility_types:
+            should.append({"terms": {"record_type": list(full_visibility_types)}})
+        base_filters.append({"bool": {"should": should, "minimum_should_match": 1}})
     if advanced_filter:
         base_filters.append(advanced_filter)
 
@@ -523,7 +534,14 @@ async def search_documents(
         # "relevance" sort on an empty query would otherwise fall back to
         # arbitrary Lucene segment order. Use a deterministic order instead.
         body["sort"] = SORT_CLAUSES["idno_asc"]
-    result = await es.search(index=INDEX_NAME, body=body)
+    try:
+        result = await es.search(index=INDEX_NAME, body=body)
+    except BadRequestError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422, detail="Die Suchanfrage enthält ungültige Suchsyntax."
+        ) from exc
     return cast(dict[str, Any], result.body)
 
 

@@ -211,6 +211,7 @@ export function SearchPage() {
   const pageKeyRef = useRef('')
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setShowScrollTop(window.scrollY > 600)
@@ -463,21 +464,42 @@ export function SearchPage() {
                   {q ? t('search.resultsFor', { q }) : ''}
                 </>}
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--fg-3)' }}>
-            {t('search.sortLabel')}
-            <select value={sort} onChange={e => setFilter('sort', e.target.value)}>
-              <option value="">{t('search.sortRelevance')}</option>
-              <option value="idno_asc">{t('search.sortIdno')}</option>
-              <option value="title_asc">{t('search.sortTitle')}</option>
-              <option value="newest">{t('search.sortNewest')}</option>
-              <option value="oldest">{t('search.sortOldest')}</option>
-            </select>
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              className="mobile-filters-toggle"
+              onClick={() => setMobileFiltersOpen(true)}
+              aria-label={t('search.openFilters')}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 4h12M4.5 8h7M7 12h2"/></svg>
+              {t('search.openFilters')}
+            </button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--fg-3)' }}>
+              <span className="sort-label-text">{t('search.sortLabel')}</span>
+              <select value={sort} onChange={e => setFilter('sort', e.target.value)}>
+                <option value="">{t('search.sortRelevance')}</option>
+                <option value="idno_asc">{t('search.sortIdno')}</option>
+                <option value="title_asc">{t('search.sortTitle')}</option>
+                <option value="newest">{t('search.sortNewest')}</option>
+                <option value="oldest">{t('search.sortOldest')}</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
       <div className="search-layout">
-        <div className="facets-wrap"><aside className="facets">
+        {mobileFiltersOpen && <div className="facets-backdrop" onClick={() => setMobileFiltersOpen(false)} />}
+        <div className={`facets-wrap${mobileFiltersOpen ? ' facets-wrap--open' : ''}`}>
+          <button
+            type="button"
+            className="facets-close"
+            onClick={() => setMobileFiltersOpen(false)}
+            aria-label={t('search.closeFilters')}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 4l10 10M14 4L4 14"/></svg>
+          </button>
+          <aside className="facets">
           {!advancedQuery && systemFacets.includes('record_type') && (
             <FacetPanel
               label={t('search.typeFacet')}

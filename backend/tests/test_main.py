@@ -42,6 +42,9 @@ def test_settings_require_katalon_secrets_key() -> None:
     with pytest.raises(ValidationError, match="katalon_secrets_key"):
         Settings(katalon_secrets_key="short")
 
+def test_settings_reject_asymmetric_jwt_algorithms() -> None:
+    with pytest.raises(ValidationError, match="algorithm"):
+        Settings(katalon_secrets_key="x" * 32, algorithm="ES256")
 
 def test_enabled_smtp_rejects_conflicting_tls_modes() -> None:
     with pytest.raises(ValidationError, match="SMTP_STARTTLS"):

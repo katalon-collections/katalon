@@ -26,7 +26,7 @@ from katalon.api.v1 import (
 )
 from katalon.api.v1.search import SearchResponse, _range_filters
 from katalon.config import settings
-from katalon.core.dependencies import DBDep, OptionalCurrentUser
+from katalon.core.dependencies import DBDep, OptionalCurrentUser, has_record_permission
 from katalon.core.limiter import limiter
 from katalon.core.models import (
     Banner,
@@ -45,7 +45,7 @@ from katalon.core.models import (
     VocabularyTerm,
 )
 from katalon.core.schemas import EntityRead, ObjectRead, OccurrenceRead, PlaceRead
-from katalon.core.visibility import PUBLIC_STATUSES
+from katalon.core.visibility import PUBLIC_STATUSES, readable_record_types
 from katalon.services import relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 
@@ -67,6 +67,14 @@ _MODELS: dict[
 def _staff_user(user: User | None) -> User | None:
     """Keep future public accounts on the anonymous portal projection."""
     return user if user and user.role in _PORTAL_STAFF_ROLES else None
+
+
+async def _collection_visibility_user(db: DBDep, user: User | None) -> User | None:
+    """Like _staff_user, but additionally requires `read` permission on
+    `collection` — being a staff role is not enough (mirrors the
+    permission-checked _visibility_user() pattern in collections.py, which
+    this module's own collection browse/detail endpoints must match)."""
+    return user if user and await has_record_permission(db, user, "collection", "read") else None
 
 
 async def _maybe_export_rdf(
@@ -523,8 +531,9 @@ async def list_collections(
     q: str | None = None,
 ) -> dict[str, Any]:
     staff_user = _staff_user(current_user)
+    visibility_user = await _collection_visibility_user(db, staff_user)
     query = select(Collection).where(Collection.deleted_at.is_(None))
-    if staff_user is None:
+    if visibility_user is None:
         query = query.where(Collection.status.in_(PUBLIC_STATUSES))
     if parent_id is not None:
         query = query.where(Collection.parent_id == parent_id)
@@ -545,7 +554,7 @@ async def list_collections(
     response_items: list[PortalCollectionRead] = []
     for col in items:
         metadata = col.metadata_ or {}
-        if staff_user is None:
+        if visibility_user is None:
             from katalon.services.public_metadata_service import (
                 filter_public_metadata,
                 load_public_fields,
@@ -583,10 +592,11 @@ async def get_collection(
     if rdf is not None:
         return rdf
     staff_user = _staff_user(current_user)
+    visibility_user = await _collection_visibility_user(db, staff_user)
     query = select(Collection).where(
         Collection.id == collection_id, Collection.deleted_at.is_(None)
     )
-    if staff_user is None:
+    if visibility_user is None:
         query = query.where(Collection.status.in_(PUBLIC_STATUSES))
     result = await db.execute(query)
     col = result.scalar_one_or_none()
@@ -594,7 +604,7 @@ async def get_collection(
         raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
 
     metadata = col.metadata_ or {}
-    if staff_user is None:
+    if visibility_user is None:
         from katalon.services.public_metadata_service import (
             filter_public_metadata,
             load_public_fields,
@@ -614,7 +624,7 @@ async def get_collection(
         p_query = select(Collection).where(
             Collection.id == curr_parent_id, Collection.deleted_at.is_(None)
         )
-        if staff_user is None:
+        if visibility_user is None:
             p_query = p_query.where(Collection.status.in_(PUBLIC_STATUSES))
         p_col = (await db.execute(p_query)).scalar_one_or_none()
         if not p_col:
@@ -636,7 +646,7 @@ async def get_collection(
     c_query = select(Collection).where(
         Collection.parent_id == col.id, Collection.deleted_at.is_(None)
     )
-    if staff_user is None:
+    if visibility_user is None:
         c_query = c_query.where(Collection.status.in_(PUBLIC_STATUSES))
     children_cols = (
         (await db.execute(c_query.order_by(Collection.created_at.asc()))).scalars().all()
@@ -658,7 +668,7 @@ async def get_collection(
         Relation.to_id == col.id,
         Relation.from_type == "object",
     )
-    if staff_user is None:
+    if visibility_user is None:
         member_count_stmt = member_count_stmt.where(
             exists(
                 select(Object.id).where(
@@ -825,6 +835,7 @@ async def search(
     sort: str | None = None,
 ) -> SearchResponse:
     staff_user = _staff_user(current_user)
+    full_visibility_types = await readable_record_types(db, staff_user)
     if type and type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=422, detail="Ungültiger öffentlicher Record-Typ.")
     if sort and sort not in _SORT_OPTIONS:
@@ -866,6 +877,7 @@ async def search(
         record_types=None if type else _PUBLIC_TYPES,
         status="public" if staff_user is None else None,
         status_facet=status if staff_user is not None else None,
+        full_visibility_types=full_visibility_types,
         page=page,
         page_size=page_size,
         extra_filters=extra_filters or None,
@@ -892,6 +904,7 @@ async def advanced_search(
     current_user: OptionalCurrentUser,
 ) -> SearchResponse:
     staff_user = _staff_user(current_user)
+    full_visibility_types = await readable_record_types(db, staff_user)
     if data.sort and data.sort not in _SORT_OPTIONS:
         raise HTTPException(status_code=422, detail="Ungültige Sortierung.")
     try:
@@ -924,6 +937,7 @@ async def advanced_search(
         record_type=data.query.record_type,
         status="public" if staff_user is None else None,
         status_facet=data.status if staff_user is not None else None,
+        full_visibility_types=full_visibility_types,
         page=data.page,
         page_size=data.page_size,
         extra_filters=data.metadata_filters or None,

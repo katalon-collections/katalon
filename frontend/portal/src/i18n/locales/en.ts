@@ -10,6 +10,8 @@ export default {
   'nav.entitiesLong': 'People & Organisations',
   'nav.worksLong': 'Works & Events',
   'nav.collectionsLong': 'Collections & Holdings',
+  'nav.menu': 'Menu',
+  'nav.home': 'Home',
 
   'type.object': 'Object',
   'type.collection': 'Collection',
@@ -47,6 +49,8 @@ export default {
   'search.relatedPlaces': 'Places',
   'search.relatedOccurrences': 'Works/Events',
   'search.relatedCollections': 'Collections',
+  'search.openFilters': 'Filters',
+  'search.closeFilters': 'Close filters',
   'search.linkedFacet': 'Linked: {type} – {field}',
   'search.loading': 'Loading…',
   'search.noResultsShort': 'No results.',

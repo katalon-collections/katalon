@@ -9,7 +9,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-from jose import jwt
+from jwt import encode
 
 from katalon.api.v1.auth import create_access_token, hash_password, verify_password
 from katalon.config import settings
@@ -151,8 +151,14 @@ async def test_pre_version_access_token_is_accepted_for_unrevoked_users(session:
         role="admin",
         is_active=True,
     )
-    legacy = jwt.encode(
-        {"sub": str(user.id), "role": user.role, "email": user.email, "typ": "access", "exp": datetime.now(UTC) + timedelta(minutes=1)},
+    legacy = encode(
+        {
+            "sub": str(user.id),
+            "role": user.role,
+            "email": user.email,
+            "typ": "access",
+            "exp": datetime.now(UTC) + timedelta(minutes=1),
+        },
         settings.secret_key,
         algorithm=settings.algorithm,
     )

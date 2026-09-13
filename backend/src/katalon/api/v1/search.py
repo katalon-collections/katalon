@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_role
 from katalon.core.limiter import limiter
+from katalon.core.visibility import readable_record_types
 from katalon.services import search_service
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -151,9 +152,11 @@ async def search(
         str | None, Query(description="Filter objects by related collection name")
     ] = None,
 ) -> SearchResponse:
-    # Unauthenticated callers may only see public records
-    if current_user is None and not status:
+    # Unauthenticated callers may only ever see public records — never let an
+    # explicit status= query param override this (was bypassable before).
+    if current_user is None:
         status = "public"
+    full_visibility_types = await readable_record_types(db, current_user)
 
     # Extra metadata filters: any query param starting with "meta_"
     extra_filters: dict[str, list[str]] = {
@@ -173,7 +176,11 @@ async def search(
         from katalon.services.collection_service import get_collection_subtree_titles
 
         sub_titles = await get_collection_subtree_titles(
-            db, rel_collection, public_only=current_user is None
+            db,
+            rel_collection,
+            public_only=not (
+                full_visibility_types is None or "collection" in full_visibility_types
+            ),
         )
         rel_filters["related_collections"] = sub_titles
     try:
@@ -192,6 +199,7 @@ async def search(
         numeric_filters=numeric_filters or None,
         facet_fields=facet_fields or None,
         rel_filters=rel_filters or None,
+        full_visibility_types=full_visibility_types,
     )
     return SearchResponse(**result)
 

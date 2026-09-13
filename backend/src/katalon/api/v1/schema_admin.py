@@ -315,7 +315,7 @@ async def schema_reset_summary(
         await _ensure_schema_subtype_exists(db, target_type, subtype)
     conditions = [
         FieldDefinition.target_type == target_type,
-        FieldDefinition.name != "label",
+        FieldDefinition.name.notin_(["label", "idno"]),
         FieldDefinition.is_deleted.is_(False),
     ]
     if subtype is not None:
@@ -340,7 +340,7 @@ async def reset_schema(
         await _ensure_schema_subtype_exists(db, target_type, subtype)
     conditions = [
         FieldDefinition.target_type == target_type,
-        FieldDefinition.name != "label",
+        FieldDefinition.name.notin_(["label", "idno"]),
         FieldDefinition.is_deleted.is_(False),
     ]
     if subtype is not None:
@@ -399,6 +399,12 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     # regardless of what the client sent.
     if not data.show_in_detail:
         data.is_facet = False
+    # Sub-fields (parent_id set) are embedded as `children` on their group field and are
+    # never returned by the top-level schema.list() query the record list view reads from
+    # (schema_admin.list_fields filters parent_id IS NULL) — show_in_list has no effect on
+    # them, so never let it linger and imply a list column that will never render.
+    if data.parent_id:
+        data.show_in_list = False
     _validate_schema_target_type(data.target_type)
     if data.parent_id:
         await _validate_parent(db, data.parent_id, data.field_type)
@@ -458,6 +464,8 @@ async def update_field(
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     if not data.show_in_detail:
         data.is_facet = False
+    if data.parent_id:
+        data.show_in_list = False
     _validate_schema_target_type(data.target_type)
     result = await db.execute(
         select(FieldDefinition).where(
@@ -499,7 +507,7 @@ async def update_field(
     responses={
         403: {"description": "Insufficient permissions"},
         404: {"description": "Field definition not found"},
-        422: {"description": "Field 'label' is a system field and cannot be deleted"},
+        422: {"description": "Field 'label'/'idno' is a system field and cannot be deleted"},
     },
 )
 async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
@@ -511,8 +519,8 @@ async def delete_field(field_id: uuid.UUID, db: DBDep) -> None:
     field = result.scalar_one_or_none()
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
-    if field.name == "label":
-        raise HTTPException(status_code=422, detail="Das Feld 'label' ist ein Systemfeld und kann nicht gelöscht werden.")
+    if field.name in ("label", "idno"):
+        raise HTTPException(status_code=422, detail=f"Das Feld '{field.name}' ist ein Systemfeld und kann nicht gelöscht werden.")
     field.is_deleted = True
     target_type = field.target_type
     await db.flush()

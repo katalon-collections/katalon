@@ -22,6 +22,7 @@ from katalon.config import settings
 from katalon.core.dependencies import (
     DBDep,
     OptionalCurrentUser,
+    has_record_permission,
     require_admin_or_editor,
 )
 from katalon.core.media_storage import (
@@ -50,6 +51,16 @@ batch_router = APIRouter(prefix="/media", tags=["media"])
 internal_router = APIRouter(prefix="/media", tags=["media"])
 
 ALLOWED_MIME = ALLOWED_MEDIA_MIME
+
+
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
+    """Treat a logged-in user without object read-permission as anonymous.
+
+    Mirrors objects.py's _visibility_user: being logged in is not enough —
+    the parent object's status/media exposure must follow the same
+    record-type read permission as the object endpoint itself.
+    """
+    return user if user and await has_record_permission(db, user, "object", "read") else None
 
 
 def _is_absolute_http_url(value: str) -> bool:
@@ -99,9 +110,10 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
     query = select(MediaFile).where(MediaFile.object_id == object_id)
-    if current_user is None:
+    if visibility_user is None:
         query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     return [_serialize(f) for f in result.scalars().all()]
@@ -283,9 +295,10 @@ async def serve_media_file(
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
     query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
-    if current_user is None:
+    if visibility_user is None:
         query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     media = result.scalar_one_or_none()
@@ -321,10 +334,11 @@ async def serve_media_thumbnail(
     obj = obj_result.scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
-    ensure_publicly_visible(obj, current_user, "Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
 
     query = select(MediaFile).where(MediaFile.id == media_id, MediaFile.object_id == object_id)
-    if current_user is None:
+    if visibility_user is None:
         query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
     result = await db.execute(query)
     media = result.scalar_one_or_none()
@@ -394,11 +408,12 @@ async def authorize_media(request: Request, db: DBDep, current_user: OptionalCur
     obj = await db.get(Object, media.object_id)
     if not obj:
         raise HTTPException(status_code=403)
+    visibility_user = await _visibility_user(db, current_user)
     try:
-        ensure_publicly_visible(obj, current_user, "nicht gefunden")
+        ensure_publicly_visible(obj, visibility_user, "nicht gefunden")
     except HTTPException as exc:
         raise HTTPException(status_code=403) from exc
-    if current_user is None and not media.is_public:
+    if visibility_user is None and not media.is_public:
         raise HTTPException(status_code=403)
 
     return Response(status_code=200)

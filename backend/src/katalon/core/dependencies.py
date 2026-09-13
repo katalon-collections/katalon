@@ -9,7 +9,7 @@ import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
-from jose import JWTError, jwt
+from jwt import InvalidTokenError, decode
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,7 +65,7 @@ async def get_current_user(
     if not token:
         raise credentials_exception
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         role: str | None = payload.get("role")
         token_type: str | None = payload.get("typ")
@@ -73,7 +73,7 @@ async def get_current_user(
         if user_id_str is None or role is None or token_type != "access" or not isinstance(token_version, int):
             raise credentials_exception
         token_data = TokenData(user_id=uuid.UUID(user_id_str), role=role)
-    except (JWTError, ValueError):
+    except (InvalidTokenError, ValueError):
         raise credentials_exception
 
     user_result = await db.execute(select(User).where(User.id == token_data.user_id))
@@ -116,7 +116,7 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
     if not token or scheme.lower() != "bearer":
         return None
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id_str: str | None = payload.get("sub")
         token_type: str | None = payload.get("typ")
         token_version = payload.get("ver", 0)
@@ -125,7 +125,7 @@ async def try_get_current_user(request: Request, db: DBDep) -> User | None:
         user_result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
         user = user_result.scalar_one_or_none()
         return user if user and user.is_active and token_version == (user.token_version or 0) else None
-    except (JWTError, ValueError):
+    except (InvalidTokenError, ValueError):
         return None
 
 

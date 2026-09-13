@@ -13,10 +13,12 @@ from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
+from starlette.middleware.base import RequestResponseEndpoint
 
 from katalon.api.v1 import (
     admin_config,
@@ -406,6 +408,46 @@ async def _ensure_label_fields() -> None:
         await db.commit()
 
 
+async def _ensure_idno_fields() -> None:
+    """Ensure every primary type has a generic 'idno' field definition. 'idno' is a
+    native model column (not JSONB metadata, see core/models.py) with its own dedicated
+    UI everywhere (ScreenForm's Stammdaten card, ScreenList's fixed ID-Nr. column) — this
+    FieldDefinition exists solely so its display label stays customizable per
+    installation/language, like 'label' (see _ensure_label_fields above). show_in_detail/
+    show_in_list stay False: idno must not also surface through the generic Metadaten
+    field/section machinery (ScreenList derives its primary list column from the first
+    show_in_list field, which must stay 'label')."""
+    async with AsyncSessionLocal() as db:
+        for target_type in (
+            "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location",
+        ):
+            result = await db.execute(
+                select(FieldDefinition).where(
+                    FieldDefinition.target_type == target_type,
+                    FieldDefinition.target_subtype.is_(None),
+                    FieldDefinition.name == "idno",
+                    FieldDefinition.is_deleted.is_(False),
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                db.add(
+                    FieldDefinition(
+                        target_type=target_type,
+                        target_subtype=None,
+                        name="idno",
+                        label={"de": "ID-Nr.", "en": "ID no."},
+                        field_type="text",
+                        is_required=True,
+                        is_repeatable=False,
+                        is_searchable=True,
+                        sort_order=-1,
+                        show_in_detail=False,
+                        show_in_list=False,
+                    )
+                )
+        await db.commit()
+
+
 async def _ensure_collection_description_field() -> None:
     """Ensure every installation has a 'description' field on collections, used by the
     portal collection detail page (rendered below the in-collection search box) and
@@ -514,6 +556,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _ensure_admin_config()
     await _ensure_authority_sources()
     await _ensure_label_fields()
+    await _ensure_idno_fields()
     await _ensure_collection_description_field()
     await _check_cantaloupe_health()
     try:
@@ -558,6 +601,19 @@ def _rate_limit_handler(request: Request, exc: Exception) -> Response:
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
+
+@app.middleware("http")
+async def reject_nul_query_parameters(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    """Reject text values PostgreSQL cannot encode before database access."""
+    if any("\x00" in key or "\x00" in value for key, value in request.query_params.multi_items()):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "NUL-Zeichen sind in Abfrageparametern nicht erlaubt."},
+        )
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

@@ -4,6 +4,7 @@
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -529,3 +530,173 @@ async def test_search_resolves_idno_subtitle_without_facet_all_field(monkeypatch
     result = await search_service.search(subtitle_fields={"object": ["idno", "status"]})
 
     assert result["items"][0]["subtitle_values"] == {"idno": "OBJ-42"}
+
+
+@pytest.mark.asyncio
+async def test_search_forces_public_status_for_anonymous_even_with_explicit_status_param(
+    monkeypatch,
+) -> None:
+    """Regression test: an anonymous caller must never see non-public records by
+    passing an explicit ?status=internal, even if a route-level auth dependency
+    were bypassed or missing (defense in depth for search.search())."""
+    from httpx import ASGITransport, AsyncClient
+
+    from katalon.api.v1 import search as search_module
+    from katalon.core.dependencies import get_current_user, try_get_current_user
+    from katalon.database import get_db
+    from katalon.main import app
+
+    captured: dict = {}
+    async def fake_search(**kwargs):
+        captured.update(kwargs)
+        return {
+            "total": 0, "items": [], "facets": {}, "numeric_facets": {},
+            "page": 1, "page_size": 20,
+        }
+    monkeypatch.setattr(search_module.search_service, "search", fake_search)
+
+    async def override_db():
+        yield SimpleNamespace()
+
+    # get_current_user only has to satisfy the router-level auth dependency;
+    # try_get_current_user (used inside the handler) is forced to None to
+    # simulate an anonymous caller reaching this code path.
+    app.dependency_overrides[get_current_user] = lambda: object()
+    app.dependency_overrides[try_get_current_user] = lambda: None
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/v1/search", params={"status": "internal"})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert captured["status"] == "public"
+
+
+@pytest.mark.asyncio
+async def test_readable_record_types_admin_is_unrestricted() -> None:
+    from katalon.core.models import User
+    from katalon.core.visibility import readable_record_types
+
+    admin = User(email="a@example.com", hashed_password="x", role="admin")
+    assert await readable_record_types(SimpleNamespace(), admin) is None
+
+
+@pytest.mark.asyncio
+async def test_readable_record_types_anonymous_is_empty() -> None:
+    from katalon.core.visibility import readable_record_types
+
+    assert await readable_record_types(SimpleNamespace(), None) == ()
+
+
+@pytest.mark.asyncio
+async def test_readable_record_types_viewer_excludes_procedure_and_storage_location() -> None:
+    """Regression test: even if a stray role_permissions row grants a viewer
+    read access to procedure/storage_location, they must stay excluded —
+    mirrors the special case already enforced by has_record_permission()."""
+    from katalon.core.models import User
+    from katalon.core.visibility import readable_record_types
+
+    viewer = User(email="v@example.com", hashed_password="x", role="viewer")
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = ["object", "procedure", "storage_location"]
+    db.execute = AsyncMock(return_value=result)
+
+    types = await readable_record_types(db, viewer)
+
+    assert types == ("object",)
+
+
+@pytest.mark.asyncio
+async def test_search_documents_restricts_non_public_statuses_to_permitted_types(
+    monkeypatch,
+) -> None:
+    """Regression test: search_documents() must AND a visibility bool-should
+    clause into the query filter whenever full_visibility_types is given,
+    so non-public records of other record types cannot leak through."""
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type(
+                "Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}}
+            )()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+
+    await elasticsearch.search_documents(
+        None, None, "internal", 0, 20, full_visibility_types=("object",)
+    )
+
+    filters = captured["body"]["query"]["bool"]["filter"]
+    visibility_clause = {
+        "bool": {
+            "should": [
+                {"terms": {"status": ["public", "published"]}},
+                {"terms": {"record_type": ["object"]}},
+            ],
+            "minimum_should_match": 1,
+        }
+    }
+    assert visibility_clause in filters
+    assert {"term": {"status": "internal"}} in filters
+
+
+@pytest.mark.asyncio
+async def test_search_hides_internal_records_for_authenticated_user_without_read_permission(
+    monkeypatch,
+) -> None:
+    """Regression test: an authenticated user whose role has no `read`
+    permission on `object` must not see internal/draft objects via /v1/search,
+    even though GET /v1/objects/{id} would already 404 for the same user."""
+    from httpx import ASGITransport, AsyncClient
+
+    from katalon.api.v1 import search as search_module
+    from katalon.core.dependencies import get_current_user, try_get_current_user
+    from katalon.core.models import User
+    from katalon.database import get_db
+    from katalon.main import app
+
+    captured: dict = {}
+
+    async def fake_search(**kwargs):
+        captured.update(kwargs)
+        return {
+            "total": 0, "items": [], "facets": {}, "numeric_facets": {},
+            "page": 1, "page_size": 20,
+        }
+
+    monkeypatch.setattr(search_module.search_service, "search", fake_search)
+
+    no_permission_user = User(email="viewer@example.com", hashed_password="x", role="viewer")
+
+    session = AsyncMock()
+    permission_result = MagicMock()
+    permission_result.scalars.return_value.all.return_value = []  # no read permissions at all
+    session.execute = AsyncMock(return_value=permission_result)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: no_permission_user
+    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/v1/search", params={"status": "internal"})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert captured["full_visibility_types"] == ()
+    # The user is logged in, so the anonymous-only status override does not
+    # apply — the explicit status filter is preserved for the caller, and the
+    # new visibility clause is what actually keeps disallowed types out.
+    assert captured["status"] == "internal"

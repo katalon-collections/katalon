@@ -5,6 +5,10 @@ import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, Ba
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+// Institutions running Katalon without a public portal/OAI (custom nginx recipe,
+// see docs "Produktionsbetrieb") set VITE_PORTAL_ENABLED=false at admin build time
+// to hide links that would otherwise point at a 404.
+export const PORTAL_ENABLED = import.meta.env.VITE_PORTAL_ENABLED !== 'false'
 
 localStorage.removeItem('katalon_token')
 localStorage.removeItem('katalon_refresh_token')

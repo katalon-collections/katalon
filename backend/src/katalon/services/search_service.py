@@ -645,6 +645,7 @@ async def search(
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
     sort: str | None = None,
+    full_visibility_types: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -662,6 +663,7 @@ async def search(
         advanced_filter=advanced_filter,
         facet_sort=facet_sort,
         sort=sort,
+        full_visibility_types=full_visibility_types,
     )
 
     hits = raw.get("hits", {})

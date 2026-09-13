@@ -4,9 +4,11 @@ RUN corepack enable && corepack prepare pnpm@11.25.0 --activate
 ARG VITE_ADMIN_FEEDBACK_ENABLED=
 ARG VITE_API_URL=
 ARG VITE_PORTAL_URL=
+ARG VITE_PORTAL_ENABLED=
 ENV VITE_ADMIN_FEEDBACK_ENABLED=$VITE_ADMIN_FEEDBACK_ENABLED
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_PORTAL_URL=$VITE_PORTAL_URL
+ENV VITE_PORTAL_ENABLED=$VITE_PORTAL_ENABLED
 ENV CI=true
 COPY frontend/admin/package.json frontend/admin/pnpm-lock.yaml frontend/admin/pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
