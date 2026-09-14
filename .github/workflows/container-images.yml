@@ -61,6 +61,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          pull: true
           push: false
           load: true
           tags: local/katalon-${{ matrix.name }}:scan
