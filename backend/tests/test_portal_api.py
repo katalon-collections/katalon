@@ -408,7 +408,7 @@ async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
 @pytest.mark.parametrize(
     ("saved_facets", "expected_system_facets"),
     [
-        ({}, ["record_type", "status"]),
+        ({}, ["record_type", "subtype"]),
         ({"_system": ["status"]}, ["status"]),
         ({"_system": []}, []),
     ],

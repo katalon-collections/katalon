@@ -101,6 +101,8 @@ INDEX_SETTINGS: dict[str, Any] = {
         ],
         "properties": {
             "record_type": {"type": "keyword"},
+            "subtype": {"type": "keyword"},
+            "object_type": {"type": "keyword"},
             "primary_media_id": {"type": "keyword"},
             "media_width": {"type": "integer"},
             "media_height": {"type": "integer"},
@@ -195,7 +197,9 @@ async def reindex_type(
         total_indexed = 0
         failed_batches: list[dict[str, Any]] = []
 
-        for batch_idx, batch in enumerate(itertools.batched(records, batch_size), start=1):
+        for batch_idx, batch in enumerate(
+            itertools.batched(records, batch_size, strict=False), start=1
+        ):
             batch_label = (
                 f"{batch_idx}/{total_batches}" if total_batches is not None else str(batch_idx)
             )
@@ -378,6 +382,7 @@ async def search_documents(
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, list[str] | str] | None = None,
     status_facet: list[str] | None = None,
+    subtype_facet: list[str] | None = None,
     record_types: tuple[str, ...] | None = None,
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
@@ -451,6 +456,8 @@ async def search_documents(
     }
     if status_facet:
         facet_filters["status"] = _term_filter("status", status_facet)
+    if subtype_facet:
+        facet_filters["subtype"] = _term_filter("subtype", subtype_facet)
     for field, values in (rel_filters or {}).items():
         vals = [values] if isinstance(values, str) else list(values)
         if vals:
@@ -507,6 +514,7 @@ async def search_documents(
     aggs: dict[str, Any] = {
         "by_type": {"terms": {"field": "record_type", "size": 10}},
         "by_status": _self_excluding_agg("status", "status", 10, {"_count": "desc"}),
+        "by_subtype": _self_excluding_agg("subtype", "subtype", 30, {"_count": "desc"}),
     }
     # Fetch generously beyond the portal's initially visible count so "show
     # more" can reveal further values without a second round-trip.

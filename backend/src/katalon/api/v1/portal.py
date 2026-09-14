@@ -189,9 +189,9 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
     # remain an explicit portal choice because they do not have their own
     # FieldDefinition row.
     saved = config.facet_fields or {}
-    configured_system_facets = saved.get("_system", ["record_type", "status"])
+    configured_system_facets = saved.get("_system", ["record_type", "subtype"])
     facet_fields["_system"] = [
-        name for name in ("record_type", "status") if name in configured_system_facets
+        name for name in ("record_type", "status", "subtype") if name in configured_system_facets
     ]
     for target_type, names in saved.items():
         facet_fields.setdefault(target_type, []).extend(

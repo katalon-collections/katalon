@@ -40,6 +40,7 @@ class SearchResult(BaseModel):
     media_width: int | None = None
     media_height: int | None = None
     object_type: str | None = None
+    subtype: str | None = None
 
 
 class SearchResponse(BaseModel):

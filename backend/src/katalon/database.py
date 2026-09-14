@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator[AsyncSession]:
     """Request-scoped session: commits after the endpoint returns successfully,
     rolls back on any exception. Side effects (ES indexing, RDF sync, relation
     cleanup) that depend on this request's write MUST be registered via

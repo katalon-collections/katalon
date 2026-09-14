@@ -87,7 +87,7 @@ docker compose logs api | grep -A5 "KATALON FIRST RUN"
                     │ REST/JSON
          ┌──────────▼──────────┐
          │   FastAPI Backend   │
-         │   (Python 3.12+)    │
+         │   (Python 3.14+)    │
          └──────────┬──────────┘
                     │
        ┌────────────┼────────────┐

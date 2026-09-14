@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse } from '../api/client'
 import { saveLastSearch, saveSearchContext } from '../hooks/useBackToSearch'
 import { useFieldLabels } from '../hooks/useFieldLabels'
+import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { t, typeLabel, useI18n } from '../i18n'
 import { decodeAdvancedQuery } from '../utils/advancedSearch'
@@ -30,7 +31,7 @@ function facetLabel(
 }
 
 const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
-const DEFAULT_SYSTEM_FACETS = ['record_type', 'status']
+const DEFAULT_SYSTEM_FACETS = ['record_type', 'subtype']
 // Relation-derived facets — see configuredMetadataFacets: included in the
 // request field list, but rendered as dedicated panels below, not generic ones.
 const RELATED_FACET_NAMES = ['related_entities', 'related_places', 'related_occurrences', 'related_collections']
@@ -130,13 +131,14 @@ function resultSubtitle(
     .join(' · ')
 }
 
-function FacetPanel({ label, buckets, active, onSelect, initialCount, translateBooleanValues = false }: {
+function FacetPanel({ label, buckets, active, onSelect, initialCount, translateBooleanValues = false, valueLabel }: {
   label: string
   buckets: FacetBucket[]
   active: string[]
   onSelect: (v: string) => void
   initialCount: number
   translateBooleanValues?: boolean
+  valueLabel?: (raw: string) => string
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
@@ -156,7 +158,7 @@ function FacetPanel({ label, buckets, active, onSelect, initialCount, translateB
           aria-pressed={active.includes(b.value)}
           style={{ fontWeight: active.includes(b.value) ? 600 : undefined }}
         >
-          <span>{translateBooleanValues && ['true', 'false'].includes(b.value.toLowerCase()) ? t(b.value.toLowerCase() === 'true' ? 'advanced.yes' : 'advanced.no') : typeLabel(b.value)}</span>
+          <span>{translateBooleanValues && ['true', 'false'].includes(b.value.toLowerCase()) ? t(b.value.toLowerCase() === 'true' ? 'advanced.yes' : 'advanced.no') : (valueLabel ?? typeLabel)(b.value)}</span>
           <span className="ct">{b.count}</span>
         </button>
       ))}
@@ -184,6 +186,7 @@ export function SearchPage() {
   const q = params.get('q') ?? ''
   const typeFilt = params.get('type') ?? ''
   const statusFilt = params.getAll('status')
+  const subtypeFilt = params.getAll('subtype')
   const encodedAdvancedQuery = params.get('aq') ?? ''
   const advancedQuery = decodeAdvancedQuery(encodedAdvancedQuery)
   const effectiveType = advancedQuery?.record_type ?? typeFilt
@@ -199,6 +202,7 @@ export function SearchPage() {
   const [facetInitialCount, setFacetInitialCount] = useState(10)
   const { locale, t } = useI18n()
   const subtypePlaceholder = useSubtypePlaceholder('object')
+  const subtypeLabel = useRecordSubtypeLabels(locale)
   const [viewMode, setViewMode] = useState<'list' | 'masonry' | 'grid'>(() => {
     const stored = localStorage.getItem('katalon_search_view')
     if (stored === 'masonry' || stored === 'grid') return stored
@@ -262,7 +266,7 @@ export function SearchPage() {
   const relPlace = params.getAll('rel_place')
   const relOccurrence = params.getAll('rel_occurrence')
   const relCollection = params.getAll('rel_collection')
-  const filterKey = JSON.stringify({ q, typeFilt, statusFilt, encodedAdvancedQuery, metaFilters, numericFilters, relEntity, relPlace, relOccurrence, relCollection, sort })
+  const filterKey = JSON.stringify({ q, typeFilt, statusFilt, subtypeFilt, encodedAdvancedQuery, metaFilters, numericFilters, relEntity, relPlace, relOccurrence, relCollection, sort })
 
   async function loadPage(pageNum: number): Promise<SearchResponse> {
     const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
@@ -283,6 +287,7 @@ export function SearchPage() {
         .map(([key, value]) => [key, String(value)])
     )
     if (systemFacets.includes('status')) statusFilt.forEach(value => qs.append('status', value))
+    if (systemFacets.includes('subtype')) subtypeFilt.forEach(value => qs.append('subtype', value))
     relEntity.forEach(value => qs.append('rel_entity', value))
     relPlace.forEach(value => qs.append('rel_place', value))
     relOccurrence.forEach(value => qs.append('rel_occurrence', value))
@@ -314,6 +319,7 @@ export function SearchPage() {
           related_collections: relCollection,
         },
         status: statusFilt,
+        subtype: subtypeFilt,
         sort: sort || undefined,
       })
     }
@@ -425,10 +431,15 @@ export function SearchPage() {
   }
 
   const total = data?.total ?? 0
+  // Grid/masonry rely on media thumbnails and only object results carry them; the
+  // toggle bar below is object-only too, so other types would get stuck in a mode
+  // with no way back. Force list there regardless of the stored preference.
+  const effectiveViewMode = effectiveType === 'object' ? viewMode : 'list'
   const hasMore = data ? allItems.length < data.total : false
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 1
   const typesFacet: FacetBucket[] = data?.facets?.['by_type'] ?? []
   const statusFacet: FacetBucket[] = data?.facets?.['by_status'] ?? []
+  const subtypeFacet: FacetBucket[] = data?.facets?.['by_subtype'] ?? []
   const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
 
   return (
@@ -516,6 +527,16 @@ export function SearchPage() {
               active={statusFilt}
               onSelect={v => v ? toggleParam('status', v) : setFilter('status', '')}
               initialCount={facetInitialCount}
+            />
+          )}
+          {systemFacets.includes('subtype') && (
+            <FacetPanel
+              label={t('search.subtypeFacet')}
+              buckets={subtypeFacet}
+              active={subtypeFilt}
+              onSelect={v => v ? toggleParam('subtype', v) : setFilter('subtype', '')}
+              initialCount={facetInitialCount}
+              valueLabel={subtypeLabel}
             />
           )}
           {configuredMetadataFacets(facetConfig, effectiveType).filter(field => !RELATED_FACET_NAMES.includes(field)).map(field => {
@@ -612,7 +633,7 @@ export function SearchPage() {
                   </div>
                 </div>
               )}
-              <div className={`result-list__items result-list__items--${viewMode}`}>
+              <div className={`result-list__items result-list__items--${effectiveViewMode}`}>
                 {allItems.map(r => {
                   const path = r.record_type === 'entity' ? `/entities/${r.id}`
                     : r.record_type === 'place' ? `/places/${r.id}`
@@ -634,7 +655,7 @@ export function SearchPage() {
                     })
                   }
 
-                  if (viewMode === 'list') {
+                  if (effectiveViewMode === 'list') {
                     return (
                       <Link key={r.id} className="result-row" to={path} onClick={saveContext}>
                         {r.record_type === 'object' && (
@@ -648,7 +669,7 @@ export function SearchPage() {
                         )}
                         <div className="body">
                           <div className="title">
-                            <span className="result-type-badge">{typeLabel(r.record_type)}</span>
+                            <span className="result-type-badge">{r.subtype ? subtypeLabel(r.subtype) : typeLabel(r.record_type)}</span>
                             {r.title || r.id}
                           </div>
                           <div className="desc">{resultSubtitle(r, subtitleConfig)}</div>

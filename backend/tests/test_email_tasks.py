@@ -9,7 +9,7 @@ from katalon.workers import email_tasks
 
 
 class _SMTP:
-    instances: list["_SMTP"] = []
+    instances: list[_SMTP] = []
 
     def __init__(self, *args, **kwargs) -> None:
         self.args = args
@@ -19,7 +19,7 @@ class _SMTP:
         self.send_message = MagicMock()
         self.instances.append(self)
 
-    def __enter__(self) -> "_SMTP":
+    def __enter__(self) -> _SMTP:
         return self
 
     def __exit__(self, *args) -> None:

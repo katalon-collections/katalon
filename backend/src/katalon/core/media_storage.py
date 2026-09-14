@@ -163,7 +163,7 @@ class LocalStorage:
 
 
 @lru_cache(maxsize=1)
-def _s3_client() -> "S3Client":
+def _s3_client() -> S3Client:
     """Build the boto3 S3 client. Cached process-wide; tests clear via cache_clear().
 
     Deviates from boto3 defaults on purpose — every override exists for
@@ -201,11 +201,11 @@ class S3Storage:
 
     is_local = False
 
-    def __init__(self, client: "S3Client | None" = None) -> None:
+    def __init__(self, client: S3Client | None = None) -> None:
         self._client = client
 
     @property
-    def client(self) -> "S3Client":
+    def client(self) -> S3Client:
         if self._client is None:
             self._client = _s3_client()
         return self._client

@@ -807,7 +807,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   const [fieldsByType, setFieldsByType] = useState<Record<string, FieldDefinition[]>>({})
   const [loadingFields, setLoadingFields] = useState(true)
   const [systemFacets, setSystemFacets] = useState<string[]>(
-    () => config.facet_fields?._system ?? ['record_type', 'status']
+    () => config.facet_fields?._system ?? ['record_type', 'subtype']
   )
   const [facetSort, setFacetSort] = useState<'count' | 'alpha'>(config.facet_sort ?? 'count')
   const [facetInitialCount, setFacetInitialCount] = useState(config.facet_initial_count ?? 10)
@@ -973,6 +973,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           {[
             { name: 'record_type', label: 'Typ' },
             { name: 'status', label: 'Status' },
+            { name: 'subtype', label: 'Subtyp' },
           ].map(f => (
             <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
               <input

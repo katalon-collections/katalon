@@ -54,10 +54,10 @@ class Object(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
-    media_files: Mapped[list["MediaFile"]] = relationship(
+    media_files: Mapped[list[MediaFile]] = relationship(
         back_populates="object", cascade="all, delete-orphan", passive_deletes=True
     )
-    media_import_references: Mapped[list["MediaImportReference"]] = relationship(
+    media_import_references: Mapped[list[MediaImportReference]] = relationship(
         back_populates="object", cascade="all, delete-orphan", passive_deletes=True
     )
 
@@ -186,7 +186,7 @@ class Collection(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
-    parent: Mapped["Collection | None"] = relationship(
+    parent: Mapped[Collection | None] = relationship(
         "Collection",
         remote_side=lambda: Collection.id,
         backref="children",
@@ -217,7 +217,7 @@ class StorageLocation(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
-    parent: Mapped["StorageLocation | None"] = relationship(
+    parent: Mapped[StorageLocation | None] = relationship(
         "StorageLocation",
         remote_side=lambda: StorageLocation.id,
         backref="children",
@@ -271,16 +271,16 @@ class FieldDefinition(Base):
         index=True,
     )
 
-    children: Mapped[list["FieldDefinition"]] = relationship(
+    children: Mapped[list[FieldDefinition]] = relationship(
         back_populates="parent",
         cascade="all, delete-orphan",
         order_by="FieldDefinition.sort_order",
     )
-    parent: Mapped["FieldDefinition | None"] = relationship(
+    parent: Mapped[FieldDefinition | None] = relationship(
         back_populates="children",
         remote_side="FieldDefinition.id",
     )
-    export_mapping_rules: Mapped[list["ExportMappingRule"]] = relationship(
+    export_mapping_rules: Mapped[list[ExportMappingRule]] = relationship(
         back_populates="field_definition",
         cascade="all, delete-orphan",
     )
@@ -318,7 +318,7 @@ class ExportMappingSet(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    rules: Mapped[list["ExportMappingRule"]] = relationship(
+    rules: Mapped[list[ExportMappingRule]] = relationship(
         back_populates="mapping_set",
         cascade="all, delete-orphan",
         order_by="ExportMappingRule.sort_order",
@@ -421,7 +421,7 @@ class FormVariant(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
-    role_defaults: Mapped[list["FormVariantRoleDefault"]] = relationship(
+    role_defaults: Mapped[list[FormVariantRoleDefault]] = relationship(
         back_populates="variant",
         cascade="all, delete-orphan",
     )
@@ -483,7 +483,7 @@ class Vocabulary(Base):
     is_hierarchical: Mapped[bool] = mapped_column(Boolean, default=False)
     kind: Mapped[str] = mapped_column(String(16), default="term", server_default="term")
     canonical_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    terms: Mapped[list["VocabularyTerm"]] = relationship(
+    terms: Mapped[list[VocabularyTerm]] = relationship(
         back_populates="vocabulary", cascade="all, delete-orphan", passive_deletes=True
     )
 
@@ -509,11 +509,11 @@ class VocabularyTerm(Base):
     )
     uri: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
     exact_match_uris: Mapped[list[str]] = mapped_column(JSONB, default=list[str], server_default="[]")
-    vocabulary: Mapped["Vocabulary"] = relationship(back_populates="terms")
-    children: Mapped[list["VocabularyTerm"]] = relationship(
+    vocabulary: Mapped[Vocabulary] = relationship(back_populates="terms")
+    children: Mapped[list[VocabularyTerm]] = relationship(
         back_populates="parent", passive_deletes=True
     )
-    parent: Mapped["VocabularyTerm | None"] = relationship(
+    parent: Mapped[VocabularyTerm | None] = relationship(
         back_populates="children", remote_side="VocabularyTerm.id"
     )
 
@@ -588,7 +588,7 @@ class MediaFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
-    object: Mapped["Object"] = relationship(back_populates="media_files")
+    object: Mapped[Object] = relationship(back_populates="media_files")
 
 
 class MediaImportReference(Base):
@@ -602,7 +602,7 @@ class MediaImportReference(Base):
     normalized_filename: Mapped[str] = mapped_column(String(512), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
-    object: Mapped["Object"] = relationship(back_populates="media_import_references")
+    object: Mapped[Object] = relationship(back_populates="media_import_references")
 
     __table_args__ = (
         UniqueConstraint(
@@ -793,7 +793,7 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
-    api_keys: Mapped[list["ApiKey"]] = relationship(
+    api_keys: Mapped[list[ApiKey]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -860,7 +860,7 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="api_keys")
+    user: Mapped[User] = relationship(back_populates="api_keys")
 
 
 # ---------------------------------------------------------------------------
@@ -972,7 +972,7 @@ class WorkingSet(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
     user: Mapped[User] = relationship("User", foreign_keys=[user_id])
-    items: Mapped[list["WorkingSetItem"]] = relationship(
+    items: Mapped[list[WorkingSetItem]] = relationship(
         "WorkingSetItem", back_populates="working_set", cascade="all, delete-orphan", order_by="WorkingSetItem.sort_order"
     )
 

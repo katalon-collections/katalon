@@ -185,7 +185,7 @@ class _FakeSession:
     async def execute(self, *args, **kwargs) -> _FakeResult:
         return _FakeResult(self._rows)
 
-    async def __aenter__(self) -> "_FakeSession":
+    async def __aenter__(self) -> _FakeSession:
         return self
 
     async def __aexit__(self, *args) -> None:

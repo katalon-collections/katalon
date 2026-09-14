@@ -310,6 +310,7 @@ class AdvancedSearchRequest(BaseModel):
     numeric_filters: dict[str, NumericRange] = Field(default_factory=dict)
     relation_filters: dict[str, list[str]] = Field(default_factory=dict)
     status: list[str] = Field(default_factory=list)
+    subtype: list[str] = Field(default_factory=list)
     sort: str | None = None
 
 
@@ -827,6 +828,7 @@ async def search(
     q: str | None = None,
     type: str | None = None,
     status: list[str] | None = Query(None),
+    subtype: list[str] | None = Query(None),
     facets: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -879,6 +881,7 @@ async def search(
         record_types=None if type else _PUBLIC_TYPES,
         status="public" if staff_user is None else None,
         status_facet=status if staff_user is not None else None,
+        subtype_facet=subtype or None,
         full_visibility_types=full_visibility_types,
         page=page,
         page_size=page_size,
@@ -939,6 +942,7 @@ async def advanced_search(
         record_type=data.query.record_type,
         status="public" if staff_user is None else None,
         status_facet=data.status if staff_user is not None else None,
+        subtype_facet=data.subtype or None,
         full_visibility_types=full_visibility_types,
         page=data.page,
         page_size=data.page_size,

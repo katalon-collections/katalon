@@ -45,6 +45,7 @@ export default {
   'search.showLess': 'Show less',
   'search.typeFacet': 'Type',
   'search.statusFacet': 'Status',
+  'search.subtypeFacet': 'Subtype',
   'search.relatedEntities': 'People/Org.',
   'search.relatedPlaces': 'Places',
   'search.relatedOccurrences': 'Works/Events',

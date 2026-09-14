@@ -170,7 +170,7 @@ class Settings(BaseSettings):
         return [o.strip().strip("[]") for o in raw.split(",") if o.strip().strip("[]")]
 
     @model_validator(mode="after")
-    def _validate_storage_backend(self) -> "Settings":
+    def _validate_storage_backend(self) -> Settings:
         if self.storage_backend == "s3":
             missing = [
                 name
@@ -189,7 +189,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _validate_smtp(self) -> "Settings":
+    def _validate_smtp(self) -> Settings:
         if not self.smtp_enabled:
             return self
         if not self.smtp_host or not self.smtp_from or not self.katalon_base_url:

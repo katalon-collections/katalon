@@ -62,7 +62,7 @@ class FieldDefinitionRead(FieldDefinitionCreate):
 
     id: uuid.UUID
     is_deleted: bool = False
-    children: list["FieldDefinitionRead"] = []
+    children: list[FieldDefinitionRead] = []
 
 
 FieldDefinitionRead.model_rebuild()
@@ -815,7 +815,7 @@ class BatchRequest(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _exactly_one_selector(self) -> "BatchRequest":
+    def _exactly_one_selector(self) -> BatchRequest:
         has_ids = bool(self.ids)
         has_filters = bool(self.filters)
         if has_ids and has_filters:

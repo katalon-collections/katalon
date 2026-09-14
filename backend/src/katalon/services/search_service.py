@@ -306,6 +306,7 @@ def _build_doc(
         if getattr(record, "updated_at", None)
         else None,
     }
+    doc["subtype"] = getattr(record, f"{record_type}_type", None)
     if record_type == "object":
         doc["object_type"] = getattr(record, "object_type", None)
         doc["collection_status"] = getattr(record, "collection_status", "active") or "active"
@@ -649,6 +650,7 @@ async def search(
     facet_fields: list[str] | None = None,
     rel_filters: dict[str, list[str] | str] | None = None,
     status_facet: list[str] | None = None,
+    subtype_facet: list[str] | None = None,
     record_types: tuple[str, ...] | None = None,
     subtitle_fields: dict[str, list[str]] | None = None,
     advanced_filter: dict[str, Any] | None = None,
@@ -668,6 +670,7 @@ async def search(
         facet_fields=facet_fields,
         rel_filters=rel_filters,
         status_facet=status_facet,
+        subtype_facet=subtype_facet,
         record_types=record_types,
         advanced_filter=advanced_filter,
         facet_sort=facet_sort,

@@ -343,6 +343,7 @@ async def test_deleting_subfield_with_purge_data_removes_nested_values(
             "name": group_name,
             "label": {"de": "Gruppe", "en": "Group"},
             "field_type": "group",
+            "is_repeatable": True,
         },
     )
     assert create_group.status_code == 201, create_group.text

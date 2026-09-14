@@ -105,6 +105,12 @@ async def _validate_field_settings(
             detail="Dieser Feldtyp ist für Vokabularterme nicht erlaubt.",
         )
 
+    if data.field_type == "group" and not data.is_repeatable:
+        raise HTTPException(
+            status_code=422,
+            detail="Containerfelder (Gruppe) sind immer wiederholbar; Werte werden als Array gespeichert.",
+        )
+
     if data.is_translatable:
         if data.is_repeatable:
             raise HTTPException(

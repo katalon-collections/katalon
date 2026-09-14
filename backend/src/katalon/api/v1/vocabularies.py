@@ -41,7 +41,7 @@ class VocabularyTermNode(BaseModel):
     parent_id: uuid.UUID | None
     uri: str | None = None
     exact_match_uris: list[str] = []
-    children: list["VocabularyTermNode"] = []
+    children: list[VocabularyTermNode] = []
     model_config = {"from_attributes": True}
 
 

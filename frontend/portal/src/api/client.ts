@@ -256,6 +256,7 @@ export interface SearchResponse {
     media_width?: number | null
     media_height?: number | null
     object_type?: string | null
+    subtype?: string | null
   }>
   facets: Record<string, FacetBucket[]>
   numeric_facets: Record<string, NumericFacetBounds>
