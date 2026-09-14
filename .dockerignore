@@ -1,0 +1,15 @@
+.git
+.venv
+backend/.venv
+**/node_modules
+**/dist
+**/.vite
+**/.pytest_cache
+**/__pycache__
+*.pyc
+*.pyo
+.DS_Store
+media/
+backups/
+.claude
+.codegraph

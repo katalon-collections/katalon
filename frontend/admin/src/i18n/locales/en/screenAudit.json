@@ -1,0 +1,41 @@
+{
+  "headline": "Audit Log",
+  "subtitle": "All changes in the system",
+  "actionLabels": {
+    "all": "All",
+    "media": "Media",
+    "relation": "Relations",
+    "create": "Created",
+    "update": "Updated",
+    "delete": "Deleted",
+    "publish": "Published",
+    "media_add": "Media attached",
+    "media_update": "Media changed",
+    "media_delete": "Media removed",
+    "relation_add": "Relation created",
+    "relation_update": "Relation changed",
+    "relation_delete": "Relation deleted",
+    "ai_schema_assist": "AI schema assistant used"
+  },
+  "loading": "Loading…",
+  "empty": "No entries.",
+  "searchAriaLabel": "Search audit log",
+  "searchPlaceholder": "Search record, identifier, editor, or change…",
+  "searchButton": "Search",
+  "fromDateAriaLabel": "Changes from",
+  "toDateAriaLabel": "Changes until",
+  "resultCount": "{{count}} entries",
+  "previousPage": "Previous",
+  "nextPage": "Next",
+  "page": "Page {{page}} of {{pages}}",
+  "typeLabels": {
+    "object": "Object",
+    "entity": "Entity",
+    "place": "Place",
+    "occurrence": "Occurrence",
+    "procedure": "Procedure",
+    "collection": "Collection"
+  },
+  "extraFile": "File: {{filename}}",
+  "extraRelationType": "Relation type: {{relationType}}"
+}

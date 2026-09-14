@@ -1,0 +1,10 @@
+{
+  "bold": "Bold",
+  "italic": "Italic",
+  "heading2": "Heading 2",
+  "heading3": "Heading 3",
+  "bulletList": "Bullet list",
+  "orderedList": "Numbered list",
+  "link": "Link",
+  "urlPrompt": "Enter URL"
+}

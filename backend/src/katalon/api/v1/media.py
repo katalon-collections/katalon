@@ -1,0 +1,563 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
+import io
+import logging
+import re
+import shutil
+import tempfile
+import uuid
+import zipfile
+from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+import aiofiles
+from celery.result import AsyncResult
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from katalon.config import settings
+from katalon.core.dependencies import (
+    CurrentUser,
+    DBDep,
+    OptionalCurrentUser,
+    has_record_permission,
+    require_feature,
+)
+from katalon.core.media_storage import (
+    LocalStorage,
+    get_storage,
+    iiif_identifier,
+    storage_key,
+)
+from katalon.core.media_validation import (
+    ALLOWED_MEDIA_MIME,
+    media_category,
+    resolve_upload_mime,
+    verified_image_mime,
+)
+from katalon.core.models import AdminConfig, MediaFile, Object, User
+from katalon.core.visibility import ensure_publicly_visible
+from katalon.integrations.cantaloupe import public_iiif_base
+from katalon.services.audit_service import diff_fields, log_change
+from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
+from katalon.workers.celery_app import celery_app
+from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
+
+router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
+batch_router = APIRouter(prefix="/media", tags=["media"])
+# Mounted without the app-wide auth dependency (see main.py) — anonymous portal
+# visitors must be able to reach this, same as the /portal/v1 media endpoints.
+internal_router = APIRouter(prefix="/media", tags=["media"])
+
+ALLOWED_MIME = ALLOWED_MEDIA_MIME
+
+logger = logging.getLogger(__name__)
+
+
+async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
+    """Treat a logged-in user without object read-permission as anonymous.
+
+    Mirrors objects.py's _visibility_user: being logged in is not enough —
+    the parent object's status/media exposure must follow the same
+    record-type read permission as the object endpoint itself.
+    """
+    return user if user and await has_record_permission(db, user, "object", "read") else None
+
+
+def _is_absolute_http_url(value: str) -> bool:
+    if any(ord(char) < 32 for char in value):
+        return False
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in {"http", "https"} and parsed.hostname is not None
+    except ValueError:
+        return False
+
+
+def _serialize(f: MediaFile) -> dict[str, Any]:
+    links = {
+        "object": {"href": f"/v1/objects/{f.object_id}"},
+        "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
+    }
+    if f.status == "ready" and media_category(f.mime_type) == "image":
+        identifier = iiif_identifier(f.iiif_storage_key, f.storage_key)
+        links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
+    if f.license_uri and _is_absolute_http_url(f.license_uri):
+        links["license"] = {"href": f.license_uri}
+    return {
+        "id": str(f.id),
+        "filename": f.filename,
+        "mime_type": f.mime_type,
+        "category": media_category(f.mime_type),
+        "status": f.status,
+        "is_primary": f.is_primary,
+        "is_public": f.is_public,
+        "media_type": f.media_type,
+        "license_uri": f.license_uri,
+        "rights_holder": f.rights_holder,
+        "created_at": f.created_at.isoformat(),
+        "_links": links,
+    }
+
+
+@router.get(
+    "",
+    response_model=list[dict[str, Any]],
+    summary="List media files for an object",
+    responses={404: {"description": "Object not found"}},
+)
+async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser) -> list[dict[str, Any]]:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
+    query = select(MediaFile).where(MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None))
+    if visibility_user is None:
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
+    result = await db.execute(query)
+    return [_serialize(f) for f in result.scalars().all()]
+
+
+@router.post(
+    "",
+    status_code=201,
+    summary="Upload a media file for an object",
+    dependencies=[require_feature("media")],
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Object not found"},
+        413: {"description": "File too large"},
+        415: {"description": "Unsupported file type"},
+    },
+)
+async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, current_user: CurrentUser) -> dict[str, Any]:
+    if not await has_record_permission(db, current_user, "object", "update"):
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung für Objekte.")
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    if not obj_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+
+    resolved_mime = resolve_upload_mime(file.content_type, file.filename or "")
+    if resolved_mime is None:
+        raise HTTPException(status_code=415, detail=f"Nicht unterstützter Dateityp: {file.content_type}")
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    file_id = uuid.uuid4()
+    key = storage_key(file_id, file.filename or "upload")
+    storage = get_storage()
+    category = media_category(resolved_mime)
+
+    if isinstance(storage, LocalStorage):
+        # Default path unchanged: stream directly into MEDIA_ROOT.
+        dest_path = storage.local_path(key)
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        size = 0
+        async with aiofiles.open(dest_path, "wb") as out:
+            while chunk := await file.read(65536):
+                size += len(chunk)
+                if size > max_bytes:
+                    dest_path.unlink(missing_ok=True)
+                    raise HTTPException(status_code=413, detail="Datei zu groß")
+                await out.write(chunk)
+        actual_mime = verified_image_mime(dest_path) if category == "image" else resolved_mime
+    else:
+        # S3: stage in a temp file (MIME verification needs a seekable file), then upload.
+        tmp_path = Path(tempfile.mkstemp()[1])
+        try:
+            size = 0
+            async with aiofiles.open(tmp_path, "wb") as out:
+                while chunk := await file.read(65536):
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise HTTPException(status_code=413, detail="Datei zu groß")
+                    await out.write(chunk)
+            actual_mime = verified_image_mime(tmp_path) if category == "image" else resolved_mime
+            await storage.put_file(key, tmp_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    existing = (
+        await db.execute(
+            select(MediaFile).where(MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None))
+        )
+    ).scalars().all()
+    config = await db.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
+    media = MediaFile(
+        id=file_id,
+        object_id=object_id,
+        filename=file.filename or "upload",
+        mime_type=actual_mime,
+        storage_key=key,
+        status="pending" if category == "image" else "ready",
+        is_primary=len(existing) == 0,
+        license_uri=config.media_default_license_uri if config else None,
+        rights_holder=config.media_default_rights_holder if config else None,
+    )
+    db.add(media)
+    await log_change(
+        db,
+        record_type="object",
+        record_id=object_id,
+        user_id=current_user.id,
+        action="media_add",
+        changed_fields={"filename": media.filename, "mime_type": media.mime_type},
+    )
+    await db.commit()
+
+    if category == "image":
+        from katalon.workers.enqueue import after_commit
+        after_commit(db, generate_iiif_tiles, str(file_id))
+
+    return _serialize(media)
+
+
+class MediaPatch(BaseModel):
+    media_type: str | None = None
+    is_primary: bool | None = None
+    is_public: bool | None = None
+    license_uri: str | None = None
+    rights_holder: dict[str, Any] | None = None
+
+
+async def _reindex_object(object_id: uuid.UUID, db: Any) -> None:
+    """Refresh the object's search document (cached primary media may have changed)."""
+    from katalon.services import search_service
+
+    obj = await db.get(Object, object_id)
+    if obj is not None:
+        await search_service.index_record("object", obj, db)
+
+
+@router.patch(
+    "/{media_id}",
+    response_model=dict[str, Any],
+    summary="Update media file metadata",
+    dependencies=[require_feature("media")],
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Media file not found"},
+    },
+)
+async def patch_media(
+    object_id: uuid.UUID, media_id: uuid.UUID, data: MediaPatch, db: DBDep, current_user: CurrentUser
+) -> dict[str, Any]:
+    if not await has_record_permission(db, current_user, "object", "update"):
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung für Objekte.")
+    result = await db.execute(
+        select(MediaFile).where(
+            MediaFile.id == media_id, MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None)
+        )
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Medium nicht gefunden")
+
+    old_fields = {
+        "media_type": media.media_type,
+        "license_uri": media.license_uri,
+        "rights_holder": media.rights_holder,
+        "is_primary": media.is_primary,
+        "is_public": media.is_public,
+    }
+
+    if data.media_type is not None:
+        media.media_type = data.media_type
+    if "license_uri" in data.model_fields_set:
+        media.license_uri = data.license_uri
+    if "rights_holder" in data.model_fields_set:
+        media.rights_holder = data.rights_holder
+    if data.is_public is not None:
+        media.is_public = data.is_public
+
+    if data.is_primary is True:
+        all_files = (
+            await db.execute(
+                select(MediaFile).where(MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None))
+            )
+        ).scalars().all()
+        for f in all_files:
+            f.is_primary = f.id == media_id
+    elif data.is_primary is False:
+        media.is_primary = False
+
+    diff = diff_fields(old_fields, {
+        "media_type": media.media_type,
+        "license_uri": media.license_uri,
+        "rights_holder": media.rights_holder,
+        "is_primary": media.is_primary,
+        "is_public": media.is_public,
+    })
+    if diff:
+        diff["filename"] = media.filename
+        await log_change(
+            db, record_type="object", record_id=object_id, user_id=current_user.id,
+            action="media_update", changed_fields=diff,
+        )
+
+    await db.flush()
+    if data.is_primary is not None or data.is_public is not None:
+        await _reindex_object(object_id, db)
+    return _serialize(media)
+
+
+@router.get(
+    "/{media_id}/file",
+    summary="Serve the raw media file",
+    responses={404: {"description": "Object, media file, or file on disk not found"}},
+)
+async def serve_media_file(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
+    query = select(MediaFile).where(
+        MediaFile.id == media_id, MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None)
+    )
+    if visibility_user is None:
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
+    result = await db.execute(query)
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    # Local backend keeps the efficient FileResponse sendfile path. S3 streams
+    # through the API on purpose: no presigned URLs, so private media cannot
+    # bypass the visibility check above.
+    storage = get_storage()
+    if isinstance(storage, LocalStorage):
+        path = storage.local_path(media.storage_key)
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+        return FileResponse(path, media_type=media.mime_type, filename=media.filename)
+    if not storage.exists(media.storage_key):
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return StreamingResponse(
+        storage.stream(media.storage_key),
+        media_type=media.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{media.filename}"'},
+    )
+
+
+@router.get(
+    "/{media_id}/thumbnail",
+    summary="Serve a browser-compatible media thumbnail",
+    responses={404: {"description": "Object, media file, or image not found"}},
+)
+async def serve_media_thumbnail(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> RedirectResponse:
+    obj_result = await db.execute(select(Object).where(Object.id == object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
+
+    query = select(MediaFile).where(
+        MediaFile.id == media_id, MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None)
+    )
+    if visibility_user is None:
+        query = query.where(MediaFile.status == "ready", MediaFile.is_public.is_(True))
+    result = await db.execute(query)
+    media = result.scalar_one_or_none()
+    if not media or media_category(media.mime_type) != "image":
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+
+    identifier = iiif_identifier(media.iiif_storage_key, media.storage_key)
+    # Host-relative redirect (not public_iiif_base()) so the browser treats it as
+    # same-origin: authorizedFetch() only keeps the Authorization header across a
+    # redirect when scheme+host+port match, which a cross-scheme absolute URL breaks.
+    return RedirectResponse(f"/iiif/3/{identifier}/full/,300/0/default.jpg")
+
+
+@router.delete(
+    "/{media_id}",
+    status_code=204,
+    summary="Delete a media file",
+    dependencies=[require_feature("media")],
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Media file not found"},
+    },
+)
+async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: CurrentUser) -> None:
+    if not await has_record_permission(db, current_user, "object", "update"):
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung für Objekte.")
+    result = await db.execute(
+        select(MediaFile).where(
+            MediaFile.id == media_id, MediaFile.object_id == object_id, MediaFile.deleted_at.is_(None)
+        )
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Medium nicht gefunden")
+
+    # Commit the deletion intent BEFORE any irreversible storage deletion:
+    # a DB failure past this point can never leave an already-gone original
+    # behind a rolled-back transaction (#390).
+    mark_pending_delete(media)
+    await log_change(
+        db,
+        record_type="object",
+        record_id=object_id,
+        user_id=current_user.id,
+        action="media_delete",
+        changed_fields={"filename": media.filename},
+    )
+    await db.commit()
+
+    if await finalize_pending_delete(media):
+        await db.delete(media)
+        await db.commit()
+    else:
+        # Storage is unreachable or a per-object error occurred (e.g. S3
+        # partial-batch failure). The row stays a durable, retryable
+        # pending-delete marker — already invisible to every read path via
+        # deleted_at — and katalon.sweep_pending_media_deletes retries it.
+        logger.warning("Media %s left pending physical deletion after manual delete request", media.id)
+
+    await _reindex_object(object_id, db)
+
+
+@internal_router.get("/_authorize", include_in_schema=False)
+async def authorize_media(request: Request, db: DBDep, current_user: OptionalCurrentUser) -> Response:
+    """Backs the nginx auth_request in front of Cantaloupe (docker/nginx.conf).
+
+    Cantaloupe has no auth of its own, so every /iiif/ request is checked here
+    against the media file's is_public flag and the parent object's visibility
+    before nginx forwards it to Cantaloupe.
+    """
+    original_uri = request.headers.get("x-original-uri", "")
+    match = re.match(r"^/iiif/3/([^/]+)/", original_uri)
+    if not match:
+        raise HTTPException(status_code=403)
+    identifier = unquote(match.group(1))
+
+    result = await db.execute(
+        select(MediaFile).where(
+            (MediaFile.iiif_storage_key == identifier) | (MediaFile.storage_key == identifier),
+            MediaFile.deleted_at.is_(None),
+        )
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=403)
+
+    obj = await db.get(Object, media.object_id)
+    if not obj:
+        raise HTTPException(status_code=403)
+    visibility_user = await _visibility_user(db, current_user)
+    try:
+        ensure_publicly_visible(obj, visibility_user, "nicht gefunden")
+    except HTTPException as exc:
+        raise HTTPException(status_code=403) from exc
+    if visibility_user is None and not media.is_public:
+        raise HTTPException(status_code=403)
+
+    return Response(status_code=200)
+
+
+def _safe_join(root: Path, relative: str) -> Path:
+    rel = Path(relative)
+    target = (root / rel).resolve()
+    if not target.is_relative_to(root.resolve()):
+        raise HTTPException(status_code=400, detail="Ungültiger Dateipfad im Archiv")
+    return target
+
+
+@batch_router.post(
+    "/batch-import",
+    dependencies=[require_feature("media")],
+    summary="Start a batch media import job from a ZIP archive or file list",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Missing or invalid archive, files, or mapping file"},
+        503: {"description": "Background task queue unavailable (broker down)"},
+    },
+)
+async def start_batch_import(
+    db: DBDep,
+    current_user: CurrentUser,
+    archive: UploadFile | None = File(None),
+    mapping: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
+) -> dict[str, Any]:
+    if not await has_record_permission(db, current_user, "object", "update"):
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung für Objekte.")
+    if archive is None and not files:
+        raise HTTPException(status_code=422, detail="Bitte ZIP-Datei oder Bildordner hochladen")
+
+    if archive is not None and archive.filename and not archive.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=422, detail="Archiv muss eine ZIP-Datei sein")
+
+    staging_root = Path(settings.media_root) / "_batch_imports"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    job_id = uuid.uuid4()
+    job_dir = staging_root / str(job_id)
+    images_dir = job_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    if archive is not None:
+        archive_bytes = await archive.read()
+        try:
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zf:
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    output_path = _safe_join(images_dir, info.filename)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(info) as src, output_path.open("wb") as dst:
+                        shutil.copyfileobj(src, dst)
+        except zipfile.BadZipFile as exc:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail=f"Ungültiges ZIP-Archiv: {exc}") from exc
+
+    for upload in files or []:
+        if not upload.filename:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail="Upload enthält Datei ohne Namen")
+        output_path = _safe_join(images_dir, upload.filename)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(output_path, "wb") as out:
+            while chunk := await upload.read(65536):
+                await out.write(chunk)
+
+    if mapping is not None:
+        mapping_name = (mapping.filename or "").lower()
+        if not (mapping_name.endswith(".csv") or mapping_name.endswith(".tsv")):
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail="Mapping-Datei muss CSV/TSV sein")
+        mapping_path = job_dir / "mapping.csv"
+        async with aiofiles.open(mapping_path, "wb") as out:
+            while chunk := await mapping.read(65536):
+                await out.write(chunk)
+
+    from katalon.workers.enqueue import enqueue_or_503
+    task_id = enqueue_or_503(import_media_batch_task, str(job_id), str(job_dir))
+    return {"status": "queued", "task_id": task_id, "batch_id": str(job_id)}
+
+
+@batch_router.get(
+    "/batch-import/task/{task_id}",
+    dependencies=[require_feature("media")],
+    summary="Get the status of a batch media import task",
+    responses={403: {"description": "Insufficient permissions"}},
+)
+async def batch_import_status(task_id: str) -> dict[str, Any]:
+    result: AsyncResult[Any] = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    meta = result.info if isinstance(result.info, dict) else None
+    if state == "SUCCESS":
+        return {"state": state, "result": result.result}
+    if state == "FAILURE":
+        return {"state": state, "error": str(result.result), "meta": meta}
+    return {"state": state, "meta": meta}

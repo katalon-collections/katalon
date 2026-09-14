@@ -1,0 +1,22 @@
+{
+  "heading": "Medien importieren",
+  "subtitle": "Mediendateien hochladen und mit Datensätzen verknüpfen.",
+  "zipLabel": "ZIP-Archiv mit Mediendateien",
+  "folderLabel": "Medienordner (Browser-Dateiauswahl)",
+  "manualMappingSummary": "Manuelle Zuordnungsdatei (optional)",
+  "csvLabel": "CSV/TSV-Zuordnungsdatei",
+  "uuidFallbackHint": "Ohne Zuordnungsdatei werden Dateinamen (ohne Endung) mit Datensatz-UUIDs abgeglichen.",
+  "startButton": "Import starten",
+  "starting": "Starte…",
+  "taskLabel": "Task: {{id}}",
+  "batchStatusUpdateFailed": "Statusaktualisierung fehlgeschlagen",
+  "selectFileOrFolder": "ZIP-Archiv oder Medienordner auswählen",
+  "statusLabel": "Status: {{state}}",
+  "runningInBackground": "Medien werden im Hintergrund importiert…",
+  "progressDetail": "Verarbeitet: {{processed}} / {{total}} · Angelegt: {{created}} · Übersprungen: {{skipped}} · Fehlgeschlagen: {{failed}}",
+  "successSummary": "Angelegt: {{created}} · Übersprungen: {{skipped}} · Fehlgeschlagen: {{failed}}",
+  "missingFiles": "Fehlende Dateien: {{count}}",
+  "duplicateFiles": "Doppelte Dateien: {{count}}",
+  "unmatchedFiles": "Nicht zugeordnete Dateien: {{count}}",
+  "importFailed": "Import fehlgeschlagen."
+}

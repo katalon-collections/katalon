@@ -1,0 +1,22 @@
+{
+  "heading": "Import media",
+  "subtitle": "Upload media files and link them to records.",
+  "zipLabel": "ZIP archive with media files",
+  "folderLabel": "Media folder (browser file picker)",
+  "manualMappingSummary": "Manual mapping file (optional)",
+  "csvLabel": "CSV/TSV mapping file",
+  "uuidFallbackHint": "If no mapping file is provided, filenames are matched against record UUIDs (without extension).",
+  "startButton": "Start import",
+  "starting": "Starting…",
+  "taskLabel": "Task: {{id}}",
+  "batchStatusUpdateFailed": "Status update failed",
+  "selectFileOrFolder": "Select a ZIP archive or a media folder",
+  "statusLabel": "Status: {{state}}",
+  "runningInBackground": "Importing media in the background…",
+  "progressDetail": "Processed: {{processed}} / {{total}} · Created: {{created}} · Skipped: {{skipped}} · Failed: {{failed}}",
+  "successSummary": "Created: {{created}} · Skipped: {{skipped}} · Failed: {{failed}}",
+  "missingFiles": "Missing files: {{count}}",
+  "duplicateFiles": "Duplicate files: {{count}}",
+  "unmatchedFiles": "Unmatched files: {{count}}",
+  "importFailed": "Import failed."
+}

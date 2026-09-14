@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Karl Krägelin
+
+"""Server-side projection for metadata exposed without authentication."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Any
+
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from katalon.core.models import FieldDefinition
+
+
+async def load_public_fields(db: AsyncSession, target_type: str) -> list[FieldDefinition]:
+    """Load active fields whose values may leave the authenticated API."""
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == target_type,
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.is_public.is_(True),
+        )
+    )
+    return list(result.scalars().all())
+
+
+def filter_public_metadata(
+    metadata: dict[str, Any] | None,
+    fields: Iterable[FieldDefinition],
+    target_subtype: str | None = None,
+) -> dict[str, Any]:
+    """Return only configured public fields, including public children of groups."""
+    source = metadata or {}
+    applicable = [
+        field for field in fields
+        if field.target_subtype is None or field.target_subtype == target_subtype
+    ]
+    top_level = [field for field in applicable if field.parent_id is None]
+    children_by_parent: dict[object, set[str]] = {}
+    for field in applicable:
+        if field.parent_id is not None:
+            children_by_parent.setdefault(field.parent_id, set()).add(field.name)
+
+    projected: dict[str, Any] = {}
+    for field in top_level:
+        value = source.get(field.name)
+        if value is None:
+            continue
+        if field.field_type != "group":
+            projected[field.name] = value
+            continue
+        child_names = children_by_parent.get(field.id, set())
+        if not child_names or not isinstance(value, list):
+            continue
+        entries = [
+            {name: item[name] for name in child_names if name in item}
+            for item in value
+            if isinstance(item, dict)
+        ]
+        entries = [entry for entry in entries if entry]
+        if entries:
+            projected[field.name] = entries
+    return projected
+
+
+async def project_public_record[T: BaseModel](
+    db: AsyncSession,
+    record: T,
+    target_type: str,
+    target_subtype: str | None = None,
+) -> T:
+    """Return a response-model copy with internal metadata removed."""
+    fields = await load_public_fields(db, target_type)
+    metadata = filter_public_metadata(
+        getattr(record, "metadata_", None), fields, target_subtype
+    )
+    updates: dict[str, Any] = {"metadata_": metadata}
+    ai_provenance = getattr(record, "ai_provenance", None)
+    if ai_provenance:
+        updates["ai_provenance"] = filter_public_ai_provenance(ai_provenance, metadata)
+    return record.model_copy(update=updates)
+
+
+def filter_public_ai_provenance(
+    ai_provenance: dict[str, Any], public_metadata: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep only provenance entries whose field (or group subfield) survived
+    the public metadata projection, so AI disclosure never leaks the
+    existence of non-public field values."""
+    filtered: dict[str, Any] = {}
+    for path, info in ai_provenance.items():
+        parts = path.split(".")
+        top = public_metadata.get(parts[0])
+        if top is None:
+            continue
+        if len(parts) == 1:
+            filtered[path] = info
+            continue
+        if len(parts) == 3 and isinstance(top, list):
+            try:
+                index = int(parts[1])
+                entry = top[index]
+            except (ValueError, IndexError):
+                continue
+            if isinstance(entry, dict) and parts[2] in entry:
+                filtered[path] = info
+    return filtered

@@ -1,0 +1,7 @@
+{
+  "searchPlaceholder": "{{source}} durchsuchen…",
+  "searchAriaLabel": "{{source}}-Normdaten durchsuchen",
+  "searching": "Suche…",
+  "remove": "Entfernen",
+  "removeAriaLabel": "{{label}} entfernen"
+}

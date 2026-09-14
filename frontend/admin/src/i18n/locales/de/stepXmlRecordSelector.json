@@ -1,0 +1,8 @@
+{
+  "loadingSelectors": "XML-Elemente werden erkannt…",
+  "heading": "Satzelement auswählen",
+  "description": "Wähle das XML-Element, das die zu importierenden Datensätze enthält.",
+  "depth": "Tiefe: {{depth}}",
+  "selectElementHint": "XML-Element auswählen, um fortzufahren",
+  "continueToMapping": "Weiter zur Zuordnung"
+}

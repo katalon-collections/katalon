@@ -1,0 +1,12 @@
+{
+  "title": "Feedback senden",
+  "buttonLabel": "Feedback",
+  "close": "Feedback schließen",
+  "placeholder": "Was ist dir aufgefallen?",
+  "hint": "URL, Browser und Fenstergröße werden mitgeschickt.",
+  "cancel": "Abbrechen",
+  "send": "Senden",
+  "sending": "Senden…",
+  "sentConfirmation": "✓ Feedback gesendet. Danke!",
+  "sendError": "Fehler beim Senden"
+}
