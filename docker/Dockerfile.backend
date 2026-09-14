@@ -15,6 +15,10 @@ COPY backend/docker-entrypoint.sh /docker-entrypoint.sh
 COPY CHANGELOG.md .
 RUN chmod +x /docker-entrypoint.sh
 RUN --mount=type=cache,target=/root/.cache/uv uv pip install --system .
+# pip is never used at runtime (uv is a standalone binary); its bundled
+# vendored deps (pip/_vendor/msgpack, /setuptools) trail the CVE fixes those
+# libraries ship standalone, and Trivy flags them as if installed directly.
+RUN python -m pip uninstall --yes pip
 
 RUN groupadd -g 1000 app && useradd -u 1000 -g app -M -s /usr/sbin/nologin app \
     && mkdir -p /var/lib/katalon && chown -R app:app /app /var/lib/katalon
