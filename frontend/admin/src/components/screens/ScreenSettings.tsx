@@ -8,6 +8,8 @@ import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/c
 import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, TerminologyEntry } from '../../types'
 import type { TourVariant } from '../tour/Tour'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { LabelEditor } from '../ui/LabelEditor'
+import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 
 interface Props {
   onNavigate?: (route: string) => void
@@ -16,7 +18,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'changelog' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -252,6 +254,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [error, setError] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
 
+  const languages = useSupportedLanguages()
   const [siteTitle, setSiteTitle] = useState(config.site_title)
   const [siteSubtitle, setSiteSubtitle] = useState(config.site_subtitle)
   const [heroText, setHeroText] = useState(config.hero_text)
@@ -322,13 +325,20 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="hd">Institution</div>
         <div className="bd">
-          <div className="field"><div className="lbl">Institutionsname / Seitentitel</div>
-            <input className="fld" value={siteTitle} onChange={e => setSiteTitle(e.target.value)} /></div>
-          <div className="field"><div className="lbl">Untertitel</div>
-            <input className="fld" value={siteSubtitle} onChange={e => setSiteSubtitle(e.target.value)} /></div>
-          <div className="field"><div className="lbl">Willkommenstext (Hero)</div>
-            <textarea className="fld" rows={3} value={heroText} onChange={e => setHeroText(e.target.value)}
-              style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
+          <div className="fg-2">
+            <LabelEditor languages={languages} value={siteTitle} labelPrefix="Institutionsname / Seitentitel"
+              onChange={(lng, val) => setSiteTitle(prev => ({ ...prev, [lng]: val }))} />
+          </div>
+          <div className="fg-2">
+            <LabelEditor languages={languages} value={siteSubtitle} labelPrefix="Untertitel"
+              onChange={(lng, val) => setSiteSubtitle(prev => ({ ...prev, [lng]: val }))} />
+          </div>
+          {languages.map(lng => (
+            <div className="field" key={lng}><div className="lbl">Willkommenstext (Hero) {lng.toUpperCase()}</div>
+              <textarea className="fld" rows={3} value={heroText[lng] ?? ''}
+                onChange={e => setHeroText(prev => ({ ...prev, [lng]: e.target.value }))}
+                style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
+          ))}
           <div className="field">
             <div className="lbl">Logo <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -820,7 +830,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   const [subtitleFields, setSubtitleFields] = useState<Record<string, string[]>>(
     () => {
       const base = config.subtitle_fields ?? {}
-      return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? ['record_type', 'status']]))
+      return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? []]))
     }
   )
   const [saving, setSaving] = useState(false)
@@ -1097,7 +1107,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
       <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>Ergebnis-Untertitel</h4>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-        Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · public“).
+        Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · Datierung“).
         Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.
       </p>
       <div className="card" style={{ marginBottom: 16 }}>
@@ -1978,7 +1988,7 @@ function SectionAuthoritySources() {
   )
 }
 
-function SectionUeber({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: (route: string) => void }) {
+function SectionUeber() {
   const { t } = useTranslation('screenSettings')
   return (
     <div>
@@ -1994,11 +2004,6 @@ function SectionUeber({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: (
           <a href="https://github.com/karkraeg/Katalon/blob/main/LICENSE" target="_blank" rel="noreferrer">{t('ueber.links.license')}</a>
           <a href="https://katalon-collections.github.io/katalon-docs/" target="_blank" rel="noreferrer">{t('ueber.links.docs')}</a>
         </div>
-        {isAdmin && (
-          <div style={{ marginTop: 16 }}>
-            <button className="btn sm gh" onClick={() => onNavigate('changelog')}>{t('ueber.links.changelog')}</button>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -2007,24 +2012,6 @@ function SectionUeber({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: (
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-
-function SectionChangelog() {
-  const [content, setContent] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    adminConfig.changelog()
-      .then(result => setContent(result.content))
-      .catch((e: Error) => setError(e.message))
-  }, [])
-
-  if (error) return <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>
-  if (content === null) return <div className="empty">Lade…</div>
-  return <div>
-    <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>Änderungen dieser Katalon-Version.</p>
-    <pre className="card" style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', font: 'inherit', lineHeight: 1.5 }}>{content}</pre>
-  </div>
-}
 
 function SectionLanguages() {
   const [input, setInput] = useState('')
@@ -2137,7 +2124,6 @@ const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }
   { id: 'sperren',  label: 'Bearbeitungssperre', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
   { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
-  { id: 'changelog', label: 'Versionshinweise', adminOnly: true },
 ]
 
 const SECTION_IDS = NAV.map(n => n.id)
@@ -2214,10 +2200,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
           {loading && <div className="empty">Lade…</div>}
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
-          {!loading && section === 'ueber' && <SectionUeber isAdmin={isAdmin} onNavigate={(r) => {
-            setSection(r as Section)
-            window.history.replaceState(null, '', `#settings/${r}`)
-          }} />}
+          {!loading && section === 'ueber' && <SectionUeber />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'startseite' && <SectionStartseite config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'terminologie' && <SectionTerminologie config={config} onSaved={setConfig} />}
@@ -2238,7 +2221,6 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
               onNavigate={onNavigate}
             />
           )}
-          {!loading && isAdmin && section === 'changelog' && <SectionChangelog />}
           {!loading && isAdmin && section === 'gefahrenbereich' && <SectionDangerZone />}
         </div>
       </div>

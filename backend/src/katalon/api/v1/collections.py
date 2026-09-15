@@ -37,6 +37,11 @@ from katalon.core.visibility import (
 )
 from katalon.services import pid_service, search_service
 from katalon.services.audit_service import delete_label_fields, diff_fields, log_change
+from katalon.services.collection_service import (
+    count_direct_children,
+    get_collection_subtree_ids,
+    reparent_children,
+)
 from katalon.services.idno_service import (
     consume_next_idno,
     maybe_advance_counter,
@@ -407,6 +412,7 @@ async def update_collection(
     col.parent_id = data.parent_id
     col.status = data.status
     col.metadata_ = metadata
+    col.ai_provenance = data.ai_provenance
 
     await flush_record(db, col)
     await sync_schema_relations(db, "collection", col.id, metadata)
@@ -473,7 +479,13 @@ async def publish_collection(
     responses={
         404: {"description": "Collection not found"},
         403: {"description": "Insufficient permissions"},
-        409: {"description": "Record has linked relations (pass force=true to delete anyway)"},
+        400: {"description": "cascade and reparent are mutually exclusive"},
+        409: {
+            "description": (
+                "Record has child collections (pass cascade=true or reparent=true) "
+                "or linked relations (pass force=true to delete anyway)"
+            )
+        },
     },
 )
 async def delete_collection(
@@ -481,36 +493,69 @@ async def delete_collection(
     db: DBDep,
     current_user: User = require_record_permission("collection", "delete"),
     force: bool = Query(False),
+    cascade: bool = Query(False, description="Delete this collection and its whole subtree."),
+    reparent: bool = Query(
+        False, description="Move direct children up to this collection's parent before deleting."
+    ),
 ) -> None:
     result = await db.execute(select(Collection).where(Collection.id == col_id))
     col = result.scalar_one_or_none()
     if not col:
         raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
+    if cascade and reparent:
+        raise HTTPException(
+            status_code=400, detail="cascade und reparent schließen sich gegenseitig aus."
+        )
 
-    related_count = await count_relations(db, "collection", col_id)
+    child_count = await count_direct_children(db, col_id)
+    if child_count > 0 and not cascade and not reparent:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Diese Sammlung hat {child_count} Unterelemente.",
+                "child_count": child_count,
+            },
+        )
+
+    target_ids = [col_id]
+    if cascade and child_count > 0:
+        target_ids = await get_collection_subtree_ids(db, col_id)
+    elif reparent and child_count > 0:
+        await reparent_children(db, col_id, col.parent_id)
+
+    related_count = sum([await count_relations(db, "collection", tid) for tid in target_ids])
     if related_count > 0 and not force:
         raise HTTPException(
             status_code=409,
             detail={
-                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "detail": f"{len(target_ids)} betroffene Sammlungen sind mit insgesamt "
+                f"{related_count} anderen Datensätzen verknüpft.",
                 "related_count": related_count,
             },
         )
 
-    col.deleted_at = datetime.now(UTC).replace(tzinfo=None)
-    await log_change(
-        db,
-        record_type="collection",
-        record_id=col.id,
-        user_id=current_user.id,
-        action="delete",
-        changed_fields=delete_label_fields(col.idno, col.metadata_),
+    targets = (
+        (await db.execute(select(Collection).where(Collection.id.in_(target_ids))))
+        .scalars()
+        .all()
     )
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for rec in targets:
+        rec.deleted_at = now
+        await log_change(
+            db,
+            record_type="collection",
+            record_id=rec.id,
+            user_id=current_user.id,
+            action="delete",
+            changed_fields=delete_label_fields(rec.idno, rec.metadata_),
+        )
     await flush_record(db, col)
-    try:
-        await search_service.remove_record(col.id, db, record_type="collection")
-    except Exception:
-        logger.warning("ES index/remove failed", exc_info=True)
+    for rec in targets:
+        try:
+            await search_service.remove_record(rec.id, db, record_type="collection")
+        except Exception:
+            logger.warning("ES index/remove failed", exc_info=True)
 
 
 @router.post(

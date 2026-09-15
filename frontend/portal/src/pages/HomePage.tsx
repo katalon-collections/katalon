@@ -4,15 +4,15 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, mediaThumbnailUrl, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type MediaFile } from '../api/client'
-import { recordTitle } from '../utils/renderFieldValue'
+import { recordTitle, resolveLangText } from '../utils/renderFieldValue'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useI18n } from '../i18n'
 
 const DEFAULT_CONFIG: PortalConfig = {
-  site_title: 'Sammlung',
-  site_subtitle: '',
-  hero_text: 'Fotografien, Dokumente, Objekte und Personen aus dem Archiv',
+  site_title: { de: 'Sammlung' },
+  site_subtitle: {},
+  hero_text: { de: 'Fotografien, Dokumente, Objekte und Personen aus dem Archiv' },
   featured_object_ids: [],
   facet_fields: {},
   subtitle_fields: {},
@@ -95,7 +95,7 @@ function TextBlock({ block, locale }: { block: HomepageBlock; locale: string }) 
 }
 
 function blockTitle(block: HomepageBlock, locale: string, fallback: string): string {
-  return block.title?.[locale] ?? Object.values(block.title ?? {})[0] ?? fallback
+  return resolveLangText(block.title, locale, fallback)
 }
 
 export function HomePage() {
@@ -203,9 +203,11 @@ export function HomePage() {
           {config.logo_url && (
             <img src={config.logo_url} alt="Logo" style={{ maxHeight: 64, marginBottom: 16 }} />
           )}
-          <h1>{config.site_title}</h1>
-          {config.site_subtitle && <p style={{ fontSize: 18, opacity: 0.85 }}>{config.site_subtitle}</p>}
-          {config.hero_text && <p>{config.hero_text}</p>}
+          <h1>{resolveLangText(config.site_title, locale)}</h1>
+          {resolveLangText(config.site_subtitle, locale) && (
+            <p style={{ fontSize: 18, opacity: 0.85 }}>{resolveLangText(config.site_subtitle, locale)}</p>
+          )}
+          {resolveLangText(config.hero_text, locale) && <p>{resolveLangText(config.hero_text, locale)}</p>}
           <form className="hero-search" onSubmit={search}>
             <input
               placeholder={t('home.searchPlaceholder')}

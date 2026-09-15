@@ -22,6 +22,7 @@ from katalon.core.media_storage import get_storage
 from katalon.core.models import (
     AdminConfig,
     AIUsageEvent,
+    Collection,
     Entity,
     FieldDefinition,
     MediaFile,
@@ -29,18 +30,30 @@ from katalon.core.models import (
     Occurrence,
     Place,
     Procedure,
+    StorageLocation,
 )
 from katalon.services.audit_service import log_change
 from katalon.services.secret_service import AI_API_KEY_SECRET, get_secret
 
 TEXTISH_FIELD_TYPES = {"text", "richtext", "vocab_free", "date", "number", "boolean"}
 AI_IMAGE_MAX_DIMENSION = 1024
-MODEL_MAP: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence] | type[Procedure]] = {
+MODEL_MAP: dict[
+    str,
+    type[Object]
+    | type[Entity]
+    | type[Place]
+    | type[Occurrence]
+    | type[Procedure]
+    | type[Collection]
+    | type[StorageLocation],
+] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
     "procedure": Procedure,
+    "collection": Collection,
+    "storage_location": StorageLocation,
 }
 
 
@@ -316,6 +329,32 @@ def _build_messages(
     ]
 
 
+def _build_translation_messages(
+    field: FieldDefinition,
+    source_language: str,
+    target_language: str,
+    source_value: str,
+) -> list[dict[str, Any]]:
+    context = {
+        "field": {"name": field.name, "field_type": field.field_type},
+        "source_language": source_language,
+        "target_language": target_language,
+        "source_value": source_value,
+    }
+    return [
+        {
+            "role": "system",
+            "content": (
+                "Du übersetzt Metadaten für Sammlungen. Übersetze ausschließlich den Text "
+                "in die gewünschte Zielsprache, ergänze oder interpretiere keine Fakten. "
+                "Bei Rich-Text-Feldern bewahre HTML-Struktur, Attribute und Link-Ziele exakt. "
+                'Antworte nur mit JSON im Schema {"value": "...", "confidence": 0.0, "warning": ""}.'
+            ),
+        },
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
+    ]
+
+
 def _coerce_value(field: FieldDefinition, value: Any) -> Any:
     if field.is_repeatable:
         if not isinstance(value, list):
@@ -425,6 +464,91 @@ async def complete_field(
     return {
         "field_name": field.name,
         "value": coerced_value,
+        "confidence": parsed.get("confidence"),
+        "warning": parsed.get("warning"),
+        "model": str(config.ai_model),
+        "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
+    }
+
+
+async def translate_field(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    record_type: str,
+    record_id: uuid.UUID,
+    field_definition_id: uuid.UUID,
+    source_language: str,
+    target_language: str,
+    source_value: str,
+) -> dict[str, Any]:
+    field = await _load_field(db, field_definition_id)
+    if field.target_type != record_type:
+        raise HTTPException(status_code=422, detail="Felddefinition passt nicht zum Datensatztyp.")
+    if not field.is_translatable or field.field_type not in {"text", "richtext"}:
+        raise HTTPException(status_code=422, detail="Feld ist nicht mehrsprachig übersetzbar.")
+    translation_config = (field.settings or {}).get("ai_translation")
+    if not isinstance(translation_config, dict) or not translation_config.get("enabled"):
+        raise HTTPException(status_code=422, detail="KI-Übersetzung ist für dieses Feld nicht aktiviert.")
+    if source_language == target_language:
+        raise HTTPException(status_code=422, detail="Quell- und Zielsprache müssen verschieden sein.")
+
+    config = await get_admin_ai_config(db)
+    supported_languages = config.supported_languages or ["de", "en"]
+    if source_language not in supported_languages or target_language not in supported_languages:
+        raise HTTPException(status_code=422, detail="Quell- oder Zielsprache ist nicht konfiguriert.")
+    if not source_value.strip():
+        raise HTTPException(status_code=422, detail="Quellsprache enthält keinen Text.")
+    await _load_record(db, record_type, record_id)
+
+    messages = _build_translation_messages(field, source_language, target_language, source_value)
+    estimated_input_tokens = _estimate_tokens(messages)
+    config = await ensure_ai_allowed(db, user_id, estimated_input_tokens)
+    api_key = await get_secret(db, AI_API_KEY_SECRET)
+    assert api_key is not None
+    data = await call_ai_provider(config, api_key, messages, config.ai_max_output_tokens)
+    content = extract_message_content(data)
+    try:
+        parsed = json.loads(_strip_code_fences(content))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="KI-Antwort war kein gültiges JSON.") from exc
+    value = parsed.get("value")
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPException(status_code=422, detail="KI-Antwort enthält keine Übersetzung.")
+
+    usage = data.get("usage") or {}
+    input_tokens = int(usage.get("prompt_tokens") or estimated_input_tokens)
+    output_tokens = int(usage.get("completion_tokens") or _estimate_tokens(parsed))
+    db.add(
+        AIUsageEvent(
+            user_id=user_id,
+            provider="openai-compatible",
+            model=str(config.ai_model),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+    )
+    await log_change(
+        db,
+        record_type=record_type,
+        record_id=record_id,
+        user_id=user_id,
+        action="ai_translate",
+        changed_fields={
+            "field_definition_id": str(field.id),
+            "field_name": field.name,
+            "source_language": source_language,
+            "target_language": target_language,
+            "provider": "openai-compatible",
+            "model": config.ai_model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+        },
+    )
+    await db.flush()
+    return {
+        "field_name": field.name,
+        "value": value,
         "confidence": parsed.get("confidence"),
         "warning": parsed.get("warning"),
         "model": str(config.ai_model),

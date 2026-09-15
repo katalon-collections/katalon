@@ -341,17 +341,22 @@ if [[ "$DEV" == true ]]; then
     echo "   source .venv/bin/activate"
     echo "   uv pip install -e .  # Dependencies installieren"
     echo
-    echo "── 2. API-Server starten (Hot-Reload) ───────────────────────────────"
+    echo "── 2. Datenbank migrieren ──────────────────────────────────────────"
+    echo "   cd backend"
+    echo "   source .venv/bin/activate"
+    echo "   alembic upgrade head"
+    echo
+    echo "── 3. API-Server starten (Hot-Reload) ───────────────────────────────"
     echo "   cd backend"
     echo "   source .venv/bin/activate"
     echo "   uvicorn katalon.main:app --reload --port 8000"
     echo
-    echo "── 3. Admin-Frontend starten (Hot-Reload) ───────────────────────────"
+    echo "── 4. Admin-Frontend starten (Hot-Reload) ───────────────────────────"
     echo "   cd frontend/admin"
     echo "   pnpm install         # einmalig"
     echo "   pnpm dev"
     echo
-    echo "── 4. Portal-Frontend starten (Hot-Reload) ──────────────────────────"
+    echo "── 5. Portal-Frontend starten (Hot-Reload) ──────────────────────────"
     echo "   cd frontend/portal"
     echo "   pnpm install         # einmalig"
     echo "   pnpm dev"
@@ -423,25 +428,16 @@ if [[ "$DEMO" == true ]]; then
         exit 1
     fi
 
-    SEED_SCRIPT="backend/scripts/seed_ics_demo.py"
+    SEED_SCRIPT="backend/scripts/seed_demo.py"
     if [[ ! -f "$SEED_SCRIPT" ]]; then
         err "Seed-Script nicht gefunden: $SEED_SCRIPT"
         exit 1
     fi
 
-    # Lese Admin-Zugangsdaten aus .env (mit Fallback auf Seeder-Defaults)
-    SEED_EMAIL=$(grep '^DEFAULT_ADMIN_EMAIL=' .env 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
-    SEED_PASSWORD=$(grep '^DEFAULT_ADMIN_PASSWORD=' .env 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
-    SEED_EMAIL=${SEED_EMAIL:-admin@katalon.dev}
-    SEED_PASSWORD=${SEED_PASSWORD:-admin}
-
-    # Kopiere Script in den Container und führe es aus
-    docker cp "$SEED_SCRIPT" "$API_CONTAINER:/tmp/seed_ics_demo.py"
-    docker exec "$API_CONTAINER" \
-        python /tmp/seed_ics_demo.py \
-        --base-url http://localhost:8000 \
-        --email "$SEED_EMAIL" \
-        --password "$SEED_PASSWORD"
+    # Das Production-Image enthält keine Demo-Daten; das Script wird nur für
+    # diesen expliziten --demo-Lauf in den laufenden API-Container kopiert.
+    docker cp "$SEED_SCRIPT" "$API_CONTAINER:/tmp/seed_demo.py"
+    docker exec "$API_CONTAINER" python /tmp/seed_demo.py
 
     ok "Demo-Daten wurden eingespielt."
     echo

@@ -5,12 +5,37 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import Collection
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services.search_service import _extract_title
+
+
+async def count_direct_children(db: AsyncSession, parent_id: uuid.UUID) -> int:
+    """Count active collections directly nested under ``parent_id``."""
+    result = await db.execute(
+        select(func.count()).where(
+            Collection.parent_id == parent_id,
+            Collection.deleted_at.is_(None),
+        )
+    )
+    return result.scalar_one()
+
+
+async def reparent_children(
+    db: AsyncSession, parent_id: uuid.UUID, new_parent_id: uuid.UUID | None
+) -> None:
+    """Move active direct children of ``parent_id`` to ``new_parent_id``."""
+    await db.execute(
+        update(Collection)
+        .where(
+            Collection.parent_id == parent_id,
+            Collection.deleted_at.is_(None),
+        )
+        .values(parent_id=new_parent_id)
+    )
 
 
 async def get_collection_subtree_ids(

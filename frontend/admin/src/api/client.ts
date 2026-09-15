@@ -93,10 +93,12 @@ export async function logout(): Promise<void> {
 
 export class ConflictError extends Error {
   related_count: number
-  constructor(message: string, related_count: number) {
+  child_count: number
+  constructor(message: string, related_count: number, child_count = 0) {
     super(message)
     this.name = 'ConflictError'
     this.related_count = related_count
+    this.child_count = child_count
   }
 }
 
@@ -159,6 +161,7 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ConflictError(
       typeof d === 'string' ? d : typeof d.detail === 'string' ? d.detail : 'Datensatz ist mit anderen Datensätzen verknüpft.',
       typeof d.related_count === 'number' ? d.related_count : 0,
+      typeof d.child_count === 'number' ? d.child_count : 0,
     )
   }
   if (!res.ok) {
@@ -325,6 +328,15 @@ export const collections = {
   create: (data: Partial<KatalonCollection>) => req<KatalonCollection>('/v1/collections', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonCollection>, version?: number) => req<KatalonCollection>(`/v1/collections/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/collections/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  /** Delete a collection that still has direct child collections — see backend
+   *  guard/cascade/reparent contract in `api/v1/collections.py::delete_collection`. */
+  deleteHierarchy: (id: string, opts: { cascade?: boolean; reparent?: boolean; force?: boolean }) => {
+    const params = new URLSearchParams()
+    if (opts.cascade) params.set('cascade', 'true')
+    if (opts.reparent) params.set('reparent', 'true')
+    if (opts.force) params.set('force', 'true')
+    return req<void>(`/v1/collections/${id}?${params.toString()}`, { method: 'DELETE' })
+  },
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/collections/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/collection', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -344,7 +356,14 @@ export const storageLocations = {
   audit:  (id: string) => audit.list({ record_type: 'storage_location', record_id: id }),
   create: (data: Partial<KatalonStorageLocation>) => req<KatalonStorageLocation>('/v1/storage-locations', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonStorageLocation>, version?: number) => req<KatalonStorageLocation>(`/v1/storage-locations/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
-  delete: (id: string, force?: boolean) => req<void>(`/v1/storage-locations/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  delete: (id: string, opts?: { force?: boolean; cascade?: boolean; reparent?: boolean }) => {
+    const params = new URLSearchParams()
+    if (opts?.force) params.set('force', 'true')
+    if (opts?.cascade) params.set('cascade', 'true')
+    if (opts?.reparent) params.set('reparent', 'true')
+    const qs = params.toString()
+    return req<void>(`/v1/storage-locations/${id}${qs ? `?${qs}` : ''}`, { method: 'DELETE' })
+  },
   objects: (id: string, params?: { include_sublocations?: boolean; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<StorageLocationObject>>(`/v1/storage-locations/${id}/objects${qs ? `?${qs}` : ''}`)
@@ -407,7 +426,13 @@ export const schema = {
     const qs = opts?.purgeData ? '?purge_data=true' : ''
     return req<void>(`/v1/schema/${id}${qs}`, { method: 'DELETE' })
   },
-  getUsage: (id: string) => req<{ field_id: string; field_name: string; target_type: string; usage_count: number }>(`/v1/schema/${id}/usage`),
+  getUsage: (id: string, opts?: { newIsRepeatable?: boolean; newFieldType?: string }) => {
+    const qs = new URLSearchParams()
+    if (opts?.newIsRepeatable !== undefined) qs.set('new_is_repeatable', String(opts.newIsRepeatable))
+    if (opts?.newFieldType) qs.set('new_field_type', opts.newFieldType)
+    const query = qs.toString()
+    return req<{ field_id: string; field_name: string; target_type: string; usage_count: number; repeatable_collapse_count: number | null; type_change_risk_count: number | null }>(`/v1/schema/${id}/usage${query ? `?${query}` : ''}`)
+  },
 
   duplicate: (id: string) => req<FieldDefinition>(`/v1/schema/${id}/duplicate`, { method: 'POST' }),
   resetSummary: (targetType: string, subtype?: string) => req<{ deletable_fields: number }>(`/v1/schema/${targetType}/reset-summary${subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''}`),
@@ -590,11 +615,13 @@ export const vocabularies = {
   createTerm: (vocabId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/${vocabId}/terms`, { method: 'POST', body: JSON.stringify(data) }),
   updateTerm: (termId: string, data: Omit<VocabularyTerm, 'id'>) => req<VocabularyTerm>(`/v1/vocabularies/terms/${termId}`, { method: 'PUT', body: JSON.stringify(data) }),
   getTermUsage: (termId: string) => req<{ term_id: string; usage_count: number }>(`/v1/vocabularies/terms/${termId}/usage`),
-  deleteTerm: (termId: string, options: { replacementTermId?: string; removeFromRecords?: boolean; force?: boolean } = {}) => {
+  deleteTerm: (termId: string, options: { replacementTermId?: string; removeFromRecords?: boolean; force?: boolean; cascade?: boolean; reparent?: boolean } = {}) => {
     const params = new URLSearchParams()
     if (options.replacementTermId) params.set('replacement_term_id', options.replacementTermId)
     if (options.removeFromRecords) params.set('remove_from_records', 'true')
     if (options.force) params.set('force', 'true')
+    if (options.cascade) params.set('cascade', 'true')
+    if (options.reparent) params.set('reparent', 'true')
     const query = params.size ? `?${params}` : ''
     return req<void>(`/v1/vocabularies/terms/${termId}${query}`, { method: 'DELETE' })
   },
@@ -1125,7 +1152,6 @@ export interface AdminConfigRead {
 
 export const adminConfig = {
   get: () => req<AdminConfigRead>('/v1/admin/config'),
-  changelog: () => req<{ content: string }>('/v1/admin/config/changelog'),
   update: (data: Partial<AdminConfigRead>) =>
     req<AdminConfigRead>('/v1/admin/config', { method: 'PUT', body: JSON.stringify(data) }),
   setAiSecret: (api_key: string) =>
@@ -1218,6 +1244,8 @@ export interface AICompleteResponse {
 export const ai = {
   complete: (data: { field_definition_id: string; record_type: string; record_id: string; group_index?: number; group_instance?: Record<string, unknown> }) =>
     req<AICompleteResponse>('/v1/ai/complete', { method: 'POST', body: JSON.stringify(data) }),
+  translate: (data: { field_definition_id: string; record_type: string; record_id: string; source_language: string; target_language: string; source_value: string }) =>
+    req<AICompleteResponse>('/v1/ai/translate', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 export interface SparqlStatus {

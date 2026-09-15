@@ -35,7 +35,7 @@ export function ConfirmModal({ title, message, confirmLabel, cancelLabel, danger
 
   return (
     <div className="batch-modal-backdrop" onClick={busy ? undefined : onCancel} role="dialog" aria-modal="true">
-      <div className="batch-modal" style={{ width: 440 }} onClick={e => e.stopPropagation()}>
+      <div className="batch-modal batch-modal--compact" style={{ width: 440 }} onClick={e => e.stopPropagation()}>
         {title && (
           <div className="batch-modal-header">
             <h2>{title}</h2>

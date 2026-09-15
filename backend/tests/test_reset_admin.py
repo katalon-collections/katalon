@@ -31,6 +31,23 @@ def test_password_token_length() -> None:
     assert len(pw) >= PASSWORD_TOKEN_BYTES
 
 
+def test_cli_forwards_explicit_admin_credentials() -> None:
+    from click.testing import CliRunner
+
+    from katalon.management.cli import cli
+
+    with patch("katalon.management.cli.reset_admin_impl") as reset_admin_impl:
+        result = CliRunner().invoke(
+            cli,
+            ["reset-admin", "--email", "admin@katalon.dev", "--password", "Password123"],
+        )
+
+    assert result.exit_code == 0
+    reset_admin_impl.assert_called_once_with(
+        email="admin@katalon.dev", password="Password123"
+    )
+
+
 def test_reset_exits_when_no_admins(monkeypatch: object, capsys: object) -> None:
     import asyncio
 

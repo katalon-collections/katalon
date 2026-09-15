@@ -4,7 +4,6 @@
 import pkg from '../../../package.json'
 import { useTranslation } from 'react-i18next'
 import { getTokenUser } from '../../api/client'
-import { FeedbackButton } from '../feedback/FeedbackButton'
 import { Bell, Bookmark, Box, Code, Download, File, Folder, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 
 type Route = string
@@ -90,10 +89,6 @@ export function Sidebar({ route, setRoute, appTitle = 'Katalon', open = false, o
           )
         })}
       </nav>
-
-      <div className="sb-feedback">
-        <FeedbackButton />
-      </div>
 
       <div className="sb-ver">Katalon Collections v{pkg.version}</div>
     </aside>

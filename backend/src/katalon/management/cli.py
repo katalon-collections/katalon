@@ -133,9 +133,11 @@ def import_xml(
 
 
 @cli.command(name="reset-admin")
-def reset_admin() -> None:
-    """Reset the admin/superuser password (interactive)."""
-    reset_admin_impl()
+@click.option("--email", type=str, help="Admin or superuser email to reset.")
+@click.option("--password", help="Explicit new password; otherwise a random password is generated.")
+def reset_admin(email: str | None, password: str | None) -> None:
+    """Reset an admin/superuser password."""
+    reset_admin_impl(email=email, password=password)
 
 
 def main() -> None:

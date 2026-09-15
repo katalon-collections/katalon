@@ -223,9 +223,9 @@ export interface TerminologyEntry {
 }
 
 export interface PortalConfig {
-  site_title: string
-  site_subtitle: string
-  hero_text: string
+  site_title: Record<string, string>
+  site_subtitle: Record<string, string>
+  hero_text: Record<string, string>
   featured_object_ids: string[]
   facet_fields: Record<string, string[]>
   subtitle_fields: Record<string, string[]>
@@ -351,8 +351,12 @@ export const api = {
   portal: {
     config: () => get<PortalConfig>(`${PORTAL_API}/portal/config`),
     schema: (type: string) => get<PortalFieldDefinition[]>(`${PORTAL_API}/schema/${type}`),
-    searchFieldTerms: (type: string, field: string) =>
-      get<VocabTerm[]>(`${PORTAL_API}/schema/${type}/fields/${encodeURIComponent(field)}/terms`),
+    searchFieldTerms: (type: string, field: string, termIds?: string[]) => {
+      const query = termIds?.length
+        ? `?${new URLSearchParams(termIds.map(termId => ['term_ids', termId])).toString()}`
+        : ''
+      return get<VocabTerm[]>(`${PORTAL_API}/schema/${type}/fields/${encodeURIComponent(field)}/terms${query}`)
+    },
   },
   pages: {
     list: () => get<StaticPageSummary[]>(`${PORTAL_API}/pages`),

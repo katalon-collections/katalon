@@ -423,6 +423,7 @@ type AiProposal = {
   suggestedValue: unknown
   model: string
   group?: { name: string; index: number }
+  translation?: { sourceLanguage: string; targetLanguage: string }
 }
 
 /** Disclosure badge for field values populated via the KI-Assistent (Katalon
@@ -504,19 +505,25 @@ function AiProposalDialog({ proposal, onCancel, onApply }: {
   onCancel: () => void
   onApply: (value: unknown) => void
 }) {
+  const { t } = useTranslation('screenForm')
   const [suggestion, setSuggestion] = useState(() => aiValueToText(proposal.suggestedValue))
   const label = getLabel(proposal.field, proposal.field.name)
+  const translation = proposal.translation
   return (
     <dialog open onCancel={event => { event.preventDefault(); onCancel() }} aria-labelledby="ai-proposal-title"
       style={{ position: 'fixed', inset: 0, margin: 'auto', width: 680, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 64px)', overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 0, background: 'var(--bg)', color: 'var(--fg)', boxShadow: '0 24px 80px rgba(0,0,0,.24)', zIndex: 25 }}>
-      <div id="ai-proposal-title" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>KI-Vorschlag für {label}</div>
+      <div id="ai-proposal-title" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>
+        {translation
+          ? t('aiTranslationProposal.title', { label, source: translation.sourceLanguage.toUpperCase(), target: translation.targetLanguage.toUpperCase() })
+          : `KI-Vorschlag für ${label}`}
+      </div>
       <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         <label className="field" style={{ margin: 0 }}>
-          <span className="lbl">Aktueller Wert</span>
+          <span className="lbl">{translation ? t('aiTranslationProposal.current', { target: translation.targetLanguage.toUpperCase() }) : 'Aktueller Wert'}</span>
           <textarea className="fld" value={aiValueToText(proposal.currentValue)} readOnly rows={8} />
         </label>
         <label className="field" style={{ margin: 0 }}>
-          <span className="lbl">KI-Vorschlag</span>
+          <span className="lbl">{translation ? t('aiTranslationProposal.suggestion', { source: translation.sourceLanguage.toUpperCase() }) : 'KI-Vorschlag'}</span>
           <textarea className="fld" value={suggestion} onChange={event => setSuggestion(event.target.value)} rows={8} autoFocus />
         </label>
       </div>
@@ -2458,14 +2465,23 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     clearAiProvenance(name)
   }
   function updateTranslatable(name: string, lang: string, val: string) {
-    const cur = { ...((values[name] as Record<string, string>) ?? {}) }
+    // A field can be toggled is_translatable after records already hold a legacy
+    // plain-string value for it; the backend migrates existing records on that
+    // toggle (#399), but defend here too so a stray non-object value can never be
+    // spread into per-character keys instead of per-language ones.
+    const current = values[name]
+    const cur = { ...(current && typeof current === 'object' && !Array.isArray(current) ? (current as Record<string, string>) : {}) }
     cur[lang] = val
     setValuesDirty(v => ({ ...v, [name]: cur }))
+    clearAiProvenance(name)
+    clearAiProvenance(`${name}.${lang}`)
   }
   function removeTranslatable(name: string, lang: string) {
     const cur = { ...((values[name] as Record<string, string>) ?? {}) }
     delete cur[lang]
     setValuesDirty(v => ({ ...v, [name]: cur }))
+    clearAiProvenance(name)
+    clearAiProvenance(`${name}.${lang}`)
   }
 
   type PidEntry = { value: string; label: string }
@@ -2750,7 +2766,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               // invalid regex on backend, ignore
             }
           }
-          if (f.field_type === 'url' && item && typeof item === 'object' && !Array.isArray(item)) {
+          if (f.field_type === 'url' && item && typeof item === 'object' && !Array.isArray(item) && (item as PidEntry).value) {
             if (!isHttpUrlString((item as PidEntry).value)) {
               errors[f.name] = 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.'
               break
@@ -2785,7 +2801,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           }
         }
       }
-      if (f.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val)) {
+      if (f.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val) && (val as PidEntry).value) {
         if (!isHttpUrlString((val as PidEntry).value)) {
           errors[f.name] = 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.'
         }
@@ -2828,7 +2844,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
       }
     }
-    if (field.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val)) {
+    if (field.field_type === 'url' && val && typeof val === 'object' && !Array.isArray(val) && (val as PidEntry).value) {
       if (!isHttpUrlString((val as PidEntry).value)) {
         return { level: 'error', message: 'Ungültige URL. Erlaubt sind vollständige http(s)-Adressen.' }
       }
@@ -2871,6 +2887,59 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
         markAiProvenance(field.name, result.model)
         clearFieldFeedback(field.name)
+      }
+      if (result.warning) {
+        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setAiBusyField(null)
+    }
+  }
+
+
+  function applyAiTranslation(field: FieldDefinition, targetLanguage: string, value: unknown, model: string) {
+    setValuesDirty(previous => ({
+      ...previous,
+      [field.name]: {
+        ...((previous[field.name] as Record<string, string> | undefined) ?? {}),
+        [targetLanguage]: String(value),
+      },
+    }))
+    markAiProvenance(`${field.name}.${targetLanguage}`, model)
+    clearAiProvenance(field.name)
+    clearFieldFeedback(field.name)
+  }
+
+  async function runAITranslation(field: FieldDefinition, sourceLanguage: string, targetLanguage: string) {
+    const targetId = savedId ?? currentId
+    if (!targetId) return
+    const valuesByLanguage = (values[field.name] as Record<string, string> | undefined) ?? {}
+    const sourceValue = valuesByLanguage[sourceLanguage] ?? ''
+    if (!sourceValue.trim()) return
+    setAiBusyField(`${field.name}.${targetLanguage}`)
+    setError(null)
+    try {
+      const result = await ai.translate({
+        field_definition_id: field.id,
+        record_type: recordType,
+        record_id: targetId,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        source_value: sourceValue,
+      })
+      const currentValue = valuesByLanguage[targetLanguage] ?? ''
+      if (!currentValue.trim()) {
+        applyAiTranslation(field, targetLanguage, result.value, result.model)
+      } else {
+        setAiProposal({
+          field,
+          currentValue,
+          suggestedValue: result.value,
+          model: result.model,
+          translation: { sourceLanguage, targetLanguage },
+        })
       }
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
@@ -3586,6 +3655,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             if (aiProposal.group) {
               updateGroupSubField(aiProposal.group.name, aiProposal.group.index, aiProposal.field.name, value)
               markAiProvenance(`${aiProposal.group.name}.${aiProposal.group.index}.${aiProposal.field.name}`, aiProposal.model)
+            } else if (aiProposal.translation) {
+              const { field, translation, model } = aiProposal
+              applyAiTranslation(field, translation.targetLanguage, value, model)
             } else {
               setValuesDirty(previous => ({ ...previous, [aiProposal.field.name]: value }))
               markAiProvenance(aiProposal.field.name, aiProposal.model)
@@ -3873,6 +3945,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
                           style={getFeedbackStyle(f.name)}
+                          translationEnabled={Boolean((f.settings?.ai_translation as Record<string, unknown> | undefined)?.enabled)}
+                          translationDisabled={justCreated || !savedId || aiBusyField !== null}
+                          translationBusyLanguage={aiBusyField?.startsWith(`${f.name}.`) ? aiBusyField.slice(f.name.length + 1) : null}
+                          onTranslate={(sourceLanguage, targetLanguage) => runAITranslation(f, sourceLanguage, targetLanguage)}
+                          aiProvenance={aiProvenance}
+                          provenancePrefix={f.name}
                         />
                       ) : f.field_type === 'vocab' ? (
                         repeatable ? (

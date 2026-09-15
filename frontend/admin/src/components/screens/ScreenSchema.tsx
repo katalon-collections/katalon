@@ -13,7 +13,9 @@ import { SchemaAiAssist } from './SchemaAiAssist'
 import { ScreenFormSections } from './ScreenFormSections'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
+import { ConfirmModal } from '../ui/ConfirmModal'
 
+type DestructiveReconfigWarning = { kind: 'translatable' | 'repeatable' | 'fieldType'; count: number; newFieldType?: string }
 const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'url', 'authority', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
 export { FIELD_TYPE_LABELS } from './schemaConstants'
@@ -78,12 +80,13 @@ type FieldFormState = {
   ai_prompt: string
   ai_include_fields: string[]
   ai_send_existing_value: boolean
+  ai_translation_enabled: boolean
   // sub-fields of this group field (populated when editing an existing group field)
   subFields?: FieldDefinition[]
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -122,6 +125,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     ai_prompt: ((f.settings?.ai_config as Record<string, unknown> | undefined)?.prompt as string) ?? '',
     ai_include_fields: ((f.settings?.ai_config as Record<string, unknown> | undefined)?.include_fields as string[]) ?? [],
     ai_send_existing_value: Boolean((f.settings?.ai_config as Record<string, unknown> | undefined)?.send_existing_value),
+    ai_translation_enabled: Boolean((f.settings?.ai_translation as Record<string, unknown> | undefined)?.enabled),
     subFields: f.children ?? [],
   }
 }
@@ -136,6 +140,7 @@ interface FieldDetailProps {
   showSubtype: boolean
   authoritySources: AuthoritySource[]
   pidProviders: ('ark' | 'dnb_urn')[]
+  aiAvailable: boolean
   onChange: (form: FieldFormState) => void
   onSave: () => void
   onDelete: () => void
@@ -157,7 +162,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
   return { name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
-function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, aiAvailable, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield }: FieldDetailProps) {
   const { t } = useTranslation('screenSchema')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
@@ -433,6 +438,12 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 <span style={{ fontSize: 13 }}>{t('fieldDetail.translatable')}</span>
               </label>
             )}
+            {form.is_translatable && aiAvailable && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" className="ck" checked={form.ai_translation_enabled} onChange={e => set('ai_translation_enabled', e.target.checked)} />
+                <span style={{ fontSize: 13 }}>{t('fieldDetail.aiTranslationEnable')}</span>
+              </label>
+            )}
             {!isVocabularyTerm && !((form.field_type === 'text' || form.field_type === 'richtext') && !form.is_repeatable) && (
               <span style={{ fontSize: 11, color: 'var(--fg-3)', alignSelf: 'center' }}>{t('fieldDetail.notTranslatableHint')}</span>
             )}
@@ -577,7 +588,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             <span style={{ fontSize: 13 }}>{t('fieldDetail.locked')}</span>
           </label>
         )}
-        {!isIdno && aiEligible && (
+        {!isIdno && aiEligible && aiAvailable && (
           <div style={{ marginBottom: 16, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--panel)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
               <input type="checkbox" className="ck" checked={form.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
@@ -1113,7 +1124,7 @@ function DeleteFieldModal({
 
   return (
     <div className="batch-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="batch-modal" style={{ width: 500 }} onClick={e => e.stopPropagation()}>
+      <div className="batch-modal batch-modal--compact" style={{ width: 500 }} onClick={e => e.stopPropagation()}>
         <div className="batch-modal-header">
           <h2>{t('deleteFieldModal.title')}</h2>
           <button className="btn sm ico gh" onClick={onClose} aria-label="Schließen">
@@ -1265,7 +1276,8 @@ function buildPath(type: string, subtype: string, target: string | null): string
 type Props = { initialPath?: string | null; onPathChange?: (path: string) => void }
 
 export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
-  const { t, i18n } = useTranslation('screenSchema')
+  const { t } = useTranslation('screenSchema')
+  const languages = useSupportedLanguages()
   const initial = parseInitial(initialPath)
   const [activeType, setActiveType] = useState(initial.type)
   const [activeSubtype, setActiveSubtype] = useState(initial.subtype)
@@ -1279,9 +1291,10 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [form, setForm] = useState<FieldFormState | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [pendingReconfigWarning, setPendingReconfigWarning] = useState<{ data: Omit<FieldDefinition, 'id'>; warnings: DestructiveReconfigWarning[] } | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [showAiAssist, setShowAiAssist] = useState(false)
-  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiAvailable, setAiAvailable] = useState(false)
   const [pidProviders, setPidProviders] = useState<('ark' | 'dnb_urn')[]>([])
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
   const [dragState, setDragState] = useState<{ id: string; overIndex: number } | null>(null)
@@ -1342,10 +1355,11 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   useEffect(() => {
     authority.list().then(setAuthoritySources).catch(() => setAuthoritySources([]))
     adminConfig.get().then(c => {
-      setAiEnabled(c.ai_enabled)
+      const available = c.ai_enabled && c.ai_secret.has_key && Boolean(c.ai_base_url) && Boolean(c.ai_model)
+      setAiAvailable(available)
       setPidProviders(c.pid_providers)
     }).catch(() => {
-      setAiEnabled(false)
+      setAiAvailable(false)
       setPidProviders([])
     })
   }, [])
@@ -1463,6 +1477,37 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     emitPath(null)
   }
 
+  async function performSave(data: Omit<FieldDefinition, 'id'>) {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      if (isNew) {
+        const created = await schema.create(data)
+        setFields(prev => [...prev, created])
+        setAllTypeFields(prev => [...prev, created])
+        closeDetail()
+        loadFields()
+        // Immediately open the new group field so user can add sub-fields
+        if (data.field_type === 'group') {
+          setTimeout(() => {
+            setIsNew(false)
+            setActiveFieldId(created.id)
+            setForm({ ...fieldToForm(created as FieldDefinition), subFields: [] })
+          }, 100)
+          return
+        }
+      } else {
+        const updated = await schema.update(activeFieldId!, data)
+        setForm(fieldToForm(updated))
+        loadFields()
+      }
+    } catch (e) {
+      setSaveError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleSave() {
     if (!form) return
     if (!form.name.trim()) {
@@ -1477,8 +1522,6 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       setSaveError(t('errorAuthoritySourceEmpty'))
       return
     }
-    setSaving(true)
-    setSaveError(null)
     const data = {
       target_type: form.target_type,
       target_subtype: form.target_subtype.trim() || null,
@@ -1512,6 +1555,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
         ...(form.is_repeatable && form.max_count.trim() ? { max_count: parseInt(form.max_count, 10) } : {}),
         ...(form.is_locked ? { is_locked: true } : {}),
+        ...(form.is_translatable && form.ai_translation_enabled ? { ai_translation: { enabled: true } } : {}),
         ...(form.ai_enabled ? {
           ai_config: {
             enabled: true,
@@ -1523,37 +1567,42 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         } : {}),
       },
     }
-    try {
-      if (isNew) {
-        const created = await schema.create(data)
-        setFields(prev => [...prev, created])
-        setAllTypeFields(prev => [...prev, created])
-        closeDetail()
-        loadFields()
-        // Immediately open the new group field so user can add sub-fields
-        if (data.field_type === 'group') {
-          setTimeout(() => {
-            setIsNew(false)
-            setActiveFieldId(created.id)
-            setForm({ ...fieldToForm(created as FieldDefinition), subFields: [] })
-          }, 100)
-          return
+    // Disabling is_translatable/is_repeatable or changing field_type on a field that
+    // already has data can hide or invalidate existing values — never silently.
+    // Preview the impact and let the admin confirm before sending it (#399).
+    if (!isNew && activeFieldId) {
+      const original = fields.find(f => f.id === activeFieldId) ?? allTypeFields.find(f => f.id === activeFieldId)
+      if (original) {
+        const disablingTranslatable = original.is_translatable && !data.is_translatable
+        const disablingRepeatable = original.is_repeatable && !data.is_repeatable
+        const changingType = original.field_type !== data.field_type
+        if (disablingTranslatable || disablingRepeatable || changingType) {
+          try {
+            const usage = await schema.getUsage(activeFieldId, {
+              newIsRepeatable: disablingRepeatable ? false : undefined,
+              newFieldType: changingType ? data.field_type : undefined,
+            })
+            const warnings: DestructiveReconfigWarning[] = []
+            if (disablingTranslatable && usage.usage_count > 0) {
+              warnings.push({ kind: 'translatable', count: usage.usage_count })
+            }
+            if (disablingRepeatable && (usage.repeatable_collapse_count ?? 0) > 0) {
+              warnings.push({ kind: 'repeatable', count: usage.repeatable_collapse_count! })
+            }
+            if (changingType && (usage.type_change_risk_count ?? 0) > 0) {
+              warnings.push({ kind: 'fieldType', count: usage.type_change_risk_count!, newFieldType: data.field_type })
+            }
+            if (warnings.length > 0) {
+              setPendingReconfigWarning({ data, warnings })
+              return
+            }
+          } catch {
+            // Usage lookup failing must not block the save.
+          }
         }
-      } else {
-        await schema.update(activeFieldId!, data)
-        loadFields()
-        // Keep group field open with updated form but preserve subFields
-        if (data.field_type === 'group') {
-          setForm(prev => prev ? { ...prev, ...data as Partial<FieldFormState> } : prev)
-          return
-        }
-        closeDetail()
       }
-    } catch (e) {
-      setSaveError((e as Error).message)
-    } finally {
-      setSaving(false)
     }
+    await performSave(data)
   }
 
   async function handleReorder(draggedId: string, targetId: string) {
@@ -1656,7 +1705,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     setDeleteTarget({
       id: activeFieldId,
       name: form.name,
-      label: getLabel(form.label, i18n.language) || form.name,
+      label: getLabel(form, form.name),
     })
   }
 
@@ -1720,7 +1769,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         <div><h1>{t('headline')}</h1><div className="sub">{t('headlineSub')}</div></div>
         <div className="right">
           {activeView === 'fields' && <>
-          {aiEnabled && (
+          {aiAvailable && (
             <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title={t('aiAssistTitle')}><Lightning size={13} /> {t('aiAssist')}</button>
           )}
           <button className="btn gh" onClick={() => setShowImport(true)}>{t('import')}</button>
@@ -1800,6 +1849,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               showSubtype={hasSubtypes && activeType !== 'vocabulary_term'}
               authoritySources={authoritySources}
               pidProviders={pidProviders}
+              aiAvailable={aiAvailable}
               onChange={setForm}
               onSave={handleSave}
               onDelete={handleDelete}
@@ -1812,7 +1862,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
               onRequestDeleteSubfield={sf => setDeleteTarget({
                 id: sf.id,
                 name: sf.name,
-                label: getLabel(sf.label, i18n.language) || sf.name,
+                label: getLabel(sf, sf.name),
                 isSubfield: true,
               })}
             />
@@ -1941,6 +1991,31 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         field={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onDeleted={handleFieldDeleted}
+      />
+    )}
+    {pendingReconfigWarning && (
+      <ConfirmModal
+        title={t('fieldDetail.reconfigWarningTitle')}
+        message={pendingReconfigWarning.warnings
+          .map(w => {
+            if (w.kind === 'translatable') {
+              return t(w.count === 1 ? 'fieldDetail.translatableDowngradeMessage' : 'fieldDetail.translatableDowngradeMessage_plural', { count: w.count, lang: (languages[0] ?? 'de').toUpperCase() })
+            }
+            if (w.kind === 'repeatable') {
+              return t(w.count === 1 ? 'fieldDetail.repeatableDowngradeMessage' : 'fieldDetail.repeatableDowngradeMessage_plural', { count: w.count })
+            }
+            return t(w.count === 1 ? 'fieldDetail.fieldTypeChangeRiskMessage' : 'fieldDetail.fieldTypeChangeRiskMessage_plural', { count: w.count, type: t(`fieldTypes.${w.newFieldType}`) })
+          })
+          .join('\n\n')}
+        confirmLabel={t('fieldDetail.reconfigWarningConfirm')}
+        cancelLabel={t('deleteFieldModal.cancel')}
+        danger
+        onConfirm={async () => {
+          const { data } = pendingReconfigWarning
+          setPendingReconfigWarning(null)
+          await performSave(data)
+        }}
+        onCancel={() => setPendingReconfigWarning(null)}
       />
     )}
     </>

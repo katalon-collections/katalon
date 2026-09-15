@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react'
 import { api, type PortalConfig } from '../api/client'
 
 const DEFAULT: PortalConfig = {
-  site_title: 'Katalon',
-  site_subtitle: '',
-  hero_text: '',
+  site_title: { de: 'Katalon' },
+  site_subtitle: {},
+  hero_text: {},
   featured_object_ids: [],
   facet_fields: {},
   subtitle_fields: {},

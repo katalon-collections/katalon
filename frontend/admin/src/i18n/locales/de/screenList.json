@@ -48,6 +48,18 @@
   "empty": "Keine Datensätze gefunden.",
   "deleteConfirm": "{{type}} wirklich löschen?",
   "deleteConfirmWithConflicts": "{{message}}\n\nAlle Verknüpfungen werden beim Löschen entfernt. Fortfahren?",
+  "deleting": "Wird gelöscht…",
+  "deleteChildrenModal": {
+    "title": "Sammlung hat Unterelemente",
+    "warningTitle": "Sammlung hat Unterelemente",
+    "warning": "Diese Sammlung hat {{count}} direktes Unterelement.",
+    "warning_plural": "Diese Sammlung hat {{count}} direkte Unterelemente.",
+    "chooseAction": "Wie soll mit den Unterelementen verfahren werden?",
+    "optionReparent": "Unterelemente eine Ebene hochstufen (Empfohlen)",
+    "optionReparentDesc": "Die Unterelemente werden auf die übergeordnete Sammlung dieser Sammlung umgehängt (bzw. zu Hauptsammlungen, falls diese Sammlung selbst keine übergeordnete Sammlung hatte).",
+    "optionCascade": "Unterelemente mitlöschen",
+    "optionCascadeDesc": "Der gesamte Teilbaum wird gelöscht, einschließlich aller Unterelemente."
+  },
   "editRowAriaLabel": "{{label}} bearbeiten",
   "editRowTitle": "Bearbeiten",
   "viewRowAriaLabel": "{{label}} anzeigen",

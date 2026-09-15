@@ -59,7 +59,7 @@ function settingsResults(language: string): AdminSearchResult[] {
     ['startseite', 'Startseite', 'Homepage'], ['terminologie', 'Terminologie', 'Terminology'],
     ['facetten', 'Facetten', 'Facets'], ['sprachen', 'Sprachen', 'Languages'], ['idno', 'ID-Schemas', 'ID schemas'],
     ['ki', 'KI', 'AI'], ['medien', 'Medienrechte', 'Media rights'], ['authorities', 'Normdatenquellen', 'Authority sources'],
-    ['suche', 'Suche & Indexierung', 'Search & indexing'], ['changelog', 'Versionshinweise', 'Release notes'],
+    ['suche', 'Suche & Indexierung', 'Search & indexing'],
     ['gefahrenbereich', 'Gefahrenbereich', 'Danger zone'],
   ]
   return sections.map(([id, de, en]) => ({

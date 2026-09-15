@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.35.0"
+    "version": "1.36.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -283,6 +283,69 @@
           },
           "422": {
             "description": "Invalid record/field type or malformed AI response"
+          },
+          "429": {
+            "description": "AI token usage limit exceeded"
+          },
+          "500": {
+            "description": "Admin configuration missing"
+          },
+          "502": {
+            "description": "AI provider request failed"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/ai/translate": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Generate an AI-assisted translation for one multilingual field value",
+        "operationId": "ai_translate_ai_field_post_v1_ai_translate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AITranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICompleteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Record or field definition not found"
+          },
+          "409": {
+            "description": "AI assistance disabled or not fully configured"
+          },
+          "422": {
+            "description": "Invalid field, language, or malformed AI response"
           },
           "429": {
             "description": "AI token usage limit exceeded"
@@ -2919,7 +2982,7 @@
         "tags": [
           "schema"
         ],
-        "summary": "Get record usage count for a field definition",
+        "summary": "Get record usage count for a field definition, optionally previewing the impact of a pending reconfiguration",
         "operationId": "schema_get_field_usage_get_v1_schema__field_id__usage",
         "security": [
           {
@@ -2939,6 +3002,42 @@
               "format": "uuid",
               "title": "Field Id"
             }
+          },
+          {
+            "name": "new_is_repeatable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "If False and the field is currently repeatable, also returns repeatable_collapse_count.",
+              "title": "New Is Repeatable"
+            },
+            "description": "If False and the field is currently repeatable, also returns repeatable_collapse_count."
+          },
+          {
+            "name": "new_field_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "If different from the field's current type, also returns type_change_risk_count.",
+              "title": "New Field Type"
+            },
+            "description": "If different from the field's current type, also returns type_change_risk_count."
           }
         ],
         "responses": {
@@ -4594,6 +4693,30 @@
               "default": false,
               "title": "Force"
             }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete this term and its whole subtree.",
+              "default": false,
+              "title": "Cascade"
+            },
+            "description": "Delete this term and its whole subtree."
+          },
+          {
+            "name": "reparent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Move direct child terms up to this term's parent before deleting.",
+              "default": false,
+              "title": "Reparent"
+            },
+            "description": "Move direct child terms up to this term's parent before deleting."
           }
         ],
         "responses": {
@@ -4603,8 +4726,11 @@
           "404": {
             "description": "Term not found"
           },
+          "400": {
+            "description": "cascade and reparent are mutually exclusive"
+          },
           "409": {
-            "description": "Term is in use; confirm force deletion or provide a replacement term"
+            "description": "Term has child terms (pass cascade=true or reparent=true) or is in use (confirm force deletion or provide a replacement term)"
           },
           "422": {
             "description": "Validation Error",
@@ -9109,6 +9235,30 @@
               "default": false,
               "title": "Force"
             }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete this collection and its whole subtree.",
+              "default": false,
+              "title": "Cascade"
+            },
+            "description": "Delete this collection and its whole subtree."
+          },
+          {
+            "name": "reparent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Move direct children up to this collection's parent before deleting.",
+              "default": false,
+              "title": "Reparent"
+            },
+            "description": "Move direct children up to this collection's parent before deleting."
           }
         ],
         "responses": {
@@ -9121,8 +9271,11 @@
           "403": {
             "description": "Insufficient permissions"
           },
+          "400": {
+            "description": "cascade and reparent are mutually exclusive"
+          },
           "409": {
-            "description": "Record has linked relations (pass force=true to delete anyway)"
+            "description": "Record has child collections (pass cascade=true or reparent=true) or linked relations (pass force=true to delete anyway)"
           },
           "422": {
             "description": "Validation Error",
@@ -9914,6 +10067,30 @@
               "default": false,
               "title": "Force"
             }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete this location and its whole subtree.",
+              "default": false,
+              "title": "Cascade"
+            },
+            "description": "Delete this location and its whole subtree."
+          },
+          {
+            "name": "reparent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Move direct children up to this location's parent before deleting.",
+              "default": false,
+              "title": "Reparent"
+            },
+            "description": "Move direct children up to this location's parent before deleting."
           }
         ],
         "responses": {
@@ -9926,8 +10103,11 @@
           "403": {
             "description": "Insufficient permissions"
           },
+          "400": {
+            "description": "cascade and reparent are mutually exclusive"
+          },
           "409": {
-            "description": "Record has linked relations (pass force=true to delete anyway)"
+            "description": "Record has child locations (pass cascade=true or reparent=true) or linked relations (pass force=true to delete anyway)"
           },
           "422": {
             "description": "Validation Error",
@@ -14795,57 +14975,6 @@
         }
       }
     },
-    "/v1/feedback": {
-      "post": {
-        "tags": [
-          "feedback"
-        ],
-        "summary": "Send in-app feedback message to Telegram (authenticated)",
-        "operationId": "feedback_send_feedback_post_v1_feedback",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackPayload"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "description": "Missing, invalid, or expired credentials"
-          },
-          "502": {
-            "description": "Telegram delivery failed"
-          },
-          "503": {
-            "description": "Feedback not configured"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ]
-      }
-    },
     "/v1/users/me/api-keys": {
       "get": {
         "tags": [
@@ -17829,6 +17958,20 @@
               "type": "string",
               "title": "Field Name"
             }
+          },
+          {
+            "name": "term_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "default": [],
+              "title": "Term Ids"
+            }
           }
         ],
         "responses": {
@@ -18400,6 +18543,51 @@
           "usage"
         ],
         "title": "AICompleteResponse"
+      },
+      "AITranslateRequest": {
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Field Definition Id"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Record Id"
+          },
+          "source_language": {
+            "type": "string",
+            "maxLength": 16,
+            "minLength": 2,
+            "title": "Source Language"
+          },
+          "target_language": {
+            "type": "string",
+            "maxLength": 16,
+            "minLength": 2,
+            "title": "Target Language"
+          },
+          "source_value": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_definition_id",
+          "record_type",
+          "record_id",
+          "source_language",
+          "target_language",
+          "source_value"
+        ],
+        "title": "AITranslateRequest"
       },
       "AIUsageRead": {
         "properties": {
@@ -21193,39 +21381,6 @@
         ],
         "title": "FeaturePermissionUpdate"
       },
-      "FeedbackPayload": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "url": {
-            "type": "string",
-            "title": "Url"
-          },
-          "user": {
-            "type": "string",
-            "title": "User"
-          },
-          "viewport": {
-            "type": "string",
-            "title": "Viewport"
-          },
-          "time": {
-            "type": "string",
-            "title": "Time"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message",
-          "url",
-          "user",
-          "viewport",
-          "time"
-        ],
-        "title": "FeedbackPayload"
-      },
       "FieldDefinitionCreate": {
         "properties": {
           "target_type": {
@@ -21517,6 +21672,28 @@
           "usage_count": {
             "type": "integer",
             "title": "Usage Count"
+          },
+          "repeatable_collapse_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeatable Collapse Count"
+          },
+          "type_change_risk_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Change Risk Count"
           }
         },
         "type": "object",
@@ -23889,15 +24066,24 @@
       "PortalConfigRead": {
         "properties": {
           "site_title": {
-            "type": "string",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
             "title": "Site Title"
           },
           "site_subtitle": {
-            "type": "string",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
             "title": "Site Subtitle"
           },
           "hero_text": {
-            "type": "string",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
             "title": "Hero Text"
           },
           "featured_object_ids": {
@@ -24041,7 +24227,10 @@
           "site_title": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
               },
               {
                 "type": "null"
@@ -24052,7 +24241,10 @@
           "site_subtitle": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
               },
               {
                 "type": "null"
@@ -24063,7 +24255,10 @@
           "hero_text": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
               },
               {
                 "type": "null"
@@ -26326,6 +26521,12 @@
             "type": "object",
             "title": "Metadata",
             "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
           }
         },
         "type": "object",
@@ -26507,6 +26708,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
+            "default": {}
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
             "default": {}
           },
           "_links": {
@@ -28051,10 +28258,6 @@
     {
       "name": "idno",
       "description": "Inventarnummern-Generierung."
-    },
-    {
-      "name": "feedback",
-      "description": "Nutzer-Feedback."
     },
     {
       "name": "ai",

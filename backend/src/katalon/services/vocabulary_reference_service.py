@@ -8,11 +8,40 @@ from collections.abc import Iterator
 from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import FieldDefinition, VocabularyTerm
 from katalon.services.relation_service import _RECORD_MODELS
+
+
+async def count_direct_children(db: AsyncSession, parent_id: uuid.UUID) -> int:
+    """Count vocabulary terms directly nested under ``parent_id``."""
+    result = await db.execute(
+        select(func.count()).where(VocabularyTerm.parent_id == parent_id)
+    )
+    return result.scalar_one()
+
+
+async def reparent_children(
+    db: AsyncSession, parent_id: uuid.UUID, new_parent_id: uuid.UUID | None
+) -> None:
+    """Move direct children of ``parent_id`` to ``new_parent_id``."""
+    await db.execute(
+        update(VocabularyTerm)
+        .where(VocabularyTerm.parent_id == parent_id)
+        .values(parent_id=new_parent_id)
+    )
+
+
+async def get_term_subtree_ids(db: AsyncSession, root_id: uuid.UUID) -> list[uuid.UUID]:
+    """Return root_id and all its recursive descendant vocabulary term IDs."""
+    base_query = select(VocabularyTerm.id).where(VocabularyTerm.id == root_id)
+    cte = base_query.cte(name="vocabulary_term_subtree", recursive=True)
+    child_query = select(VocabularyTerm.id).join(cte, VocabularyTerm.parent_id == cte.c.id)
+    cte = cte.union_all(child_query)
+    result = await db.execute(select(cte.c.id))
+    return list(result.scalars().all())
 
 
 def _references(value: object, term_id: uuid.UUID) -> Iterator[dict[str, Any]]:

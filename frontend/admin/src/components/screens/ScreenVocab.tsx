@@ -272,15 +272,16 @@ function DeleteTermModal({
   onClose,
   onDeleted,
 }: DeleteTermModalProps) {
-  const { t, i18n } = useTranslation('screenVocab')
+  const { t } = useTranslation('screenVocab')
   const [usageCount, setUsageCount] = useState<number | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(true)
   const [deleteAction, setDeleteAction] = useState<'remove' | 'remap' | 'force'>('remove')
   const [replacementTermId, setReplacementTermId] = useState<string>('')
+  const [childAction, setChildAction] = useState<'reparent' | 'cascade'>('reparent')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const termLabel = getLabel(term.label, i18n.language) || term.term
+  const termLabel = getLabel(term, term.term)
 
   useEffect(() => {
     let active = true
@@ -300,6 +301,13 @@ function DeleteTermModal({
     return () => { active = false }
   }, [term.id])
 
+  function selectChildAction(action: 'reparent' | 'cascade') {
+    setChildAction(action)
+    // A replacement term can't be resolved for a whole deleted subtree — see
+    // the backend's cascade/replacement_term_id mutual-exclusion guard.
+    if (action === 'cascade' && deleteAction === 'remap') setDeleteAction('remove')
+  }
+
   async function handleConfirm() {
     if (usageCount && usageCount > 0 && deleteAction === 'remap' && !replacementTermId) {
       setError(t('termDeletion.selectReplacementError'))
@@ -307,15 +315,18 @@ function DeleteTermModal({
     }
     setSubmitting(true)
     setError(null)
+    const hierarchyOptions = childCount > 0
+      ? { cascade: childAction === 'cascade', reparent: childAction === 'reparent' }
+      : {}
     try {
       if (usageCount === 0) {
-        await vocabularies.deleteTerm(term.id)
+        await vocabularies.deleteTerm(term.id, hierarchyOptions)
       } else if (deleteAction === 'remove') {
-        await vocabularies.deleteTerm(term.id, { removeFromRecords: true })
+        await vocabularies.deleteTerm(term.id, { removeFromRecords: true, ...hierarchyOptions })
       } else if (deleteAction === 'remap') {
-        await vocabularies.deleteTerm(term.id, { replacementTermId })
+        await vocabularies.deleteTerm(term.id, { replacementTermId, ...hierarchyOptions })
       } else {
-        await vocabularies.deleteTerm(term.id, { force: true })
+        await vocabularies.deleteTerm(term.id, { force: true, ...hierarchyOptions })
       }
       onDeleted()
       onClose()
@@ -343,8 +354,76 @@ function DeleteTermModal({
           </p>
 
           {childCount > 0 && (
-            <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', padding: '8px 12px', borderRadius: 6 }}>
-              {t('termDeletion.childrenWarning', { children: childCount })}
+            <div className="batch-warning" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <Alert size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', marginBottom: 4 }}>
+                    {t('termDeletion.childrenWarningTitle')}
+                  </strong>
+                  <p style={{ margin: 0, fontSize: 13, color: '#92400e' }}>
+                    {t(childCount === 1 ? 'termDeletion.childrenWarning' : 'termDeletion.childrenWarning_plural', { count: childCount })}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    background: childAction === 'reparent' ? 'var(--panel-active, rgba(0,0,0,0.03))' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="termChildAction"
+                    value="reparent"
+                    checked={childAction === 'reparent'}
+                    onChange={() => selectChildAction('reparent')}
+                    style={{ marginTop: 3 }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{t('termDeletion.childOptionReparent')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 2 }}>
+                      {t('termDeletion.childOptionReparentDesc')}
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    background: childAction === 'cascade' ? 'var(--panel-active, rgba(0,0,0,0.03))' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="termChildAction"
+                    value="cascade"
+                    checked={childAction === 'cascade'}
+                    onChange={() => selectChildAction('cascade')}
+                    style={{ marginTop: 3 }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#b91c1c' }}>{t('termDeletion.childOptionCascade')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 2 }}>
+                      {t('termDeletion.childOptionCascadeDesc')}
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
 
@@ -401,50 +480,54 @@ function DeleteTermModal({
                     </div>
                   </label>
 
-                  {/* Option 2: Remap */}
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 10,
-                      padding: '10px 12px',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      background: deleteAction === 'remap' ? 'var(--panel-active, rgba(0,0,0,0.03))' : 'transparent',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="termDeleteAction"
-                      value="remap"
-                      checked={deleteAction === 'remap'}
-                      onChange={() => setDeleteAction('remap')}
-                      style={{ marginTop: 3 }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{t('termDeletion.optionRemap')}</div>
-                      <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 2, marginBottom: deleteAction === 'remap' ? 8 : 0 }}>
-                        {t('termDeletion.optionRemapDesc')}
-                      </div>
-                      {deleteAction === 'remap' && (
-                        <select
-                          className="form-control"
-                          value={replacementTermId}
-                          onChange={e => setReplacementTermId(e.target.value)}
-                          style={{ width: '100%', fontSize: 13, padding: '6px 8px' }}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <option value="">{t('termDeletion.selectReplacement')}</option>
-                          {availableTerms.map(tItem => (
-                            <option key={tItem.id} value={tItem.id}>
-                              {getLabel(tItem.label, i18n.language) || tItem.term}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </label>
+                  {!(childCount > 0 && childAction === 'cascade') && (
+                    <>
+                      {/* Option 2: Remap */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                          padding: '10px 12px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          background: deleteAction === 'remap' ? 'var(--panel-active, rgba(0,0,0,0.03))' : 'transparent',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="termDeleteAction"
+                          value="remap"
+                          checked={deleteAction === 'remap'}
+                          onChange={() => setDeleteAction('remap')}
+                          style={{ marginTop: 3 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{t('termDeletion.optionRemap')}</div>
+                          <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 2, marginBottom: deleteAction === 'remap' ? 8 : 0 }}>
+                            {t('termDeletion.optionRemapDesc')}
+                          </div>
+                          {deleteAction === 'remap' && (
+                            <select
+                              className="form-control"
+                              value={replacementTermId}
+                              onChange={e => setReplacementTermId(e.target.value)}
+                              style={{ width: '100%', fontSize: 13, padding: '6px 8px' }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <option value="">{t('termDeletion.selectReplacement')}</option>
+                              {availableTerms.map(tItem => (
+                                <option key={tItem.id} value={tItem.id}>
+                                  {getLabel(tItem, tItem.term)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </label>
+                    </>
+                  )}
 
                   {/* Option 3: Force (Tombstone) */}
                   <label

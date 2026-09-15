@@ -269,6 +269,8 @@ def _validate_url_value(value: object, field_name: str) -> str | None:
     """Validate a single URL dict {"value": "https://...", "label": "optional"}. Returns error or None."""
     if not isinstance(value, dict):
         return f"Feld '{field_name}': URL muss ein Objekt {{value, label}} sein."
+    if not value.get("value"):
+        return None
     if not _is_http_url(value.get("value")):
         return f"Feld '{field_name}': URL-Wert (value) muss eine vollständige http(s)-URL sein."
     label = value.get("label")
@@ -893,3 +895,190 @@ async def purge_field_data(
 
     return modified_count
 
+
+async def migrate_translatable_shape(
+    db: AsyncSession,
+    field: FieldDefinition,
+    *,
+    enable: bool,
+    primary_language: str,
+    user_id: uuid.UUID | None = None,
+) -> int:
+    """Reshape existing values of a top-level text/richtext field after its
+    ``is_translatable`` flag changed, so the schema and the stored data never
+    drift apart (#399 — a field toggled translatable left legacy plain-string
+    values unreadable; toggling it off left `{lang: text}` objects invalid).
+
+    Enabling (``enable=True``): wraps a legacy plain-string value into
+    ``{primary_language: value}``. Lossless — every character is kept.
+
+    Disabling (``enable=False``): collapses a ``{lang: text}`` value back to a
+    plain string, keeping ``primary_language``'s text (or the first non-empty
+    language if the primary one is empty) and discarding every other
+    language. Callers MUST warn the admin before triggering this direction —
+    text in the dropped languages is not recoverable from the database.
+
+    Returns the number of records whose value was reshaped.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from katalon.services.audit_service import log_change
+
+    model = get_target_model(field.target_type)
+    if model is None:
+        return 0
+
+    query = select(model).where(model.metadata_.has_key(field.name))
+    if hasattr(model, "deleted_at"):
+        query = query.where(model.deleted_at.is_(None))
+
+    result = await db.execute(query)
+    records = list(result.scalars().all())
+
+    migrated = 0
+    for record in records:
+        if not record.metadata_ or not isinstance(record.metadata_, dict):
+            continue
+        val = record.metadata_.get(field.name)
+        if enable:
+            if not isinstance(val, str) or not val.strip():
+                continue
+            record.metadata_[field.name] = {primary_language: val}
+        else:
+            if not isinstance(val, dict):
+                continue
+            text = val.get(primary_language) or next(
+                (v for v in val.values() if isinstance(v, str) and v.strip()), ""
+            )
+            record.metadata_[field.name] = text
+
+        flag_modified(record, "metadata_")
+        migrated += 1
+        if field.target_type != "vocabulary_term":
+            await log_change(
+                db,
+                record_type=field.target_type,
+                record_id=record.id,
+                user_id=user_id,
+                action="field_shape_migrated",
+                changed_fields={
+                    "field": field.name,
+                    "direction": "translatable_on" if enable else "translatable_off",
+                },
+            )
+
+    return migrated
+
+
+async def migrate_repeatable_shape(
+    db: AsyncSession,
+    field: FieldDefinition,
+    *,
+    enable: bool,
+    user_id: uuid.UUID | None = None,
+) -> int:
+    """Reshape existing values of a top-level field after its ``is_repeatable``
+    flag changed (#399 — same drift-prevention as migrate_translatable_shape;
+    subfields of a group are out of scope, group fields are always repeatable).
+
+    Enabling (``enable=True``): wraps a scalar value into ``[value]``. Lossless.
+
+    Disabling (``enable=False``): collapses a list back to its first entry.
+    Every other entry is discarded. Callers MUST warn the admin before
+    triggering this direction — see ``count_repeatable_collapse_loss``.
+
+    Returns the number of records whose value was reshaped.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from katalon.services.audit_service import log_change
+
+    model = get_target_model(field.target_type)
+    if model is None:
+        return 0
+
+    query = select(model).where(model.metadata_.has_key(field.name))
+    if hasattr(model, "deleted_at"):
+        query = query.where(model.deleted_at.is_(None))
+
+    result = await db.execute(query)
+    records = list(result.scalars().all())
+
+    migrated = 0
+    for record in records:
+        if not record.metadata_ or not isinstance(record.metadata_, dict):
+            continue
+        val = record.metadata_.get(field.name)
+        if enable:
+            if isinstance(val, list) or val is None or val == "":
+                continue
+            record.metadata_[field.name] = [val]
+        else:
+            if not isinstance(val, list):
+                continue
+            record.metadata_[field.name] = val[0] if val else None
+
+        flag_modified(record, "metadata_")
+        migrated += 1
+        if field.target_type != "vocabulary_term":
+            await log_change(
+                db,
+                record_type=field.target_type,
+                record_id=record.id,
+                user_id=user_id,
+                action="field_shape_migrated",
+                changed_fields={
+                    "field": field.name,
+                    "direction": "repeatable_on" if enable else "repeatable_off",
+                },
+            )
+
+    return migrated
+
+
+async def count_repeatable_collapse_loss(db: AsyncSession, field: FieldDefinition) -> int:
+    """Count records whose current list value for ``field`` holds more than one
+    entry — i.e. how many would actually lose data if ``is_repeatable`` were
+    disabled (collapsing to the first entry)."""
+    model = get_target_model(field.target_type)
+    if model is None:
+        return 0
+    query = select(model.metadata_).where(model.metadata_.has_key(field.name))
+    if hasattr(model, "deleted_at"):
+        query = query.where(model.deleted_at.is_(None))
+    result = await db.execute(query)
+    count = 0
+    for metadata in result.scalars().all():
+        if not isinstance(metadata, dict):
+            continue
+        val = metadata.get(field.name)
+        if isinstance(val, list) and len(val) > 1:
+            count += 1
+    return count
+
+
+# field_type pairs whose values are all plain strings — freely interchangeable,
+# a change within this group can never make an existing value invalid.
+_INTERCHANGEABLE_SCALAR_TYPES = {"text", "richtext", "vocab_free", "geo"}
+
+
+async def count_field_type_change_risk(
+    db: AsyncSession, field: FieldDefinition, new_field_type: str
+) -> int:
+    """Count existing records whose value may no longer fit ``new_field_type``.
+
+    Unlike the is_translatable/is_repeatable migrations, a field_type change
+    never touches stored values — there is no generally safe way to convert a
+    plain string into e.g. a vocabulary reference. The record keeps exactly
+    what it has; it just cannot be re-saved unmodified once the schema no
+    longer matches. Returns 0 when the change stays within the interchangeable
+    plain-text group, where nothing can become invalid.
+    """
+    if field.field_type == new_field_type:
+        return 0
+    if (
+        field.field_type in _INTERCHANGEABLE_SCALAR_TYPES
+        and new_field_type in _INTERCHANGEABLE_SCALAR_TYPES
+    ):
+        return 0
+    return await count_field_usage(db, field)

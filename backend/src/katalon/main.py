@@ -37,7 +37,6 @@ from katalon.api.v1 import (
     export,
     export_mapping_sets,
     export_profiles,
-    feedback,
     form_sections,
     form_variants,
     idno,
@@ -117,7 +116,6 @@ OPENAPI_TAGS = [
     {"name": "portal", "description": "Öffentliche Portal-Endpoints."},
     {"name": "pids", "description": "Persistent Identifiers."},
     {"name": "idno", "description": "Inventarnummern-Generierung."},
-    {"name": "feedback", "description": "Nutzer-Feedback."},
     {"name": "ai", "description": "KI-gestützte Vorschläge (z. B. Auto-Mapping)."},
     {"name": "dnb-urn-mock", "description": "Test-Double für DNB-URN-Vergabe (nur Dev/Test)."},
     {"name": "working-sets", "description": "Arbeitslisten / Sets für Ad-hoc-Gruppierungen von Datensätzen."},
@@ -668,7 +666,6 @@ app.include_router(export_mapping_sets.router, prefix="/v1", dependencies=_authe
 app.include_router(export_profiles.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
-app.include_router(feedback.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_authenticated)
 app.include_router(working_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(sparql.router, prefix="")

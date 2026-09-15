@@ -469,9 +469,9 @@ export interface TerminologyEntry {
 }
 
 export interface PortalConfigRead {
-  site_title: string
-  site_subtitle: string
-  hero_text: string
+  site_title: Record<string, string>
+  site_subtitle: Record<string, string>
+  hero_text: Record<string, string>
   featured_object_ids: string[]
   facet_fields: Record<string, string[]>
   subtitle_fields: Record<string, string[]>

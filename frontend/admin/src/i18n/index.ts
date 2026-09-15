@@ -9,8 +9,6 @@ import deAuthorityInput from './locales/de/authorityInput.json'
 import enAuthorityInput from './locales/en/authorityInput.json'
 import deBatchEditModal from './locales/de/batchEditModal.json'
 import enBatchEditModal from './locales/en/batchEditModal.json'
-import deFeedbackButton from './locales/de/feedbackButton.json'
-import enFeedbackButton from './locales/en/feedbackButton.json'
 import deRichTextEditor from './locales/de/richTextEditor.json'
 import enRichTextEditor from './locales/en/richTextEditor.json'
 import deScreenForm from './locales/de/screenForm.json'
@@ -78,7 +76,6 @@ i18next.use(initReactI18next).init({
       translation: de,
       authorityInput: deAuthorityInput,
       batchEditModal: deBatchEditModal,
-      feedbackButton: deFeedbackButton,
       richTextEditor: deRichTextEditor,
       screenForm: deScreenForm,
       screenFormVariants: deScreenFormVariants,
@@ -109,7 +106,6 @@ i18next.use(initReactI18next).init({
       translation: en,
       authorityInput: enAuthorityInput,
       batchEditModal: enBatchEditModal,
-      feedbackButton: enFeedbackButton,
       richTextEditor: enRichTextEditor,
       screenForm: enScreenForm,
       screenFormVariants: enScreenFormVariants,

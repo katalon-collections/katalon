@@ -4,6 +4,12 @@
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
+/** Picks one string out of a {"de": ..., "en": ...} field, falling back to whatever
+ *  language is set before giving up and using `fallback`. */
+export function resolveLangText(value: Record<string, string> | undefined, locale: string, fallback = ''): string {
+  return value?.[locale] || Object.values(value ?? {}).find(Boolean) || fallback
+}
+
 /** Strips markdown syntax down to plain text, for teaser/preview contexts (card excerpts,
  *  <meta name="description">) where richtext fields shouldn't leak raw `**`/`#`/link syntax. */
 export function markdownToPlainText(value: string): string {
@@ -88,7 +94,12 @@ export function formatDateValue(value: string): string {
  * Converts a metadata field value to a human-readable string for display.
  * Returns null if the value is empty / should be skipped.
  */
-export function renderFieldValue(value: unknown, locale?: string, fieldType?: string): string | null {
+export function renderFieldValue(
+  value: unknown,
+  locale?: string,
+  fieldType?: string,
+  vocabularyLabels?: ReadonlyMap<string, string>,
+): string | null {
   if (value == null) return null
 
   if (fieldType === 'date') {
@@ -102,6 +113,10 @@ export function renderFieldValue(value: unknown, locale?: string, fieldType?: st
   // Authority entry {source, external_id, label} / translatable field {lang: text}
   if (typeof value === 'object' && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>
+    if (fieldType === 'vocab' && typeof obj.id === 'string') {
+      const localizedLabel = vocabularyLabels?.get(obj.id)
+      if (localizedLabel) return localizedLabel
+    }
     if (typeof obj.label === 'string' && obj.label) return obj.label
     if (typeof obj.value === 'string' && obj.value) return obj.value
     // Translatable field: prefer active locale → de → en → first non-empty value.
@@ -124,6 +139,10 @@ export function renderFieldValue(value: unknown, locale?: string, fieldType?: st
         if (typeof item === 'string') return item
         if (typeof item === 'object' && item !== null) {
           const o = item as Record<string, unknown>
+          if (fieldType === 'vocab' && typeof o.id === 'string') {
+            const localizedLabel = vocabularyLabels?.get(o.id)
+            if (localizedLabel) return localizedLabel
+          }
           if (typeof o.label === 'string' && o.label) return o.label
           if (typeof o.value === 'string' && o.value) return o.value
           if (typeof o.name === 'string' && o.name) return o.name
@@ -159,13 +178,18 @@ function facetRawValue(item: unknown): string | null {
 /** Pairs each metadata item with its facet-filter raw value (matching the `facet_all_<field>`
  *  term indexed in Elasticsearch) and its human-readable display text, so detail pages can
  *  render a click-to-filter link per value for fields marked `is_facet`. */
-export function facetItems(value: unknown, locale?: string, fieldType?: string): { display: string; raw: string }[] {
+export function facetItems(
+  value: unknown,
+  locale?: string,
+  fieldType?: string,
+  vocabularyLabels?: ReadonlyMap<string, string>,
+): { display: string; raw: string }[] {
   const entries = Array.isArray(value) ? value : [value]
   return entries
     .map(item => {
       const raw = facetRawValue(item)
       if (raw === null) return null
-      const display = renderFieldValue(item, locale, fieldType) ?? raw
+      const display = renderFieldValue(item, locale, fieldType, vocabularyLabels) ?? raw
       return { display, raw }
     })
     .filter((entry): entry is { display: string; raw: string } => entry !== null)

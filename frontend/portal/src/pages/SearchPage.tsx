@@ -30,7 +30,7 @@ function facetLabel(
   return (owner ? labels[owner]?.[field]?.label : undefined) ?? field
 }
 
-const DEFAULT_SUBTITLE_FIELDS = ['record_type', 'status']
+const DEFAULT_SUBTITLE_FIELDS: string[] = []
 const DEFAULT_SYSTEM_FACETS = ['record_type', 'subtype']
 // Relation-derived facets — see configuredMetadataFacets: included in the
 // request field list, but rendered as dedicated panels below, not generic ones.
@@ -655,6 +655,8 @@ export function SearchPage() {
                     })
                   }
 
+                  const subtitle = resultSubtitle(r, subtitleConfig)
+
                   if (effectiveViewMode === 'list') {
                     return (
                       <Link key={r.id} className="result-row" to={path} onClick={saveContext}>
@@ -672,7 +674,7 @@ export function SearchPage() {
                             <span className="result-type-badge">{r.subtype ? subtypeLabel(r.subtype) : typeLabel(r.record_type)}</span>
                             {r.title || r.id}
                           </div>
-                          <div className="desc">{resultSubtitle(r, subtitleConfig)}</div>
+                          {subtitle && <div className="desc">{subtitle}</div>}
                         </div>
                       </Link>
                     )
@@ -698,8 +700,11 @@ export function SearchPage() {
                         </div>
                       )}
                       <div className="result-card__info">
-                        <div className="result-card__title">{r.title || r.id}</div>
-                        <div className="result-card__meta">{resultSubtitle(r, subtitleConfig)}</div>
+                        <div className="result-card__title">
+                          <span className="result-type-badge">{r.subtype ? subtypeLabel(r.subtype) : typeLabel(r.record_type)}</span>
+                          {r.title || r.id}
+                        </div>
+                        {subtitle && <div className="result-card__meta">{subtitle}</div>}
                       </div>
                     </Link>
                   )

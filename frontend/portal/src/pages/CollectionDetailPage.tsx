@@ -267,7 +267,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
         </div>
 
         {/* 2-Spalten-Layout: Links Hierarchie & Metadaten, Rechts Bestands-Objekte */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) 1fr', gap: 32, alignItems: 'start' }}>
+        <div className="collection-detail-grid">
           
           {/* Linke Spalte: Hierarchiebaum & Formale Metadaten */}
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

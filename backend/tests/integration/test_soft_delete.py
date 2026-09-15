@@ -81,7 +81,6 @@ async def test_object_soft_delete_listed_in_trash_and_restorable(
             "/v1/entities",
             lambda idno: {
                 "idno": idno,
-                "entity_type": "person",
                 "status": "draft",
                 "metadata_": {"label": "to be trashed"},
             },

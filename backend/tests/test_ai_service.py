@@ -1,16 +1,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Karl Krägelin
-
 import json
+import uuid
 from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
 from PIL import Image
 
+import katalon.services.ai_service as ai_service
 from katalon.services.ai_service import (
     _build_messages,
+    _build_translation_messages,
     _coerce_value,
     _enforce_input_token_limit,
     _extract_content,
@@ -85,6 +88,66 @@ def test_group_ai_uses_only_requested_instance() -> None:
     assert '"current_value": "Alt hinten"' in prompt
     assert "Vorderseite" not in prompt
 
+
+
+def test_translation_prompt_preserves_richtext_structure() -> None:
+    field = SimpleNamespace(name="beschreibung", field_type="richtext")
+    messages = _build_translation_messages(
+        field,
+        source_language="de",
+        target_language="en",
+        source_value='<p>Siehe <a href="https://example.org">Katalog</a>.</p>',
+    )
+
+    assert "HTML-Struktur" in messages[0]["content"]
+    assert json.loads(messages[1]["content"]) == {
+        "field": {"name": "beschreibung", "field_type": "richtext"},
+        "source_language": "de",
+        "target_language": "en",
+        "source_value": '<p>Siehe <a href="https://example.org">Katalog</a>.</p>',
+    }
+
+
+async def test_translation_uses_default_languages_when_config_list_is_empty(monkeypatch) -> None:
+    field = SimpleNamespace(
+        id="field-id",
+        name="beschreibung",
+        field_type="richtext",
+        target_type="object",
+        is_translatable=True,
+        settings={"ai_translation": {"enabled": True}},
+    )
+    config = SimpleNamespace(supported_languages=[], ai_model="test-model", ai_max_output_tokens=100)
+    monkeypatch.setattr(ai_service, "_load_field", AsyncMock(return_value=field))
+    monkeypatch.setattr(ai_service, "_load_record", AsyncMock(return_value=SimpleNamespace()))
+    monkeypatch.setattr(ai_service, "get_admin_ai_config", AsyncMock(return_value=config))
+    monkeypatch.setattr(ai_service, "ensure_ai_allowed", AsyncMock(return_value=config))
+    monkeypatch.setattr(ai_service, "get_secret", AsyncMock(return_value="test-key"))
+    monkeypatch.setattr(
+        ai_service,
+        "call_ai_provider",
+        AsyncMock(
+            return_value={
+                "choices": [{"message": {"content": '{"value":"Description"}'}}],
+                "usage": {"prompt_tokens": 4, "completion_tokens": 2},
+            }
+        ),
+    )
+    monkeypatch.setattr(ai_service, "log_change", AsyncMock())
+    db = SimpleNamespace(add=Mock(), flush=AsyncMock())
+
+    result = await ai_service.translate_field(
+        db,
+        user_id=uuid.uuid4(),
+        record_type="object",
+        record_id=uuid.uuid4(),
+        field_definition_id=uuid.uuid4(),
+        source_language="de",
+        target_language="en",
+        source_value="<p>Beschreibung</p>",
+    )
+
+    assert result["value"] == "Description"
 
 def test_vision_image_is_resized_to_1024px_jpeg(tmp_path) -> None:
     path = tmp_path / "primary.png"

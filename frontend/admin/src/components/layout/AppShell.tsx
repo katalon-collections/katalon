@@ -95,7 +95,7 @@ function Placeholder({ label }: { label: string }) {
 }
 
 export function AppShell() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [loggedIn, setLoggedIn] = useState(hasToken)
   const [sessionChecked, setSessionChecked] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -124,7 +124,8 @@ export function AppShell() {
     if (!loggedIn) return
     req<PortalConfigRead>(`${BASE}/v1/portal/config`)
       .then(config => {
-        if (config.site_title?.trim()) setAppTitle(config.site_title.trim())
+        const title = (config.site_title?.[i18n.language] ?? Object.values(config.site_title ?? {}).find(Boolean) ?? '').trim()
+        if (title) setAppTitle(title)
       })
       .catch(() => {})
   }, [loggedIn])

@@ -1,3 +1,11 @@
 {
-  "removeLang": "{{lang}} entfernen"
+  "removeLang": "{{lang}} entfernen",
+  "translateFrom": "Aus {{lang}} übersetzen",
+  "createTranslation": "Übersetzung erstellen",
+  "updateTranslation": "Übersetzung aktualisieren",
+  "translationRunning": "KI übersetzt…",
+  "translationSource": "Quellsprache für {{target}} wählen",
+  "translationFromOption": "Aus {{lang}}",
+  "aiGeneratedTitle": "KI-generiert ({{model}}) am {{at}}",
+  "translationNoSource": "Zuerst Text in einer anderen Sprache erfassen."
 }

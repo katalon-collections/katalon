@@ -210,3 +210,84 @@ async def test_relations_include_subcollections(async_client, auth_headers) -> N
     assert portal_res.status_code == 200
     portal_from_ids = {item["from_id"] for item in portal_res.json()}
     assert portal_from_ids == {obj1_id, obj2_id}
+
+
+@pytest.mark.asyncio
+async def test_collection_delete_blocks_cascades_and_reparents(async_client, auth_headers) -> None:
+    root_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": f"COL-{uuid.uuid4().hex[:10]}",
+            "status": "public",
+            "metadata_": {"label": "Root"},
+        },
+    )
+    assert root_res.status_code == 201, root_res.text
+    root_id = root_res.json()["id"]
+
+    child_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": f"COL-{uuid.uuid4().hex[:10]}",
+            "parent_id": root_id,
+            "status": "public",
+            "metadata_": {"label": "Child"},
+        },
+    )
+    assert child_res.status_code == 201, child_res.text
+    child_id = child_res.json()["id"]
+
+    grandchild_res = await async_client.post(
+        "/v1/collections",
+        headers=auth_headers,
+        json={
+            "idno": f"COL-{uuid.uuid4().hex[:10]}",
+            "parent_id": child_id,
+            "status": "public",
+            "metadata_": {"label": "Grandchild"},
+        },
+    )
+    assert grandchild_res.status_code == 201, grandchild_res.text
+    grandchild_id = grandchild_res.json()["id"]
+
+    # Deleting root is blocked by default — it still has a child collection.
+    blocked = await async_client.delete(f"/v1/collections/{root_id}", headers=auth_headers)
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["child_count"] == 1
+
+    # Reparent moves the child up (root -> None) instead of orphaning it silently.
+    reparented = await async_client.delete(
+        f"/v1/collections/{root_id}",
+        headers=auth_headers,
+        params={"reparent": "true"},
+    )
+    assert reparented.status_code == 204, reparented.text
+    child_after = await async_client.get(f"/v1/collections/{child_id}", headers=auth_headers)
+    assert child_after.status_code == 200, child_after.text
+    assert child_after.json()["parent_id"] is None
+
+    # Cascade removes the whole remaining subtree (child + grandchild) in one call.
+    cascade_blocked = await async_client.delete(f"/v1/collections/{child_id}", headers=auth_headers)
+    assert cascade_blocked.status_code == 409, cascade_blocked.text
+    assert cascade_blocked.json()["detail"]["child_count"] == 1
+
+    cascade_deleted = await async_client.delete(
+        f"/v1/collections/{child_id}",
+        headers=auth_headers,
+        params={"cascade": "true"},
+    )
+    assert cascade_deleted.status_code == 204, cascade_deleted.text
+    grandchild_after = await async_client.get(
+        f"/v1/collections/{grandchild_id}", headers=auth_headers
+    )
+    assert grandchild_after.status_code == 404, grandchild_after.text
+
+    # cascade and reparent are mutually exclusive.
+    conflict = await async_client.delete(
+        f"/v1/collections/{root_id}",
+        headers=auth_headers,
+        params={"cascade": "true", "reparent": "true"},
+    )
+    assert conflict.status_code == 400, conflict.text

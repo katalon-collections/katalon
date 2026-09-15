@@ -38,11 +38,15 @@ services:
       dockerfile: ../docker/Dockerfile.backend.dev
     environment:
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
+      DEFAULT_ADMIN_EMAIL: admin@katalon.dev
+      DEFAULT_ADMIN_PASSWORD: 1qayxsw2
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
+      - ./backend/docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ${MEDIA_ROOT:-./media}:/var/lib/katalon/media
-    command: uvicorn katalon.main:app --host 0.0.0.0 --port 8000 --reload
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+    command: ["uvicorn", "katalon.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
     depends_on:
@@ -91,7 +95,6 @@ services:
       - API_PROXY_TARGET=http://api:8000
       - VITE_BASE_PATH=/admin/
       - VITE_PORTAL_URL=https://${KATALON_LOCAL_DOMAIN:-katalon.local}
-      - VITE_ADMIN_FEEDBACK_ENABLED=${VITE_ADMIN_FEEDBACK_ENABLED:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
       interval: 10s

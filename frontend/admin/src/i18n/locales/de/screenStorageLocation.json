@@ -23,6 +23,18 @@
   "delete": "Löschen",
   "deleting": "Löschen…",
   "deleteConfirm": "Lagerort „{{name}}“ wirklich löschen?",
+  "deleteConflictRetry": "{{message}} Trotzdem löschen?",
+  "deleteChildrenModal": {
+    "title": "Lagerort hat Unterelemente",
+    "warningTitle": "Lagerort hat Unterelemente",
+    "warning": "Dieser Lagerort hat {{count}} direktes Unterelement.",
+    "warning_plural": "Dieser Lagerort hat {{count}} direkte Unterelemente.",
+    "chooseAction": "Wie soll mit den Unterelementen verfahren werden?",
+    "optionReparent": "Unterelemente eine Ebene hochstufen (Empfohlen)",
+    "optionReparentDesc": "Die Unterelemente werden auf den übergeordneten Lagerort dieses Lagerorts umgehängt (bzw. zu Hauptlagerorten, falls dieser Lagerort selbst keinen übergeordneten Lagerort hatte).",
+    "optionCascade": "Unterelemente mitlöschen",
+    "optionCascadeDesc": "Der gesamte Teilbaum wird gelöscht, einschließlich aller Unterelemente."
+  },
   "errorVersionConflict": "Der Lagerort wurde inzwischen von jemand anderem geändert. Bitte neu laden und erneut versuchen.",
   "objectsHeading": "Objekte an diesem Standort",
   "includeSublocations": "Untergeordnete Standorte einbeziehen",

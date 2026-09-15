@@ -388,3 +388,423 @@ async def test_deleting_subfield_with_purge_data_removes_nested_values(
     group_val = persisted.json()["metadata_"][group_name]
     assert group_val == [{"other": "bleibt"}]
 
+
+@pytest.mark.asyncio
+async def test_enabling_translatable_wraps_legacy_string_values(async_client, auth_headers) -> None:
+    """Toggling a field to is_translatable=True must not orphan existing plain-string
+    values (#399): they are wrapped into {primary_language: value} so they stay visible
+    and editable instead of silently reading as empty.
+    """
+    field_name = f"desc_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "richtext",
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"XLATE-ON-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "Legacy-Objekt", field_name: "<p>Alter Text</p>"},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    toggle_on = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "richtext",
+            "is_translatable": True,
+        },
+    )
+    assert toggle_on.status_code == 200, toggle_on.text
+    assert toggle_on.json()["is_translatable"] is True
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == {"de": "<p>Alter Text</p>"}
+
+
+@pytest.mark.asyncio
+async def test_disabling_translatable_keeps_primary_language_and_drops_others(
+    async_client, auth_headers
+) -> None:
+    """Toggling is_translatable off collapses {lang: text} back to a plain string. This
+    direction is lossy (secondary-language text is discarded) but must never leave the
+    field holding a dict that the now-non-translatable schema can no longer validate.
+    """
+    field_name = f"desc_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "text",
+            "is_translatable": True,
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"XLATE-OFF-{uuid.uuid4().hex[:12]}",
+            "metadata_": {
+                "label": "Mehrsprachiges Objekt",
+                field_name: {"de": "Deutscher Text", "en": "English text"},
+            },
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    toggle_off = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "text",
+            "is_translatable": False,
+        },
+    )
+    assert toggle_off.status_code == 200, toggle_off.text
+    assert toggle_off.json()["is_translatable"] is False
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == "Deutscher Text"
+
+
+@pytest.mark.asyncio
+async def test_disabling_translatable_falls_back_to_first_populated_language(
+    async_client, auth_headers
+) -> None:
+    field_name = f"desc_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "text",
+            "is_translatable": True,
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"XLATE-FB-{uuid.uuid4().hex[:12]}",
+            "metadata_": {
+                "label": "Nur Englisch",
+                field_name: {"de": "", "en": "Only English"},
+            },
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    toggle_off = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "text",
+            "is_translatable": False,
+        },
+    )
+    assert toggle_off.status_code == 200, toggle_off.text
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == "Only English"
+
+
+@pytest.mark.asyncio
+async def test_saving_translatable_field_persists_after_enabling_on_legacy_record(
+    async_client, auth_headers
+) -> None:
+    """Regression: before the shape migration, editing the auto-migrated field and
+    saving silently produced no database change at all (SQLAlchemy saw the write as a
+    no-op because the value never actually round-tripped through the frontend as a plain
+    object) — the user saw a "saved" confirmation but the text was gone on reload.
+    """
+    field_name = f"desc_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "richtext",
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    idno = f"XLATE-RT-{uuid.uuid4().hex[:12]}"
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={"idno": idno, "metadata_": {"label": "L", field_name: "<p>Alt</p>"}},
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    toggle_on = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Beschreibung"},
+            "field_type": "richtext",
+            "is_translatable": True,
+        },
+    )
+    assert toggle_on.status_code == 200, toggle_on.text
+
+    # The is_translatable toggle itself already migrated and persisted the legacy
+    # string (see test_enabling_translatable_wraps_legacy_string_values), bumping
+    # the object's version — re-fetch it before the next optimistic-lock write.
+    migrated = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert migrated.status_code == 200
+    version = migrated.json()["version"]
+
+    updated = await async_client.put(
+        f"/v1/objects/{object_id}",
+        headers={**auth_headers, "If-Match": str(version)},
+        json={
+            "idno": idno,
+            "status": "draft",
+            "metadata_": {"label": "L", field_name: {"de": "<p>Neuer Text</p>", "en": ""}},
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["version"] == version + 1
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == {"de": "<p>Neuer Text</p>", "en": ""}
+
+
+@pytest.mark.asyncio
+async def test_enabling_repeatable_wraps_scalar_value_in_list(async_client, auth_headers) -> None:
+    field_name = f"tags_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"REPEAT-ON-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "Skalares Objekt", field_name: "Einzelwert"},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    toggle_on = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+            "is_repeatable": True,
+        },
+    )
+    assert toggle_on.status_code == 200, toggle_on.text
+    assert toggle_on.json()["is_repeatable"] is True
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == ["Einzelwert"]
+
+
+@pytest.mark.asyncio
+async def test_disabling_repeatable_collapses_to_first_entry_and_drops_rest(
+    async_client, auth_headers
+) -> None:
+    field_name = f"tags_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+            "is_repeatable": True,
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"REPEAT-OFF-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "Listenobjekt", field_name: ["Erster", "Zweiter", "Dritter"]},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    # Preview before sending the downgrade: the field usage endpoint must report
+    # that this record would actually lose entries.
+    preview = await async_client.get(
+        f"/v1/schema/{field_id}/usage?new_is_repeatable=false", headers=auth_headers
+    )
+    assert preview.status_code == 200
+    assert preview.json()["repeatable_collapse_count"] == 1
+
+    toggle_off = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+            "is_repeatable": False,
+        },
+    )
+    assert toggle_off.status_code == 200, toggle_off.text
+    assert toggle_off.json()["is_repeatable"] is False
+
+    persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == "Erster"
+
+
+@pytest.mark.asyncio
+async def test_field_usage_preview_reports_no_risk_for_interchangeable_types(
+    async_client, auth_headers
+) -> None:
+    """text <-> richtext <-> vocab_free <-> geo are all plain strings under the hood —
+    switching between them can never make an existing value invalid."""
+    field_name = f"note_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Notiz"},
+            "field_type": "text",
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"TYPE-SAFE-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "L", field_name: "Freitext"},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+
+    preview = await async_client.get(
+        f"/v1/schema/{field_id}/usage?new_field_type=richtext", headers=auth_headers
+    )
+    assert preview.status_code == 200
+    assert preview.json()["type_change_risk_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_field_usage_preview_reports_risk_for_incompatible_type_change(
+    async_client, auth_headers
+) -> None:
+    field_name = f"note_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Notiz"},
+            "field_type": "text",
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"TYPE-RISK-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "L", field_name: "Freitext"},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+
+    preview = await async_client.get(
+        f"/v1/schema/{field_id}/usage?new_field_type=number", headers=auth_headers
+    )
+    assert preview.status_code == 200
+    assert preview.json()["type_change_risk_count"] == 1
+
+    # The value itself is never touched or deleted by the field_type change.
+    change = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Notiz"},
+            "field_type": "number",
+        },
+    )
+    assert change.status_code == 200, change.text
+
+    persisted = await async_client.get(
+        f"/v1/objects/{created_object.json()['id']}", headers=auth_headers
+    )
+    assert persisted.status_code == 200
+    assert persisted.json()["metadata_"][field_name] == "Freitext"
+

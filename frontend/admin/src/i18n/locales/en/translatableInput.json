@@ -1,3 +1,11 @@
 {
-  "removeLang": "Remove {{lang}}"
+  "removeLang": "Remove {{lang}}",
+  "translateFrom": "Translate from {{lang}}",
+  "createTranslation": "Create translation",
+  "updateTranslation": "Update translation",
+  "translationRunning": "AI is translating…",
+  "translationSource": "Choose source language for {{target}}",
+  "translationFromOption": "From {{lang}}",
+  "aiGeneratedTitle": "AI-generated ({{model}}) on {{at}}",
+  "translationNoSource": "Enter text in another language first."
 }

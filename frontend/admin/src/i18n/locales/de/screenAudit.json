@@ -15,7 +15,8 @@
     "relation_add": "Relation angelegt",
     "relation_update": "Relation geändert",
     "relation_delete": "Relation gelöscht",
-    "ai_schema_assist": "KI-Schema-Assistent verwendet"
+    "ai_schema_assist": "KI-Schema-Assistent verwendet",
+    "ai_translate": "KI-Übersetzung erstellt"
   },
   "loading": "Lade…",
   "empty": "Keine Einträge.",

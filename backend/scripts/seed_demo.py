@@ -74,6 +74,11 @@ VORGANG_VOCAB_NAME = "vorgangstypen"
 PD_MARK = "https://creativecommons.org/publicdomain/mark/1.0/"
 CC0 = "https://creativecommons.org/publicdomain/zero/1.0/"
 
+def demo_object_id(idno: str) -> uuid.UUID:
+    """Return the stable UUID assigned to a seeded demo object."""
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"katalon-demo/object/{idno}")
+
+
 DEMO_IMAGES: list[tuple[str, str, str, str, str]] = [
     ("OBJ-001", "goethe-stieler.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Goethe_(Stieler_1828).jpg", "https://upload.wikimedia.org/wikipedia/commons/0/0e/Goethe_%28Stieler_1828%29.jpg"),
     ("OBJ-002", "schiller.jpg", "Public domain", "https://commons.wikimedia.org/wiki/File:Schiller_edit1.jpg", "https://upload.wikimedia.org/wikipedia/commons/e/e5/Schiller_edit1.jpg"),
@@ -805,7 +810,7 @@ async def main() -> None:
             ],
         )
 
-        _, technik_labels = await make_vocab(
+        technik_ids, technik_labels = await make_vocab(
             db, TECHNIK_VOCAB_NAME, "term",
             [
                 {"term": "oelmalerei", "label": {"de": "Ölmalerei", "en": "Oil Painting"}},
@@ -852,7 +857,7 @@ async def main() -> None:
         await add_field(db, "object", "beschreibung", {"de": "Beschreibung", "en": "Description"}, "richtext", sort_order=1, detail_role="description", detail_slot="main")
         await add_field(db, "object", "kurzbeschreibung", {"de": "Kurzbeschreibung", "en": "Short Description"}, "text", sort_order=2, is_translatable=True)
         await add_field(db, "object", "material", {"de": "Material", "en": "Material"}, "vocab", sort_order=3, settings_dict={"vocabulary_id": str(obj_mat_vocab_id)}, is_facet=True)
-        await add_field(db, "object", "technik", {"de": "Technik", "en": "Technique"}, "vocab_free", sort_order=4, settings_dict={"vocabulary_id": str(obj_tec_vocab_id)}, is_repeatable=True, is_facet=True)
+        await add_field(db, "object", "technik", {"de": "Technik", "en": "Technique"}, "vocab", sort_order=4, settings_dict={"vocabulary_id": str(obj_tec_vocab_id)}, is_repeatable=True, is_facet=True)
         await add_field(db, "object", "masse", {"de": "Maße", "en": "Dimensions"}, "text", sort_order=5)
         await add_field(db, "object", "anzahl", {"de": "Anzahl Stücke", "en": "Number of Pieces"}, "number", sort_order=6)
         await add_field(db, "object", "gewicht_g", {"de": "Gewicht (Gramm)", "en": "Weight (grams)"}, "number", sort_order=7)
@@ -974,7 +979,7 @@ async def main() -> None:
                 geom=WKTElement(f"POINT({lon} {lat})", srid=4326),
                 metadata_={
                     "label": label_de,
-                    "beschreibung": f"<p>{label_de} ist ein bedeutender historischer Ort im Umkreis der Weimarer Kulturgeschichte.</p>",
+                    "beschreibung": f"{label_de} ist ein bedeutender historischer Ort im Umkreis der Weimarer Kulturgeschichte.",
                     "plz": plz,
                     "ist_hauptort": hauptort,
                     "ersterwaehnung": ersterw,
@@ -996,7 +1001,7 @@ async def main() -> None:
         for idno, name, etype, geb, gest, beruf, geb_ort, gest_ort, gnd, viaf in ENTITIES_DATA:
             md: dict[str, Any] = {
                 "label": name,
-                "beschreibung": f"<p><strong>{name}</strong> ist ein herausragender Bestandteil der Sammlung Weimarer Klassik.</p>",
+                "beschreibung": f"**{name}** ist ein herausragender Bestandteil der Sammlung Weimarer Klassik.",
                 "beruf": [beruf],
                 "anzahl_werke": 42 if "goethe" in idno or "schiller" in idno else 12,
                 "viaf_pid": {"source": "viaf", "external_id": viaf, "label": name},
@@ -1037,7 +1042,7 @@ async def main() -> None:
         for idno, title, otype, jahr, gattung, verfasser, komponist, spielort, umfang in OCCURRENCES_DATA:
             md = {
                 "label": title,
-                "beschreibung": f"<p><em>{title}</em> ist ein Schlüsselwerk bzw. Meilenstein der europäischen Kulturgeschichte.</p>",
+                "beschreibung": f"*{title}* ist ein Schlüsselwerk bzw. Meilenstein der europäischen Kulturgeschichte.",
                 "entstehungsdatum": jahr,
                 "gattung": {"id": genre_ids.get(gattung, ""), "label": gattung.title()},
                 "form": [gattung],
@@ -1079,7 +1084,7 @@ async def main() -> None:
                 status="public",
                 metadata_={
                     "label": title,
-                    "beschreibung": f"<p>{desc}</p>",
+                    "beschreibung": desc,
                     "bestandssignatur": f"SW-{idno.upper()}",
                     "laufzeit_beginn": "1770",
                     "laufzeit_ende": "1835",
@@ -1131,7 +1136,7 @@ async def main() -> None:
                 reference_number=ref_no,
                 metadata_={
                     "label": f"{ptype.upper()}: {ref_no}",
-                    "verfahrensbericht": f"<p>{desc}</p>",
+                    "verfahrensbericht": desc,
                     "antragsteller": rel(str(entities["goethe"].id), entities["goethe"].metadata_["label"], "antragsteller"),
                     "leihnehmer_oder_partner": rel(str(entities[ent_key].id), entities[ent_key].metadata_["label"], "leihnehmer") if ent_key and ent_key in entities else None,
                     "zielort": rel(str(places[place_key].id), places[place_key].metadata_["label"], "ausstellungsort") if place_key and place_key in places else None,
@@ -1171,10 +1176,10 @@ async def main() -> None:
                     "de": f"{title} aus der Sammlung Weimarer Klassik.",
                     "en": f"{title} from the Weimar Classicism Collection.",
                 },
-                "beschreibung": f"<p><strong>{title}</strong> ist ein repräsentatives Sammlungsstück ({subtype}) aus dem Bestand der Weimarer Klassik. "
-                                f"Hergestellt aus <em>{mat_label}</em> mittels <em>{tec_label}</em>.</p>",
+                "beschreibung": f"**{title}** ist ein repräsentatives Sammlungsstück ({subtype}) aus dem Bestand der Weimarer Klassik. "
+                                f"Hergestellt aus *{mat_label}* mittels *{tec_label}*.",
                 "material": {"id": material_ids.get(mat_key, ""), "label": mat_label},
-                "technik": [tec_label],
+                "technik": [{"id": technik_ids.get(tec_key, ""), "label": tec_label}],
                 "masse": spec["masse"],
                 "anzahl": 1,
                 "gewicht_g": spec["gewicht_g"],
@@ -1218,6 +1223,7 @@ async def main() -> None:
                 md["fundkoordinaten"] = spec["coords"]
 
             obj = Object(
+                id=demo_object_id(idno),
                 idno=idno,
                 object_type=subtype,
                 status=spec["status"],
@@ -1336,12 +1342,21 @@ async def main() -> None:
             await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
         ).scalar_one_or_none()
         if portal_config:
-            portal_config.hero_text = (
-                "Fotografien, Handschriften, Kunsthandwerk und Nachlassobjekte aus der "
-                "Sammlung Weimarer Klassik – durchsuchbar, vernetzt und mit IIIF-Bildbetrachter."
-            )
-            portal_config.site_title = "Sammlung Weimarer Klassik"
-            portal_config.site_subtitle = "Digitale Sammlung Weimarer Klassik"
+            portal_config.hero_text = {
+                "de": (
+                    "Fotografien, Handschriften, Kunsthandwerk und Nachlassobjekte aus der "
+                    "Sammlung Weimarer Klassik – durchsuchbar, vernetzt und mit IIIF-Bildbetrachter."
+                ),
+                "en": (
+                    "Photographs, manuscripts, crafts, and estate objects from the Weimar "
+                    "Classicism Collection – searchable, linked, and with an IIIF image viewer."
+                ),
+            }
+            portal_config.site_title = {"de": "Sammlung Weimarer Klassik", "en": "Weimar Classicism Collection"}
+            portal_config.site_subtitle = {
+                "de": "Digitale Sammlung Weimarer Klassik",
+                "en": "Digital Weimar Classicism Collection",
+            }
             portal_config.facet_fields = {
                 "object": ["material", "erhaltungszustand", "technik"],
                 # Status is always "public" for anonymous portal visitors (their queries

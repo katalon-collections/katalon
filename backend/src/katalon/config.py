@@ -97,8 +97,6 @@ class Settings(BaseSettings):
     sparql_max_query_length: int = Field(default=65536, gt=0)  # 64 KB
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
 
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
     ai_request_timeout_seconds: int = 60
 
     smtp_enabled: bool = False

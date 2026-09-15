@@ -517,6 +517,24 @@ async def test_url_repeatable_requires_list() -> None:
     assert errors == ["Feld 'links' muss eine Liste sein (wiederholbar)."]
 
 
+@pytest.mark.asyncio
+async def test_url_value_empty_string_not_rejected() -> None:
+    db = mock_db(make_url_field())
+    errors = await validate_metadata(db, "object", {"link": {"value": "", "label": ""}})
+    assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_url_repeatable_empty_entry_not_rejected() -> None:
+    db = mock_db(make_url_field("links", is_repeatable=True))
+    errors = await validate_metadata(
+        db,
+        "object",
+        {"links": [{"value": "https://a.example"}, {"value": "", "label": ""}]},
+    )
+    assert errors == []
+
+
 # ---------------------------------------------------------------------------
 # PID fields are system-managed
 # ---------------------------------------------------------------------------

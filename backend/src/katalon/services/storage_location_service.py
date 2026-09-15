@@ -5,10 +5,35 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import StorageLocation
+
+
+async def count_direct_children(db: AsyncSession, parent_id: uuid.UUID) -> int:
+    """Count active storage locations directly nested under ``parent_id``."""
+    result = await db.execute(
+        select(func.count()).where(
+            StorageLocation.parent_id == parent_id,
+            StorageLocation.deleted_at.is_(None),
+        )
+    )
+    return result.scalar_one()
+
+
+async def reparent_children(
+    db: AsyncSession, parent_id: uuid.UUID, new_parent_id: uuid.UUID | None
+) -> None:
+    """Move active direct children of ``parent_id`` to ``new_parent_id``."""
+    await db.execute(
+        update(StorageLocation)
+        .where(
+            StorageLocation.parent_id == parent_id,
+            StorageLocation.deleted_at.is_(None),
+        )
+        .values(parent_id=new_parent_id)
+    )
 
 
 async def get_storage_location_subtree_ids(

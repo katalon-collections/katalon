@@ -73,6 +73,11 @@
     "heading": "Nicht im Schema",
     "remove": "Entfernen"
   },
+  "aiTranslationProposal": {
+    "title": "KI-Übersetzung für {{label}} · {{source}} → {{target}}",
+    "current": "Aktueller {{target}}-Wert",
+    "suggestion": "Übersetzung aus {{source}}"
+  },
   "unsavedChangesModal": {
     "title": "Ungespeicherte Änderungen",
     "prompt": "Du hast ungespeicherte Änderungen an diesem Datensatz vorgenommen. Möchtest du die Seite wirklich verlassen und alle ungespeicherten Änderungen verwerfen?",

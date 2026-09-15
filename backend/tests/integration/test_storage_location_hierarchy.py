@@ -173,3 +173,81 @@ async def test_storage_location_objects_endpoint_and_filter(async_client, auth_h
     assert rel_sub.status_code == 200
     rel_found_objs = {r["from_id"] for r in rel_sub.json()}
     assert {obj_bld_id, obj_room_id}.issubset(rel_found_objs)
+
+
+@pytest.mark.asyncio
+async def test_storage_location_delete_blocks_cascades_and_reparents(
+    async_client, auth_headers
+) -> None:
+    # Building -> Room -> Shelf
+    bld_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={"idno": f"BLD-{uuid.uuid4().hex[:6]}", "metadata_": {"label": "Depot"}},
+    )
+    assert bld_res.status_code == 201, bld_res.text
+    bld_id = bld_res.json()["id"]
+
+    room_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={
+            "idno": f"ROOM-{uuid.uuid4().hex[:6]}",
+            "parent_id": bld_id,
+            "metadata_": {"label": "Raum"},
+        },
+    )
+    assert room_res.status_code == 201, room_res.text
+    room_id = room_res.json()["id"]
+
+    shelf_res = await async_client.post(
+        "/v1/storage-locations",
+        headers=auth_headers,
+        json={
+            "idno": f"SHELF-{uuid.uuid4().hex[:6]}",
+            "parent_id": room_id,
+            "metadata_": {"label": "Regal"},
+        },
+    )
+    assert shelf_res.status_code == 201, shelf_res.text
+    shelf_id = shelf_res.json()["id"]
+
+    # Deleting the building is blocked by default — it still has a child room.
+    blocked = await async_client.delete(f"/v1/storage-locations/{bld_id}", headers=auth_headers)
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["child_count"] == 1
+
+    # Reparent moves the room up (building -> None) instead of orphaning it silently.
+    reparented = await async_client.delete(
+        f"/v1/storage-locations/{bld_id}",
+        headers=auth_headers,
+        params={"reparent": "true"},
+    )
+    assert reparented.status_code == 204, reparented.text
+    room_after = await async_client.get(f"/v1/storage-locations/{room_id}", headers=auth_headers)
+    assert room_after.status_code == 200, room_after.text
+    assert room_after.json()["parent_id"] is None
+
+    # Cascade removes the whole remaining subtree (room + shelf) in one call.
+    cascade_blocked = await async_client.delete(
+        f"/v1/storage-locations/{room_id}", headers=auth_headers
+    )
+    assert cascade_blocked.status_code == 409, cascade_blocked.text
+    assert cascade_blocked.json()["detail"]["child_count"] == 1
+
+    cascade_deleted = await async_client.delete(
+        f"/v1/storage-locations/{room_id}",
+        headers=auth_headers,
+        params={"cascade": "true"},
+    )
+    assert cascade_deleted.status_code == 204, cascade_deleted.text
+    shelf_after = await async_client.get(f"/v1/storage-locations/{shelf_id}", headers=auth_headers)
+    assert shelf_after.status_code == 404, shelf_after.text
+
+    # cascade and reparent are mutually exclusive.
+    conflict = await async_client.delete(
+        f"/v1/storage-locations/{bld_id}",
+        headers=auth_headers,
+        params={"cascade": "true", "reparent": "true"},
+    )
+    assert conflict.status_code == 400, conflict.text

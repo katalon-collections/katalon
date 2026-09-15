@@ -31,9 +31,9 @@ _LOGO_URL = "/v1/portal/logo/file"
 router = APIRouter(prefix="/portal", tags=["portal"])
 
 _DEFAULTS = {
-    "site_title": "Katalon",
-    "site_subtitle": "",
-    "hero_text": "",
+    "site_title": {"de": "Katalon"},
+    "site_subtitle": {},
+    "hero_text": {},
     "featured_object_ids": [],
     "accent_color": "#1e3a8a",
     "logo_url": "",
@@ -104,9 +104,9 @@ class HomepageBlock(BaseModel):
 
 
 class PortalConfigRead(BaseModel):
-    site_title: str
-    site_subtitle: str
-    hero_text: str
+    site_title: dict[str, str]
+    site_subtitle: dict[str, str]
+    hero_text: dict[str, str]
     featured_object_ids: list[str]
     facet_fields: dict[str, list[str]]
     subtitle_fields: dict[str, list[str]] = Field(default_factory=dict)
@@ -128,9 +128,9 @@ class PortalConfigRead(BaseModel):
 
 
 class PortalConfigUpdate(BaseModel):
-    site_title: str | None = None
-    site_subtitle: str | None = None
-    hero_text: str | None = None
+    site_title: dict[str, str] | None = None
+    site_subtitle: dict[str, str] | None = None
+    hero_text: dict[str, str] | None = None
     featured_object_ids: list[str] | None = None
     facet_fields: dict[str, list[str]] | None = None
     subtitle_fields: dict[str, list[str]] | None = None
@@ -147,6 +147,13 @@ class PortalConfigUpdate(BaseModel):
     homepage_blocks: list[HomepageBlock] | None = None
     terminology: dict[TerminologyRecordType, TerminologyEntry] | None = None
     show_iiif_manifest_link: bool | None = None
+
+
+def resolve_lang_text(value: dict[str, str] | None, preferred: str = "de") -> str:
+    """Pick one string out of a {"de": ..., "en": ...} field for non-i18n-aware consumers."""
+    if not value:
+        return ""
+    return value.get(preferred) or next(iter(value.values()), "")
 
 
 async def _get_or_create(db: DBDep) -> PortalConfig:

@@ -179,6 +179,7 @@ class Collection(Base):
     )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -210,6 +211,7 @@ class StorageLocation(Base):
         index=True,
     )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
+    ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -708,9 +710,10 @@ class PortalConfig(Base):
     __tablename__ = "portal_config"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True, default="default")
-    site_title: Mapped[str] = mapped_column(String(256), default="Katalon")
-    site_subtitle: Mapped[str] = mapped_column(String(512), default="")
-    hero_text: Mapped[str] = mapped_column(Text, default="")
+    # {"de": "...", "en": "..."} — see api/v1/portal.py for resolution to a single language
+    site_title: Mapped[dict[str, Any]] = mapped_column(JSONB, default=lambda: {"de": "Katalon"})
+    site_subtitle: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    hero_text: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     featured_object_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
     # Ordered list of homepage content blocks, see api/v1/portal.py:HomepageBlock
     homepage_blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list[Any])
@@ -721,7 +724,7 @@ class PortalConfig(Base):
     # e.g. {"object": ["creator"], "entity": []}
     facet_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     # Fields shown as the result-list subtitle, per record type, in display order.
-    # e.g. {"object": ["record_type", "status"], "entity": ["status"]}
+    # e.g. {"object": ["record_type", "dating"], "entity": ["record_type"]}
     subtitle_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
     browse_enabled_types: Mapped[list[str]] = mapped_column(
         JSONB, default=lambda: ["object", "entity", "place", "occurrence"]

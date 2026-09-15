@@ -23,6 +23,18 @@
   "delete": "Delete",
   "deleting": "Deleting…",
   "deleteConfirm": "Really delete storage location \"{{name}}\"?",
+  "deleteConflictRetry": "{{message}} Delete anyway?",
+  "deleteChildrenModal": {
+    "title": "Storage location has sub-locations",
+    "warningTitle": "Storage location has sub-locations",
+    "warning": "This storage location has {{count}} direct sub-location.",
+    "warning_plural": "This storage location has {{count}} direct sub-locations.",
+    "chooseAction": "How should the sub-locations be handled?",
+    "optionReparent": "Promote sub-locations up one level (Recommended)",
+    "optionReparentDesc": "Sub-locations are reassigned to this location's own parent (or become top-level locations if this location had none).",
+    "optionCascade": "Delete sub-locations as well",
+    "optionCascadeDesc": "The entire subtree is deleted, including all sub-locations."
+  },
   "errorVersionConflict": "This storage location was changed by someone else in the meantime. Please reload and try again.",
   "objectsHeading": "Objects at this location",
   "includeSublocations": "Include sub-locations",

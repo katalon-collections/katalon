@@ -450,6 +450,7 @@ class StorageLocationCreate(BaseModel):
     storage_location_type: str | None = None
     parent_id: uuid.UUID | None = None
     metadata_: dict[str, Any] = {}
+    ai_provenance: dict[str, Any] = {}
 
 
 class StorageLocationRead(StorageLocationCreate, RecordCommon):

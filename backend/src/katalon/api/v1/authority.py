@@ -45,13 +45,15 @@ class HitOut(BaseModel):
 async def list_sources(db: DBDep, _: CurrentUser) -> list[SourceOut]:
     result = await db.execute(select(AuthoritySourceModel))
     db_by_id = {s.id: s for s in result.scalars().all()}
+    all_ids = dict.fromkeys(authority_service.list_sources())
+    all_ids.update(dict.fromkeys(db_by_id))
     return [
         SourceOut(
             id=sid,
             label=db_by_id[sid].label if sid in db_by_id else authority_service.default_label(sid),
             is_enabled=db_by_id[sid].is_enabled if sid in db_by_id else True,
         )
-        for sid in authority_service.list_sources()
+        for sid in all_ids
     ]
 
 
@@ -62,9 +64,9 @@ async def list_sources(db: DBDep, _: CurrentUser) -> list[SourceOut]:
     dependencies=[require_role("admin")],
 )
 async def update_source(source_id: str, body: SourceUpdate, db: DBDep) -> SourceOut:
-    if source_id not in authority_service.list_sources():
-        raise HTTPException(status_code=404, detail=f"Unbekannte Authority-Quelle: {source_id}")
     row = await db.get(AuthoritySourceModel, source_id)
+    if row is None and source_id not in authority_service.list_sources():
+        raise HTTPException(status_code=404, detail=f"Unbekannte Authority-Quelle: {source_id}")
     if row is None:
         row = AuthoritySourceModel(
             id=source_id,

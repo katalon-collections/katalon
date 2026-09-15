@@ -36,6 +36,11 @@ from katalon.services.lock_service import enforce_not_locked
 from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.storage_location_service import (
+    count_direct_children,
+    get_storage_location_subtree_ids,
+    reparent_children,
+)
 from katalon.services.subtype_service import ensure_subtype_exists, normalize_subtype_name
 
 logger = logging.getLogger(__name__)
@@ -190,6 +195,7 @@ async def create_storage_location(
         storage_location_type=storage_location_type,
         parent_id=data.parent_id,
         metadata_=metadata,
+        ai_provenance=data.ai_provenance,
     )
     db.add(loc)
     await flush_record(db, loc)
@@ -303,6 +309,7 @@ async def update_storage_location(
     loc.storage_location_type = storage_location_type
     loc.parent_id = data.parent_id
     loc.metadata_ = metadata
+    loc.ai_provenance = data.ai_provenance
 
     await flush_record(db, loc)
     await sync_schema_relations(db, "storage_location", loc.id, metadata)
@@ -338,7 +345,13 @@ async def update_storage_location(
     responses={
         404: {"description": "Storage location not found"},
         403: {"description": "Insufficient permissions"},
-        409: {"description": "Record has linked relations (pass force=true to delete anyway)"},
+        400: {"description": "cascade and reparent are mutually exclusive"},
+        409: {
+            "description": (
+                "Record has child locations (pass cascade=true or reparent=true) "
+                "or linked relations (pass force=true to delete anyway)"
+            )
+        },
     },
 )
 async def delete_storage_location(
@@ -346,36 +359,69 @@ async def delete_storage_location(
     db: DBDep,
     current_user: User = require_record_permission("storage_location", "delete"),
     force: bool = Query(False),
+    cascade: bool = Query(False, description="Delete this location and its whole subtree."),
+    reparent: bool = Query(
+        False, description="Move direct children up to this location's parent before deleting."
+    ),
 ) -> None:
     result = await db.execute(select(StorageLocation).where(StorageLocation.id == loc_id))
     loc = result.scalar_one_or_none()
     if not loc:
         raise HTTPException(status_code=404, detail="Lagerort nicht gefunden")
+    if cascade and reparent:
+        raise HTTPException(
+            status_code=400, detail="cascade und reparent schließen sich gegenseitig aus."
+        )
 
-    related_count = await count_relations(db, "storage_location", loc_id)
+    child_count = await count_direct_children(db, loc_id)
+    if child_count > 0 and not cascade and not reparent:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Lagerort hat {child_count} Unterelemente.",
+                "child_count": child_count,
+            },
+        )
+
+    target_ids = [loc_id]
+    if cascade and child_count > 0:
+        target_ids = await get_storage_location_subtree_ids(db, loc_id)
+    elif reparent and child_count > 0:
+        await reparent_children(db, loc_id, loc.parent_id)
+
+    related_count = sum([await count_relations(db, "storage_location", tid) for tid in target_ids])
     if related_count > 0 and not force:
         raise HTTPException(
             status_code=409,
             detail={
-                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "detail": f"{len(target_ids)} betroffene Lagerorte sind mit insgesamt "
+                f"{related_count} anderen Datensätzen verknüpft.",
                 "related_count": related_count,
             },
         )
 
-    loc.deleted_at = datetime.now(UTC).replace(tzinfo=None)
-    await log_change(
-        db,
-        record_type="storage_location",
-        record_id=loc.id,
-        user_id=current_user.id,
-        action="delete",
-        changed_fields=delete_label_fields(loc.idno, loc.metadata_),
+    targets = (
+        (await db.execute(select(StorageLocation).where(StorageLocation.id.in_(target_ids))))
+        .scalars()
+        .all()
     )
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for rec in targets:
+        rec.deleted_at = now
+        await log_change(
+            db,
+            record_type="storage_location",
+            record_id=rec.id,
+            user_id=current_user.id,
+            action="delete",
+            changed_fields=delete_label_fields(rec.idno, rec.metadata_),
+        )
     await flush_record(db, loc)
-    try:
-        await search_service.remove_record(loc.id, db, record_type="storage_location")
-    except Exception:
-        logger.warning("ES index/remove failed", exc_info=True)
+    for rec in targets:
+        try:
+            await search_service.remove_record(rec.id, db, record_type="storage_location")
+        except Exception:
+            logger.warning("ES index/remove failed", exc_info=True)
 
 
 @router.post(

@@ -338,7 +338,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_portal_exposes_terms_only_through_public_searchable_vocab_field() -> None:
+async def test_portal_exposes_terms_through_public_vocab_field() -> None:
     vocabulary_id = uuid.uuid4()
     field_result = MagicMock()
     field_result.scalar_one_or_none.return_value = MagicMock(
@@ -364,7 +364,9 @@ async def test_portal_exposes_terms_only_through_public_searchable_vocab_field()
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/portal/v1/schema/object/fields/material/terms")
+            response = await client.get(
+                f"/portal/v1/schema/object/fields/material/terms?term_ids={term.id}"
+            )
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -377,14 +379,18 @@ async def test_portal_exposes_terms_only_through_public_searchable_vocab_field()
             "parent_id": None,
         }
     ]
+    field_query = str(session.execute.call_args_list[0].args[0])
+    term_query = str(session.execute.call_args_list[1].args[0])
+    assert "field_definitions.is_searchable IS" not in field_query
+    assert "vocabulary_terms.id IN" in term_query
 
 
 @pytest.mark.asyncio
 async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
     config = PortalConfigRead(
-        site_title="Katalon",
-        site_subtitle="",
-        hero_text="",
+        site_title={"de": "Katalon"},
+        site_subtitle={},
+        hero_text={},
         featured_object_ids=[],
         facet_fields={},
         accent_color="#1e3a8a",
@@ -689,16 +695,6 @@ async def test_portal_config_rejects_unknown_homepage_block_type() -> None:
         app.dependency_overrides.pop(get_current_user, None)
 
     assert response.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_portal_has_no_feedback_write_endpoint() -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/portal/v1/feedback", json={})
-        authenticated_api = await client.post("/v1/feedback", json={})
-
-    assert response.status_code == 404
-    assert authenticated_api.status_code == 401
 
 
 @pytest.mark.asyncio

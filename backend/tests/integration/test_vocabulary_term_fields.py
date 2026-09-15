@@ -246,7 +246,7 @@ async def test_relation_vocabulary_rejects_hierarchy(
 
 
 @pytest.mark.asyncio
-async def test_hierarchical_terms_reject_cycles_and_promote_children_on_delete(
+async def test_hierarchical_terms_reject_cycles_and_block_delete_with_children(
     async_client: AsyncClient, auth_headers: dict
 ) -> None:
     vocab_response = await async_client.post(
@@ -315,8 +315,18 @@ async def test_hierarchical_terms_reject_cycles_and_promote_children_on_delete(
     )
     assert cycle.status_code == 422
 
-    deleted = await async_client.delete(
+    # Deleting a term with children is blocked by default — no silent orphaning.
+    blocked = await async_client.delete(
         f"/v1/vocabularies/terms/{root['id']}", headers=auth_headers
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["child_count"] == 1
+
+    # Explicit reparent moves the direct child up to the deleted term's parent (root -> None).
+    deleted = await async_client.delete(
+        f"/v1/vocabularies/terms/{root['id']}",
+        headers=auth_headers,
+        params={"reparent": "true"},
     )
     assert deleted.status_code == 204, deleted.text
     child_after_delete = await async_client.get(
@@ -324,6 +334,24 @@ async def test_hierarchical_terms_reject_cycles_and_promote_children_on_delete(
     )
     assert child_after_delete.status_code == 200, child_after_delete.text
     assert child_after_delete.json()["parent_id"] is None
+
+    # Cascade removes the whole subtree, including the now-orphaned grandchild's parent (child).
+    cascade_blocked = await async_client.delete(
+        f"/v1/vocabularies/terms/{child['id']}", headers=auth_headers
+    )
+    assert cascade_blocked.status_code == 409, cascade_blocked.text
+    assert cascade_blocked.json()["detail"]["child_count"] == 1
+
+    cascade_deleted = await async_client.delete(
+        f"/v1/vocabularies/terms/{child['id']}",
+        headers=auth_headers,
+        params={"cascade": "true"},
+    )
+    assert cascade_deleted.status_code == 204, cascade_deleted.text
+    grandchild_after_cascade = await async_client.get(
+        f"/v1/vocabularies/{vocab['id']}/terms/{grandchild['id']}", headers=auth_headers
+    )
+    assert grandchild_after_cascade.status_code == 404, grandchild_after_cascade.text
 
 
 @pytest.mark.asyncio

@@ -21,9 +21,12 @@ from katalon.core.schemas import (
 from katalon.services import skos_import_service, vocabulary_import_service
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.vocabulary_reference_service import (
+    count_direct_children,
     count_references,
+    get_term_subtree_ids,
     remap_references,
     remove_references,
+    reparent_children,
 )
 
 router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
@@ -378,8 +381,12 @@ async def get_term_usage(term_id: uuid.UUID, db: DBDep) -> TermUsageResponse:
     summary="Delete a vocabulary term",
     responses={
         404: {"description": "Term not found"},
+        400: {"description": "cascade and reparent are mutually exclusive"},
         409: {
-            "description": "Term is in use; confirm force deletion or provide a replacement term"
+            "description": (
+                "Term has child terms (pass cascade=true or reparent=true) "
+                "or is in use (confirm force deletion or provide a replacement term)"
+            )
         },
     },
 )
@@ -389,19 +396,50 @@ async def delete_term(
     replacement_term_id: uuid.UUID | None = Query(None),
     remove_from_records: bool = Query(False),
     force: bool = Query(False),
+    cascade: bool = Query(False, description="Delete this term and its whole subtree."),
+    reparent: bool = Query(
+        False, description="Move direct child terms up to this term's parent before deleting."
+    ),
 ) -> None:
     result = await db.execute(select(VocabularyTerm).where(VocabularyTerm.id == term_id))
     term = result.scalar_one_or_none()
     if not term:
         raise HTTPException(status_code=404, detail="Term nicht gefunden")
-    usage_count = await count_references(db, term.vocabulary_id, term.id)
+    if cascade and reparent:
+        raise HTTPException(
+            status_code=400, detail="cascade und reparent schließen sich gegenseitig aus."
+        )
+
+    child_count = await count_direct_children(db, term_id)
+    if child_count > 0 and not cascade and not reparent:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Term hat {child_count} Unterbegriffe.",
+                "child_count": child_count,
+            },
+        )
+    if cascade and replacement_term_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="replacement_term_id kann nicht mit cascade kombiniert werden.",
+        )
+
+    target_ids = [term_id]
+    if cascade and child_count > 0:
+        target_ids = await get_term_subtree_ids(db, term_id)
+    elif reparent and child_count > 0:
+        await reparent_children(db, term_id, term.parent_id)
+
+    usage_count = sum([await count_references(db, term.vocabulary_id, tid) for tid in target_ids])
     if usage_count and replacement_term_id is None and not force and not remove_from_records:
         raise HTTPException(
             status_code=409,
             detail={
                 "error": "term_in_use",
                 "related_count": usage_count,
-                "message": f"{usage_count} Datensätze verweisen auf diesen Term.",
+                "message": f"{usage_count} Datensätze verweisen auf "
+                f"{'diesen Term' if len(target_ids) == 1 else 'Terme in diesem Teilbaum'}.",
             },
         )
     if replacement_term_id is not None:
@@ -416,8 +454,15 @@ async def delete_term(
             )
         await remap_references(db, term.vocabulary_id, term.id, replacement)
     elif remove_from_records:
-        await remove_references(db, term.vocabulary_id, term.id)
-    await db.delete(term)
+        for tid in target_ids:
+            await remove_references(db, term.vocabulary_id, tid)
+    targets = (
+        (await db.execute(select(VocabularyTerm).where(VocabularyTerm.id.in_(target_ids))))
+        .scalars()
+        .all()
+    )
+    for t in targets:
+        await db.delete(t)
     await db.commit()
 
 

@@ -99,8 +99,6 @@ services:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
       OXIGRAPH_ENABLED: ${OXIGRAPH_ENABLED:-false}
       OXIGRAPH_URL: ${OXIGRAPH_URL:-http://oxigraph:7878}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -199,8 +197,6 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.admin
-      args:
-        VITE_ADMIN_FEEDBACK_ENABLED: ${VITE_ADMIN_FEEDBACK_ENABLED:-}
     ports:
       - "3000:80"
     healthcheck:
@@ -220,8 +216,6 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.portal
-      args:
-        VITE_PORTAL_FEEDBACK_ENABLED: ${VITE_PORTAL_FEEDBACK_ENABLED:-}
     ports:
       - "3001:80"
     healthcheck:

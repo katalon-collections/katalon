@@ -3,13 +3,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { schema, storageLocations, subtypes, VersionConflictError } from '../../api/client'
+import { ConflictError, schema, storageLocations, subtypes, VersionConflictError } from '../../api/client'
 import { getLabel, type FieldDefinition, type KatalonStorageLocation, type RecordSubtype, type StorageLocationObject } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
 import { Box, Plus, Trash, X } from '../ui/Icons'
 import { HelpPopover } from '../ui/HelpPopover'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { DeleteWithChildrenModal } from '../ui/DeleteWithChildrenModal'
 
 type TreeLocation = { loc: KatalonStorageLocation; depth: number }
 
@@ -175,6 +176,8 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [childDeleteOpen, setChildDeleteOpen] = useState(false)
+  const [forceRetry, setForceRetry] = useState<{ message: string; run: () => Promise<void> } | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
   const [locationObjects, setLocationObjects] = useState<StorageLocationObject[]>([])
@@ -358,7 +361,19 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
 
   function handleDelete() {
     if (!selectedId) return
-    setConfirmDeleteOpen(true)
+    const childCount = locations.filter(l => l.parent_id === selectedId).length
+    if (childCount > 0) {
+      setChildDeleteOpen(true)
+    } else {
+      setConfirmDeleteOpen(true)
+    }
+  }
+
+  async function runDelete(opts?: { force?: boolean; cascade?: boolean; reparent?: boolean }) {
+    if (!selectedId) return
+    await storageLocations.delete(selectedId, opts)
+    cancelForm()
+    await load()
   }
 
   async function confirmDelete() {
@@ -366,15 +381,53 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
     setDeleting(true)
     setFormError(null)
     try {
-      setLocations(prev => prev.filter(l => l.id !== selectedId))
-      await storageLocations.delete(selectedId)
-      cancelForm()
-      await load()
+      await runDelete()
+      setConfirmDeleteOpen(false)
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : String(e))
+      if (e instanceof ConflictError) {
+        setConfirmDeleteOpen(false)
+        setForceRetry({
+          message: t('deleteConflictRetry', { message: e.message }),
+          run: () => runDelete({ force: true }),
+        })
+      } else {
+        setFormError(e instanceof Error ? e.message : String(e))
+      }
     } finally {
       setDeleting(false)
-      setConfirmDeleteOpen(false)
+    }
+  }
+
+  async function confirmChildDelete(action: 'cascade' | 'reparent') {
+    if (!selectedId) return
+    try {
+      await runDelete({ [action]: true })
+      setChildDeleteOpen(false)
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        setChildDeleteOpen(false)
+        setForceRetry({
+          message: t('deleteConflictRetry', { message: e.message }),
+          run: () => runDelete({ [action]: true, force: true }),
+        })
+      } else {
+        throw e
+      }
+    }
+  }
+
+  async function runForceRetry() {
+    if (!forceRetry) return
+    setDeleting(true)
+    setFormError(null)
+    try {
+      await forceRetry.run()
+      setForceRetry(null)
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : String(e))
+      setForceRetry(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -567,6 +620,39 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
           />
         ) : null
       })()}
+      {childDeleteOpen && (() => {
+        const loc = locations.find(l => l.id === selectedId)
+        if (!loc) return null
+        const childCount = locations.filter(l => l.parent_id === loc.id).length
+        return (
+          <DeleteWithChildrenModal
+            title={t('deleteChildrenModal.title')}
+            description={t('deleteConfirm', { name: locationLabel(loc) })}
+            warningTitle={t('deleteChildrenModal.warningTitle')}
+            warningText={t(childCount === 1 ? 'deleteChildrenModal.warning' : 'deleteChildrenModal.warning_plural', { count: childCount })}
+            chooseActionLabel={t('deleteChildrenModal.chooseAction')}
+            reparentLabel={t('deleteChildrenModal.optionReparent')}
+            reparentDesc={t('deleteChildrenModal.optionReparentDesc')}
+            cascadeLabel={t('deleteChildrenModal.optionCascade')}
+            cascadeDesc={t('deleteChildrenModal.optionCascadeDesc')}
+            cancelLabel={t('cancel')}
+            confirmLabel={t('delete')}
+            deletingLabel={t('deleting')}
+            onConfirm={confirmChildDelete}
+            onCancel={() => setChildDeleteOpen(false)}
+          />
+        )
+      })()}
+      {forceRetry && (
+        <ConfirmModal
+          message={forceRetry.message}
+          confirmLabel={t('delete')}
+          cancelLabel={t('cancel')}
+          danger
+          onConfirm={runForceRetry}
+          onCancel={() => setForceRetry(null)}
+        />
+      )}
     </div>
   )
 }

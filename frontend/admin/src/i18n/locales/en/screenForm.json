@@ -73,6 +73,11 @@
     "heading": "Not in schema",
     "remove": "Remove"
   },
+  "aiTranslationProposal": {
+    "title": "AI translation for {{label}} · {{source}} → {{target}}",
+    "current": "Current {{target}} value",
+    "suggestion": "Translation from {{source}}"
+  },
   "unsavedChangesModal": {
     "title": "Unsaved changes",
     "prompt": "You have unsaved changes in this record. Are you sure you want to leave this page and discard all unsaved changes?",

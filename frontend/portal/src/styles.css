@@ -267,8 +267,8 @@ input, select, textarea { font-family: inherit; }
 }
 /* A record with nothing in the main column (no media, no relations, ...) shows the
    metadata panel alone instead of leaving a wide empty column beside a narrow one. */
-.detail-layout--metadata-only { display: block; max-width: 640px; }
 .detail-viewer { background: #0f172a; border-radius: 10px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.3); font-size: 14px; }
+.collection-detail-grid { display: grid; grid-template-columns: minmax(280px, 320px) 1fr; gap: 32px; align-items: start; }
 .detail-meta { background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 20px; align-self: start; }
 .meta-row { display: flex; flex-direction: column; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border, #e4e6eb); }
 .meta-row:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
@@ -466,6 +466,7 @@ input, select, textarea { font-family: inherit; }
     background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 50%; color: inherit;
   }
   .detail-layout { grid-template-columns: 1fr; gap: 24px; }
+  .collection-detail-grid { grid-template-columns: 1fr; gap: 24px; }
   .obj-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .advanced-rule-row { grid-template-columns: 1fr; }
   .advanced-rule-row > * { width: 100%; }

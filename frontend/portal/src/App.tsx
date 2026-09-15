@@ -20,6 +20,7 @@ import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BannerBar } from './components/BannerBar'
 import { useI18n, typeLabel, setSupportedLocales, setTerminology } from './i18n'
+import { resolveLangText } from './utils/renderFieldValue'
 import { usePortalConfig } from './hooks/usePortalConfig'
 
 // Lazy: only page pulling in @samvera/clover-iiif + openseadragon; keep that chunk
@@ -144,7 +145,7 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
 
   return (
     <header className="site-header">
-      <Link to="/" className="logo">{config.site_title}</Link>
+      <Link to="/" className="logo">{resolveLangText(config.site_title, locale, 'Katalon')}</Link>
       <Link to="/" className="home-icon" aria-label={t('nav.home')} title={t('nav.home')}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9.5 10 3l7 6.5" /><path d="M5 8v8h10V8" />
@@ -232,7 +233,7 @@ function Footer() {
   useEffect(() => { api.pages.list().then(ps => setPages(ps.filter(p => p.placement === 'footer'))).catch(() => {}) }, [])
   return (
     <footer className="site-footer">
-      {config.site_title} · Metadata Management System
+      {resolveLangText(config.site_title, locale, 'Katalon')} · Metadata Management System
       {pages.map(p => {
         const label = pageLabel(p, locale)
         return (
@@ -251,6 +252,7 @@ function Footer() {
 function AppInner() {
   const [user, setUser] = useState<PortalUser | null>(() => currentUser())
   const config = usePortalConfig()
+  const { locale } = useI18n()
   useEffect(() => { restoreSession().then(setUser).catch(() => setUser(null)) }, [])
   function logout() {
     void endSession()
@@ -272,7 +274,10 @@ function AppInner() {
   }, [])
   return (
     <>
-      <Helmet defaultTitle={config.site_title} titleTemplate={`%s – ${config.site_title}`}>
+      <Helmet
+        defaultTitle={resolveLangText(config.site_title, locale, 'Katalon')}
+        titleTemplate={`%s – ${resolveLangText(config.site_title, locale, 'Katalon')}`}
+      >
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
       <BannerBar />

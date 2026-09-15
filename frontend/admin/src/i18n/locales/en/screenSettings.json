@@ -58,8 +58,7 @@
     "links": {
       "repo": "Source code on GitHub",
       "license": "License text (LICENSE)",
-      "docs": "Documentation",
-      "changelog": "Show release notes"
+      "docs": "Documentation"
     }
   },
   "sparql": {

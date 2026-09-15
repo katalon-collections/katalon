@@ -48,6 +48,18 @@
   "empty": "No records found.",
   "deleteConfirm": "Really delete {{type}}?",
   "deleteConfirmWithConflicts": "{{message}}\n\nAll links will be removed when deleting. Continue?",
+  "deleting": "Deleting…",
+  "deleteChildrenModal": {
+    "title": "Collection has sub-collections",
+    "warningTitle": "Collection has sub-collections",
+    "warning": "This collection has {{count}} direct sub-collection.",
+    "warning_plural": "This collection has {{count}} direct sub-collections.",
+    "chooseAction": "How should the sub-collections be handled?",
+    "optionReparent": "Promote sub-collections up one level (Recommended)",
+    "optionReparentDesc": "Sub-collections are reassigned to this collection's own parent (or become top-level collections if this collection had none).",
+    "optionCascade": "Delete sub-collections as well",
+    "optionCascadeDesc": "The entire subtree is deleted, including all sub-collections."
+  },
   "editRowAriaLabel": "Edit {{label}}",
   "editRowTitle": "Edit",
   "viewRowAriaLabel": "View {{label}}",

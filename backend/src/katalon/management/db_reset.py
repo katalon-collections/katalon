@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 import click
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from katalon.core import models  # noqa: F401 - registers tables on Base.metadata
 from katalon.database import Base
@@ -28,6 +29,7 @@ _CONFIG_TABLES: set[str] = {
     "authority_sources",
     "banners",
     "field_definitions",
+    "feature_permissions",
     "form_variant_role_defaults",
     "form_variants",
     "idno_counters",
@@ -45,6 +47,49 @@ _CONFIG_TABLES: set[str] = {
 }
 
 _ALWAYS_EXCLUDED = {"alembic_version"}
+
+_DEFAULT_ROLE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
+    *(
+        (role, record_type, action)
+        for role in ("editor", "cataloger")
+        for record_type in ("object", "entity", "place", "occurrence", "procedure")
+        for action in ("read", "create", "update", "delete")
+        if not (role == "cataloger" and action == "delete")
+    ),
+    *(("viewer", record_type, "read") for record_type in (
+        "object", "entity", "place", "occurrence", "collection", "vocabulary_term",
+    )),
+    *(
+        ("cataloger", record_type, action)
+        for record_type in ("collection", "vocabulary_term")
+        for action in ("create", "read", "update")
+    ),
+    ("cataloger", "storage_location", "read"),
+    *(
+        ("editor", record_type, action)
+        for record_type in ("collection", "storage_location", "vocabulary_term")
+        for action in ("create", "read", "update", "delete")
+    ),
+)
+
+_DEFAULT_FEATURE_PERMISSIONS: tuple[tuple[str, str], ...] = (
+    *(("viewer", feature) for feature in ("export", "sparql", "audit_log")),
+    *(
+        ("cataloger", feature)
+        for feature in (
+            "export", "sparql", "import", "working_sets", "audit_log", "vocab_terms",
+            "manual_lock", "media", "batch",
+        )
+    ),
+    *(
+        ("editor", feature)
+        for feature in (
+            "export", "sparql", "import", "working_sets", "audit_log", "vocab_terms",
+            "vocab_structure", "form_variants", "storage_locations", "manual_lock",
+            "media", "batch",
+        )
+    ),
+)
 
 
 def _to_pg_url(asyncpg_url: str) -> str:
@@ -113,6 +158,24 @@ async def _dump_database(backup_file: Path) -> None:
         )
 
 
+async def _seed_default_permissions(connection: AsyncConnection) -> None:
+    """Restore the current permission baseline after an explicit full reset."""
+    await connection.execute(
+        models.RolePermission.__table__.insert(),
+        [
+            {"id": uuid.uuid4(), "role": role, "record_type": record_type, "action": action}
+            for role, record_type, action in _DEFAULT_ROLE_PERMISSIONS
+        ],
+    )
+    await connection.execute(
+        models.FeaturePermission.__table__.insert(),
+        [
+            {"id": uuid.uuid4(), "role": role, "feature": feature}
+            for role, feature in _DEFAULT_FEATURE_PERMISSIONS
+        ],
+    )
+
+
 async def _do_reset(engine: AsyncEngine, wipe_all: bool) -> list[str]:
     """Compute and truncate the target tables.
 
@@ -134,6 +197,8 @@ async def _do_reset(engine: AsyncEngine, wipe_all: bool) -> list[str]:
             await conn.execute(
                 text(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE')
             )
+        if wipe_all:
+            await _seed_default_permissions(conn)
     return target_tables
 
 
@@ -141,7 +206,7 @@ def db_reset(wipe_all: bool, backup_dir: str | None, no_backup: bool, confirm: b
     """Reset Katalon data tables.
 
     Args:
-        wipe_all: Also truncate configuration tables.
+        wipe_all: Also truncate configuration tables, then restore default permissions.
         backup_dir: Directory for the pg_dump backup.
         no_backup: Skip the backup step.
         confirm: If True, ask for interactive confirmation.
@@ -179,5 +244,10 @@ def db_reset(wipe_all: bool, backup_dir: str | None, no_backup: bool, confirm: b
         click.echo("Truncating tables ...")
         truncated = await _do_reset(engine, wipe_all)
         click.echo(f"Truncated {len(truncated)} tables: {', '.join(truncated)}")
+        if wipe_all:
+            click.echo(
+                f"Restored {len(_DEFAULT_ROLE_PERMISSIONS)} role and "
+                f"{len(_DEFAULT_FEATURE_PERMISSIONS)} feature permissions."
+            )
 
     asyncio.run(_run())

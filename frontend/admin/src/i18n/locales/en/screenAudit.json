@@ -15,7 +15,8 @@
     "relation_add": "Relation created",
     "relation_update": "Relation changed",
     "relation_delete": "Relation deleted",
-    "ai_schema_assist": "AI schema assistant used"
+    "ai_schema_assist": "AI schema assistant used",
+    "ai_translate": "AI translation created"
   },
   "loading": "Loading…",
   "empty": "No entries.",

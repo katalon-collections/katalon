@@ -492,7 +492,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     },
 )
 async def update_field(
-    field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep
+    field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep, current_user: CurrentUser
 ) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
@@ -517,6 +517,9 @@ async def update_field(
     await _validate_unique_detail_role(db, data, exclude_id=field_id)
     old_is_public = field.is_public
     old_settings = field.settings or {}
+    old_is_translatable = field.is_translatable
+    old_is_repeatable = field.is_repeatable
+    old_field_type = field.field_type
     for k, v in data.model_dump().items():
         setattr(field, k, v)
     await db.flush()
@@ -524,11 +527,48 @@ async def update_field(
         old_settings.get(key) != field.settings.get(key)
         for key in ("target_type", "fixed_relation_type", "inherited_fields")
     )
+    if old_is_translatable != field.is_translatable and not field.parent_id:
+        # A field's is_translatable flag is reversible in both directions (#399):
+        # existing records are reshaped in the same transaction so the schema and
+        # the stored data never drift apart. Toggling on is lossless (wraps the
+        # legacy plain-string value); toggling off is lossy (keeps only the
+        # primary language) — the admin UI warns and asks for confirmation
+        # before sending a downgrade, based on the field's usage count.
+        from katalon.services.ai_service import get_admin_ai_config
+        from katalon.services.schema_service import migrate_translatable_shape
+
+        ai_config = await get_admin_ai_config(db)
+        primary_language = (ai_config.supported_languages or ["de", "en"])[0]
+        await migrate_translatable_shape(
+            db,
+            field,
+            enable=field.is_translatable,
+            primary_language=primary_language,
+            user_id=current_user.id,
+        )
+        await db.flush()
+    if old_is_repeatable != field.is_repeatable and not field.parent_id:
+        # Same reversibility contract for is_repeatable (#399): scalar <-> list is
+        # reshaped automatically. Enabling wraps the scalar in a single-item list
+        # (lossless); disabling collapses to the first list entry — the admin UI
+        # warns first when any affected record would actually lose entries.
+        from katalon.services.schema_service import migrate_repeatable_shape
+
+        await migrate_repeatable_shape(
+            db, field, enable=field.is_repeatable, user_id=current_user.id
+        )
+        await db.flush()
     # is_facet toggles need no reindex: docs carry facet_all_* for every public
     # field and the portal whitelists aggregations against is_facet at query
     # time. Only content-affecting changes (visibility, inherited relation
-    # settings) require a rebuild.
-    if field.is_public != old_is_public or inherited_settings_changed:
+    # settings, translatable/repeatable shape, field type) require a rebuild.
+    if (
+        field.is_public != old_is_public
+        or inherited_settings_changed
+        or old_is_translatable != field.is_translatable
+        or old_is_repeatable != field.is_repeatable
+        or old_field_type != field.field_type
+    ):
         _enqueue_reindex(db, field.target_type)
     return _fd_read(field)
 
@@ -538,20 +578,40 @@ class FieldUsageResponse(BaseModel):
     field_name: str
     target_type: str
     usage_count: int
+    # Populated only when the matching `new_*` query param was supplied — the
+    # frontend uses these to decide whether a pending schema change needs a
+    # data-loss confirmation before it is sent (#399).
+    repeatable_collapse_count: int | None = None
+    type_change_risk_count: int | None = None
 
 
 @router.get(
     "/{field_id}/usage",
     response_model=FieldUsageResponse,
     dependencies=[require_role("admin")],
-    summary="Get record usage count for a field definition",
+    summary="Get record usage count for a field definition, optionally previewing the impact of a pending reconfiguration",
     responses={
         403: {"description": "Insufficient permissions"},
         404: {"description": "Field definition not found"},
     },
 )
-async def get_field_usage(field_id: uuid.UUID, db: DBDep) -> FieldUsageResponse:
-    from katalon.services.schema_service import count_field_usage
+async def get_field_usage(
+    field_id: uuid.UUID,
+    db: DBDep,
+    new_is_repeatable: bool | None = Query(
+        default=None,
+        description="If False and the field is currently repeatable, also returns repeatable_collapse_count.",
+    ),
+    new_field_type: str | None = Query(
+        default=None,
+        description="If different from the field's current type, also returns type_change_risk_count.",
+    ),
+) -> FieldUsageResponse:
+    from katalon.services.schema_service import (
+        count_field_type_change_risk,
+        count_field_usage,
+        count_repeatable_collapse_loss,
+    )
 
     result = await db.execute(
         select(FieldDefinition).where(
@@ -562,11 +622,23 @@ async def get_field_usage(field_id: uuid.UUID, db: DBDep) -> FieldUsageResponse:
     if not field:
         raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
     usage_count = await count_field_usage(db, field)
+    repeatable_collapse_count = (
+        await count_repeatable_collapse_loss(db, field)
+        if new_is_repeatable is False and field.is_repeatable
+        else None
+    )
+    type_change_risk_count = (
+        await count_field_type_change_risk(db, field, new_field_type)
+        if new_field_type is not None and new_field_type != field.field_type
+        else None
+    )
     return FieldUsageResponse(
         field_id=field.id,
         field_name=field.name,
         target_type=field.target_type,
         usage_count=usage_count,
+        repeatable_collapse_count=repeatable_collapse_count,
+        type_change_risk_count=type_change_risk_count,
     )
 
 

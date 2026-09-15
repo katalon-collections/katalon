@@ -1,297 +1,489 @@
 # Changelog
 
-All notable changes to Katalon are documented here.
-Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versioning: [Semantic Versioning](https://semver.org/).
+Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Version für
+Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
+Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
-## [1.35.0] - 2026-09-14
+## [1.36.0]
 
-### Added
-- **Subtyp-Facette in der Portal-Suche (Object/Entity/Place/Occurrence):** Die
-  Suche zeigt jetzt eine Subtyp-Facette (z. B. Gemälde/Skulptur/Archivalie bei
-  Objekten, Person/Organisation bei Entitäten) mit lokalisierten Labels und
-  Trefferzahlen; ein Klick filtert Ergebnisliste und URL. Die Trefferliste
-  zeigt in der Typ-Kennzeichnung jetzt ebenfalls den konkreten Subtyp statt
-  nur des generischen Datensatztyps.
+- **KI-gestützte Übersetzung im Editor:** Mehrsprachige Textfelder können direkt im
+  Formular per KI-Assistent in die konfigurierten Zielsprachen übersetzt werden.
+- **Mehrsprachiges Portal-Branding:** Site-Titel, Untertitel und Hero-Texte lassen sich
+  in den Admin-Einstellungen für jede unterstützte Sprache separat pflegen und wechseln
+  im Portal mit der gewählten Nutzersprache.
+- **Lokalisierte Vokabulare im Portal:** Begriffe aus kontrollierten Vokabularen werden
+  in der Suche und auf Detailseiten automatisch in der aktiven Sprache angezeigt.
+- **Einheitliche Typ-Kennzeichnung in der Portalsuche:** Suchtreffer tragen in Listen-
+  und Kachelansicht eine konsistente Subtyp-Pill am Titel; redundante Standarduntertitel
+  entfallen.
+- **KI-Transparenz für Sammlungen und Lagerorte:** KI-generierte Feldwerte werden nun
+  auch für Sammlungen und Standorte mit Modell und Zeitstempel transparent markiert.
 
-### Fixed
-- **Gruppenfelder im Schema müssen wiederholbar sein:** Ein Gruppenfeld mit
-  `is_repeatable=false` führte im Admin-Formular zu einem Absturz, sobald ein
-  Wert gesetzt war, weil Gruppenwerte immer als Array gespeichert werden. Die
-  Schema-API lehnt diese inkonsistente Konfiguration jetzt ab.
-- **Raster-/Masonry-Ansicht der Suche wurde fälschlich auf andere
-  Datensatztypen übertragen:** Wer bei Objekten die Rasteransicht wählte, saß
-  bei Personen/Orten/Werken ohne Umschalter in dieser Ansicht fest. Diese
-  Typen zeigen jetzt immer die Listenansicht.
+## [1.35.0]
 
-### Changed
-- **Backend auf Python 3.14 angehoben** (zuvor 3.12) — Docker-Images, CI und
-  Entwicklungsumgebung.
+- **Subtyp-Facette in der Portal-Suche:** Objekte, Entitäten, Orte und Occurrences
+  lassen sich jetzt zusätzlich nach ihrem konkreten Subtyp filtern (z. B.
+  Gemälde/Skulptur/Archivalie), inklusive Trefferzahlen und Anzeige in der Trefferliste.
 
-## [1.34.7] - 2026-09-14
+## [1.34.6]
 
-### Fixed
-- **Integrationstests Session-Isolation:** In `test_batch_editing.py` und
-  `test_import_authorization.py` wurde der statische Modul-Import von
-  `AsyncSessionLocal` durch dynamische Aufrufe über `database_module` ersetzt,
-  wodurch die Verbindung zur dynamisch allokierten Testdatenbank im CI-Container
-  stets aktuell bleibt.
-- **Audit-Autorisierungstests:** Korrektur des Plural-Routings für `entity` in
-  `_create_record` (`/v1/entities` statt `/v1/entitys`) und Einbindung der neuen
-  Paritäts-Endpunkte für Lagerorte in
-  `backend/tests/integration/test_audit_read_authorization.py`.
-- **Lagerort Batch-Tests:** Hinzufügen des Pflichtfelds `label` in `metadata_`
-  und Korrektur des Audit-Listen-Parsings in `test_batch_storage_location.py`.
-- **Soft-Delete Rollback-Simulation:** Umstellung des Fehler-Monkeypatchings auf
-  `log_change` in `test_soft_delete.py`, um Transaktionsabbrüche deterministisch
-  über den FastAPI/get_db-Lebenszyklus auszulösen.
+- **Batch-Operationen für Lagerorte:** Massenbearbeitung von Feldern und Beziehungen
+  steht jetzt auch für Lagerorte zur Verfügung, analog zu den übrigen Kerntypen.
 
-## [1.34.0] - 2026-09-13
+## [1.34.4]
 
-### Added
-- Portal: mobile Kopfzeile mit Hamburger-Menü (Sprache, Login/Logout, erweiterte
-  Suche hinter einem Menü-Toggle statt permanent sichtbarer Leiste) sowie ein
-  Home-Icon neben dem Logo. Auf der Suchseite öffnen sich Facetten/Filter auf
-  schmalen Viewports als Overlay-Panel über einen eigenen Filter-Button statt
-  dauerhaft die Seitenspalte zu belegen.
-- `idno` ("ID-Nr.") ist jetzt wie `label` ein echtes Systemfeld in der
-  Schema-Verwaltung: `_ensure_idno_fields()` legt es pro Haupttyp an, sein
-  Anzeigename bleibt EN/DE anpassbar. Im Schema-Editor stehen `idno` und
-  `label` immer ganz oben mit einem "System"-Vermerk (Look wie bei
-  Systemvokabularen), nicht per Drag verschiebbar und nicht löschbar. Ihr
-  Felddetail zeigt nur noch Anzeigename und Hilfetext — Feldtyp, Pflicht,
-  Wiederholbar, Mehrsprachig, Regex, Standardwert, Sperren und KI-Assistent
-  entfallen, da diese Einstellungen für Systemfelder ohnehin fix sind. Der
-  konfigurierte Anzeigename von `idno` erscheint jetzt auch im
-  Stammdaten-Feld des Datensatzformulars statt des zuvor hartkodierten
-  Texts "ID-Nr.".
+- **Erweitertes Betriebs-Monitoring:** Der Health-Check prüft jetzt zusätzlich Redis,
+  Cantaloupe, Oxigraph sowie einen Celery-Heartbeat und liefert Warteschlangenlänge
+  und Backup-Alter — hilfreich für Alarmierung im Produktivbetrieb.
 
-### Changed
-- Systemfeld `label` ("Titel") behält im Schema-Editor abweichend von `idno`
-  weiterhin Validierungs-Regex, Standardwert und KI-Assistent im Felddetail
-  (Titel ist Freitext und damit KI-/Regex-/Default-tauglich; `idno` als
-  strukturierter Identifikator nicht).
+## [1.34.0]
 
+- **Mobile Portal-Kopfzeile:** Kompaktes Hamburger-Menü für Sprache, Login/Logout und
+  erweiterte Suche auf schmalen Bildschirmen; Facetten öffnen dort als Overlay statt
+  dauerhaft Platz zu belegen.
+- **`idno` als konfigurierbares Systemfeld:** Die ID-Nummer verhält sich jetzt wie das
+  Titelfeld als geschütztes, aber im Anzeigenamen anpassbares Systemfeld.
 
-## [1.32.0] - 2026-09-12
+## [1.32.0]
 
-### Added
-- Admin-Einstellungen: Neuer Schalter „IIIF-Manifest-Button auf der
-  Objekt-Detailseite anzeigen“ (`PortalConfig.show_iiif_manifest_link`,
-  Migration `0069`, Default: an). Der Manifest-Link/-Button und die
-  Kopieren-Aktion auf der öffentlichen Objekt-Detailseite lassen sich damit
-  zentral ausblenden; der alternate JSON-LD-Link im `<head>` bleibt
-  unabhängig davon bestehen. Beide Elemente rendern jetzt ohne Icons.
-- Test-Infrastruktur (Issue #382): `ruff check`, `pip-audit`, `pnpm audit`
-  (Admin + Portal) und ein Secret-Scan (`gitleaks`) laufen jetzt auf jedem
-  Push/PR (`.github/workflows/security.yml`). Container-Images werden vor
-  dem Push mit Trivy auf kritische/hohe CVEs geprüft
-  (`public-container-images.yml`). Locust hat jetzt Smoke-/Normal-/Load-Profile
-  und einen Fehlerraten-Schwellenwert als CI-Gate
-  (`backend/tests/performance/locustfile.py`). Ein wöchentlicher
-  Locust-Smoke-Lauf und ein wöchentlicher OWASP-ZAP-Scan gegen die
-  Staging-Umgebung sowie ein quartalsweiser automatisierter
-  Backup/Restore-Drill laufen ausschließlich zeitgesteuert
-  (`load-smoke.yml`, `dast-staging.yml`, `backup-drill.yml`), nie bei
-  jedem Push. Neue Integrationstests sichern ab, dass ein abgebrochener
-  Import keine Karteileichen hinterlässt (`test_import_resilience.py`) und
-  dass das Löschen eines Feldes oder Vokabularterms keine Daten aus
-  bestehenden Datensätzen entfernt (`test_schema_destructive_changes.py`).
+- **IIIF-Manifest-Link ein-/ausblendbar:** Neuer Schalter in den Admin-Einstellungen,
+  um den öffentlichen IIIF-Manifest-Button auf Objektseiten zentral zu steuern.
 
-## [1.31.0] - 2026-09-11
+## [1.31.2]
 
-### Added
-- Importer: Import-Mappings können nun direkt in der Admin-UI als Vorlagen in der Datenbank gespeichert, aktualisiert und für den jeweiligen Datensatz-Typ geladen werden (`import_mappings`-Tabelle, `SaveMappingModal`, `LoadMappingModal`).
-- Importer: Die CLI (`katalon-manage import-xml`) akzeptiert nun direkt exportierte JSON-Profile aus der Oberfläche.
-- Doku: Neues API-Rezept `docs/16_cookbook_api_import.md` für den automatisierten und wiederverwendbaren Import von XML- und LIDO-Dateien über die REST-API.
+- **KI-Transparenz:** Feldwerte, die per KI-Assistent übernommen wurden, sind direkt
+  am Feld als KI-generiert markiert (Modell + Zeitpunkt) — sichtbar für Redakteure
+  und, bei öffentlichen Feldern, im Portal.
 
-## [1.30.0] - 2026-09-10
+## [1.31.0]
 
-### Added
-- Pro Subtyp konfigurierbares Portal-Platzhalterbild (Admin → Subtypen, Feld
-  „Platzhalter-Bild", nur für Objekt-Subtypen): greift auf Objekt-Detailseiten,
-  in Suchergebnis-Karten, verwandten Objekten, Sammlungsansichten und der
-  Startseite, sobald ein Datensatz des Subtyps kein eigenes Medium hat. Fällt
-  auf das bestehende globale Platzhalterbild zurück, wenn kein subtyp-eigenes
-  gesetzt ist.
-- Portal-Detailseiten: Unauffällige Vor-/Zurück-Pfeile führen innerhalb der
-  ursprünglichen Suche weiter. Filter, Sortierung und Seite bleiben dabei
-  erhalten; die Navigation lädt bei paginierten Standardsuchen bei Bedarf die
-  nächste Ergebnis-Seite nach.
+- **Wiederverwendbare Import-Mappings:** Import-Zuordnungen lassen sich in der
+  Admin-Oberfläche als Vorlage speichern, aktualisieren und für den jeweiligen
+  Datensatztyp wiederverwenden. Die CLI akzeptiert direkt exportierte JSON-Profile.
 
-### Changed
-- Objekt-Detailseite ohne Medien und ohne Platzhalterbild zeigt keine leere
-  Bildfläche mit „Kein Bild verfügbar" mehr; die Metadaten-Spalte übernimmt
-  stattdessen den großen Teil der Seite (statt der schmalen 400px-Sidebar),
-  da sie in diesem Fall der eigentliche Seiteninhalt ist. Verknüpfungen
-  werden dabei als eigene Karte dargestellt statt als frei stehende Liste.
-  Die Metadaten-Sidebar ist generell von 320px auf 400px verbreitert.
-- Sammlungsübersicht zeigt den konfigurierten Subtyp-Namen (Label) statt des
-  internen Subtyp-Schlüssels.
+## [1.30.2]
 
-### Fixed
-- Anonyme Portal-Besucher sahen in der Mitgliederzahl einer Sammlung auch
-  nicht-öffentliche (Entwurf/intern) Objekte mitgezählt; die Zahl
-  berücksichtigt jetzt nur für den jeweiligen Betrachter sichtbare Objekte.
+- **Automatisches Beschreibungsfeld für Sammlungen:** Neu angelegte Sammlungen
+  erhalten automatisch ein Richtext-Beschreibungsfeld.
 
-## [1.29.0] - 2026-09-10
+## [1.30.0]
 
-### Added
-- Portal-Terminologie pro Installation konfigurierbar (Issue #373):
-  `PortalConfig.terminology` erlaubt es, die Bezeichnung der Kerntypen
-  (Objekte, Entitäten, Orte, Occurrences, Sammlungen) im Portal zu
-  überschreiben, getrennt nach Singular/Plural und pro Sprache — z. B.
-  „Werk"/„Werke" statt „Objekt"/„Objekte" für eine bibliothekarische
-  Installation. Reine Präsentationsschicht: interne Record-Type-Keys,
-  API-Routen/Payloads und Berechtigungen bleiben unverändert. Im Portal
-  läuft die Auflösung zentral über `typeLabel()`/`t()` in `i18n/index.ts`,
-  sodass Hauptnavigation, Startseite, Suchergebnisse, Facetten und
-  Detailseiten die konfigurierten Begriffe automatisch übernehmen, ohne
-  dass jede Stelle einzeln angepasst werden musste. Fehlt eine Übersetzung
-  oder ein Override, greift die eingebaute Standardterminologie — im Admin
-  unter Einstellungen → Terminologie mit „Auf Standard zurücksetzen" pro Typ.
+- **Subtyp-Platzhalterbilder:** Pro Objekt-Subtyp konfigurierbares Platzhalterbild für
+  Datensätze ohne eigenes Medium.
+- **Vor-/Zurück-Navigation auf Detailseiten:** Unauffällige Pfeile führen innerhalb der
+  ursprünglichen Suche weiter, inklusive Nachladen weiterer Ergebnisseiten.
 
-## [1.28.0] - 2026-09-10
+## [1.29.0]
 
-### Added
-- Portal-Startseite konfigurierbar über Inhaltsbausteine (Issue #374):
-  `PortalConfig.homepage_blocks` (geordnetes JSONB-Array) ersetzt die feste
-  Reihenfolge „Highlights → Neueste Objekte". Blocktypen: `text` (mehrsprachig,
-  frei formulierbar), `objects` (neueste Objekte, Anzahl konfigurierbar),
-  `curated` (nutzt die bestehenden `featured_object_ids` unter Portal &
-  Institution, keine Doppelpflege) und `collections` (oberste Sammlungen,
-  alle Sammlungen oder eine manuell gewählte Auswahl). Blöcke lassen sich im
-  Admin unter Einstellungen → Startseite hinzufügen, umsortieren
-  (Hoch/Runter), aktivieren/deaktivieren und entfernen. Bestehende
-  Installationen erhalten per Migration automatisch die bisherige
-  Blockkonfiguration (`curated` + `objects`), damit die Startseite nach dem
-  Upgrade nicht leer bleibt. Fehlende/gelöschte referenzierte Sammlungen oder
-  Objekte werden beim Rendern übersprungen statt die Seite abstürzen zu
-  lassen. Arbeitslisten wurden bewusst nicht als Quelle angebunden — das
-  Konzept ist für persönliche/geteilte Merklisten gedacht, nicht für
-  öffentliche Kuration; `curated` deckt den Anwendungsfall stattdessen über
-  das bereits vorhandene Feld ab.
+- **Konfigurierbare Portal-Terminologie:** Die Bezeichnung der Kerntypen (z. B. „Werk“
+  statt „Objekt“) lässt sich pro Installation und Sprache anpassen, getrennt nach
+  Singular/Plural.
 
-## [1.27.0] - 2026-09-10
+## [1.28.0]
 
-### Added
-- S3-kompatibles Objektspeicher-Backend für Medien (strikt opt-in, Issue #121):
-  `STORAGE_BACKEND=s3` neben dem unveränderten Default `local`. Zielklasse sind
-  alle S3-kompatiblen Implementierungen — Ceph RADOSGW, MinIO, Hetzner Object
-  Storage, Garage, AWS S3. Der Backend-Client (boto3, in `asyncio.to_thread`)
-  weicht bewusst von boto3-Defaults ab: `request_checksum_calculation=
-  "when_required"` (botocore ≥ 1.36 sonst `x-amz-checksum-crc32` → 400 bei
-  vielen kompatiblen Implementierungen), Path-Style als Default, explizite
-  Region, konfigurierbare TLS-Verifikation (`S3_VERIFY_TLS`, `S3_CA_BUNDLE`
-  für On-Prem-Ceph mit interner CA). Cantaloupe liest via nativem `S3Source`
-  direkt aus dem Bucket — weil Cantaloupe 5.0.x kein Path-Style kennt
-  (virtual-hosted addressing), muss `<bucket>.<endpoint-host>` DNS-seitig
-  auflösbar sein. Private Medien werden durchs Backend gestreamt, keine
-  Presigned-URLs (kein Auth-Bypass). Neue Compose-Overrides:
-  `docker-compose.s3.yml` (Produktion) und `docker-compose.minio.yml`
-  (Dev-only MinIO zum Testen ohne Cloud-Account). Logos/Themes und
-  Batch-Import-Staging bleiben lokal. Kein Migrationsskript: bestehende
-  local-Instanzen sind unverändert, nur neue Instanzen starten mit S3.
+- **Konfigurierbare Startseite:** Die Portal-Startseite besteht jetzt aus frei
+  anordenbaren Inhaltsbausteinen (Text, neueste Objekte, kuratierte Auswahl,
+  Sammlungen) statt einer festen Reihenfolge.
 
-## [1.26.13] - 2026-09-10
+## [1.27.0]
 
-### Fixed
-- Admin → Einstellungen → Facetten: Toggling eines Feldes vom Typ `authority`
-  (Normdaten-Feld) als Facette schlug fehl, sobald die im Feld hinterlegte
-  `settings.source` unbekannt oder deaktiviert war — auch wenn nur `is_facet`
-  geändert wurde. Die Validierung in `schema_admin._validate_field_settings`
-  greift jetzt nur noch, wenn sich `source` tatsächlich ändert (analog zum
-  bestehenden PID-Provider-Grandfathering). Da das PUT bei Fehlschlag
-  komplett verworfen wurde, ohne den lokalen Checkbox-Zustand zurückzusetzen,
-  wirkten Facetten- und „Ergebnis-Untertitel"-Auswahl im UI gespeichert,
-  obwohl der Server nichts übernommen hatte — sichtbar erst nach einem
-  manuellen Reload.
+- **S3-kompatibler Objektspeicher für Medien:** Alternative zum lokalen Speicher,
+  kompatibel mit Ceph, MinIO, Hetzner Object Storage, Garage und AWS S3 (opt-in).
 
-### Added
-- Admin → Einstellungen → Facetten → „Ergebnis-Untertitel": Die ID-Nummer
-  (`idno`) steht jetzt immer als Option zur Verfügung, unabhängig davon, ob
-  sie als Facette aktiviert ist — analog zu Typ/Status. Der öffentliche
-  Portal-Search-Endpunkt löst `idno` direkt aus dem Datensatz auf, da es kein
-  Feld mit `facet_all_*`-Aggregation ist.
+## [1.26.2]
 
-## [1.25.0] - 2026-09-09
+- **Direkter Bearbeiten-Link im Portal:** Angemeldete Mitarbeitende mit Schreibrecht
+  sehen auf Detailseiten einen Link direkt ins Admin-Bearbeitungsformular.
 
-### Added
-- Rollenkonzept (#371, Phase 2): Vollständige Überarbeitung des Berechtigungssystems.
-  - Viewer: Standard-Leseberechtigung auf 6 Typen (ohne Vorgänge und Lagerorte),
-    per Matrix abschaltbar
-  - Cataloger: CRU (kein Löschen), darf Lagerorte nur lesen
-  - Editor: CRUD + Status-Wechsel + Vokabular-Struktur + Lagerorte verwalten
-  - Admin: Force Unlock, erweiterte Konfiguration
-- `feature_permissions`-Tabelle: feingranulare Feature-Rechte (Export, SPARQL,
-  Import, Vokabular, etc.), konfigurierbar über die Admin-UI, Defaults pro Rolle
-  aus dem Rollenkonzept, Feature-Liste im JWT-Token
-- `RolePermission` um `collection`, `storage_location`, `vocabulary_term` erweitert
-- Backend Feature-Gates: Export, SPARQL, Import, Audit, Working-Sets, Vokabular,
-  Statische Seiten, OAI-Sets, Banner, Lagerorte über `require_feature()` statt
-  hartem `require_role("admin")` — Admin kann über UI konfigurieren
-- Frontend Sidebar/AppShell: Feature-basierte Anzeige statt `isAdmin`-binär-Gate
-- Manual Exclusive Lock (#371, Phase 2): Persistente exklusive Sperre mit
-  Besitzer, Grund, Ablaufdatum (max. 7 Tage). Owner-Release, Editor darf
-  Cataloger-Locks aufheben, Admin+ Force Unlock. Audit-Log. Banner im Formular.
-- Automatischer Lock-Ablauf nach 7 Tagen; Erinnerungshinweis in der UI
+## [1.26.1]
 
-## [1.23.0] - 2026-09-09
+- **Drei Suchansichten:** Liste, Masonry und Raster mit Umschalter, dazu optionales
+  Endless Scrolling neben der klassischen Seitennummerierung.
 
-### Added
-- Admin-UI / Audit-Log: Serverseitige Suche nach Datensatz, Kennung, Bearbeiter, Aktion oder Änderungsinhalt, mit Datumsfilter und Pagination. Die Ansicht ist damit auch für große, migrierte Bestände vollständig durchsuchbar.
-- Admin-UI / Datensatzlisten: Ein Klick auf den primären Labelwert öffnet einen Datensatz direkt zur Bearbeitung; das Aktionsmenü bleibt weiterhin verfügbar.
+## [1.26.0]
 
-### Fixed
-- LIDO-Export: Entfernt bildpostkartenspezifische Vorgaben für Institution, Sammlung, Objekttyp, Ereignisse, Rechte und Medien. LIDO übernimmt fachliche Werte jetzt ausschließlich aus aktivierten Mapping-Regeln; die schemaerforderlichen Zielfelder Titel und Objekttyp werden vor der Veröffentlichung geprüft.
+- **Preservation-Export (BagIt):** Manuell auslösbares Langzeitarchivierungspaket pro
+  Objekt (RFC 8493) mit Dublin-Core-, METS- und PREMIS-Metadaten sowie Master- und
+  Ableitungsdateien.
 
-## [1.22.0] - 2026-09-08
+## [1.25.2]
 
-### Added
-- Admin-UI / Formulare: Konfigurierbare Formularabschnitte pro Datensatztyp und Subtyp. Admins ordnen Schemafelder benannten Abschnitten zu; das Erfassungsformular zeigt diese als Tabs, lässt nicht zugeordnete Felder unter „Allgemein“ und markiert Tabs mit Validierungsfehlern.
+- **Hierarchie-Browser für Vokabularfelder:** Baumstruktur direkt im Feld-Dropdown
+  neben der Textsuche.
 
-## [1.21.0] - 2026-09-08
+## [1.25.0]
 
-### Added
-- Portal / Detailseiten: Metadatenfelder, die im Schema als Facette (`is_facet`) markiert sind, werden auf den Objekt-, Personen-, Orts-, Werk- und Sammlungs-Detailseiten als klickbare Links dargestellt. Ein Klick führt zur Suche, gefiltert auf denselben Wert und Datensatztyp (`meta_<feld>=<wert>` bzw. bei Zahlenfeldern `range_<feld>_from/_to`). Betrifft `DetailPageLayout.tsx` (Objekt/Person/Ort/Werk) und den manuellen Feld-Loop in `CollectionDetailPage.tsx`; Backend liefert dafür `is_facet` neu über `GET /portal/v1/schema/{target_type}`.
+- **Überarbeitetes Rollenkonzept:** Vier Standardrollen (Viewer, Cataloger, Editor,
+  Admin) mit feingranularen, über die Admin-UI konfigurierbaren Feature-Rechten
+  (Export, SPARQL, Import, Vokabular u. a.).
+- **Manuelle exklusive Sperre:** Datensätze lassen sich mit Besitzer, Grund und
+  Ablaufdatum (max. 7 Tage) gezielt sperren; Editoren und Admins können Sperren
+  aufheben.
 
-### Fixed
-- Admin-UI / Einstellungen: Das Speichern von Facetten unter „Einstellungen → Facetten“ synchronisiert direkte Schema-Facetten (`is_facet`) und geerbte Facetten nun zuverlässig mit dem Backend. `PUT /v1/portal/config` liefert die vollständig dynamisch aufgelöste Konfiguration zurück, und die UI serialisiert Schema- und Portal-Config-Updates, sodass aktive Facetten nach dem Speichern, Tab-Wechseln und Neuladen stabil erhalten bleiben.
+## [1.24.0]
 
-## [1.20.1] - 2026-09-07
+- **Bearbeitungssperre (Presence Lock):** Zeigt an, wenn ein Datensatz gerade von
+  jemand anderem bearbeitet wird — wahlweise als Warnung oder als harte Blockade
+  beim Speichern.
 
-### Fixed
-- SPARQL / Validation: Import von `ParseException` aus `pyparsing.exceptions` korrigiert (statt fälschlich aus `rdflib.plugins.sparql.parser`), wodurch SPARQL-Validierungs- und Unit-Tests fehlschlugen.
+## [1.23.1]
 
-## [1.20.0] - 2026-09-07
+- **Maximalanzahl für wiederholbare Felder:** Konfigurierbares Limit, serverseitig
+  durchgesetzt und im Formular sichtbar.
 
-### Added
-- Admin-UI / Arbeitslisten (Working Sets): Neuer Menüpunkt „Arbeitslisten“ (`ScreenWorkingSets.tsx`) für ad-hoc, typgebundene Gruppierungen von Datensätzen für interne Workflows (Ausstellungsvorbereitungen, Prüflisten, Dublettenbereinigung, Kuration).
-- Admin-UI / Listenintegration: Auswahlen in allen Datensatzlisten (`ScreenList.tsx`) können über die Massenaktionsleiste („Zu Arbeitsliste“) direkt in bestehende oder neu angelegte Arbeitslisten übernommen werden (`AddToWorkingSetModal.tsx`).
-- Admin-UI / Detailansicht & Sortierung: Detailansicht von Arbeitslisten mit Reordering (Hoch/Runter), individuellen Notizen pro Datensatz, Thumbnails und direkter Verlinkung in die Bearbeitungsmaske.
-- Admin-UI / Batch-Editing-Brücke: Nahtlose Übergabe aller Datensätze einer Arbeitsliste in das bestehende `BatchEditModal` zur gemeinsamen Status-, Feld- oder Relationsänderung.
-- Backend / Arbeitslisten-Datenmodell: Neue PostgreSQL-Tabellen `working_sets` und `working_set_items` (Alembic-Migration `0057_working_sets.py`) mit Kaskadenlöschung und Berechtigungskontrolle (privat vs. geteilt).
-- Backend / REST-API: Vollständige Endpunkte unter `/v1/working-sets` zur Erstellung, Verwaltung, Reordering und Befüllung von Arbeitslisten inklusive automatischer Titel- und Kennungsauflösung.
+## [1.23.0]
 
-## [1.19.2] - 2026-09-03
+- **Durchsuchbares Audit-Log:** Serverseitige Suche nach Datensatz, Kennung,
+  Bearbeiter, Aktion oder Änderungsinhalt mit Datumsfilter.
+- **Direktes Öffnen aus Listen:** Klick auf den Titel öffnet einen Datensatz sofort
+  zur Bearbeitung.
 
-### Fixed
-- Backend: Relations-Label-Auflösung kannte den Datensatztyp `storage_location` nicht — verknüpfte Lagerorte zeigten im Objektformular "Nicht verfügbar" statt ihres Namens.
-- Admin-UI: Lagerort-Suche im Beziehungs-Picker lief über die Volltextsuche, die Lagerorte gar nicht indiziert — die Suche fand nie Treffer. Fragt jetzt direkt die Lagerort-Liste ab, zeigt beim Fokussieren sofort bis zu 20 Einträge (kein Mindest-Zeichen mehr nötig) und filtert bei Eingabe weiter.
-- Admin-UI: "Lagerort-Typ" hat jetzt ein Info-Popover (Zweck, wo neue Typen angelegt werden).
+## [1.22.0]
 
-### Changed
-- Lagerorte haben kein Entwurf/Intern/Öffentlich-Statusfeld mehr — sie waren nie im Portal oder in der öffentlichen Suche sichtbar, das Feld war wirkungslos. Die Inventarnummer/ID ist jetzt stattdessen immer Pflicht (außer bei konfigurierter automatischer Nummernvergabe), statt nur bei Nicht-Entwurf. Migration `0055` entfernt die `status`-Spalte und setzt `idno NOT NULL`.
+- **Konfigurierbare Formularabschnitte:** Schemafelder lassen sich benannten Tabs im
+  Erfassungsformular zuordnen, inklusive Fehlermarkierung pro Tab.
 
-## [1.16.0] - 2026-09-02
+## [1.21.0]
 
-### Added
-- Admin-Kopfsuche durchsucht neben Bestandsdaten auch Nutzer, Vokabulare und Terme, statische Seiten, OAI-Sets, Schemafelder, Subtypen, Formularvarianten, Banner und konfigurierte Normdatenquellen. Die Suche öffnet passende Admin-Bereiche direkt und verwendet für Konfigurationsdaten PostgreSQL statt eines zusätzlichen Suchindex.
+- **Facetten als klickbare Links auf Detailseiten:** Ein Klick auf einen als Facette
+  markierten Feldwert führt direkt zur passend gefilterten Suche.
 
-### Changed
-- Die Admin-Hilfe öffnet die veröffentlichte Anwenderdokumentation auf GitHub Pages statt Markdown-Dateien im Quellrepository.
-- Subtypen: Beim Anlegen wird der interne Name automatisch aus dem Label abgeleitet (z. B. „Person" → `person`) und lässt sich bis zum Speichern anpassen. Nach dem Speichern bleibt er wie bisher unveränderlich.
+## [1.20.0]
 
-### Fixed
-- Portal-Abhängigkeiten und der IIIF-Viewer wurden auf sichere Versionen aktualisiert. Äußeres nginx liefert nun CSP-, HSTS- (Produktion), MIME-, Frame-, Referrer- und Permissions-Schutzheader aus.
-- Portal-Kopfzeile: Suchfeld mit Autocomplete-Vorschlägen hatte `aria-expanded`/`aria-controls` ohne passende ARIA-Rolle gesetzt, was Screenreadern die Beziehung zur Vorschlagsliste unzugänglich machte (axe: `aria-allowed-attr`). Das Feld trägt jetzt `role="combobox"` und `aria-autocomplete="list"`.
+- **Arbeitslisten (Working Sets):** Ad-hoc-Gruppierungen von Datensätzen für interne
+  Workflows, mit Reordering, Notizen pro Eintrag und direkter Übergabe an die
+  Massenbearbeitung.
 
+## [1.19.19]–[1.19.22]
+
+- **SPARQL & Linked Data:** Schreibgeschützter SPARQL-1.1-Endpunkt auf eine
+  automatisch synchronisierte RDF-Projektion (Oxigraph), inklusive interaktivem
+  Query Builder in der Admin-UI, gespeicherten Abfragen, Vorlagen für CIDOC-CRM/
+  LRMoo sowie einer KI-gestützten Übersetzung natürlichsprachlicher Fragen in
+  SPARQL-Abfragen (NL2SPARQL).
+
+## [1.19.16]
+
+- **Transitive Sammlungs- und Lagerort-Suche:** Ein Filter auf eine Obersammlung
+  bzw. einen übergeordneten Lagerort findet automatisch auch Objekte in
+  Teilbeständen bzw. Unterstandorten.
+
+## [1.19.9]
+
+- **Zwei weitere GND-Normdatenquellen:** Eigene, auf Personen bzw. Sachschlagwörter
+  gefilterte GND-Quellen zusätzlich zur bisherigen allgemeinen Quelle.
+
+## [1.19.8]
+
+- **Duplizieren von Feldern und Vokabeltermen:** Felddefinitionen (inkl. Unterfelder)
+  und Vokabularbegriffe lassen sich direkt kopieren.
+
+## [1.19.7]
+
+- **Konfigurierbare Rate-Limits und Crawler-Hinweise:** `.env`-gesteuerte Limits für
+  öffentliche Endpunkte sowie `/robots.txt` und `/llms.txt` für Suchmaschinen- und
+  LLM-Crawler.
+
+## [1.19.4]
+
+- **Kuratorische Sammlungsdetailseite:** Eigenständiges Portal-Layout mit
+  Hero-Banner, Schnellsuche innerhalb der Sammlung, hierarchischem Kontextbaum und
+  umschaltbarer Objektansicht (Galerie/Findbuchliste). Dazu Facettierung nach
+  Sammlungen in der Suche.
+
+## [1.19.0]
+
+- **Neuer Primärtyp „Lagerort“:** Hierarchische Standortverwaltung physischer
+  Aufbewahrungsorte (Haus → Raum → Regal → Box), mit eigenen Schemafeldern,
+  Subtypen und Versionierung. Bewusst nicht im Portal sichtbar.
+
+## [1.18.0]
+
+- **Neuer Primärtyp „Sammlung“:** Vollwertiger Typ zur hierarchischen Erschließung
+  von Sammlungen und Beständen, inklusive eigener Verwaltungsoberfläche und
+  Objektzuordnung.
+
+## [1.17.2]
+
+- **Linked-Data-Export nach CIDOC-CRM & LRMoo:** Strukturierter RDF-/JSON-LD-Export
+  pro Datensatz und über OAI-PMH, inklusive Relationsauflösung und
+  SKOS-Vokabularbegriffen.
+
+## [1.17.1]
+
+- **SKOS-Import für Vokabulare:** Selektiver Import aus Turtle, RDF/XML, JSON-LD und
+  N-Triples, inklusive mehrsprachiger Labels, Cross-Konkordanzen und Hierarchie.
+
+## [1.17.0]
+
+- **Kanonische URIs für Vokabulare:** Eigene URI- und Cross-Konkordanz-Felder
+  (`skos:exactMatch`) für Vokabulare und Terme, z. B. für Getty AAT oder GND.
+
+## [1.16.0]
+
+- **Erweiterte Admin-Kopfsuche:** Durchsucht jetzt auch Nutzer, Vokabulare,
+  statische Seiten, Schemafelder, Subtypen, Banner und Normdatenquellen.
+
+## [1.15.10]
+
+- **PID-Reservierung und URL-Feldtyp:** Felder können ARKs oder DNB-URNs
+  automatisch beim Veröffentlichen reservieren; ein neuer Feldtyp speichert Links
+  mit optionalem Titel.
+
+## [1.15.3]
+
+- **Sortierbare Listenspalten:** ID-Nr., Status und „Geändert“ lassen sich per
+  Klick auf den Spaltenkopf sortieren.
+
+## [1.15.0]
+
+- **E-Mail-Versand für Staff-Konten:** SMTP-gestützter Passwort-Reset sowie
+  Benachrichtigungen zu Importen und Batch-Bearbeitungen.
+
+## [1.14.0]
+
+- **Konfigurierbare Facetten-Anzeige:** Sortierung (Trefferanzahl/alphabetisch) und
+  Startanzahl sichtbarer Werte global im Portal-Admin einstellbar.
+
+## [1.13.0]
+
+- **Interne Portal-Recherche mit Staff-Login:** Bestehende Katalon-Konten
+  ermöglichen berechtigten Mitarbeitenden Zugriff auf interne Datensätze und
+  zusätzliche Schemafelder direkt im Portal.
+
+## [1.12.7]
+
+- **Starter-Helm-Chart:** Proof-of-concept für Kubernetes-Deployment.
+
+## [1.12.5]
+
+- **Platzierung statischer Seiten:** Wahlweise in der Kopfzeile, im Footer oder
+  ganz ohne sichtbaren Link.
+
+## [1.12.0]
+
+- **Präzise Zahlenfacetten:** Von/Bis-Bereiche mit nativen Schiebereglern.
+- **Gekachelte IIIF-Ableitungen:** Bilder werden beim Upload als Pyramid-TIFF
+  vorbereitet, spürbar schnelleres Zoomen im Viewer.
+
+## [1.10.0]
+
+- **Vollständig zweisprachige Admin-Oberfläche:** Deutsch/Englisch für alle
+  Admin-Bereiche, inklusive Sprachumschaltung.
+
+## [1.9.2]
+
+- **Eingebettete Karte für Ortsnormdaten:** GeoNames-Felder zeigen eine
+  OpenStreetMap-Karte im Admin-Formular und auf Portal-Detailseiten.
+
+## [1.8.0]
+
+- **Vokabularvorschläge in der erweiterten Suche:** Feste Vokabularfelder bieten
+  zulässige Begriffe an, freie Felder schlagen konfigurierte Begriffe vor.
+
+## [1.7.0]
+
+- **Erweiterte Portalsuche:** Kombinierbare Feldbedingungen mit UND/ODER-Gruppen
+  und bis zu zwei Relationsschritten, als teilbare URL.
+
+## [1.6.0]
+
+- **Export-Bereich im Admin:** CSV-/JSON-Datendumps pro Bestandstyp; Export-Formate
+  (OAI-DC, LIDO, METS/MODS) sind als erweiterbares Plugin-Register aufgebaut.
+
+## [1.5.0]
+
+- **Getty AAT als Normdatenquelle**, dazu eine Admin-Übersicht aller
+  Normdatenquellen mit Aktivieren/Deaktivieren und Verbindungstest.
+
+## [1.4.4]
+
+- **Hierarchische Vokabularpflege:** Vokabulare lassen sich als Baum mit
+  Eltern-/Unterterm-Beziehungen pflegen.
+
+## [1.4.2]
+
+- **WYSIWYG-Editor für Richtext-Felder:** Formatierungs-Toolbar bei weiterhin
+  Markdown-basierter Speicherung.
+
+## [1.4.0]
+
+- **Massenbearbeitung:** Status setzen, Felder setzen/anhängen/leeren und
+  Relationen hinzufügen/entfernen für ganze Auswahlen oder komplette Suchergebnisse.
+
+## [1.3.0]
+
+- **Konfigurierbare Detailseiten-Layouts:** Pro Feld einstellbar, ob es im
+  Hauptbereich oder in der Seitenspalte erscheint, plus globale Sidebar-Position.
+
+## [1.2.20]
+
+- **Konfigurierbarer Trefferlisten-Untertitel:** Pro Datensatztyp wählbar aus Typ,
+  Status und aktivierten Facettenfeldern.
+
+## [1.2.15]
+
+- **Interne Felder:** Werte lassen sich als „nur für Mitarbeitende“ markieren und
+  bleiben aus allen öffentlichen Ausgaben ausgeschlossen.
+
+## [1.2.12]
+
+- **Browsing-Menüpunkte ein-/ausblendbar:** Pro Datensatztyp im Portal steuerbar.
+
+## [1.2.10]
+
+- **Management-CLI `katalon-manage`:** Kommandozeilenwerkzeuge für Datenbank-Reset,
+  CSV-/XML-Import und Admin-Passwort-Reset.
+
+## [1.2.6]
+
+- **Mehrdatei-XML-Import:** Mehrere XML-Dateien (z. B. LIDO-Exporte) lassen sich in
+  einem Lauf gemeinsam importieren.
+
+## [1.1.2]/[1.1.1]
+
+- **Datumsfelder mit Zeiträumen und Unschärfe (EDTF-lite):** Freitext-Eingaben wie
+  „ca. 1900“, „vor 1900“ oder „1900 bis 1950“ sowie Jahre v. Chr.
+
+## [1.1.0]
+
+- **KI-Assistent für die Schema-Verwaltung:** Felddefinitionen per Chat mit
+  konfigurierbarem OpenAI-kompatiblem Provider generieren.
+
+## [1.0.5]
+
+- **Soft-Delete mit Wiederherstellung:** Gelöschte Datensätze landen im Papierkorb
+  mit konfigurierbarer Aufbewahrungsfrist statt sofort endgültig gelöscht zu werden.
+
+## [1.0.0]
+
+- **Medienformate über Bilder hinaus:** PDF, Audio, Video und 3D-Modelle sind
+  hochladbar, mit passendem Viewer im Portal.
+- **Mehrsprachigkeit:** Konfigurierbare Sprachliste, mehrsprachige Labels und
+  übersetzbare Text-/Richtext-Felder mit Sprachumschalter im Portal.
+
+## [0.11.8]
+
+- **Automatische Spaltenzuordnung beim Import:** Heuristik erkennt passende
+  Zielfelder für CSV-/Excel-Spalten automatisch.
+
+## [0.11.5]
+
+- **Anonymes Portal-API getrennt von der Arbeits-API:** Öffentliche Leserouten unter
+  `/portal/v1`, während `/v1` künftig ein Token verlangt.
+
+## [0.10.28]
+
+- **Konfigurierbare Rollenrechte:** CRUD-Rechte pro Primärtyp und Rolle in einer
+  Matrix in der Benutzerverwaltung einstellbar.
+
+## [0.10.13]
+
+- **Fester Relationstyp pro Feld:** Relationsfelder können einen Relationstyp aus
+  ihrem Vokabular fest vorgeben.
+
+## [0.10.12]
+
+- **Verknüpfte Felder als Portal-Facetten:** Werte aus verknüpften Datensätzen
+  lassen sich als Facette im Portal nutzen.
+
+## [0.10.0]
+
+- **Relationstypen mit Typ-Einschränkung:** Relationstyp-Vokabeleinträge lassen
+  sich auf zulässige Quell-/Zieltypen beschränken.
+
+## [0.9.0]
+
+- **Geführte Onboarding-Tour** für die Admin-Erstanmeldung, jederzeit über das
+  Hilfe-Icon erneut startbar.
+
+## [0.8.1]
+
+- **Felder per Drag & Drop umsortieren** im Schema-Editor.
+
+## [0.8.0]
+
+- **Schnellanlage verknüpfter Datensätze:** Objekte, Entitäten, Orte, Occurrences
+  und Vorgänge lassen sich direkt aus Relationsfeldern als Entwurf anlegen und
+  automatisch verknüpfen.
+
+## [0.7.6]
+
+- **Vollständig responsive Admin-Oberfläche:** Bedienbar bis hinunter zu 319 px
+  Bildschirmbreite.
+
+## [0.7.5]/[0.7.4]
+
+- **KI-Unterstützung und Normdatenfelder in wiederholbaren Gruppen:** KI-Vorschläge
+  und Authority-Felder stehen jetzt auch als Subfelder von Containergruppen zur
+  Verfügung.
+
+## [0.7.0]
+
+- **Formularvarianten:** Benannte, reduzierte Feldauswahlen pro Datensatztyp und
+  Subtyp (Voll-, Schnellerfassung, workflow-spezifische Masken) mit Rollen-Defaults.
+
+## [0.6.2]
+
+- **Optimistic Locking:** Paralleles Bearbeiten desselben Datensatzes wird über
+  `If-Match`/Versionsnummer erkannt statt Änderungen stillschweigend zu
+  überschreiben; Admin-UI bietet einen feldweisen 3-Wege-Merge-Dialog an.
+
+## [0.5.10]
+
+- **Automatisches Backup:** Täglicher Datenbank- und Medien-Dump mit
+  konfigurierbarer Aufbewahrungsfrist, plus manueller One-Shot-Modus.
+
+## [0.5.6]
+
+- **Fuzzy-Clustering für Vokabular-Spalten im Import:** Erkennt Schreibweisen-
+  Varianten und schlägt einen kanonischen Wert vor.
+
+## [0.4.0]
+
+- **Normdaten an Vokabulartermen:** Strukturierte Verweise auf GND, Geonames,
+  Wikidata, Iconclass, VIAF und Getty TGN direkt am Vokabularbegriff.
+
+## [0.3.3]
+
+- **KI-gestützte Feldvorschläge:** Erste Version der KI-Unterstützung in
+  Admin-Formularen für Vokabular-, Freitext-Vokabular- und Relationsfelder.
+
+## [0.3.0]
+
+- **Import-Fortschrittsanzeige und Abbrechen-Funktion:** Laufende Importe zeigen
+  Fortschritt und Ergebnis über alle Screens hinweg an und lassen sich sauber
+  abbrechen.
+
+## [0.2.0]
+
+- **Neuer Primärtyp „Vorgang“:** Interner Record-Typ für Leihverkehr, Erwerbung,
+  Restaurierung u. a., mit Abschluss-Workflow, der verknüpfte Objekte automatisch
+  aktualisiert.
+
+## [0.1.22]
+
+- **Gegenrichtungslabels für Relationen:** Relationstypen können ein eigenes Label
+  für die umgekehrte Blickrichtung tragen.
+
+## [0.1.9]
+
+- **Feedback-Funktion:** Angemeldete Mitarbeitende können Feedback direkt aus der
+  Admin-Oberfläche senden.
+
+## [0.1.0] — Erste interne Testversion
+
+- Bestandsverwaltung für Objekte, Entitäten, Orte und Occurrences mit frei
+  konfigurierbarer Schema-Engine (inkl. Gruppierungsfeldern)
+- Kontrollierte Vokabulare (streng und frei)
+- Rollenbasierte Anmeldung (Admin, Editor, Viewer)
+- Audit-Log und Versionierung/Snapshots für alle Datensätze
+- Beziehungsverwaltung zwischen Datensätzen
+- Medien-Upload mit IIIF-Kachelgenerierung (Cantaloupe)
+- Volltextsuche und Facettierung (Elasticsearch)
+- Öffentliches Portal mit Detailseiten und IIIF-Viewer
+- Anbindung an Normdatenquellen: GND, VIAF, Wikidata, Geonames, Getty TGN, ICONCLASS
+- Import-Assistent für CSV/TSV/Excel/XML mit Probelauf
+- Massenimport von Medien (ZIP + Zuordnung)
+- OAI-PMH-Schnittstelle mit Dublin-Core-Export
+- Benutzerverwaltung und Subtyp-Konfiguration über die Admin-Oberfläche

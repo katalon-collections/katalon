@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 
+from katalon.api.v1.portal import resolve_lang_text
 from katalon.config import settings
 from katalon.core.dependencies import DBDep
 from katalon.core.models import PortalConfig
@@ -45,9 +46,9 @@ async def llms_txt(db: DBDep) -> PlainTextResponse:
     base = settings.katalon_base_url.rstrip("/") if settings.katalon_base_url else ""
 
     lines = [
-        f"# {config.site_title}",
+        f"# {resolve_lang_text(config.site_title) or 'Katalon'}",
         "",
-        config.site_subtitle or "GLAM metadata collection published with Katalon.",
+        resolve_lang_text(config.site_subtitle) or "GLAM metadata collection published with Katalon.",
         "",
         "## Structured data",
         "",

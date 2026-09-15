@@ -13,6 +13,7 @@ import { ActionMenu } from '../ui/ActionMenu'
 import { BatchEditModal } from './BatchEditModal'
 import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { DeleteWithChildrenModal } from '../ui/DeleteWithChildrenModal'
 
 const PAGE_SIZE = 50
 
@@ -165,6 +166,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const [addToSetOpen, setAddToSetOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void | Promise<void> } | null>(null)
+  const [childDeleteTarget, setChildDeleteTarget] = useState<{ id: string; childCount: number } | null>(null)
   const [treeItems, setTreeItems] = useState<AnyRecord[] | null>(null)
 
   // Hierarchical browse: only when unfiltered/unsorted, so parent/child relations stay complete.
@@ -300,6 +302,11 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           load()
           setConfirmState(null)
         } catch (e) {
+          if (e instanceof ConflictError && e.child_count > 0) {
+            setConfirmState(null)
+            setChildDeleteTarget({ id, childCount: e.child_count })
+            return
+          }
           if (e instanceof ConflictError) {
             setConfirmState({
               message: t('deleteConfirmWithConflicts', { message: e.message }),
@@ -322,6 +329,35 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         }
       },
     })
+  }
+
+  async function handleChildDelete(id: string, action: 'cascade' | 'reparent') {
+    try {
+      await collections.deleteHierarchy(id, { [action]: true })
+      removeLocally(id)
+      load()
+      setChildDeleteTarget(null)
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        setChildDeleteTarget(null)
+        setConfirmState({
+          message: t('deleteConfirmWithConflicts', { message: e.message }),
+          onConfirm: async () => {
+            try {
+              await collections.deleteHierarchy(id, { [action]: true, force: true })
+              removeLocally(id)
+              load()
+            } catch (e2) {
+              alert((e2 as Error).message)
+            } finally {
+              setConfirmState(null)
+            }
+          },
+        })
+      } else {
+        throw e
+      }
+    }
   }
 
   // Primary label field: first list field, or fallback to label
@@ -674,6 +710,24 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           danger
           onConfirm={confirmState.onConfirm}
           onCancel={() => setConfirmState(null)}
+        />
+      )}
+      {childDeleteTarget && (
+        <DeleteWithChildrenModal
+          title={t('deleteChildrenModal.title')}
+          description={t('deleteConfirm', { type: typeSingularLabels[recordType] })}
+          warningTitle={t('deleteChildrenModal.warningTitle')}
+          warningText={t(childDeleteTarget.childCount === 1 ? 'deleteChildrenModal.warning' : 'deleteChildrenModal.warning_plural', { count: childDeleteTarget.childCount })}
+          chooseActionLabel={t('deleteChildrenModal.chooseAction')}
+          reparentLabel={t('deleteChildrenModal.optionReparent')}
+          reparentDesc={t('deleteChildrenModal.optionReparentDesc')}
+          cascadeLabel={t('deleteChildrenModal.optionCascade')}
+          cascadeDesc={t('deleteChildrenModal.optionCascadeDesc')}
+          cancelLabel={t('cancel')}
+          confirmLabel={t('deleteRowTitle')}
+          deletingLabel={t('deleting')}
+          onConfirm={action => handleChildDelete(childDeleteTarget.id, action)}
+          onCancel={() => setChildDeleteTarget(null)}
         />
       )}
     </div>

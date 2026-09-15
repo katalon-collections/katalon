@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
+import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow } from './RelationFieldRow'
+import { api, type VocabTerm } from '../api/client'
 
 /** Search-page link for one facet value of a field marked `is_facet`, scoped to the
  *  record's own type. Numeric fields use the range filter (exact value as both bounds);
@@ -47,6 +49,65 @@ export function MetaRow({ label, value, href, items }: {
       </span>
     </div>
   )
+}
+
+type VocabularyTermRequest = { fieldName: string; termIds: string[] }
+
+function useVocabularyLabels(
+  recordType: string,
+  fields: FieldDefinition[],
+  metadata: Record<string, unknown>,
+  locale: string,
+): ReadonlyMap<string, string> {
+  const requests = useMemo((): VocabularyTermRequest[] => {
+    const idsByField = new Map<string, Set<string>>()
+    for (const field of fields) {
+      if (field.field_type !== 'vocab') continue
+      const rawValue = metadata[field.name]
+      const values = Array.isArray(rawValue) ? rawValue : [rawValue]
+      for (const value of values) {
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+        const id = (value as Record<string, unknown>).id
+        if (typeof id !== 'string') continue
+        const ids = idsByField.get(field.name) ?? new Set<string>()
+        ids.add(id)
+        idsByField.set(field.name, ids)
+      }
+    }
+    return Array.from(idsByField, ([fieldName, termIds]) => ({
+      fieldName,
+      termIds: Array.from(termIds),
+    }))
+  }, [fields, metadata])
+  const [terms, setTerms] = useState<ReadonlyMap<string, VocabTerm>>(() => new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    if (requests.length === 0) {
+      setTerms(new Map())
+      return () => { cancelled = true }
+    }
+    Promise.all(
+      requests.map(({ fieldName, termIds }) =>
+        api.portal.searchFieldTerms(recordType, fieldName, termIds).catch(() => [] as VocabTerm[])
+      )
+    ).then(results => {
+      if (cancelled) return
+      const nextTerms = new Map<string, VocabTerm>()
+      for (const result of results) {
+        for (const term of result) nextTerms.set(term.id, term)
+      }
+      setTerms(nextTerms)
+    })
+    return () => { cancelled = true }
+  }, [recordType, requests])
+
+  return useMemo(() => new Map(
+    Array.from(terms, ([id, term]) => [
+      id,
+      term.label[locale] ?? term.label.de ?? term.label.en ?? term.term,
+    ])
+  ), [locale, terms])
 }
 
 function GeoNamesMaps({ value }: { value: unknown }) {
@@ -106,12 +167,12 @@ export function richText(value: string): ReactNode {
 }
 
 /** A field placed in the main column: labeled block, markdown for richtext fields. */
-function MainField({ field, value, locale, recordType, aiProvenance }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string } }) {
+function MainField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string> }) {
   if (field.field_type === 'relation') {
-    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
+    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
   }
   if (field.is_facet) {
-    const items = facetItems(value, locale, field.field_type)
+    const items = facetItems(value, locale, field.field_type, vocabularyLabels)
     if (items.length === 0) return null
     return (
       <div style={{ marginBottom: 20 }}>
@@ -125,7 +186,7 @@ function MainField({ field, value, locale, recordType, aiProvenance }: { field: 
       </div>
     )
   }
-  const rendered = renderFieldValue(value, locale, field.field_type)
+  const rendered = renderFieldValue(value, locale, field.field_type, vocabularyLabels)
   if (!rendered) return null
   const href = field.field_type === 'url'
     ? urlHref(value)
@@ -151,16 +212,16 @@ function MainField({ field, value, locale, recordType, aiProvenance }: { field: 
 }
 
 /** A field placed in the sidebar: compact key/value row. */
-function SidebarField({ field, value, locale, recordType, aiProvenance }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string } }) {
+function SidebarField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string> }) {
   if (field.field_type === 'relation') {
-    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} />
+    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
   }
   const label = <>{fieldLabel(field, locale)}{aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}</>
   if (field.is_facet) {
-    const items = facetItems(value, locale, field.field_type)
+    const items = facetItems(value, locale, field.field_type, vocabularyLabels)
     return <MetaRow label={label} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw) }))} />
   }
-  const rendered = renderFieldValue(value, locale, field.field_type)
+  const rendered = renderFieldValue(value, locale, field.field_type, vocabularyLabels)
   const href = field.field_type === 'url'
     ? urlHref(value)
     : field.field_type === 'authority'
@@ -202,9 +263,13 @@ interface DetailPageLayoutProps {
 export function DetailPageLayout({
   media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
 }: DetailPageLayoutProps) {
+  const vocabularyLabels = useVocabularyLabels(recordType, fieldDefs, metadata, locale)
+  const resolveRelationType = useRelationTypeLabels(locale)
   const detailFields = fieldDefs.filter(f => f.show_in_detail)
   const descriptionField = detailFields.find(f => f.detail_role === 'description')
-  const description = descriptionField ? renderFieldValue(metadata[descriptionField.name], locale, descriptionField.field_type) : null
+  const description = descriptionField
+    ? renderFieldValue(metadata[descriptionField.name], locale, descriptionField.field_type, vocabularyLabels)
+    : null
   const otherFields = detailFields.filter(f => f !== descriptionField)
   const mainFields = otherFields.filter(f => f.detail_slot === 'main')
   const sidebarFields = otherFields.filter(f => f.detail_slot !== 'main')
@@ -212,13 +277,23 @@ export function DetailPageLayout({
   // configured field — resolve actual output up front so "is there main content" reflects
   // what's really on screen, not how many fields happen to be configured for the slot.
   const mainFieldNodes = mainFields
-    .map(f => ({ key: f.name, node: MainField({ field: f, value: metadata[f.name], locale, recordType, aiProvenance: aiProvenance?.[f.name] }) }))
-    .filter((entry): entry is { key: string; node: JSX.Element } => entry.node !== null)
+    .map(f => ({
+      key: f.name,
+      node: MainField({
+        field: f,
+        value: metadata[f.name],
+        locale,
+        recordType,
+        aiProvenance: aiProvenance?.[f.name],
+        resolveRelationType,
+        vocabularyLabels,
+      }),
+    }))
 
   const sidebar = (
     <aside className="detail-meta">
       {sidebarBefore}
-      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} />)}
+      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} resolveRelationType={resolveRelationType} vocabularyLabels={vocabularyLabels} />)}
       {sidebarExtra}
     </aside>
   )

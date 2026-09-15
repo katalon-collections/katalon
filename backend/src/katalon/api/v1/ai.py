@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from katalon.core.dependencies import CurrentUser, DBDep, require_admin_or_editor
-from katalon.services.ai_service import complete_field
+from katalon.services.ai_service import complete_field, translate_field
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -18,6 +18,15 @@ class AICompleteRequest(BaseModel):
     record_id: uuid.UUID
     group_index: int | None = Field(default=None, ge=0)
     group_instance: dict[str, object] | None = None
+
+
+class AITranslateRequest(BaseModel):
+    field_definition_id: uuid.UUID
+    record_type: str
+    record_id: uuid.UUID
+    source_language: str = Field(min_length=2, max_length=16)
+    target_language: str = Field(min_length=2, max_length=16)
+    source_value: str = Field(min_length=1)
 
 
 class AICompleteResponse(BaseModel):
@@ -58,5 +67,39 @@ async def complete_ai_field(
         field_definition_id=data.field_definition_id,
         group_index=data.group_index,
         group_instance=data.group_instance,
+    )
+    return AICompleteResponse.model_validate(result)
+
+
+@router.post(
+    "/translate",
+    response_model=AICompleteResponse,
+    dependencies=[require_admin_or_editor()],
+    summary="Generate an AI-assisted translation for one multilingual field value",
+    responses={
+        401: {"description": "Missing, invalid, or expired credentials"},
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Record or field definition not found"},
+        409: {"description": "AI assistance disabled or not fully configured"},
+        422: {"description": "Invalid field, language, or malformed AI response"},
+        429: {"description": "AI token usage limit exceeded"},
+        500: {"description": "Admin configuration missing"},
+        502: {"description": "AI provider request failed"},
+    },
+)
+async def translate_ai_field(
+    data: AITranslateRequest,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> AICompleteResponse:
+    result = await translate_field(
+        db,
+        user_id=current_user.id,
+        record_type=data.record_type,
+        record_id=data.record_id,
+        source_value=data.source_value,
+        field_definition_id=data.field_definition_id,
+        source_language=data.source_language,
+        target_language=data.target_language,
     )
     return AICompleteResponse.model_validate(result)

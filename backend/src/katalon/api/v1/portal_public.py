@@ -991,7 +991,10 @@ async def list_fields(
     response_model=list[PortalSearchTermRead],
 )
 async def list_search_field_terms(
-    target_type: str, field_name: str, db: DBDep
+    target_type: str,
+    field_name: str,
+    db: DBDep,
+    term_ids: list[uuid.UUID] = Query(default=[]),
 ) -> list[VocabularyTerm]:
     if target_type not in _PUBLIC_TYPES:
         raise HTTPException(status_code=404, detail="Suchfeld nicht gefunden")
@@ -1002,7 +1005,6 @@ async def list_search_field_terms(
             FieldDefinition.field_type.in_(("vocab", "vocab_free")),
             FieldDefinition.is_deleted.is_(False),
             FieldDefinition.is_public.is_(True),
-            FieldDefinition.is_searchable.is_(True),
             FieldDefinition.parent_id.is_(None),
         )
     )
@@ -1012,11 +1014,10 @@ async def list_search_field_terms(
         vocabulary_uuid = uuid.UUID(str(vocabulary_id))
     except (TypeError, ValueError):
         raise HTTPException(status_code=404, detail="Suchfeld-Vokabular nicht gefunden") from None
-    terms = await db.execute(
-        select(VocabularyTerm)
-        .where(VocabularyTerm.vocabulary_id == vocabulary_uuid)
-        .order_by(VocabularyTerm.term)
-    )
+    query = select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocabulary_uuid)
+    if term_ids:
+        query = query.where(VocabularyTerm.id.in_(term_ids))
+    terms = await db.execute(query.order_by(VocabularyTerm.term))
     return list(terms.scalars().all())
 
 

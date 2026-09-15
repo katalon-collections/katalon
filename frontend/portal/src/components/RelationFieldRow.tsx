@@ -39,9 +39,10 @@ interface Props {
   label: string
   value: unknown
   targetType: string | undefined
+  resolveRelationType: (code: string) => string
 }
 
-export function RelationFieldRow({ label, value, targetType }: Props) {
+export function RelationFieldRow({ label, value, targetType, resolveRelationType }: Props) {
   const entries = parseEntries(value)
   if (entries.length === 0) return null
 
@@ -60,7 +61,7 @@ export function RelationFieldRow({ label, value, targetType }: Props) {
             )}
             {entry.relation_type && (
               <span style={{ fontSize: 11, color: 'var(--fg-3)', marginLeft: 6 }}>
-                {entry.relation_type}
+                {resolveRelationType(entry.relation_type)}
               </span>
             )}
           </span>
