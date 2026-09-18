@@ -12,13 +12,16 @@ from katalon.core.dependencies import get_current_user
 from katalon.core.models import (
     ExportMappingRule,
     ExportMappingSet,
+    PortalConfig,
+    RecordSubtype,
     User,
 )
 from katalon.core.schemas import (
     ExportMappingRuleCreate,
+    ExportMappingSetCreate,
     ExportMappingSetUpdate,
 )
-from katalon.integrations.metadata_format import SourceKind
+from katalon.integrations.metadata_format import CompiledMappingSet, MappingSpec, SourceKind
 from katalon.main import app
 from katalon.services import metadata_mapping_service
 from katalon.services.metadata_mapping_service import OptimisticLockError
@@ -116,6 +119,86 @@ async def test_get_mapping_index_only_reads_published_sets() -> None:
     cms = index["object"]
     assert len(cms.rules) == 1
     assert cms.rules[0].target_key == "dc:title"
+
+
+@pytest.mark.asyncio
+async def test_new_lido_object_mapping_defaults_title_to_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_db = AsyncMock()
+    added: list[object] = []
+    mock_db.add = MagicMock(side_effect=added.append)
+    portal_result = MagicMock()
+    portal_result.scalar_one_or_none.return_value = PortalConfig(
+        key="default",
+        site_title={"de": "Sammlung Beispiel"},
+    )
+    mock_db.execute.return_value = portal_result
+
+    async def get_created_set(_: AsyncMock, __: uuid.UUID) -> ExportMappingSet:
+        return next(item for item in added if isinstance(item, ExportMappingSet))
+
+    monkeypatch.setattr(metadata_mapping_service, "get_mapping_set", get_created_set)
+
+    await metadata_mapping_service.create_mapping_set(
+        mock_db,
+        ExportMappingSetCreate(
+            format_key="lido",
+            profile_id="lido_core",
+            profile_version="1.0",
+            record_type="object",
+            name="LIDO Objects",
+        ),
+    )
+
+    created = next(item for item in added if isinstance(item, ExportMappingSet))
+    rules = [item for item in added if isinstance(item, ExportMappingRule)]
+    assert created.institution_config == {"institution_name": "Sammlung Beispiel"}
+    assert len(rules) == 1
+    assert rules[0].source_kind == SourceKind.FIELD.value
+    assert rules[0].source_config == {"field_name": "label"}
+    assert rules[0].target_key == (
+        "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"
+    )
+
+@pytest.mark.asyncio
+async def test_lido_subtype_authority_validation_lists_missing_subtypes() -> None:
+    mapping_set = ExportMappingSet(
+        id=uuid.uuid4(),
+        format_key="lido",
+        profile_id="lido_core",
+        record_type="object",
+        name="LIDO Objects",
+    )
+    compiled = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.RECORD,
+                source_config={"property": "target_subtype"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            )
+        ],
+    )
+    missing = RecordSubtype(primary_type="object", name="archivalie", label={"de": "Archivalie / Druckwerk"})
+    linked = RecordSubtype(
+        primary_type="object",
+        name="druckgrafik",
+        label={"de": "Druckgrafik"},
+        concept_uri="https://vocab.getty.edu/aat/300041347",
+    )
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = [missing, linked]
+    mock_db.execute.return_value = mock_result
+
+    diagnostics = await metadata_mapping_service._validate_lido_subtype_authorities(
+        mock_db, mapping_set, compiled
+    )
+
+    assert [diagnostic.code for diagnostic in diagnostics] == ["subtype_authority_missing"]
+    assert diagnostics[0].message == "Subtypen ohne Normdaten: Archivalie / Druckwerk."
 
 
 @pytest.mark.asyncio

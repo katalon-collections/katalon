@@ -32,7 +32,47 @@ import { Tour, type TourVariant } from '../tour/Tour'
 import { BASE, req, sparql, users } from '../../api/client'
 import type { PortalConfigRead } from '../../types'
 
-type Crumb = { label: string; route?: string }
+type Crumb = { label: string; route?: string; editId?: string }
+
+const EXPORT_RECORD_LABELS: Record<string, string> = {
+  object: 'Objekte',
+  collection: 'Sammlungen',
+  entity: 'Entitäten',
+  place: 'Orte',
+  occurrence: 'Occurrences',
+  procedure: 'Vorgänge',
+  storage_location: 'Lagerorte',
+}
+
+function getExportCrumbs(appTitle: string, editId: string | null): Crumb[] {
+  const base: Crumb[] = [
+    { label: appTitle },
+    { label: 'Konfiguration' },
+    { label: 'Export', route: 'export' },
+  ]
+  if (!editId) return base
+
+  const parts = editId.split('/')
+  const recLabel = EXPORT_RECORD_LABELS[parts[1]] ?? parts[1]
+
+  if (parts[0] === 'mapping') {
+    if (parts[2]) {
+      base.push({
+        label: `Format-Mapping (${recLabel})`,
+        route: 'export',
+        editId: `mapping/${parts[1]}`,
+      })
+      const fmt = parts[2].toUpperCase()
+      const fmtName = parts[2] === 'lido' ? 'LIDO 1.0' : parts[2] === 'oai_dc' ? 'Dublin Core' : fmt
+      base.push({ label: fmtName })
+    } else {
+      base.push({ label: `Format-Mapping (${recLabel})` })
+    }
+  } else if (parts[0] === 'dumps') {
+    base.push({ label: `Dumps & Datensätze (${recLabel})` })
+  }
+  return base
+}
 
 const CRUMBS: Record<string, Crumb[]> = {
   list:               [{ label: 'Katalon' }, { label: 'Objekte' }],
@@ -76,7 +116,8 @@ function adminDocumentTitle(appTitle: string, route: string, crumbs: Crumb[]): s
 }
 
 function hashToState(hash: string): { route: string; editId: string | null } {
-  const h = hash.replace(/^#/, '') || 'list'
+  const withoutHash = hash.replace(/^#/, '') || 'list'
+  const h = withoutHash.split('?')[0]
   const slash = h.indexOf('/')
   if (slash === -1) return { route: h, editId: null }
   return { route: h.slice(0, slash), editId: h.slice(slash + 1) }
@@ -201,12 +242,13 @@ export function AppShell() {
     setLoggedIn(false)
   }
 
-  useEffect(() => {
-    const titleCrumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
-    document.title = adminDocumentTitle(appTitle, route, titleCrumbs)
-  }, [appTitle, route])
+  const crumbs = route === 'export' && editId
+    ? getExportCrumbs(appTitle, editId)
+    : withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
 
-  const crumbs = withBrand(CRUMBS[route] ?? [{ label: appTitle }], appTitle)
+  useEffect(() => {
+    document.title = adminDocumentTitle(appTitle, route, crumbs)
+  }, [appTitle, route, crumbs])
 
   if (!sessionChecked) return null
 
@@ -240,7 +282,7 @@ export function AppShell() {
       case 'vocab':             return features.includes('vocab_terms') ? <ScreenVocab initialVocab={editId} onVocabSelect={(name) => navigate('vocab', name)} /> : <Placeholder label="Kein Zugriff" />
       case 'pages':             return features.includes('pages') ? <ScreenPages initialSlug={editId} onSlugChange={(s) => navigate('pages', s)} /> : <Placeholder label="Kein Zugriff" />
       case 'oai-sets':          return features.includes('oai_sets') ? <ScreenOAISets /> : <Placeholder label="Kein Zugriff" />
-      case 'export':            return features.includes('export') ? <ScreenExport /> : <Placeholder label="Kein Zugriff" />
+      case 'export':            return features.includes('export') ? <ScreenExport initialPath={editId} onPathChange={(p) => navigate('export', p)} /> : <Placeholder label="Kein Zugriff" />
       case 'sparql':            return features.includes('sparql') ? <ScreenSparql onOpenRecord={(type, id) => navigate(type === 'object' ? 'form' : `${type}s-form`, id)} /> : <Placeholder label="Kein Zugriff" />
       case 'import':            return features.includes('import') ? <ScreenImporter initialTab={editId} onTabChange={(t) => navigate('import', t)} /> : <Placeholder label="Kein Zugriff" />
       case 'audit':             return features.includes('audit_log') ? <ScreenAudit initialFilter={editId} onFilterChange={(f) => navigate('audit', f)} /> : <Placeholder label="Kein Zugriff" />

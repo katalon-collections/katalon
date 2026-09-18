@@ -136,6 +136,7 @@ export interface FieldDefinition {
   is_searchable: boolean
   parent_id?: string | null
   children?: FieldDefinition[]
+  is_deleted?: boolean
 }
 
 export interface FormVariant {
@@ -203,6 +204,13 @@ export interface ValidatorDependency {
   name: string
   version?: string | null
   available: boolean
+}
+
+export interface LidoEventConfig {
+  id: string
+  type: string
+  label: LocalizedText
+  is_preset?: boolean
 }
 
 export interface ExportProfileCapabilities {
@@ -540,6 +548,10 @@ export interface RecordSubtype {
   sort_order: number
   is_default: boolean
   placeholder_image_url: string
+  concept_source?: string | null
+  concept_id?: string | null
+  concept_uri?: string | null
+  concept_label?: string | null
 }
 
 export interface Banner {

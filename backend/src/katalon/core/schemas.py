@@ -204,6 +204,10 @@ class RecordSubtypeCreate(BaseModel):
     sort_order: int = 0
     is_default: bool = False
     placeholder_image_url: str = ""
+    concept_source: str | None = None
+    concept_id: str | None = None
+    concept_uri: str | None = None
+    concept_label: str | None = None
 
 
 class RecordSubtypeRead(RecordSubtypeCreate):

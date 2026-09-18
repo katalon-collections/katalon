@@ -500,3 +500,145 @@ async def test_update_authority_field_ignores_now_disabled_source(
 
     await async_client.patch("/v1/authorities/gnd", headers=auth_headers, json={"is_enabled": True})
     await async_client.delete(f"/v1/schema/{field_id}", headers=auth_headers)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_field_names_rejected(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    # 1. Create top-level field
+    field_a_r = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": "test_uniq_field_a",
+            "label": {"de": "Feld A"},
+            "field_type": "text",
+            "is_required": False,
+            "is_repeatable": False,
+            "sort_order": 1,
+            "settings": {},
+        },
+    )
+    assert field_a_r.status_code == 201
+    field_a_id = field_a_r.json()["id"]
+
+    try:
+        # Attempt to create duplicate top-level field
+        dup_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "name": "test_uniq_field_a",
+                "label": {"de": "Feld A Duplikat"},
+                "field_type": "text",
+                "is_required": False,
+                "is_repeatable": False,
+                "sort_order": 2,
+                "settings": {},
+            },
+        )
+        assert dup_r.status_code == 409
+        assert "existiert bereits" in dup_r.json()["detail"]
+
+        # 2. Create another top-level field and try to rename it to the first
+        field_b_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "name": "test_uniq_field_b",
+                "label": {"de": "Feld B"},
+                "field_type": "text",
+                "is_required": False,
+                "is_repeatable": False,
+                "sort_order": 3,
+                "settings": {},
+            },
+        )
+        assert field_b_r.status_code == 201
+        field_b_id = field_b_r.json()["id"]
+
+        try:
+            rename_dup_r = await async_client.put(
+                f"/v1/schema/{field_b_id}",
+                headers=auth_headers,
+                json={
+                    "target_type": "object",
+                    "name": "test_uniq_field_a",
+                    "label": {"de": "Feld B umbenannt"},
+                    "field_type": "text",
+                    "is_required": False,
+                    "is_repeatable": False,
+                    "sort_order": 3,
+                    "settings": {},
+                },
+            )
+            assert rename_dup_r.status_code == 409
+            assert "existiert bereits" in rename_dup_r.json()["detail"]
+        finally:
+            await async_client.delete(f"/v1/schema/{field_b_id}", headers=auth_headers)
+
+        # 3. Create group and test subfield collision
+        group_r = await async_client.post(
+            "/v1/schema",
+            headers=auth_headers,
+            json={
+                "target_type": "object",
+                "name": "test_uniq_group",
+                "label": {"de": "Gruppe"},
+                "field_type": "group",
+                "is_required": False,
+                "is_repeatable": True,
+                "sort_order": 10,
+                "settings": {},
+            },
+        )
+        assert group_r.status_code == 201
+        group_id = group_r.json()["id"]
+
+        try:
+            # Create subfield under group
+            sub_1_r = await async_client.post(
+                "/v1/schema",
+                headers=auth_headers,
+                json={
+                    "target_type": "object",
+                    "parent_id": group_id,
+                    "name": "test_uniq_sub_a",
+                    "label": {"de": "Subfeld A"},
+                    "field_type": "text",
+                    "is_required": False,
+                    "is_repeatable": False,
+                    "sort_order": 1,
+                    "settings": {},
+                },
+            )
+            assert sub_1_r.status_code == 201
+
+            # Duplicate subfield in SAME group must be rejected
+            sub_dup_r = await async_client.post(
+                "/v1/schema",
+                headers=auth_headers,
+                json={
+                    "target_type": "object",
+                    "parent_id": group_id,
+                    "name": "test_uniq_sub_a",
+                    "label": {"de": "Subfeld A Kopie"},
+                    "field_type": "text",
+                    "is_required": False,
+                    "is_repeatable": False,
+                    "sort_order": 2,
+                    "settings": {},
+                },
+            )
+            assert sub_dup_r.status_code == 409
+            assert "existiert bereits in dieser Gruppe" in sub_dup_r.json()["detail"]
+        finally:
+            await async_client.delete(f"/v1/schema/{group_id}", headers=auth_headers)
+
+    finally:
+        await async_client.delete(f"/v1/schema/{field_a_id}", headers=auth_headers)
+

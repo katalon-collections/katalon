@@ -12,6 +12,7 @@ from katalon.integrations.metadata_format import (
     ExportRecordContext,
     ExportTargetCapability,
     LocalizedText,
+    MappingDiagnostic,
     MetadataFormat,
     SourceKind,
     ValidatorDependency,
@@ -72,6 +73,23 @@ class MetsModsFormat(MetadataFormat):
             targets=caps,
             validators=[ValidatorDependency(name="LOC MODS 3.8 Schema", version="3.8", available=True)],
         )
+
+    def validate_mapping(self, mapping_set: CompiledMappingSet) -> list[MappingDiagnostic]:
+        """Validate that the METS/MODS core profile has its required mapped values."""
+        diagnostics = super().validate_mapping(mapping_set)
+        if diagnostics:
+            return diagnostics
+        mapped_targets = {rule.target_key for rule in mapping_set.rules if rule.is_enabled}
+        if "mods:titleInfo/mods:title" not in mapped_targets:
+            diagnostics.append(
+                MappingDiagnostic(
+                    code="required_target_missing",
+                    message="Pflichtziel für METS/MODS fehlt: 'mods:titleInfo/mods:title'.",
+                    target_key="mods:titleInfo/mods:title",
+                )
+            )
+        return diagnostics
+
     def render(
         self,
         hit: ExportRecordContext | dict[str, Any],
@@ -101,7 +119,10 @@ class MetsModsFormat(MetadataFormat):
             elif rule.source_kind == SourceKind.RELATION:
                 rel_type = rule.source_config.get("relation_type")
                 target_field = rule.source_config.get("target_field")
+                rel_direction = str(rule.source_config.get("direction") or "outbound")
                 for rel in ctx.relations:
+                    if rel.direction != rel_direction:
+                        continue
                     if not rel_type or rel.relation_type == rel_type:
                         val = (
                             rel.target_values.get(target_field)

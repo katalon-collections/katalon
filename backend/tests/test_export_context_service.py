@@ -200,12 +200,21 @@ async def test_build_export_context_from_db_security_filtering() -> None:
     res_media = MagicMock()
     res_media.scalars.return_value.all.return_value = [mf_pub]  # DB query filters is_public=True
 
+    res_no_subtype = MagicMock()
+    res_no_subtype.scalar_one_or_none.return_value = None
+
     def _mock_exec(stmt: Any) -> Any:
         s = str(stmt)
-        if "relations" in s:
+        if "relations.from_type = " in s:
             return res_rels
+        if "relations.to_type = " in s:
+            res_empty = MagicMock()
+            res_empty.scalars.return_value.all.return_value = []
+            return res_empty
         if "media_files" in s:
             return res_media
+        if "record_subtypes" in s:
+            return res_no_subtype
         res = MagicMock()
         res.scalars.return_value.all.return_value = []
         return res

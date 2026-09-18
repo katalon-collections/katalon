@@ -96,7 +96,7 @@ services:
       - VITE_BASE_PATH=/admin/
       - VITE_PORTAL_URL=https://${KATALON_LOCAL_DOMAIN:-katalon.local}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/ > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O- http://0.0.0.0:5173/admin/ > /dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -126,11 +126,12 @@ services:
       api:
         condition: service_healthy
 
-  # Outer nginx proxies to the production frontend ports, but the Dev
-  # containers run Vite on 5173/5174. Remove its inherited host ports so
-  # optional host-level Caddy can bind 80/443.
+  # Outer nginx in dev mode proxies to Vite dev servers (5173/5174) with HMR
+  # WebSocket support and uses mkcert TLS certs from ./docker/certs.
   nginx:
-    ports: !reset []
+    volumes:
+      - ./docker/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/certs:/etc/nginx/certs:ro
     depends_on:
       api:
         condition: service_healthy

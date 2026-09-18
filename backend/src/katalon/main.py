@@ -328,10 +328,10 @@ _DEFAULT_AUTHORITY_SOURCES = [
     ("gnd-subject", "GND – Sachschlagwörter",          "katalon.integrations.gnd_adapter.GNDAdapter",         False),
     ("geonames",  "GeoNames",                          "katalon.integrations.geonames_adapter.GeonamesAdapter", False),
     ("viaf",      "VIAF (Virtual Int. Authority File)", "katalon.integrations.viaf_adapter.VIAFAdapter",        False),
-    ("wikidata",  "Wikidata",                          "katalon.integrations.wikidata_adapter.WikidataAdapter", False),
+    ("wikidata",  "Wikidata",                          "katalon.integrations.wikidata_adapter.WikidataAdapter", True),
     ("tgn",       "Getty Thesaurus of Geographic Names","katalon.integrations.tgn_adapter.TGNAdapter",          False),
     ("iconclass", "ICONCLASS",                         "katalon.integrations.iconclass_adapter.ICONCLASSAdapter", False),
-    ("aat",       "Getty Art & Architecture Thesaurus", "katalon.integrations.aat_adapter.AATAdapter",          False),
+    ("aat",       "Getty Art & Architecture Thesaurus", "katalon.integrations.aat_adapter.AATAdapter",          True),
 ]
 
 

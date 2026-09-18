@@ -35,5 +35,12 @@
   "defaultBadge": "Default",
   "editButtonTitle": "Edit",
   "deleteButtonTitle": "Delete",
-  "deleteConfirm": "Really delete subtype \"{{name}}\"? Linked schema fields and form variants will be deactivated. Records and procedures are kept."
+  "deleteConfirm": "Really delete subtype \"{{name}}\"? Linked schema fields and form variants will be deactivated. Records and procedures are kept.",
+  "authoritySectionTitle": "Authority link",
+  "authoritySectionHint": "optional, used for LIDO/export classification and aggregators",
+  "authoritySourceAat": "Getty AAT",
+  "authoritySourceGnd": "GND",
+  "authoritySourceWikidata": "Wikidata",
+  "authorityClear": "Remove",
+  "authorityDirectUri": "Direct authority URI"
 }

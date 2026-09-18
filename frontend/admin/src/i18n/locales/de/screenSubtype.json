@@ -35,5 +35,12 @@
   "defaultBadge": "Standard",
   "editButtonTitle": "Bearbeiten",
   "deleteButtonTitle": "Löschen",
-  "deleteConfirm": "Subtyp „{{name}}\" wirklich löschen? Zugehörige Schemafelder und Formularvarianten werden deaktiviert. Vorgänge oder andere Datensätze bleiben erhalten."
+  "deleteConfirm": "Subtyp „{{name}}\" wirklich löschen? Zugehörige Schemafelder und Formularvarianten werden deaktiviert. Vorgänge oder andere Datensätze bleiben erhalten.",
+  "authoritySectionTitle": "Normdaten-Verknüpfung",
+  "authoritySectionHint": "optional, für LIDO/Export-Klassifikation und Aggregatoren",
+  "authoritySourceAat": "Getty AAT",
+  "authoritySourceGnd": "GND",
+  "authoritySourceWikidata": "Wikidata",
+  "authorityClear": "Entfernen",
+  "authorityDirectUri": "Direkte Normdaten-URI"
 }

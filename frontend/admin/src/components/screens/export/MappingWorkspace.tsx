@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { exportMappingSets, schema } from '../../../api/client'
-import type { ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FieldDefinition, MappingDiagnostic, SourceKind } from '../../../types'
-import { ChevL, Plus, Trash, X } from '../../ui/Icons'
+import { exportMappingSets, schema, vocabularies } from '../../../api/client'
+import type {
+  ExportMappingRule,
+  ExportMappingSet,
+  ExportProfileCapabilities,
+  ExportTargetCapability,
+  FieldDefinition,
+  LidoEventConfig,
+  MappingDiagnostic,
+  SourceKind,
+} from '../../../types'
+import { ChevD, ChevL, ChevU, Plus, Trash, X } from '../../ui/Icons'
+import { ExportGuidance } from './ExportGuidance'
 import { ExportPreview } from './ExportPreview'
 import { PublishMapping } from './PublishMapping'
 import { RuleEditor } from './RuleEditor'
@@ -19,65 +29,402 @@ export interface MappingWorkspaceProps {
   onBack: () => void
 }
 
-function InstitutionConfigEditor({ config, busy, onSave }: {
+const DEFAULT_LIDO_EVENTS: LidoEventConfig[] = [
+  {
+    id: 'production',
+    type: 'Herstellung',
+    label: { de: 'Herstellung / Entstehung', en: 'Production / Creation' },
+    is_preset: true,
+  },
+]
+
+const LIDO_LEGACY_TARGET_ALIAS: Record<string, string> = {
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventType/lido:term': 'lido:events/production/type',
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate': 'lido:events/production/date',
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:date/lido:earliestDate': 'lido:events/production/earliest_date',
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/lido:actor/lido:nameActorSet/lido:appellationValue': 'lido:events/production/actor',
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventPlace/lido:displayPlace': 'lido:events/production/place',
+}
+
+function buildLidoEventTargets(
+  event: LidoEventConfig,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): ExportTargetCapability[] {
+  const { id, label } = event
+  return [
+    {
+      key: `lido:events/${id}/actor`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventActorLabel')}`, en: `${label.en}: ${t('eventActorLabel')}` },
+      help: { de: t('eventActorHelp'), en: t('eventActorHelp') },
+      source_kinds: ['field', 'relation'],
+      accepted_field_types: ['text', 'relation'],
+      cardinality: 'many',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/date`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventDateLabel')}`, en: `${label.en}: ${t('eventDateLabel')}` },
+      help: { de: t('eventDateHelp'), en: t('eventDateHelp') },
+      source_kinds: ['field'],
+      accepted_field_types: ['text', 'date'],
+      cardinality: 'one',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/earliest_date`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventEarliestDateLabel')}`, en: `${label.en}: ${t('eventEarliestDateLabel')}` },
+      help: { de: t('eventEarliestDateHelp'), en: t('eventEarliestDateHelp') },
+      source_kinds: ['field'],
+      accepted_field_types: ['text', 'date'],
+      cardinality: 'one',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/place`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventPlaceLabel')}`, en: `${label.en}: ${t('eventPlaceLabel')}` },
+      help: { de: t('eventPlaceHelp'), en: t('eventPlaceHelp') },
+      source_kinds: ['field', 'relation'],
+      accepted_field_types: ['text', 'geo', 'relation'],
+      cardinality: 'many',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+  ]
+}
+
+function InstitutionConfigEditor({ config, busy, isLido, onSave }: {
   config: Record<string, unknown>
   busy: boolean
-  onSave: (config: Record<string, string>) => void
+  isLido: boolean
+  onSave: (config: Record<string, unknown>) => Promise<boolean>
 }) {
   const { t } = useTranslation('screenExport')
-  const [rows, setRows] = useState<{ key: string; value: string }[]>(
-    () => Object.entries(config).map(([key, value]) => ({ key, value: String(value ?? '') })),
-  )
-  const [dirty, setDirty] = useState(false)
 
-  function updateRow(i: number, patch: Partial<{ key: string; value: string }>) {
-    setRows(r => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
-    setDirty(true)
-  }
-  function addRow() {
-    setRows(r => [...r, { key: '', value: '' }])
-    setDirty(true)
-  }
-  function removeRow(i: number) {
-    setRows(r => r.filter((_, idx) => idx !== i))
-    setDirty(true)
-  }
-  function save() {
-    const next: Record<string, string> = {}
-    for (const row of rows) if (row.key.trim()) next[row.key.trim()] = row.value
-    onSave(next)
+  const STANDARD_KEYS = useMemo<Record<string, true>>(
+    () => ({
+      institution_name: true,
+      repository_name: true,
+      isil: true,
+      website: true,
+      repository_url: true,
+      location: true,
+      repository_location: true,
+      portal_host: true,
+      record_rights: true,
+      lido_events: true,
+    }),
+    []
+  )
+
+  const [institutionName, setInstitutionName] = useState<string>(
+    () => String(config.institution_name ?? config.repository_name ?? '')
+  )
+  const [isil, setIsil] = useState<string>(
+    () => String(config.isil ?? '')
+  )
+  const [website, setWebsite] = useState<string>(
+    () => String(config.website ?? config.repository_url ?? '')
+  )
+  const [location, setLocation] = useState<string>(
+    () => String(config.location ?? config.repository_location ?? '')
+  )
+  const [portalHost, setPortalHost] = useState<string>(() => String(config.portal_host ?? ''))
+  const [recordRights, setRecordRights] = useState<string>(
+    () => String(config.record_rights ?? 'https://creativecommons.org/publicdomain/zero/1.0/')
+  )
+
+  const [customRows, setCustomRows] = useState<{ key: string; value: string }[]>(() =>
+    Object.entries(config)
+      .filter(([key]) => !STANDARD_KEYS[key])
+      .map(([key, value]) => ({ key, value: String(value ?? '') }))
+  )
+  const [showCustom, setShowCustom] = useState(() => customRows.length > 0)
+  const [dirty, setDirty] = useState(false)
+  const [open, setOpen] = useState(() => !institutionName.trim())
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setInstitutionName(String(config.institution_name ?? config.repository_name ?? ''))
+    setIsil(String(config.isil ?? ''))
+    setWebsite(String(config.website ?? config.repository_url ?? ''))
+    setLocation(String(config.location ?? config.repository_location ?? ''))
+    setPortalHost(String(config.portal_host ?? ''))
+    setRecordRights(String(config.record_rights ?? 'https://creativecommons.org/publicdomain/zero/1.0/'))
+    const nextCustom = Object.entries(config)
+      .filter(([key]) => !STANDARD_KEYS[key])
+      .map(([key, value]) => ({ key, value: String(value ?? '') }))
+    setCustomRows(nextCustom)
+    setShowCustom(nextCustom.length > 0)
     setDirty(false)
+  }, [config, STANDARD_KEYS])
+
+  function updateCustomRow(i: number, patch: Partial<{ key: string; value: string }>) {
+    setCustomRows(r => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+    setDirty(true)
+  }
+  function addCustomRow() {
+    setCustomRows(r => [...r, { key: '', value: '' }])
+    setShowCustom(true)
+    setDirty(true)
+  }
+  function removeCustomRow(i: number) {
+    setCustomRows(r => r.filter((_, idx) => idx !== i))
+    setDirty(true)
+  }
+
+  async function save() {
+    const next: Record<string, unknown> = {}
+    if (config.lido_events) {
+      next.lido_events = config.lido_events
+    }
+    if (institutionName.trim()) next.institution_name = institutionName.trim()
+    if (isil.trim()) next.isil = isil.trim()
+    if (website.trim()) next.website = website.trim()
+    if (location.trim()) next.location = location.trim()
+    if (isLido && portalHost.trim()) next.portal_host = portalHost.trim()
+    if (isLido && recordRights.trim()) next.record_rights = recordRights.trim()
+
+    for (const row of customRows) {
+      if (row.key.trim()) {
+        next[row.key.trim()] = row.value
+      }
+    }
+    if (await onSave(next)) {
+      setDirty(false)
+      setSaved(true)
+      if (institutionName.trim()) setOpen(false)
+      window.setTimeout(() => setSaved(false), 2000)
+    }
   }
 
   return (
     <div className="settings-card" style={{ marginBottom: 16 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 4 }}>{t('institutionConfigHeadline')}</h3>
-      <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 0 }}>{t('institutionConfigHelp')}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-        {rows.map((row, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8 }}>
-            <input className="fld" style={{ width: 220 }} placeholder={t('institutionConfigKey')} aria-label={t('institutionConfigKey')} value={row.key} onChange={e => updateRow(i, { key: e.target.value })} />
-            <input className="fld" style={{ flex: 1 }} placeholder={t('institutionConfigValue')} aria-label={t('institutionConfigValue')} value={row.value} onChange={e => updateRow(i, { value: e.target.value })} />
-            <button type="button" className="btn sm ico gh" aria-label={t('ruleDeleteLabel')} title={t('ruleDeleteLabel')} onClick={() => removeRow(i)}>
-              <X size={12} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" className="btn sm gh" onClick={addRow} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={13} /> {t('institutionConfigAddRow')}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t('institutionConfigHeadline')}</h3>
+        <button
+          type="button"
+          className="btn sm ico gh"
+          aria-label={open ? t('collapseLabel') : t('expandLabel')}
+          title={open ? t('collapseLabel') : t('expandLabel')}
+          disabled={open && (!institutionName.trim() || dirty)}
+          onClick={() => setOpen(current => !current)}
+        >
+          {open ? <ChevU size={13} /> : <ChevD size={13} />}
         </button>
-        <button type="button" className="btn sm pri" disabled={!dirty || busy} onClick={save}>{t('institutionConfigSave')}</button>
       </div>
+      {saved && <div role="status" style={{ color: '#16a34a', fontSize: 12, marginBottom: 8 }}>{t('institutionConfigSaved')}</div>}
+      {open && <>
+        <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 0, marginBottom: 16 }}>
+          {t('institutionConfigHelp')}
+        </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+        {/* Name der Institution (Pflicht) */}
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+            {t('institutionNameLabel')}{' '}
+            <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 700 }}>* {t('requiredMarker')}</span>
+          </label>
+          <input
+            className="fld"
+            style={{ width: '100%' }}
+            placeholder={t('institutionNamePlaceholder')}
+            value={institutionName}
+            onChange={e => {
+              setInstitutionName(e.target.value)
+              setDirty(true)
+            }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('institutionNameHelp')}</div>
+        </div>
+
+        {/* ISIL (Empfohlen) */}
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+            {t('isilLabel')}{' '}
+            <span style={{ color: 'var(--fg-3)', fontSize: 11, fontWeight: 400 }}>({t('recommendedMarker')})</span>
+          </label>
+          <input
+            className="fld"
+            style={{ width: '100%' }}
+            placeholder={t('isilPlaceholder')}
+            value={isil}
+            onChange={e => {
+              setIsil(e.target.value)
+              setDirty(true)
+            }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('isilHelp')}</div>
+        </div>
+
+        {/* Webseite / URL */}
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+            {t('websiteLabel')}
+          </label>
+          <input
+            className="fld"
+            style={{ width: '100%' }}
+            placeholder={t('websitePlaceholder')}
+            value={website}
+            onChange={e => {
+              setWebsite(e.target.value)
+              setDirty(true)
+            }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('websiteHelp')}</div>
+        </div>
+
+        {/* Standort / Ort */}
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+            {t('locationLabel')}
+          </label>
+          <input
+            className="fld"
+            style={{ width: '100%' }}
+            placeholder={t('locationPlaceholder')}
+            value={location}
+            onChange={e => {
+              setLocation(e.target.value)
+              setDirty(true)
+            }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('locationHelp')}</div>
+        </div>
+
+        {isLido && (
+          <>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+                {t('portalHostLabel')}
+              </label>
+              <input
+                className="fld"
+                style={{ width: '100%' }}
+                placeholder={t('portalHostPlaceholder')}
+                value={portalHost}
+                onChange={e => {
+                  setPortalHost(e.target.value)
+                  setDirty(true)
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('portalHostHelp')}</div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+                {t('recordRightsLabel')}
+              </label>
+              <input
+                className="fld"
+                style={{ width: '100%' }}
+                placeholder={t('recordRightsPlaceholder')}
+                value={recordRights}
+                onChange={e => {
+                  setRecordRights(e.target.value)
+                  setDirty(true)
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('recordRightsHelp')}</div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Custom parameters section */}
+      <div style={{ borderTop: '1px solid var(--border-s)', paddingTop: 12, marginBottom: 16 }}>
+        <button
+          type="button"
+          className="btn sm gh"
+          onClick={() => {
+            if (!showCustom && customRows.length === 0) {
+              addCustomRow()
+            } else {
+              setShowCustom(v => !v)
+            }
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '4px 8px' }}
+        >
+          <Plus size={12} /> {t('customParamsToggle')} {customRows.length > 0 ? `(${customRows.length})` : ''}
+        </button>
+
+        {showCustom && (
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {customRows.map((row, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  className="fld sm"
+                  style={{ width: 200 }}
+                  placeholder={t('institutionConfigKey')}
+                  aria-label={t('institutionConfigKey')}
+                  value={row.key}
+                  onChange={e => updateCustomRow(i, { key: e.target.value })}
+                />
+                <input
+                  className="fld sm"
+                  style={{ flex: 1 }}
+                  placeholder={t('institutionConfigValue')}
+                  aria-label={t('institutionConfigValue')}
+                  value={row.value}
+                  onChange={e => updateCustomRow(i, { value: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="btn sm ico gh"
+                  aria-label={t('ruleDeleteLabel')}
+                  title={t('ruleDeleteLabel')}
+                  onClick={() => removeCustomRow(i)}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            <div>
+              <button
+                type="button"
+                className="btn sm gh"
+                onClick={addCustomRow}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+              >
+                <Plus size={12} /> {t('addCustomParam')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          className="btn sm pri"
+          disabled={!dirty || busy}
+          onClick={save}
+        >
+          {t('institutionConfigSave')}
+        </button>
+      </div>
+      </>}
     </div>
   )
 }
+
 
 export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspaceProps) {
   const { t, i18n } = useTranslation('screenExport')
   const lang = i18n.language.startsWith('en') ? 'en' : 'de'
   const compact = profile.format_key === 'oai_dc'
+  const isLido = profile.format_key === 'lido'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [publishedSet, setPublishedSet] = useState<ExportMappingSet | null>(null)
@@ -88,13 +435,46 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
   const [busy, setBusy] = useState(false)
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [relationTypeOptions, setRelationTypeOptions] = useState<{ term: string; label: Record<string, string> }[]>([])
+
+  const lidoEvents: LidoEventConfig[] = useMemo(() => {
+    if (!isLido) return []
+    const configured = draftSet?.institution_config?.lido_events
+    if (Array.isArray(configured) && configured.length > 0) {
+      return configured as LidoEventConfig[]
+    }
+    return DEFAULT_LIDO_EVENTS
+  }, [isLido, draftSet?.institution_config])
+
+  const effectiveTargets = useMemo(() => {
+    if (!isLido) return profile.targets
+    const nonEventTargets = profile.targets.filter(trg => trg.group !== 'events')
+    const eventTargets: ExportTargetCapability[] = []
+    for (const ev of lidoEvents) {
+      eventTargets.push(...buildLidoEventTargets(ev, t))
+    }
+    return [...nonEventTargets, ...eventTargets]
+  }, [isLido, profile.targets, lidoEvents, t])
 
   const load = useCallback(() => {
     return Promise.all([
       schema.list(recordType),
       exportMappingSets.list({ record_type: recordType, format_key: profile.format_key }),
-    ]).then(([fieldList, sets]) => {
+      vocabularies.list().then(vocabs => {
+        const relVocab = vocabs.find(v => v.kind === 'relation')
+        if (!relVocab) return []
+        return Promise.all([
+          vocabularies.listTerms(relVocab.id, { from_type: recordType }),
+          vocabularies.listTerms(relVocab.id, { to_type: recordType }),
+        ]).then(([asSource, asTarget]) => {
+          const byId = new Map(asSource.map(term => [term.id, term]))
+          for (const term of asTarget) byId.set(term.id, term)
+          return [...byId.values()]
+        })
+      }),
+    ]).then(([fieldList, sets, terms]) => {
       setFields(fieldList)
+      setRelationTypeOptions(terms.map(t => ({ term: t.term, label: t.label })))
       setPublishedSet(sets.find(s => s.status === 'published') ?? null)
       setDraftSet(sets.find(s => s.status === 'draft') ?? null)
     })
@@ -106,6 +486,13 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
     setValidated(false)
     load().catch(() => setError(t('loadFailed')))
   }, [load])
+
+
+  useEffect(() => {
+    if (!compact && !selectedTargetKey && effectiveTargets.length > 0) {
+      setSelectedTargetKey(effectiveTargets[0].key)
+    }
+  }, [compact, selectedTargetKey, effectiveTargets])
 
   async function refreshDraft(id: string) {
     const full = await exportMappingSets.get(id)
@@ -126,7 +513,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
         record_type: recordType,
         name: `${profile.label[lang]} (${recordType})`,
         based_on_id: publishedSet?.id ?? null,
-        institution_config: publishedSet?.institution_config ?? {},
+        institution_config: publishedSet?.institution_config ?? (isLido ? { lido_events: DEFAULT_LIDO_EVENTS } : {}),
       })
       await refreshDraft(created.id)
     } catch (e) {
@@ -186,13 +573,71 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
     }
   }
 
-  async function updateInstitutionConfig(config: Record<string, string>) {
-    if (!draftSet) return
+  async function updateInstitutionConfig(config: Record<string, unknown>): Promise<boolean> {
+    if (!draftSet) return false
     setBusy(true)
     setError(null)
     try {
       await exportMappingSets.update(draftSet.id, { institution_config: config }, draftSet.version)
       await refreshDraft(draftSet.id)
+      return true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('actionFailed'))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAddLidoEvent(newEvent: LidoEventConfig) {
+    if (!draftSet) return
+    setBusy(true)
+    setError(null)
+    try {
+      const currentConfig = (draftSet.institution_config ?? {}) as Record<string, unknown>
+      const currentEvents = Array.isArray(currentConfig.lido_events)
+        ? (currentConfig.lido_events as LidoEventConfig[])
+        : DEFAULT_LIDO_EVENTS
+      if (currentEvents.some(e => e.id === newEvent.id)) return
+      const updatedEvents = [...currentEvents, newEvent]
+      await exportMappingSets.update(
+        draftSet.id,
+        { institution_config: { ...currentConfig, lido_events: updatedEvents } },
+        draftSet.version,
+      )
+      await refreshDraft(draftSet.id)
+      setSelectedTargetKey(`lido:events/${newEvent.id}/actor`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('actionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDeleteLidoEvent(eventId: string) {
+    if (!draftSet) return
+    setBusy(true)
+    setError(null)
+    try {
+      const rulesToDelete = (draftSet.rules ?? []).filter(r => r.target_key.startsWith(`lido:events/${eventId}/`))
+      for (const rule of rulesToDelete) {
+        await exportMappingSets.deleteRule(draftSet.id, rule.id)
+      }
+      const currentDraft = await exportMappingSets.get(draftSet.id)
+      const currentConfig = (currentDraft.institution_config ?? {}) as Record<string, unknown>
+      const currentEvents = Array.isArray(currentConfig.lido_events)
+        ? (currentConfig.lido_events as LidoEventConfig[])
+        : DEFAULT_LIDO_EVENTS
+      const updatedEvents = currentEvents.filter(e => e.id !== eventId)
+      await exportMappingSets.update(
+        currentDraft.id,
+        { institution_config: { ...currentConfig, lido_events: updatedEvents } },
+        currentDraft.version,
+      )
+      await refreshDraft(currentDraft.id)
+      if (selectedTargetKey?.startsWith(`lido:events/${eventId}/`)) {
+        setSelectedTargetKey(effectiveTargets[0]?.key ?? null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('actionFailed'))
     } finally {
@@ -264,13 +709,27 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
   const rulesByTarget: Record<string, ExportMappingRule[]> = {}
   for (const rule of draftSet?.rules ?? []) {
     (rulesByTarget[rule.target_key] ??= []).push(rule)
+    const alias = LIDO_LEGACY_TARGET_ALIAS[rule.target_key]
+    if (alias && alias !== rule.target_key) {
+      (rulesByTarget[alias] ??= []).push(rule)
+    }
   }
   const diagnosticsByTarget: Record<string, MappingDiagnostic[]> = {}
   for (const d of diagnostics) {
-    if (d.target_key) (diagnosticsByTarget[d.target_key] ??= []).push(d)
+    if (d.target_key) {
+      (diagnosticsByTarget[d.target_key] ??= []).push(d)
+      const alias = LIDO_LEGACY_TARGET_ALIAS[d.target_key]
+      if (alias && alias !== d.target_key) {
+        (diagnosticsByTarget[alias] ??= []).push(d)
+      }
+    }
   }
 
-  const selectedTarget = profile.targets.find(target => target.key === selectedTargetKey) ?? null
+  const selectedTarget = effectiveTargets.find(target => target.key === selectedTargetKey)
+    ?? (selectedTargetKey && LIDO_LEGACY_TARGET_ALIAS[selectedTargetKey]
+        ? effectiveTargets.find(target => target.key === LIDO_LEGACY_TARGET_ALIAS[selectedTargetKey])
+        : null)
+    ?? null
 
   return (
     <div>
@@ -279,6 +738,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       </button>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0 }}>{profile.label[lang]}</h2>
+
 
       {error && <div role="alert" style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
@@ -292,17 +752,19 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
         onDiscardDraft={discardDraft}
       />
 
+      <ExportGuidance formatKey={profile.format_key} />
+
       {draftSet && (
         <>
           {!compact && (
-            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} onSave={updateInstitutionConfig} />
+            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} isLido={isLido} onSave={updateInstitutionConfig} />
           )}
 
           {compact ? (
             <div className="settings-card" style={{ marginBottom: 16 }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0 }}>{t('compactFieldsHeadline')}</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {profile.targets.map(target => {
+                {effectiveTargets.map(target => {
                   const rules = rulesByTarget[target.key] ?? []
                   return (
                     <div key={target.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
@@ -317,7 +779,9 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
                             allowedKinds={target.source_kinds}
                             fields={fields}
                             acceptedFieldTypes={target.accepted_field_types}
+                            editorKind={target.editor_kind}
                             disabled={busyRuleId === rules[0].id}
+                            relationTypeOptions={relationTypeOptions}
                             value={{ source_kind: rules[0].source_kind, source_config: rules[0].source_config, settings: rules[0].settings }}
                             onChange={draft => updateRule(rules[0].id, draft)}
                           />
@@ -336,11 +800,15 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
           ) : (
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               <TargetNavigator
-                targets={profile.targets}
+                targets={effectiveTargets}
                 rulesByTarget={rulesByTarget}
                 diagnosticsByTarget={diagnosticsByTarget}
                 selected={selectedTargetKey}
                 onSelect={setSelectedTargetKey}
+                isLido={isLido}
+                lidoEvents={lidoEvents}
+                onAddLidoEvent={handleAddLidoEvent}
+                onDeleteLidoEvent={handleDeleteLidoEvent}
               />
               <div style={{ flex: 1, minWidth: 280 }}>
                 {selectedTarget && (
@@ -350,6 +818,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
                     fields={fields}
                     diagnostics={diagnosticsByTarget[selectedTarget.key] ?? []}
                     busyRuleId={busyRuleId}
+                    relationTypeOptions={relationTypeOptions}
                     onAdd={() => addRule(selectedTarget.key, selectedTarget.source_kinds[0])}
                     onUpdate={updateRule}
                     onToggle={toggleRule}
@@ -365,7 +834,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
             validated={validated}
             validating={busy}
             onValidate={runValidate}
-            onJump={key => setSelectedTargetKey(key)}
+            onJump={key => setSelectedTargetKey(LIDO_LEGACY_TARGET_ALIAS[key] ?? key)}
           />
 
           <ExportPreview recordType={recordType} mappingSetId={draftSet.id} />

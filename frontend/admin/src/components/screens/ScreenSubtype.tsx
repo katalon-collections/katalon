@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { subtypes } from '../../api/client'
+import { authority, subtypes } from '../../api/client'
 import type { RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Plus, Trash, X } from '../ui/Icons'
@@ -11,8 +11,16 @@ import { ActionMenu } from '../ui/ActionMenu'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
+import { AuthorityInput, authorityUrl } from '../AuthorityInput'
 
 const TYPE_IDS: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure', 'collection', 'storage_location']
+
+const SUBTYPE_AUTHORITY_SOURCES = ['aat', 'gnd', 'wikidata'] as const
+const AUTHORITY_SOURCE_LABELS: Record<string, string> = {
+  aat: 'authoritySourceAat',
+  gnd: 'authoritySourceGnd',
+  wikidata: 'authoritySourceWikidata',
+}
 
 function toSlug(label: string): string {
   return label
@@ -30,10 +38,26 @@ interface FormState {
   sort_order: number
   is_default: boolean
   placeholder_image_url: string
+  concept_source: string
+  concept_id: string
+  concept_uri: string
+  concept_label: string
 }
 
-function emptyForm(primaryType: string): FormState {
-  return { primary_type: primaryType, name: '', label: {}, description: '', sort_order: 0, is_default: false, placeholder_image_url: '' }
+function emptyForm(primaryType: string, conceptSource = ''): FormState {
+  return {
+    primary_type: primaryType,
+    name: '',
+    label: {},
+    description: '',
+    sort_order: 0,
+    is_default: false,
+    placeholder_image_url: '',
+    concept_source: conceptSource,
+    concept_id: '',
+    concept_uri: '',
+    concept_label: '',
+  }
 }
 
 function subtypeToForm(s: RecordSubtype): FormState {
@@ -45,6 +69,10 @@ function subtypeToForm(s: RecordSubtype): FormState {
     sort_order: s.sort_order,
     is_default: s.is_default,
     placeholder_image_url: s.placeholder_image_url ?? '',
+    concept_source: s.concept_source ?? '',
+    concept_id: s.concept_id ?? '',
+    concept_uri: s.concept_uri ?? '',
+    concept_label: s.concept_label ?? '',
   }
 }
 
@@ -65,6 +93,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   const [formError, setFormError] = useState<string | null>(null)
   const [nameTouched, setNameTouched] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<RecordSubtype | null>(null)
+  const [enabledAuthoritySources, setEnabledAuthoritySources] = useState<string[]>([])
 
   const primaryTypes = useMemo(() => [
     { id: 'object',     label: t('typeObject') },
@@ -90,9 +119,17 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    void authority.list()
+      .then(sources => setEnabledAuthoritySources(
+        SUBTYPE_AUTHORITY_SOURCES.filter(id => sources.some(source => source.id === id && source.is_enabled)),
+      ))
+      .catch(() => setEnabledAuthoritySources([]))
+  }, [])
+
   function openNew() {
     setEditId(null)
-    setForm(emptyForm(activeType))
+    setForm(emptyForm(activeType, enabledAuthoritySources[0]))
     setFormError(null)
     setNameTouched(false)
     setShowForm(true)
@@ -123,6 +160,10 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
         sort_order: form.sort_order,
         is_default: form.is_default,
         placeholder_image_url: form.placeholder_image_url.trim(),
+        concept_source: form.concept_id ? form.concept_source : null,
+        concept_id: form.concept_id ? form.concept_id.trim() : null,
+        concept_uri: form.concept_uri ? form.concept_uri.trim() : null,
+        concept_label: form.concept_label ? form.concept_label.trim() : null,
       }
       if (editId) {
         await subtypes.update(editId, payload)
@@ -155,6 +196,10 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
       await load()
     }
   }
+
+  const selectedAuthoritySource = enabledAuthoritySources.includes(form.concept_source)
+    ? form.concept_source
+    : (enabledAuthoritySources[0] ?? '')
 
   return (
     <div className="scroll">
@@ -229,6 +274,72 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                 {form.placeholder_image_url && <img src={form.placeholder_image_url} alt="" style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
               </div>
             )}
+            <div className="field" style={{ marginBottom: 14, background: 'var(--bg-subtle, rgba(0,0,0,0.02))', padding: 12, borderRadius: 6, border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div className="lbl" style={{ margin: 0 }}>
+                  {t('authoritySectionTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('authoritySectionHint')})</span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {enabledAuthoritySources.map(source => (
+                    <button
+                      key={source}
+                      type="button"
+                      className={`btn sm ${selectedAuthoritySource === source ? 'pri' : 'gh'}`}
+                      style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => set('concept_source', source)}
+                    >
+                      {t(AUTHORITY_SOURCE_LABELS[source])}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {selectedAuthoritySource ? (
+                <AuthorityInput
+                  source={selectedAuthoritySource}
+                  value={form.concept_id ? {
+                    source: form.concept_source || selectedAuthoritySource,
+                    external_id: form.concept_id,
+                    label: form.concept_label || form.concept_id,
+                  } : null}
+                  onChange={(v) => {
+                    if (v) {
+                      setForm(prev => ({
+                        ...prev,
+                        concept_source: v.source,
+                        concept_id: v.external_id,
+                        concept_uri: authorityUrl(v) || '',
+                        concept_label: v.label,
+                      }))
+                    } else {
+                      setForm(prev => ({
+                        ...prev,
+                        concept_source: selectedAuthoritySource,
+                        concept_id: '',
+                        concept_uri: '',
+                        concept_label: '',
+                      }))
+                    }
+                  }}
+                />
+              ) : (
+                <div className="field">
+                  <div className="lbl">{t('authorityDirectUri')}</div>
+                  <input
+                    className="fld mono"
+                    type="url"
+                    value={form.concept_uri}
+                    onChange={e => setForm(prev => ({
+                      ...prev,
+                      concept_source: '',
+                      concept_id: '',
+                      concept_uri: e.target.value,
+                      concept_label: '',
+                    }))}
+                    placeholder="https://..."
+                  />
+                </div>
+              )}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                 <input type="checkbox" className="ck" checked={form.is_default} onChange={e => set('is_default', e.target.checked)} />
@@ -267,7 +378,34 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
               {items.map(s => (
                 <tr key={s.id}>
                   <td><span className="mono" style={{ fontSize: 12 }}>{s.name}</span></td>
-                  <td>{getLabel(s, '—')}</td>
+                  <td>
+                    <div>{getLabel(s, '—')}</div>
+                    {(s.concept_id || s.concept_uri) && (
+                      <div style={{ marginTop: 3 }}>
+                        <a
+                          href={s.concept_uri || authorityUrl({ source: s.concept_source || '', external_id: s.concept_id || '', label: s.concept_label || s.concept_id || '' }) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="typ"
+                          style={{
+                            fontSize: 11,
+                            textDecoration: 'none',
+                            background: 'var(--accent-50)',
+                            color: 'var(--accent-ink)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>{s.concept_source?.toUpperCase() || t('authorityDirectUri')}</span>
+                          <span>{s.concept_id || s.concept_uri}</span>
+                          {s.concept_label && <span style={{ opacity: 0.85 }}>({s.concept_label})</span>}
+                        </a>
+                      </div>
+                    )}
+                  </td>
                   <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '—'}</td>
                   <td style={{ textAlign: 'center' }}>
                     {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{t('defaultBadge')}</span>}

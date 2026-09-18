@@ -16,6 +16,7 @@ from importlib.metadata import version as get_version
 
 import click
 
+from katalon.management.create_user import create_user as create_user_impl
 from katalon.management.db_reset import db_reset as db_reset_impl
 from katalon.management.import_cmd import import_csv as import_csv_impl
 from katalon.management.import_cmd import import_xml as import_xml_impl
@@ -139,6 +140,23 @@ def reset_admin(email: str | None, password: str | None) -> None:
     """Reset an admin/superuser password."""
     reset_admin_impl(email=email, password=password)
 
+
+@cli.command(name="create-user")
+@click.option("--email", required=True, help="Email address for the new user.")
+@click.password_option(confirmation_prompt=True)
+@click.option(
+    "--role",
+    required=True,
+    type=click.Choice(["admin", "superuser", "editor", "cataloger", "viewer"]),
+    help="Role for the new user.",
+)
+def create_user(email: str, password: str, role: str) -> None:
+    """Create a user."""
+    try:
+        create_user_impl(email=email, password=password, role=role)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Created user {email} with role {role}.")
 
 def main() -> None:
     cli()

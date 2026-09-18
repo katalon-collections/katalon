@@ -61,10 +61,10 @@ class LidoFormat(MetadataFormat):
                 "classification",
                 "Objektart / Typ",
                 "Object / Work Type",
-                "Gattung oder Art des Werks (z. B. Fotografie, Gemälde)",
-                "Nature or category of the work (e.g. Photograph, Painting)",
+                "Gattung oder Art des Werks (z. B. Fotografie, Gemälde). Drei Quellenarten: 1) Subtyp-Normdaten: Der Export übernimmt die AAT/GND/URI-Verknüpfung jedes Subtyps; alle Objekt-Subtypen benötigen dafür Normdaten. 2) Feld aus Objekt: Ein Authority- oder Vokabularfeld für feingliedrige Klassifikation mappen. 3) Freitext: Einen einzelnen lokalen Wert ausgeben.",
+                "Nature or category of the work (e.g. Photograph, Painting). Three source types: 1) Subtype authority data: The export uses each subtype's AAT/GND/URI link; every object subtype needs authority data. 2) Object field: Map an authority or vocabulary field for granular classification. 3) Free text: Emit one local value.",
                 True,
-                {SourceKind.FIELD, SourceKind.CONSTANT},
+                {SourceKind.FIELD, SourceKind.CONSTANT, SourceKind.RECORD},
             ),
             (
                 "lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription",
@@ -175,6 +175,16 @@ class LidoFormat(MetadataFormat):
                 help=LocalizedText(de=hde, en=hen),
                 source_kinds=sk,
                 required=req,
+                cardinality=(
+                    "one"
+                    if key == "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
+                    else "many"
+                ),
+                editor_kind=(
+                    "lido_work_type"
+                    if key == "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
+                    else "default"
+                ),
             )
             for key, group, lde, len_, hde, hen, req, sk in targets_def
         ]
@@ -188,7 +198,23 @@ class LidoFormat(MetadataFormat):
         )
     def validate_mapping(self, mapping_set: CompiledMappingSet) -> list[MappingDiagnostic]:
         """Validate that the LIDO core has its required mapped values."""
-        diagnostics = super().validate_mapping(mapping_set)
+        diagnostics: list[MappingDiagnostic] = []
+        for rule in mapping_set.rules:
+            if rule.target_key in self.targets:
+                continue
+            if rule.target_key.startswith("lido:events/"):
+                parts = rule.target_key.split("/")
+                if len(parts) == 3 and parts[2] in {"type", "actor", "date", "earliest_date", "place"}:
+                    continue
+            diagnostics.append(
+                MappingDiagnostic(
+                    code="invalid_target",
+                    message=f"Ungültiges {self.label}-Ziel '{rule.target_key}'.",
+                    level="error",
+                    target_key=rule.target_key,
+                    rule_key=rule.rule_key,
+                )
+            )
         if diagnostics:
             return diagnostics
         mapped_targets = {rule.target_key for rule in mapping_set.rules if rule.is_enabled}
@@ -204,6 +230,20 @@ class LidoFormat(MetadataFormat):
                         target_key=target,
                     )
                 )
+        work_type_target = "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
+        work_type_rules = [
+            rule for rule in mapping_set.rules
+            if rule.is_enabled and rule.target_key == work_type_target
+        ]
+        if len(work_type_rules) > 1:
+            diagnostics.append(
+                MappingDiagnostic(
+                    code="cardinality_exceeded",
+                    message="LIDO Objektart / Typ erlaubt nur eine Quellenregel.",
+                    target_key=work_type_target,
+                )
+            )
+
         event_targets = {
             "lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/lido:actor/lido:nameActorSet/lido:appellationValue",
             "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate",

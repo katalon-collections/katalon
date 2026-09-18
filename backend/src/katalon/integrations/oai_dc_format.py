@@ -124,7 +124,10 @@ class OaiDcFormat(MetadataFormat):
             elif rule.source_kind == SourceKind.RELATION:
                 rel_type = rule.source_config.get("relation_type")
                 target_field = rule.source_config.get("target_field")
+                rel_direction = str(rule.source_config.get("direction") or "outbound")
                 for rel in ctx.relations:
+                    if rel.direction != rel_direction:
+                        continue
                     if not rel_type or rel.relation_type == rel_type:
                         val = (
                             rel.target_values.get(target_field)

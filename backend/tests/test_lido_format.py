@@ -14,6 +14,7 @@ from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportRecordContext,
     ExportRecordSummary,
+    ExportRelation,
     MappingSpec,
     SourceKind,
 )
@@ -137,6 +138,41 @@ def test_minimal_record_renders_valid_lido_1_0() -> None:
     assert "Minimales Objekt" in xml_str
 
 
+def test_lido_subtype_source_without_authority_does_not_emit_label_fallback() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="no-authority",
+            idno="NO-AUTHORITY",
+            record_type="object",
+            title="Titel",
+            status="public",
+            target_subtype="Fotografie",
+        ),
+        fields={"title": "Titel"},
+        relations=[],
+        media=[],
+    )
+    mapping = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.RECORD,
+                source_config={"property": "target_subtype"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+        ],
+    )
+
+    xml = ET.tostring(LidoFormat().render(ctx, mapping), encoding="unicode")
+
+    assert "Fotografie" not in xml
+
 def test_lido_requires_title_and_work_type_mappings() -> None:
     diagnostics = LidoFormat().validate_mapping(
         CompiledMappingSet(format_key="lido", record_type="object", rules=[])
@@ -144,6 +180,24 @@ def test_lido_requires_title_and_work_type_mappings() -> None:
 
     assert {diagnostic.code for diagnostic in diagnostics} == {"required_target_missing"}
     assert len(diagnostics) == 2
+
+def test_lido_work_type_allows_only_one_source_rule() -> None:
+    target = "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
+    capability = next(capability for capability in LidoFormat().capabilities().targets if capability.key == target)
+    diagnostics = LidoFormat().validate_mapping(
+        CompiledMappingSet(
+            format_key="lido",
+            record_type="object",
+            rules=[
+                MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+                MappingSpec(source_kind=SourceKind.RECORD, source_config={"property": "target_subtype"}, target_key=target),
+                MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Bla"}, target_key=target),
+            ],
+        )
+    )
+
+    assert capability.cardinality == "one"
+    assert [diagnostic.code for diagnostic in diagnostics] == ["cardinality_exceeded"]
 
 
 def test_lido_requires_an_event_type_for_event_mappings() -> None:
@@ -365,3 +419,277 @@ def test_group_vocab_value_prefers_uri_over_label() -> None:
 
     assert "http://creativecommons.org/publicdomain/zero/1.0/" in xml_str
     assert "CC0 1.0" not in xml_str
+
+
+def test_lido_multiple_events_rendered_as_separate_event_sets() -> None:
+    """Test that multiple events (e.g. Herstellung and Erwerb) produce distinct lido:eventSet blocks."""
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="multi-ev-001",
+            idno="POSTCARD-1908",
+            record_type="object",
+            title="Postkarte Berlin",
+        ),
+        fields={
+            "title": "Postkarte Berlin",
+            "herstellungsjahr": "1908",
+            "erwerbsjahr": "1985",
+            "herstellungsort": "Berlin",
+        },
+        relations=[
+            ExportRelation(
+                id="rel-1",
+                relation_type="publisher",
+                target_type="entity",
+                target_id="ent-1",
+                target_label="Verlag X",
+            ),
+            ExportRelation(
+                id="rel-2",
+                relation_type="donor",
+                target_type="entity",
+                target_id="ent-2",
+                target_label="Familie Schmidt",
+            ),
+        ],
+        media=[],
+    )
+    fmt = LidoFormat()
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        institution_config={
+            "lido_events": [
+                {"id": "production", "type": "Herstellung", "label_de": "Herstellung", "label_en": "Production"},
+                {"id": "acquisition", "type": "Erwerb", "label_de": "Erwerb / Zugang", "label_en": "Acquisition"},
+            ]
+        },
+        rules=[
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+            MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Postkarte"}, target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"),
+            # Event 1: Herstellung
+            MappingSpec(source_kind=SourceKind.RELATION, source_config={"relation_type": "publisher"}, settings={"role": "Verlag"}, target_key="lido:events/production/actor"),
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "herstellungsjahr"}, target_key="lido:events/production/date"),
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "herstellungsort"}, target_key="lido:events/production/place"),
+            # Event 2: Erwerb
+            MappingSpec(source_kind=SourceKind.RELATION, source_config={"relation_type": "donor"}, settings={"role": "Schenker:in"}, target_key="lido:events/acquisition/actor"),
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "erwerbsjahr"}, target_key="lido:events/acquisition/date"),
+        ],
+    )
+
+    el = fmt.render(ctx, cms)
+    xml_str = ET.tostring(el, encoding="unicode")
+
+    errors = validate_lido_xml(xml_str)
+    assert errors == [], f"Multi-event LIDO failed XSD: {errors}"
+
+    root = ET.fromstring(xml_str)
+    event_sets = root.findall(".//{http://www.lido-schema.org}eventSet")
+    assert len(event_sets) == 2, f"Expected 2 eventSet elements, got {len(event_sets)}"
+
+    # Check first event (Herstellung)
+    ev1 = event_sets[0]
+    assert ev1.find(".//{http://www.lido-schema.org}eventType/{http://www.lido-schema.org}term").text == "Herstellung"
+    assert ev1.find(".//{http://www.lido-schema.org}actor/{http://www.lido-schema.org}nameActorSet/{http://www.lido-schema.org}appellationValue").text == "Verlag X"
+    assert ev1.find(".//{http://www.lido-schema.org}roleActor/{http://www.lido-schema.org}term").text == "Verlag"
+    assert ev1.find(".//{http://www.lido-schema.org}eventDate/{http://www.lido-schema.org}displayDate").text == "1908"
+    assert ev1.find(".//{http://www.lido-schema.org}eventPlace/{http://www.lido-schema.org}displayPlace").text == "Berlin"
+
+    # Check second event (Erwerb)
+    ev2 = event_sets[1]
+    assert ev2.find(".//{http://www.lido-schema.org}eventType/{http://www.lido-schema.org}term").text == "Erwerb"
+    assert ev2.find(".//{http://www.lido-schema.org}actor/{http://www.lido-schema.org}nameActorSet/{http://www.lido-schema.org}appellationValue").text == "Familie Schmidt"
+    assert ev2.find(".//{http://www.lido-schema.org}roleActor/{http://www.lido-schema.org}term").text == "Schenker:in"
+    assert ev2.find(".//{http://www.lido-schema.org}eventDate/{http://www.lido-schema.org}displayDate").text == "1985"
+
+
+def test_lido_object_work_type_from_subtype_normdaten() -> None:
+    """Weg A (Kleine Häuser): Subtyp besitzt AAT-Normdatum, LIDO exportiert conceptID und term."""
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="obj-123",
+            idno="INV-2026-01",
+            record_type="object",
+            target_subtype="gemaelde",
+            title="Landschaft bei Weimar",
+            subtype_concept_source="aat",
+            subtype_concept_id="300033618",
+            subtype_concept_uri="http://vocab.getty.edu/aat/300033618",
+            subtype_concept_label="Gemälde",
+        ),
+        fields={"title": "Landschaft bei Weimar"},
+        relations=[],
+        media=[],
+    )
+    fmt = LidoFormat()
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.RECORD,
+                source_config={"property": "target_subtype"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+        ],
+    )
+    el = fmt.render(ctx, cms)
+    xml_str = ET.tostring(el, encoding="unicode")
+
+    errors = validate_lido_xml(xml_str)
+    assert errors == [], f"LIDO validation failed: {errors}"
+
+    root = ET.fromstring(xml_str)
+    work_type = root.find(".//{http://www.lido-schema.org}objectWorkType")
+    assert work_type is not None
+
+    concept_id = work_type.find("{http://www.lido-schema.org}conceptID")
+    assert concept_id is not None
+    assert concept_id.text == "http://vocab.getty.edu/aat/300033618"
+    assert concept_id.attrib.get("{http://www.lido-schema.org}source") == "AAT"
+    assert concept_id.attrib.get("{http://www.lido-schema.org}type") == "URI"
+
+    term = work_type.find("{http://www.lido-schema.org}term")
+    assert term is not None
+    assert term.text == "Gemälde"
+
+
+def test_lido_object_work_type_from_authority_field() -> None:
+    """Weg B (Große Häuser): Dediziertes Authority-Feld (z. B. objektart mit AAT-Concept) gemappt."""
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="obj-456",
+            idno="INV-2026-02",
+            record_type="object",
+            target_subtype="druckgrafik",
+            title="Die Melancholie",
+        ),
+        fields={
+            "title": "Die Melancholie",
+            "objektart": {
+                "source": "aat",
+                "id": "300041347",
+                "uri": "http://vocab.getty.edu/aat/300041347",
+                "label": "copper engravings (visual works)",
+            },
+        },
+        relations=[],
+        media=[],
+    )
+    fmt = LidoFormat()
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "objektart"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+        ],
+    )
+    el = fmt.render(ctx, cms)
+    xml_str = ET.tostring(el, encoding="unicode")
+
+    errors = validate_lido_xml(xml_str)
+    assert errors == [], f"LIDO validation failed: {errors}"
+
+    root = ET.fromstring(xml_str)
+    work_type = root.find(".//{http://www.lido-schema.org}objectWorkType")
+    assert work_type is not None
+
+    concept_id = work_type.find("{http://www.lido-schema.org}conceptID")
+    assert concept_id is not None
+    assert concept_id.text == "http://vocab.getty.edu/aat/300041347"
+    assert concept_id.attrib.get("{http://www.lido-schema.org}source") == "AAT"
+
+    term = work_type.find("{http://www.lido-schema.org}term")
+    assert term is not None
+    assert term.text == "copper engravings (visual works)"
+
+
+
+def test_lido_emits_ddb_record_metadata_defaults() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="obj-789",
+            idno="INV-2026-03",
+            record_type="object",
+            title="DDB-Testobjekt",
+        )
+    )
+    mapping_set = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        institution_config={
+            "isil": "DE-MUS-123",
+            "institution_name": "Testmuseum",
+            "portal_host": "https://sammlung.example.test/",
+        },
+    )
+
+    xml_str = ET.tostring(LidoFormat().render(ctx, mapping_set), encoding="unicode")
+    assert validate_lido_xml(xml_str) == []
+
+    root = ET.fromstring(xml_str)
+    ns = {"lido": LIDO_NS}
+    record_wrap = root.find(".//lido:recordWrap", ns)
+    assert record_wrap is not None
+    record_id = record_wrap.find("lido:recordID", ns)
+    assert record_id is not None
+    assert record_id.attrib[f"{{{LIDO_NS}}}type"] == "http://terminology.lido-schema.org/lido00100"
+    assert (
+        record_wrap.findtext("lido:recordType/lido:conceptID", namespaces=ns)
+        == "http://terminology.lido-schema.org/lido00141"
+    )
+    assert (
+        record_wrap.findtext("lido:recordSource/lido:legalBodyID", namespaces=ns)
+        == "https://ld.zdb-services.de/resource/organisations/DE-MUS-123"
+    )
+    assert (
+        record_wrap.findtext("lido:recordRights/lido:rightsType/lido:conceptID", namespaces=ns)
+        == "https://creativecommons.org/publicdomain/zero/1.0/"
+    )
+    assert (
+        record_wrap.findtext("lido:recordInfoSet/lido:recordInfoLink", namespaces=ns)
+        == "https://sammlung.example.test/objects/obj-789"
+    )
+    assert record_wrap.findtext("lido:recordInfoSet/lido:recordMetadataDate", namespaces=ns)
+
+
+def test_lido_marks_production_events_with_the_lido_concept() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(id="obj-production", idno="INV-2026-04", record_type="object"),
+        fields={"year": "1900"},
+    )
+    mapping_set = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "year"},
+                target_key="lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate",
+            )
+        ],
+    )
+
+    xml_str = ET.tostring(LidoFormat().render(ctx, mapping_set), encoding="unicode")
+    assert validate_lido_xml(xml_str) == []
+    root = ET.fromstring(xml_str)
+    assert (
+        root.findtext(
+            ".//{http://www.lido-schema.org}eventType/{http://www.lido-schema.org}conceptID"
+        )
+        == "http://terminology.lido-schema.org/lido00007"
+    )

@@ -13,13 +13,14 @@ export interface RuleEditorProps {
   fields: FieldDefinition[]
   diagnostics: MappingDiagnostic[]
   busyRuleId: string | null
+  relationTypeOptions?: { term: string; label: Record<string, string> }[]
   onAdd: () => void
   onUpdate: (ruleId: string, patch: SourceDraft) => void
   onToggle: (ruleId: string, enabled: boolean) => void
   onDelete: (ruleId: string) => void
 }
 
-export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, onAdd, onUpdate, onToggle, onDelete }: RuleEditorProps) {
+export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, relationTypeOptions, onAdd, onUpdate, onToggle, onDelete }: RuleEditorProps) {
   const { t, i18n } = useTranslation('screenExport')
   const lang = i18n.language.startsWith('en') ? 'en' : 'de'
   const canAddMore = target.cardinality === 'many' || rules.length === 0
@@ -55,7 +56,9 @@ export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, onA
                 allowedKinds={target.source_kinds}
                 fields={fields}
                 acceptedFieldTypes={target.accepted_field_types}
+                editorKind={target.editor_kind}
                 disabled={busyRuleId === rule.id}
+                relationTypeOptions={relationTypeOptions}
                 value={{ source_kind: rule.source_kind, source_config: rule.source_config, settings: rule.settings }}
                 onChange={draft => onUpdate(rule.id, draft)}
               />

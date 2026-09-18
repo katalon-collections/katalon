@@ -358,7 +358,11 @@ def build_jsonld_doc(
             target_label = rel.get("label") or rel.get("to_label") or rel.get("from_label")
             target_subtype = rel.get("target_subtype")
             rel_type = rel.get("relation_type", "")
-            is_incoming = str(rel.get("to_id", "")) == str(record_id) and bool(record_id)
+            is_incoming = (
+                str(rel["direction"]) == "inbound"
+                if "direction" in rel
+                else str(rel.get("to_id", "")) == str(record_id) and bool(record_id)
+            )
 
             prop = map_relation_property(rel_type, is_inverse=is_incoming)
             target_uri = record_uri_path(target_type, str(target_id), base_url)
@@ -461,6 +465,7 @@ class JsonLdFormat(MetadataFormat):
                     "target_type": rel.target_type,
                     "target_id": rel.target_id,
                     "relation_type": rel.relation_type,
+                    "direction": rel.direction,
                 })
         elif isinstance(hit, dict):
             src = hit.get("_source", {}) or {}

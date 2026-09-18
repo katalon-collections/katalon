@@ -97,7 +97,7 @@ const ROUTE_DOCS: Record<string, string> = {
  }
 
 interface Props {
-  crumbs: Array<{ label: string; route?: string }>
+  crumbs: Array<{ label: string; route?: string; editId?: string }>
   route?: string
   onNavigate?: (route: string, id?: string) => void
   currentUser?: { email: string; role: string } | null
@@ -114,6 +114,7 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const crumbRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -149,6 +150,10 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
     return () => document.removeEventListener('mousedown', onOutside)
   }, [])
 
+  useEffect(() => {
+    if (crumbRef.current) crumbRef.current.scrollLeft = crumbRef.current.scrollWidth
+  }, [crumbs])
+
   function handleSelect(r: AdminSearchResult) {
     setQ('')
     setOpen(false)
@@ -162,13 +167,13 @@ export function Topbar({ crumbs, route, onNavigate, currentUser, onLogout, onOpe
         <span />
         <span />
       </button>
-      <div className="cr">
+      <div className="cr" ref={crumbRef}>
         {crumbs.map((c, i) =>
           i === crumbs.length - 1 ? (
             <b key={i}>{c.label}</b>
           ) : c.route ? (
             <span key={i}>
-              <button onClick={() => onNavigate?.(c.route!)}>{c.label}</button>
+              <button onClick={() => onNavigate?.(c.route!, c.editId)}>{c.label}</button>
               <span className="sep"> / </span>
             </span>
           ) : (

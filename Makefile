@@ -126,12 +126,18 @@ knowledge-site:
 	@echo "Open .agents/knowledge/_site/index.html"
 
 # ---------------------------------------------------------------------------
-# Dev TLS (self-signed, für https://localhost/)
+# Dev TLS (mkcert bevorzugt für https://katalon.local/)
 # ---------------------------------------------------------------------------
 certs:
 	@mkdir -p docker/certs
-	openssl req -x509 -nodes -newkey rsa:2048 \
-		-keyout docker/certs/localhost.key -out docker/certs/localhost.crt -days 825 \
-		-subj "/CN=localhost" \
-		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-	@echo "Zertifikat erzeugt: docker/certs/. Browser wird es als 'unsicher' melden — für lokale Dev-Nutzung ok."
+	@if command -v mkcert >/dev/null 2>&1; then \
+		mkcert -cert-file docker/certs/localhost.crt -key-file docker/certs/localhost.key localhost 127.0.0.1 katalon.local "*.katalon.local"; \
+		echo "Valides mkcert-Zertifikat erzeugt: docker/certs/ (im Browser vertrauenswürdig)."; \
+	else \
+		openssl req -x509 -nodes -newkey rsa:2048 \
+			-keyout docker/certs/localhost.key -out docker/certs/localhost.crt -days 825 \
+			-subj "/CN=localhost" \
+			-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"; \
+		echo "Selbst-signiertes Zertifikat erzeugt: docker/certs/. Browser wird es als 'unsicher' melden."; \
+	fi
+

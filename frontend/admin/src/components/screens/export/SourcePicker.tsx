@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FieldDefinition, SourceKind } from '../../../types'
 import { getLabel } from '../../../types'
+import { HelpPopover } from '../../ui/HelpPopover'
 
 const fld: React.CSSProperties = { minWidth: 160 }
 const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, marginBottom: 3, color: 'var(--fg-3)' }
@@ -20,11 +21,14 @@ export interface SourcePickerProps {
   value: SourceDraft
   fields: FieldDefinition[]
   acceptedFieldTypes: string[]
+  editorKind?: string
   disabled?: boolean
+  relationTypeOptions?: { term: string; label: Record<string, string> }[]
   onChange: (next: SourceDraft) => void
 }
 
 const RECORD_PROPERTIES = ['idno', 'canonical_url', 'id', 'created_at', 'updated_at']
+const WORK_TYPE_KINDS: SourceKind[] = ['record', 'constant', 'field']
 const MEDIA_PROPERTIES = ['url', 'mime_type', 'license_uri', 'rights_holder']
 
 /** Local text input that commits on blur/Enter instead of on every keystroke. */
@@ -107,20 +111,35 @@ function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
   )
 }
 
-export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, disabled, onChange }: SourcePickerProps) {
+export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, editorKind, disabled, relationTypeOptions, onChange }: SourcePickerProps) {
   const { t } = useTranslation('screenExport')
 
+  const isLidoWorkType = editorKind === 'lido_work_type'
+
   function setKind(kind: SourceKind) {
-    onChange({ source_kind: kind, source_config: {}, settings: {} })
+    onChange({
+      source_kind: kind,
+      source_config: kind === 'record' && isLidoWorkType ? { property: 'target_subtype' } : {},
+      settings: {},
+    })
   }
 
-  const kindLabels: Record<SourceKind, string> = {
+  const kindLabels: Record<SourceKind, string> = isLidoWorkType ? {
+    field: t('sourceKindWorkTypeField'),
+    relation: t('sourceKindRelation'),
+    record: t('sourceKindWorkTypeSubtype'),
+    constant: t('sourceKindWorkTypeFreeText'),
+    media: t('sourceKindMedia'),
+  } : {
     field: t('sourceKindField'),
     relation: t('sourceKindRelation'),
     record: t('sourceKindRecord'),
     constant: t('sourceKindConstant'),
     media: t('sourceKindMedia'),
   }
+  const visibleKinds = isLidoWorkType
+    ? WORK_TYPE_KINDS.filter(kind => allowedKinds.includes(kind))
+    : allowedKinds
 
   const eligibleFields = fields.filter(f => acceptedFieldTypes.length === 0 || acceptedFieldTypes.includes(f.field_type))
 
@@ -129,7 +148,42 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
       {allowedKinds.length > 1 && (
         <div>
-          <label style={lbl}>{t('sourceKindLabel')}</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+            <label style={{ ...lbl, marginBottom: 0 }}>{t('sourceKindLabel')}</label>
+            <HelpPopover
+              title={t('sourceKindLabel')}
+              ariaLabel={t('sourceKindHelpAriaLabel')}
+              content={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                  {visibleKinds.includes('field') && (
+                    <div><strong>{t('sourceKindField')}:</strong> {t('sourceKindHelpFieldDesc')}</div>
+                  )}
+                  {visibleKinds.includes('relation') && (
+                    <>
+                      <div><strong>{t('sourceKindRelation')}:</strong> {t('sourceKindHelpRelationDesc')}</div>
+                      <ul style={{ margin: 0, paddingLeft: 16 }}>
+                        <li><strong>{t('sourceRelationTypeLabel')}:</strong> {t('sourceKindHelpRelationTypeDesc')}</li>
+                        <li><strong>{t('sourceDirectionLabel')}:</strong> {t('sourceKindHelpDirectionDesc')}</li>
+                        <li><strong>{t('sourceRoleLabel')}:</strong> {t('sourceKindHelpRoleDesc')}</li>
+                      </ul>
+                      <div style={{ background: 'var(--bg-2, #f3f4f6)', borderRadius: 6, padding: 8 }}>
+                        <strong>{t('sourceKindHelpExampleTitle')}:</strong> {t('sourceKindHelpExampleText')}
+                      </div>
+                    </>
+                  )}
+                  {visibleKinds.includes('record') && (
+                    <div><strong>{t('sourceKindRecord')}:</strong> {t('sourceKindHelpRecordDesc')}</div>
+                  )}
+                  {visibleKinds.includes('constant') && (
+                    <div><strong>{t('sourceKindConstant')}:</strong> {t('sourceKindHelpConstantDesc')}</div>
+                  )}
+                  {visibleKinds.includes('media') && (
+                    <div><strong>{t('sourceKindMedia')}:</strong> {t('sourceKindHelpMediaDesc')}</div>
+                  )}
+                </div>
+              }
+            />
+          </div>
           <select
             className="fld"
             style={fld}
@@ -137,7 +191,7 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
             disabled={disabled}
             onChange={e => setKind(e.target.value as SourceKind)}
           >
-            {allowedKinds.map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}
+            {visibleKinds.map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}
           </select>
         </div>
       )}
@@ -170,13 +224,30 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
         <>
           <div>
             <label style={lbl}>{t('sourceRelationTypeLabel')}</label>
-            <CommitInput
-              value={String(value.source_config.relation_type ?? '')}
-              placeholder={t('sourceRelationTypePlaceholder')}
-              ariaLabel={t('sourceRelationTypeLabel')}
-              disabled={disabled}
-              onCommit={v => onChange({ ...value, source_config: { ...value.source_config, relation_type: v || undefined } })}
-            />
+            {relationTypeOptions && relationTypeOptions.length > 0 ? (
+              <select
+                className="fld"
+                style={fld}
+                value={String(value.source_config.relation_type ?? '')}
+                disabled={disabled}
+                onChange={e => onChange({ ...value, source_config: { ...value.source_config, relation_type: e.target.value || undefined } })}
+              >
+                <option value="">{t('sourceFieldChoose')}</option>
+                {relationTypeOptions.map(o => (
+                  <option key={o.term} value={o.term}>
+                    {o.label?.de || o.label?.en || o.term}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <CommitInput
+                value={String(value.source_config.relation_type ?? '')}
+                placeholder={t('sourceRelationTypePlaceholder')}
+                ariaLabel={t('sourceRelationTypeLabel')}
+                disabled={disabled}
+                onCommit={v => onChange({ ...value, source_config: { ...value.source_config, relation_type: v || undefined } })}
+              />
+            )}
           </div>
           <div>
             <label style={lbl}>{t('sourceDirectionLabel')}</label>
@@ -204,7 +275,7 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
         </>
       )}
 
-      {value.source_kind === 'record' && (
+      {value.source_kind === 'record' && !isLidoWorkType && (
         <div>
           <label style={lbl}>{t('sourceRecordPropertyLabel')}</label>
           <select

@@ -14,7 +14,7 @@ export type AuthorityEntry = {
   coordinates?: { lat: number; lng: number }
 }
 
-const AUTHORITY_URLS: Record<string, string> = {
+export const AUTHORITY_URLS: Record<string, string> = {
   gnd: 'https://d-nb.info/gnd/',
   'gnd-person': 'https://d-nb.info/gnd/',
   'gnd-subject': 'https://d-nb.info/gnd/',
@@ -26,7 +26,7 @@ const AUTHORITY_URLS: Record<string, string> = {
   aat: 'https://vocab.getty.edu/aat/',
 }
 
-function authorityUrl({ source, external_id }: AuthorityEntry): string | null {
+export function authorityUrl({ source, external_id }: AuthorityEntry): string | null {
   const baseUrl = AUTHORITY_URLS[source]
   return baseUrl ? `${baseUrl}${encodeURIComponent(external_id)}` : null
 }

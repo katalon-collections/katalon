@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { adminConfig, authority, schema, subtypes, vocabularies } from '../../api/client'
+import { adminConfig, authority, getTokenUser, schema, subtypes, vocabularies } from '../../api/client'
 import type { AuthoritySource, SchemaImportResult } from '../../api/client'
 import type { FieldDefinition, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { Alert, Copy, Edit, Grip, Lightning, Plus, Trash, X } from '../ui/Icons'
+import { Alert, Archive, Check, Copy, Edit, Grip, Lightning, Plus, RotateCcw, Trash, X } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
 import { SchemaAiAssist } from './SchemaAiAssist'
 import { ScreenFormSections } from './ScreenFormSections'
@@ -148,6 +148,9 @@ interface FieldDetailProps {
   onClose: () => void
   onSubFieldChange: () => void  // reload field list after sub-field create/delete
   onRequestDeleteSubfield?: (sf: FieldDefinition) => void
+  onRequestHardDeleteSubfield?: (sf: FieldDefinition) => void
+  onRestoreSubfield?: (sf: FieldDefinition) => void
+  isAdmin?: boolean
 }
 
 function toSlug(label: string): string {
@@ -162,7 +165,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
   return { name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
-function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, aiAvailable, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield }: FieldDetailProps) {
+function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, aiAvailable, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield, onRequestHardDeleteSubfield, onRestoreSubfield, isAdmin }: FieldDetailProps) {
   const { t } = useTranslation('screenSchema')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
@@ -745,6 +748,25 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                     onSave={handleSubFieldSave}
                     onCancel={() => { setSubFieldEditing(null); setSubFieldForm(null) }}
                   />
+                ) : sf.is_deleted ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', opacity: 0.65 }}>
+                    <span style={{ flex: 1, fontWeight: 500, textDecoration: 'line-through', color: 'var(--fg-3)' }}>{getLabel(sf, sf.name)}</span>
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', fontWeight: 600 }}>
+                      {t('badgeDeleted')}
+                    </span>
+                    <span className="key" style={{ fontSize: 11 }}>{sf.name}</span>
+                    <span className="typ">{t(`fieldTypes.${sf.field_type}`)}</span>
+                    {onRestoreSubfield && (
+                      <button className="btn sm ico gh" title={t('restoreRow')} onClick={() => onRestoreSubfield(sf)}>
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
+                    {isAdmin && onRequestHardDeleteSubfield && (
+                      <button className="btn sm ico gh dn" title={t('hardDeleteRow')} onClick={() => onRequestHardDeleteSubfield(sf)}>
+                        <Trash size={12} />
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)' }}>
                     <span style={{ flex: 1, fontWeight: 500 }}>{getLabel(sf, sf.name)}</span>
@@ -1252,7 +1274,127 @@ function DeleteFieldModal({
   )
 }
 
-const TYPE_IDS = ['object', 'entity', 'place', 'occurrence', 'procedure', 'vocabulary_term']
+type FieldHardDeleteTarget = {
+  id: string
+  name: string
+  label: string
+  isSubfield?: boolean
+}
+
+function HardDeleteModal({
+  field,
+  onClose,
+  onDeleted,
+}: {
+  field: FieldHardDeleteTarget
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const { t } = useTranslation('screenSchema')
+  const [usageCount, setUsageCount] = useState<number | null>(null)
+  const [loadingUsage, setLoadingUsage] = useState(true)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    schema.getUsage(field.id)
+      .then(res => {
+        if (active) {
+          setUsageCount(res.usage_count)
+          setLoadingUsage(false)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setUsageCount(null)
+          setLoadingUsage(false)
+        }
+      })
+    return () => { active = false }
+  }, [field.id])
+
+  async function handleConfirm() {
+    setDeleting(true)
+    setError(null)
+    try {
+      await schema.hardDelete(field.id)
+      onDeleted()
+    } catch (err) {
+      setError((err as Error).message)
+      setDeleting(false)
+    }
+  }
+
+  const isBlocked = usageCount !== null && usageCount > 0
+
+  return (
+    <div className="batch-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="batch-modal batch-modal--compact" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="batch-modal-header">
+          <h2>{t('hardDeleteModal.title')}</h2>
+          <button className="btn sm ico gh" onClick={onClose} aria-label="Schließen">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="batch-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14 }}>
+            {field.isSubfield
+              ? t('hardDeleteModal.subfieldQuestion', { name: field.label })
+              : t('hardDeleteModal.question', { name: field.label })}
+          </p>
+
+          {loadingUsage ? (
+            <div style={{ fontSize: 13, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="spinner sm" />
+              <span>{t('hardDeleteModal.checkingUsage')}</span>
+            </div>
+          ) : isBlocked ? (
+            <div className="batch-warning" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <Alert size={18} style={{ flexShrink: 0, marginTop: 2, color: '#dc2626' }} />
+                <div style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', marginBottom: 4, color: '#dc2626' }}>
+                    {t('hardDeleteModal.warningTitle')}
+                  </strong>
+                  <p style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>
+                    {t(usageCount === 1 ? 'hardDeleteModal.warningBlocked' : 'hardDeleteModal.warningBlocked_plural', { count: usageCount })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Alert size={18} style={{ flexShrink: 0, marginTop: 2, color: '#dc2626' }} />
+              <div style={{ flex: 1, fontSize: 13, color: '#991b1b' }}>
+                <strong style={{ display: 'block', marginBottom: 4 }}>
+                  {t('hardDeleteModal.warningAllowedTitle')}
+                </strong>
+                {t('hardDeleteModal.warningAllowed', { name: field.name })}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="error-banner" style={{ fontSize: 13, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, color: '#991b1b' }}>
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="batch-modal-footer">
+          <button className="btn" onClick={onClose} disabled={deleting}>
+            {t('hardDeleteModal.cancel')}
+          </button>
+          <button className="btn danger" onClick={handleConfirm} disabled={deleting || loadingUsage || isBlocked}>
+            {deleting ? t('hardDeleteModal.deleting') : t('hardDeleteModal.confirmButton')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TYPE_IDS = ['object', 'entity', 'place', 'occurrence', 'procedure', 'collection', 'storage_location', 'vocabulary_term']
 
 function parseInitial(editId?: string | null): { type: string; subtype: string; target: string | null } {
   if (!editId) return { type: 'object', subtype: '', target: null }
@@ -1297,6 +1439,11 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
   const [aiAvailable, setAiAvailable] = useState(false)
   const [pidProviders, setPidProviders] = useState<('ark' | 'dnb_urn')[]>([])
   const [authoritySources, setAuthoritySources] = useState<AuthoritySource[]>([])
+  const currentUser = getTokenUser()
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superuser'
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<FieldHardDeleteTarget | null>(null)
+  const [statusNotice, setStatusNotice] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [dragState, setDragState] = useState<{ id: string; overIndex: number } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FieldDeleteTarget | null>(null)
   const fieldRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -1366,9 +1513,9 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
 
   const loadFields = useCallback(() => {
     setLoading(true)
-    const pFields = schema.list(activeType, activeSubtype || undefined)
+    const pFields = schema.list(activeType, activeSubtype || undefined, { includeDeleted: showDeleted })
     const pAll = activeSubtype && activeType !== 'vocabulary_term'
-      ? schema.list(activeType)
+      ? schema.list(activeType, undefined, { includeDeleted: showDeleted })
       : null
 
     pFields
@@ -1398,7 +1545,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     if (pAll) {
       pAll.then(setAllTypeFields).catch(console.error)
     }
-  }, [activeType, activeSubtype])
+  }, [activeType, activeSubtype, showDeleted])
 
   useEffect(() => {
     setActiveFieldId(null)
@@ -1725,6 +1872,34 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
     }
   }
 
+  async function handleRestore(f: { id: string; name: string }) {
+    try {
+      await schema.restore(f.id)
+      setStatusNotice({ message: t('restoreSuccess', { name: f.name }), type: 'success' })
+      setTimeout(() => setStatusNotice(null), 4000)
+      loadFields()
+    } catch (err) {
+      setStatusNotice({ message: t('restoreError', { error: (err as Error).message }), type: 'error' })
+      setTimeout(() => setStatusNotice(null), 6000)
+    }
+  }
+
+  function handleFieldHardDeleted() {
+    if (hardDeleteTarget) {
+      const deletedId = hardDeleteTarget.id
+      const wasSubfield = hardDeleteTarget.isSubfield
+      setHardDeleteTarget(null)
+      if (!wasSubfield) {
+        setFields(prev => prev.filter(x => x.id !== deletedId))
+        setAllTypeFields(prev => prev.filter(x => x.id !== deletedId))
+        if (activeFieldId === deletedId) {
+          closeDetail()
+        }
+      }
+      loadFields()
+    }
+  }
+
   async function handleDuplicate(f: FieldDefinition) {
     setSaving(true)
     try {
@@ -1732,7 +1907,8 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
       await loadFields()
       openExisting(duplicated)
     } catch (e) {
-      alert((e as Error).message)
+      setStatusNotice({ message: (e as Error).message, type: 'error' })
+      setTimeout(() => setStatusNotice(null), 6000)
     } finally {
       setSaving(false)
     }
@@ -1772,6 +1948,22 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           {aiAvailable && (
             <button className="btn gh" onClick={() => setShowAiAssist(true)} disabled={activeType === 'vocabulary_term'} title={t('aiAssistTitle')}><Lightning size={13} /> {t('aiAssist')}</button>
           )}
+          <button
+            type="button"
+            className={`btn gh${showDeleted ? ' active' : ''}`}
+            onClick={() => setShowDeleted(prev => !prev)}
+            title={t('trashToggleTitle')}
+            aria-pressed={showDeleted}
+            style={showDeleted ? { background: 'var(--panel-active, rgba(0,0,0,0.08))', borderColor: 'var(--border-s)', fontWeight: 600 } : undefined}
+          >
+            <Archive size={13} />
+            <span>{t('trashToggle')}</span>
+            {showDeleted && fields.filter(f => f.is_deleted).length > 0 && (
+              <span style={{ marginLeft: 4, background: '#fee2e2', color: '#991b1b', fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                {fields.filter(f => f.is_deleted).length}
+              </span>
+            )}
+          </button>
           <button className="btn gh" onClick={() => setShowImport(true)}>{t('import')}</button>
           <button className="btn pri" onClick={openNew} disabled={activeType === 'vocabulary_term' && !activeSubtype}><Plus size={13} /> {t('addField')}</button>
           </>}
@@ -1865,6 +2057,14 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                 label: getLabel(sf, sf.name),
                 isSubfield: true,
               })}
+              onRequestHardDeleteSubfield={sf => setHardDeleteTarget({
+                id: sf.id,
+                name: sf.name,
+                label: getLabel(sf, sf.name),
+                isSubfield: true,
+              })}
+              onRestoreSubfield={sf => handleRestore(sf)}
+              isAdmin={isAdmin}
             />
           ) : (
             <>
@@ -1872,10 +2072,17 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                 <div className="empty" style={{ paddingTop: 40 }}>{t('loading')}</div>
               ) : (
                 <>
-                  <div style={{ margin: '12px 24px 4px', color: 'var(--fg-3)', fontSize: 12 }}>
-                    {t('fieldCount', { count: fields.length })}
-                    {activeSubtype && (
-                      <span>{t('forSubtype', { subtype: activeSubtype })}</span>
+                  <div style={{ margin: '12px 24px 4px', color: 'var(--fg-3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span>
+                      {t('fieldCount', { count: fields.filter(f => !f.is_deleted).length })}
+                      {activeSubtype && (
+                        <span>{t('forSubtype', { subtype: activeSubtype })}</span>
+                      )}
+                    </span>
+                    {showDeleted && fields.some(f => f.is_deleted) && (
+                      <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                        • {fields.filter(f => f.is_deleted).length} {t('badgeDeleted')}
+                      </span>
                     )}
                   </div>
                   {(['idno', 'label'] as const)
@@ -1917,24 +2124,38 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                     const idx = fields.findIndex(x => x.id === f.id)
                     const fieldLabel = getLabel(f, f.name)
                     const isDragging = dragState?.id === f.id
-                    const showDropBefore = dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx < fields.findIndex(x => x.id === dragState.id)
-                    const showDropAfter = dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx > fields.findIndex(x => x.id === dragState.id)
+                    const isDeleted = Boolean(f.is_deleted)
+                    const showDropBefore = !isDeleted && dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx < fields.findIndex(x => x.id === dragState.id)
+                    const showDropAfter = !isDeleted && dragState != null && dragState.id !== f.id && dragState.overIndex === idx && idx > fields.findIndex(x => x.id === dragState.id)
                     return (
                       <div
                         key={f.id}
                         ref={el => { if (el) fieldRowRefs.current.set(f.id, el); else fieldRowRefs.current.delete(f.id) }}
                         className={`field-row${isDragging ? ' dragging' : ''}${showDropBefore ? ' drop-before' : ''}${showDropAfter ? ' drop-after' : ''}`}
+                        style={isDeleted ? { opacity: 0.6, background: 'rgba(0,0,0,0.02)' } : undefined}
                       >
                         <span
                           className="gp"
-                          role="button"
-                          aria-label={t('reorderRow', { name: fieldLabel })}
+                          role={isDeleted ? undefined : 'button'}
+                          aria-label={isDeleted ? undefined : t('reorderRow', { name: fieldLabel })}
                           tabIndex={-1}
-                          onPointerDown={e => handleGripPointerDown(e, f.id)}
+                          style={isDeleted ? { pointerEvents: 'none', opacity: 0.3 } : undefined}
+                          onPointerDown={isDeleted ? undefined : (e => handleGripPointerDown(e, f.id))}
                         ><Grip size={14} /></span>
-                        <button className="field-row-main" onClick={() => openExisting(f)}>
-                          <span className="nm">{fieldLabel}</span>
+                        <button
+                          className="field-row-main"
+                          onClick={() => {
+                            if (!isDeleted) openExisting(f)
+                          }}
+                          style={isDeleted ? { cursor: 'default' } : undefined}
+                        >
+                          <span className="nm" style={isDeleted ? { textDecoration: 'line-through', color: 'var(--fg-3)' } : undefined}>{fieldLabel}</span>
                           <span className="key">{f.name}</span>
+                          {isDeleted && (
+                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', fontWeight: 600 }}>
+                              {t('badgeDeleted')}
+                            </span>
+                          )}
                           {f.target_subtype && (
                             <span className="typ target-subtype" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{f.target_subtype}</span>
                           )}
@@ -1946,7 +2167,29 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
                         <div className="actions">
                           <ActionMenu
                             ariaLabel={`Aktionen für Feld ${fieldLabel}`}
-                            items={[
+                            items={isDeleted ? [
+                              {
+                                key: 'restore',
+                                label: t('restoreRow'),
+                                icon: <RotateCcw size={13} />,
+                                onClick: () => handleRestore(f),
+                              },
+                              ...(isAdmin ? [
+                                {
+                                  key: 'hard-delete',
+                                  label: t('hardDeleteRow'),
+                                  icon: <Trash size={13} />,
+                                  danger: true,
+                                  onClick: () => {
+                                    setHardDeleteTarget({
+                                      id: f.id,
+                                      name: f.name,
+                                      label: fieldLabel,
+                                    })
+                                  },
+                                },
+                              ] : []),
+                            ] : [
                               {
                                 key: 'edit',
                                 label: t('editRow'),
@@ -1992,6 +2235,44 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         onClose={() => setDeleteTarget(null)}
         onDeleted={handleFieldDeleted}
       />
+    )}
+    {hardDeleteTarget && (
+      <HardDeleteModal
+        field={hardDeleteTarget}
+        onClose={() => setHardDeleteTarget(null)}
+        onDeleted={handleFieldHardDeleted}
+      />
+    )}
+    {statusNotice && (
+      <div
+        role={statusNotice.type === 'error' ? 'alert' : 'status'}
+        style={{
+          position: 'fixed',
+          bottom: 28,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 16px',
+          borderRadius: 7,
+          background: statusNotice.type === 'error' ? '#991b1b' : 'var(--fg-1, #111)',
+          color: '#fff',
+          fontSize: 13,
+          boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+        }}
+      >
+        {statusNotice.type === 'error' ? <Alert size={14} /> : <Check size={14} />}
+        <span>{statusNotice.message}</span>
+        <button
+          onClick={() => setStatusNotice(null)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', marginLeft: 6, padding: 0 }}
+          aria-label="Schließen"
+        >
+          <X size={13} />
+        </button>
+      </div>
     )}
     {pendingReconfigWarning && (
       <ConfirmModal

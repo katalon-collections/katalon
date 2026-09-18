@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { exportMappingSets } from '../../../api/client'
 import type { MappingDiagnostic } from '../../../types'
@@ -40,14 +40,67 @@ function HighlightedXml({ xml }: { xml: string }) {
   </>
 }
 
+function previewStorageKey(recordType: string): string {
+  return `katalon_export_preview_specimen:${recordType}`
+}
+
+function readStoredSpecimen(recordType: string): Specimen | null {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(previewStorageKey(recordType)) ?? 'null') as unknown
+    if (
+      typeof stored === 'object'
+      && stored !== null
+      && 'id' in stored
+      && 'title' in stored
+    ) {
+      const idno = 'idno' in stored ? stored.idno : null
+      if (
+        typeof stored.id === 'string'
+        && typeof stored.title === 'string'
+        && (idno === null || typeof idno === 'string')
+      ) {
+        return { id: stored.id, idno, title: stored.title }
+      }
+    }
+  } catch {
+    // Ignore an unavailable or invalid browser storage entry.
+  }
+  return null
+}
+
+function storeSpecimen(recordType: string, specimen: Specimen | null) {
+  try {
+    if (specimen) {
+      window.localStorage.setItem(previewStorageKey(recordType), JSON.stringify(specimen))
+    } else {
+      window.localStorage.removeItem(previewStorageKey(recordType))
+    }
+  } catch {
+    // Keep the in-memory selection if browser storage is unavailable.
+  }
+}
+
 
 export function ExportPreview({ recordType, mappingSetId }: { recordType: string; mappingSetId: string }) {
   const { t } = useTranslation('screenExport')
-  const [specimen, setSpecimen] = useState<Specimen | null>(null)
+  const [specimen, setSpecimen] = useState<Specimen | null>(() => readStoredSpecimen(recordType))
   const [xml, setXml] = useState<string | null>(null)
   const [diagnostics, setDiagnostics] = useState<MappingDiagnostic[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSpecimen(readStoredSpecimen(recordType))
+    setXml(null)
+    setDiagnostics([])
+  }, [recordType])
+
+  function selectSpecimen(next: Specimen | null) {
+    storeSpecimen(recordType, next)
+    setSpecimen(next)
+    setXml(null)
+    setDiagnostics([])
+  }
 
   async function runPreview() {
     if (!specimen) return
@@ -70,7 +123,7 @@ export function ExportPreview({ recordType, mappingSetId }: { recordType: string
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 10 }}>{t('previewHeadline')}</h3>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <SpecimenPicker recordType={recordType} value={specimen} onChange={s => { setSpecimen(s); setXml(null); setDiagnostics([]) }} />
+        <SpecimenPicker recordType={recordType} value={specimen} onChange={selectSpecimen} />
         <button
           type="button"
           className="btn sm pri"

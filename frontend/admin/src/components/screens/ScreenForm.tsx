@@ -2569,6 +2569,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setValuesDirty(v => ({ ...v, [name]: cur }))
     clearAiProvenance(`${name}.${idx}.${subName}`)
   }
+  function removeGroupSubFieldLegacyKey(groupName: string, idx: number, legacyKey: string) {
+    const cur = [...((values[groupName] as GroupInstance[]) ?? [])]
+    if (cur[idx]) {
+      const nextInst = { ...cur[idx] }
+      delete nextInst[legacyKey]
+      cur[idx] = nextInst
+      setValuesDirty(v => ({ ...v, [groupName]: cur }))
+    }
+  }
 
   function renderSubFieldInput(sf: FieldDefinition, val: unknown, onChange: (v: unknown) => void, disabled: boolean) {
     switch (sf.field_type) {
@@ -3624,7 +3633,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       )}
 
       {error && (
-        <div className="record-notice" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c' }}>
+        <div className="record-notice" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c', whiteSpace: 'pre-line' }}>
           {error}
           {Object.keys(fieldErrors).length > 0 && (
             <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.6 }}>
@@ -4305,6 +4314,36 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                   {renderSubFieldInput(sf, instance[sf.name], v => updateGroupSubField(f.name, i, sf.name, v), justCreated)}
                                 </div>
                               ))}
+                              {(() => {
+                                const activeSubFieldNames = new Set((f.children ?? []).map(sf => sf.name))
+                                const legacyKeys = Object.entries(instance || {}).filter(
+                                  ([k, v]) => !activeSubFieldNames.has(k) && k !== 'id' && v !== undefined
+                                )
+                                if (legacyKeys.length === 0) return null
+                                return (
+                                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed var(--border-s)' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 4 }}>
+                                      {t('legacy.heading')}
+                                    </div>
+                                    {legacyKeys.map(([legacyKey, legacyVal]) => (
+                                      <div key={legacyKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 12 }}>
+                                        <code style={{ overflow: 'hidden', textOverflow: 'ellipsis', background: 'var(--bg-s)', padding: '2px 6px', borderRadius: 4 }}>
+                                          {legacyKey}: {typeof legacyVal === 'object' ? JSON.stringify(legacyVal) : String(legacyVal)}
+                                        </code>
+                                        <button
+                                          type="button"
+                                          className="btn sm gh dn"
+                                          style={{ fontSize: 11, padding: '2px 6px', height: 'auto' }}
+                                          onClick={() => removeGroupSubFieldLegacyKey(f.name, i, legacyKey)}
+                                          disabled={justCreated}
+                                        >
+                                          {t('legacy.remove')}
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )
+                              })()}
                               {(f.children ?? []).length === 0 && (
                                 <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Keine Sub-Felder definiert.</div>
                               )}

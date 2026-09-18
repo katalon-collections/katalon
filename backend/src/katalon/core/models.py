@@ -402,6 +402,11 @@ class RecordSubtype(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     # Portal fallback image for records of this subtype that have no media of their own.
     placeholder_image_url: Mapped[str] = mapped_column(String(512), default="", server_default="")
+    # Optional authority / normdaten linking (e.g. AAT or GND concept for objectWorkType export)
+    concept_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    concept_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    concept_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    concept_label: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("primary_type", "name", name="uq_record_subtypes_primary_name"),

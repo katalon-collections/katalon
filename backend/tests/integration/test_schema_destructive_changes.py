@@ -808,3 +808,128 @@ async def test_field_usage_preview_reports_risk_for_incompatible_type_change(
     assert persisted.status_code == 200
     assert persisted.json()["metadata_"][field_name] == "Freitext"
 
+
+@pytest.mark.asyncio
+async def test_restore_field_restores_soft_deleted_field_and_group_children(
+    async_client, auth_headers
+) -> None:
+    group_name = f"grp_{uuid.uuid4().hex[:8]}"
+    create_group = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": group_name,
+            "label": {"de": "Gruppe"},
+            "field_type": "group",
+            "is_repeatable": True,
+        },
+    )
+    assert create_group.status_code == 201
+    group_id = create_group.json()["id"]
+
+    sub_name = f"sub_{uuid.uuid4().hex[:8]}"
+    create_sub = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": sub_name,
+            "label": {"de": "Unterfeld"},
+            "field_type": "text",
+            "parent_id": group_id,
+        },
+    )
+    assert create_sub.status_code == 201
+    sub_id = create_sub.json()["id"]
+
+    # Delete group -> soft deletes group and subfield
+    del_res = await async_client.delete(f"/v1/schema/{group_id}", headers=auth_headers)
+    assert del_res.status_code == 204
+
+    # Subfield cannot be restored while parent is deleted
+    sub_restore_fail = await async_client.post(
+        f"/v1/schema/{sub_id}/restore", headers=auth_headers
+    )
+    assert sub_restore_fail.status_code == 422
+    assert "übergeordnete Feld" in sub_restore_fail.json()["detail"]
+
+    # Restore group -> restores group and subfield
+    restore_res = await async_client.post(
+        f"/v1/schema/{group_id}/restore", headers=auth_headers
+    )
+    assert restore_res.status_code == 200
+    restored_data = restore_res.json()
+    assert restored_data["is_deleted"] is False
+    assert len(restored_data["children"]) == 1
+    assert restored_data["children"][0]["id"] == sub_id
+    assert restored_data["children"][0]["is_deleted"] is False
+
+
+@pytest.mark.asyncio
+async def test_hard_delete_field_lifecycle(async_client, auth_headers) -> None:
+    field_name = f"hard_del_{uuid.uuid4().hex[:8]}"
+    create_res = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Hard Delete Test"},
+            "field_type": "text",
+        },
+    )
+    assert create_res.status_code == 201
+    field_id = create_res.json()["id"]
+
+    # Create object using this field
+    obj_res = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"HARD-DEL-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "O", field_name: "In Benutzung"},
+        },
+    )
+    assert obj_res.status_code == 201
+
+    # Hard delete is blocked because field is in use
+    hard_del_blocked = await async_client.delete(
+        f"/v1/schema/{field_id}/hard", headers=auth_headers
+    )
+    assert hard_del_blocked.status_code == 409
+
+    # Purge data from records
+    purge_res = await async_client.delete(
+        f"/v1/schema/{field_id}?purge_data=true", headers=auth_headers
+    )
+    assert purge_res.status_code == 204
+
+    # Now hard delete succeeds
+    hard_del_ok = await async_client.delete(
+        f"/v1/schema/{field_id}/hard", headers=auth_headers
+    )
+    assert hard_del_ok.status_code == 204
+
+    # Field is completely gone even with include_deleted=True
+    all_fields = await async_client.get(
+        "/v1/schema/object?include_deleted=true", headers=auth_headers
+    )
+    assert field_name not in {f["name"] for f in all_fields.json()}
+
+    # Creating a new field with the exact same name succeeds without reusing an old row
+    recreate_res = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Neu erstellt"},
+            "field_type": "number",
+        },
+    )
+    assert recreate_res.status_code == 201
+    assert recreate_res.json()["id"] != field_id
+    assert recreate_res.json()["field_type"] == "number"
+
+

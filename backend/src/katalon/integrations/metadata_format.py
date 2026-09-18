@@ -74,6 +74,10 @@ class ExportRecordSummary(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     canonical_url: str | None = None
+    subtype_concept_source: str | None = None
+    subtype_concept_id: str | None = None
+    subtype_concept_uri: str | None = None
+    subtype_concept_label: str | None = None
 
 
 class ExportRelation(BaseModel):

@@ -417,3 +417,42 @@ async def test_export_profiles_endpoints() -> None:
             assert any(f["key"] == "lido" and f.get("capabilities") is not None for f in fmts_data)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_mets_mods_validate_mapping_required_title() -> None:
+    from katalon.integrations.mets_mods_format import MetsModsFormat
+
+    fmt = MetsModsFormat()
+
+    cms_no_title = CompiledMappingSet(
+        format_key="mets_mods",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                rule_key=uuid.uuid4(),
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "desc"},
+                target_key="mods:abstract",
+            )
+        ],
+    )
+    diags = fmt.validate_mapping(cms_no_title)
+    assert len(diags) == 1
+    assert diags[0].code == "required_target_missing"
+    assert diags[0].target_key == "mods:titleInfo/mods:title"
+
+    cms_with_title = CompiledMappingSet(
+        format_key="mets_mods",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                rule_key=uuid.uuid4(),
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="mods:titleInfo/mods:title",
+            )
+        ],
+    )
+    diags_ok = fmt.validate_mapping(cms_with_title)
+    assert len(diags_ok) == 0
+

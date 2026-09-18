@@ -76,43 +76,43 @@ docker compose logs api | grep -A5 "KATALON FIRST RUN"
 
 ## Architektur
 
-```text
-┌─────────────────┐    ┌─────────────────┐
-│   Admin-UI      │    │  Public-Portal  │
-│  (React/Vite)   │    │  (React/Vite)   │
-│  Eingabe, CRUD  │    │  Suche, IIIF    │
-└────────┬────────┘    └────────┬────────┘
-         │                     │
-         └──────────┬──────────┘
-                    │ REST/JSON
-         ┌──────────▼──────────┐
-         │   FastAPI Backend   │
-         │   (Python 3.14+)    │
-         └──────────┬──────────┘
-                    │
-       ┌────────────┼────────────┐
-       ▼            ▼            ▼
-  PostgreSQL  Elasticsearch  Cantaloupe
-  +PostGIS    (Suche)        (IIIF)
-  +JSONB
+```mermaid
+flowchart TD
+    Client["Browser & API-Clients"] --> Nginx["Nginx Reverse Proxy (TLS)"]
+    Nginx --> Admin["Admin-UI (React/Vite)"]
+    Nginx --> Portal["Public-Portal (React/Vite)"]
+    Admin -->|REST / JSON| API["FastAPI Backend (Python 3.14+)"]
+    Portal -->|REST / JSON| API
+    Portal -->|IIIF Image API 3| Cantaloupe["Cantaloupe (IIIF Server)"]
+    API --> DB[("PostgreSQL 16 + PostGIS + JSONB")]
+    API --> ES[("Elasticsearch 8 (Suche)")]
+    API --> Redis[("Redis (Queue / Locks)")]
+    API --> Cantaloupe
+    API -.-> Oxigraph[("Oxigraph (SPARQL 1.1 Triplestore)")]
+    Redis --> Celery["Celery Worker & Beat"]
+    Celery --> DB
+    Celery --> ES
 ```
 
-**Stack:** FastAPI · PostgreSQL 16 + PostGIS · Elasticsearch 8 · Redis · Celery · Cantaloupe (IIIF) · React 18 + TypeScript
+**Stack:** FastAPI · PostgreSQL 16 + PostGIS · Elasticsearch 8 · Redis · Celery · Cantaloupe (IIIF) · Oxigraph (SPARQL) · React 18 + TypeScript
 
 ---
 
 ## Kernfunktionen
 
-### Vier Primärtypen
+### Sieben Kerntypen (`RECORD_TYPES`)
 
-| Typ            | Beschreibung                          | Beispiele                           |
-|----------------|---------------------------------------|-------------------------------------|
-| **Object**     | Physische oder digitale Artefakte     | Fotografie, Dokument, Gemälde       |
-| **Entity**     | Personen oder Organisationen          | Fotograf, Verlag, Institution       |
-| **Place**      | Geografische Orte                     | Stadtbezirk, Gebäude, Region        |
-| **Occurrence** | Werke, Ereignisse, abstrakte Konzepte | Musikwerk, Ausstellung, Publikation |
+| Typ | DB-Tabelle | Beschreibung | Beispiele |
+|---|---|---|---|
+| **Object** | `objects` | Physische oder digitale Artefakte | Fotografie, Dokument, Gemälde, Digitalisat |
+| **Entity** | `entities` | Personen oder Organisationen | Fotograf:in, Verlag, Sammler:in, Institution |
+| **Place** | `places` | Geografische Orte (PostGIS-Punktgeometrie) | Stadtbezirk, Gebäude, Fundort, Region |
+| **Occurrence** | `occurrences` | Werke (FRBR), Ereignisse, Konzepte | Musikwerk, Ausstellung, historische Epoche |
+| **Collection** | `collections` | Sammlungen, Bestände, Archivtektonik | Nachlass, Fotosammlung, Teilbestand |
+| **Storage Location** | `storage_locations` | Standort- & Lagerortverwaltung (hierarchisch) | Magazin A → Raum 102 → Regal 4 → Fach B |
+| **Procedure** | `procedures` | Vorgangsverwaltung & Fachprozesse | Leihverkehr, Restaurierung, Erwerbung |
 
-Alle Typen haben **frei konfigurierbare Metadatenfelder** — definiert im Admin-UI und dynamisch in der Datenbank gespeichert (JSONB).
+Alle Typen haben **optimistische Sperren** (`version`), Zeitstempel und **frei konfigurierbare Metadatenfelder** — definiert im Admin-UI und dynamisch in der Datenbank gespeichert (JSONB).
 
 ### Schema-Engine
 

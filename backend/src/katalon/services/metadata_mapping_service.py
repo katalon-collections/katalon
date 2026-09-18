@@ -11,7 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from katalon.core.models import AuditLog, ExportMappingRule, ExportMappingSet, FieldDefinition
+from katalon.core.models import (
+    AuditLog,
+    ExportMappingRule,
+    ExportMappingSet,
+    FieldDefinition,
+    PortalConfig,
+    RecordSubtype,
+)
 from katalon.core.schemas import (
     ExportMappingRuleCreate,
     ExportMappingRuleUpdate,
@@ -29,6 +36,8 @@ from katalon.integrations.metadata_format import (
 OAI_DC_FORMAT = "oai_dc"
 
 MappingIndex = dict[str, CompiledMappingSet]
+
+
 
 
 class OptimisticLockError(Exception):
@@ -106,6 +115,7 @@ async def get_mapping_index(db: AsyncSession, format_key: str) -> MappingIndex:
             format_key=format_key,
             record_type=record_type,
             rules=rules,
+            institution_config=dict(mapping_set.institution_config or {}),
         )
     return sets
 
@@ -162,6 +172,26 @@ async def create_mapping_set(
             revision = base.revision + 1
             rules_to_clone = base.rules
 
+    institution_config = dict(data.institution_config or {})
+    if (
+        data.format_key == "lido"
+        and data.record_type == "object"
+        and data.based_on_id is None
+        and not institution_config.get("institution_name")
+    ):
+        portal_result = await db.execute(
+            select(PortalConfig).where(PortalConfig.key == "default")
+        )
+        portal_config = portal_result.scalar_one_or_none()
+        site_title = portal_config.site_title if portal_config else {}
+        institution_name = (
+            site_title.get("de")
+            or site_title.get("en")
+            or next((title for title in site_title.values() if title), "")
+        )
+        if institution_name.strip():
+            institution_config["institution_name"] = institution_name.strip()
+
     new_set = ExportMappingSet(
         format_key=data.format_key,
         profile_id=data.profile_id,
@@ -172,7 +202,7 @@ async def create_mapping_set(
         status="draft",
         revision=revision,
         based_on_id=data.based_on_id,
-        institution_config=dict(data.institution_config or {}),
+        institution_config=institution_config,
         version=1,
         created_by=user_id,
     )
@@ -192,6 +222,23 @@ async def create_mapping_set(
             is_enabled=r.is_enabled,
         )
         db.add(cloned_rule)
+
+    if (
+        data.format_key == "lido"
+        and data.record_type == "object"
+        and data.based_on_id is None
+    ):
+        db.add(
+            ExportMappingRule(
+                mapping_set_id=new_set.id,
+                source_kind=SourceKind.FIELD.value,
+                source_config={"field_name": "label"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+                settings={},
+                sort_order=0,
+                is_enabled=True,
+            )
+        )
 
     await db.flush()
 
@@ -431,6 +478,45 @@ def compile_mapping_set(mapping_set: ExportMappingSet) -> CompiledMappingSet:
     )
 
 
+
+
+async def _validate_lido_subtype_authorities(
+    db: AsyncSession,
+    mapping_set: ExportMappingSet,
+    compiled: CompiledMappingSet,
+) -> list[MappingDiagnostic]:
+    work_type_target = "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
+    uses_subtype_authorities = any(
+        rule.is_enabled
+        and rule.target_key == work_type_target
+        and rule.source_kind == SourceKind.RECORD
+        for rule in compiled.rules
+    )
+    if mapping_set.format_key != "lido" or mapping_set.record_type != "object" or not uses_subtype_authorities:
+        return []
+
+    result = await db.execute(
+        select(RecordSubtype).where(RecordSubtype.primary_type == "object")
+    )
+    missing = [
+        (subtype.label or {}).get("de")
+        or (subtype.label or {}).get("en")
+        or subtype.name
+        for subtype in result.scalars().all()
+        if not subtype.concept_id and not subtype.concept_uri
+    ]
+    if not missing:
+        return []
+
+    return [
+        MappingDiagnostic(
+            code="subtype_authority_missing",
+            message=f"Subtypen ohne Normdaten: {', '.join(missing)}.",
+            target_key=work_type_target,
+        )
+    ]
+
+
 async def validate_mapping_set(
     db: AsyncSession,
     set_id: uuid.UUID,
@@ -452,7 +538,9 @@ async def validate_mapping_set(
         ]
 
     cms = compile_mapping_set(mapping_set)
-    return fmt.validate_mapping(cms)
+    diagnostics = fmt.validate_mapping(cms)
+    diagnostics.extend(await _validate_lido_subtype_authorities(db, mapping_set, cms))
+    return diagnostics
 
 
 async def preview_mapping_set(
@@ -473,11 +561,12 @@ async def preview_mapping_set(
     if not fmt:
         raise ValueError(f"Unbekanntes Format '{mapping_set.format_key}'.")
 
-    diagnostics = fmt.validate_mapping(compile_mapping_set(mapping_set))
+    cms = compile_mapping_set(mapping_set)
+    diagnostics = fmt.validate_mapping(cms)
     ctx = await export_context_service.build_export_context_from_db(
         db, mapping_set.record_type, record_id
     )
-    element = fmt.render(ctx, compile_mapping_set(mapping_set))
+    element = fmt.render(ctx, cms)
     xml = ET.tostring(element, encoding="unicode")
     return xml, diagnostics
 

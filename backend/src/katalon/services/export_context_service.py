@@ -17,6 +17,7 @@ from katalon.core.models import (
     Object,
     Occurrence,
     Place,
+    RecordSubtype,
     Relation,
 )
 from katalon.integrations.metadata_format import (
@@ -64,6 +65,31 @@ async def build_export_context_from_db(
 
     canonical_url = f"{clean_base}/{record_type}/{record_id}" if clean_base else None
 
+    subtype_concept_source = None
+    subtype_concept_id = None
+    subtype_concept_uri = None
+    subtype_concept_label = None
+    if subtype:
+        res_st = await db.execute(
+            select(RecordSubtype).where(
+                RecordSubtype.primary_type == record_type,
+                RecordSubtype.name == str(subtype),
+            )
+        )
+        st_obj = res_st.scalar_one_or_none()
+        if st_obj:
+            subtype_concept_source = st_obj.concept_source
+            subtype_concept_id = st_obj.concept_id
+            subtype_concept_uri = st_obj.concept_uri
+            lbl = st_obj.label or {}
+            subtype_concept_label = (
+                st_obj.concept_label
+                or lbl.get("de")
+                or lbl.get("en")
+                or next((str(v) for v in lbl.values() if v), None)
+                or st_obj.name
+            )
+
     summary = ExportRecordSummary(
         id=str(record.id),
         idno=getattr(record, "idno", None),
@@ -74,6 +100,10 @@ async def build_export_context_from_db(
         created_at=record.created_at.isoformat() if getattr(record, "created_at", None) else None,
         updated_at=record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
         canonical_url=canonical_url,
+        subtype_concept_source=subtype_concept_source,
+        subtype_concept_id=subtype_concept_id,
+        subtype_concept_uri=subtype_concept_uri,
+        subtype_concept_label=subtype_concept_label,
     )
 
     # 2. Public fields only (internal fields excluded)
@@ -81,48 +111,62 @@ async def build_export_context_from_db(
     fields = filter_public_metadata(raw_md, public_fields, subtype)
 
     # 3. Public relations only (excluding storage_location & procedure; excluding deleted/non-public targets)
+    async def _resolve_relation(
+        other_type: str, other_id: uuid.UUID, relation_type: str, rel_metadata: dict[str, Any], rel_id: uuid.UUID, direction: str
+    ) -> ExportRelation | None:
+        if other_type in _EXCLUDED_RELATION_TARGET_TYPES:
+            return None
+        other_model = _MODEL_MAP.get(other_type)
+        if not other_model:
+            return None
+        other_rec = await db.get(other_model, other_id)
+        if not other_rec or getattr(other_rec, "is_deleted", False):
+            return None
+        other_status = getattr(other_rec, "status", "public")
+        if other_status not in ("public", None):
+            return None
+
+        other_md = getattr(other_rec, "metadata_", None) or {}
+        other_title = getattr(other_rec, "title", None) or _extract_title(other_md) or getattr(other_rec, "idno", None) or ""
+
+        other_public_fields = await load_public_fields(db, other_type)
+        other_subtype = getattr(other_rec, f"{other_type}_type", None) or getattr(other_rec, "subtype", None)
+        filtered_other_values = filter_public_metadata(other_md, other_public_fields, other_subtype)
+
+        return ExportRelation(
+            id=str(rel_id),
+            direction=direction,
+            relation_type=relation_type,
+            target_type=other_type,
+            target_id=str(other_id),
+            target_label=str(other_title) if other_title else None,
+            target_idno=getattr(other_rec, "idno", None),
+            metadata=dict(rel_metadata or {}),
+            target_values=filtered_other_values,
+        )
+
     relations: list[ExportRelation] = []
-    rel_res = await db.execute(
+    outbound_res = await db.execute(
         select(Relation).where(
             Relation.from_type == record_type,
             Relation.from_id == record_id,
         )
     )
-    for rel in rel_res.scalars().all():
-        if rel.to_type in _EXCLUDED_RELATION_TARGET_TYPES:
-            continue
-        target_model = _MODEL_MAP.get(rel.to_type)
-        if not target_model:
-            continue
-        target_rec = await db.get(target_model, rel.to_id)
-        if not target_rec or getattr(target_rec, "is_deleted", False):
-            continue
-        # Check target visibility
-        target_status = getattr(target_rec, "status", "public")
-        if target_status not in ("public", None):
-            continue
+    for rel in outbound_res.scalars().all():
+        resolved = await _resolve_relation(rel.to_type, rel.to_id, rel.relation_type, rel.metadata_, rel.id, "outbound")
+        if resolved:
+            relations.append(resolved)
 
-        target_md = getattr(target_rec, "metadata_", None) or {}
-        target_title = getattr(target_rec, "title", None) or _extract_title(target_md) or getattr(target_rec, "idno", None) or ""
-
-        # Filter target public values
-        target_public_fields = await load_public_fields(db, rel.to_type)
-        target_subtype = getattr(target_rec, f"{rel.to_type}_type", None) or getattr(target_rec, "subtype", None)
-        filtered_target_values = filter_public_metadata(target_md, target_public_fields, target_subtype)
-
-        relations.append(
-            ExportRelation(
-                id=str(rel.id),
-                direction="outbound",
-                relation_type=rel.relation_type,
-                target_type=rel.to_type,
-                target_id=str(rel.to_id),
-                target_label=str(target_title) if target_title else None,
-                target_idno=getattr(target_rec, "idno", None),
-                metadata=dict(rel.metadata_ or {}),
-                target_values=filtered_target_values,
-            )
+    inbound_res = await db.execute(
+        select(Relation).where(
+            Relation.to_type == record_type,
+            Relation.to_id == record_id,
         )
+    )
+    for rel in inbound_res.scalars().all():
+        resolved = await _resolve_relation(rel.from_type, rel.from_id, rel.relation_type, rel.metadata_, rel.id, "inbound")
+        if resolved:
+            relations.append(resolved)
 
     # 4. Public media representations only (non-public media excluded)
     media: list[ExportMediaItem] = []

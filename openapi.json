@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.36.0"
+    "version": "1.37.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -3095,6 +3095,18 @@
               "format": "uuid",
               "title": "Field Id"
             }
+          },
+          {
+            "name": "restore_children",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If True and field is a group, also restores its subfields",
+              "default": true,
+              "title": "Restore Children"
+            },
+            "description": "If True and field is a group, also restores its subfields"
           }
         ],
         "responses": {
@@ -3115,14 +3127,53 @@
             "description": "Deleted field definition not found"
           },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
+            "description": "Parent group field is deleted or detail_role conflict"
+          }
+        }
+      }
+    },
+    "/v1/schema/{field_id}/hard": {
+      "delete": {
+        "tags": [
+          "schema"
+        ],
+        "summary": "Permanently hard-delete a field definition",
+        "operationId": "schema_hard_delete_field_delete_v1_schema__field_id__hard",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Field Id"
             }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Field definition not found"
+          },
+          "409": {
+            "description": "Field is still in use by existing records"
+          },
+          "422": {
+            "description": "System fields cannot be deleted"
           }
         }
       }
@@ -25548,6 +25599,50 @@
             "type": "string",
             "title": "Placeholder Image Url",
             "default": ""
+          },
+          "concept_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Source"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "concept_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Uri"
+          },
+          "concept_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Label"
           }
         },
         "type": "object",
@@ -25592,6 +25687,50 @@
             "type": "string",
             "title": "Placeholder Image Url",
             "default": ""
+          },
+          "concept_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Source"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "concept_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Uri"
+          },
+          "concept_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Label"
           },
           "id": {
             "type": "string",

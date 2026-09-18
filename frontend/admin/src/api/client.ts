@@ -138,6 +138,32 @@ function ifMatch(version?: number): Record<string, string> | undefined {
   return version != null ? { 'If-Match': String(version) } : undefined
 }
 
+function formatApiErrorDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    const messages = detail.map(item => {
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object') {
+        const d = item as Record<string, unknown>
+        if (typeof d.msg === 'string') {
+          if (Array.isArray(d.loc) && d.loc.length > 0) {
+            const locPath = d.loc.filter(l => l !== 'body').join('.')
+            return locPath ? `${locPath}: ${d.msg}` : d.msg
+          }
+          return d.msg
+        }
+        return JSON.stringify(d)
+      }
+      return String(item)
+    })
+    return messages.filter(Boolean).join('\n')
+  }
+  if (detail && typeof detail === 'object') {
+    return JSON.stringify(detail)
+  }
+  return ''
+}
+
 export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string> ?? {}) }
   const res = await authorizedFetch(path, { ...init, headers })
@@ -166,7 +192,7 @@ export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    const msg = typeof err.detail === 'string' ? err.detail : (err.detail ? JSON.stringify(err.detail) : res.statusText)
+    const msg = formatApiErrorDetail(err.detail) || res.statusText
     throw new Error(msg)
   }
   if (res.status === 204) return undefined as T
@@ -416,8 +442,11 @@ export interface SchemaAiAssistResult {
 
 // Schema
 export const schema = {
-  list:   (targetType: string, subtype?: string) => {
-    const qs = subtype ? `?subtype=${encodeURIComponent(subtype)}` : ''
+  list:   (targetType: string, subtype?: string, opts?: { includeDeleted?: boolean }) => {
+    const params = new URLSearchParams()
+    if (subtype) params.set('subtype', subtype)
+    if (opts?.includeDeleted) params.set('include_deleted', 'true')
+    const qs = params.toString() ? `?${params.toString()}` : ''
     return req<FieldDefinition[]>(`/v1/schema/${targetType}${qs}`)
   },
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
@@ -426,6 +455,11 @@ export const schema = {
     const qs = opts?.purgeData ? '?purge_data=true' : ''
     return req<void>(`/v1/schema/${id}${qs}`, { method: 'DELETE' })
   },
+  restore: (id: string, opts?: { restoreChildren?: boolean }) => {
+    const qs = opts?.restoreChildren !== undefined ? `?restore_children=${opts.restoreChildren}` : ''
+    return req<FieldDefinition>(`/v1/schema/${id}/restore${qs}`, { method: 'POST' })
+  },
+  hardDelete: (id: string) => req<void>(`/v1/schema/${id}/hard`, { method: 'DELETE' }),
   getUsage: (id: string, opts?: { newIsRepeatable?: boolean; newFieldType?: string }) => {
     const qs = new URLSearchParams()
     if (opts?.newIsRepeatable !== undefined) qs.set('new_is_repeatable', String(opts.newIsRepeatable))
@@ -838,9 +872,9 @@ export const subtypes = {
     const qs = primaryType ? `?primary_type=${encodeURIComponent(primaryType)}` : ''
     return req<RecordSubtype[]>(`/v1/record-subtypes${qs}`)
   },
-  create: (data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean }) =>
+  create: (data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean; placeholder_image_url?: string; concept_source?: string | null; concept_id?: string | null; concept_uri?: string | null; concept_label?: string | null }) =>
     req<RecordSubtype>('/v1/record-subtypes', { method: 'POST', body: JSON.stringify({ description: '', sort_order: 0, is_default: false, ...data }) }),
-  update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean }) =>
+  update: (id: string, data: { primary_type: string; name: string; label: Record<string, string>; description?: string; sort_order?: number; is_default?: boolean; placeholder_image_url?: string; concept_source?: string | null; concept_id?: string | null; concept_uri?: string | null; concept_label?: string | null }) =>
     req<RecordSubtype>(`/v1/record-subtypes/${id}`, { method: 'PUT', body: JSON.stringify({ description: '', sort_order: 0, is_default: false, ...data }) }),
   delete: (id: string) => req<void>(`/v1/record-subtypes/${id}`, { method: 'DELETE' }),
 }

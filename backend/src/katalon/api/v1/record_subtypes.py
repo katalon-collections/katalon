@@ -82,6 +82,11 @@ async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordS
         description=data.description,
         sort_order=data.sort_order,
         is_default=data.is_default,
+        placeholder_image_url=data.placeholder_image_url,
+        concept_source=data.concept_source,
+        concept_id=data.concept_id,
+        concept_uri=data.concept_uri,
+        concept_label=data.concept_label,
     )
     if subtype.is_default:
         await _unset_default_for_type(db, subtype.primary_type, keep_id=None)
@@ -132,6 +137,11 @@ async def update_record_subtype(
     subtype.description = data.description
     subtype.sort_order = data.sort_order
     subtype.is_default = data.is_default
+    subtype.placeholder_image_url = data.placeholder_image_url
+    subtype.concept_source = data.concept_source
+    subtype.concept_id = data.concept_id
+    subtype.concept_uri = data.concept_uri
+    subtype.concept_label = data.concept_label
     await db.flush()
     return subtype
 

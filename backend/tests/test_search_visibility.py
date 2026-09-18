@@ -651,16 +651,11 @@ async def test_search_documents_restricts_non_public_statuses_to_permitted_types
 async def test_search_hides_internal_records_for_authenticated_user_without_read_permission(
     monkeypatch,
 ) -> None:
-    """Regression test: an authenticated user whose role has no `read`
-    permission on `object` must not see internal/draft objects via /v1/search,
-    even though GET /v1/objects/{id} would already 404 for the same user."""
-    from httpx import ASGITransport, AsyncClient
+    """A viewer without read permission must not see internal record types."""
+    from starlette.requests import Request
 
     from katalon.api.v1 import search as search_module
-    from katalon.core.dependencies import get_current_user, try_get_current_user
     from katalon.core.models import User
-    from katalon.database import get_db
-    from katalon.main import app
 
     captured: dict = {}
 
@@ -674,29 +669,28 @@ async def test_search_hides_internal_records_for_authenticated_user_without_read
     monkeypatch.setattr(search_module.search_service, "search", fake_search)
 
     no_permission_user = User(email="viewer@example.com", hashed_password="x", role="viewer")
-
     session = AsyncMock()
     permission_result = MagicMock()
-    permission_result.scalars.return_value.all.return_value = []  # no read permissions at all
+    permission_result.scalars.return_value.all.return_value = []
     session.execute = AsyncMock(return_value=permission_result)
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/v1/search",
+            "query_string": b"status=internal",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+        }
+    )
 
-    async def override_db():
-        yield session
+    response = await search_module.search(
+        request=request,
+        db=session,
+        current_user=no_permission_user,
+        status="internal",
+    )
 
-    app.dependency_overrides[get_current_user] = lambda: no_permission_user
-    app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
-    app.dependency_overrides[get_db] = override_db
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/v1/search", params={"status": "internal"})
-    finally:
-        app.dependency_overrides.pop(get_current_user, None)
-        app.dependency_overrides.pop(try_get_current_user, None)
-        app.dependency_overrides.pop(get_db, None)
-
-    assert response.status_code == 200
+    assert response.total == 0
     assert captured["full_visibility_types"] == ()
-    # The user is logged in, so the anonymous-only status override does not
-    # apply — the explicit status filter is preserved for the caller, and the
-    # new visibility clause is what actually keeps disallowed types out.
     assert captured["status"] == "internal"

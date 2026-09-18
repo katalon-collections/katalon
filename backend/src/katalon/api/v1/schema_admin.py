@@ -79,6 +79,42 @@ async def _validate_unique_detail_role(
         )
 
 
+async def _check_field_name_collision(
+    db: DBDep,
+    *,
+    target_type: str,
+    target_subtype: str | None,
+    parent_id: uuid.UUID | None,
+    name: str,
+    exclude_id: uuid.UUID | None = None,
+) -> None:
+    conditions = [
+        FieldDefinition.target_type == target_type,
+        FieldDefinition.name == name,
+        FieldDefinition.is_deleted.is_(False),
+    ]
+    if parent_id is not None:
+        conditions.append(FieldDefinition.parent_id == parent_id)
+    else:
+        conditions.append(FieldDefinition.parent_id.is_(None))
+        if target_subtype is None:
+            conditions.append(FieldDefinition.target_subtype.is_(None))
+        else:
+            conditions.append(FieldDefinition.target_subtype == target_subtype)
+
+    if exclude_id is not None:
+        conditions.append(FieldDefinition.id != exclude_id)
+
+    existing = await db.scalar(select(FieldDefinition.id).where(*conditions).limit(1))
+    if existing is not None:
+        detail = (
+            "Ein Unterfeld mit diesem internen Namen existiert bereits in dieser Gruppe."
+            if parent_id is not None
+            else "Ein Feld mit diesem internen Namen existiert bereits für diesen Typ/Subtyp."
+        )
+        raise HTTPException(status_code=409, detail=detail)
+
+
 async def _validate_field_settings(
     db: DBDep, data: FieldDefinitionCreate, existing: FieldDefinition | None = None
 ) -> None:
@@ -281,21 +317,19 @@ class SchemaResetResult(SchemaResetSummary):
 
 
 async def _embed_children(
-    db: DBDep, target_type: str, top_fields: list[FieldDefinition]
+    db: DBDep, target_type: str, top_fields: list[FieldDefinition], include_deleted: bool = False
 ) -> list[FieldDefinitionRead]:
     """Load sub-fields for all group fields and embed them as children."""
     group_ids = [f.id for f in top_fields if f.field_type == "group"]
     children_map: dict[uuid.UUID, list[FieldDefinition]] = defaultdict(list[Any])
     if group_ids:
-        sub_result = await db.execute(
-            select(FieldDefinition)
-            .where(
-                FieldDefinition.target_type == target_type,
-                FieldDefinition.parent_id.in_(group_ids),
-                FieldDefinition.is_deleted.is_(False),
-            )
-            .order_by(FieldDefinition.sort_order)
+        sub_query = select(FieldDefinition).where(
+            FieldDefinition.target_type == target_type,
+            FieldDefinition.parent_id.in_(group_ids),
         )
+        if not include_deleted:
+            sub_query = sub_query.where(FieldDefinition.is_deleted.is_(False))
+        sub_result = await db.execute(sub_query.order_by(FieldDefinition.sort_order))
         for sf in sub_result.scalars().all():
             if sf.parent_id is not None:
                 children_map[sf.parent_id].append(sf)
@@ -336,7 +370,7 @@ async def list_fields(
         q = q.where(FieldDefinition.is_deleted.is_(False))
     result = await db.execute(q.order_by(FieldDefinition.sort_order))
     top_fields = list(result.scalars().all())
-    return await _embed_children(db, target_type, top_fields)
+    return await _embed_children(db, target_type, top_fields, include_deleted=include_deleted)
 
 
 @router.get(
@@ -446,20 +480,31 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_settings(db, data)
     await _validate_unique_detail_role(db, data, exclude_id=None)
+    await _check_field_name_collision(
+        db,
+        target_type=data.target_type,
+        target_subtype=data.target_subtype,
+        parent_id=data.parent_id,
+        name=data.name,
+    )
+
     # Soft-deleted Felder blockieren ihren Namen per Unique-Constraint. Statt zu kollidieren,
     # reaktiviere die alte Zeile (gleiche ID, gleiche Historie) und übernehme die neuen Werte.
-    reused = await db.scalar(
-        select(FieldDefinition).where(
-            FieldDefinition.target_type == data.target_type,
-            (
-                FieldDefinition.target_subtype.is_(None)
-                if data.target_subtype is None
-                else FieldDefinition.target_subtype == data.target_subtype
-            ),
-            FieldDefinition.name == data.name,
-            FieldDefinition.is_deleted.is_(True),
-        )
-    )
+    reused_conditions = [
+        FieldDefinition.target_type == data.target_type,
+        FieldDefinition.name == data.name,
+        FieldDefinition.is_deleted.is_(True),
+    ]
+    if data.parent_id is not None:
+        reused_conditions.append(FieldDefinition.parent_id == data.parent_id)
+    else:
+        reused_conditions.append(FieldDefinition.parent_id.is_(None))
+        if data.target_subtype is None:
+            reused_conditions.append(FieldDefinition.target_subtype.is_(None))
+        else:
+            reused_conditions.append(FieldDefinition.target_subtype == data.target_subtype)
+
+    reused = await db.scalar(select(FieldDefinition).where(*reused_conditions))
     if reused is not None:
         for key, value in data.model_dump().items():
             setattr(reused, key, value)
@@ -467,6 +512,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
         await db.flush()
         _enqueue_reindex(db, data.target_type)
         return _fd_read(reused)
+
     field = FieldDefinition(**data.model_dump())
     db.add(field)
     try:
@@ -474,7 +520,7 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409,
-            detail="Ein Feld mit diesem Namen existiert bereits für diesen Typ/Subtyp.",
+            detail="Ein Feld mit diesem internen Namen existiert bereits für diesen Typ/Subtyp.",
         ) from exc
     _enqueue_reindex(db, data.target_type)
     return _fd_read(field)
@@ -515,6 +561,19 @@ async def update_field(
         await _ensure_schema_subtype_exists(db, data.target_type, data.target_subtype)
     await _validate_field_settings(db, data, field)
     await _validate_unique_detail_role(db, data, exclude_id=field_id)
+    if (
+        data.name != field.name
+        or data.target_subtype != field.target_subtype
+        or data.parent_id != field.parent_id
+    ):
+        await _check_field_name_collision(
+            db,
+            target_type=data.target_type,
+            target_subtype=data.target_subtype,
+            parent_id=data.parent_id,
+            name=data.name,
+            exclude_id=field.id,
+        )
     old_is_public = field.is_public
     old_settings = field.settings or {}
     old_is_translatable = field.is_translatable
@@ -522,7 +581,13 @@ async def update_field(
     old_field_type = field.field_type
     for k, v in data.model_dump().items():
         setattr(field, k, v)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Ein Feld mit diesem internen Namen existiert bereits für diesen Typ/Subtyp.",
+        ) from exc
     inherited_settings_changed = field.field_type == "relation" and any(
         old_settings.get(key) != field.settings.get(key)
         for key in ("target_type", "fixed_relation_type", "inherited_fields")
@@ -614,9 +679,7 @@ async def get_field_usage(
     )
 
     result = await db.execute(
-        select(FieldDefinition).where(
-            FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(False)
-        )
+        select(FieldDefinition).where(FieldDefinition.id == field_id)
     )
     field = result.scalar_one_or_none()
     if not field:
@@ -702,9 +765,16 @@ async def delete_field(
     responses={
         403: {"description": "Insufficient permissions"},
         404: {"description": "Deleted field definition not found"},
+        422: {"description": "Parent group field is deleted or detail_role conflict"},
     },
 )
-async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
+async def restore_field(
+    field_id: uuid.UUID,
+    db: DBDep,
+    restore_children: bool = Query(
+        default=True, description="If True and field is a group, also restores its subfields"
+    ),
+) -> FieldDefinitionRead:
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.id == field_id, FieldDefinition.is_deleted.is_(True)
@@ -713,11 +783,108 @@ async def restore_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead:
     field = result.scalar_one_or_none()
     if not field:
         raise HTTPException(status_code=404, detail="Gelöschte Felddefinition nicht gefunden")
+
+    # If field is a sub-field, verify its parent group exists and is active
+    if field.parent_id is not None:
+        parent = await db.get(FieldDefinition, field.parent_id)
+        if not parent or parent.is_deleted:
+            parent_name = parent.name if parent else ""
+            raise HTTPException(
+                status_code=422,
+                detail=f"Das übergeordnete Feld '{parent_name}' ist gelöscht. Bitte stellen Sie zuerst das übergeordnete Feld wieder her.",
+            )
+
+    # Validate detail role uniqueness against active fields
+    await _validate_unique_detail_role(db, field, exclude_id=field.id)
+
+    # Validate field name collision against active fields
+    await _check_field_name_collision(
+        db,
+        target_type=field.target_type,
+        target_subtype=field.target_subtype,
+        parent_id=field.parent_id,
+        name=field.name,
+        exclude_id=field.id,
+    )
+
     field.is_deleted = False
+
+    # If group field, re-activate children
+    if field.field_type == "group" and restore_children:
+        await db.execute(
+            update(FieldDefinition)
+            .where(FieldDefinition.parent_id == field.id)
+            .values(is_deleted=False)
+        )
+
     target_type = field.target_type
     await db.flush()
     _enqueue_reindex(db, target_type)
-    return _fd_read(field)
+
+    children_reads = []
+    if field.field_type == "group":
+        sub_res = await db.execute(
+            select(FieldDefinition)
+            .where(
+                FieldDefinition.target_type == target_type,
+                FieldDefinition.parent_id == field.id,
+                FieldDefinition.is_deleted.is_(False),
+            )
+            .order_by(FieldDefinition.sort_order)
+        )
+        children_reads = [_fd_read(c) for c in sub_res.scalars().all()]
+
+    return _fd_read(field, children=children_reads)
+
+
+@router.delete(
+    "/{field_id}/hard",
+    status_code=204,
+    dependencies=[require_role("admin")],
+    summary="Permanently hard-delete a field definition",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition not found"},
+        409: {"description": "Field is still in use by existing records"},
+        422: {"description": "System fields cannot be deleted"},
+    },
+)
+async def hard_delete_field(field_id: uuid.UUID, db: DBDep) -> None:
+    from katalon.services.schema_service import count_field_usage
+
+    result = await db.execute(select(FieldDefinition).where(FieldDefinition.id == field_id))
+    field = result.scalar_one_or_none()
+    if not field:
+        raise HTTPException(status_code=404, detail="Felddefinition nicht gefunden")
+    if field.name in ("label", "idno"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Das Feld '{field.name}' ist ein Systemfeld und kann nicht endgültig gelöscht werden.",
+        )
+
+    usage_count = await count_field_usage(db, field)
+    if usage_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Feld kann nicht endgültig gelöscht werden: Es wird noch in {usage_count} Datensätzen verwendet. Bitte bereinigen Sie die Felddaten zuerst.",
+        )
+
+    if field.field_type == "group":
+        sub_res = await db.execute(
+            select(FieldDefinition).where(FieldDefinition.parent_id == field.id)
+        )
+        for sf in sub_res.scalars().all():
+            sub_usage = await count_field_usage(db, sf)
+            if sub_usage > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Feldgruppe kann nicht endgültig gelöscht werden: Das Unterfeld '{sf.name}' wird noch in {sub_usage} Datensätzen verwendet.",
+                )
+
+    target_type = field.target_type
+    await db.delete(field)
+    await db.flush()
+    _enqueue_reindex(db, target_type)
 
 
 @router.post(

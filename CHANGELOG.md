@@ -4,6 +4,18 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.37.0]
+
+- **Autoritätsdaten für Objekt-Subtypen:** Subtypen können mit AAT-, GND- oder
+  URI-Normdaten verknüpft werden; der LIDO-Export nutzt diese Verknüpfung wahlweise
+  als Klassifikationsquelle.
+- **Verbesserter Beziehungs-Export:** Export-Mappings können jetzt auch Beziehungen
+  auswerten, bei denen der aktuelle Datensatz das Ziel statt die Quelle ist (z. B.
+  Objekte, auf die ein Vorgang verweist). Die Auswahl der Beziehungsart im
+  Mapping-Editor ist jetzt eine geführte Auswahlliste statt Freitext.
+- **Benutzer per Kommandozeile anlegen:** Neuer `katalon-manage create-user`-Befehl
+  für Betreiber, die Konten ohne die Admin-Oberfläche einrichten möchten.
+
 ## [1.36.0]
 
 - **KI-gestützte Übersetzung im Editor:** Mehrsprachige Textfelder können direkt im
