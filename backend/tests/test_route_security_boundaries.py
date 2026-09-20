@@ -37,6 +37,13 @@ PUBLIC_V1_ENDPOINTS = {
     ("post", "/v1/auth/token"),
     ("post", "/v1/auth/password-reset"),
     ("post", "/v1/auth/password-reset/confirm"),
+    # Public-media direct-by-ID routes (media.py internal_router, mounted
+    # without the router-level auth dependency): anonymous access is
+    # deliberate for publicly visible media, enforced per-request inside
+    # serve_media_by_id via ensure_publicly_visible() + media.is_public/
+    # status=="ready" checks, not by a missing credential requirement.
+    ("get", "/v1/media/{media_id}/file"),
+    ("get", "/v1/media/{media_id}/download"),
 }
 
 # Portal search takes a complex filter payload and is a read, not a write;

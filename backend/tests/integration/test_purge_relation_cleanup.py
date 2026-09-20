@@ -160,7 +160,6 @@ async def test_purge_cleans_direct_and_group_references_for_all_source_types_and
         lambda *args, **kwargs: dispatched.append((args, kwargs)),
     )
     monkeypatch.setattr("katalon.config.settings.oxigraph_enabled", False)
-    monkeypatch.setattr("katalon.config.settings.purge_after_days", 30)
 
     totals = await purge_tasks._do_purge()
     assert totals["entity"] == 1

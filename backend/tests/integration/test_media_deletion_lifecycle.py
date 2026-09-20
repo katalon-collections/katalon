@@ -248,7 +248,6 @@ async def test_purge_defers_record_when_media_deletion_fails_and_retries_next_ru
 
     media_root = tmp_path / "media"
     monkeypatch.setattr("katalon.config.settings.media_root", str(media_root))
-    monkeypatch.setattr("katalon.config.settings.purge_after_days", 30)
 
     created = await async_client.post(
         "/v1/objects",
@@ -369,7 +368,6 @@ async def test_purge_hard_deletes_soft_deleted_collections_and_storage_locations
         )
         await session.commit()
 
-    monkeypatch.setattr("katalon.config.settings.purge_after_days", 30)
     totals = await purge_tasks._do_purge()
     assert totals["collection"] >= 1
     assert totals["storage_location"] >= 1

@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -236,6 +237,33 @@ async def create_mapping_set(
                 target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
                 settings={},
                 sort_order=0,
+                is_enabled=True,
+            )
+        )
+    elif (
+        data.format_key == "mets_mods"
+        and data.record_type == "object"
+        and data.based_on_id is None
+    ):
+        db.add(
+            ExportMappingRule(
+                mapping_set_id=new_set.id,
+                source_kind=SourceKind.FIELD.value,
+                source_config={"field_name": "label"},
+                target_key="mods:titleInfo/mods:title",
+                settings={},
+                sort_order=0,
+                is_enabled=True,
+            )
+        )
+        db.add(
+            ExportMappingRule(
+                mapping_set_id=new_set.id,
+                source_kind=SourceKind.MEDIA.value,
+                source_config={"property": "license_uri"},
+                target_key="mods:accessCondition",
+                settings={},
+                sort_order=1,
                 is_enabled=True,
             )
         )
@@ -646,6 +674,266 @@ async def publish_mapping_set(
 
     await db.commit()
     return await get_mapping_set(db, mapping_set.id)  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# YAML Export & Import
+# ---------------------------------------------------------------------------
+
+
+async def export_mapping_set_to_yaml(db: AsyncSession, set_id: uuid.UUID) -> tuple[str, str]:
+    """Serialize an ExportMappingSet and its rules to portable YAML."""
+    result = await db.execute(
+        select(ExportMappingSet)
+        .options(
+            selectinload(ExportMappingSet.rules).selectinload(ExportMappingRule.field_definition)
+        )
+        .where(ExportMappingSet.id == set_id)
+    )
+    mapping_set = result.scalar_one_or_none()
+    if not mapping_set:
+        raise ValueError("ExportMappingSet nicht gefunden.")
+
+    rules_data: list[dict[str, Any]] = []
+    for r in sorted(mapping_set.rules, key=lambda x: x.sort_order):
+        field_name = (
+            r.field_definition.name
+            if r.field_definition
+            else (r.source_config or {}).get("field_name")
+        )
+        rule_dict: dict[str, Any] = {
+            "rule_key": str(r.rule_key),
+            "source_kind": r.source_kind,
+            "target_key": r.target_key,
+            "sort_order": r.sort_order,
+            "is_enabled": r.is_enabled,
+        }
+        if field_name:
+            rule_dict["field_name"] = field_name
+        if r.source_config:
+            rule_dict["source_config"] = dict(r.source_config)
+        if r.settings:
+            rule_dict["settings"] = dict(r.settings)
+        rules_data.append(rule_dict)
+
+    data: dict[str, Any] = {
+        "schema_version": "1.0",
+        "format_key": mapping_set.format_key,
+        "profile_id": mapping_set.profile_id,
+        "profile_version": mapping_set.profile_version,
+        "record_type": mapping_set.record_type,
+        "name": mapping_set.name,
+    }
+    if mapping_set.target_subtype:
+        data["target_subtype"] = mapping_set.target_subtype
+    if mapping_set.institution_config:
+        data["institution_config"] = dict(mapping_set.institution_config)
+    data["rules"] = rules_data
+
+    yaml_content = yaml.dump(
+        data,
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+    )
+    subtype_suffix = f"-{mapping_set.target_subtype}" if mapping_set.target_subtype else ""
+    filename = (
+        f"export-mapping-{mapping_set.format_key}-{mapping_set.record_type}"
+        f"{subtype_suffix}-rev{mapping_set.revision}.yaml"
+    )
+    return yaml_content, filename
+
+
+async def import_mapping_set_from_yaml(
+    db: AsyncSession,
+    yaml_content: str,
+    *,
+    user_id: uuid.UUID | None = None,
+    target_set_id: uuid.UUID | None = None,
+    dry_run: bool = False,
+) -> tuple[ExportMappingSet, list[str]]:
+    """Import an ExportMappingSet and its rules from YAML.
+
+    Resolves field names to field_definition_id on the current target type.
+    If target_set_id is given, overwrites rules in that draft set.
+    Otherwise, creates a new draft set with the next revision number.
+    """
+    try:
+        data = yaml.safe_load(yaml_content)
+    except Exception as exc:
+        raise ValueError(f"YAML konnte nicht geparst werden: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("Ungültiges YAML-Format: Wurzelknoten muss ein Mapping/Dictionary sein.")
+
+    format_key = data.get("format_key")
+    record_type = data.get("record_type")
+    if not format_key or not record_type:
+        raise ValueError("YAML muss 'format_key' und 'record_type' enthalten.")
+
+    target_subtype = data.get("target_subtype")
+    now = datetime.now(UTC).replace(tzinfo=None)
+
+    if target_set_id:
+        target_set = await get_mapping_set(db, target_set_id)
+        if not target_set:
+            raise ValueError("Ziel-ExportMappingSet nicht gefunden.")
+        if target_set.status != "draft":
+            raise ValueError("Nur Entwürfe (status='draft') können durch Import überschrieben werden.")
+        if target_set.format_key != format_key or target_set.record_type != record_type:
+            raise ValueError(
+                f"Format ({format_key}) oder Datensatztyp ({record_type}) der Datei stimmen nicht "
+                f"mit dem Ziel-Set ({target_set.format_key}/{target_set.record_type}) überein."
+            )
+        if data.get("name"):
+            target_set.name = str(data["name"])
+        if "institution_config" in data and isinstance(data["institution_config"], dict):
+            target_set.institution_config = {
+                **dict(target_set.institution_config or {}),
+                **data["institution_config"],
+            }
+        for existing_rule in list(target_set.rules):
+            await db.delete(existing_rule)
+        await db.flush()
+    else:
+        q_rev = select(ExportMappingSet.revision).where(
+            ExportMappingSet.format_key == format_key,
+            ExportMappingSet.record_type == record_type,
+        )
+        if target_subtype:
+            q_rev = q_rev.where(ExportMappingSet.target_subtype == target_subtype)
+        else:
+            q_rev = q_rev.where(ExportMappingSet.target_subtype.is_(None))
+        revs = (await db.execute(q_rev)).scalars().all()
+        revision = max(revs) + 1 if revs else 1
+
+        q_pub = select(ExportMappingSet.id).where(
+            ExportMappingSet.format_key == format_key,
+            ExportMappingSet.record_type == record_type,
+            ExportMappingSet.status == "published",
+        )
+        if target_subtype:
+            q_pub = q_pub.where(ExportMappingSet.target_subtype == target_subtype)
+        else:
+            q_pub = q_pub.where(ExportMappingSet.target_subtype.is_(None))
+        based_on_id = (await db.execute(q_pub)).scalar_one_or_none()
+
+        target_set = ExportMappingSet(
+            format_key=format_key,
+            profile_id=str(data.get("profile_id", f"{format_key}-default")),
+            profile_version=str(data.get("profile_version", "1.0")),
+            record_type=record_type,
+            target_subtype=target_subtype,
+            name=str(data.get("name") or f"{format_key.upper()} {record_type.capitalize()} Mapping"),
+            status="draft",
+            revision=revision,
+            based_on_id=based_on_id,
+            institution_config=dict(data.get("institution_config") or {}),
+            version=1,
+            created_by=user_id,
+        )
+        db.add(target_set)
+        await db.flush()
+
+    # Load field definitions for this record_type to resolve field names to IDs
+    fields_res = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == target_set.record_type,
+            FieldDefinition.is_deleted.is_(False),
+        )
+    )
+    field_by_name = {f.name: f for f in fields_res.scalars().all()}
+
+    warnings: list[str] = []
+    raw_rules = data.get("rules") or []
+    if not isinstance(raw_rules, list):
+        raise ValueError("Das Attribut 'rules' muss eine Liste sein.")
+
+    added_rules_count = 0
+    for idx, r in enumerate(raw_rules):
+        if not isinstance(r, dict):
+            continue
+        target_key = r.get("target_key")
+        if not target_key:
+            warnings.append(f"Regel #{idx + 1} ohne 'target_key' übersprungen.")
+            continue
+
+        source_kind = str(r.get("source_kind", "field"))
+        source_cfg = dict(r.get("source_config") or {})
+        settings = dict(r.get("settings") or {})
+        sort_order = int(r.get("sort_order", idx * 10))
+        is_enabled = bool(r.get("is_enabled", True))
+
+        raw_key = r.get("rule_key")
+        rule_key = None
+        if raw_key:
+            try:
+                rule_key = uuid.UUID(str(raw_key))
+            except (ValueError, TypeError):
+                rule_key = None
+        if rule_key is None:
+            rule_key = uuid.uuid4()
+
+        field_name = r.get("field_name") or source_cfg.get("field_name")
+        field_def_id = None
+        if source_kind == "field" or field_name:
+            if field_name:
+                fd = field_by_name.get(field_name)
+                if fd:
+                    field_def_id = fd.id
+                    source_cfg["field_name"] = fd.name
+                    source_cfg["field_type"] = fd.field_type
+                else:
+                    warnings.append(
+                        f"Feld '{field_name}' existiert nicht für Typ '{target_set.record_type}'. "
+                        f"Regel für '{target_key}' wurde ohne Feldzuordnung importiert."
+                    )
+            else:
+                warnings.append(
+                    f"Regel für '{target_key}' hat Quellentyp 'field', aber keinen Feldnamen angegeben."
+                )
+
+        new_rule = ExportMappingRule(
+            rule_key=rule_key,
+            mapping_set_id=target_set.id,
+            source_kind=source_kind,
+            field_definition_id=field_def_id,
+            source_config=source_cfg,
+            target_key=target_key,
+            settings=settings,
+            sort_order=sort_order,
+            is_enabled=is_enabled,
+        )
+        db.add(new_rule)
+        added_rules_count += 1
+
+    target_set.version += 1
+    target_set.updated_at = now
+    await db.flush()
+
+    if dry_run:
+        await db.rollback()
+        return target_set, warnings, added_rules_count
+
+    log = AuditLog(
+        record_type="export_mapping_set",
+        record_id=target_set.id,
+        user_id=user_id,
+        action="import_yaml",
+        changed_fields={
+            "name": target_set.name,
+            "format_key": target_set.format_key,
+            "record_type": target_set.record_type,
+            "revision": target_set.revision,
+            "rules_count": added_rules_count,
+            "warnings": warnings,
+        },
+    )
+    db.add(log)
+    await db.commit()
+
+    refreshed = await get_mapping_set(db, target_set.id)
+    return refreshed or target_set, warnings, added_rules_count
 
 
 # ---------------------------------------------------------------------------

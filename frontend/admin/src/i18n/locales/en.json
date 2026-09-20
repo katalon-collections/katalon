@@ -26,6 +26,9 @@
     "passwordResetComplete": "Your password was changed. Please sign in.",
     "backToLogin": "Back to sign in"
   },
+  "appShell": {
+    "skipToContent": "Skip to content"
+  },
   "topbar": {
     "openNav": "Open navigation",
     "globalSearch": "Global search",

@@ -168,3 +168,65 @@ async def test_export_draft_object_hidden_when_read_permission_revoked(async_cli
         assert res.status_code == 200
         assert draft_idno not in res.text
         assert public_idno in res.text
+
+
+@pytest.mark.asyncio
+async def test_export_single_record_lido(async_client, auth_headers) -> None:
+    set_res = await async_client.post(
+        "/v1/export-mapping-sets",
+        headers=auth_headers,
+        json={
+            "format_key": "lido",
+            "profile_id": "lido_core",
+            "profile_version": "1.0",
+            "record_type": "object",
+            "name": "LIDO Object Published",
+        },
+    )
+    assert set_res.status_code == 201
+    set_id = set_res.json()["id"]
+
+    await async_client.post(
+        f"/v1/export-mapping-sets/{set_id}/rules",
+        headers=auth_headers,
+        json={
+            "source_kind": "record",
+            "source_config": {"property": "title"},
+            "target_key": "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+        },
+    )
+    await async_client.post(
+        f"/v1/export-mapping-sets/{set_id}/rules",
+        headers=auth_headers,
+        json={
+            "source_kind": "constant",
+            "source_config": {"value": "Objekt"},
+            "target_key": "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+        },
+    )
+    set_data = (await async_client.get(f"/v1/export-mapping-sets/{set_id}", headers=auth_headers)).json()
+    pub_res = await async_client.post(
+        f"/v1/export-mapping-sets/{set_id}/publish",
+        headers={**auth_headers, "If-Match": str(set_data["version"])},
+    )
+    assert pub_res.status_code == 200
+
+    obj_idno = f"OBJ-LIDO-{uuid.uuid4().hex[:8]}"
+    obj_res = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={"idno": obj_idno, "status": "public", "metadata_": {"label": "LIDO Test Werk"}},
+    )
+    assert obj_res.status_code == 201
+    obj_id = obj_res.json()["id"]
+
+    single_res = await async_client.get(
+        f"/v1/export/object/{obj_id}",
+        headers=auth_headers,
+        params={"format": "lido"},
+    )
+    assert single_res.status_code == 200
+    assert "application/xml" in single_res.headers["content-type"]
+    assert f'filename="{obj_idno}.lido.xml"' in single_res.headers["content-disposition"]
+    assert "<lido:lidoWrap" in single_res.text
+    assert obj_idno in single_res.text

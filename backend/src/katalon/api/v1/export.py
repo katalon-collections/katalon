@@ -100,11 +100,11 @@ async def export_records(
 
 @router.get(
     "/{record_type}/{record_id}",
-    summary="Export a single record as JSON-LD or Turtle RDF",
+    summary="Export a single record as JSON-LD, Turtle RDF, or metadata format XML",
 )
 @router.get(
     "/{record_type}/{record_id}/export",
-    summary="Export a single record as JSON-LD or Turtle RDF",
+    summary="Export a single record as JSON-LD, Turtle RDF, or metadata format XML",
 )
 async def export_single_record_route(
     record_type: str,
@@ -115,14 +115,71 @@ async def export_single_record_route(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> Response:
-    from katalon.services.rdf_service import handle_single_record_export
+    norm_type = record_type.lower().strip()
+    if norm_type.endswith("s") and norm_type[:-1] in RECORD_TYPES:
+        norm_type = norm_type[:-1]
 
-    return await handle_single_record_export(
-        record_type,
-        record_id,
-        db,
-        request,
-        current_user=current_user,
-        format_param=format,
-        accept_header=accept,
+    format_key = (format or "").lower().strip()
+    if not format_key or format_key in {"jsonld", "json-ld", "json_ld", "ttl", "turtle", "rdf"}:
+        from katalon.services.rdf_service import handle_single_record_export
+
+        return await handle_single_record_export(
+            record_type,
+            record_id,
+            db,
+            request,
+            current_user=current_user,
+            format_param=format,
+            accept_header=accept,
+        )
+
+    if norm_type not in RECORD_TYPES:
+        raise HTTPException(status_code=404, detail=f"Unbekannter Typ: {record_type}")
+
+    metadata_format = await metadata_format_service.get_format(format_key)
+    if metadata_format is None:
+        raise HTTPException(status_code=404, detail=f"Unbekanntes Export-Format '{format_key}'.")
+
+    if norm_type not in await mapped_record_types(db, format_key):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Format '{format_key}' hat keine Feld-Mappings für Typ '{norm_type}'.",
+        )
+
+    from katalon.services.export_context_service import build_export_context_from_db
+
+    try:
+        ctx = await build_export_context_from_db(db, norm_type, record_id, base_url=str(request.base_url))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    has_perm = await has_record_permission(db, current_user, norm_type, "read") if current_user else False
+    if not has_perm and ctx.record.status != "public":
+        raise HTTPException(status_code=404, detail=f"{norm_type.capitalize()} nicht gefunden")
+
+    from katalon.integrations.metadata_format import CompiledMappingSet
+    from katalon.services import metadata_mapping_service
+
+    mapping_index = await metadata_mapping_service.get_mapping_index(db, format_key)
+    record_mappings = mapping_index.get(norm_type)
+    if record_mappings is None:
+        record_mappings = CompiledMappingSet(format_key=format_key, record_type=norm_type)
+
+    missing = metadata_format.required_field_errors(ctx, record_mappings)
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Datensatz kann nicht als {metadata_format.label} exportiert werden: {'; '.join(missing)}.",
+        )
+
+    el = metadata_format.render(ctx, record_mappings)
+    import xml.etree.ElementTree as ET
+
+    xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(el, encoding="unicode") + "\n"
+    filename = f"{ctx.record.idno or ctx.record.id}.{format_key}.xml"
+
+    return Response(
+        content=xml_str,
+        media_type="application/xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

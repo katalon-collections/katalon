@@ -537,3 +537,104 @@ async def test_portal_iiif_manifest_inactive_collection_returns_404() -> None:
         assert response.status_code == 404
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_direct_media_download_by_id_public_success(tmp_path, monkeypatch) -> None:
+    media_id = uuid.uuid4()
+    obj_id = uuid.uuid4()
+    obj = Object(
+        id=obj_id,
+        idno="OBJ-001",
+        status="public",
+        collection_status="active",
+        metadata_={},
+    )
+    test_file = tmp_path / "test.jpg"
+    test_file.write_bytes(b"dummy jpeg content")
+
+    from katalon.core.media_storage import LocalStorage
+
+    storage = LocalStorage()
+    monkeypatch.setattr("katalon.api.v1.media.get_storage", lambda: storage)
+    monkeypatch.setattr(storage, "local_path", lambda key: test_file)
+
+    mf = MediaFile(
+        id=media_id,
+        object_id=obj_id,
+        filename="specimen.jpg",
+        mime_type="image/jpeg",
+        storage_key="dummy.jpg",
+        status="ready",
+        is_public=True,
+        created_at=datetime.now(),
+    )
+
+    session = AsyncMock()
+    # First execute is for MediaFile, second is for Object
+    session.execute = AsyncMock(side_effect=[_mock_result(mf), _mock_result(obj)])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Test /v1/media/{id}/download
+            r = await client.get(f"/v1/media/{media_id}/download")
+            assert r.status_code == 200
+            assert 'filename="specimen.jpg"' in r.headers.get("content-disposition", "")
+            assert r.content == b"dummy jpeg content"
+
+            # Reset side effect for next call
+            session.execute = AsyncMock(side_effect=[_mock_result(mf), _mock_result(obj)])
+            # Test /api/v1/media/{id}/download
+            r_api = await client.get(f"/api/v1/media/{media_id}/download")
+            assert r_api.status_code == 200
+
+            # Reset side effect for portal call
+            session.execute = AsyncMock(side_effect=[_mock_result(mf), _mock_result(obj)])
+            # Test /portal/v1/media/{id}/download
+            r_portal = await client.get(f"/portal/v1/media/{media_id}/download")
+            assert r_portal.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_direct_media_download_draft_object_returns_404_for_anonymous() -> None:
+    media_id = uuid.uuid4()
+    obj_id = uuid.uuid4()
+    obj = Object(
+        id=obj_id,
+        idno="OBJ-001",
+        status="draft",
+        collection_status="active",
+        metadata_={},
+    )
+    mf = MediaFile(
+        id=media_id,
+        object_id=obj_id,
+        filename="specimen.jpg",
+        mime_type="image/jpeg",
+        storage_key="dummy.jpg",
+        status="ready",
+        is_public=True,
+        created_at=datetime.now(),
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[_mock_result(mf), _mock_result(obj)])
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(f"/v1/media/{media_id}/download")
+            assert r.status_code == 404
+            assert r.json() == {"detail": "Objekt nicht gefunden"}
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+

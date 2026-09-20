@@ -20,6 +20,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 from starlette.middleware.base import RequestResponseEndpoint
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from katalon.api.v1 import (
     admin_config,
@@ -84,7 +85,12 @@ from katalon.core.models import (
 from katalon.core.models import (
     AuthoritySource as AuthoritySourceModel,
 )
-from katalon.database import AsyncSessionLocal
+from katalon.database import (
+    AsyncSessionLocal,
+    SessionHolder,
+    _request_session_holder_var,
+    commit_current_session,
+)
 from katalon.services.relation_type_service import sync_relation_type_terms
 
 OPENAPI_TAGS = [
@@ -614,6 +620,49 @@ async def reject_nul_query_parameters(
         )
     return await call_next(request)
 
+class DatabaseCommitMiddleware:
+    """ASGI middleware ensuring database transactions commit BEFORE response delivery.
+
+    FastAPI's default generator dependency teardown (code after `yield` in `get_db()`)
+    runs only AFTER `await response(scope, receive, send)` has already transmitted the
+    response headers and body across the network to the client socket.
+
+    When frontends immediately follow a mutation with a read request (e.g. refetching
+    a list after creating/updating a user, subtype, banner, or term), that read query
+    races against the server-side commit and sees stale data.
+
+    By intercepting the ASGI `http.response.start` message before forwarding it,
+    this middleware ensures `session.commit()` and `run_after_commit_hooks` complete
+    durably in PostgreSQL before the client receives the 2xx response.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        holder = SessionHolder()
+        token = _request_session_holder_var.set(holder)
+
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                status = message.get("status", 200)
+                method = scope.get("method", "GET").upper()
+                if status < 400 and method in ("POST", "PUT", "PATCH", "DELETE"):
+                    await commit_current_session()
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            _request_session_holder_var.reset(token)
+
+
+app.add_middleware(DatabaseCommitMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -652,6 +701,7 @@ app.include_router(locks.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.batch_router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.internal_router, prefix="/v1")
+app.include_router(media.internal_router, prefix="/api/v1")
 app.include_router(theme.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(portal.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(pages.router, prefix="/v1", dependencies=_authenticated)

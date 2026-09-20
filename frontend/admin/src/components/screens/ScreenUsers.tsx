@@ -182,12 +182,14 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     loadUsers()
   }, [])
 
-  function loadUsers() {
-    setLoading(true)
+  function loadUsers(silent = false) {
+    if (!silent) setLoading(true)
     usersApi.list()
       .then(setUserList)
       .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
   }
 
   async function handleCreate() {
@@ -204,7 +206,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
       setEmail('')
       setPassword('')
       setRole('cataloger')
-      loadUsers()
+      loadUsers(true)
     } catch (e) {
       setFormError((e as Error).message)
     } finally {
@@ -219,7 +221,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     }
     try {
       await usersApi.update(user.id, { is_active: !user.is_active })
-      loadUsers()
+      loadUsers(true)
     } catch (e) {
       alert((e as Error).message)
     }
@@ -238,10 +240,10 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     try {
       setUserList(prev => prev.filter(u => u.id !== user.id))
       await usersApi.remove(user.id)
-      loadUsers()
+      loadUsers(true)
     } catch (e) {
       alert((e as Error).message)
-      loadUsers()
+      loadUsers(true)
     } finally {
       setConfirmDeleteUser(null)
     }
@@ -257,7 +259,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
     setRoleSaving(prev => new Set(prev).add(user.id))
     try {
       await usersApi.update(user.id, { role: nextRole })
-      loadUsers()
+      loadUsers(true)
     } catch (e) {
       alert((e as Error).message)
     } finally {
@@ -313,7 +315,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
         next.delete(user.id)
         return next
       })
-      loadUsers()
+      loadUsers(true)
     } catch (e) {
       setSaveError((e as Error).message)
     }

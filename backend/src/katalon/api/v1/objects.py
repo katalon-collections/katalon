@@ -558,6 +558,29 @@ async def list_deleted_objects(
 
 
 @router.post(
+    "/{object_id}/purge",
+    status_code=204,
+    summary="Permanently delete a soft-deleted object (hard delete)",
+    responses={
+        404: {"description": "Object not found or not in trash"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def purge_object(
+    object_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_role("admin"),
+) -> None:
+    from katalon.workers.purge_tasks import purge_record_now
+
+    ok = await purge_record_now(db, "object", object_id, current_user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="Objekt nicht gefunden oder nicht im Papierkorb"
+        )
+
+
+@router.post(
     "/{object_id}/snapshots",
     response_model=SnapshotRead,
     status_code=201,

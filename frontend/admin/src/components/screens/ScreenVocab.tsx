@@ -884,7 +884,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
         <div className="vocab-tree">
           {vocabs.map(v => (
             <div key={v.id}>
-              <div className={`tree-it${activeVocab === v.id ? ' active' : ''}`} onClick={() => { setActiveVocab(v.id); onVocabSelect?.(v.name) }}>
+              <div className={`tree-it${activeVocab === v.id ? ' active' : ''}`}>
                 <button
                   className="caret"
                   type="button"
@@ -901,23 +901,29 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                 >
                   {v.is_hierarchical ? (expandedVocab === v.id ? <ChevD size={12} /> : <ChevR size={12} />) : null}
                 </button>
-                <Tag size={13} className="ic" />
-                <span style={{ flex: 1 }}>{v.name}</span>
-                {isSystemVocabulary(v) && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 5px',
-                      borderRadius: 3,
-                      background: 'var(--panel-2)',
-                      color: 'var(--fg-3)',
-                      border: '1px solid var(--border-s)',
-                      marginRight: 6,
-                    }}
-                  >
-                    {t('systemVocabBadge')}
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => { setActiveVocab(v.id); onVocabSelect?.(v.name) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, border: 0, background: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <Tag size={13} className="ic" />
+                  <span style={{ flex: 1 }}>{v.name}</span>
+                  {isSystemVocabulary(v) && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 3,
+                        background: 'var(--panel-2)',
+                        color: 'var(--fg-3)',
+                        border: '1px solid var(--border-s)',
+                        marginRight: 6,
+                      }}
+                    >
+                      {t('systemVocabBadge')}
+                    </span>
+                  )}
+                </button>
                 {activeVocab === v.id && !termsLoading && <span className="ct">{terms.length}</span>}
               </div>
               {activeVocab === v.id && expandedVocab === v.id && !termsLoading && (

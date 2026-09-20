@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.37.0"
+    "version": "1.38.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -1083,6 +1083,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/users/me/record-permissions": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List effective record permissions for the current user",
+        "operationId": "users_get_own_record_permissions_get_v1_users_me_record_permissions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecordPermissionRead"
+                  },
+                  "type": "array",
+                  "title": "Response Users Get Own Record Permissions Get V1 Users Me Record Permissions"
                 }
               }
             }
@@ -2285,6 +2318,56 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/v1/objects/{object_id}/purge": {
+      "post": {
+        "tags": [
+          "objects"
+        ],
+        "summary": "Permanently delete a soft-deleted object (hard delete)",
+        "operationId": "objects_purge_object_post_v1_objects__object_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Object not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/objects/{object_id}/snapshots": {
@@ -6092,6 +6175,56 @@
         ]
       }
     },
+    "/v1/entities/{entity_id}/purge": {
+      "post": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "Permanently delete a soft-deleted entity (hard delete)",
+        "operationId": "entities_purge_entity_post_v1_entities__entity_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Entity not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/entities/{entity_id}/snapshots": {
       "post": {
         "tags": [
@@ -7009,6 +7142,56 @@
         ]
       }
     },
+    "/v1/places/{place_id}/purge": {
+      "post": {
+        "tags": [
+          "places"
+        ],
+        "summary": "Permanently delete a soft-deleted place (hard delete)",
+        "operationId": "places_purge_place_post_v1_places__place_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Place Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Place not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/places/{place_id}/snapshots": {
       "post": {
         "tags": [
@@ -7924,6 +8107,56 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/v1/occurrences/{occ_id}/purge": {
+      "post": {
+        "tags": [
+          "occurrences"
+        ],
+        "summary": "Permanently delete a soft-deleted occurrence (hard delete)",
+        "operationId": "occurrences_purge_occurrence_post_v1_occurrences__occ_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "occ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Occ Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Occurrence not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/occurrences/{occ_id}/snapshots": {
@@ -9488,6 +9721,56 @@
         ]
       }
     },
+    "/v1/collections/{col_id}/purge": {
+      "post": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Permanently delete a soft-deleted collection (hard delete)",
+        "operationId": "collections_purge_collection_post_v1_collections__col_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "col_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Col Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Collection not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/collections/{col_id}/snapshots": {
       "post": {
         "tags": [
@@ -10261,6 +10544,56 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/v1/storage-locations/{loc_id}/purge": {
+      "post": {
+        "tags": [
+          "storage-locations"
+        ],
+        "summary": "Permanently delete a soft-deleted storage location (hard delete)",
+        "operationId": "storage_locations_purge_storage_location_post_v1_storage_locations__loc_id__purge",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "loc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Loc Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Storage location not found or not in trash"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/storage-locations/{loc_id}/objects": {
@@ -11731,6 +12064,182 @@
           },
           "403": {
             "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media/{media_id}/file": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Serve raw public media file by media ID",
+        "operationId": "media_serve_media_file_direct_get_v1_media__media_id__file",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Media file or file on disk not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media/{media_id}/download": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Download public media file by media ID",
+        "operationId": "media_download_media_file_direct_get_v1_media__media_id__download",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Media file or file on disk not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{media_id}/file": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Serve raw public media file by media ID",
+        "operationId": "media_serve_media_file_direct_get_api_v1_media__media_id__file",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Media file or file on disk not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{media_id}/download": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Download public media file by media ID",
+        "operationId": "media_download_media_file_direct_get_api_v1_media__media_id__download",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Media file or file on disk not found"
           },
           "422": {
             "description": "Validation Error",
@@ -13788,7 +14297,7 @@
         "tags": [
           "export"
         ],
-        "summary": "Export a single record as JSON-LD or Turtle RDF",
+        "summary": "Export a single record as JSON-LD, Turtle RDF, or metadata format XML",
         "operationId": "export_export_single_record_route_get_v1_export__record_type___record_id__export",
         "security": [
           {
@@ -13878,7 +14387,7 @@
         "tags": [
           "export"
         ],
-        "summary": "Export a single record as JSON-LD or Turtle RDF",
+        "summary": "Export a single record as JSON-LD, Turtle RDF, or metadata format XML",
         "operationId": "export_export_single_record_route_get_v1_export__record_type___record_id_",
         "security": [
           {
@@ -14152,6 +14661,87 @@
         }
       }
     },
+    "/v1/export-mapping-sets/import-yaml": {
+      "post": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Import export mapping set and rules from a YAML file",
+        "operationId": "export_mapping_sets_import_mapping_set_yaml_post_v1_export_mapping_sets_import_yaml",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional draft set ID to overwrite",
+              "title": "Target Set Id"
+            },
+            "description": "Optional draft set ID to overwrite"
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Simulate import without persisting changes",
+              "default": false,
+              "title": "Dry Run"
+            },
+            "description": "Simulate import without persisting changes"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_export_mapping_sets_import_mapping_set_yaml_post_v1_export_mapping_sets_import_yaml"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportMappingSetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid YAML or mapping configuration"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "File decoding or parsing failure"
+          }
+        }
+      }
+    },
     "/v1/export-mapping-sets/{set_id}": {
       "get": {
         "tags": [
@@ -14318,6 +14908,62 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export-mapping-sets/{set_id}/yaml": {
+      "get": {
+        "tags": [
+          "export-mapping-sets"
+        ],
+        "summary": "Export mapping set and its rules as portable YAML",
+        "operationId": "export_mapping_sets_export_mapping_set_yaml_get_v1_export_mapping_sets__set_id__yaml",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "YAML representation of mapping set and rules",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/x-yaml": {}
+            }
+          },
+          "404": {
+            "description": "Export mapping set not found"
+          },
+          "403": {
+            "description": "Insufficient permissions"
           },
           "422": {
             "description": "Validation Error",
@@ -17493,6 +18139,88 @@
         }
       }
     },
+    "/portal/v1/media/{media_id}/file": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Serve Portal Media File",
+        "operationId": "portal_serve_portal_media_file_get_portal_v1_media__media_id__file",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/media/{media_id}/download": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Download Portal Media File",
+        "operationId": "portal_download_portal_media_file_get_portal_v1_media__media_id__download",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portal/v1/objects/{object_id}/iiif/manifest": {
       "get": {
         "tags": [
@@ -18787,6 +19515,14 @@
             "type": "string",
             "title": "Presence Lock Mode"
           },
+          "auto_purge_enabled": {
+            "type": "boolean",
+            "title": "Auto Purge Enabled"
+          },
+          "purge_retention_days": {
+            "type": "integer",
+            "title": "Purge Retention Days"
+          },
           "pid_providers": {
             "items": {
               "type": "string"
@@ -18819,6 +19555,8 @@
           "media_default_license_uri",
           "media_default_rights_holder",
           "presence_lock_mode",
+          "auto_purge_enabled",
+          "purge_retention_days",
           "pid_providers",
           "ai_secret",
           "ai_usage"
@@ -19018,6 +19756,29 @@
               }
             ],
             "title": "Presence Lock Mode"
+          },
+          "auto_purge_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Purge Enabled"
+          },
+          "purge_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purge Retention Days"
           }
         },
         "type": "object",
@@ -20121,6 +20882,20 @@
         ],
         "title": "Body_auth_login_post_v1_auth_token"
       },
+      "Body_export_mapping_sets_import_mapping_set_yaml_post_v1_export_mapping_sets_import_yaml": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_export_mapping_sets_import_mapping_set_yaml_post_v1_export_mapping_sets_import_yaml"
+      },
       "Body_importer_upload_file_post_v1_importer_upload": {
         "properties": {
           "file": {
@@ -20472,6 +21247,11 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "public_without_public_members": {
+            "type": "boolean",
+            "title": "Public Without Public Members",
+            "default": false
           },
           "_links": {
             "additionalProperties": {
@@ -21340,6 +22120,11 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Settings Schema"
+          },
+          "is_core": {
+            "type": "boolean",
+            "title": "Is Core",
+            "default": true
           }
         },
         "type": "object",
@@ -22248,6 +23033,68 @@
           "updated_at"
         ],
         "title": "ImportMappingRead"
+      },
+      "ImportMappingSetResult": {
+        "properties": {
+          "mapping_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mapping Set Id"
+          },
+          "format_key": {
+            "type": "string",
+            "title": "Format Key"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rules_count": {
+            "type": "integer",
+            "title": "Rules Count"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mapping_set_id",
+          "format_key",
+          "record_type",
+          "name",
+          "revision",
+          "status",
+          "rules_count"
+        ],
+        "title": "ImportMappingSetResult"
       },
       "ImportMappingUpdate": {
         "properties": {
@@ -25563,6 +26410,41 @@
           "version"
         ],
         "title": "ProcedureRead"
+      },
+      "RecordPermissionRead": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "enum": [
+              "object",
+              "entity",
+              "place",
+              "occurrence",
+              "procedure",
+              "collection",
+              "storage_location",
+              "vocabulary_term"
+            ],
+            "title": "Record Type"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "read",
+              "create",
+              "update",
+              "delete"
+            ],
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type",
+          "action"
+        ],
+        "title": "RecordPermissionRead",
+        "description": "One effective permission for the authenticated user."
       },
       "RecordSubtypeCreate": {
         "properties": {

@@ -95,6 +95,14 @@
     "blockingDescription": "while the record is open, other people cannot save it.",
     "saved": "Saved."
   },
+  "autoPurge": {
+    "title": "Trash & automatic cleanup",
+    "description": "Deleted records (objects, entities, places, occurrences, collections, storage locations) first go to the trash, where they can be restored. When automatic cleanup is enabled, they are permanently deleted after the configured retention period (nightly background job).",
+    "enabledLabel": "Automatic cleanup enabled",
+    "daysLabel": "Retention period (days)",
+    "daysHint": "Records that have been in the trash longer than this many days are permanently deleted on the next run.",
+    "saved": "Saved."
+  },
   "startseite": {
     "nav": "Homepage",
     "title": "Homepage",

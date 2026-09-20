@@ -45,6 +45,7 @@ class ExportTargetCapability(BaseModel):
     required: bool = False
     editor_kind: str = "default"
     settings_schema: dict[str, Any] = Field(default_factory=dict)
+    is_core: bool = True
 
 
 class ValidatorDependency(BaseModel):
@@ -103,6 +104,7 @@ class ExportMediaItem(BaseModel):
     iiif_url: str | None = None
     license_uri: str | None = None
     rights_holder: str | None = None
+    rights_holder_uri: str | None = None
 
 
 class ExportRecordContext(BaseModel):
@@ -273,6 +275,19 @@ class MetadataFormat(ABC):
                 )
         return diagnostics
 
+    def required_field_errors(
+        self,
+        ctx: ExportRecordContext,
+        mapping_set: CompiledMappingSet,
+    ) -> list[str]:
+        """Return German error messages for required fields that resolve empty for this record.
+
+        Unlike `validate_mapping` (checks the mapping config once), this checks the
+        actual data of one record. Callers skip/reject records with non-empty results
+        instead of emitting broken/incomplete XML.
+        """
+        return []
+
     @abstractmethod
     def render(
         self,
@@ -280,6 +295,20 @@ class MetadataFormat(ABC):
         mappings: CompiledMappingSet | dict[str, list[str]],
     ) -> ET.Element:
         """Render one record/hit into a format-specific XML element."""
+
+    def render_batch_envelope(self) -> tuple[str, str]:
+        """Return opening and closing XML strings for bulk stream export."""
+        return ('<?xml version="1.0" encoding="UTF-8"?>\n<collection>\n', "</collection>\n")
+
+    def render_batch_item(
+        self,
+        hit: ExportRecordContext | dict[str, Any],
+        mappings: CompiledMappingSet | dict[str, list[str]],
+    ) -> ET.Element:
+        """Render one record item for streaming inside the batch envelope."""
+        return self.render(hit, mappings)
+
+
 def append_path(root: ET.Element, path: str, value: str) -> None:
     """Create the nested element chain for a slash-separated target_path and set the leaf text."""
     if not value:

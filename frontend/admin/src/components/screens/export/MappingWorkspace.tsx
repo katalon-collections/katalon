@@ -44,6 +44,7 @@ const LIDO_LEGACY_TARGET_ALIAS: Record<string, string> = {
   'lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:date/lido:earliestDate': 'lido:events/production/earliest_date',
   'lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/lido:actor/lido:nameActorSet/lido:appellationValue': 'lido:events/production/actor',
   'lido:eventWrap/lido:eventSet/lido:event/lido:eventPlace/lido:displayPlace': 'lido:events/production/place',
+  'lido:eventWrap/lido:eventSet/lido:event/lido:eventMaterialsTech/lido:displayMaterialsTech': 'lido:events/production/materials_tech',
 }
 
 function buildLidoEventTargets(
@@ -59,6 +60,18 @@ function buildLidoEventTargets(
       help: { de: t('eventActorHelp'), en: t('eventActorHelp') },
       source_kinds: ['field', 'relation'],
       accepted_field_types: ['text', 'relation'],
+      cardinality: 'many',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/materials_tech`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventMaterialsTechLabel')}`, en: `${label.en}: ${t('eventMaterialsTechLabel')}` },
+      help: { de: t('eventMaterialsTechHelp'), en: t('eventMaterialsTechHelp') },
+      source_kinds: ['field', 'constant'],
+      accepted_field_types: ['text'],
       cardinality: 'many',
       required: false,
       editor_kind: 'default',
@@ -103,10 +116,11 @@ function buildLidoEventTargets(
   ]
 }
 
-function InstitutionConfigEditor({ config, busy, isLido, onSave }: {
+function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onSave }: {
   config: Record<string, unknown>
   busy: boolean
   isLido: boolean
+  isMetsMods?: boolean
   onSave: (config: Record<string, unknown>) => Promise<boolean>
 }) {
   const { t } = useTranslation('screenExport')
@@ -123,6 +137,7 @@ function InstitutionConfigEditor({ config, busy, isLido, onSave }: {
       portal_host: true,
       record_rights: true,
       lido_events: true,
+      mods_elements: true,
     }),
     []
   )
@@ -188,12 +203,15 @@ function InstitutionConfigEditor({ config, busy, isLido, onSave }: {
     if (config.lido_events) {
       next.lido_events = config.lido_events
     }
+    if (config.mods_elements) {
+      next.mods_elements = config.mods_elements
+    }
     if (institutionName.trim()) next.institution_name = institutionName.trim()
     if (isil.trim()) next.isil = isil.trim()
     if (website.trim()) next.website = website.trim()
     if (location.trim()) next.location = location.trim()
-    if (isLido && portalHost.trim()) next.portal_host = portalHost.trim()
-    if (isLido && recordRights.trim()) next.record_rights = recordRights.trim()
+    if ((isLido || isMetsMods) && portalHost.trim()) next.portal_host = portalHost.trim()
+    if ((isLido || isMetsMods) && recordRights.trim()) next.record_rights = recordRights.trim()
 
     for (const row of customRows) {
       if (row.key.trim()) {
@@ -304,24 +322,26 @@ function InstitutionConfigEditor({ config, busy, isLido, onSave }: {
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('locationHelp')}</div>
         </div>
 
-        {isLido && (
+        {(isLido || isMetsMods) && (
           <>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
-                {t('portalHostLabel')}
-              </label>
-              <input
-                className="fld"
-                style={{ width: '100%' }}
-                placeholder={t('portalHostPlaceholder')}
-                value={portalHost}
-                onChange={e => {
-                  setPortalHost(e.target.value)
-                  setDirty(true)
-                }}
-              />
-              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('portalHostHelp')}</div>
-            </div>
+            {isLido && (
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
+                  {t('portalHostLabel')}
+                </label>
+                <input
+                  className="fld"
+                  style={{ width: '100%' }}
+                  placeholder={t('portalHostPlaceholder')}
+                  value={portalHost}
+                  onChange={e => {
+                    setPortalHost(e.target.value)
+                    setDirty(true)
+                  }}
+                />
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('portalHostHelp')}</div>
+              </div>
+            )}
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', marginBottom: 4 }}>
                 {t('recordRightsLabel')}
@@ -425,6 +445,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
   const lang = i18n.language.startsWith('en') ? 'en' : 'de'
   const compact = profile.format_key === 'oai_dc'
   const isLido = profile.format_key === 'lido'
+  const isMetsMods = profile.format_key === 'mets_mods'
 
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [publishedSet, setPublishedSet] = useState<ExportMappingSet | null>(null)
@@ -435,6 +456,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
   const [busy, setBusy] = useState(false)
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error'; warnings?: string[] } | null>(null)
   const [relationTypeOptions, setRelationTypeOptions] = useState<{ term: string; label: Record<string, string> }[]>([])
 
   const lidoEvents: LidoEventConfig[] = useMemo(() => {
@@ -446,15 +468,97 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
     return DEFAULT_LIDO_EVENTS
   }, [isLido, draftSet?.institution_config])
 
+  const configuredModsElements = useMemo<string[]>(() => {
+    if (!isMetsMods) return []
+    const raw = draftSet?.institution_config?.mods_elements
+    return Array.isArray(raw) ? (raw as string[]) : []
+  }, [isMetsMods, draftSet?.institution_config])
+
   const effectiveTargets = useMemo(() => {
-    if (!isLido) return profile.targets
-    const nonEventTargets = profile.targets.filter(trg => trg.group !== 'events')
-    const eventTargets: ExportTargetCapability[] = []
-    for (const ev of lidoEvents) {
-      eventTargets.push(...buildLidoEventTargets(ev, t))
+    if (isLido) {
+      const nonEventTargets = profile.targets.filter(trg => trg.group !== 'events')
+      const eventTargets: ExportTargetCapability[] = []
+      for (const ev of lidoEvents) {
+        eventTargets.push(...buildLidoEventTargets(ev, t))
+      }
+      return [...nonEventTargets, ...eventTargets]
     }
-    return [...nonEventTargets, ...eventTargets]
-  }, [isLido, profile.targets, lidoEvents, t])
+    if (isMetsMods) {
+      const baseNoteTarget = profile.targets.find(t => t.key === 'mods:note')
+      const rules = draftSet?.rules ?? []
+
+      const noteKeysSet = new Set<string>()
+      for (const k of configuredModsElements) {
+        if (k === 'mods:note' || k.startsWith('mods:note/')) {
+          noteKeysSet.add(k)
+        }
+      }
+      for (const r of rules) {
+        if (r.target_key === 'mods:note' || r.target_key.startsWith('mods:note/')) {
+          noteKeysSet.add(r.target_key)
+        }
+      }
+
+      const noteKeys = Array.from(noteKeysSet)
+
+      const noteTargets: ExportTargetCapability[] = noteKeys.map((key, idx) => {
+        const matchingRule = rules.find(r => r.target_key === key)
+        const noteType = (matchingRule?.settings?.type as string | undefined)?.trim()
+        const baseDe = t('noteTargetBaseName', 'Anmerkung')
+        const baseEn = t('noteTargetBaseName', 'Note')
+        const deLabel = noteType
+          ? `${baseDe} (${noteType})`
+          : noteKeys.length > 1
+            ? `${baseDe} ${idx + 1}`
+            : (baseNoteTarget?.label.de ?? 'Anmerkung / Note')
+        const enLabel = noteType
+          ? `${baseEn} (${noteType})`
+          : noteKeys.length > 1
+            ? `${baseEn} ${idx + 1}`
+            : (baseNoteTarget?.label.en ?? 'Note')
+
+        return {
+          ...(baseNoteTarget ?? {
+            key,
+            group: 'description',
+            label: { de: deLabel, en: enLabel },
+            help: { de: 'Anmerkung oder Hinweis mit optionalem Typ', en: 'Note or remark with optional type' },
+            source_kinds: ['field', 'constant'],
+            accepted_field_types: ['text'],
+            cardinality: 'one',
+            required: false,
+            editor_kind: 'mods_note',
+            settings_schema: {},
+            is_core: false,
+          }),
+          key,
+          label: { de: deLabel, en: enLabel },
+          cardinality: 'one',
+          is_core: false,
+        }
+      })
+
+      const activeKeys = new Set([
+        ...configuredModsElements,
+        ...(rules.map(r => r.target_key)),
+      ])
+
+      const nonNoteTargets = profile.targets.filter(
+        trg => trg.key !== 'mods:note' && (trg.is_core !== false || activeKeys.has(trg.key))
+      )
+
+      return [...nonNoteTargets, ...noteTargets]
+    }
+    return profile.targets
+  }, [isLido, isMetsMods, profile.targets, lidoEvents, configuredModsElements, draftSet?.rules, t])
+
+  const availableModsTargets = useMemo(() => {
+    if (!isMetsMods) return []
+    const activeKeys = new Set(effectiveTargets.map(t => t.key))
+    return profile.targets.filter(
+      trg => trg.is_core === false && (trg.key === 'mods:note' || !activeKeys.has(trg.key))
+    )
+  }, [isMetsMods, effectiveTargets, profile.targets])
 
   const load = useCallback(() => {
     return Promise.all([
@@ -573,6 +677,44 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
     }
   }
 
+  async function handleExportYaml() {
+    const target = draftSet ?? publishedSet
+    if (!target) return
+    setBusy(true)
+    setError(null)
+    try {
+      await exportMappingSets.exportYaml(target.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('actionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleImportYaml(file: File) {
+    setBusy(true)
+    setError(null)
+    setImportStatus(null)
+    try {
+      const res = await exportMappingSets.importYaml(file, {
+        targetSetId: draftSet?.id,
+      })
+      await load()
+      setImportStatus({
+        message: t('importYamlSuccess', { count: res.rules_count }),
+        type: 'success',
+        warnings: res.warnings && res.warnings.length > 0 ? res.warnings : undefined,
+      })
+    } catch (e) {
+      setImportStatus({
+        message: t('importYamlFailed', { error: e instanceof Error ? e.message : String(e) }),
+        type: 'error',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function updateInstitutionConfig(config: Record<string, unknown>): Promise<boolean> {
     if (!draftSet) return false
     setBusy(true)
@@ -637,6 +779,88 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       await refreshDraft(currentDraft.id)
       if (selectedTargetKey?.startsWith(`lido:events/${eventId}/`)) {
         setSelectedTargetKey(effectiveTargets[0]?.key ?? null)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('actionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAddModsTarget(targetKey: string) {
+    if (!draftSet) return
+    setBusy(true)
+    setError(null)
+    try {
+      const currentConfig = (draftSet.institution_config ?? {}) as Record<string, unknown>
+      const currentElements = Array.isArray(currentConfig.mods_elements)
+        ? (currentConfig.mods_elements as string[])
+        : []
+
+      let actualTargetKey = targetKey
+      if (targetKey === 'mods:note') {
+        const existingNoteKeys = new Set([
+          ...currentElements.filter(k => k === 'mods:note' || k.startsWith('mods:note/')),
+          ...((draftSet.rules ?? []).map(r => r.target_key).filter(k => k === 'mods:note' || k.startsWith('mods:note/'))),
+        ])
+        if (existingNoteKeys.size === 0) {
+          actualTargetKey = 'mods:note'
+        } else {
+          actualTargetKey = `mods:note/n_${Date.now().toString(36)}`
+        }
+      }
+
+      if (!currentElements.includes(actualTargetKey)) {
+        const updatedElements = [...currentElements, actualTargetKey]
+        await exportMappingSets.update(
+          draftSet.id,
+          { institution_config: { ...currentConfig, mods_elements: updatedElements } },
+          draftSet.version,
+        )
+      }
+
+      const existingRules = (draftSet.rules ?? []).filter(r => r.target_key === actualTargetKey)
+      if (existingRules.length === 0) {
+        await exportMappingSets.createRule(draftSet.id, {
+          source_kind: 'field',
+          target_key: actualTargetKey,
+          sort_order: (draftSet.rules ?? []).length,
+        })
+      }
+
+      await refreshDraft(draftSet.id)
+      setSelectedTargetKey(actualTargetKey)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('actionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDeleteModsTarget(targetKey: string) {
+    if (!draftSet) return
+    setBusy(true)
+    setError(null)
+    try {
+      const rulesToDelete = (draftSet.rules ?? []).filter(r => r.target_key === targetKey)
+      for (const rule of rulesToDelete) {
+        await exportMappingSets.deleteRule(draftSet.id, rule.id)
+      }
+      const currentDraft = await exportMappingSets.get(draftSet.id)
+      const currentConfig = (currentDraft.institution_config ?? {}) as Record<string, unknown>
+      const currentElements = Array.isArray(currentConfig.mods_elements)
+        ? (currentConfig.mods_elements as string[])
+        : []
+      const updatedElements = currentElements.filter(k => k !== targetKey)
+      await exportMappingSets.update(
+        currentDraft.id,
+        { institution_config: { ...currentConfig, mods_elements: updatedElements } },
+        currentDraft.version,
+      )
+      await refreshDraft(currentDraft.id)
+      if (selectedTargetKey === targetKey) {
+        const remaining = effectiveTargets.filter(t => t.key !== targetKey)
+        setSelectedTargetKey(remaining[0]?.key ?? null)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('actionFailed'))
@@ -742,6 +966,33 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
 
       {error && <div role="alert" style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
+      {importStatus && (
+        <div
+          role="alert"
+          style={{
+            padding: '10px 14px',
+            borderRadius: 6,
+            marginBottom: 14,
+            fontSize: 13,
+            background: importStatus.type === 'error' ? 'var(--bg-danger-subtle, #fee2e2)' : 'var(--bg-success-subtle, #dcfce7)',
+            color: importStatus.type === 'error' ? 'var(--fg-danger, #dc2626)' : 'var(--fg-success, #166534)',
+            border: `1px solid ${importStatus.type === 'error' ? '#fca5a5' : '#86efac'}`,
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>{importStatus.message}</div>
+          {importStatus.warnings && importStatus.warnings.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontWeight: 500, fontSize: 12 }}>{t('importYamlWarnings')}</div>
+              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                {importStatus.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       <PublishMapping
         publishedSet={publishedSet}
         draftSet={draftSet}
@@ -750,6 +1001,8 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
         onCreateDraft={createDraft}
         onPublish={publish}
         onDiscardDraft={discardDraft}
+        onExportYaml={handleExportYaml}
+        onImportYaml={handleImportYaml}
       />
 
       <ExportGuidance formatKey={profile.format_key} />
@@ -757,7 +1010,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       {draftSet && (
         <>
           {!compact && (
-            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} isLido={isLido} onSave={updateInstitutionConfig} />
+            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} isLido={isLido} isMetsMods={isMetsMods} onSave={updateInstitutionConfig} />
           )}
 
           {compact ? (
@@ -809,6 +1062,10 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
                 lidoEvents={lidoEvents}
                 onAddLidoEvent={handleAddLidoEvent}
                 onDeleteLidoEvent={handleDeleteLidoEvent}
+                isMetsMods={isMetsMods}
+                availableModsTargets={availableModsTargets}
+                onAddModsTarget={handleAddModsTarget}
+                onDeleteModsTarget={handleDeleteModsTarget}
               />
               <div style={{ flex: 1, minWidth: 280 }}>
                 {selectedTarget && (
@@ -823,6 +1080,11 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
                     onUpdate={updateRule}
                     onToggle={toggleRule}
                     onDelete={deleteRule}
+                    onAddAnotherNote={
+                      isMetsMods && (selectedTarget.key === 'mods:note' || selectedTarget.key.startsWith('mods:note/'))
+                        ? () => handleAddModsTarget('mods:note')
+                        : undefined
+                    }
                   />
                 )}
               </div>
@@ -837,7 +1099,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
             onJump={key => setSelectedTargetKey(LIDO_LEGACY_TARGET_ALIAS[key] ?? key)}
           />
 
-          <ExportPreview recordType={recordType} mappingSetId={draftSet.id} />
+          <ExportPreview recordType={recordType} mappingSetId={draftSet.id} formatKey={profile.format_key} />
         </>
       )}
     </div>

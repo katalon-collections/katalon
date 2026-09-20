@@ -95,6 +95,14 @@
     "blockingDescription": "solange der Datensatz geöffnet ist, können andere Personen ihn nicht speichern.",
     "saved": "Gespeichert."
   },
+  "autoPurge": {
+    "title": "Papierkorb & automatische Bereinigung",
+    "description": "Gelöschte Datensätze (Objekte, Entitäten, Orte, Occurrences, Sammlungen, Standorte) landen zunächst im Papierkorb und können dort wiederhergestellt werden. Ist die automatische Bereinigung aktiv, werden sie nach der eingestellten Aufbewahrungsfrist endgültig gelöscht (jede Nacht per Hintergrundjob).",
+    "enabledLabel": "Automatische Bereinigung aktiv",
+    "daysLabel": "Aufbewahrungsfrist (Tage)",
+    "daysHint": "Datensätze, die länger als diese Anzahl Tage im Papierkorb liegen, werden beim nächsten Lauf endgültig gelöscht.",
+    "saved": "Gespeichert."
+  },
   "startseite": {
     "nav": "Startseite",
     "title": "Startseite",

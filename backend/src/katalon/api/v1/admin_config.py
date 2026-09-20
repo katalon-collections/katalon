@@ -61,6 +61,8 @@ class AdminConfigRead(BaseModel):
     media_default_license_uri: str | None
     media_default_rights_holder: dict[str, Any] | None
     presence_lock_mode: str
+    auto_purge_enabled: bool
+    purge_retention_days: int
     pid_providers: list[str]
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
@@ -86,6 +88,8 @@ class AdminConfigUpdate(BaseModel):
     media_default_license_uri: str | None = None
     media_default_rights_holder: dict[str, Any] | None = None
     presence_lock_mode: str | None = None
+    auto_purge_enabled: bool | None = None
+    purge_retention_days: int | None = Field(default=None, ge=1)
 
     @field_validator("presence_lock_mode")
     @classmethod
@@ -156,6 +160,8 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         media_default_license_uri=config.media_default_license_uri,
         media_default_rights_holder=config.media_default_rights_holder,
         presence_lock_mode=config.presence_lock_mode,
+        auto_purge_enabled=config.auto_purge_enabled,
+        purge_retention_days=config.purge_retention_days,
         pid_providers=list(available_pid_providers()),
         ai_secret=SecretStatus(
             has_key=secret_obj is not None,
@@ -235,6 +241,10 @@ async def update_admin_config(
         config.media_default_rights_holder = _rights_holder_or_none(data.media_default_rights_holder)
     if data.presence_lock_mode is not None:
         config.presence_lock_mode = data.presence_lock_mode
+    if data.auto_purge_enabled is not None:
+        config.auto_purge_enabled = data.auto_purge_enabled
+    if data.purge_retention_days is not None:
+        config.purge_retention_days = data.purge_retention_days
     await db.flush()
     return await _to_read(db, config, current_user.id)
 

@@ -18,6 +18,7 @@
   "tabActive": "Active",
   "tabCompleted": "Completed",
   "tabCancelled": "Cancelled",
+  "tabTrash": "Trash",
   "recordsCount": "{{count}} records",
   "addButton": "New record",
   "searchAriaLabel": "Search {{type}}",
@@ -75,5 +76,10 @@
   "paginationPageSize": "{{size}} per page",
   "paginationPageAriaLabel": "Page {{number}}",
   "presenceBadge": "being edited",
-  "presenceBadgeTitle": "Being edited by: {{names}}"
+  "presenceBadgeTitle": "Being edited by: {{names}}",
+  "trashHint": "Records in the trash are permanently deleted automatically once the retention window passes, unless auto-purge is disabled (see admin settings).",
+  "trashRowActionsAriaLabel": "Actions for {{label}}",
+  "restoreRowTitle": "Restore",
+  "purgeRowTitle": "Delete permanently",
+  "purgeConfirm": "Permanently delete this {{type}}? This cannot be undone."
 }

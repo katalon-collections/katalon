@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FieldDefinition, SourceKind } from '../../../types'
 import { getLabel } from '../../../types'
 import { HelpPopover } from '../../ui/HelpPopover'
+import { X } from '../../ui/Icons'
 
 const fld: React.CSSProperties = { minWidth: 160 }
 const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, marginBottom: 3, color: 'var(--fg-3)' }
@@ -29,7 +30,57 @@ export interface SourcePickerProps {
 
 const RECORD_PROPERTIES = ['idno', 'canonical_url', 'id', 'created_at', 'updated_at']
 const WORK_TYPE_KINDS: SourceKind[] = ['record', 'constant', 'field']
-const MEDIA_PROPERTIES = ['url', 'mime_type', 'license_uri', 'rights_holder']
+type MediaPropKey = 'mediaPropLicenseUri' | 'mediaPropRightsHolder' | 'mediaPropUrl' | 'mediaPropMimeType'
+const MEDIA_PROPERTIES: { prop: string; labelKey: MediaPropKey }[] = [
+  { prop: 'license_uri', labelKey: 'mediaPropLicenseUri' },
+  { prop: 'rights_holder', labelKey: 'mediaPropRightsHolder' },
+  { prop: 'url', labelKey: 'mediaPropUrl' },
+  { prop: 'mime_type', labelKey: 'mediaPropMimeType' },
+]
+
+export const MODS_NOTE_TYPES: { type: string; labelDe: string }[] = [
+  { type: 'accrual method', labelDe: 'Zugangsart' },
+  { type: 'accrual policy', labelDe: 'Sammlungsrichtlinie / Zugangspolitik' },
+  { type: 'acquisition', labelDe: 'Erwerbung / Zugang' },
+  { type: 'action', labelDe: 'Maßnahme / Bearbeitung' },
+  { type: 'additional physical form', labelDe: 'Weitere physische Form' },
+  { type: 'admin', labelDe: 'Verwaltungshinweis' },
+  { type: 'bibliographic history', labelDe: 'Bibliografische Geschichte' },
+  { type: 'bibliography', labelDe: 'Bibliografie / Literatur' },
+  { type: 'biographical/historical', labelDe: 'Biografie / Geschichte' },
+  { type: 'citation/reference', labelDe: 'Zitierbeleg / Nachweis' },
+  { type: 'conservation history', labelDe: 'Restaurierungsgeschichte / Zustand' },
+  { type: 'content', labelDe: 'Inhaltliche Beschreibung' },
+  { type: 'creation/production credits', labelDe: 'Mitwirkende / Produktion' },
+  { type: 'date', labelDe: 'Datierungsangabe' },
+  { type: 'date/sequential designation', labelDe: 'Erscheinungsverlauf / Zählung' },
+  { type: 'exhibitions', labelDe: 'Ausstellungen' },
+  { type: 'funding', labelDe: 'Förderung / Drittmittel' },
+  { type: 'general', labelDe: 'Allgemeine Anmerkung' },
+  { type: 'handwritten', labelDe: 'Handschriftliche Vermerke' },
+  { type: 'language', labelDe: 'Sprachhinweis' },
+  { type: 'numbering', labelDe: 'Zählung / Nummerierung' },
+  { type: 'original location', labelDe: 'Aufbewahrungsort des Originals' },
+  { type: 'original version', labelDe: 'Originalfassung' },
+  { type: 'orthography', labelDe: 'Orthografie' },
+  { type: 'ownership', labelDe: 'Vorbesitz / Provenienz' },
+  { type: 'performers', labelDe: 'Darsteller / Ausführende' },
+  { type: 'preferred citation', labelDe: 'Empfohlene Zitierweise' },
+  { type: 'publications', labelDe: 'Publikationen / Veröffentlichungen' },
+  { type: 'reproduction', labelDe: 'Reproduktion / Nachdruck' },
+  { type: 'restriction', labelDe: 'Benutzungsbeschränkung' },
+  { type: 'source characteristics', labelDe: 'Merkmale der Vorlage' },
+  { type: 'source dimensions', labelDe: 'Maße der Vorlage' },
+  { type: 'source identifier', labelDe: 'Identifikator der Vorlage' },
+  { type: 'source note', labelDe: 'Anmerkung zur Vorlage' },
+  { type: 'source type', labelDe: 'Art der Vorlage' },
+  { type: 'statement of responsibility', labelDe: 'Verantwortlichkeitsangabe' },
+  { type: 'subject completeness', labelDe: 'Vollständigkeit der Erfassung' },
+  { type: 'system details', labelDe: 'Systemvoraussetzungen / Technische Angaben' },
+  { type: 'thesis', labelDe: 'Hochschulschrift / Dissertation' },
+  { type: 'venue', labelDe: 'Veranstaltungs- / Aufführungsort' },
+  { type: 'version identification', labelDe: 'Fassungsangabe / Version' },
+]
 
 /** Local text input that commits on blur/Enter instead of on every keystroke. */
 function CommitInput({ value, placeholder, ariaLabel, onCommit, disabled }: {
@@ -65,13 +116,23 @@ function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
   const selected = fields.find(f => f.name === value)
   const filtered = fields.filter(f => {
     const text = `${getLabel(f) || f.name} ${f.name}`.toLocaleLowerCase()
     return text.includes(query.toLocaleLowerCase())
   }).slice(0, 12)
   return (
-    <div style={{ position: 'relative', minWidth: 220 }}>
+    <div ref={containerRef} style={{ position: 'relative', minWidth: 220 }}>
       <input
         className="fld"
         style={{ width: '100%' }}
@@ -111,16 +172,149 @@ function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
   )
 }
 
-export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, editorKind, disabled, relationTypeOptions, onChange }: SourcePickerProps) {
+function NoteTypeSearch({ value, isDe, disabled, placeholder, onChange }: {
+  value: string
+  isDe: boolean
+  disabled?: boolean
+  placeholder: string
+  onChange: (value: string) => void
+}) {
   const { t } = useTranslation('screenExport')
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const selected = MODS_NOTE_TYPES.find(t => t.type === value)
+  const q = query.trim().toLocaleLowerCase()
+  const filtered = MODS_NOTE_TYPES.filter(t => {
+    if (!q) return true
+    return t.type.toLocaleLowerCase().includes(q) || (isDe && t.labelDe.toLocaleLowerCase().includes(q))
+  })
+
+  const hasExactMatch = MODS_NOTE_TYPES.some(t => t.type.toLowerCase() === q)
+  const showCustomOption = q.length > 0 && !hasExactMatch
+
+  const displayValue = open
+    ? query
+    : (selected ? (isDe ? `${selected.labelDe} · ${selected.type}` : selected.type) : value)
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', minWidth: 240 }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          className="fld"
+          style={{ width: '100%', paddingRight: value ? 28 : undefined }}
+          type="search"
+          value={displayValue}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          disabled={disabled}
+          onFocus={() => { setQuery(''); setOpen(true) }}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setOpen(false)
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (query.trim()) {
+                const exact = MODS_NOTE_TYPES.find(t => t.type.toLowerCase() === query.trim().toLowerCase())
+                onChange(exact ? exact.type : query.trim())
+                setOpen(false)
+              }
+            }
+          }}
+        />
+        {value && !disabled && (
+          <button
+            type="button"
+            className="btn sm ico gh"
+            style={{ position: 'absolute', right: 4, padding: 2 }}
+            aria-label={t('sourceNoteTypeClear')}
+            title={t('sourceNoteTypeClear')}
+            onClick={() => { onChange(''); setQuery(''); setOpen(false) }}
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+      {open && !disabled && (
+        <div role="listbox" style={{
+          position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: 'var(--panel, #fff)', border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,.08)', padding: 4, maxHeight: 240, overflowY: 'auto',
+        }}>
+          {value && (
+            <button
+              type="button"
+              role="option"
+              className="btn sm gh"
+              style={{ width: '100%', textAlign: 'left', justifyContent: 'flex-start', color: 'var(--fg-3)', fontStyle: 'italic', marginBottom: 2 }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(''); setOpen(false) }}
+            >
+              {t('sourceNoteTypeNone')}
+            </button>
+          )}
+          {showCustomOption && (
+            <button
+              type="button"
+              role="option"
+              className="btn sm gh"
+              style={{ width: '100%', textAlign: 'left', justifyContent: 'flex-start', fontWeight: 600, color: 'var(--accent, #0066cc)', marginBottom: 2 }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(query.trim()); setOpen(false) }}
+            >
+              {t('sourceNoteTypeCustom', { value: query.trim() })}
+            </button>
+          )}
+          {filtered.map(nt => (
+            <button
+              key={nt.type}
+              type="button"
+              role="option"
+              aria-selected={nt.type === value}
+              className="btn sm gh"
+              style={{ width: '100%', textAlign: 'left', justifyContent: 'flex-start' }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(nt.type); setOpen(false) }}
+            >
+              {isDe ? (
+                <span>
+                  {nt.labelDe} <span style={{ color: 'var(--fg-3)' }}>· {nt.type}</span>
+                </span>
+              ) : (
+                nt.type
+              )}
+            </button>
+          ))}
+          {filtered.length === 0 && !showCustomOption && (
+            <div style={{ padding: 8, fontSize: 12, color: 'var(--fg-3)' }}>Keine Treffer</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, editorKind, disabled, relationTypeOptions, onChange }: SourcePickerProps) {
+  const { t, i18n } = useTranslation('screenExport')
+  const isDe = !i18n.language?.startsWith('en')
 
   const isLidoWorkType = editorKind === 'lido_work_type'
+  const isModsNote = editorKind === 'mods_note'
 
   function setKind(kind: SourceKind) {
     onChange({
       source_kind: kind,
       source_config: kind === 'record' && isLidoWorkType ? { property: 'target_subtype' } : {},
-      settings: {},
+      settings: isModsNote && value.settings.type ? { type: value.settings.type } : {},
     })
   }
 
@@ -314,8 +508,25 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
             onChange={e => onChange({ ...value, source_config: { ...value.source_config, property: e.target.value } })}
           >
             <option value="">{t('sourceFieldChoose')}</option>
-            {MEDIA_PROPERTIES.map(p => <option key={p} value={p}>{p}</option>)}
+            {MEDIA_PROPERTIES.map(item => (
+              <option key={item.prop} value={item.prop}>
+                {t(item.labelKey)}
+              </option>
+            ))}
           </select>
+        </div>
+      )}
+
+      {isModsNote && (
+        <div>
+          <label style={lbl}>{t('sourceNoteTypeLabel')}</label>
+          <NoteTypeSearch
+            value={String(value.settings.type ?? '')}
+            isDe={isDe}
+            placeholder={t('sourceNoteTypePlaceholder')}
+            disabled={disabled}
+            onChange={type => onChange({ ...value, settings: { ...value.settings, type: type || undefined } })}
+          />
         </div>
       )}
     </div>

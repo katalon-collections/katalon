@@ -492,3 +492,152 @@ async def test_preview_endpoint_rejects_unknown_set() -> None:
     finally:
         metadata_mapping_service.preview_mapping_set = orig_preview
         app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_export_mapping_set_to_yaml() -> None:
+    set_id = uuid.uuid4()
+    mock_set = ExportMappingSet(
+        id=set_id,
+        format_key="lido",
+        profile_id="lido-v1.1",
+        profile_version="1.1",
+        record_type="object",
+        name="LIDO Object Test",
+        revision=2,
+        institution_config={"institution_name": "Test Museum"},
+    )
+    rule = ExportMappingRule(
+        id=uuid.uuid4(),
+        rule_key=uuid.uuid4(),
+        mapping_set_id=set_id,
+        source_kind="field",
+        source_config={"field_name": "title"},
+        target_key="lido:appellationValue",
+        settings={},
+        sort_order=0,
+        is_enabled=True,
+    )
+    mock_set.rules = [rule]
+
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_set
+    mock_db.execute.return_value = mock_result
+
+    yaml_str, filename = await metadata_mapping_service.export_mapping_set_to_yaml(mock_db, set_id)
+    assert "format_key: lido" in yaml_str
+    assert "record_type: object" in yaml_str
+    assert "target_key: lido:appellationValue" in yaml_str
+    assert "field_name: title" in yaml_str
+    assert filename == "export-mapping-lido-object-rev2.yaml"
+
+
+@pytest.mark.asyncio
+async def test_import_mapping_set_from_yaml_creates_draft() -> None:
+    yaml_content = """
+format_key: lido
+profile_id: lido-v1.1
+profile_version: "1.1"
+record_type: object
+name: Imported LIDO Mapping
+institution_config:
+  institution_name: Sample Archive
+rules:
+  - source_kind: field
+    field_name: title
+    target_key: lido:appellationValue
+    sort_order: 0
+    is_enabled: true
+"""
+    mock_db = AsyncMock()
+    mock_rev_res = MagicMock()
+    mock_rev_res.scalars.return_value.all.return_value = []
+    mock_pub_res = MagicMock()
+    mock_pub_res.scalar_one_or_none.return_value = None
+    title_field = MagicMock()
+    title_field.id = uuid.uuid4()
+    title_field.name = "title"
+    title_field.field_type = "text"
+    mock_fields_res = MagicMock()
+    mock_fields_res.scalars.return_value.all.return_value = [title_field]
+    mock_refresh_res = MagicMock()
+    mock_refresh_res.scalar_one_or_none.side_effect = lambda: next(
+        (x for x in added if isinstance(x, ExportMappingSet)), None
+    )
+
+    mock_db.execute.side_effect = [mock_rev_res, mock_pub_res, mock_fields_res, mock_refresh_res]
+
+    added: list[object] = []
+    mock_db.add = MagicMock(side_effect=lambda obj: added.append(obj))
+
+    imported_set, warnings, rules_count = await metadata_mapping_service.import_mapping_set_from_yaml(
+        mock_db,
+        yaml_content,
+        dry_run=False,
+    )
+    assert warnings == []
+    assert rules_count == 1
+    created_set = next(x for x in added if isinstance(x, ExportMappingSet))
+    created_rule = next(x for x in added if isinstance(x, ExportMappingRule))
+    assert created_set.format_key == "lido"
+    assert created_set.record_type == "object"
+    assert created_set.status == "draft"
+    assert created_set.revision == 1
+    assert created_rule.field_definition_id == title_field.id
+    assert created_rule.target_key == "lido:appellationValue"
+
+
+@pytest.mark.asyncio
+async def test_yaml_export_and_import_endpoints() -> None:
+    admin_user = User(
+        id=uuid.uuid4(),
+        email="admin_yaml@example.org",
+        hashed_password="hash",
+        role="admin",
+        is_active=True,
+    )
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    set_id = uuid.uuid4()
+
+    orig_export = metadata_mapping_service.export_mapping_set_to_yaml
+    orig_import = metadata_mapping_service.import_mapping_set_from_yaml
+
+    dummy_set = ExportMappingSet(
+        id=set_id,
+        format_key="lido",
+        record_type="object",
+        name="LIDO",
+        status="draft",
+        revision=1,
+    )
+    dummy_set.rules = []
+
+    try:
+        metadata_mapping_service.export_mapping_set_to_yaml = AsyncMock(
+            return_value=("format_key: lido\nrecord_type: object\n", "export-mapping-lido-object-rev1.yaml")
+        )
+        metadata_mapping_service.import_mapping_set_from_yaml = AsyncMock(
+            return_value=(dummy_set, ["Notice: test warning"], 0)
+        )
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Export YAML
+            res_export = await client.get(f"/v1/export-mapping-sets/{set_id}/yaml")
+            assert res_export.status_code == 200
+            assert "format_key: lido" in res_export.text
+            assert "export-mapping-lido-object-rev1.yaml" in res_export.headers.get("Content-Disposition", "")
+
+            # 2. Import YAML
+            files = {"file": ("mapping.yaml", b"format_key: lido\nrecord_type: object\n", "application/x-yaml")}
+            res_import = await client.post("/v1/export-mapping-sets/import-yaml", files=files)
+            assert res_import.status_code == 200
+            data = res_import.json()
+            assert data["format_key"] == "lido"
+            assert data["warnings"] == ["Notice: test warning"]
+    finally:
+        metadata_mapping_service.export_mapping_set_to_yaml = orig_export
+        metadata_mapping_service.import_mapping_set_from_yaml = orig_import
+        app.dependency_overrides.pop(get_current_user, None)
+

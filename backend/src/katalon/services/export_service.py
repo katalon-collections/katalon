@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncIterator
 from typing import Any
@@ -28,6 +29,8 @@ from katalon.core.visibility import apply_public_visibility
 from katalon.integrations.metadata_format import CompiledMappingSet, ExportRecordContext
 from katalon.services.metadata_format_service import get_format
 from katalon.services.metadata_mapping_service import extract_values, get_mapping_index
+
+logger = logging.getLogger(__name__)
 
 RECORD_MODELS: dict[str, tuple[type[Any], str]] = {
     "object": (Object, "object_type"),
@@ -148,9 +151,23 @@ async def stream_xml(
     record_mappings = mapping_index.get(record_type)
     if record_mappings is None:
         record_mappings = CompiledMappingSet(format_key=format_key, record_type=record_type)
-    yield '<?xml version="1.0" encoding="UTF-8"?>\n<collection>\n'
+    header, footer = metadata_format.render_batch_envelope()
+    yield header
+    skipped: list[str] = []
     async for hit in iter_hits_by_type(record_type, public_only=visibility_user is None):
         ctx = ExportRecordContext.from_hit(hit)
-        el = metadata_format.render(ctx, record_mappings)
+        missing = metadata_format.required_field_errors(ctx, record_mappings)
+        if missing:
+            record_ref = ctx.record.idno or str(ctx.record.id)
+            logger.warning(
+                "Export %s: Datensatz %s übersprungen (Pflichtfelder fehlen): %s",
+                format_key, record_ref, "; ".join(missing),
+            )
+            skipped.append(record_ref)
+            continue
+        el = metadata_format.render_batch_item(ctx, record_mappings)
         yield ET.tostring(el, encoding="unicode") + "\n"
-    yield "</collection>\n"
+    if skipped:
+        comment = f"{len(skipped)} Datensatz/Datensätze übersprungen (Pflichtfelder fehlen): {', '.join(skipped)}"
+        yield f"<!-- {comment.replace('--', '—')} -->\n"
+    yield footer

@@ -4,6 +4,18 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.38.0]
+
+- **Automatische & manuelle Papierkorb-Bereinigung:** In den Admin-Einstellungen kann
+  die automatische endgültige Löschung aktiviert und eine Aufbewahrungsfrist in Tagen
+  festgelegt werden. Gelöschte Einträge können zudem manuell endgültig aus dem
+  Papierkorb entfernt werden.
+- **METS/MODS-Export & Einzelsatz-Download:** Grundlegend überarbeiteter METS/MODS-Standardexport
+  sowie die Möglichkeit, Exporte einzelner Datensätze direkt aus der Bearbeitungsansicht
+  herunterzuladen.
+- **Hinweis auf leere öffentliche Sammlungen:** Die Admin-Oberfläche weist darauf hin,
+  wenn eine als öffentlich markierte Sammlung keine sichtbaren Objekte enthält.
+
 ## [1.37.0]
 
 - **Autoritätsdaten für Objekt-Subtypen:** Subtypen können mit AAT-, GND- oder

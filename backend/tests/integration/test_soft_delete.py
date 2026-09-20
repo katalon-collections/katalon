@@ -68,6 +68,71 @@ async def test_object_soft_delete_listed_in_trash_and_restorable(
 
 
 @pytest.mark.asyncio
+async def test_manual_purge_hard_deletes_trashed_object_immediately(
+    async_client, auth_headers
+) -> None:
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"MANUAL-PURGE-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "metadata_": {"label": "purge me now"},
+        },
+    )
+    object_id = created.json()["id"]
+
+    # Purging an active (non-trashed) record must be rejected.
+    reject = await async_client.post(f"/v1/objects/{object_id}/purge", headers=auth_headers)
+    assert reject.status_code == 404
+
+    await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+
+    purge = await async_client.post(f"/v1/objects/{object_id}/purge", headers=auth_headers)
+    assert purge.status_code == 204
+
+    trash_after = await async_client.get("/v1/objects/trash/list", headers=auth_headers)
+    assert not any(item["id"] == object_id for item in trash_after.json())
+
+    still_purged = await async_client.post(f"/v1/objects/{object_id}/purge", headers=auth_headers)
+    assert still_purged.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_manual_purge_requires_admin_role(async_client, auth_headers) -> None:
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"PURGE-PERM-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "metadata_": {"label": "no editor purge"},
+        },
+    )
+    object_id = created.json()["id"]
+    await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+
+    email = f"purge-editor-{uuid.uuid4().hex}@example.com"
+    created_user = await async_client.post(
+        "/v1/users",
+        headers=auth_headers,
+        json={"email": email, "password": "Editor1234", "role": "editor"},
+    )
+    assert created_user.status_code == 201, created_user.text
+    login = await async_client.post(
+        "/v1/auth/token", data={"username": email, "password": "Editor1234"}
+    )
+    assert login.status_code == 200, login.text
+    editor_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    editor_purge = await async_client.post(f"/v1/objects/{object_id}/purge", headers=editor_headers)
+    assert editor_purge.status_code == 403
+
+    admin_purge = await async_client.post(f"/v1/objects/{object_id}/purge", headers=auth_headers)
+    assert admin_purge.status_code == 204
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("record_type", "endpoint", "payload_factory"),
     [
@@ -616,7 +681,6 @@ async def test_purge_task_hard_deletes_past_retention_window(
         obj.deleted_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=999)
         await session.commit()
 
-    monkeypatch.setattr("katalon.config.settings.purge_after_days", 30)
     totals = await purge_tasks._do_purge()
     assert totals["object"] >= 1
 
@@ -637,6 +701,56 @@ async def test_purge_task_hard_deletes_past_retention_window(
             )
         )
         assert audit_result.scalar_one_or_none() is not None
+
+
+@pytest.mark.asyncio
+async def test_purge_task_skips_run_when_auto_purge_disabled(async_client, auth_headers) -> None:
+    import katalon.database as database_module
+    from katalon.core.models import AdminConfig, Object
+    from katalon.workers import purge_tasks
+
+    created = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"PURGE-OFF-{uuid.uuid4().hex[:12]}",
+            "status": "draft",
+            "metadata_": {"label": "should survive"},
+        },
+    )
+    object_id = created.json()["id"]
+
+    delete_response = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert delete_response.status_code == 204
+
+    async with database_module.AsyncSessionLocal() as session:
+        result = await session.execute(select(Object).where(Object.id == uuid.UUID(object_id)))
+        obj = result.scalar_one()
+        obj.deleted_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=999)
+
+        config = await session.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
+        if config is None:
+            config = AdminConfig(key="default")
+            session.add(config)
+        config.auto_purge_enabled = False
+        await session.commit()
+
+    try:
+        totals = await purge_tasks._do_purge()
+        assert totals == {}
+
+        async with database_module.AsyncSessionLocal() as session:
+            result = await session.execute(select(Object).where(Object.id == uuid.UUID(object_id)))
+            assert result.scalar_one_or_none() is not None
+    finally:
+        # AdminConfig is a process-wide singleton row shared by every other test
+        # in this session — leaving auto-purge disabled would silently break
+        # unrelated purge tests that run afterwards.
+        async with database_module.AsyncSessionLocal() as session:
+            config = await session.scalar(select(AdminConfig).where(AdminConfig.key == "default"))
+            if config is not None:
+                config.auto_purge_enabled = True
+                await session.commit()
 
 
 @pytest.mark.asyncio

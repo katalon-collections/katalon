@@ -487,6 +487,29 @@ async def list_deleted_entities(
 
 
 @router.post(
+    "/{entity_id}/purge",
+    status_code=204,
+    summary="Permanently delete a soft-deleted entity (hard delete)",
+    responses={
+        404: {"description": "Entity not found or not in trash"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def purge_entity(
+    entity_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_role("admin"),
+) -> None:
+    from katalon.workers.purge_tasks import purge_record_now
+
+    ok = await purge_record_now(db, "entity", entity_id, current_user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="Datensatz nicht gefunden oder nicht im Papierkorb"
+        )
+
+
+@router.post(
     "/{entity_id}/snapshots",
     response_model=SnapshotRead,
     status_code=201,

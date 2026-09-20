@@ -159,10 +159,33 @@ def _get_work_type_concepts(ctx: ExportRecordContext, mapping_set: CompiledMappi
     return results
 
 
+def missing_required_fields(ctx: ExportRecordContext, mapping_set: CompiledMappingSet) -> list[str]:
+    """Check this record's actual data for LIDO's two required fields (title, work type).
+
+    A mapping can be configured correctly (checked by `validate_mapping`) and still
+    resolve empty for a given record, e.g. an object whose "label" field is blank.
+    """
+    rules_by_target = mapping_set.by_target()
+    errors: list[str] = []
+
+    title_target = "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"
+    title_values = [v for rule in rules_by_target.get(title_target, []) for v in _rule_values(ctx, rule)]
+    if not title_values:
+        errors.append("Objekttitel (appellationValue) ist leer")
+
+    work_types = _get_work_type_concepts(ctx, mapping_set)
+    if not any((wt.get("term") or "").strip() for wt in work_types):
+        errors.append("Objektart / Typ (objectWorkType) ist leer")
+
+    return errors
+
+
 def build_lido_element(
     ctx: ExportRecordContext,
     mapping_set: CompiledMappingSet,
     institution_config: dict[str, Any] | None = None,
+    *,
+    wrap_envelope: bool = True,
 ) -> ET.Element:
     """Build a LIDO 1.0 envelope from explicit mappings and institution values."""
     config = institution_config or {}
@@ -242,7 +265,6 @@ def build_lido_element(
 
     optional_sections = (
         ("lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription", "lido:inscriptionsWrap", "lido:inscriptions", "lido:inscriptionTranscription"),
-        ("lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue", "lido:objectDescriptionWrap", "lido:objectDescriptionSet", "lido:descriptiveNoteValue"),
         ("lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:displayObjectMeasurements", "lido:objectMeasurementsWrap", "lido:objectMeasurementsSet", "lido:displayObjectMeasurements"),
     )
     for target, wrap_tag, set_tag, value_tag in optional_sections:
@@ -251,6 +273,24 @@ def build_lido_element(
             for value in section_values:
                 section_set = ET.SubElement(section_wrap, set_tag)
                 ET.SubElement(section_set, value_tag).text = value
+
+    # objectDescriptionSet: mehrere Beschreibungsarten teilen sich EIN
+    # objectDescriptionWrap (LIDO 1.0 erlaubt davon max. 1), unterschieden
+    # per lido:type-Attribut auf jedem descriptionSet.
+    description_sections = (
+        ("lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue", None),
+        ("lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/short", "brief"),
+        ("lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/condition", "condition"),
+    )
+    description_wrap: ET.Element | None = None
+    for target, type_attr in description_sections:
+        if section_values := values(target):
+            if description_wrap is None:
+                description_wrap = ET.SubElement(identification, "lido:objectDescriptionWrap")
+            for value in section_values:
+                set_attrs = {"lido:type": type_attr} if type_attr else {}
+                section_set = ET.SubElement(description_wrap, "lido:objectDescriptionSet", set_attrs)
+                ET.SubElement(section_set, "lido:descriptiveNoteValue").text = value
 
     if institution_name:
         repository_wrap = ET.SubElement(identification, "lido:repositoryWrap")
@@ -305,6 +345,7 @@ def build_lido_element(
     legacy_date_target = "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate"
     legacy_earliest_target = "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:date/lido:earliestDate"
     legacy_place_target = "lido:eventWrap/lido:eventSet/lido:event/lido:eventPlace/lido:displayPlace"
+    legacy_materials_target = "lido:eventWrap/lido:eventSet/lido:event/lido:eventMaterialsTech/lido:displayMaterialsTech"
 
     event_sets_to_render = []
     for ev in event_specs:
@@ -316,6 +357,7 @@ def build_lido_element(
         date_rules = list(rules_by_target.get(f"lido:events/{eid}/date", []))
         earliest_rules = list(rules_by_target.get(f"lido:events/{eid}/earliest_date", []))
         place_rules = list(rules_by_target.get(f"lido:events/{eid}/place", []))
+        materials_rules = list(rules_by_target.get(f"lido:events/{eid}/materials_tech", []))
 
         if eid == "production":
             type_rules.extend(rules_by_target.get(legacy_event_type_target, []))
@@ -323,14 +365,16 @@ def build_lido_element(
             date_rules.extend(rules_by_target.get(legacy_date_target, []))
             earliest_rules.extend(rules_by_target.get(legacy_earliest_target, []))
             place_rules.extend(rules_by_target.get(legacy_place_target, []))
+            materials_rules.extend(rules_by_target.get(legacy_materials_target, []))
 
         ev_types = [val for r in type_rules for val in _rule_values(ctx, r)]
         ev_actors: list[tuple[MappingSpec, str]] = [(r, val) for r in actor_rules for val in _rule_values(ctx, r)]
         ev_dates = [val for r in date_rules for val in _rule_values(ctx, r)]
         ev_earliest = [val for r in earliest_rules for val in _rule_values(ctx, r)]
         ev_places = [val for r in place_rules for val in _rule_values(ctx, r)]
+        ev_materials = [val for r in materials_rules for val in _rule_values(ctx, r)]
 
-        if ev_types or ev_actors or ev_dates or ev_earliest or ev_places:
+        if ev_types or ev_actors or ev_dates or ev_earliest or ev_places or ev_materials:
             event_type_name = ev_types[0] if ev_types else preset_type
             event_sets_to_render.append({
                 "type": event_type_name,
@@ -338,6 +382,7 @@ def build_lido_element(
                 "dates": ev_dates,
                 "earliest_dates": ev_earliest,
                 "places": ev_places,
+                "materials": ev_materials,
             })
 
     if event_sets_to_render:
@@ -374,14 +419,35 @@ def build_lido_element(
                 event_place = ET.SubElement(event, "lido:eventPlace")
                 ET.SubElement(event_place, "lido:displayPlace").text = p_val
 
+            for m_val in ev_data["materials"]:
+                event_mat = ET.SubElement(event, "lido:eventMaterialsTech")
+                ET.SubElement(event_mat, "lido:displayMaterialsTech").text = m_val
+
     subject_values = values("lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term")
-    if subject_values:
+    related_works_target = "lido:objectRelationWrap/lido:relatedWorksWrap/lido:relatedWorkSet/lido:relatedWork/lido:displayObject"
+    related_works_rules = rules_by_target.get(related_works_target, [])
+
+    if subject_values or related_works_rules:
         relation_wrap = ET.SubElement(descriptive, "lido:objectRelationWrap")
-        subject_wrap = ET.SubElement(relation_wrap, "lido:subjectWrap")
-        for value in subject_values:
-            subject = ET.SubElement(ET.SubElement(subject_wrap, "lido:subjectSet"), "lido:subject")
-            concept = ET.SubElement(subject, "lido:subjectConcept")
-            ET.SubElement(concept, "lido:term").text = value
+
+        if subject_values:
+            subject_wrap = ET.SubElement(relation_wrap, "lido:subjectWrap")
+            for value in subject_values:
+                subject = ET.SubElement(ET.SubElement(subject_wrap, "lido:subjectSet"), "lido:subject")
+                concept = ET.SubElement(subject, "lido:subjectConcept")
+                ET.SubElement(concept, "lido:term").text = value
+
+        if related_works_rules:
+            related_wrap = ET.SubElement(relation_wrap, "lido:relatedWorksWrap")
+            for rule in related_works_rules:
+                for value in _rule_values(ctx, rule):
+                    related_set = ET.SubElement(related_wrap, "lido:relatedWorkSet")
+                    related_work = ET.SubElement(related_set, "lido:relatedWork")
+                    ET.SubElement(related_work, "lido:displayObject").text = value
+                    rel_type = _clean_text(rule.settings.get("rel_type") or rule.source_config.get("rel_type"))
+                    if rel_type:
+                        rel_type_elem = ET.SubElement(related_set, "lido:relatedWorkRelType")
+                        ET.SubElement(rel_type_elem, "lido:term").text = rel_type
 
     administrative = ET.SubElement(lido, "lido:administrativeMetadata", {"xml:lang": "de"})
     rights_values = values("lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term")
@@ -427,4 +493,4 @@ def build_lido_element(
             representation = ET.SubElement(resource_set, "lido:resourceRepresentation")
             ET.SubElement(representation, "lido:linkResource").text = value
 
-    return wrap
+    return wrap if wrap_envelope else lido

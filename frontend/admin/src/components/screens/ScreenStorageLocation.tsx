@@ -3,11 +3,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ConflictError, schema, storageLocations, subtypes, VersionConflictError } from '../../api/client'
-import { getLabel, type FieldDefinition, type KatalonStorageLocation, type RecordSubtype, type StorageLocationObject } from '../../types'
+import { ConflictError, getTokenUser, schema, storageLocations, subtypes, users, VersionConflictError } from '../../api/client'
+import { getLabel, type FieldDefinition, type KatalonStorageLocation, type RecordPermission, type RecordSubtype, type StorageLocationObject } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
 import { AuthorityInput, type AuthorityEntry } from '../AuthorityInput'
-import { Box, Plus, Trash, X } from '../ui/Icons'
+import { Box, Plus, RotateCcw, Trash, X } from '../ui/Icons'
+import { ActionMenu } from '../ui/ActionMenu'
 import { HelpPopover } from '../ui/HelpPopover'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { DeleteWithChildrenModal } from '../ui/DeleteWithChildrenModal'
@@ -167,6 +168,11 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
+  const [recordPermissions, setRecordPermissions] = useState<RecordPermission[]>([])
+  const [showTrash, setShowTrash] = useState(false)
+  const [trashLocations, setTrashLocations] = useState<KatalonStorageLocation[]>([])
+  const [trashLoading, setTrashLoading] = useState(false)
+  const [purgeTarget, setPurgeTarget] = useState<KatalonStorageLocation | null>(null)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -184,6 +190,10 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
   const [objectsTotal, setObjectsTotal] = useState(0)
   const [objectsLoading, setObjectsLoading] = useState(false)
   const [includeSublocations, setIncludeSublocations] = useState(true)
+  const isAdmin = ['admin', 'superuser'].includes(getTokenUser()?.role ?? '')
+  const canDelete = recordPermissions.some(permission =>
+    permission.record_type === 'storage_location' && permission.action === 'delete'
+  )
 
   useEffect(() => {
     if (!initialLocationId) {
@@ -259,6 +269,19 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
+    users.recordPermissions().then(setRecordPermissions).catch(() => setRecordPermissions([]))
+  }, [])
+
+  useEffect(() => {
+    if (!showTrash) return
+    setTrashLoading(true)
+    storageLocations.trashList()
+      .then(setTrashLocations)
+      .catch(e => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setTrashLoading(false))
+  }, [showTrash])
+
+  useEffect(() => {
     subtypes.list('storage_location').then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
   }, [])
 
@@ -270,7 +293,29 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
       .catch(() => setFields([]))
   }, [form?.storage_location_type])
 
-  const displayTree = flattenLocations(locations)
+  const displayTree = flattenLocations(showTrash ? trashLocations : locations)
+
+  async function restoreLocation(location: KatalonStorageLocation) {
+    try {
+      await storageLocations.restore(location.id)
+      setTrashLocations(current => current.filter(item => item.id !== location.id))
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function purgeLocation() {
+    if (!purgeTarget) return
+    try {
+      await storageLocations.purge(purgeTarget.id)
+      setTrashLocations(current => current.filter(item => item.id !== purgeTarget.id))
+      setPurgeTarget(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setPurgeTarget(null)
+    }
+  }
 
   function set<K extends keyof LocationForm>(k: K, v: LocationForm[K]) {
     setForm(f => f ? { ...f, [k]: v } : f)
@@ -440,7 +485,12 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
       <div className="ph">
         <div><h1>{t('headline')}</h1><div className="sub">{t('headlineSub')}</div></div>
         <div className="right">
-          <button className="btn pri" onClick={startNewRoot}><Plus size={13} /> {t('newRootButton')}</button>
+          {isAdmin && (
+            <button className="btn gh" onClick={() => { setShowTrash(value => !value); cancelForm() }}>
+              <Trash size={13} /> {showTrash ? t('activeButton') : t('trashButton')}
+            </button>
+          )}
+          {!showTrash && <button className="btn pri" onClick={startNewRoot}><Plus size={13} /> {t('newRootButton')}</button>}
         </div>
       </div>
 
@@ -448,35 +498,45 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
 
       <div className="vocab-grid" style={{ flex: 1, minHeight: 0 }}>
         <div className="vocab-tree">
-          {loading && <div className="empty" style={{ padding: 12, fontSize: 12 }}>{t('loading')}</div>}
-          {!loading && displayTree.length === 0 && (
-            <div className="empty" style={{ padding: 12, fontSize: 12 }}>{t('emptyTree')}</div>
+          {(showTrash ? trashLoading : loading) && <div className="empty" style={{ padding: 12, fontSize: 12 }}>{t('loading')}</div>}
+          {!(showTrash ? trashLoading : loading) && displayTree.length === 0 && (
+            <div className="empty" style={{ padding: 12, fontSize: 12 }}>{showTrash ? t('emptyTrash') : t('emptyTree')}</div>
           )}
-          {!loading && displayTree.map(({ loc, depth }) => (
+          {!(showTrash ? trashLoading : loading) && displayTree.map(({ loc, depth }) => (
             <div key={loc.id}>
               <div
                 className={`tree-it${selectedId === loc.id ? ' active' : ''}`}
-                onClick={() => selectLocation(loc)}
+                onClick={() => !showTrash && selectLocation(loc)}
                 style={{ paddingLeft: 6 + depth * 16 }}
               >
                 <Box size={13} className="ic" />
                 <span style={{ flex: 1 }}>{locationLabel(loc)}</span>
-                <button
+                {!showTrash && <button
                   type="button"
                   className="btn sm ico gh"
                   title={t('newChildButton')}
                   onClick={event => { event.stopPropagation(); startNewChild(loc) }}
                 >
                   <Plus size={12} />
-                </button>
+                </button>}
+                {showTrash && (
+                  <ActionMenu
+                    ariaLabel={t('trashActions', { name: locationLabel(loc) })}
+                    items={[
+                      { key: 'restore', label: t('restore'), icon: <RotateCcw size={12} />, onClick: () => restoreLocation(loc) },
+                      { key: 'purge', label: t('purge'), icon: <Trash size={12} />, danger: true, onClick: () => setPurgeTarget(loc) },
+                    ]}
+                  />
+                )}
               </div>
             </div>
           ))}
         </div>
 
         <div className="vocab-detail">
-          {!form && <div className="empty">{t('selectPrompt')}</div>}
-          {form && (
+          {showTrash && <div className="empty">{t('trashPrompt')}</div>}
+          {!showTrash && !form && <div className="empty">{t('selectPrompt')}</div>}
+          {!showTrash && form && (
             <>
               <div className="vocab-detail-head">
                 <span style={{ fontWeight: 600, fontSize: 15 }}>
@@ -528,7 +588,7 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
                   {saving ? t('saving') : t('save')}
                 </button>
                 <button className="btn gh" onClick={cancelForm}><X size={12} /> {t('cancel')}</button>
-                {!creating && (
+                {!creating && canDelete && (
                   <button className="btn gh dn" onClick={handleDelete} disabled={deleting} style={{ marginLeft: 'auto' }}>
                     <Trash size={12} /> {deleting ? t('deleting') : t('delete')}
                   </button>
@@ -620,6 +680,16 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
           />
         ) : null
       })()}
+      {purgeTarget && (
+        <ConfirmModal
+          message={t('purgeConfirm', { name: locationLabel(purgeTarget) })}
+          confirmLabel={t('purge')}
+          cancelLabel={t('cancel')}
+          danger
+          onConfirm={purgeLocation}
+          onCancel={() => setPurgeTarget(null)}
+        />
+      )}
       {childDeleteOpen && (() => {
         const loc = locations.find(l => l.id === selectedId)
         if (!loc) return null

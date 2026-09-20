@@ -218,6 +218,13 @@ export function SearchPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   useEffect(() => {
+    if (!mobileFiltersOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [mobileFiltersOpen])
+
+  useEffect(() => {
     const onScroll = () => setShowScrollTop(window.scrollY > 600)
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()

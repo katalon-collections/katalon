@@ -340,6 +340,25 @@ SUBTYPES_SPECS = [
     ("object", "archivalie", {"de": "Archivalie / Druckwerk", "en": "Archival Record"}, False),
     ("object", "kunsthandwerk", {"de": "Kunsthandwerk & Relikt", "en": "Decorative Art"}, False),
     ("object", "mineral", {"de": "Mineral & Belegstück", "en": "Mineral Specimen"}, False),
+]
+
+# Getty AAT concept IDs for each object subtype's objectWorkType export (LIDO).
+# Verified live against the AAT SPARQL endpoint (vocab.getty.edu/sparql.json) via
+# katalon.integrations.aat_adapter.AATAdapter — not guessed.
+OBJECT_SUBTYPE_AAT = {
+    "sammlungsobjekt": ("300191086", "visual works"),
+    "gemaelde": ("300033618", "paintings (visual works)"),
+    "druckgrafik": ("300041273", "prints (visual works)"),
+    "handschrift": ("300028569", "manuscripts (documents)"),
+    "fotografie": ("300046300", "photographs"),
+    "skulptur": ("300047090", "sculpture (visual works)"),
+    "archivalie": ("300379505", "archival materials"),
+    "kunsthandwerk": ("300411641", "decorative art (art genre)"),
+    "mineral": ("300379627", "geological specimens"),
+}
+
+SUBTYPES_SPECS = [
+    *SUBTYPES_SPECS,
     ("entity", "person", {"de": "Person", "en": "Person"}, True),
     ("entity", "organisation", {"de": "Organisation", "en": "Organization"}, False),
     ("place", "ort", {"de": "Ort", "en": "Place"}, True),
@@ -686,13 +705,26 @@ async def main() -> None:
         ).scalar_one_or_none()
 
         logger.info("Initializing RecordSubtypes...")
-        existing_subtypes = {
-            (r.primary_type, r.name)
-            for r in (await db.execute(select(RecordSubtype))).scalars().all()
-        }
+        existing_subtype_rows = (await db.execute(select(RecordSubtype))).scalars().all()
+        existing_subtypes = {(r.primary_type, r.name): r for r in existing_subtype_rows}
         for ptype, name, label, is_default in SUBTYPES_SPECS:
             if (ptype, name) not in existing_subtypes:
                 db.add(RecordSubtype(primary_type=ptype, name=name, label=label, is_default=is_default))
+        await db.flush()
+
+        logger.info("Linking object subtypes to Getty AAT authority data...")
+        object_subtype_rows = (
+            await db.execute(select(RecordSubtype).where(RecordSubtype.primary_type == "object"))
+        ).scalars().all()
+        for row in object_subtype_rows:
+            aat = OBJECT_SUBTYPE_AAT.get(row.name)
+            if not aat:
+                continue
+            concept_id, concept_label = aat
+            row.concept_source = "aat"
+            row.concept_id = concept_id
+            row.concept_uri = f"http://vocab.getty.edu/aat/{concept_id}"
+            row.concept_label = concept_label
         await db.flush()
 
         logger.info("Enabling Authority Sources (GND, Geonames, VIAF)...")

@@ -12,11 +12,13 @@ from katalon.api.v1.auth import hash_password, verify_password
 from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import FeaturePermission, RolePermission, User
 from katalon.core.schemas import (
+    RECORD_TYPES,
     EmailChange,
     FeaturePermissionRead,
     FeaturePermissionUpdate,
     OnboardingUpdate,
     PasswordChange,
+    RecordPermissionRead,
     RolePermissionRead,
     RolePermissionUpdate,
     UserCreate,
@@ -29,6 +31,8 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 _VALID_ROLES = {"admin", "superuser", "editor", "cataloger", "viewer"}
 _CONFIGURABLE_ROLES = {"editor", "cataloger", "viewer"}
+_PERMISSION_RECORD_TYPES = (*RECORD_TYPES, "vocabulary_term")
+_PERMISSION_ACTIONS = ("read", "create", "update", "delete")
 
 
 @router.get(
@@ -74,6 +78,32 @@ async def create_user(data: UserCreate, db: DBDep) -> User:
 @router.get("/me", response_model=UserRead, summary="Get the current authenticated user")
 async def get_me(current_user: CurrentUser) -> User:
     return current_user
+
+
+@router.get(
+    "/me/record-permissions",
+    response_model=list[RecordPermissionRead],
+    summary="List effective record permissions for the current user",
+)
+async def get_own_record_permissions(
+    db: DBDep, current_user: CurrentUser
+) -> list[RecordPermissionRead]:
+    if current_user.role in {"admin", "superuser"}:
+        return [
+            RecordPermissionRead(record_type=record_type, action=action)
+            for record_type in _PERMISSION_RECORD_TYPES
+            for action in _PERMISSION_ACTIONS
+        ]
+    result = await db.execute(
+        select(RolePermission.record_type, RolePermission.action).where(
+            RolePermission.role == current_user.role
+        )
+    )
+    return [
+        RecordPermissionRead(record_type=record_type, action=action)
+        for record_type, action in result.all()
+        if not (current_user.role == "viewer" and record_type in {"procedure", "storage_location"})
+    ]
 
 
 @router.get(

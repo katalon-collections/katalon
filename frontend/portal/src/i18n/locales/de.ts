@@ -12,6 +12,7 @@ export default {
   'nav.collectionsLong': 'Sammlungen & Bestände',
   'nav.menu': 'Menü',
   'nav.home': 'Startseite',
+  'nav.skipToContent': 'Zum Inhalt springen',
 
   'type.object': 'Objekt',
   'type.collection': 'Sammlung',

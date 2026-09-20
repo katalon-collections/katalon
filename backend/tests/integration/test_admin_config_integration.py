@@ -61,6 +61,40 @@ async def test_admin_config_saves_media_rights_defaults(async_client, auth_heade
 
 
 @pytest.mark.asyncio
+async def test_admin_config_defaults_and_saves_auto_purge_settings(
+    async_client, auth_headers
+) -> None:
+    defaults = await async_client.get("/v1/admin/config", headers=auth_headers)
+    assert defaults.status_code == 200
+    assert defaults.json()["auto_purge_enabled"] is True
+    assert defaults.json()["purge_retention_days"] == 30
+
+    try:
+        updated = await async_client.put(
+            "/v1/admin/config",
+            headers=auth_headers,
+            json={"auto_purge_enabled": False, "purge_retention_days": 90},
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["auto_purge_enabled"] is False
+        assert updated.json()["purge_retention_days"] == 90
+
+        rejected = await async_client.put(
+            "/v1/admin/config", headers=auth_headers, json={"purge_retention_days": 0}
+        )
+        assert rejected.status_code == 422
+    finally:
+        # This config is a process-wide singleton row shared by every other test
+        # in this session — leaving it disabled would silently break unrelated
+        # purge tests that run afterwards.
+        await async_client.put(
+            "/v1/admin/config",
+            headers=auth_headers,
+            json={"auto_purge_enabled": True, "purge_retention_days": 30},
+        )
+
+
+@pytest.mark.asyncio
 async def test_admin_config_supported_languages_defaults_to_de_en(async_client, auth_headers) -> None:
     response = await async_client.get("/v1/admin/config", headers=auth_headers)
 

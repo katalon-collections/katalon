@@ -26,6 +26,9 @@
     "passwordResetComplete": "Das Passwort wurde geändert. Bitte melde dich an.",
     "backToLogin": "Zurück zur Anmeldung"
   },
+  "appShell": {
+    "skipToContent": "Zum Inhalt springen"
+  },
   "topbar": {
     "openNav": "Navigation öffnen",
     "globalSearch": "Global suchen",

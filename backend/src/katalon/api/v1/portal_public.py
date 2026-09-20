@@ -742,6 +742,20 @@ async def serve_media_thumbnail(
     return await media.serve_media_thumbnail(object_id, media_id, db, _staff_user(current_user))
 
 
+@router.get("/media/{media_id}/file")
+async def serve_portal_media_file(
+    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    return await media.serve_media_by_id(media_id, db, _staff_user(current_user), as_attachment=False)
+
+
+@router.get("/media/{media_id}/download")
+async def download_portal_media_file(
+    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    return await media.serve_media_by_id(media_id, db, _staff_user(current_user), as_attachment=True)
+
+
 @router.get("/objects/{object_id}/iiif/manifest")
 async def iiif_manifest(
     object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser

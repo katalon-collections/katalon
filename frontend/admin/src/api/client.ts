@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FeaturePermission, FieldDefinition, FormSection, FormVariant, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, VocabularyTermNode, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
+import type { AdminSearchResponse, ApiKey, ApiKeyCreated, AuditEntry, Banner, BatchRequest, BatchResponse, Entity, ExportMappingRule, ExportMappingSet, ExportProfileCapabilities, FeaturePermission, FieldDefinition, FormSection, FormVariant, ImportMappingSetResult, KatalonCollection, KatalonObject, KatalonStorageLocation, MappingDiagnostic, MappingPreviewResult, MetadataMapping, Occurrence, Page, Place, Procedure, RecordPermission, RecordSubtype, Relation, RolePermission, SearchResponse, Snapshot, SourceKind, StorageLocationObject, Token, UserRead, Vocabulary, VocabularyImportResult, VocabularyTerm, VocabularyTermNode, WorkingSet, WorkingSetCreate, WorkingSetDetail, WorkingSetItem, WorkingSetItemCreate, WorkingSetItemUpdate, WorkingSetUpdate } from '../types'
 
 export const BASE = import.meta.env.VITE_API_URL ?? ''
 export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || (typeof window !== 'undefined' ? window.location.origin : '')
@@ -224,6 +224,7 @@ export const auth = {
 
 export const users = {
   me: () => req<UserRead>('/v1/users/me'),
+  recordPermissions: () => req<RecordPermission[]>('/v1/users/me/record-permissions'),
   list: () => req<UserRead[]>('/v1/users'),
   create: (data: { email: string; password: string; role: string }) =>
     req<UserRead>('/v1/users', { method: 'POST', body: JSON.stringify(data) }),
@@ -255,6 +256,9 @@ export const objects = {
   create: (data: Partial<KatalonObject>) => req<KatalonObject>('/v1/objects', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<KatalonObject>, version?: number) => req<KatalonObject>(`/v1/objects/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/objects/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  trashList: () => req<KatalonObject[]>('/v1/objects/trash/list'),
+  restore: (id: string) => req<KatalonObject>(`/v1/objects/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/objects/${id}/purge`, { method: 'POST' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/objects/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/object', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -275,6 +279,9 @@ export const entities = {
   create: (data: Partial<Entity>) => req<Entity>('/v1/entities', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Entity>, version?: number) => req<Entity>(`/v1/entities/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/entities/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  trashList: () => req<Entity[]>('/v1/entities/trash/list'),
+  restore: (id: string) => req<Entity>(`/v1/entities/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/entities/${id}/purge`, { method: 'POST' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/entities/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/entity', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -295,6 +302,9 @@ export const places = {
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Place>, version?: number) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  trashList: () => req<Place[]>('/v1/places/trash/list'),
+  restore: (id: string) => req<Place>(`/v1/places/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/places/${id}/purge`, { method: 'POST' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/places/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/place', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -315,6 +325,9 @@ export const occurrences = {
   create: (data: Partial<Occurrence>) => req<Occurrence>('/v1/occurrences', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Occurrence>, version?: number) => req<Occurrence>(`/v1/occurrences/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/occurrences/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  trashList: () => req<Occurrence[]>('/v1/occurrences/trash/list'),
+  restore: (id: string) => req<Occurrence>(`/v1/occurrences/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/occurrences/${id}/purge`, { method: 'POST' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/occurrences/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/occurrence', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -363,6 +376,9 @@ export const collections = {
     if (opts.force) params.set('force', 'true')
     return req<void>(`/v1/collections/${id}?${params.toString()}`, { method: 'DELETE' })
   },
+  trashList: () => req<KatalonCollection[]>('/v1/collections/trash/list'),
+  restore: (id: string) => req<KatalonCollection>(`/v1/collections/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/collections/${id}/purge`, { method: 'POST' }),
   publish: (id: string) => req<{ ok: boolean; errors?: string[] }>(`/v1/collections/${id}/publish`, { method: 'POST' }),
   batch: (data: BatchRequest) => req<BatchResponse>('/v1/batch/collection', { method: 'POST', body: JSON.stringify(data) }),
   snapshots: {
@@ -390,6 +406,9 @@ export const storageLocations = {
     const qs = params.toString()
     return req<void>(`/v1/storage-locations/${id}${qs ? `?${qs}` : ''}`, { method: 'DELETE' })
   },
+  trashList: () => req<KatalonStorageLocation[]>('/v1/storage-locations/trash/list'),
+  restore: (id: string) => req<KatalonStorageLocation>(`/v1/storage-locations/${id}/restore`, { method: 'POST' }),
+  purge: (id: string) => req<void>(`/v1/storage-locations/${id}/purge`, { method: 'POST' }),
   objects: (id: string, params?: { include_sublocations?: boolean; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<StorageLocationObject>>(`/v1/storage-locations/${id}/objects${qs ? `?${qs}` : ''}`)
@@ -573,6 +592,37 @@ export const exportMappingSets = {
       method: 'POST',
       headers: version !== undefined ? { 'If-Match': String(version) } : undefined,
     }),
+  exportYaml: async (id: string): Promise<void> => {
+    const res = await authorizedFetch(`/v1/export-mapping-sets/${encodeURIComponent(id)}/yaml`)
+    if (!res.ok) throw new Error(`YAML-Export fehlgeschlagen (${res.status}).`)
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition') ?? ''
+    const match = /filename="([^"]+)"/.exec(disposition)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = match?.[1] ?? `export-mapping-${id}.yaml`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+  importYaml: async (file: File, opts: { targetSetId?: string; dryRun?: boolean } = {}): Promise<ImportMappingSetResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const params = new URLSearchParams()
+    if (opts.targetSetId) params.set('target_set_id', opts.targetSetId)
+    if (opts.dryRun) params.set('dry_run', 'true')
+    const qs = params.toString() ? `?${params.toString()}` : ''
+    const res = await authorizedFetch(`/v1/export-mapping-sets/import-yaml${qs}`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen. Bitte neu anmelden.') }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail ?? res.statusText)
+    }
+    return res.json()
+  },
 }
 
 export const metadataMappings = {
@@ -596,7 +646,7 @@ export const metadataMappings = {
 export interface ExportFormatInfo {
   key: string
   label: string
-  kind: 'flat' | 'xml'
+  kind: 'flat' | 'xml' | 'graph'
 }
 
 export const exportApi = {
@@ -611,6 +661,20 @@ export const exportApi = {
     const a = document.createElement('a')
     a.href = url
     a.download = `${recordType}.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+  downloadSingle: async (recordType: string, recordId: string, format: string): Promise<void> => {
+    const res = await authorizedFetch(`/v1/export/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}?format=${encodeURIComponent(format)}`)
+    if (!res.ok) throw new Error(`Export fehlgeschlagen (${res.status}).`)
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition') ?? ''
+    const match = /filename="([^"]+)"/.exec(disposition)
+    const ext = format === 'turtle' || format === 'ttl' ? 'ttl' : format === 'jsonld' || format === 'json-ld' || format === 'json_ld' ? 'jsonld' : `${format}.xml`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = match?.[1] ?? `${recordType}_${recordId}.${ext}`
     a.click()
     URL.revokeObjectURL(url)
   },
@@ -1173,6 +1237,8 @@ export interface AdminConfigRead {
   media_default_license_uri: string | null
   media_default_rights_holder: { name: string; uri?: string } | null
   presence_lock_mode: 'warning' | 'blocking'
+  auto_purge_enabled: boolean
+  purge_retention_days: number
   pid_providers: ('ark' | 'dnb_urn')[]
   ai_secret: {
     has_key: boolean

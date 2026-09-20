@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from sqlalchemy import Text, cast, func, select
+from sqlalchemy import Text, cast, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -22,7 +22,7 @@ from katalon.core.dependencies import (
 )
 from katalon.core.limiter import limiter
 from katalon.core.list_query import SortBy, SortDir, apply_sort
-from katalon.core.models import AdminConfig, Collection, RecordSnapshot, User
+from katalon.core.models import AdminConfig, Collection, Object, RecordSnapshot, Relation, User
 from katalon.core.schemas import (
     AuditLogRead,
     CollectionCreate,
@@ -67,6 +67,33 @@ PUBLIC_SAVE_STATUSES = set(PUBLIC_STATUSES)
 
 async def _visibility_user(db: DBDep, user: OptionalCurrentUser) -> User | None:
     return user if user and await has_record_permission(db, user, "collection", "read") else None
+
+
+async def _has_public_member(db: AsyncSession, collection_id: uuid.UUID) -> bool:
+    """True if the collection has a public member object or a public child collection."""
+    has_public_object = exists(
+        select(Relation.id).where(
+            Relation.to_type == "collection",
+            Relation.to_id == collection_id,
+            Relation.from_type == "object",
+            exists(
+                select(Object.id).where(
+                    Object.id == Relation.from_id,
+                    Object.status.in_(PUBLIC_STATUSES),
+                    Object.deleted_at.is_(None),
+                )
+            ),
+        )
+    )
+    has_public_child = exists(
+        select(Collection.id).where(
+            Collection.parent_id == collection_id,
+            Collection.status.in_(PUBLIC_STATUSES),
+            Collection.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(select(has_public_object | has_public_child))
+    return bool(result.scalar())
 
 
 async def _validate_parent_id(
@@ -330,7 +357,10 @@ async def get_collection(
         return await project_public_record(
             db, CollectionRead.model_validate(col), "collection", col.collection_type
         )
-    return col
+    read = CollectionRead.model_validate(col)
+    if col.status == "public":
+        read.public_without_public_members = not await _has_public_member(db, col.id)
+    return read
 
 
 @router.put(
@@ -606,6 +636,29 @@ async def list_deleted_collections(
         .order_by(Collection.deleted_at.desc())
     )
     return list(result.scalars().all())
+
+
+@router.post(
+    "/{col_id}/purge",
+    status_code=204,
+    summary="Permanently delete a soft-deleted collection (hard delete)",
+    responses={
+        404: {"description": "Collection not found or not in trash"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def purge_collection(
+    col_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_role("admin"),
+) -> None:
+    from katalon.workers.purge_tasks import purge_record_now
+
+    ok = await purge_record_now(db, "collection", col_id, current_user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="Sammlung nicht gefunden oder nicht im Papierkorb"
+        )
 
 
 @router.post(

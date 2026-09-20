@@ -345,7 +345,7 @@ async def handle_single_record_export(
         fmt = format_param.lower().strip()
         if fmt in ("ttl", "turtle"):
             format_choice = "turtle"
-        elif fmt in ("jsonld", "json-ld"):
+        elif fmt in ("jsonld", "json-ld", "json_ld"):
             format_choice = "jsonld"
     elif accept_header:
         if "text/turtle" in accept_header:

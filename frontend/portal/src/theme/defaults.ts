@@ -13,7 +13,7 @@ export const DEFAULT_TOKENS: Record<string, string> = {
   '--fg':           '#181a1f',
   '--fg-2':         '#3a4150',
   '--fg-3':         '#5a6173',
-  '--fg-4':         '#8a92a3',
+  '--fg-4':         '#677083',
   '--header-bg':    '#0b1a33',
   '--header-fg':    '#ffffff',
 }

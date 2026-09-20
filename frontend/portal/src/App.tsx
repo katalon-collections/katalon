@@ -252,7 +252,7 @@ function Footer() {
 function AppInner() {
   const [user, setUser] = useState<PortalUser | null>(() => currentUser())
   const config = usePortalConfig()
-  const { locale } = useI18n()
+  const { locale, t } = useI18n()
   useEffect(() => { restoreSession().then(setUser).catch(() => setUser(null)) }, [])
   function logout() {
     void endSession()
@@ -280,6 +280,7 @@ function AppInner() {
       >
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
+      <a href="#main-content" className="skip-link">{t('nav.skipToContent')}</a>
       <BannerBar />
       <Header user={user} onLogout={logout} />
       <main id="main-content" style={{ flex: 1, width: '100%' }}>

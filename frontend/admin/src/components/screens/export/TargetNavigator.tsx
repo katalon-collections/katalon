@@ -39,6 +39,10 @@ export interface TargetNavigatorProps {
   lidoEvents?: LidoEventConfig[]
   onAddLidoEvent?: (event: LidoEventConfig) => void
   onDeleteLidoEvent?: (eventId: string) => void
+  isMetsMods?: boolean
+  availableModsTargets?: ExportTargetCapability[]
+  onAddModsTarget?: (targetKey: string) => void
+  onDeleteModsTarget?: (targetKey: string) => void
 }
 
 export function TargetNavigator({
@@ -51,12 +55,18 @@ export function TargetNavigator({
   lidoEvents = [],
   onAddLidoEvent,
   onDeleteLidoEvent,
+  isMetsMods = false,
+  availableModsTargets = [],
+  onAddModsTarget,
+  onDeleteModsTarget,
 }: TargetNavigatorProps) {
   const { t, i18n } = useTranslation('screenExport')
   const lang = i18n.language.startsWith('en') ? 'en' : 'de'
 
   const [eventToDelete, setEventToDelete] = useState<LidoEventConfig | null>(null)
+  const [modsTargetToDelete, setModsTargetToDelete] = useState<ExportTargetCapability | null>(null)
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [showModsMenu, setShowModsMenu] = useState(false)
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [customName, setCustomName] = useState('')
 
@@ -73,7 +83,7 @@ export function TargetNavigator({
     setShowCustomInput(false)
   }
 
-  const groupOrder = ['identification', 'classification', 'events', 'relations', 'rights', 'media']
+  const groupOrder = ['identification', 'classification', 'description', 'events', 'relations', 'rights', 'media', 'language']
   const groups: Record<string, ExportTargetCapability[]> = {}
   for (const target of targets) {
     (groups[target.group] ??= []).push(target)
@@ -313,11 +323,22 @@ export function TargetNavigator({
           )
         }
 
+        const groupLabels: Record<string, string> = {
+          identification: t('groupIdentification'),
+          classification: t('groupClassification'),
+          description: t('groupDescription'),
+          events: t('groupEvents'),
+          relations: t('groupRelations'),
+          rights: t('groupRights'),
+          media: t('groupMedia'),
+          language: t('groupLanguage'),
+        }
+
         const groupTargets = groups[group] ?? []
         return (
           <div key={group} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--fg-3)', marginBottom: 6 }}>
-              {group}
+              {groupLabels[group] ?? group}
             </div>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {groupTargets.map(target => {
@@ -328,7 +349,7 @@ export function TargetNavigator({
                 const hasError = diags.some(d => d.level === 'error')
                 const missingRequired = target.required && rules.length === 0
                 return (
-                  <li key={target.key}>
+                  <li key={target.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <button
                       type="button"
                       onClick={() => onSelect(target.key)}
@@ -337,7 +358,8 @@ export function TargetNavigator({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6,
-                        width: '100%',
+                        flex: 1,
+                        minWidth: 0,
                         textAlign: 'left',
                         padding: '6px 8px',
                         border: 'none',
@@ -356,6 +378,18 @@ export function TargetNavigator({
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.label[lang]}</span>
                       {rules.length > 0 && <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{rules.length}</span>}
                     </button>
+                    {isMetsMods && target.is_core === false && onDeleteModsTarget && (
+                      <button
+                        type="button"
+                        className="btn sm ico gh"
+                        title={t('deleteModsElement')}
+                        aria-label={t('deleteModsElement')}
+                        style={{ padding: 2, height: 22, width: 22, flexShrink: 0 }}
+                        onClick={() => setModsTargetToDelete(target)}
+                      >
+                        <Trash size={12} />
+                      </button>
+                    )}
                   </li>
                 )
               })}
@@ -363,6 +397,63 @@ export function TargetNavigator({
           </div>
         )
       })}
+
+      {isMetsMods && onAddModsTarget && availableModsTargets.length > 0 && (
+        <div style={{ position: 'relative', marginTop: 16 }}>
+          {!showModsMenu ? (
+            <button
+              type="button"
+              className="btn sm gh"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '6px 8px' }}
+              onClick={() => setShowModsMenu(true)}
+            >
+              <Plus size={13} /> {t('addModsElement')}
+            </button>
+          ) : (
+            <div
+              style={{
+                background: 'var(--bg-card, #fff)',
+                border: '1px solid var(--border-s, #cbd5e1)',
+                borderRadius: 6,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                padding: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                maxHeight: 280,
+                overflowY: 'auto',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px', marginBottom: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-3)' }}>{t('addModsElementTitle')}</span>
+                <button
+                  type="button"
+                  className="btn sm ico gh"
+                  style={{ padding: 2, height: 18, width: 18 }}
+                  onClick={() => setShowModsMenu(false)}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {availableModsTargets.map(optTarget => (
+                <button
+                  key={optTarget.key}
+                  type="button"
+                  className="btn sm gh"
+                  style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: 12, padding: '4px 8px' }}
+                  onClick={() => {
+                    setShowModsMenu(false)
+                    onAddModsTarget(optTarget.key)
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>{optTarget.label[lang]}</span>
+                  <span style={{ fontSize: 10, color: 'var(--fg-3)', marginLeft: 6 }}>({optTarget.key.split('/').pop()?.replace('mods:', '')})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {eventToDelete && (
         <ConfirmModal
@@ -376,6 +467,21 @@ export function TargetNavigator({
             setEventToDelete(null)
           }}
           onCancel={() => setEventToDelete(null)}
+        />
+      )}
+
+      {modsTargetToDelete && (
+        <ConfirmModal
+          title={t('deleteModsElementConfirmTitle')}
+          message={t('deleteModsElementConfirmMessage', { name: modsTargetToDelete.label[lang] })}
+          confirmLabel={t('deleteModsElementConfirmBtn')}
+          cancelLabel={t('cancelBtn')}
+          danger
+          onConfirm={() => {
+            onDeleteModsTarget?.(modsTargetToDelete.key)
+            setModsTargetToDelete(null)
+          }}
+          onCancel={() => setModsTargetToDelete(null)}
         />
       )}
     </nav>

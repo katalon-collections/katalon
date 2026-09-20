@@ -156,6 +156,18 @@ class MappingPreviewResult(BaseModel):
     diagnostics: list[MappingDiagnostic] = Field(default_factory=list)
 
 
+class ImportMappingSetResult(BaseModel):
+    mapping_set_id: uuid.UUID
+    format_key: str
+    record_type: str
+    target_subtype: str | None = None
+    name: str
+    revision: int
+    status: str
+    rules_count: int
+    warnings: list[str] = Field(default_factory=list)
+
+
 # Backwards-compatible aliases for legacy imports
 MetadataMappingCreate = ExportMappingRuleCreate
 MetadataMappingRead = ExportMappingRuleRead
@@ -447,6 +459,8 @@ class CollectionRead(CollectionCreate, RecordRead):
     _api_path: ClassVar[str] = "collections"
     _record_type: ClassVar[str] = "collection"
 
+    public_without_public_members: bool = False
+
 class StorageLocationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -561,6 +575,13 @@ class RolePermissionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     role: PermissionRole
+    record_type: PermissionRecordType
+    action: PermissionAction
+
+
+class RecordPermissionRead(BaseModel):
+    """One effective permission for the authenticated user."""
+
     record_type: PermissionRecordType
     action: PermissionAction
 

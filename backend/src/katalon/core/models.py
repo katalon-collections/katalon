@@ -900,6 +900,9 @@ class AdminConfig(Base):
     media_default_rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # "warning": editing anyway is allowed; "blocking": save is rejected while another user's presence is active.
     presence_lock_mode: Mapped[str] = mapped_column(String(16), default="warning", server_default="warning")
+    # #414 follow-up: nightly hard-delete of soft-deleted records past the retention window.
+    auto_purge_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    purge_retention_days: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 

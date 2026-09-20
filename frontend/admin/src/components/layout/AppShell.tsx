@@ -296,6 +296,7 @@ export function AppShell() {
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">{t('appShell.skipToContent')}</a>
       <Sidebar
         route={route}
         setRoute={(r) => safeNavigate(r)}

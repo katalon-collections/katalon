@@ -18,7 +18,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'papierkorb' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -2109,6 +2109,71 @@ function SectionPresenceLock() {
   )
 }
 
+function SectionAutoPurge() {
+  const { t } = useTranslation('screenSettings')
+  const [enabled, setEnabled] = useState(true)
+  const [days, setDays] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminConfig.get()
+      .then(cfg => { setEnabled(cfg.auto_purge_enabled); setDays(cfg.purge_retention_days) })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save(patch: { auto_purge_enabled?: boolean; purge_retention_days?: number }) {
+    setSaving(true); setError(null); setSaved(false)
+    try {
+      const cfg = await adminConfig.update(patch)
+      setEnabled(cfg.auto_purge_enabled); setDays(cfg.purge_retention_days)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="empty">Lade…</div>
+  return (
+    <div className="card">
+      <div className="hd">{t('autoPurge.title')}</div>
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
+          {t('autoPurge.description')}
+        </p>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={saving}
+            onChange={e => { setEnabled(e.target.checked); save({ auto_purge_enabled: e.target.checked }) }}
+            style={{ marginTop: 3 }}
+          />
+          <span>{t('autoPurge.enabledLabel')}</span>
+        </label>
+        <div className="lbl">{t('autoPurge.daysLabel')}</div>
+        <input
+          className="fld mono"
+          type="number"
+          min={1}
+          style={{ maxWidth: 120 }}
+          value={days}
+          disabled={saving || !enabled}
+          onChange={e => setDays(Number(e.target.value))}
+          onBlur={() => { if (days >= 1) save({ purge_retention_days: days }) }}
+        />
+        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+          {t('autoPurge.daysHint')}
+        </div>
+        {error && <div style={{ fontSize: 13, color: '#dc2626', marginTop: 10 }}>{error}</div>}
+        {saved && <div style={{ fontSize: 13, color: '#166534', marginTop: 10 }}>{t('autoPurge.saved')}</div>}
+      </div>
+    </div>
+  )
+}
+
 const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'ueber',    label: 'Über Katalon' },
@@ -2122,6 +2187,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }
   { id: 'medien',   label: 'Medienrechte', adminOnly: true },
   { id: 'authorities', label: 'Normdatenquellen', adminOnly: true },
   { id: 'sperren',  label: 'Bearbeitungssperre', adminOnly: true },
+  { id: 'papierkorb', label: 'Papierkorb', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
   { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
 ]
@@ -2211,6 +2277,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
           {!loading && isAdmin && section === 'medien' && <SectionMediaRights />}
           {!loading && isAdmin && section === 'authorities' && <SectionAuthoritySources />}
           {!loading && isAdmin && section === 'sperren' && <SectionPresenceLock />}
+          {!loading && isAdmin && section === 'papierkorb' && <SectionAutoPurge />}
           {!loading && isAdmin && section === 'suche' && <SectionSuche />}
           {!loading && isAdmin && section === 'sparql' && sparqlStatus?.enabled && (
             <SectionSparql

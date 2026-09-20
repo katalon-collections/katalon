@@ -198,6 +198,7 @@ export interface ExportTargetCapability {
   required: boolean
   editor_kind: string
   settings_schema: Record<string, unknown>
+  is_core?: boolean
 }
 
 export interface ValidatorDependency {
@@ -269,6 +270,18 @@ export interface ExportMappingSet {
   updated_at: string
   published_at?: string | null
   rules?: ExportMappingRule[]
+}
+
+export interface ImportMappingSetResult {
+  mapping_set_id: string
+  format_key: string
+  record_type: string
+  target_subtype?: string | null
+  name: string
+  revision: number
+  status: string
+  rules_count: number
+  warnings: string[]
 }
 
 export interface Vocabulary {
@@ -508,6 +521,11 @@ export interface UserRead {
 
 export interface RolePermission {
   role: 'admin' | 'editor' | 'cataloger' | 'viewer'
+  record_type: RecordType | 'vocabulary_term'
+  action: 'read' | 'create' | 'update' | 'delete'
+}
+
+export interface RecordPermission {
   record_type: RecordType | 'vocabulary_term'
   action: 'read' | 'create' | 'update' | 'delete'
 }

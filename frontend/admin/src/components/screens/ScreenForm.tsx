@@ -4,8 +4,8 @@
 import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi } from '../../api/client'
-import type { MediaFile, ActivePresence, LockInfo } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi, exportApi } from '../../api/client'
+import type { MediaFile, ActivePresence, LockInfo, ExportFormatInfo } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import type { AiProvenance, AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
@@ -1901,6 +1901,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [status, setStatus]   = useState<Status | ProcedureStatus>('draft')
   const [loadedStatus, setLoadedStatus] = useState<Status | ProcedureStatus>('draft')
   const [collectionStatus, setCollectionStatus] = useState('active')
+  const [publicWithoutPublicMembers, setPublicWithoutPublicMembers] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -2009,6 +2010,52 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [workingSetsDropdownOpen])
 
+  const [availableExportFormats, setAvailableExportFormats] = useState<ExportFormatInfo[]>([])
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
+
+  const loadExportFormats = useCallback(async () => {
+    if (isNew || !currentId || !features.includes('export')) {
+      setAvailableExportFormats([])
+      return
+    }
+    try {
+      const formats = await exportApi.listFormats(recordType)
+      setAvailableExportFormats(formats.filter((f) => f.kind !== 'flat'))
+    } catch {
+      setAvailableExportFormats([])
+    }
+  }, [isNew, currentId, recordType, features])
+
+  useEffect(() => {
+    loadExportFormats()
+  }, [loadExportFormats])
+
+  useEffect(() => {
+    if (!exportDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [exportDropdownOpen])
+
+  const handleSingleExport = async (formatKey: string) => {
+    if (!currentId || exportingFormat) return
+    setExportingFormat(formatKey)
+    try {
+      await exportApi.downloadSingle(recordType, currentId, formatKey)
+      setExportDropdownOpen(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t('export.failed', { error: 'Unknown' }))
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   const [rels, setRels]           = useState<Relation[]>([])
   const [relTitles, setRelTitles] = useState<Record<string, string>>({})
   const [objectStatuses, setObjectStatuses] = useState<Record<string, string>>({})
@@ -2103,6 +2150,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setStatus('draft')
     setLoadedStatus('draft')
     setCollectionStatus('active')
+    setPublicWithoutPublicMembers(false)
     setValues({})
     setMediaFiles([])
     setRels([])
@@ -2150,6 +2198,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         if (rec) {
           setStatus((rec as { status?: string }).status as Status)
           setLoadedStatus((rec as { status?: string }).status as Status)
+          setPublicWithoutPublicMembers(
+            (rec as { public_without_public_members?: boolean }).public_without_public_members ?? false
+          )
           setValues(rec.metadata_)
           setAiProvenance('ai_provenance' in rec ? rec.ai_provenance : {})
           setVersion(rec.version)
@@ -2621,7 +2672,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         return val ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
-            <button className="btn sm ico gh" onClick={() => onChange(undefined)} disabled={disabled}><X size={10} /></button>
+            <button className="btn sm ico gh" onClick={() => onChange(undefined)} disabled={disabled} title={t('remove')} aria-label={t('remove')}><X size={10} /></button>
           </div>
         ) : (
           <RelationInput
@@ -3592,6 +3643,80 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               )}
             </div>
           )}
+          {!isNew && currentId && features.includes('export') && availableExportFormats.length > 0 && (
+            <div ref={exportDropdownRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="btn gh"
+                onClick={() => setExportDropdownOpen((prev) => !prev)}
+                title={t('export.buttonTitle')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                disabled={exportingFormat !== null}
+              >
+                <Download size={14} />
+                <span>{exportingFormat ? t('export.exporting') : t('export.button')}</span>
+                <span style={{ fontSize: 10, marginLeft: 2 }}>▾</span>
+              </button>
+
+              {exportDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    zIndex: 200,
+                    width: 220,
+                    background: 'var(--panel, #fff)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    padding: '6px 0',
+                    fontSize: 13,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '4px 12px 6px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--fg-3)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {t('export.formatsTitle')}
+                  </div>
+                  {availableExportFormats.map((fmt) => (
+                    <button
+                      key={fmt.key}
+                      type="button"
+                      onClick={() => handleSingleExport(fmt.key)}
+                      disabled={exportingFormat !== null}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        padding: '7px 12px',
+                        color: 'var(--fg)',
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      className="link-hover"
+                    >
+                      <span style={{ fontWeight: 500 }}>{fmt.label}</span>
+                      <span style={{ fontSize: 10, color: 'var(--fg-4)', textTransform: 'uppercase' }}>
+                        {fmt.kind}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {!isNew && currentId && features.includes('manual_lock') && (
             !manualLock || manualLock.locked_by_email === user?.email || user?.role === 'admin' || user?.role === 'superuser'
               ? <button className="btn gh" onClick={handleLockToggle} disabled={lockLoading} style={{ minWidth: 90 }}>
@@ -3620,6 +3745,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       {otherEditors.length > 0 && (
         <div className="record-notice" style={{ background: '#fffbeb', borderBottom: '1px solid #fcd34d', color: '#92400e' }}>
           {t('presence.editingBy', { names: otherEditors.map(p => p.user_email).join(', ') })}
+        </div>
+      )}
+
+      {recordType === 'collection' && publicWithoutPublicMembers && (
+        <div className="record-notice" style={{ background: '#fffbeb', borderBottom: '1px solid #fcd34d', color: '#92400e' }}>
+          {t('collection.publicWithoutPublicMembers')}
         </div>
       )}
 
@@ -4969,7 +5100,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
               {!isNew && savedId && showSnapshotsForRecord && (
                 <div className="card versions-card">
-                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setShowSnapshots(s => !s)}>
+                  <div
+                    className="hd"
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={showSnapshots}
+                    onClick={() => setShowSnapshots(s => !s)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowSnapshots(s => !s) } }}
+                  >
                     <span>Versionen ({snapshots.length})</span>
                     <div className="grow" />
                     <ChevD size={14} style={{ transform: showSnapshots ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />
@@ -5058,10 +5197,24 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
               {!isNew && (
                 <div className="card audit-card">
-                  <div className="hd" style={{ cursor: 'pointer' }} onClick={() => {
-                    if (!showAudit && savedId) loadAudit(savedId)
-                    setShowAudit(a => !a)
-                  }}>
+                  <div
+                    className="hd"
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={showAudit}
+                    onClick={() => {
+                      if (!showAudit && savedId) loadAudit(savedId)
+                      setShowAudit(a => !a)
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        if (!showAudit && savedId) loadAudit(savedId)
+                        setShowAudit(a => !a)
+                      }
+                    }}
+                  >
                     <span>Audit-Log</span>
                     <div className="grow" />
                     <ChevD size={14} style={{ transform: showAudit ? undefined : 'rotate(-90deg)', transition: 'transform .15s' }} />

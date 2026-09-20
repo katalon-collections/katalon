@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Response, UploadFile
 
 from katalon.core.concurrency import require_version
 from katalon.core.dependencies import CurrentUser, DBDep
@@ -17,6 +17,7 @@ from katalon.core.schemas import (
     ExportMappingSetDetail,
     ExportMappingSetRead,
     ExportMappingSetUpdate,
+    ImportMappingSetResult,
     MappingPreviewRequest,
     MappingPreviewResult,
 )
@@ -75,6 +76,57 @@ async def create_export_mapping_set(
     return ExportMappingSetDetail.model_validate(mapping_set)
 
 
+@router.post(
+    "/import-yaml",
+    response_model=ImportMappingSetResult,
+    status_code=200,
+    summary="Import export mapping set and rules from a YAML file",
+    responses={
+        400: {"description": "Invalid YAML or mapping configuration"},
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "File decoding or parsing failure"},
+    },
+)
+async def import_mapping_set_yaml(
+    file: UploadFile,
+    db: DBDep,
+    current_user: CurrentUser,
+    target_set_id: uuid.UUID | None = Query(None, description="Optional draft set ID to overwrite"),
+    dry_run: bool = Query(False, description="Simulate import without persisting changes"),
+) -> ImportMappingSetResult:
+    _require_admin(current_user)
+    content_bytes = await file.read()
+    try:
+        yaml_content = content_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Die Datei muss UTF-8-kodiert sein: {exc}",
+        ) from exc
+
+    try:
+        mapping_set, warnings, rules_count = await metadata_mapping_service.import_mapping_set_from_yaml(
+            db,
+            yaml_content,
+            user_id=current_user.id,
+            target_set_id=target_set_id,
+            dry_run=dry_run,
+        )
+        return ImportMappingSetResult(
+            mapping_set_id=mapping_set.id,
+            format_key=mapping_set.format_key,
+            record_type=mapping_set.record_type,
+            target_subtype=mapping_set.target_subtype,
+            name=mapping_set.name,
+            revision=mapping_set.revision,
+            status=mapping_set.status,
+            rules_count=rules_count,
+            warnings=warnings,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get(
     "/{set_id}",
     response_model=ExportMappingSetDetail,
@@ -88,6 +140,35 @@ async def get_export_mapping_set(
     if not mapping_set:
         raise HTTPException(status_code=404, detail="Export-Mapping-Set nicht gefunden.")
     return ExportMappingSetDetail.model_validate(mapping_set)
+
+
+@router.get(
+    "/{set_id}/yaml",
+    summary="Export mapping set and its rules as portable YAML",
+    responses={
+        200: {
+            "content": {"application/x-yaml": {}},
+            "description": "YAML representation of mapping set and rules",
+        },
+        404: {"description": "Export mapping set not found"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def export_mapping_set_yaml(
+    set_id: uuid.UUID,
+    db: DBDep,
+    current_user: CurrentUser,
+) -> Response:
+    _require_admin(current_user)
+    try:
+        yaml_content, filename = await metadata_mapping_service.export_mapping_set_to_yaml(db, set_id)
+        return Response(
+            content=yaml_content,
+            media_type="application/x-yaml",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.patch(

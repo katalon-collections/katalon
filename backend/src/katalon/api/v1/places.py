@@ -482,6 +482,29 @@ async def list_deleted_places(db: DBDep, current_user: User = require_role("admi
 
 
 @router.post(
+    "/{place_id}/purge",
+    status_code=204,
+    summary="Permanently delete a soft-deleted place (hard delete)",
+    responses={
+        404: {"description": "Place not found or not in trash"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def purge_place(
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_role("admin"),
+) -> None:
+    from katalon.workers.purge_tasks import purge_record_now
+
+    ok = await purge_record_now(db, "place", place_id, current_user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="Ort nicht gefunden oder nicht im Papierkorb"
+        )
+
+
+@router.post(
     "/{place_id}/snapshots",
     response_model=SnapshotRead,
     status_code=201,

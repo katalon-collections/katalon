@@ -842,9 +842,10 @@ async def purge_field_data(
 
     check_key = parent.name if parent else field.name
 
+    # Runs over every record regardless of deleted_at — a purge must also
+    # reach trashed records, otherwise a later restore() brings the purged
+    # value back from the dead (#414).
     query = select(model).where(model.metadata_.has_key(check_key))
-    if hasattr(model, "deleted_at"):
-        query = query.where(model.deleted_at.is_(None))
 
     result = await db.execute(query)
     records = list(result.scalars().all())
@@ -928,9 +929,8 @@ async def migrate_translatable_shape(
     if model is None:
         return 0
 
+    # Runs over every record regardless of deleted_at — see #414.
     query = select(model).where(model.metadata_.has_key(field.name))
-    if hasattr(model, "deleted_at"):
-        query = query.where(model.deleted_at.is_(None))
 
     result = await db.execute(query)
     records = list(result.scalars().all())
@@ -997,9 +997,8 @@ async def migrate_repeatable_shape(
     if model is None:
         return 0
 
+    # Runs over every record regardless of deleted_at — see #414.
     query = select(model).where(model.metadata_.has_key(field.name))
-    if hasattr(model, "deleted_at"):
-        query = query.where(model.deleted_at.is_(None))
 
     result = await db.execute(query)
     records = list(result.scalars().all())

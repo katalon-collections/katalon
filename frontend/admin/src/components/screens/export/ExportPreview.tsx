@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { exportMappingSets } from '../../../api/client'
 import type { MappingDiagnostic } from '../../../types'
-import { AlertCircle, Eye } from '../../ui/Icons'
+import { AlertCircle, Check, Copy, Download, Eye } from '../../ui/Icons'
 import { SpecimenPicker, type Specimen } from './SpecimenPicker'
 
 function formatXml(xml: string): string {
@@ -81,12 +81,21 @@ function storeSpecimen(recordType: string, specimen: Specimen | null) {
 }
 
 
-export function ExportPreview({ recordType, mappingSetId }: { recordType: string; mappingSetId: string }) {
+export function ExportPreview({
+  recordType,
+  mappingSetId,
+  formatKey,
+}: {
+  recordType: string
+  mappingSetId: string
+  formatKey?: string
+}) {
   const { t } = useTranslation('screenExport')
   const [specimen, setSpecimen] = useState<Specimen | null>(() => readStoredSpecimen(recordType))
   const [xml, setXml] = useState<string | null>(null)
   const [diagnostics, setDiagnostics] = useState<MappingDiagnostic[]>([])
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -118,6 +127,29 @@ export function ExportPreview({ recordType, mappingSetId }: { recordType: string
     }
   }
 
+  async function handleCopy() {
+    if (!xml) return
+    try {
+      await navigator.clipboard.writeText(xml)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Ignore copy error
+    }
+  }
+
+  function handleDownload() {
+    if (!xml) return
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const ext = formatKey ? `${formatKey}.xml` : 'xml'
+    a.download = `${specimen?.idno || specimen?.id || 'record'}.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="settings-card" style={{ marginBottom: 16 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 10 }}>{t('previewHeadline')}</h3>
@@ -133,6 +165,30 @@ export function ExportPreview({ recordType, mappingSetId }: { recordType: string
         >
           <Eye size={13} /> {loading ? t('previewLoading') : t('previewButton')}
         </button>
+
+        {xml && (
+          <>
+            <button
+              type="button"
+              className="btn sm gh"
+              onClick={handleCopy}
+              title={copied ? t('xmlCopied') : t('copyXml')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              {copied ? <Check size={13} style={{ color: '#16a34a' }} /> : <Copy size={13} />}
+              {copied ? t('xmlCopied') : t('copyXml')}
+            </button>
+            <button
+              type="button"
+              className="btn sm gh"
+              onClick={handleDownload}
+              title={t('downloadXml')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Download size={13} /> {t('downloadXml')}
+            </button>
+          </>
+        )}
       </div>
 
       {error && (

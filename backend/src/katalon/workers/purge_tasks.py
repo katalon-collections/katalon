@@ -36,17 +36,26 @@ def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 
-async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutoff: datetime) -> int:
+async def _purge_records(
+    session: AsyncSession,
+    records: list[Any],
+    record_type: str,
+    *,
+    cutoff: datetime | None,
+    user_id: uuid.UUID | None,
+) -> int:
+    """Hard-delete every one of ``records`` (already confirmed soft-deleted).
+
+    Shared by the nightly retention sweep (``_purge_type``, one ``record_type``
+    at a time, ``cutoff`` = retention window) and the manual admin purge of a
+    single record (``purge_record_now``, ``cutoff=None``, no retention check —
+    the caller already verified the record is trashed).
+    """
     from katalon.core.models import MediaFile
     from katalon.services.audit_service import log_change
     from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
     from katalon.services.relation_cleanup_service import cleanup_relation_refs
     from katalon.services.relation_service import delete_relations
-
-    result = await session.execute(
-        select(model).where(model.deleted_at.is_not(None), model.deleted_at < cutoff)
-    )
-    records = result.scalars().all()
 
     # Phase 1: commit every to-be-purged record's media deletion intent before
     # touching storage at all. A crash or rollback here leaves every physical
@@ -94,21 +103,54 @@ async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutof
         await delete_relations(session, record_type, record.id)
         await cleanup_relation_refs(session, record_type, record.id, cutoff=cutoff)
         await log_change(
-            session, record_type=record_type, record_id=record.id, user_id=None, action="purge"
+            session, record_type=record_type, record_id=record.id, user_id=user_id, action="purge"
         )
         await session.delete(record)
         purged += 1
     return purged
 
 
+async def _purge_type(session: AsyncSession, model: Any, record_type: str, cutoff: datetime) -> int:
+    result = await session.execute(
+        select(model).where(model.deleted_at.is_not(None), model.deleted_at < cutoff)
+    )
+    records = list(result.scalars().all())
+    return await _purge_records(session, records, record_type, cutoff=cutoff, user_id=None)
+
+
+async def purge_record_now(
+    session: AsyncSession, record_type: str, record_id: uuid.UUID, user_id: uuid.UUID | None
+) -> bool:
+    """Manually hard-delete a single trashed record on admin request.
+
+    Returns False if the record does not exist or is not currently
+    soft-deleted (nothing to purge) — the caller turns that into a 404.
+    """
+    model = _PURGEABLE_MODELS.get(record_type)
+    if model is None:
+        return False
+    record = await session.get(model, record_id)
+    if record is None or record.deleted_at is None:
+        return False
+    purged = await _purge_records(session, [record], record_type, cutoff=None, user_id=user_id)
+    return purged == 1
+
+
 async def _do_purge() -> dict[str, int]:
-    from katalon.config import settings
+    from sqlalchemy import select as _select
+
+    from katalon.core.models import AdminConfig
     from katalon.database import AsyncSessionLocal
     from katalon.workers.enqueue import run_after_commit_hooks
 
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=settings.purge_after_days)
     totals: dict[str, int] = {}
     async with AsyncSessionLocal() as session:
+        config = await session.scalar(_select(AdminConfig).where(AdminConfig.key == "default"))
+        if config is not None and not config.auto_purge_enabled:
+            logger.info("Auto-purge disabled via AdminConfig — skipping run")
+            return totals
+        retention_days = config.purge_retention_days if config is not None else 30
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=retention_days)
         for record_type, model in _PURGEABLE_MODELS.items():
             totals[record_type] = await _purge_type(session, model, record_type, cutoff)
         await session.commit()

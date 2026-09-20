@@ -41,6 +41,49 @@ OAI_DC_TARGETS = {
 }
 
 
+def _rule_values(ctx: ExportRecordContext, rule: Any) -> list[str]:
+    """Resolve one mapping rule's values for the given record (shared by render + required-field checks)."""
+    values: list[str] = []
+    if rule.source_kind == SourceKind.FIELD:
+        field_name = rule.field_name
+        if field_name:
+            values = extract_values(ctx, field_name)
+    elif rule.source_kind == SourceKind.RELATION:
+        rel_type = rule.source_config.get("relation_type")
+        target_field = rule.source_config.get("target_field")
+        rel_direction = str(rule.source_config.get("direction") or "outbound")
+        for rel in ctx.relations:
+            if rel.direction != rel_direction:
+                continue
+            if not rel_type or rel.relation_type == rel_type:
+                val = (
+                    rel.target_values.get(target_field)
+                    if target_field
+                    else (rel.target_label or rel.target_idno)
+                )
+                if val:
+                    values.append(str(val))
+    elif rule.source_kind == SourceKind.RECORD:
+        prop = rule.source_config.get("property") or rule.target_key
+        if prop == "canonical_url" and ctx.record.canonical_url:
+            values = [ctx.record.canonical_url]
+        elif getattr(ctx.record, prop, None):
+            values = [str(getattr(ctx.record, prop))]
+    elif rule.source_kind == SourceKind.CONSTANT:
+        if const_val := rule.source_config.get("value") or rule.settings.get("value"):
+            values = [str(const_val)]
+    elif rule.source_kind == SourceKind.MEDIA:
+        prop = rule.source_config.get("property", "url")
+        for m in ctx.media:
+            val = getattr(m, prop, None)
+            if val:
+                values.append(str(val))
+
+    if prefix := rule.settings.get("prefix"):
+        values = [f"{prefix}{v}" for v in values]
+    return values
+
+
 class OaiDcFormat(MetadataFormat):
     key = "oai_dc"
     label = "OAI Dublin Core"
@@ -116,45 +159,7 @@ class OaiDcFormat(MetadataFormat):
             if not rule.is_enabled:
                 continue
 
-            values: list[str] = []
-            if rule.source_kind == SourceKind.FIELD:
-                field_name = rule.field_name
-                if field_name:
-                    values = extract_values(ctx, field_name)
-            elif rule.source_kind == SourceKind.RELATION:
-                rel_type = rule.source_config.get("relation_type")
-                target_field = rule.source_config.get("target_field")
-                rel_direction = str(rule.source_config.get("direction") or "outbound")
-                for rel in ctx.relations:
-                    if rel.direction != rel_direction:
-                        continue
-                    if not rel_type or rel.relation_type == rel_type:
-                        val = (
-                            rel.target_values.get(target_field)
-                            if target_field
-                            else (rel.target_label or rel.target_idno)
-                        )
-                        if val:
-                            values.append(str(val))
-            elif rule.source_kind == SourceKind.RECORD:
-                prop = rule.source_config.get("property") or rule.target_key
-                if prop == "canonical_url" and ctx.record.canonical_url:
-                    values = [ctx.record.canonical_url]
-                elif getattr(ctx.record, prop, None):
-                    values = [str(getattr(ctx.record, prop))]
-            elif rule.source_kind == SourceKind.CONSTANT:
-                if const_val := rule.source_config.get("value") or rule.settings.get("value"):
-                    values = [str(const_val)]
-            elif rule.source_kind == SourceKind.MEDIA:
-                prop = rule.source_config.get("property", "url")
-                for m in ctx.media:
-                    val = getattr(m, prop, None)
-                    if val:
-                        values.append(str(val))
-
-            for value in values:
-                if prefix := rule.settings.get("prefix"):
-                    value = f"{prefix}{value}"
+            for value in _rule_values(ctx, rule):
                 mapped_targets.add(rule.target_key)
                 if rule.target_key.startswith("dc:"):
                     ET.SubElement(dc, rule.target_key).text = value

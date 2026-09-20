@@ -18,6 +18,7 @@
   "tabActive": "Aktiv",
   "tabCompleted": "Abgeschlossen",
   "tabCancelled": "Abgebrochen",
+  "tabTrash": "Papierkorb",
   "recordsCount": "{{count}} Datensätze",
   "addButton": "Neu anlegen",
   "searchAriaLabel": "{{type}} durchsuchen",
@@ -75,5 +76,10 @@
   "paginationPageSize": "{{size}} pro Seite",
   "paginationPageAriaLabel": "Seite {{number}}",
   "presenceBadge": "wird bearbeitet",
-  "presenceBadgeTitle": "Wird bearbeitet von: {{names}}"
+  "presenceBadgeTitle": "Wird bearbeitet von: {{names}}",
+  "trashHint": "Datensätze im Papierkorb werden automatisch endgültig gelöscht, sofern die automatische Bereinigung aktiv ist (siehe Admin-Einstellungen).",
+  "trashRowActionsAriaLabel": "Aktionen für {{label}}",
+  "restoreRowTitle": "Wiederherstellen",
+  "purgeRowTitle": "Endgültig löschen",
+  "purgeConfirm": "{{type}} endgültig löschen? Dies kann nicht rückgängig gemacht werden."
 }

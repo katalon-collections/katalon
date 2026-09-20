@@ -7,11 +7,6 @@ import { ChevD, ChevU, Globe, Info } from '../../ui/Icons'
 
 const VALIDATORS = [
   {
-    nameKey: 'validatorDdb',
-    url: 'https://validator.deutsche-digitale-bibliothek.de/',
-    formats: ['lido', 'mets_mods', 'oai_dc'],
-  },
-  {
     nameKey: 'validatorEuropeana',
     url: 'https://metis.europeana.eu/',
     formats: ['lido', 'oai_dc'],

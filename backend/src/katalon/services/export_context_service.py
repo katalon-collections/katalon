@@ -179,15 +179,19 @@ async def build_export_context_from_db(
             ).order_by(MediaFile.is_primary.desc(), MediaFile.created_at)
         )
         for mf in media_res.scalars().all():
-            media_url = f"{clean_base}/api/v1/media/{mf.id}/download" if clean_base else f"/api/v1/media/{mf.id}/download"
+            media_url = f"{clean_base}/v1/media/{mf.id}/download" if clean_base else f"/v1/media/{mf.id}/download"
             iiif_url = f"{clean_base}/iiif/3/{mf.id}/full/max/0/default.jpg" if clean_base and mf.iiif_storage_key else None
             rights_holder_str = None
+            rights_holder_uri = None
             if mf.rights_holder:
-                rights_holder_str = (
-                    mf.rights_holder.get("name")
-                    or mf.rights_holder.get("label")
-                    or str(mf.rights_holder)
-                )
+                if isinstance(mf.rights_holder, dict):
+                    rights_holder_str = (
+                        mf.rights_holder.get("name")
+                        or mf.rights_holder.get("label")
+                    )
+                    rights_holder_uri = mf.rights_holder.get("uri")
+                else:
+                    rights_holder_str = str(mf.rights_holder)
 
             media.append(
                 ExportMediaItem(
@@ -201,6 +205,7 @@ async def build_export_context_from_db(
                     iiif_url=iiif_url,
                     license_uri=mf.license_uri,
                     rights_holder=rights_holder_str,
+                    rights_holder_uri=rights_holder_uri,
                 )
             )
 

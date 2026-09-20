@@ -6,7 +6,14 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from katalon.integrations.lido.builder import LIDO_NS, build_lido_element
+from katalon.integrations.lido.builder import (
+    GML_NS,
+    LIDO_NS,
+    SCHEMA_LOC,
+    XSI_NS,
+    build_lido_element,
+    missing_required_fields,
+)
 from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportProfileCapabilities,
@@ -25,12 +32,17 @@ LIDO_TARGETS = {
     "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
     "lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription",
     "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue",
+    "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/short",
+    "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/condition",
     "lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:displayObjectMeasurements",
+    "lido:objectClassificationWrap/lido:classificationWrap/lido:classification",
+    "lido:objectRelationWrap/lido:relatedWorksWrap/lido:relatedWorkSet/lido:relatedWork/lido:displayObject",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventType/lido:term",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:displayDate",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventDate/lido:date/lido:earliestDate",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventActor/lido:actorInRole/lido:actor/lido:nameActorSet/lido:appellationValue",
     "lido:eventWrap/lido:eventSet/lido:event/lido:eventPlace/lido:displayPlace",
+    "lido:eventWrap/lido:eventSet/lido:event/lido:eventMaterialsTech/lido:displayMaterialsTech",
     "lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term",
     "lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term",
     "lido:administrativeMetadata/lido:resourceWrap/lido:resourceSet/lido:resourceRepresentation/lido:linkResource",
@@ -97,6 +109,46 @@ class LidoFormat(MetadataFormat):
                 {SourceKind.FIELD},
             ),
             (
+                "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/short",
+                "identification",
+                "Kurzbeschreibung",
+                "Short Description",
+                "Kurze Zusammenfassung, separat von der ausführlichen Beschreibung (lido:type=\"brief\")",
+                "Brief summary, kept separate from the full description (lido:type=\"brief\")",
+                False,
+                {SourceKind.FIELD},
+            ),
+            (
+                "lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue/condition",
+                "identification",
+                "Erhaltungszustand",
+                "Condition",
+                "Zustandsbeschreibung des Objekts (lido:type=\"condition\")",
+                "Condition statement for the object (lido:type=\"condition\")",
+                False,
+                {SourceKind.FIELD},
+            ),
+            (
+                "lido:objectClassificationWrap/lido:classificationWrap/lido:classification",
+                "classification",
+                "Klassifikation / Sammlung",
+                "Classification / Collection",
+                "Zusätzlicher Klassifikationsbegriff, etwa Sammlungszugehörigkeit",
+                "Additional classification term, such as collection membership",
+                False,
+                {SourceKind.FIELD, SourceKind.CONSTANT, SourceKind.RELATION},
+            ),
+            (
+                "lido:objectRelationWrap/lido:relatedWorksWrap/lido:relatedWorkSet/lido:relatedWork/lido:displayObject",
+                "relations",
+                "Verwandtes Werk / Teil von",
+                "Related Work / Part of",
+                "Bezug zu einem anderen Objekt oder Werk (z. B. Teil-von-Beziehung)",
+                "Reference to another object or work (e.g. part-of relationship)",
+                False,
+                {SourceKind.FIELD, SourceKind.RELATION},
+            ),
+            (
                 "lido:eventWrap/lido:eventSet/lido:event/lido:eventType/lido:term",
                 "events",
                 "Ereignistyp",
@@ -135,6 +187,16 @@ class LidoFormat(MetadataFormat):
                 "Artist, photographer, publisher or involved entity",
                 False,
                 {SourceKind.FIELD, SourceKind.RELATION},
+            ),
+            (
+                "lido:eventWrap/lido:eventSet/lido:event/lido:eventMaterialsTech/lido:displayMaterialsTech",
+                "events",
+                "Material / Technik",
+                "Materials / Technique",
+                "Angabe zu Material und Technik (z. B. Öl auf Leinwand, Bronze)",
+                "Statement on materials and techniques (e.g. oil on canvas, bronze)",
+                False,
+                {SourceKind.FIELD, SourceKind.CONSTANT},
             ),
             (
                 "lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term",
@@ -204,7 +266,7 @@ class LidoFormat(MetadataFormat):
                 continue
             if rule.target_key.startswith("lido:events/"):
                 parts = rule.target_key.split("/")
-                if len(parts) == 3 and parts[2] in {"type", "actor", "date", "earliest_date", "place"}:
+                if len(parts) == 3 and parts[2] in {"type", "actor", "date", "earliest_date", "place", "materials_tech"}:
                     continue
             diagnostics.append(
                 MappingDiagnostic(
@@ -260,6 +322,13 @@ class LidoFormat(MetadataFormat):
             )
         return diagnostics
 
+    def required_field_errors(
+        self,
+        ctx: ExportRecordContext,
+        mapping_set: CompiledMappingSet,
+    ) -> list[str]:
+        return missing_required_fields(ctx, mapping_set)
+
     def render(
         self,
         hit: ExportRecordContext | dict[str, Any],
@@ -272,3 +341,24 @@ class LidoFormat(MetadataFormat):
             else CompiledMappingSet.from_legacy_dict(self.key, ctx.record.record_type, mappings)
         )
         return build_lido_element(ctx, mapping_set, mapping_set.institution_config)
+
+    def render_batch_envelope(self) -> tuple[str, str]:
+        header = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<lido:lidoWrap xmlns:lido="{LIDO_NS}" xmlns:gml="{GML_NS}" '
+            f'xmlns:xsi="{XSI_NS}" xsi:schemaLocation="{SCHEMA_LOC}">\n'
+        )
+        return (header, "</lido:lidoWrap>\n")
+
+    def render_batch_item(
+        self,
+        hit: ExportRecordContext | dict[str, Any],
+        mappings: CompiledMappingSet | dict[str, list[str]],
+    ) -> ET.Element:
+        ctx = hit if isinstance(hit, ExportRecordContext) else ExportRecordContext.from_hit(hit)
+        mapping_set = (
+            mappings
+            if isinstance(mappings, CompiledMappingSet)
+            else CompiledMappingSet.from_legacy_dict(self.key, ctx.record.record_type, mappings)
+        )
+        return build_lido_element(ctx, mapping_set, mapping_set.institution_config, wrap_envelope=False)

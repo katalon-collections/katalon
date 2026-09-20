@@ -3,12 +3,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser, presence, locks } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser, locks, presence, users } from '../../api/client'
 import type { ActivePresence, LockInfo } from '../../api/client'
-import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordSubtype } from '../../types'
+import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordPermission, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
 import { StatusBadge } from '../ui/StatusBadge'
-import { Edit, Eye, Folder, Layers, Plus, Search, Trash } from '../ui/Icons'
+import { Edit, Eye, Folder, Layers, Plus, RotateCcw, Search, Trash } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
 import { BatchEditModal } from './BatchEditModal'
 import { AddToWorkingSetModal } from './AddToWorkingSetModal'
@@ -105,20 +105,30 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const api = getApi(recordType)
   const subtypeKey = SUBTYPE_KEYS[recordType]
 
-  const tabs = recordType === 'procedure'
-    ? [
-        { id: 'all',       label: t('tabAll') },
-        { id: 'draft',     label: t('tabDraft') },
-        { id: 'active',    label: t('tabActive') },
-        { id: 'completed', label: t('tabCompleted') },
-        { id: 'cancelled', label: t('tabCancelled') },
-      ]
-    : [
-        { id: 'all',      label: t('tabAll') },
-        { id: 'draft',    label: t('tabDraft') },
-        { id: 'internal', label: t('tabInternal') },
-        { id: 'public',   label: t('tabPublic') },
-      ]
+  const user = getTokenUser()
+  const isAdmin = user?.role === 'admin' || user?.role === 'superuser'
+  // Papierkorb ist nur für object/entity/place/occurrence/collection verdrahtet (#414-Folgearbeit) —
+  // procedure hat keinen deleted_at-Lebenszyklus (archive() statt soft delete), storage_location
+  // hat einen eigenen Screen (ScreenStorageLocation.tsx).
+  const showTrashTab = isAdmin && recordType !== 'procedure'
+
+  const tabs = [
+    ...(recordType === 'procedure'
+      ? [
+          { id: 'all',       label: t('tabAll') },
+          { id: 'draft',     label: t('tabDraft') },
+          { id: 'active',    label: t('tabActive') },
+          { id: 'completed', label: t('tabCompleted') },
+          { id: 'cancelled', label: t('tabCancelled') },
+        ]
+      : [
+          { id: 'all',      label: t('tabAll') },
+          { id: 'draft',    label: t('tabDraft') },
+          { id: 'internal', label: t('tabInternal') },
+          { id: 'public',   label: t('tabPublic') },
+        ]),
+    ...(showTrashTab ? [{ id: 'trash', label: t('tabTrash') }] : []),
+  ]
   const tabIds = tabs.map(t => t.id)
 
   const typeLabels: Record<ListableRecordType, string> = {
@@ -139,7 +149,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   }
 
   const [tab, setTab] = useState(initialTab && tabIds.includes(initialTab) ? initialTab : 'all')
-  const skipResetRef = useRef(true)
+  const previousRecordTypeRef = useRef(recordType)
   const [q, setQ] = useState('')
   const [subtypeFilter, setSubtypeFilter] = useState('')
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
@@ -153,9 +163,11 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestSeqRef = useRef(0)
   const selectAllRef = useRef<HTMLInputElement>(null)
-  const user = getTokenUser()
-  const canEdit = user?.features?.includes('import') || user?.role === 'admin' || user?.role === 'superuser'
-  const canDelete = user?.role === 'editor' || user?.role === 'admin' || user?.role === 'superuser'
+  const canEdit = user?.features?.includes('import') || isAdmin
+  const [recordPermissions, setRecordPermissions] = useState<RecordPermission[]>([])
+  const canDelete = recordPermissions.some(permission =>
+    permission.record_type === recordType && permission.action === 'delete'
+  )
 
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
@@ -165,7 +177,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const [batchOpen, setBatchOpen] = useState(false)
   const [addToSetOpen, setAddToSetOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void | Promise<void> } | null>(null)
+  const [confirmState, setConfirmState] = useState<{ message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void | Promise<void> } | null>(null)
   const [childDeleteTarget, setChildDeleteTarget] = useState<{ id: string; childCount: number } | null>(null)
   const [treeItems, setTreeItems] = useState<AnyRecord[] | null>(null)
 
@@ -219,7 +231,12 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   }, [recordType, subtypeKey])
 
   useEffect(() => {
-    if (skipResetRef.current) { skipResetRef.current = false; return }
+    users.recordPermissions().then(setRecordPermissions).catch(() => setRecordPermissions([]))
+  }, [])
+
+  useEffect(() => {
+    if (previousRecordTypeRef.current === recordType) return
+    previousRecordTypeRef.current = recordType
     setTab('all')
     setQ('')
     setSubtypeFilter('')
@@ -240,6 +257,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     const requestSeq = ++requestSeqRef.current
     setLoading(true)
     setError(null)
+    if (tab === 'trash') {
+      ;(api as unknown as { trashList: () => Promise<AnyRecord[]> }).trashList()
+        .then(items => {
+          if (requestSeq !== requestSeqRef.current) return
+          setData({ total: items.length, page: 1, page_size: items.length || 1, items })
+        })
+        .catch(e => {
+          if (requestSeq === requestSeqRef.current) setError(e.message)
+        })
+        .finally(() => {
+          if (requestSeq === requestSeqRef.current) setLoading(false)
+        })
+      return
+    }
     const params: Record<string, unknown> = {
       page,
       page_size: PAGE_SIZE,
@@ -360,6 +391,38 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     }
   }
 
+  const trashApi = api as unknown as {
+    restore: (id: string) => Promise<AnyRecord>
+    purge: (id: string) => Promise<void>
+  }
+
+  async function handleRestore(id: string) {
+    try {
+      await trashApi.restore(id)
+      removeLocally(id)
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  function handlePurge(id: string) {
+    setConfirmState({
+      message: t('purgeConfirm', { type: typeSingularLabels[recordType] }),
+      confirmLabel: t('purgeRowTitle'),
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await trashApi.purge(id)
+          removeLocally(id)
+        } catch (e) {
+          alert((e as Error).message)
+        } finally {
+          setConfirmState(null)
+        }
+      },
+    })
+  }
+
   // Primary label field: first list field, or fallback to label
   const primaryField = listFields[0]
   const primaryKey = primaryField?.name || 'label'
@@ -424,6 +487,8 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     return new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
+  const isTrashTab = tab === 'trash'
+
   // Build column configuration dynamically
   // Always: Checkbox, ID-Nr., [Subtype], [listFields...], Status, Geändert, Actions
   const showIdno = true
@@ -433,7 +498,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   // Additional list fields (after primary)
   const extraFields = listFields.slice(1)
 
-  const colCount = 4 + (showIdno ? 1 : 0) + (showSubtype ? 1 : 0) + extraFields.length
+  const colCount = 4 + (showIdno ? 1 : 0) + (showSubtype ? 1 : 0) + extraFields.length - (isTrashTab ? 1 : 0)
 
   return (
     <div className="scroll">
@@ -443,9 +508,11 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           <div className="sub">{t('recordsCount', { count: data.total })}</div>
         </div>
         <div className="right">
-          <button className="btn pri" onClick={() => onOpen?.('new')} data-tour="new-record-button">
-            <Plus size={13} /> {t('addButton')}
-          </button>
+          {!isTrashTab && (
+            <button className="btn pri" onClick={() => onOpen?.('new')} data-tour="new-record-button">
+              <Plus size={13} /> {t('addButton')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -458,40 +525,48 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         ))}
       </div>
 
-      <div className="toolbar">
-        <div className="search">
-          <Search className="ic" size={14} />
-          <input
-            aria-label={t('searchAriaLabel', { type: typeLabels[recordType] })}
-            placeholder={t('searchPlaceholder')}
-            value={q}
-            onChange={e => handleSearch(e.target.value)}
-          />
+      {!isTrashTab && (
+        <div className="toolbar">
+          <div className="search">
+            <Search className="ic" size={14} />
+            <input
+              aria-label={t('searchAriaLabel', { type: typeLabels[recordType] })}
+              placeholder={t('searchPlaceholder')}
+              value={q}
+              onChange={e => handleSearch(e.target.value)}
+            />
+          </div>
+          {availableSubtypes.length > 0 && (
+            <select
+              aria-label={t('subtypeFilterAriaLabel')}
+              className="fld"
+              style={{ maxWidth: 210 }}
+              value={subtypeFilter}
+              onChange={e => { resetSelection(); setSubtypeFilter(e.target.value); setPage(1) }}
+            >
+              <option value="">{t('subtypeFilterAll')}</option>
+              {availableSubtypes.map(subtype => (
+                <option key={subtype.id} value={subtype.name}>{getLabel(subtype, subtype.name)}</option>
+              ))}
+            </select>
+          )}
+          {recordType === 'procedure' && (
+            <>
+              <input aria-label={t('dueDateAriaLabel')} className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title={t('dueDateTitle')} />
+              <input aria-label={t('referenceNumberAriaLabel')} className="fld mono" style={{ maxWidth: 180 }} placeholder={t('referenceNumberPlaceholder')} value={referenceNumber} onChange={e => { resetSelection(); setReferenceNumber(e.target.value); setPage(1) }} />
+              <button className="btn gh" onClick={handleOverdue}>{t('overdueButton')}</button>
+            </>
+          )}
         </div>
-        {availableSubtypes.length > 0 && (
-          <select
-            aria-label={t('subtypeFilterAriaLabel')}
-            className="fld"
-            style={{ maxWidth: 210 }}
-            value={subtypeFilter}
-            onChange={e => { resetSelection(); setSubtypeFilter(e.target.value); setPage(1) }}
-          >
-            <option value="">{t('subtypeFilterAll')}</option>
-            {availableSubtypes.map(subtype => (
-              <option key={subtype.id} value={subtype.name}>{getLabel(subtype, subtype.name)}</option>
-            ))}
-          </select>
-        )}
-        {recordType === 'procedure' && (
-          <>
-            <input aria-label={t('dueDateAriaLabel')} className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title={t('dueDateTitle')} />
-            <input aria-label={t('referenceNumberAriaLabel')} className="fld mono" style={{ maxWidth: 180 }} placeholder={t('referenceNumberPlaceholder')} value={referenceNumber} onChange={e => { resetSelection(); setReferenceNumber(e.target.value); setPage(1) }} />
-            <button className="btn gh" onClick={handleOverdue}>{t('overdueButton')}</button>
-          </>
-        )}
-      </div>
+      )}
 
-      {someSel && (
+      {isTrashTab && (
+        <div className="empty" style={{ padding: '12px 24px', color: 'var(--fg-3)', fontSize: 13 }}>
+          {t('trashHint')}
+        </div>
+      )}
+
+      {!isTrashTab && someSel && (
         <div className="bb">
           <b>{selectionSummary()}</b>
           <div className="grow" />
@@ -520,18 +595,20 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
         <table className="tbl">
           <thead>
             <tr>
-              <th className="col-ck">
-                <label className="ck-hit">
-                  <input
-                    aria-label={t('selectAllAriaLabel')}
-                    ref={selectAllRef}
-                    type="checkbox"
-                    className={`ck${someSel && !allSel ? ' ind' : ''}`}
-                    checked={allSel}
-                    onChange={toggleAll}
-                  />
-                </label>
-              </th>
+              {!isTrashTab && (
+                <th className="col-ck">
+                  <label className="ck-hit">
+                    <input
+                      aria-label={t('selectAllAriaLabel')}
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className={`ck${someSel && !allSel ? ' ind' : ''}`}
+                      checked={allSel}
+                      onChange={toggleAll}
+                    />
+                  </label>
+                </th>
+              )}
               {showIdno && (
                 <th className="sortable" style={{ width: 140 }} onClick={() => handleSort('idno')}>
                   {t('tableIdno')}{sortBy === 'idno' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
@@ -568,17 +645,19 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
               const depth = collectionTree?.depth.get(rec.id) ?? 0
               return (
                 <tr key={rec.id} className={sel.has(rec.id) ? 'sel' : ''}>
-                  <td className="col-ck">
-                    <label className="ck-hit">
-                      <input aria-label={t('selectRowAriaLabel', { label: recordLabel })} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
-                    </label>
-                  </td>
+                  {!isTrashTab && (
+                    <td className="col-ck">
+                      <label className="ck-hit">
+                        <input aria-label={t('selectRowAriaLabel', { label: recordLabel })} type="checkbox" className="ck" checked={sel.has(rec.id)} onChange={() => toggle(rec.id)} />
+                      </label>
+                    </td>
+                  )}
                   {showIdno && <td className="mono">{idno}</td>}
                   {showSubtype && <td style={{ color: 'var(--fg-2)', fontSize: 12 }}>{subtypeVal}</td>}
                   <td>
                     {depth > 0 && <span style={{ display: 'inline-block', width: depth * 16 }} aria-hidden="true" />}
                     {depth > 0 && <span style={{ color: 'var(--fg-4)', marginRight: 4 }} aria-hidden="true">&#8627;</span>}
-                    {onOpen ? (
+                    {onOpen && !isTrashTab ? (
                       <button
                         type="button"
                         className="record-label-button"
@@ -618,26 +697,47 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   <td style={{ color: 'var(--fg-3)', fontSize: 12 }}>{fmt(rec.updated_at)}</td>
                   <td className="col-act">
                     <div className="row-actions">
-                      <ActionMenu
-                        ariaLabel={canEdit
-                          ? t('editRowAriaLabel', { label: recordLabel })
-                          : t('viewRowAriaLabel', { label: recordLabel })}
-                        items={[
-                          {
-                            key: canEdit ? 'edit' : 'view',
-                            label: canEdit ? t('editRowTitle') : t('viewRowTitle'),
-                            icon: canEdit ? <Edit size={13} /> : <Eye size={13} />,
-                            onClick: () => onOpen?.(rec.id),
-                          },
-                          ...(canDelete ? [{
-                            key: 'delete',
-                            label: t('deleteRowTitle'),
-                            icon: <Trash size={13} />,
-                            danger: true,
-                            onClick: () => handleDelete(rec.id),
-                          }] : []),
-                        ]}
-                      />
+                      {isTrashTab ? (
+                        <ActionMenu
+                          ariaLabel={t('trashRowActionsAriaLabel', { label: recordLabel })}
+                          items={[
+                            {
+                              key: 'restore',
+                              label: t('restoreRowTitle'),
+                              icon: <RotateCcw size={13} />,
+                              onClick: () => handleRestore(rec.id),
+                            },
+                            {
+                              key: 'purge',
+                              label: t('purgeRowTitle'),
+                              icon: <Trash size={13} />,
+                              danger: true,
+                              onClick: () => handlePurge(rec.id),
+                            },
+                          ]}
+                        />
+                      ) : (
+                        <ActionMenu
+                          ariaLabel={canEdit
+                            ? t('editRowAriaLabel', { label: recordLabel })
+                            : t('viewRowAriaLabel', { label: recordLabel })}
+                          items={[
+                            {
+                              key: canEdit ? 'edit' : 'view',
+                              label: canEdit ? t('editRowTitle') : t('viewRowTitle'),
+                              icon: canEdit ? <Edit size={13} /> : <Eye size={13} />,
+                              onClick: () => onOpen?.(rec.id),
+                            },
+                            ...(canDelete ? [{
+                              key: 'delete',
+                              label: t('deleteRowTitle'),
+                              icon: <Trash size={13} />,
+                              danger: true,
+                              onClick: () => handleDelete(rec.id),
+                            }] : []),
+                          ]}
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -705,9 +805,9 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       {confirmState && (
         <ConfirmModal
           message={confirmState.message}
-          confirmLabel={t('deleteRowTitle')}
+          confirmLabel={confirmState.confirmLabel ?? t('deleteRowTitle')}
           cancelLabel={t('cancel')}
-          danger
+          danger={confirmState.danger ?? true}
           onConfirm={confirmState.onConfirm}
           onCancel={() => setConfirmState(null)}
         />

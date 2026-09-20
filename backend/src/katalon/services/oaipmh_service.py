@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +26,8 @@ SCHEMA_LOC = (
 )
 
 PAGE_SIZE = 100
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -90,13 +93,23 @@ def _hit_to_oai_record(
     set_spec: str | None,
     metadata_format: MetadataFormat,
     mapping_index: MappingIndex | dict[str, Any] | None = None,
-) -> ET.Element:
+) -> ET.Element | None:
+    """Render one hit, or return None if it's missing required fields for `metadata_format`."""
     ctx = ExportRecordContext.from_hit(hit)
     record_id = ctx.record.id
     record_type = ctx.record.record_type
     record_mappings = (mapping_index or {}).get(record_type)
     if record_mappings is None:
         record_mappings = CompiledMappingSet(format_key=metadata_format.key, record_type=record_type)
+
+    missing = metadata_format.required_field_errors(ctx, record_mappings)
+    if missing:
+        logger.warning(
+            "OAI-PMH %s: Datensatz %s übersprungen (Pflichtfelder fehlen): %s",
+            metadata_format.key, ctx.record.idno or record_id, "; ".join(missing),
+        )
+        return None
+
     oai_rec = ET.Element("record")
     header = ET.SubElement(oai_rec, "header")
     ET.SubElement(header, "identifier").text = f"oai:{settings.oai_repository_domain}:{record_type}:{record_id}"
@@ -196,9 +209,16 @@ def list_records(
     if not hits:
         return _error(root, "noRecordsMatch", "No records match the query.")
 
+    record_els = [
+        el for hit in hits
+        if (el := _hit_to_oai_record(hit, set_spec, metadata_format, mapping_index)) is not None
+    ]
+    if not record_els:
+        return _error(root, "noRecordsMatch", "No records match the query.")
+
     lr = ET.SubElement(root, "ListRecords")
-    for hit in hits:
-        lr.append(_hit_to_oai_record(hit, set_spec, metadata_format, mapping_index))
+    for el in record_els:
+        lr.append(el)
 
     next_offset = offset + len(hits)
     if next_offset < total:
@@ -264,8 +284,15 @@ def get_record(
     req = ET.SubElement(root, "request", verb="GetRecord", metadataPrefix=prefix,
                         identifier=identifier)
     req.text = base_url
+    record_el = _hit_to_oai_record(hit, None, metadata_format, mapping_index)
+    if record_el is None:
+        return _error(
+            root,
+            "cannotDisseminateFormat",
+            f"Datensatz erfüllt nicht die Pflichtfelder für Format '{prefix}'.",
+        )
     gr = ET.SubElement(root, "GetRecord")
-    gr.append(_hit_to_oai_record(hit, None, metadata_format, mapping_index))
+    gr.append(record_el)
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 

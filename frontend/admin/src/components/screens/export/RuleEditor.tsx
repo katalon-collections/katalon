@@ -18,12 +18,14 @@ export interface RuleEditorProps {
   onUpdate: (ruleId: string, patch: SourceDraft) => void
   onToggle: (ruleId: string, enabled: boolean) => void
   onDelete: (ruleId: string) => void
+  onAddAnotherNote?: () => void
 }
 
-export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, relationTypeOptions, onAdd, onUpdate, onToggle, onDelete }: RuleEditorProps) {
+export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, relationTypeOptions, onAdd, onUpdate, onToggle, onDelete, onAddAnotherNote }: RuleEditorProps) {
   const { t, i18n } = useTranslation('screenExport')
   const lang = i18n.language.startsWith('en') ? 'en' : 'de'
-  const canAddMore = target.cardinality === 'many' || rules.length === 0
+  const isNoteTarget = target.editor_kind === 'mods_note' || target.key.startsWith('mods:note')
+  const canAddMore = !isNoteTarget && (target.cardinality === 'many' || rules.length === 0)
 
   return (
     <div className="settings-card" style={{ marginBottom: 16 }}>
@@ -89,6 +91,17 @@ export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, rel
       {canAddMore && (
         <button type="button" className="btn sm gh" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={onAdd}>
           <Plus size={13} /> {t('ruleAddLabel')}
+        </button>
+      )}
+
+      {isNoteTarget && onAddAnotherNote && (
+        <button
+          type="button"
+          className="btn sm gh"
+          style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+          onClick={onAddAnotherNote}
+        >
+          <Plus size={13} /> {t('addAnotherNoteBtn')}
         </button>
       )}
     </div>

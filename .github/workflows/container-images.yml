@@ -80,8 +80,28 @@ jobs:
             ghcr.io/katalon-collections/katalon-${{ matrix.name }}:${{ needs.validate.outputs.version }}
           docker push ghcr.io/katalon-collections/katalon-${{ matrix.name }}:${{ needs.validate.outputs.version }}
 
-  release:
+  smoke-test-admin-routing:
     needs: [validate, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull built images
+        run: |
+          docker pull ghcr.io/katalon-collections/katalon-admin:${{ needs.validate.outputs.version }}
+          docker pull ghcr.io/katalon-collections/katalon-portal:${{ needs.validate.outputs.version }}
+      - name: Verify admin/nginx routing stays in sync
+        run: |
+          ./scripts/smoke-test-admin-routing.sh \
+            ghcr.io/katalon-collections/katalon-admin:${{ needs.validate.outputs.version }} \
+            ghcr.io/katalon-collections/katalon-portal:${{ needs.validate.outputs.version }}
+
+  release:
+    needs: [validate, build, smoke-test-admin-routing]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

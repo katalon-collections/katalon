@@ -719,6 +719,72 @@ async def test_disabling_repeatable_collapses_to_first_entry_and_drops_rest(
 
 
 @pytest.mark.asyncio
+async def test_disabling_repeatable_also_migrates_trashed_records(
+    async_client, auth_headers
+) -> None:
+    """#414 — a record in the trash (deleted_at set) must be migrated exactly
+    like an active one, otherwise a later restore() brings back a value shape
+    that no longer matches the schema and blocks the next save."""
+    field_name = f"tags_{uuid.uuid4().hex[:8]}"
+    create_field = await async_client.post(
+        "/v1/schema",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+            "is_repeatable": True,
+        },
+    )
+    assert create_field.status_code == 201, create_field.text
+    field_id = create_field.json()["id"]
+
+    created_object = await async_client.post(
+        "/v1/objects",
+        headers=auth_headers,
+        json={
+            "idno": f"REPEAT-TRASH-{uuid.uuid4().hex[:12]}",
+            "metadata_": {"label": "Papierkorb-Objekt", field_name: ["Erster", "Zweiter"]},
+        },
+    )
+    assert created_object.status_code == 201, created_object.text
+    object_id = created_object.json()["id"]
+
+    trash = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+    assert trash.status_code == 204, trash.text
+
+    toggle_off = await async_client.put(
+        f"/v1/schema/{field_id}",
+        headers=auth_headers,
+        json={
+            "target_type": "object",
+            "name": field_name,
+            "label": {"de": "Schlagwort"},
+            "field_type": "text",
+            "is_repeatable": False,
+        },
+    )
+    assert toggle_off.status_code == 200, toggle_off.text
+
+    restore = await async_client.post(f"/v1/objects/{object_id}/restore", headers=auth_headers)
+    assert restore.status_code == 200, restore.text
+    restored = restore.json()
+    assert restored["metadata_"][field_name] == "Erster"
+
+    # Restored record must be immediately re-savable — no leftover list value.
+    resave = await async_client.put(
+        f"/v1/objects/{object_id}",
+        headers={**auth_headers, "If-Match": str(restored["version"])},
+        json={
+            "idno": restored["idno"],
+            "metadata_": {**restored["metadata_"], "label": "Wiederhergestellt"},
+        },
+    )
+    assert resave.status_code == 200, resave.text
+
+
+@pytest.mark.asyncio
 async def test_field_usage_preview_reports_no_risk_for_interchangeable_types(
     async_client, auth_headers
 ) -> None:

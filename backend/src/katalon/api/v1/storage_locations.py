@@ -474,6 +474,29 @@ async def list_deleted_storage_locations(
     return list(result.scalars().all())
 
 
+@router.post(
+    "/{loc_id}/purge",
+    status_code=204,
+    summary="Permanently delete a soft-deleted storage location (hard delete)",
+    responses={
+        404: {"description": "Storage location not found or not in trash"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def purge_storage_location(
+    loc_id: uuid.UUID,
+    db: DBDep,
+    current_user: User = require_role("admin"),
+) -> None:
+    from katalon.workers.purge_tasks import purge_record_now
+
+    ok = await purge_record_now(db, "storage_location", loc_id, current_user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="Standort nicht gefunden oder nicht im Papierkorb"
+        )
+
+
 class StorageLocationObjectRead(BaseModel):
     id: uuid.UUID
     idno: str | None = None

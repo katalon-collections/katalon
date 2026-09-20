@@ -38,6 +38,19 @@ async def _create_role_user(
     return {"Authorization": f"Bearer {token}"}
 
 
+async def test_current_user_record_permissions_are_effective(
+    async_client, auth_headers: dict[str, str]
+) -> None:
+    admin_response = await async_client.get("/v1/users/me/record-permissions", headers=auth_headers)
+    assert admin_response.status_code == 200, admin_response.text
+    assert {"record_type": "storage_location", "action": "delete"} in admin_response.json()
+
+    viewer_headers = await _create_role_user(async_client, auth_headers, "viewer")
+    viewer_response = await async_client.get("/v1/users/me/record-permissions", headers=viewer_headers)
+    assert viewer_response.status_code == 200, viewer_response.text
+    assert not any(row["record_type"] == "storage_location" for row in viewer_response.json())
+
+
 @asynccontextmanager
 async def _without_read_permission(
     async_client, auth_headers: dict[str, str], role: str, record_type: str

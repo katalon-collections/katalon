@@ -19,23 +19,23 @@ import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
 
-function ViewerFallback({ objectId, mediaFiles }: { objectId: string; mediaFiles: MediaFile[] }) {
+function ViewerFallback({ objectId, mediaFiles, title }: { objectId: string; mediaFiles: MediaFile[]; title: string }) {
   if (mediaFiles.length === 1) {
     return (
       <img
         src={mediaThumbnailUrl(objectId, mediaFiles[0].id)}
-        alt=""
+        alt={title}
         style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
       />
     )
   }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-      {mediaFiles.map(f => (
+      {mediaFiles.map((f, i) => (
         <img
           key={f.id}
           src={mediaThumbnailUrl(objectId, f.id)}
-          alt=""
+          alt={`${title} (${i + 1}/${mediaFiles.length})`}
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#0f172a' }}
         />
       ))}
@@ -133,7 +133,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   ) : showViewer ? (
     <IIIFViewer manifestUrl={manifestUrl} onError={() => setViewerError(true)} />
   ) : readyMedia.length > 0 ? (
-    <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} />
+    <ViewerFallback objectId={obj.id} mediaFiles={readyMedia} title={title} />
   ) : placeholderUrl ? (
     <img
       src={placeholderUrl}

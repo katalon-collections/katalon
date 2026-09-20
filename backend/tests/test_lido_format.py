@@ -101,6 +101,103 @@ def test_lido_uses_only_explicit_mapping_values(bpk_fixture: ExportRecordContext
     assert "60508_ca_object_representations_media_104088_original.jpg" in xml_str
 
 
+def test_lido_renders_materials_tech_valid_xsd() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="mat-001",
+            idno="MAT-001",
+            record_type="object",
+            title="Gemälde",
+            status="public",
+        ),
+        fields={"title": "Gemälde", "material": "Öl auf Leinwand"},
+        relations=[],
+        media=[],
+    )
+    fmt = LidoFormat()
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.CONSTANT,
+                source_config={"value": "Gemälde"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.CONSTANT,
+                source_config={"value": "Herstellung"},
+                target_key="lido:events/production/type",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "material"},
+                target_key="lido:events/production/materials_tech",
+            ),
+        ],
+    )
+
+    el = fmt.render(ctx, cms)
+    xml_str = ET.tostring(el, encoding="unicode")
+    assert "<lido:displayMaterialsTech>Öl auf Leinwand</lido:displayMaterialsTech>" in xml_str
+
+    errors = validate_lido_xml(xml_str)
+    assert errors == [], f"MaterialsTech LIDO record failed XSD: {errors}"
+
+
+def test_lido_batch_envelope_renders_valid_xsd() -> None:
+    ctx1 = ExportRecordContext(
+        record=ExportRecordSummary(id="b1", idno="B-001", record_type="object", title="Objekt 1"),
+        fields={"title": "Objekt 1"},
+        relations=[],
+        media=[],
+    )
+    ctx2 = ExportRecordContext(
+        record=ExportRecordSummary(id="b2", idno="B-002", record_type="object", title="Objekt 2"),
+        fields={"title": "Objekt 2"},
+        relations=[],
+        media=[],
+    )
+    fmt = LidoFormat()
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "title"},
+                target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+            ),
+            MappingSpec(
+                source_kind=SourceKind.CONSTANT,
+                source_config={"value": "Objekt"},
+                target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+            ),
+        ],
+    )
+
+    header, footer = fmt.render_batch_envelope()
+    item1 = fmt.render_batch_item(ctx1, cms)
+    item2 = fmt.render_batch_item(ctx2, cms)
+
+    assert "lido:lido" in item1.tag
+    assert "lidoWrap" not in item1.tag
+
+    batch_xml = header + ET.tostring(item1, encoding="unicode") + "\n" + ET.tostring(item2, encoding="unicode") + "\n" + footer
+    assert "<collection>" not in batch_xml
+    assert batch_xml.startswith("<?xml")
+    assert "<lido:lidoWrap" in batch_xml
+    assert batch_xml.strip().endswith("</lido:lidoWrap>")
+
+    errors = validate_lido_xml(batch_xml)
+    assert errors == [], f"Batch LIDO stream failed XSD: {errors}"
+
+
 # ---------------------------------------------------------------------------
 # Minimal Record & Empty Envelopes
 # ---------------------------------------------------------------------------
@@ -290,6 +387,20 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
             "export_context": bpk_fixture.to_dict(),
         },
     }
+    # Title mapping required, else the record is now skipped (empty appellationValue).
+    mapping_index = {
+        "object": CompiledMappingSet(
+            format_key="lido",
+            record_type="object",
+            rules=[
+                MappingSpec(
+                    source_kind=SourceKind.FIELD,
+                    source_config={"field_name": "title"},
+                    target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+                ),
+            ],
+        ),
+    }
 
     # 1. OAI GetRecord
     get_rec_xml = oaipmh_service.get_record(
@@ -298,6 +409,7 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
         identifier="oai:katalon:object:550e8400",
         prefix="lido",
         metadata_format=fmt,
+        mapping_index=mapping_index,
     )
     assert "<GetRecord>" in get_rec_xml
     assert "<lido:lidoWrap" in get_rec_xml
@@ -315,10 +427,51 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
         prefix="lido",
         base_url="http://test/oai",
         metadata_format=fmt,
+        mapping_index=mapping_index,
     )
     assert "<ListRecords>" in list_rec_xml
     assert "<lido:lidoWrap" in list_rec_xml
     assert "Historische Bildpostkarten" not in list_rec_xml
+
+
+def test_oai_get_record_missing_required_field_returns_cannot_disseminate(
+    bpk_fixture: ExportRecordContext,
+) -> None:
+    """No title mapping configured -> record must not be exported with an empty appellationValue."""
+    fmt = LidoFormat()
+    hit = {
+        "_id": bpk_fixture.record.id,
+        "_source": {
+            "record_type": "object",
+            "title": bpk_fixture.record.title,
+            "idno": bpk_fixture.record.idno,
+            "export_context": bpk_fixture.to_dict(),
+        },
+    }
+
+    xml_str = oaipmh_service.get_record(
+        hit,
+        base_url="http://test/oai",
+        identifier="oai:katalon:object:550e8400",
+        prefix="lido",
+        metadata_format=fmt,
+    )
+    assert "cannotDisseminateFormat" in xml_str
+    assert "<GetRecord>" not in xml_str
+
+    list_xml = oaipmh_service.list_records(
+        hits=[hit],
+        total=1,
+        offset=0,
+        set_spec="object",
+        from_=None,
+        until=None,
+        prefix="lido",
+        base_url="http://test/oai",
+        metadata_format=fmt,
+    )
+    assert "noRecordsMatch" in list_xml
+    assert "<ListRecords>" not in list_xml
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ docker-compose.log
 docker-compose.override.yml
 .claude/settings.local.json
 .claude/
+.codex/
 .env
 .codegraph/
 .agents/knowledge/_site/

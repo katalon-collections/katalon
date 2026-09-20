@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Karl Krägelin
 
+import inspect
 from collections.abc import AsyncGenerator
+from contextvars import ContextVar
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -20,6 +22,48 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+class SessionHolder:
+    def __init__(self) -> None:
+        self.session: AsyncSession | None = None
+
+
+_request_session_holder_var: ContextVar[SessionHolder | None] = ContextVar(
+    "request_session_holder", default=None
+)
+
+
+def register_current_session(session: AsyncSession) -> None:
+    """Register the active database session for the current request context."""
+    holder = _request_session_holder_var.get()
+    if holder is not None:
+        holder.session = session
+
+
+def get_current_session() -> AsyncSession | None:
+    """Return the database session registered for the current request, if any."""
+    holder = _request_session_holder_var.get()
+    return holder.session if holder is not None else None
+
+
+async def commit_current_session() -> None:
+    """Commit the database session active in the current request context, if any,
+    and flush after_commit hooks immediately.
+
+    Called by DatabaseCommitMiddleware BEFORE the HTTP response is transmitted
+    to the client socket, preventing read-after-write race conditions where an
+    immediate client-side refetch observes pre-commit database state.
+    """
+    from katalon.workers.enqueue import run_after_commit_hooks
+
+    session = get_current_session()
+    if session is not None and session.is_active:
+        in_tx = session.in_transaction()
+        if inspect.isawaitable(in_tx):
+            in_tx = await in_tx
+        if in_tx:
+            await session.commit()
+        await run_after_commit_hooks(session)
 
 
 class Base(DeclarativeBase):
@@ -42,11 +86,20 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
     from katalon.workers.enqueue import discard_after_commit_hooks, run_after_commit_hooks
 
     async with AsyncSessionLocal() as session:
+        register_current_session(session)
         try:
             yield session
-            await session.commit()
-            await run_after_commit_hooks(session)
+            if session.is_active:
+                in_tx = session.in_transaction()
+                if inspect.isawaitable(in_tx):
+                    in_tx = await in_tx
+                if in_tx:
+                    await session.commit()
+                await run_after_commit_hooks(session)
         except Exception:
             discard_after_commit_hooks(session)
             await session.rollback()
             raise
+
+
+

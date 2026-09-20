@@ -306,6 +306,57 @@ async def patch_media(
     return _serialize(media)
 
 
+def _serve_media_response(media: MediaFile, as_attachment: bool = False) -> Response:
+    storage = get_storage()
+    disposition = "attachment" if as_attachment else "inline"
+    headers = {"Content-Disposition": f'{disposition}; filename="{media.filename}"'}
+    if isinstance(storage, LocalStorage):
+        path = storage.local_path(media.storage_key)
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+        return FileResponse(
+            path,
+            media_type=media.mime_type,
+            filename=media.filename,
+            content_disposition_type=disposition,
+        )
+    if not storage.exists(media.storage_key):
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return StreamingResponse(
+        storage.stream(media.storage_key),
+        media_type=media.mime_type,
+        headers=headers,
+    )
+
+
+async def serve_media_by_id(
+    media_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    as_attachment: bool = False,
+) -> Response:
+    query = select(MediaFile).where(
+        MediaFile.id == media_id, MediaFile.deleted_at.is_(None)
+    )
+    result = await db.execute(query)
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+
+    obj_result = await db.execute(select(Object).where(Object.id == media.object_id))
+    obj = obj_result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Objekt nicht gefunden")
+
+    visibility_user = await _visibility_user(db, current_user)
+    ensure_publicly_visible(obj, visibility_user, "Objekt nicht gefunden")
+    if visibility_user is None:
+        if media.status != "ready" or not media.is_public:
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+
+    return _serve_media_response(media, as_attachment=as_attachment)
+
+
 @router.get(
     "/{media_id}/file",
     summary="Serve the raw media file",
@@ -329,22 +380,7 @@ async def serve_media_file(
     media = result.scalar_one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    # Local backend keeps the efficient FileResponse sendfile path. S3 streams
-    # through the API on purpose: no presigned URLs, so private media cannot
-    # bypass the visibility check above.
-    storage = get_storage()
-    if isinstance(storage, LocalStorage):
-        path = storage.local_path(media.storage_key)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-        return FileResponse(path, media_type=media.mime_type, filename=media.filename)
-    if not storage.exists(media.storage_key):
-        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    return StreamingResponse(
-        storage.stream(media.storage_key),
-        media_type=media.mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{media.filename}"'},
-    )
+    return _serve_media_response(media, as_attachment=False)
 
 
 @router.get(
@@ -464,6 +500,28 @@ async def authorize_media(request: Request, db: DBDep, current_user: OptionalCur
         raise HTTPException(status_code=403)
 
     return Response(status_code=200)
+
+
+@internal_router.get(
+    "/{media_id}/file",
+    summary="Serve raw public media file by media ID",
+    responses={404: {"description": "Media file or file on disk not found"}},
+)
+async def serve_media_file_direct(
+    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    return await serve_media_by_id(media_id, db, current_user, as_attachment=False)
+
+
+@internal_router.get(
+    "/{media_id}/download",
+    summary="Download public media file by media ID",
+    responses={404: {"description": "Media file or file on disk not found"}},
+)
+async def download_media_file_direct(
+    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    return await serve_media_by_id(media_id, db, current_user, as_attachment=True)
 
 
 def _safe_join(root: Path, relative: str) -> Path:
