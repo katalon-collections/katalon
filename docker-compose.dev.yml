@@ -115,6 +115,7 @@ services:
       - "4001:5174"
     environment:
       - VITE_API_URL=
+      - CI=true
       - API_PROXY_TARGET=http://api:8000
       - VITE_ADMIN_URL=https://${KATALON_LOCAL_DOMAIN:-katalon.local}/admin/
     healthcheck:

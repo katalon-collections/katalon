@@ -81,6 +81,18 @@
     "current": "Current {{target}} value",
     "suggestion": "Translation from {{source}}"
   },
+  "ai": {
+    "generated": "AI-generated",
+    "generate": "AI suggestion",
+    "regenerate": "Regenerate",
+    "running": "AI is running…",
+    "saveFirst": "Save the record first, then generate an AI suggestion.",
+    "proposalTitle": "AI suggestion for {{label}}",
+    "currentValue": "Current value",
+    "suggestion": "AI suggestion",
+    "discard": "Discard",
+    "apply": "Apply"
+  },
   "unsavedChangesModal": {
     "title": "Unsaved changes",
     "prompt": "You have unsaved changes in this record. Are you sure you want to leave this page and discard all unsaved changes?",
@@ -95,4 +107,3 @@
     "failed": "Export failed: {{error}}"
   }
 }
-

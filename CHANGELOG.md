@@ -4,6 +4,12 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.39.0]
+
+- **KI-Vorschläge im Editor prüfen:** KI-Vervollständigungen werden vor dem Übernehmen
+  in einem bearbeitbaren Dialog angezeigt. So bleibt die fachliche Kontrolle erhalten;
+  weitgehend übernommene Vorschläge sind weiterhin transparent als KI-generiert markiert.
+
 ## [1.38.0]
 
 - **Automatische & manuelle Papierkorb-Bereinigung:** In den Admin-Einstellungen kann

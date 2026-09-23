@@ -38,7 +38,7 @@ from locust import HttpUser, LoadTestShape, between, events, task  # type: ignor
 
 
 def _default_host() -> str:
-    return os.getenv("KATALON_LOCUST_HOST", "http://localhost:8000")
+    return os.getenv("KATALON_LOCUST_HOST") or "http://localhost:8000"
 
 
 # name -> (users, spawn_rate, duration_seconds)

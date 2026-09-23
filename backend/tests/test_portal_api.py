@@ -1188,7 +1188,7 @@ async def test_portal_schema_cache_header_depends_on_the_viewer() -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             anon = await client.get("/portal/v1/schema/object")
             assert anon.headers["cache-control"] == "public, max-age=60"
-            assert anon.headers["vary"] == "Authorization"
+            assert "Authorization" in {value.strip() for value in anon.headers["vary"].split(",")}
 
             app.dependency_overrides[try_get_current_user] = lambda: staff_user
             staff = await client.get("/portal/v1/schema/object")

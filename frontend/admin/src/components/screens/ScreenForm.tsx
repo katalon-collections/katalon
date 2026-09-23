@@ -430,13 +430,14 @@ type AiProposal = {
  *  data-integrity requirement: AI involvement in a field value must be visible
  *  to catalogers, not just logged in the audit trail). */
 function AiDisclosureBadge({ model, at }: { model: string; at: string }) {
+  const { t } = useTranslation('screenForm')
   return (
     <span
       className="h"
       title={`KI-generiert (${model}) am ${new Date(at).toLocaleString('de')}`}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6, color: 'var(--accent-ink)' }}
     >
-      <Lightning size={11} /> KI
+      <Lightning size={11} /> {t('ai.generated')}
     </span>
   )
 }
@@ -455,6 +456,34 @@ function aiTextToValue(field: FieldDefinition, value: string): unknown {
     return item
   }
   return field.is_repeatable ? value.split('\n').map(item => item.trim()).filter(Boolean).map(coerce) : coerce(value)
+}
+
+function aiTextSimilarity(suggestion: string, value: string): number {
+  const normalize = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' ').trim()
+  const source = normalize(suggestion)
+  const accepted = normalize(value)
+  if (!source && !accepted) return 1
+  if (!source || !accepted) return 0
+  let previous = Array.from({ length: accepted.length + 1 }, (_, index) => index)
+  for (let sourceIndex = 1; sourceIndex <= source.length; sourceIndex += 1) {
+    const current = [sourceIndex]
+    for (let acceptedIndex = 1; acceptedIndex <= accepted.length; acceptedIndex += 1) {
+      current[acceptedIndex] = Math.min(
+        previous[acceptedIndex] + 1,
+        current[acceptedIndex - 1] + 1,
+        previous[acceptedIndex - 1] + (source[sourceIndex - 1] === accepted[acceptedIndex - 1] ? 0 : 1),
+      )
+    }
+    previous = current
+  }
+  return 1 - previous[accepted.length] / Math.max(source.length, accepted.length)
+}
+
+function retainsAiProvenance(field: FieldDefinition, suggestion: unknown, value: unknown): boolean {
+  if (field.field_type === 'text' || field.field_type === 'richtext') {
+    return aiTextSimilarity(aiValueToText(suggestion), aiValueToText(value)) > 0.7
+  }
+  return JSON.stringify(suggestion) === JSON.stringify(value)
 }
 
 function sanitizeMetadataForSave(
@@ -515,21 +544,21 @@ function AiProposalDialog({ proposal, onCancel, onApply }: {
       <div id="ai-proposal-title" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-s)', fontWeight: 700 }}>
         {translation
           ? t('aiTranslationProposal.title', { label, source: translation.sourceLanguage.toUpperCase(), target: translation.targetLanguage.toUpperCase() })
-          : `KI-Vorschlag für ${label}`}
+          : t('ai.proposalTitle', { label })}
       </div>
       <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         <label className="field" style={{ margin: 0 }}>
-          <span className="lbl">{translation ? t('aiTranslationProposal.current', { target: translation.targetLanguage.toUpperCase() }) : 'Aktueller Wert'}</span>
+          <span className="lbl">{translation ? t('aiTranslationProposal.current', { target: translation.targetLanguage.toUpperCase() }) : t('ai.currentValue')}</span>
           <textarea className="fld" value={aiValueToText(proposal.currentValue)} readOnly rows={8} />
         </label>
         <label className="field" style={{ margin: 0 }}>
-          <span className="lbl">{translation ? t('aiTranslationProposal.suggestion', { source: translation.sourceLanguage.toUpperCase() }) : 'KI-Vorschlag'}</span>
+          <span className="lbl">{translation ? t('aiTranslationProposal.suggestion', { source: translation.sourceLanguage.toUpperCase() }) : t('ai.suggestion')}</span>
           <textarea className="fld" value={suggestion} onChange={event => setSuggestion(event.target.value)} rows={8} autoFocus />
         </label>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-s)' }}>
-        <button className="btn gh" onClick={onCancel}>Verwerfen</button>
-        <button className="btn pri" onClick={() => onApply(aiTextToValue(proposal.field, suggestion))}>Übernehmen</button>
+        <button className="btn gh" onClick={onCancel}>{t('ai.discard')}</button>
+        <button className="btn pri" onClick={() => onApply(aiTextToValue(proposal.field, suggestion))}>{t('ai.apply')}</button>
       </div>
     </dialog>
   )
@@ -1886,6 +1915,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
   const user = getTokenUser()
   const features = user?.features ?? []
+  const canExport = features.includes('export')
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
   const canManageContent = !user || user.role === 'viewer' ? false : features.includes('import') || user.role === 'admin' || user.role === 'superuser'
 
@@ -2016,7 +2046,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   const loadExportFormats = useCallback(async () => {
-    if (isNew || !currentId || !features.includes('export')) {
+    if (isNew || !currentId || !canExport) {
       setAvailableExportFormats([])
       return
     }
@@ -2026,7 +2056,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     } catch {
       setAvailableExportFormats([])
     }
-  }, [isNew, currentId, recordType, features])
+  }, [isNew, currentId, recordType, canExport])
 
   useEffect(() => {
     loadExportFormats()
@@ -2933,7 +2963,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     const targetId = savedId ?? currentId
     if (!aiConfig || !targetId) return
     const currentValue = values[field.name]
-    const hasValue = !isEmptyValue(currentValue)
     setAiBusyField(field.name)
     setError(null)
     try {
@@ -2942,12 +2971,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         record_type: recordType,
         record_id: targetId,
       })
-      if (hasValue) setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model })
-      else {
-        setValuesDirty(prev => ({ ...prev, [field.name]: result.value }))
-        markAiProvenance(field.name, result.model)
-        clearFieldFeedback(field.name)
-      }
+      setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model })
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -2959,7 +2983,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   }
 
 
-  function applyAiTranslation(field: FieldDefinition, targetLanguage: string, value: unknown, model: string) {
+  function applyAiTranslation(field: FieldDefinition, targetLanguage: string, value: unknown, model: string | null) {
     setValuesDirty(previous => ({
       ...previous,
       [field.name]: {
@@ -2967,7 +2991,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         [targetLanguage]: String(value),
       },
     }))
-    markAiProvenance(`${field.name}.${targetLanguage}`, model)
+    if (model) markAiProvenance(`${field.name}.${targetLanguage}`, model)
     clearAiProvenance(field.name)
     clearFieldFeedback(field.name)
   }
@@ -2990,17 +3014,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         source_value: sourceValue,
       })
       const currentValue = valuesByLanguage[targetLanguage] ?? ''
-      if (!currentValue.trim()) {
-        applyAiTranslation(field, targetLanguage, result.value, result.model)
-      } else {
-        setAiProposal({
-          field,
-          currentValue,
-          suggestedValue: result.value,
-          model: result.model,
-          translation: { sourceLanguage, targetLanguage },
-        })
-      }
+      setAiProposal({
+        field,
+        currentValue,
+        suggestedValue: result.value,
+        model: result.model,
+        translation: { sourceLanguage, targetLanguage },
+      })
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -3028,12 +3048,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         group_index: groupIndex,
         group_instance: instance,
       })
-      if (isEmptyValue(currentValue)) {
-        updateGroupSubField(group.name, groupIndex, field.name, result.value)
-        markAiProvenance(`${group.name}.${groupIndex}.${field.name}`, result.model)
-      } else {
-        setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model, group: { name: group.name, index: groupIndex } })
-      }
+      setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model, group: { name: group.name, index: groupIndex } })
       if (result.warning) {
         setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
       }
@@ -3792,15 +3807,20 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           proposal={aiProposal}
           onCancel={() => setAiProposal(null)}
           onApply={value => {
+            const keepProvenance = retainsAiProvenance(aiProposal.field, aiProposal.suggestedValue, value)
             if (aiProposal.group) {
               updateGroupSubField(aiProposal.group.name, aiProposal.group.index, aiProposal.field.name, value)
-              markAiProvenance(`${aiProposal.group.name}.${aiProposal.group.index}.${aiProposal.field.name}`, aiProposal.model)
+              const path = `${aiProposal.group.name}.${aiProposal.group.index}.${aiProposal.field.name}`
+              if (keepProvenance) markAiProvenance(path, aiProposal.model)
+              else clearAiProvenance(path)
             } else if (aiProposal.translation) {
               const { field, translation, model } = aiProposal
-              applyAiTranslation(field, translation.targetLanguage, value, model)
+              applyAiTranslation(field, translation.targetLanguage, value, keepProvenance ? model : '')
+              if (!keepProvenance) clearAiProvenance(`${field.name}.${translation.targetLanguage}`)
             } else {
               setValuesDirty(previous => ({ ...previous, [aiProposal.field.name]: value }))
-              markAiProvenance(aiProposal.field.name, aiProposal.model)
+              if (keepProvenance) markAiProvenance(aiProposal.field.name, aiProposal.model)
+              else clearAiProvenance(aiProposal.field.name)
               clearFieldFeedback(aiProposal.field.name)
             }
             setAiProposal(null)
@@ -4022,6 +4042,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               <div className="bd">
                 {sectionFields.length > 0 && (
                   <div className="tabs" style={{ marginBottom: 12 }} role="tablist" aria-label={t('sections.label')}>
+                    {unassignedFields.length > 0 && (
+                      <button className={`tab${activeSection === undefined ? ' active' : ''}`} onClick={() => setActiveSectionId(null)} role="tab" aria-selected={activeSection === undefined}>
+                        {t('sections.general')}{sectionErrorCount(unassignedFields.map(field => field.name)) > 0 ? ` · ${sectionErrorCount(unassignedFields.map(field => field.name))}` : ''}
+                      </button>
+                    )}
                     {sectionFields.map(({ section, fields: sectionFields }) => {
                       const count = sectionErrorCount(sectionFields.map(field => field.name))
                       return (
@@ -4030,11 +4055,6 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         </button>
                       )
                     })}
-                    {unassignedFields.length > 0 && (
-                      <button className={`tab${activeSection === undefined ? ' active' : ''}`} onClick={() => setActiveSectionId(null)} role="tab" aria-selected={activeSection === undefined}>
-                        {t('sections.general')}{sectionErrorCount(unassignedFields.map(field => field.name)) > 0 ? ` · ${sectionErrorCount(unassignedFields.map(field => field.name))}` : ''}
-                      </button>
-                    )}
                   </div>
                 )}
 
@@ -4067,9 +4087,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             style={{ marginLeft: 8, padding: '2px 8px', height: 24 }}
                             onClick={() => runAIForField(f)}
                             disabled={justCreated || !savedId || aiBusyField !== null}
-                            title={!savedId ? 'Datensatz zuerst speichern.' : undefined}
+                            title={!savedId ? t('ai.saveFirst') : undefined}
                           >
-                            <Lightning size={12} /> {aiBusyField === f.name ? 'KI läuft…' : 'KI'}
+                            <Lightning size={12} /> {aiBusyField === f.name ? t('ai.running') : aiProvenance[f.name] ? t('ai.regenerate') : t('ai.generate')}
                           </button>
                         )}
                       </div>
@@ -4436,9 +4456,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                         className="btn sm gh"
                                         onClick={() => runAIForGroupSubField(f, sf, i)}
                                         disabled={justCreated || !savedId || aiBusyField !== null}
-                                        title={!savedId ? 'Datensatz zuerst speichern, dann KI-Vorschlag erzeugen.' : undefined}
+                                        title={!savedId ? t('ai.saveFirst') : undefined}
                                       >
-                                        <Lightning size={12} /> {aiBusyField === `${f.name}:${i}:${sf.name}` ? 'KI läuft…' : 'KI'}
+                                        <Lightning size={12} /> {aiBusyField === `${f.name}:${i}:${sf.name}` ? t('ai.running') : aiProvenance[`${f.name}.${i}.${sf.name}`] ? t('ai.regenerate') : t('ai.generate')}
                                       </button>
                                     )}
                                   </div>

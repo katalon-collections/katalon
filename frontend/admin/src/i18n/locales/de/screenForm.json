@@ -81,6 +81,18 @@
     "current": "Aktueller {{target}}-Wert",
     "suggestion": "Übersetzung aus {{source}}"
   },
+  "ai": {
+    "generated": "KI-generiert",
+    "generate": "KI-Vorschlag",
+    "regenerate": "Neu generieren",
+    "running": "KI läuft…",
+    "saveFirst": "Datensatz zuerst speichern, dann KI-Vorschlag erzeugen.",
+    "proposalTitle": "KI-Vorschlag für {{label}}",
+    "currentValue": "Aktueller Wert",
+    "suggestion": "KI-Vorschlag",
+    "discard": "Verwerfen",
+    "apply": "Übernehmen"
+  },
   "unsavedChangesModal": {
     "title": "Ungespeicherte Änderungen",
     "prompt": "Du hast ungespeicherte Änderungen an diesem Datensatz vorgenommen. Möchtest du die Seite wirklich verlassen und alle ungespeicherten Änderungen verwerfen?",
@@ -95,4 +107,3 @@
     "failed": "Export fehlgeschlagen: {{error}}"
   }
 }
-
