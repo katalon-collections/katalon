@@ -236,6 +236,8 @@ export interface PortalConfig {
   color_tokens: Record<string, string>
   supported_languages: string[]
   detail_sidebar_position: 'left' | 'right'
+  meta_row_layout: 'stacked' | 'inline'
+  meta_label_uppercase: boolean
   facet_sort: 'count' | 'alpha'
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]

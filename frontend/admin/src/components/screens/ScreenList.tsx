@@ -171,6 +171,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
 
   const [debouncedQ, setDebouncedQ] = useState('')
   const [listFields, setListFields] = useState<FieldDefinition[]>([])
+  const [batchFields, setBatchFields] = useState<FieldDefinition[]>([])
   const [sortBy, setSortBy] = useState<'idno' | 'status' | 'updated_at' | ''>('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectionMode, setSelectionMode] = useState<'page' | 'all'>('page')
@@ -214,12 +215,16 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   useEffect(() => {
     schema.list(recordType, subtypeFilter || undefined)
       .then(fields => {
+        setBatchFields(fields)
         const visible = fields
           .filter(f => f.show_in_list)
           .sort((a, b) => a.sort_order - b.sort_order)
         setListFields(visible)
       })
-      .catch(() => setListFields([]))
+      .catch(() => {
+        setListFields([])
+        setBatchFields([])
+      })
   }, [recordType, subtypeFilter])
 
   useEffect(() => {
@@ -774,7 +779,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       {batchOpen && (
         <BatchEditModal
           recordType={recordType}
-          fields={listFields}
+          fields={batchFields}
           selection={
             selectionMode === 'all'
               ? { mode: 'filters', ids: [], filters: currentFilters, count: data.total }

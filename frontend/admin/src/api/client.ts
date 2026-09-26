@@ -231,8 +231,14 @@ export const users = {
   update: (userId: string, data: { email?: string; password?: string; role?: string; is_active?: boolean }) =>
     req<UserRead>(`/v1/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
   remove: (userId: string) => req<void>(`/v1/users/${userId}`, { method: 'DELETE' }),
-  changeOwnPassword: (current_password: string, new_password: string) =>
-    req<void>('/v1/users/me/password', { method: 'PUT', body: JSON.stringify({ current_password, new_password }) }),
+  logoutOthers: async () => {
+    const token = await req<Token>('/v1/auth/logout-others', { method: 'POST' })
+    setToken(token.access_token)
+  },
+  changeOwnPassword: async (current_password: string, new_password: string) => {
+    const token = await req<Token>('/v1/users/me/password', { method: 'PUT', body: JSON.stringify({ current_password, new_password }) })
+    setToken(token.access_token)
+  },
   changeOwnEmail: (new_email: string, current_password: string) =>
     req<UserRead>('/v1/users/me/email', { method: 'PUT', body: JSON.stringify({ new_email, current_password }) }),
   setOwnOnboarding: (completed: boolean) =>
@@ -816,7 +822,7 @@ function fileFormName(file: FolderFile): string {
   return file.webkitRelativePath || file.name
 }
 
-function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (fraction: number) => void): Promise<T> {
+function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (fraction: number) => void, allowRefresh = true): Promise<T> {
   const { promise, resolve, reject } = Promise.withResolvers<T>()
   const xhr = new XMLHttpRequest()
   xhr.open('POST', resolveUrl(path))
@@ -827,6 +833,15 @@ function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (f
   }
   xhr.onerror = () => reject(new Error('Netzwerkfehler beim Hochladen.'))
   xhr.onload = () => {
+    if (xhr.status === 401 && allowRefresh) {
+      refreshAccessToken().then(
+        token => (token
+          ? uploadWithProgress<T>(path, formData, onProgress, false).then(resolve, reject)
+          : reject(new Error('Sitzung abgelaufen. Bitte neu anmelden.'))),
+        reject,
+      )
+      return
+    }
     if (xhr.status === 401) {
       setToken(null)
       _onUnauthorized?.()

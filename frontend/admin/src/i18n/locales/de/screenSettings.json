@@ -42,6 +42,12 @@
         "weak": "Passwort ist zu schwach."
       }
     },
+    "sessions": {
+      "title": "Sitzungen",
+      "intro": "Meldet dich auf allen anderen Geräten und Browsern ab. Diese Sitzung bleibt angemeldet.",
+      "submit": "Auf allen anderen Geräten abmelden",
+      "success": "Alle anderen Sitzungen wurden abgemeldet."
+    },
     "tour": {
       "title": "Onboarding-Tour",
       "intro": "Die wichtigsten Funktionen von Katalon kennenlernen.",
@@ -145,5 +151,13 @@
     "save": "Speichern",
     "saving": "Speichert…",
     "saved": "Gespeichert."
+  },
+  "detailLayout": {
+    "metaRowLabel": "Metadaten-Darstellung",
+    "metaRowStacked": "Untereinander",
+    "metaRowInline": "Label: Wert",
+    "metaRowHint": "Gilt einheitlich für alle Detailseiten.",
+    "metaLabelUppercase": "Feldbezeichnungen in Großbuchstaben",
+    "metaLabelUppercaseHint": "Betrifft Metadaten und Verknüpfungen auf allen Detailseiten."
   }
 }

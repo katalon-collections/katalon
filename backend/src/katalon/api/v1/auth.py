@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
-from katalon.core.dependencies import get_user_features
+from katalon.core.dependencies import CurrentUser, get_user_features
 from katalon.core.limiter import limiter
 from katalon.core.models import PasswordResetToken, User
 from katalon.core.schemas import (
@@ -53,6 +53,10 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+# Verified against for unknown emails so login timing does not reveal which accounts exist.
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
 
 
 def _create_token(
@@ -117,7 +121,7 @@ async def login(
 ) -> Token:
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(form.password, user.hashed_password):
+    if not verify_password(form.password, user.hashed_password if user else _DUMMY_HASH) or not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Ungültige Anmeldedaten",
@@ -265,6 +269,18 @@ async def refresh_token(
         )
     features = await get_user_features(db, user)
     return issue_token_pair(user, response, features=features)
+
+
+@router.post(
+    "/logout-others",
+    response_model=Token,
+    summary="Sign out all other sessions and keep the calling one",
+    responses={200: {"description": "Fresh token pair for the calling session", "headers": _REFRESH_COOKIE_HEADER}},
+)
+async def logout_others(response: Response, db: DBDep, current_user: CurrentUser) -> Token:
+    current_user.token_version = (current_user.token_version or 0) + 1
+    features = await get_user_features(db, current_user)
+    return issue_token_pair(current_user, response, features=features)
 
 
 @router.post(

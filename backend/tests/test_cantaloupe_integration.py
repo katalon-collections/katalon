@@ -131,8 +131,8 @@ def test_build_object_manifest_multi_canvas_with_metadata() -> None:
     fd_desc.label = {"de": "Beschreibung", "en": "Description"}
 
     media_items = [
-        ("img1.jpg", {"width": 1200, "height": 800}),
-        ("img2.jpg", {"width": 600, "height": 400}),
+        ("img1.jpg", 1200, 800),
+        ("img2.jpg", 600, 400),
     ]
 
     manifest = build_object_manifest(
@@ -167,7 +167,7 @@ def test_build_object_manifest_falls_back_to_idno_for_label() -> None:
 
     manifest = build_object_manifest(
         "http://test/manifest",
-        [("img.jpg", None)],
+        [("img.jpg", None, None)],
         obj=obj,
     )
 
@@ -177,9 +177,21 @@ def test_build_object_manifest_falls_back_to_idno_for_label() -> None:
 def test_build_object_manifest_no_obj() -> None:
     manifest = build_object_manifest(
         "http://test/manifest",
-        [("img.jpg", None)],
+        [("img.jpg", None, None)],
     )
 
     assert manifest["type"] == "Manifest"
     assert len(manifest["items"]) == 1
     assert "label" not in manifest
+
+
+def test_object_manifest_uses_current_public_iiif_url() -> None:
+    media_items = [("img.jpg", 1200, 800)]
+    with patch("katalon.integrations.cantaloupe._public_base", return_value="https://new.example"):
+        manifest = build_object_manifest("https://new.example/manifest", media_items)
+
+    canvas = manifest["items"][0]
+    body = canvas["items"][0]["items"][0]["body"]
+    assert (canvas["width"], canvas["height"]) == (1200, 800)
+    assert body["id"] == "https://new.example/iiif/3/img.jpg/full/max/0/default.jpg"
+    assert body["service"][0]["id"] == "https://new.example/iiif/3/img.jpg"

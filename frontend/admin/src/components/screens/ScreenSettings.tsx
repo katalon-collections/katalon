@@ -52,6 +52,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
   const [pwdConfirm, setPwdConfirm] = useState('')
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState(false)
+  const [sessionsMsg, setSessionsMsg] = useState<{ ok: boolean, text: string } | null>(null)
   const [emailNew, setEmailNew] = useState('')
   const [emailPassword, setEmailPassword] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
@@ -108,6 +109,14 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
     } catch (e) { setPwdError((e as Error).message) }
   }
 
+  async function handleLogoutOthers() {
+    setSessionsMsg(null)
+    try {
+      await users.logoutOthers()
+      setSessionsMsg({ ok: true, text: t('profil.sessions.success') })
+    } catch (e) { setSessionsMsg({ ok: false, text: (e as Error).message }) }
+  }
+
   async function handleChangeEmail() {
     setEmailError(null); setEmailSuccess(false)
     if (!emailNew.trim()) { setEmailError(t('profil.email.errors.newRequired')); return }
@@ -157,6 +166,15 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
           {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
           {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{t('profil.password.success')}</div>}
           <button className="btn pri" onClick={handleChangePassword}>{t('profil.password.submit')}</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">{t('profil.sessions.title')}</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{t('profil.sessions.intro')}</p>
+          {sessionsMsg && <div style={{ fontSize: 12, color: sessionsMsg.ok ? '#166534' : '#dc2626', marginBottom: 8 }}>{sessionsMsg.text}</div>}
+          <button className="btn" onClick={handleLogoutOthers}>{t('profil.sessions.submit')}</button>
         </div>
       </div>
 
@@ -248,6 +266,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
 // ---------------------------------------------------------------------------
 
 function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
+  const { t } = useTranslation('screenSettings')
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -264,6 +283,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [browseTypes, setBrowseTypes] = useState(config.browse_enabled_types ?? ['object', 'entity', 'place', 'occurrence'])
   const [accentColor, setAccentColor] = useState(config.accent_color)
   const [detailSidebarPosition, setDetailSidebarPosition] = useState(config.detail_sidebar_position ?? 'right')
+  const [metaRowLayout, setMetaRowLayout] = useState(config.meta_row_layout ?? 'stacked')
+  const [metaLabelUppercase, setMetaLabelUppercase] = useState(config.meta_label_uppercase ?? false)
   const [showIiifManifestLink, setShowIiifManifestLink] = useState(config.show_iiif_manifest_link ?? true)
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
@@ -285,6 +306,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           browse_enabled_types: browseTypes,
           accent_color: accentColor,
           detail_sidebar_position: detailSidebarPosition,
+          meta_row_layout: metaRowLayout,
+          meta_label_uppercase: metaLabelUppercase,
           show_iiif_manifest_link: showIiifManifestLink,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
@@ -392,6 +415,29 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
               Gilt einheitlich für alle Detailseiten (Objekte, Entitäten, Orte, Occurrences). Auf kleinen Bildschirmen stehen Medien/Hauptinhalt immer zuerst.
+            </div>
+          </div>
+          <div className="field">
+            <div className="lbl">{t('detailLayout.metaRowLabel')}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={`btn${metaRowLayout === 'stacked' ? ' pri' : ' gh'}`} onClick={() => setMetaRowLayout('stacked')}>{t('detailLayout.metaRowStacked')}</button>
+              <button className={`btn${metaRowLayout === 'inline' ? ' pri' : ' gh'}`} onClick={() => setMetaRowLayout('inline')}>{t('detailLayout.metaRowInline')}</button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              {t('detailLayout.metaRowHint')}
+            </div>
+          </div>
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={metaLabelUppercase}
+                onChange={e => setMetaLabelUppercase(e.target.checked)}
+              />
+              {t('detailLayout.metaLabelUppercase')}
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              {t('detailLayout.metaLabelUppercaseHint')}
             </div>
           </div>
           <div className="field">

@@ -28,7 +28,7 @@ input, select, textarea { font-family: inherit; }
   background: var(--header-bg, #0b1a33);
   color: var(--header-fg, #fff);
   padding: 0 32px;
-  height: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   gap: 24px;
@@ -46,7 +46,7 @@ input, select, textarea { font-family: inherit; }
 .site-header .header-actions { display: contents; }
 .site-header .header-actions__bottom { display: contents; }
 .site-header .home-icon { display: none; align-items: center; justify-content: center; color: inherit; }
-.site-header .logo { font-weight: 700; font-size: 18px; letter-spacing: -.02em; color: inherit; }
+.site-header .logo { font-weight: 700; font-size: 18px; line-height: 1.2; letter-spacing: -.02em; color: inherit; min-width: 0; }
 .site-header nav { display: flex; gap: 4px; margin-left: 16px; }
 .site-header nav a { color: rgba(255,255,255,.7); font-size: 13.5px; padding: 6px 10px; border-radius: 5px; }
 .site-header nav a:hover { background: rgba(255,255,255,.08); color: #fff; text-decoration: none; }
@@ -279,8 +279,17 @@ input, select, textarea { font-family: inherit; }
 .detail-meta { background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 20px; align-self: start; }
 .meta-row { display: flex; flex-direction: column; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border, #e4e6eb); }
 .meta-row:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
-.meta-row .key { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3, #5a6173); font-weight: 600; margin-bottom: 3px; }
+.meta-row .key { font-size: 11px; letter-spacing: .02em; color: var(--fg-2, #3a3f4a); font-weight: 600; margin-bottom: 3px; }
 .meta-row .val { font-size: 13.5px; color: var(--fg, #181a1f); }
+/* meta_row_layout portal setting: "Label: Wert" inline instead of stacked */
+.detail-meta--inline .meta-row { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); align-items: baseline; column-gap: 12px; margin-bottom: 0; padding: 9px 0; border-bottom: 0; }
+.detail-meta--inline .meta-row:first-child { padding-top: 0; }
+.detail-meta--inline .meta-row:last-child { padding-bottom: 0; }
+.detail-meta--inline .meta-row .key { margin-bottom: 0; overflow-wrap: anywhere; }
+.detail-meta--inline .meta-row .key::after { content: ":"; }
+
+/* meta_label_uppercase portal setting: field/relation labels in capitals */
+.detail-layout--caps .meta-row .key, .detail-layout--caps .rel-key { text-transform: uppercase; letter-spacing: .04em; }
 
 /* Breadcrumb */
 .bc { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--fg-3, #5a6173); margin-bottom: 20px; }

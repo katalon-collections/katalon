@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.39.0"
+    "version": "1.40.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -705,6 +705,43 @@
         ]
       }
     },
+    "/v1/auth/logout-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out all other sessions and keep the calling one",
+        "operationId": "auth_logout_others_post_v1_auth_logout_others",
+        "responses": {
+          "200": {
+            "description": "Fresh token pair for the calling session",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Sets or clears the HttpOnly refresh-token cookie.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/v1/auth/logout": {
       "post": {
         "tags": [
@@ -1330,7 +1367,7 @@
         "tags": [
           "users"
         ],
-        "summary": "Change the current user's own password",
+        "summary": "Change the current user's own password and sign out all other sessions",
         "operationId": "users_change_own_password_put_v1_users_me_password",
         "requestBody": {
           "content": {
@@ -1343,8 +1380,15 @@
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
           },
           "400": {
             "description": "Current password incorrect"
@@ -25051,6 +25095,20 @@
             "title": "Detail Sidebar Position",
             "default": "right"
           },
+          "meta_row_layout": {
+            "type": "string",
+            "enum": [
+              "stacked",
+              "inline"
+            ],
+            "title": "Meta Row Layout",
+            "default": "stacked"
+          },
+          "meta_label_uppercase": {
+            "type": "boolean",
+            "title": "Meta Label Uppercase",
+            "default": false
+          },
           "supported_languages": {
             "items": {
               "type": "string"
@@ -25292,6 +25350,32 @@
               }
             ],
             "title": "Detail Sidebar Position"
+          },
+          "meta_row_layout": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "stacked",
+                  "inline"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Row Layout"
+          },
+          "meta_label_uppercase": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Label Uppercase"
           },
           "facet_sort": {
             "anyOf": [

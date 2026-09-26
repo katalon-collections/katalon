@@ -75,16 +75,15 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
 
           return (
             <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
-                <span style={{
-                  color: 'var(--fg-3)',
+              <div style={{ display: 'grid', gridTemplateColumns: '9.5rem minmax(0, 1fr)', alignItems: 'baseline', columnGap: 12, fontSize: 13 }}>
+                <span className="rel-key" style={{
+                  color: 'var(--fg-2, #3a3f4a)',
                   fontSize: 11,
-                  minWidth: 110,
-                  flexShrink: 0,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.04em',
+                  fontWeight: 600,
+                  overflowWrap: 'anywhere',
+                  letterSpacing: '.02em',
                 }}>
-                  {resolveLabel(r.relation_type, isFrom)}
+                  {resolveLabel(r.relation_type, isFrom)}:
                 </span>
                 <a
                   href="#"
@@ -95,7 +94,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
                 </a>
               </div>
               {meta && inheritedFieldNames.length > 0 && (
-                <div style={{ paddingLeft: 118, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ paddingLeft: 'calc(9.5rem + 12px)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {inheritedFieldNames.map(fname => {
                     const text = extractText(meta[fname])
                     if (!text) return null

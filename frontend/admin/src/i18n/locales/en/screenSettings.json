@@ -42,6 +42,12 @@
         "weak": "Password is too weak."
       }
     },
+    "sessions": {
+      "title": "Sessions",
+      "intro": "Signs you out on all other devices and browsers. This session stays signed in.",
+      "submit": "Sign out on all other devices",
+      "success": "All other sessions have been signed out."
+    },
     "tour": {
       "title": "Onboarding tour",
       "intro": "Walk through the key features of Katalon.",
@@ -145,5 +151,13 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved."
+  },
+  "detailLayout": {
+    "metaRowLabel": "Metadata display",
+    "metaRowStacked": "Stacked",
+    "metaRowInline": "Label: Value",
+    "metaRowHint": "Applies uniformly to all detail pages.",
+    "metaLabelUppercase": "Field labels in uppercase",
+    "metaLabelUppercaseHint": "Affects metadata and relations on all detail pages."
   }
 }

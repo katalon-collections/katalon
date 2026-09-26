@@ -163,6 +163,7 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
         recordType="place"
         aiProvenance={place.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
+        metaRowLayout={portalConfig.meta_row_layout}
         media={hasCoords ? <StaticMap lat={place.lat!} lon={place.lon!} name={title} /> : undefined}
         mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (

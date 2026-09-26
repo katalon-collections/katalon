@@ -23,6 +23,8 @@ const DEFAULT_CONFIG: PortalConfig = {
   color_tokens: {},
   supported_languages: ['de', 'en'],
   detail_sidebar_position: 'right',
+  meta_row_layout: 'stacked',
+  meta_label_uppercase: false,
   facet_sort: 'count',
   facet_initial_count: 10,
   homepage_blocks: [],

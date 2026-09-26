@@ -6,6 +6,8 @@ Turn-key Open-Source Metadata Management System (MMS) für den GLAM-Sektor — G
 
 Katalon verbindet flexible, dynamische Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
 
+> Both the Admin UI and the public Portal are fully multilingual, shipping with German and English out of the box. Field labels, vocabulary terms, and other collection metadata support any number of languages per install, configured through the UI. Additional UI interface languages can be added via a small locale file, no core code changes required.
+
 ---
 
 ## Was ist Katalon?
@@ -20,7 +22,7 @@ Katalon baut auf einem modernen Stack:
 - **IIIF als first-class citizen** — Hochauflösender Deep-Zoom für Digitalisate
 - **Volltextsuche**
 - **Facettierte Suche über alle Bestände**
-- **Theme-System** — Public-Portal per Drop-in-Bundle anpassbar, kein Rebuild nötig
+- **Theme-System** — Public-Portal per Drop-in-Bundle anpassbar (Farben, Logo, Schrift, Layout), kein Rebuild nötig — [Doku](https://katalon-collections.github.io/katalon-docs/administration/portal-themes/)
 
 Unique Selling Points:
 
@@ -222,78 +224,45 @@ Die lokale `docs/`-Ablage enthält nur technische Entwickler- und Betriebsdokume
 
 ---
 
-## Entwicklung
+## Entwicklung am Quellcode
 
-Für aktive lokale Entwicklung ist `make dev` der richtige Einstieg:
+Für Beiträge zum Quellcode steht ein Docker-Dev-Stack mit Live-Reload bereit:
 
 ```bash
-# Einmalig bzw. nach Änderungen an Dockerfiles oder Dependencies
 make dev
 ```
 
-`make dev` startet den Docker-Dev-Stack aus `docker-compose.yml` und
-`docker-compose.dev.yml` im Vordergrund. Backend und beide Frontends laufen
-darin mit Live-Reload; Quellcodeänderungen brauchen normalerweise keinen
-Rebuild. Die Oberflächen sind unter
-[`http://localhost:4000`](http://localhost:4000) (Admin) und
-[`http://localhost:4001`](http://localhost:4001) (Portal) erreichbar. Die
-direkte API liegt unter
-[`http://localhost:8000/api/docs`](http://localhost:8000/api/docs).
+Backend und beide Frontends laufen darin mit Live-Reload; die Oberflächen
+sind unter `http://localhost:4000` (Admin) und `http://localhost:4001`
+(Portal) erreichbar, die API-Dokumentation unter
+`http://localhost:8000/api/docs`. Nach dem Start oder nach Änderungen an
+Migrationen: `make migrate`.
 
-Für optionale HTTPS-Hostnamen wie
-[`https://admin.katalon.local`](https://admin.katalon.local) läuft Caddy
-zusätzlich als Host-Prozess vor dem Dev-Stack. Einrichtung und Startbefehl
-stehen in [`docs/dev_https.md`](docs/dev_https.md).
-
-Nach dem Start oder nach Änderungen an Migrationen:
-
-```bash
-make migrate
-```
-
-`make up` ist dagegen für den normalen beziehungsweise production-like
-Compose-Stack gedacht. Es führt `docker compose up -d --build` ohne das
-Dev-Override aus: Container laufen im Hintergrund, ohne Live-Reload. Der
-Zugriff erfolgt über nginx unter
-[`http://localhost/`](http://localhost/) (Portal) und
-[`http://localhost/admin/`](http://localhost/admin/) (Admin). Verwende
-`make up` zum End-to-End-Testen des gebauten Stacks, nicht als täglichen
+`make up` startet stattdessen den production-like Stack im Hintergrund
+(Zugriff über nginx unter `http://localhost/` bzw. `http://localhost/admin/`)
+— nützlich zum End-to-End-Testen des gebauten Stacks, nicht als täglicher
 Entwicklungsworkflow.
-
-Kurzfassung:
-
-| Ziel       | Zweck                                | Zugriff                       |
-|------------|--------------------------------------|-------------------------------|
-| `make dev` | Aktive Entwicklung mit Live-Reload   | `:4000` Admin, `:4001` Portal |
-| `make up`  | Production-like Stack im Hintergrund | `/admin/` Admin, `/` Portal   |
-
-Die Infrastruktur für lokale Prozesse kann separat mit `make up-dev`
-gestartet werden. Das ist nur nötig, wenn Backend und Frontends direkt auf
-dem Host laufen sollen; dafür gelten die Ports `5173` (Admin), `5174`
-(Portal) und `8000` (API). Die vollständigen Varianten stehen in
-
-## `.agents/DEV.md`
 
 ## Lizenz
 
 [AGPL-3.0-or-later](LICENSE)
 
-### Disclaimer
+### Haftungsausschluss
 
-Katalon Collections is provided as free and open-source software under the GNU Affero General Public License v3.0 (AGPL-3.0).
+Katalon Collections wird als freie Open-Source-Software unter der GNU Affero General Public License v3.0 (AGPL-3.0) bereitgestellt.
 
-The software is provided "as is" and without warranty of any kind, as further specified in the license.
+Die Software wird "wie besehen" und ohne jegliche Gewährleistung bereitgestellt, wie in der Lizenz näher spezifiziert.
 
-Katalon Collections may be used to store, manage and publish valuable, confidential or personal data. Operators are solely responsible for the secure deployment and operation of their installation, including in particular:
+Katalon Collections kann zur Speicherung, Verwaltung und Veröffentlichung wertvoller, vertraulicher oder personenbezogener Daten eingesetzt werden. Betreiberinstitutionen sind allein verantwortlich für den sicheren Einsatz und Betrieb ihrer Installation, insbesondere für:
 
-- regular and tested backups,
-- access control and authentication,
-- TLS and network security,
-- secure configuration and secrets management,
-- installation of security and dependency updates,
-- compliance with applicable data protection and other legal requirements,
-- review and testing before use in production environments.
+- regelmäßige und getestete Backups,
+- Zugriffskontrolle und Authentifizierung,
+- TLS und Netzwerksicherheit,
+- sichere Konfiguration und Secrets-Management,
+- Einspielen von Sicherheits- und Abhängigkeits-Updates,
+- Einhaltung geltender datenschutzrechtlicher und sonstiger gesetzlicher Anforderungen,
+- Prüfung und Test vor dem Einsatz in Produktivumgebungen.
 
-No software can guarantee complete protection against software defects, data loss, unauthorized access or other security incidents.
+Keine Software kann vollständigen Schutz vor Softwarefehlern, Datenverlust, unbefugtem Zugriff oder anderen Sicherheitsvorfällen garantieren.
 
-Please read the [LICENSE](LICENSE), [DISCLAIMER.md](DISCLAIMER.md) and [SECURITY.md](SECURITY.md) files before using Katalon Collections in production.
+Bitte [LICENSE](LICENSE), [DISCLAIMER.md](DISCLAIMER.md) und [SECURITY.md](SECURITY.md) vor dem Produktiveinsatz von Katalon Collections lesen.

@@ -502,11 +502,13 @@ export interface PortalConfigRead {
   placeholder_image_url: string
   color_tokens: Record<string, string>
   detail_sidebar_position: 'left' | 'right'
+  meta_row_layout: 'stacked' | 'inline'
   facet_sort: 'count' | 'alpha'
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
   show_iiif_manifest_link: boolean
+  meta_label_uppercase: boolean
 }
 
 export interface UserRead {

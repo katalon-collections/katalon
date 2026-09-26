@@ -3,7 +3,7 @@
 
 import uuid
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -30,6 +30,7 @@ def override_deps():
         id=uuid.uuid4(),
         email="admin@example.org",
         hashed_password=hash_password("Current123"),
+        token_version=0,
         role="admin",
         is_active=True,
         created_at=datetime.now(),
@@ -53,12 +54,16 @@ async def test_change_own_password_writes_audit_log(override_deps) -> None:
     session, user = override_deps
     old_hash = user.hashed_password
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.put("/v1/users/me/password", json={
-            "current_password": "Current123",
-            "new_password": "NewPass123",
-        })
+        with patch("katalon.api.v1.users.get_user_features", AsyncMock(return_value=[])):
+            response = await client.put("/v1/users/me/password", json={
+                "current_password": "Current123",
+                "new_password": "NewPass123",
+            })
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.json()["access_token"]
+    assert "katalon_refresh_token" in response.headers["set-cookie"]
+    assert user.token_version == 1
     assert user.hashed_password != old_hash
     assert verify_password("NewPass123", user.hashed_password)
     audit_entries = [

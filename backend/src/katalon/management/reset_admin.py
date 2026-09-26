@@ -70,6 +70,7 @@ async def _reset(email: str | None = None, password: str | None = None) -> None:
         result = await db.execute(select(User).where(User.id == target.id))
         user = result.scalar_one()
         user.hashed_password = hash_password(new_password)
+        user.token_version = (user.token_version or 0) + 1
         await db.commit()
 
     print()

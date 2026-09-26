@@ -5,11 +5,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import delete, select
 
-from katalon.api.v1.auth import hash_password, verify_password
-from katalon.core.dependencies import CurrentUser, DBDep, require_role
+from katalon.api.v1.auth import hash_password, issue_token_pair, verify_password
+from katalon.core.dependencies import CurrentUser, DBDep, get_user_features, require_role
 from katalon.core.models import FeaturePermission, RolePermission, User
 from katalon.core.schemas import (
     RECORD_TYPES,
@@ -21,6 +21,7 @@ from katalon.core.schemas import (
     RecordPermissionRead,
     RolePermissionRead,
     RolePermissionUpdate,
+    Token,
     UserCreate,
     UserRead,
     UserUpdate,
@@ -178,14 +179,16 @@ async def update_feature_permissions(
 
 @router.put(
     "/me/password",
-    status_code=204,
-    summary="Change the current user's own password",
+    summary="Change the current user's own password and sign out all other sessions",
     responses={400: {"description": "Current password incorrect"}},
 )
-async def change_own_password(data: PasswordChange, db: DBDep, current_user: CurrentUser) -> None:
+async def change_own_password(
+    data: PasswordChange, response: Response, db: DBDep, current_user: CurrentUser
+) -> Token:
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     current_user.hashed_password = hash_password(data.new_password)
+    current_user.token_version = (current_user.token_version or 0) + 1
     await log_change(
         db,
         record_type="user",
@@ -194,6 +197,8 @@ async def change_own_password(data: PasswordChange, db: DBDep, current_user: Cur
         action="update",
         changed_fields={"password": "updated"},
     )
+    features = await get_user_features(db, current_user)
+    return issue_token_pair(current_user, response, features=features)
 
 
 @router.put(

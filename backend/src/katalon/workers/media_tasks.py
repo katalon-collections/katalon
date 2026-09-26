@@ -124,7 +124,6 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
             return {"status": "error", "detail": str(exc)}
 
         manifest = build_manifest(media_file_id, filename, width=width, height=height)
-        media.iiif_manifest = manifest
         media.width = width
         media.height = height
         media.status = "ready"

@@ -7,6 +7,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
+import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow } from './RelationFieldRow'
 import { api, type VocabTerm } from '../api/client'
@@ -246,6 +247,7 @@ interface DetailPageLayoutProps {
   /** The record's own type, used to scope facet-click filter links to matching records. */
   recordType: string
   sidebarPosition: 'left' | 'right'
+  metaRowLayout?: 'stacked' | 'inline'
   /** Extra content rendered in the main column, after generic main fields and before relations (e.g. keyword tags, linked-objects grid). */
   mainExtra?: ReactNode
   /** Extra content rendered in the sidebar, before generic sidebar fields (e.g. inventory number). */
@@ -261,8 +263,9 @@ interface DetailPageLayoutProps {
  * admins control layout instead of it being hardcoded per record type.
  */
 export function DetailPageLayout({
-  media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, mainExtra, sidebarBefore, sidebarExtra, relations,
+  media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, metaRowLayout, mainExtra, sidebarBefore, sidebarExtra, relations,
 }: DetailPageLayoutProps) {
+  const { meta_label_uppercase } = usePortalConfig()
   const vocabularyLabels = useVocabularyLabels(recordType, fieldDefs, metadata, locale)
   const resolveRelationType = useRelationTypeLabels(locale)
   const detailFields = fieldDefs.filter(f => f.show_in_detail)
@@ -291,7 +294,7 @@ export function DetailPageLayout({
     }))
 
   const sidebar = (
-    <aside className="detail-meta">
+    <aside className={`detail-meta${metaRowLayout === 'inline' ? ' detail-meta--inline' : ''}`}>
       {sidebarBefore}
       {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} resolveRelationType={resolveRelationType} vocabularyLabels={vocabularyLabels} />)}
       {sidebarExtra}
@@ -308,7 +311,7 @@ export function DetailPageLayout({
   }
 
   return (
-    <div className={`detail-layout${sidebarPosition === 'left' ? ' detail-layout--sidebar-left' : ''}${media ? '' : ' detail-layout--no-media'}`}>
+    <div className={`detail-layout${sidebarPosition === 'left' ? ' detail-layout--sidebar-left' : ''}${media ? '' : ' detail-layout--no-media'}${meta_label_uppercase ? ' detail-layout--caps' : ''}`}>
       <div className="detail-main">
         {media}
         {description && (descriptionField!.field_type === 'richtext' ? richText(description) : (

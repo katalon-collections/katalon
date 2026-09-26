@@ -185,6 +185,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         recordType="object"
         aiProvenance={obj.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
+        metaRowLayout={portalConfig.meta_row_layout}
         media={media && (
           <>
             {media}

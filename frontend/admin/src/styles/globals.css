@@ -30,6 +30,10 @@ input, textarea, select { font-family: inherit; color: inherit; }
 svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+/* Slim, low-contrast scrollbars instead of the classic wide ones (Chromium on macOS/Windows/Linux) */
+* { scrollbar-width: thin; scrollbar-color: var(--border-s) transparent; }
+.sb, .sb * { scrollbar-color: rgba(255,255,255,.22) transparent; }
+
 .skip-link {
   position: absolute; top: -100px; left: 12px; z-index: 1000;
   padding: 10px 16px; border-radius: 6px;
@@ -77,6 +81,7 @@ svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .tb .gs:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-50); }
 .tb { height: 46px; display: flex; align-items: center; gap: 14px; padding: 0 22px; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .cr { display: flex; align-items: center; gap: 8px; color: var(--fg-3); font-size: 12.5px; min-width: 0; flex-shrink: 1; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; -ms-overflow-style: none; }
+.cr { scrollbar-width: none; }
 .cr::-webkit-scrollbar { display: none; }
 .cr b { color: var(--fg); font-weight: 500; }
 .cr .sep { color: var(--fg-5); }

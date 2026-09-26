@@ -84,7 +84,8 @@ async def test_process_fetches_info_builds_manifest_sets_ready() -> None:
     assert result["status"] == "ok"
     assert result["manifest"] == fake_manifest
     assert media.status == "ready"
-    assert media.iiif_manifest == fake_manifest
+    assert media.iiif_manifest is None
+    assert (media.width, media.height) == (1200, 800)
     session.commit.assert_awaited()
 
 

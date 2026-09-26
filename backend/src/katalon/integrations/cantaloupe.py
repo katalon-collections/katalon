@@ -41,16 +41,12 @@ async def fetch_image_info(filename: str) -> tuple[int | None, int | None]:
         return None, None
 
 
-def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest: dict[str, Any] | None) -> dict[str, Any]:
+def _build_canvas(
+    manifest_base: str, index: int, filename: str, width: int | None, height: int | None
+) -> dict[str, Any]:
     """Build a single IIIF Canvas for one media file."""
     img_base = f"{_public_base()}/iiif/3/{filename}"
     canvas_id = f"{manifest_base}/canvas/{index}"
-
-    width = height = None
-    if stored_manifest and stored_manifest.get("items"):
-        c = stored_manifest["items"][0]
-        width = c.get("width")
-        height = c.get("height")
 
     canvas: dict[str, Any] = {
         "id": canvas_id,
@@ -92,7 +88,7 @@ def _build_canvas(manifest_base: str, index: int, filename: str, stored_manifest
 
 def build_object_manifest(
     manifest_id: str,
-    media_items: list[tuple[str, dict[str, Any] | None]],
+    media_items: list[tuple[str, int | None, int | None]],
     obj: Any | None = None,
     field_defs: list[Any] | None = None,
     homepage_url: str | None = None,
@@ -100,8 +96,8 @@ def build_object_manifest(
 ) -> dict[str, Any]:
     """Build a multi-canvas IIIF Presentation 3.0 manifest for an object."""
     canvases = [
-        _build_canvas(manifest_id, i, filename, stored)
-        for i, (filename, stored) in enumerate(media_items, 1)
+        _build_canvas(manifest_id, i, filename, width, height)
+        for i, (filename, width, height) in enumerate(media_items, 1)
     ]
 
     manifest: dict[str, Any] = {

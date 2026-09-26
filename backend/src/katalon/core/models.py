@@ -740,6 +740,10 @@ class PortalConfig(Base):
     color_tokens: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])  # extra CSS var overrides
     # Global (not per-type) detail page layout: left/right sidebar position
     detail_sidebar_position: Mapped[str] = mapped_column(String(16), default="right", server_default="right")
+    # Global detail page metadata row layout: stacked (label above value) or inline ("label: value")
+    meta_row_layout: Mapped[str] = mapped_column(String(16), default="stacked", server_default="stacked")
+    # Render metadata/relation labels in uppercase on detail pages
+    meta_label_uppercase: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Global facet display settings (#321). Per-field override via
     # FieldDefinition.settings can be added later if actually needed.
     facet_sort: Mapped[str] = mapped_column(String(16), default="count", server_default="count")

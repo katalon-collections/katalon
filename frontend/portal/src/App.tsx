@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useEffect, useRef, useState, Suspense, lazy } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, Suspense, lazy } from 'react'
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
@@ -68,10 +68,54 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [headerPages, setHeaderPages] = useState<StaticPageSummary[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
+  const siteTitle = resolveLangText(config.site_title, locale, 'Katalon')
+  const logoRef = useRef<HTMLAnchorElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuToggleRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    const logo = logoRef.current
+    const header = headerRef.current
+    if (!logo || !header) return
+
+    let frame = 0
+    let active = true
+    const fit = () => {
+      logo.style.removeProperty('font-size')
+      if (getComputedStyle(logo).display === 'none') return
+      const originalSize = parseFloat(getComputedStyle(logo).fontSize)
+      const text = document.createRange()
+      text.selectNodeContents(logo)
+      let size = originalSize
+      const preferredMinimum = Math.max(14, originalSize * 0.7)
+      while (text.getClientRects().length > 1 && size > preferredMinimum) {
+        size = Math.max(preferredMinimum, size - 1)
+        logo.style.setProperty('font-size', `${size}px`, 'important')
+      }
+      while (text.getClientRects().length > 2 && size > 12) {
+        size = Math.max(12, size - 1)
+        logo.style.setProperty('font-size', `${size}px`, 'important')
+      }
+    }
+    const scheduleFit = () => {
+      if (!active) return
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(fit)
+    }
+    const observer = new ResizeObserver(scheduleFit)
+    observer.observe(header)
+    observer.observe(logo)
+    scheduleFit()
+    document.fonts.ready.then(scheduleFit)
+    return () => {
+      active = false
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [siteTitle])
 
   useEffect(() => {
     api.pages.list().then(ps => setHeaderPages(ps.filter(p => p.placement === 'header'))).catch(() => {})
@@ -144,8 +188,8 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   }
 
   return (
-    <header className="site-header">
-      <Link to="/" className="logo">{resolveLangText(config.site_title, locale, 'Katalon')}</Link>
+    <header ref={headerRef} className="site-header">
+      <Link ref={logoRef} to="/" className="logo">{siteTitle}</Link>
       <Link to="/" className="home-icon" aria-label={t('nav.home')} title={t('nav.home')}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9.5 10 3l7 6.5" /><path d="M5 8v8h10V8" />

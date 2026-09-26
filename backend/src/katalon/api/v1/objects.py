@@ -681,7 +681,8 @@ async def iiif_manifest(
     from katalon.core.media_storage import iiif_identifier
 
     media_items = [
-        (iiif_identifier(m.iiif_storage_key, m.storage_key), m.iiif_manifest) for m in media_files
+        (iiif_identifier(m.iiif_storage_key, m.storage_key), m.width, m.height)
+        for m in media_files
     ]
     portal_url = settings.katalon_base_url.rstrip("/")
     manifest_id = f"{portal_url}{request.url.path}" if portal_url else str(request.url)
