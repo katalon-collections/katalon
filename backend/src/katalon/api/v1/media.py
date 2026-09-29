@@ -472,7 +472,11 @@ async def authorize_media(request: Request, db: DBDep, current_user: OptionalCur
     against the media file's is_public flag and the parent object's visibility
     before nginx forwards it to Cantaloupe.
     """
-    original_uri = request.headers.get("x-original-uri", "")
+    # nginx auth_request (docker/nginx.conf) sends X-Original-URI; ingress-nginx
+    # auth-url (charts/katalon) only sends the full X-Original-URL.
+    original_uri = request.headers.get("x-original-uri") or urlparse(
+        request.headers.get("x-original-url", "")
+    ).path
     match = re.match(r"^/iiif/3/([^/]+)/", original_uri)
     if not match:
         raise HTTPException(status_code=403)

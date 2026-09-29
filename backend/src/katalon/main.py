@@ -14,8 +14,10 @@ from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
@@ -188,13 +190,17 @@ async def _ensure_admin() -> None:
                         base_url,
                     )
                 first_run_email = derived_admin_email or settings.default_admin_email
-                first_run_password = secrets.token_urlsafe(FIRST_RUN_PASSWORD_TOKEN_BYTES)
+                first_run_password = (
+                    settings.initial_admin_password
+                    if settings.initial_admin_password not in _DEFAULT_PASSWORDS | {""}
+                    else secrets.token_urlsafe(FIRST_RUN_PASSWORD_TOKEN_BYTES)
+                )
                 admin_email = first_run_email
                 admin_password = first_run_password
                 admin_role = "superuser"
             else:
                 admin_email = settings.default_admin_email
-                admin_password = settings.default_admin_password
+                admin_password = settings.initial_admin_password
                 admin_role = "admin"
                 logger.warning(
                     "KATALON_BASE_URL is empty; falling back to configured default admin credentials."
@@ -504,8 +510,9 @@ def _check_production_secrets() -> None:
     errors = []
     if settings.secret_key in _DEFAULT_SECRETS or len(settings.secret_key) < 32:
         errors.append("SECRET_KEY is insecure — set a strong random value (>= 32 chars) via environment variable")
-    if settings.default_admin_password in _DEFAULT_PASSWORDS:
-        errors.append("DEFAULT_ADMIN_PASSWORD is set to a well-known default — change it before going live")
+    # Only the empty-KATALON_BASE_URL fallback in _ensure_admin uses this password.
+    if not settings.katalon_base_url.strip() and settings.initial_admin_password in _DEFAULT_PASSWORDS | {""}:
+        errors.append("INITIAL_ADMIN_PASSWORD is set to a well-known default — change it before going live")
     if errors:
         raise RuntimeError("Refusing to start in production mode:\n" + "\n".join(f"  - {e}" for e in errors))
 
@@ -592,12 +599,52 @@ app = FastAPI(
     version=_api_version,
     contact={"name": "Katalon Collections", "url": "https://github.com/katalon-collections/katalon"},
     license_info={"name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later"},
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    docs_url=None,
+    redoc_url=None,
     openapi_url="/api/openapi.json",
     openapi_tags=OPENAPI_TAGS,
     generate_unique_id_function=_openapi_operation_id,
 )
+
+_DOCS_STATIC_DIR = Path(__file__).parent / "static" / "docs"
+app.mount("/api/docs-static", StaticFiles(directory=_DOCS_STATIC_DIR), name="docs-static")
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def swagger_ui_html() -> Response:
+    """Self-hosted Swagger UI: no CDN, no inline <script> (see VENDORED.md), so
+    it works under the strict script-src 'self' CSP set by nginx."""
+    return Response(
+        content=f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link type="text/css" rel="stylesheet" href="/api/docs-static/swagger-ui.css">
+<title>{app.title} - Swagger UI</title>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="/api/docs-static/swagger-ui-bundle.js"></script>
+<script src="/api/docs-static/swagger-ui-init.js"></script>
+</body>
+</html>
+""",
+        media_type="text/html",
+    )
+
+
+@app.get("/api/redoc", include_in_schema=False)
+async def redoc_html() -> Response:
+    """Self-hosted ReDoc: no CDN (Google Fonts, jsdelivr) so it works under the
+    strict script-src 'self' CSP set by nginx."""
+    return get_redoc_html(
+        openapi_url=cast(str, app.openapi_url),
+        title=f"{app.title} - ReDoc",
+        redoc_js_url="/api/docs-static/redoc.standalone.js",
+        redoc_favicon_url="",
+        with_google_fonts=False,
+    )
 
 def _rate_limit_handler(request: Request, exc: Exception) -> Response:
     """Adapt slowapi's handler (typed for RateLimitExceeded) to Starlette's Exception signature."""

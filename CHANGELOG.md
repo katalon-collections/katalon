@@ -4,6 +4,15 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.40.3]
+
+- **Eigenes Startpasswort für den ersten Admin:** `INITIAL_ADMIN_PASSWORD` legt das
+  Passwort bei der ersten Einrichtung fest. Der bisherige Name
+  `DEFAULT_ADMIN_PASSWORD` wird ignoriert. Bei gesetzter `KATALON_BASE_URL` erzeugt
+  Katalon ein Zufallspasswort, falls der Wert leer oder ein bekanntes Standardpasswort
+  ist. Der Produktions-Check für schwache Passwörter greift nur bei leerer
+  `KATALON_BASE_URL`.
+
 ## [1.39.0]
 
 - **KI-Vorschläge im Editor prüfen:** KI-Vervollständigungen werden vor dem Übernehmen

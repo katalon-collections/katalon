@@ -39,7 +39,7 @@ services:
     environment:
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
       DEFAULT_ADMIN_EMAIL: admin@katalon.dev
-      DEFAULT_ADMIN_PASSWORD: 1qayxsw2
+      INITIAL_ADMIN_PASSWORD: 1qayxsw2
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations

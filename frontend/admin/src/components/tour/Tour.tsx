@@ -67,7 +67,21 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
         </div>
         <div style={{ ...step.styles.tooltipFooter, gap: 8 }}>
           <div style={step.styles.tooltipFooterSpacer}>
-            {step.showSkipButton && !isLastStep && <button type="button" style={step.styles.buttonSkip} {...skipProps} />}
+            {step.showSkipButton && !isLastStep && (
+              <button
+                type="button"
+                style={{
+                  ...step.styles.buttonSkip,
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--border, #d1d5db)',
+                  borderRadius: 999,
+                  color: 'var(--fg-3, #6b7280)',
+                  padding: '8px 16px',
+                  margin: 0,
+                }}
+                {...skipProps}
+              />
+            )}
           </div>
           <button
             type="button"

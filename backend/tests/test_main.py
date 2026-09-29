@@ -90,6 +90,27 @@ def test_check_production_secrets_accepts_valid_katalon_secrets_key(monkeypatch:
     monkeypatch.setattr("katalon.main.settings.debug", False)
     monkeypatch.setattr("katalon.main.settings.secret_key", "x" * 32)
     monkeypatch.setattr("katalon.main.settings.katalon_secrets_key", "y" * 32)
-    monkeypatch.setattr("katalon.main.settings.default_admin_password", "correct-horse-battery-staple")
+    monkeypatch.setattr("katalon.main.settings.initial_admin_password", "correct-horse-battery-staple")
 
     _check_production_secrets()
+
+
+def test_check_production_secrets_ignores_weak_password_when_base_url_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("katalon.main.settings.debug", False)
+    monkeypatch.setattr("katalon.main.settings.secret_key", "x" * 32)
+    monkeypatch.setattr("katalon.main.settings.katalon_secrets_key", "y" * 32)
+    monkeypatch.setattr("katalon.main.settings.katalon_base_url", "https://katalon.example.org")
+    monkeypatch.setattr("katalon.main.settings.initial_admin_password", "admin")
+
+    _check_production_secrets()
+
+
+def test_check_production_secrets_rejects_weak_password_without_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("katalon.main.settings.debug", False)
+    monkeypatch.setattr("katalon.main.settings.secret_key", "x" * 32)
+    monkeypatch.setattr("katalon.main.settings.katalon_secrets_key", "y" * 32)
+    monkeypatch.setattr("katalon.main.settings.katalon_base_url", "")
+    monkeypatch.setattr("katalon.main.settings.initial_admin_password", "admin")
+
+    with pytest.raises(RuntimeError, match="INITIAL_ADMIN_PASSWORD"):
+        _check_production_secrets()

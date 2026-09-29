@@ -72,7 +72,7 @@ docker compose exec api cat /var/lib/katalon/first-run-credentials.txt
 docker compose logs api | grep -A5 "KATALON FIRST RUN"
 ```
 
-> **Ohne gesetztes `KATALON_BASE_URL`** (z. B. lokale Entwicklung) wird statt eines generierten Passworts der Wert `DEFAULT_ADMIN_PASSWORD` aus der `.env` verwendet (Standard: `admin`).
+> **Ohne gesetztes `KATALON_BASE_URL`** (z. B. lokale Entwicklung) wird statt eines generierten Passworts der Wert `INITIAL_ADMIN_PASSWORD` aus der `.env` verwendet (Standard: `admin`). Mit gesetzter `KATALON_BASE_URL` gilt `INITIAL_ADMIN_PASSWORD`, falls gesetzt und kein Standardwert, sonst wird ein Zufallspasswort erzeugt.
 
 ---
 

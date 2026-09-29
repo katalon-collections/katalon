@@ -34,3 +34,7 @@ minimum_installer_version = "0.1.0"
 [requires]
 postgres = ">=16"
 elasticsearch = ">=8.15,<9"
+
+[[releases."1.40.3".deprecated_env_vars]]
+key = "DEFAULT_ADMIN_PASSWORD"
+note = "Umbenannt in INITIAL_ADMIN_PASSWORD (optional). Die Zeile kann aus der .env entfernt werden."

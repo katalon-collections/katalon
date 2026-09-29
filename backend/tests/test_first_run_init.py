@@ -71,8 +71,8 @@ async def test_ensure_admin_creates_superuser_from_base_url(monkeypatch, tmp_pat
     )
     monkeypatch.setattr(
         main_module.settings,
-        "default_admin_password",
-        "fallback-password",
+        "initial_admin_password",
+        "admin",
         raising=False,
     )
     monkeypatch.setattr(
@@ -122,3 +122,20 @@ async def test_ensure_admin_is_one_shot_when_superuser_exists(monkeypatch, tmp_p
     assert fake_db.added is None
     assert fake_db.committed is False
     assert not credentials_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_ensure_admin_uses_initial_admin_password_when_set(monkeypatch, tmp_path) -> None:
+    fake_db = _FakeDB(existing_user=None)
+
+    monkeypatch.setattr(main_module, "AsyncSessionLocal", lambda: _FakeSessionContext(fake_db))
+    monkeypatch.setattr(main_module.settings, "katalon_base_url", "https://katalon.example.org", raising=False)
+    monkeypatch.setattr(
+        main_module.settings, "first_run_credentials_path", str(tmp_path / "creds.txt"), raising=False
+    )
+    monkeypatch.setattr(main_module.settings, "initial_admin_password", "my-own-secret-pw", raising=False)
+    monkeypatch.setattr(main_module, "hash_password", lambda value: f"hashed::{value}")
+
+    await main_module._ensure_admin()
+
+    assert fake_db.added.hashed_password == "hashed::my-own-secret-pw"

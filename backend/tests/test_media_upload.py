@@ -462,6 +462,49 @@ async def test_iiif_authorize_denied_for_staff_without_object_read_permission() 
         app.dependency_overrides.pop(try_get_current_user, None)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("is_public", "expected"), [(True, 200), (False, 403)])
+async def test_iiif_authorize_accepts_ingress_nginx_original_url(
+    is_public: bool, expected: int
+) -> None:
+    """ingress-nginx auth-url (Helm chart) sends X-Original-URL, not X-Original-URI."""
+    obj_id = uuid.uuid4()
+    media = MediaFile(
+        id=uuid.uuid4(),
+        object_id=obj_id,
+        filename="test.jpg",
+        mime_type="image/jpeg",
+        storage_key="ab/test.jpg",
+        iiif_storage_key="ab/test.jpg",
+        status="ready",
+        is_public=is_public,
+        created_at=datetime.now(),
+    )
+    obj = Object(id=obj_id, idno="OBJ-001", status="published", metadata_={})
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mock_result(media))
+    session.get = AsyncMock(return_value=obj)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: None
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/v1/media/_authorize",
+                headers={
+                    "X-Original-Url": "http://katalon.local/iiif/3/ab%2Ftest.jpg/full/,300/0/default.jpg"
+                },
+            )
+        assert response.status_code == expected
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
 # ---------------------------------------------------------------------------
 # GET /v1/objects/{id}/iiif/manifest
 # ---------------------------------------------------------------------------
