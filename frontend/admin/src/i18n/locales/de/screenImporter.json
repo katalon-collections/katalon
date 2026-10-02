@@ -9,7 +9,7 @@
   "tabAriaLabel": "{{label}}-Import anzeigen",
   "typeLabel": "Typ:",
   "subtypeLabel": "Subtyp:",
-  "noSubtype": "— kein Subtyp —",
+  "noSubtype": "– kein Subtyp –",
   "continueToDryRun": "Weiter → Probelauf",
   "dryRun": {
     "totalLines": "{{count}} Zeilen gesamt",

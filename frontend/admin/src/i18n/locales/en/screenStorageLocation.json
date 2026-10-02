@@ -18,7 +18,7 @@
   "editHeading": "Edit storage location",
   "fieldIdno": "ID no.",
   "fieldType": "Storage location type",
-  "fieldTypeNone": "— no type —",
+  "fieldTypeNone": "– no type –",
   "fieldTypeHelpPopover": {
     "title": "Storage location type",
     "description": "Classifies the storage location by kind (e.g. depot, shelf, drawer, display case). Enables type-specific extra fields and filtering storage locations by kind. New types are created under Configuration → Subtypes for \"Storage locations\"."

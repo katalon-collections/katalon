@@ -457,7 +457,7 @@ def dry_run(
     for i, rec in enumerate(mapped):
         row_num = i + 2
         if not rec and not idnos[i]:
-            errors.append({"row": row_num, "message": "Keine Felder gemappt — Zeile wird übersprungen"})
+            errors.append({"row": row_num, "message": "Keine Felder gemappt – Zeile wird übersprungen"})
             continue
         for fname in required_fields:
             if fname in mapped_fields and not rec.get(fname):

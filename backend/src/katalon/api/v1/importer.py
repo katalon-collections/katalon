@@ -441,7 +441,7 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
     if not subtype and await has_any_subtypes(db, body.record_type):
         dry_result["warnings"].insert(0, {
             "row": None,
-            "message": "Dieser Typ hat Subtypen — bitte einen Subtyp auswählen.",
+            "message": "Dieser Typ hat Subtypen – bitte einen Subtyp auswählen.",
         })
 
     # Run full schema validation per row (catches pid/relation/regex/required errors)

@@ -28,7 +28,7 @@
   "statusFilterLabel": "Status-Filter",
   "searchQueryLabel": "Suchanfrage",
   "searchPlaceholder": "z.B. Marokko Fotografie",
-  "searchHint": "Volltext — wie Portal-Suche",
+  "searchHint": "Volltext – wie Portal-Suche",
   "errorSetSpecRequired": "set_spec ist erforderlich.",
   "errorNameRequired": "Name ist erforderlich.",
   "errorSave": "Fehler beim Speichern.",

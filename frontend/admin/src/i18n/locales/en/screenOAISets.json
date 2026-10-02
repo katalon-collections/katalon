@@ -28,7 +28,7 @@
   "statusFilterLabel": "Status filter",
   "searchQueryLabel": "Search query",
   "searchPlaceholder": "e.g. Morocco photography",
-  "searchHint": "Full text — like portal search",
+  "searchHint": "Full text – like portal search",
   "errorSetSpecRequired": "set_spec is required.",
   "errorNameRequired": "Name is required.",
   "errorSave": "Error saving.",

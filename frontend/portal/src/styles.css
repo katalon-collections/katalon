@@ -519,3 +519,6 @@ input, select, textarea { font-family: inherit; }
 .prose pre { background: var(--panel, #f1f5f9); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 0 0 1em; }
 .prose pre code { background: none; padding: 0; }
 .prose blockquote { border-left: 3px solid var(--accent, #1e3a8a); margin: 0 0 1em; padding: 4px 0 4px 16px; color: var(--fg-2, #4b5563); }
+.prose img { max-width: 100%; height: auto; border-radius: 6px; margin: 1em 0; }
+.prose video { max-width: 100%; height: auto; border-radius: 6px; margin: 1em 0; display: block; background: #000; }
+

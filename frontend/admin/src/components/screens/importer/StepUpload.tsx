@@ -161,7 +161,7 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
                   <tr key={i}>
                     {uploaded.headers.map(h => (
                       <td key={h} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {row[h] ?? '—'}
+                        {row[h] ?? '–'}
                       </td>
                     ))}
                   </tr>

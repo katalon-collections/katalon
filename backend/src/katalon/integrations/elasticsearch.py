@@ -582,7 +582,7 @@ async def search_documents(
         # FORWARD_LIMIT need a deterministic sort (idno/title/date) instead.
         raise ValueError(
             "Diese Seite liegt zu tief in den Volltext-Trefferergebnissen. "
-            "Relevanzsortierung unterstützt keine so tiefe Paginierung — Suche "
+            "Relevanzsortierung unterstützt keine so tiefe Paginierung – Suche "
             "eingrenzen oder eine feste Sortierung (Titel/ID/Datum) wählen."
         )
 

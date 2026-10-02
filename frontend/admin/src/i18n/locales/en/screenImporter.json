@@ -9,7 +9,7 @@
   "tabAriaLabel": "Show {{label}} import",
   "typeLabel": "Type:",
   "subtypeLabel": "Subtype:",
-  "noSubtype": "— no subtype —",
+  "noSubtype": "– no subtype –",
   "continueToDryRun": "Continue → Dry run",
   "dryRun": {
     "totalLines": "{{count}} lines total",

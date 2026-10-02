@@ -705,6 +705,26 @@ class StaticPage(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
+    assets: Mapped[list[PageAsset]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="PageAsset.created_at"
+    )
+
+
+class PageAsset(Base):
+    __tablename__ = "page_assets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("static_pages.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(512))
+    mime_type: Mapped[str] = mapped_column(String(128))
+    file_size: Mapped[int] = mapped_column(Integer)
+    storage_key: Mapped[str] = mapped_column(String(1024))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    page: Mapped[StaticPage] = relationship(back_populates="assets")
+
 
 # ---------------------------------------------------------------------------
 # Portal configuration (singleton row, key="default")

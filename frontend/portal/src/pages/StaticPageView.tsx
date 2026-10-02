@@ -8,6 +8,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { api, type StaticPageSummary } from '../api/client'
 import { useI18n } from '../i18n'
+import { resolveLangText } from '../utils/renderFieldValue'
 
 export function StaticPageView() {
   const { slug } = useParams<{ slug: string }>()
@@ -36,10 +37,13 @@ export function StaticPageView() {
   }
 
   const lang = locale
-  const title = (page.title as Record<string, string>)[lang] ?? Object.values(page.title)[0] ?? page.slug
-  const content = (page.content as Record<string, string>)[lang] ?? Object.values(page.content)[0] ?? ''
+  const title = resolveLangText(page.title as Record<string, string>, lang, page.slug)
+  const content = resolveLangText(page.content as Record<string, string>, lang, '')
 
-  const html = DOMPurify.sanitize(marked.parse(content) as string)
+  const html = DOMPurify.sanitize(marked.parse(content) as string, {
+    ADD_TAGS: ['video', 'source'],
+    ADD_ATTR: ['controls', 'preload', 'loop', 'muted', 'playsinline', 'type', 'poster'],
+  })
   const plainText = content.replace(/[#*`_[\]()>]/g, '').slice(0, 160)
 
   return (

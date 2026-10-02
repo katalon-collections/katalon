@@ -571,7 +571,7 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
                   <select id="storage-location-parent" className="fld" value={form.parent_id} onChange={e => set('parent_id', e.target.value)}>
                     <option value="">{t('fieldParentNone')}</option>
                     {parentOptions.map(({ loc, depth }) => (
-                      <option key={loc.id} value={loc.id}>{`${'— '.repeat(depth)}${locationLabel(loc)}`}</option>
+                      <option key={loc.id} value={loc.id}>{`${'– '.repeat(depth)}${locationLabel(loc)}`}</option>
                     ))}
                   </select>
                 </div>
@@ -649,9 +649,9 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
                                   {obj.idno || obj.id.slice(0, 8)}
                                 </button>
                               </td>
-                              <td>{obj.title || '—'}</td>
-                              <td>{obj.object_type || '—'}</td>
-                              <td className="mono" style={{ fontSize: 11 }}>{obj.storage_location_idno || '—'}</td>
+                              <td>{obj.title || '–'}</td>
+                              <td>{obj.object_type || '–'}</td>
+                              <td className="mono" style={{ fontSize: 11 }}>{obj.storage_location_idno || '–'}</td>
                               <td>
                                 <StatusBadge status={obj.status} />
                               </td>

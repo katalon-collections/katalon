@@ -36,6 +36,7 @@ _CONFIG_TABLES: set[str] = {
     "import_mappings",
     "metadata_mappings",
     "oai_sets",
+    "page_assets",
     "portal_config",
     "record_subtypes",
     "role_permissions",

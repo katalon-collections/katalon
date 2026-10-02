@@ -211,7 +211,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
                     <td style={{ padding: '4px 8px' }}>{k.name}</td>
                     <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
                     <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
-                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '–'}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>
                       <button className="btn sm ico gh dn" onClick={() => handleRevokeOwnKey(k.id)} title={t('profil.apiKeys.revoke')}>🗑</button>
                     </td>
@@ -337,8 +337,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
 
   const colorFields = [
     { lbl: 'Akzentfarbe', val: accentColor, set: setAccentColor },
-    { lbl: 'Kopfzeile — Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
-    { lbl: 'Kopfzeile — Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
+    { lbl: 'Kopfzeile – Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
+    { lbl: 'Kopfzeile – Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
     { lbl: 'Seitenhintergrund', val: pageBg, set: setPageBg, ph: '#f4f5f7' },
     { lbl: 'Panel-/Kartenfarbe', val: panelBg, set: setPanelBg, ph: '#ffffff' },
   ]
@@ -1195,7 +1195,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
             ]
             return options.length === 0 ? (
               <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>
-                Keine weiteren Felder — aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
+                Keine weiteren Felder – aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
               </div>
             ) : options.map(f => (
               <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
@@ -1255,7 +1255,7 @@ function IndexHealthWidget() {
         reconciliation_threshold: c.reconciliation_threshold,
         reconciliation_id_diff_enabled: c.reconciliation_id_diff_enabled,
       })
-    } catch { /* ignore — widget still shows counts without config controls */ }
+    } catch { /* ignore – widget still shows counts without config controls */ }
   }
 
   useEffect(() => { load(); loadCfg() }, [])
@@ -1275,7 +1275,7 @@ function IndexHealthWidget() {
     setRunning(mode); setMsg(null)
     try {
       await req(`${BASE}/v1/admin/index-health/reconcile?mode=${mode}`, { method: 'POST' })
-      setMsg('Abgleich gestartet — läuft im Hintergrund. Aktualisieren Sie die Seite in Kürze, um das Ergebnis zu sehen.')
+      setMsg('Abgleich gestartet – läuft im Hintergrund. Aktualisieren Sie die Seite in Kürze, um das Ergebnis zu sehen.')
       setTimeout(() => setMsg(null), 8000)
     } catch (e) { setMsg(`Fehler: ${(e as Error).message}`) }
     finally { setRunning(null) }
@@ -1391,7 +1391,7 @@ function SectionSuche() {
     try {
       const url = type ? `${BASE}/v1/search/reindex/${type}` : `${BASE}/v1/search/reindex`
       await req(url, { method: 'POST' })
-      setReindexMsg('Reindizierung gestartet — läuft im Hintergrund.')
+      setReindexMsg('Reindizierung gestartet – läuft im Hintergrund.')
       setTimeout(() => setReindexMsg(null), 5000)
     } catch (e) { setReindexMsg(`Fehler: ${(e as Error).message}`) }
     finally { setReindexing(null) }
@@ -1540,7 +1540,7 @@ function SectionSparql({
               {t('sparql.triplesCount')}
             </div>
             <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
-              {status.triples_count != null ? status.triples_count.toLocaleString() : '—'}
+              {status.triples_count != null ? status.triples_count.toLocaleString() : '–'}
             </div>
           </div>
 
@@ -1701,7 +1701,7 @@ function SectionIdnoSchemas() {
                 placeholder="z.B. ulb_x_{counter:05d}"
               />
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                Platzhalter: {'{counter}'} — laufende Nummer | {'{counter:05d}'} — mit Nullen aufgefüllt | {'{year}'} — aktuelles Jahr | {'{type}'} — Typ-Kürzel (obj/ent/pla/occ/pro)
+                Platzhalter: {'{counter}'} – laufende Nummer | {'{counter:05d}'} – mit Nullen aufgefüllt | {'{year}'} – aktuelles Jahr | {'{type}'} – Typ-Kürzel (obj/ent/pla/occ/pro)
               </div>
             </div>
             <div className="field">
@@ -1829,7 +1829,7 @@ function SectionAI() {
           <div className="field">
             <div className="lbl">Base URL</div>
             <input className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
-            <div className="sub">Ohne <code>/chat/completions</code> am Ende — wird automatisch angehängt. Für OpenRouter z.B. <code>https://openrouter.ai/api/v1</code>.</div>
+            <div className="sub">Ohne <code>/chat/completions</code> am Ende – wird automatisch angehängt. Für OpenRouter z.B. <code>https://openrouter.ai/api/v1</code>.</div>
           </div>
           <div className="field">
             <div className="lbl">Modell</div>
@@ -1983,7 +1983,7 @@ function SectionAuthoritySources() {
     const testRequest = AUTHORITY_TESTS[source.id] ?? { query: 'test', href: '#' }
     try {
       const hits = await authority.search(source.id, testRequest.query, 1)
-      setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: `Erreichbar — ${hits.length} Treffer für Testanfrage.` } }))
+      setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: `Erreichbar – ${hits.length} Treffer für Testanfrage.` } }))
     } catch (e) {
       setTestResults(prev => ({ ...prev, [source.id]: { ok: false, message: (e as Error).message } }))
     } finally {
@@ -2020,7 +2020,7 @@ function SectionAuthoritySources() {
               <button className="btn sm gh" onClick={() => test(source)} disabled={!source.is_enabled || testing === source.id}>
                 {testing === source.id ? 'Prüft…' : 'Verbindung testen'}
               </button>
-              {!source.is_enabled && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--fg-3)' }}>Quelle deaktiviert — keine Anfragen möglich.</span>}
+              {!source.is_enabled && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--fg-3)' }}>Quelle deaktiviert – keine Anfragen möglich.</span>}
               {source.is_enabled && result && (
                 <span style={{ marginLeft: 8, fontSize: 12, color: result.ok ? '#166534' : '#dc2626' }}>
                   {result.message}
@@ -2142,11 +2142,11 @@ function SectionPresenceLock() {
         </p>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, marginBottom: 10 }}>
           <input type="radio" name="presence_lock_mode" checked={mode === 'warning'} disabled={saving} onChange={() => save('warning')} style={{ marginTop: 3 }} />
-          <span><strong>{t('presenceLock.warningLabel')}</strong> — {t('presenceLock.warningDescription')}</span>
+          <span><strong>{t('presenceLock.warningLabel')}</strong> – {t('presenceLock.warningDescription')}</span>
         </label>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13 }}>
           <input type="radio" name="presence_lock_mode" checked={mode === 'blocking'} disabled={saving} onChange={() => save('blocking')} style={{ marginTop: 3 }} />
-          <span><strong>{t('presenceLock.blockingLabel')}</strong> — {t('presenceLock.blockingDescription')}</span>
+          <span><strong>{t('presenceLock.blockingLabel')}</strong> – {t('presenceLock.blockingDescription')}</span>
         </label>
         {error && <div style={{ fontSize: 13, color: '#dc2626', marginTop: 10 }}>{error}</div>}
         {saved && <div style={{ fontSize: 13, color: '#166534', marginTop: 10 }}>{t('presenceLock.saved')}</div>}

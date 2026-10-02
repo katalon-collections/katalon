@@ -60,12 +60,12 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
   function renderTooltip(props: TooltipRenderProps) {
     const { backProps, closeProps, index, isLastStep, primaryProps, skipProps, step, tooltipProps } = props
     return (
-      <div className="react-joyride__tooltip" style={step.styles.tooltip} {...tooltipProps}>
+      <div className="react-joyride__tooltip" style={{ ...step.styles.tooltip, maxWidth: 'calc(100vw - 32px)' }} {...tooltipProps}>
         <div style={step.styles.tooltipContainer}>
           {step.title && <h1 style={step.styles.tooltipTitle}>{step.title}</h1>}
           <div style={step.styles.tooltipContent}>{step.content}</div>
         </div>
-        <div style={{ ...step.styles.tooltipFooter, gap: 8 }}>
+        <div style={{ ...step.styles.tooltipFooter, flexWrap: 'wrap', gap: 8 }}>
           <div style={step.styles.tooltipFooterSpacer}>
             {step.showSkipButton && !isLastStep && (
               <button
@@ -162,7 +162,7 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
           nextLabelWithProgress: t('locale.nextLabelWithProgress'),
           skip: t('locale.skip'),
         }}
-        styles={{ options: { primaryColor: 'var(--accent, #2563eb)', width: 440, zIndex: 10000 } }}
+        styles={{ options: { primaryColor: 'var(--accent, #2563eb)', width: 520, zIndex: 10000 } }}
       />
       {!run && (
         <div

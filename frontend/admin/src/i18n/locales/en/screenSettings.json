@@ -88,7 +88,7 @@
     "rebuildBtn": "Rebuild Triple Store",
     "rebuilding": "Starting…",
     "rebuildConfirm": "Rebuild the entire triple store from PostgreSQL? This process runs asynchronously in the background.",
-    "rebuildSuccess": "Rebuild queued — synchronization is running in the background.",
+    "rebuildSuccess": "Rebuild queued – synchronization is running in the background.",
     "rebuildError": "Failed to trigger rebuild",
     "openBuilder": "Go to SPARQL Query Builder →"
   },
@@ -142,7 +142,7 @@
   "terminologie": {
     "nav": "Terminology",
     "title": "Terminology",
-    "description": "Customize the core-type terminology per installation (e.g. \"Work\" instead of \"Object\"). Presentation only — internal names, API routes, and permissions stay unchanged.",
+    "description": "Customize the core-type terminology per installation (e.g. \"Work\" instead of \"Object\"). Presentation only – internal names, API routes, and permissions stay unchanged.",
     "singularDE": "Singular German",
     "singularEN": "Singular English",
     "pluralDE": "Plural German",

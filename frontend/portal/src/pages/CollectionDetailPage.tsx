@@ -569,7 +569,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                               </div>
                             </td>
                             <td style={{ padding: '8px 14px', fontFamily: 'monospace', color: 'var(--fg-2)', fontSize: 12 }}>
-                              {obj.idno ?? '—'}
+                              {obj.idno ?? '–'}
                             </td>
                             <td style={{ padding: '8px 14px', fontWeight: 500, color: 'var(--fg-1)' }}>
                               <Link to={`/objects/${obj.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>

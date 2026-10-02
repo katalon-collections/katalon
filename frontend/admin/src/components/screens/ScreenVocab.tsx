@@ -154,9 +154,9 @@ function RelationTypePreview({ label, inverseLabel, from, to }: {
     >
       <strong style={{ color: 'var(--fg)' }}>{t('relationTypeHelp.preview')}</strong>
       <div style={{ marginTop: 4, color: 'var(--fg)' }}>
-        {source} — <em>{label || t('relationTypeHelp.labelFallback')}</em> → {target}
+        {source} – <em>{label || t('relationTypeHelp.labelFallback')}</em> → {target}
         <br />
-        {target} — <em>{inverseLabel || t('relationTypeHelp.inverseFallback')}</em> → {source}
+        {target} – <em>{inverseLabel || t('relationTypeHelp.inverseFallback')}</em> → {source}
       </div>
     </div>
   )
@@ -1010,7 +1010,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           <select id="new-term-parent" className="fld" value={newTermParentId} onChange={e => setNewTermParentId(e.target.value)}>
                             <option value="">Kein übergeordneter Term</option>
                             {parentOptions().map(({ term, depth }) => (
-                              <option key={term.id} value={term.id}>{`${'— '.repeat(depth)}${getLabel(term, term.term)} (${term.term})`}</option>
+                              <option key={term.id} value={term.id}>{`${'– '.repeat(depth)}${getLabel(term, term.term)} (${term.term})`}</option>
                             ))}
                           </select>
                         </div>
@@ -1129,7 +1129,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                   <select id={`edit-term-parent-${termItem.id}`} className="fld" value={editTermParentId} onChange={e => setEditTermParentId(e.target.value)}>
                                     <option value="">Kein übergeordneter Term</option>
                                     {parentOptions(termItem.id).map(({ term, depth: parentDepth }) => (
-                                      <option key={term.id} value={term.id}>{`${'— '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
+                                      <option key={term.id} value={term.id}>{`${'– '.repeat(parentDepth)}${getLabel(term, term.term)} (${term.term})`}</option>
                                     ))}
                                   </select>
                                 </div>}
@@ -1230,12 +1230,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             )}
                           </td>
                           <td>
-                            {getLabel(termItem, '—')}
+                            {getLabel(termItem, '–')}
                             <MetadataSummary fields={termFields} metadata={termItem.metadata_ ?? {}} />
                           </td>
-                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)' }}>{getLabel({ label: termItem.inverse_label }, '—')}</td>}
+                          {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)' }}>{getLabel({ label: termItem.inverse_label }, '–')}</td>}
                           {vocab.kind === 'relation' && <td style={{ color: 'var(--fg-3)', fontSize: 12 }}>{appliesLabel(t, termItem)}</td>}
-                          {isHierarchical && <td style={{ color: 'var(--fg-3)' }}>{termItem.parent_id ? getLabel(terms.find(term => term.id === termItem.parent_id) ?? termItem, '—') : '—'}</td>}
+                          {isHierarchical && <td style={{ color: 'var(--fg-3)' }}>{termItem.parent_id ? getLabel(terms.find(term => term.id === termItem.parent_id) ?? termItem, '–') : '–'}</td>}
                           <td className="col-act">
                             <div className="row-actions">
                               <ActionMenu

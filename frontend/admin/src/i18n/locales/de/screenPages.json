@@ -30,5 +30,18 @@
   "delete": "Löschen",
   "cancel": "Abbrechen",
   "emptyEditor": "Seite auswählen oder neue anlegen.",
-  "deleteConfirm": "Seite \"{{slug}}\" wirklich löschen?"
+  "deleteConfirm": "Seite \"{{slug}}\" wirklich löschen?",
+  "assetsHeadline": "Dateien & Medien",
+  "assetsSubtitle": "Bilder, PDF-Dokumente oder MP4-Videos hochladen und per Snippet im Text einbinden.",
+  "uploadAsset": "Datei hochladen",
+  "uploading": "Wird hochgeladen…",
+  "assetsSaveFirst": "Bitte speichern Sie die Seite zuerst, um Dateien anzuhängen.",
+  "loadingAssets": "Dateien werden geladen…",
+  "assetsEmpty": "Keine Dateien vorhanden. Ziehen Sie Dateien hierher oder klicken Sie auf „Datei hochladen“.",
+  "insertSnippet": "Einfügen",
+  "inserted": "Eingefügt!",
+  "insertSnippetTitle": "In den Text an der Cursorposition einfügen und kopieren",
+  "deleteAssetTitle": "Datei \"{{filename}}\" löschen",
+  "deleteAssetConfirm": "Möchten Sie die Datei \"{{filename}}\" wirklich löschen?",
+  "viewInPortal": "Im Portal ansehen"
 }

@@ -142,7 +142,7 @@ export function LoadMappingModal({
               <tbody>
                 {mappings.map(m => {
                   const ruleCount = m.mapping ? Object.keys(m.mapping).length : 0
-                  const dateStr = m.updated_at ? new Date(m.updated_at).toLocaleDateString() : '—'
+                  const dateStr = m.updated_at ? new Date(m.updated_at).toLocaleDateString() : '–'
                   return (
                     <tr key={m.id} style={{ borderBottom: '1px solid var(--border-subtle, #eee)' }}>
                       <td style={{ padding: '10px 6px', fontWeight: 500 }}>{m.name}</td>
@@ -152,7 +152,7 @@ export function LoadMappingModal({
                             {m.subtype}
                           </span>
                         ) : (
-                          '—'
+                          '–'
                         )}
                       </td>
                       <td style={{ padding: '10px 6px', color: 'var(--fg-3)' }}>{ruleCount}</td>

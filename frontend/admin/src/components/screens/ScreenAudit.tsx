@@ -88,7 +88,7 @@ function fmt(iso: string) {
 }
 
 function userDisplay(entry: AuditEntry) {
-  return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '—')
+  return entry.user_name ?? (entry.user_id ? entry.user_id.slice(-8) : '–')
 }
 
 function formatDiffValue(v: unknown): string {
@@ -221,7 +221,7 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                     (() => {
                       const ai = diff as AiSchemaAssistFields
                       const tokens = (ai.input_tokens ?? 0) + (ai.output_tokens ?? 0)
-                      return <div className="sub">{ai.model ?? '—'}{tokens > 0 ? ` · ${tokens} Tokens` : ''}</div>
+                      return <div className="sub">{ai.model ?? '–'}{tokens > 0 ? ` · ${tokens} Tokens` : ''}</div>
                     })()
                   ) : (
                     <div className="sub">{evt.record_type} · {evt.record_id.slice(-8)}</div>

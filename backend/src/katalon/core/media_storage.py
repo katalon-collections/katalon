@@ -36,6 +36,11 @@ def storage_key(media_id: uuid.UUID, filename: str) -> str:
     return f"{media_id.hex[:2]}/{media_id}--{safe_filename(filename)}"
 
 
+def page_asset_storage_key(asset_id: uuid.UUID, filename: str) -> str:
+    """Build the relative storage key for a static page asset."""
+    return f"pages/{asset_id.hex[:2]}/{asset_id}--{safe_filename(filename)}"
+
+
 def storage_path(key: str) -> Path:
     """Resolve a media key under MEDIA_ROOT without allowing path traversal."""
     root = Path(config.settings.media_root).resolve()

@@ -123,7 +123,7 @@ function resultSubtitle(
   return fields
     .map(field => {
       if (field === 'record_type') return typeLabel(r.record_type)
-      if (field === 'status') return r.status ?? '—'
+      if (field === 'status') return r.status ?? '–'
       const value = r.subtitle_values?.[field]
       return value == null ? null : Array.isArray(value) ? value.join(', ') : value
     })

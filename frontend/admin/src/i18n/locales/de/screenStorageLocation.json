@@ -18,7 +18,7 @@
   "editHeading": "Lagerort bearbeiten",
   "fieldIdno": "ID-Nr.",
   "fieldType": "Lagerort-Typ",
-  "fieldTypeNone": "— kein Typ —",
+  "fieldTypeNone": "– kein Typ –",
   "fieldTypeHelpPopover": {
     "title": "Lagerort-Typ",
     "description": "Klassifiziert den Lagerort nach Art (z. B. Depot, Regal, Schublade, Vitrine). Ermöglicht typspezifische Zusatzfelder und das Filtern der Lagerorte nach Art. Neue Typen werden unter Konfiguration → Subtypen für den Bereich „Lagerorte“ angelegt."

@@ -187,7 +187,7 @@ export function StepMapping({
                 value={idnoColumn ?? ''}
                 onChange={e => onIdnoStrategyChange('column', e.target.value || null)}
               >
-                <option value="">{xmlLabelMap ? '— Element wählen —' : '— Spalte wählen —'}</option>
+                <option value="">{xmlLabelMap ? '– Element wählen –' : '– Spalte wählen –'}</option>
                 {xmlLabelMap
                   ? Object.entries(
                       uploaded.headers.reduce<Record<string, string[]>>((groups, h) => {
@@ -228,7 +228,7 @@ export function StepMapping({
               aria-describedby="media-selector-help"
               onChange={e => onMediaSelectorChange(e.target.value || null)}
             >
-              <option value="">— keine Medien zuordnen —</option>
+              <option value="">– keine Medien zuordnen –</option>
               {xmlLabelMap
                 ? Object.entries(
                     uploaded.headers.reduce<Record<string, string[]>>((groups, h) => {
@@ -299,7 +299,7 @@ export function StepMapping({
                     {displayLabel}
                   </td>
                   <td style={{ color: 'var(--fg-3)', maxWidth: 220, fontSize: 12 }}>
-                    {uploaded.preview[0]?.[col] ?? '—'}
+                    {uploaded.preview[0]?.[col] ?? '–'}
                   </td>
                   <td>
                     <select
@@ -319,7 +319,7 @@ export function StepMapping({
                         onMappingChange(next)
                       }}
                     >
-                      <option value="">— ignorieren —</option>
+                      <option value="">– ignorieren –</option>
                       <optgroup label={RECORD_TYPES.find(t => t.id === recordType)?.label ?? 'Felder'}>
                         {fields.map(f => {
                           const isMappedByOther = Object.entries(mapping).some(

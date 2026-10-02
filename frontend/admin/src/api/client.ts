@@ -1007,6 +1007,16 @@ export interface StaticPage {
   sort_order: number
 }
 
+export interface PageAsset {
+  id: string
+  page_id: string
+  filename: string
+  mime_type: string
+  file_size: number
+  url: string
+  created_at: string
+}
+
 export const staticPages = {
   list:   () => req<StaticPage[]>('/v1/pages/admin'),
   create: (data: { slug: string; title: Record<string, string>; content: Record<string, string>; is_published: boolean; placement: 'header' | 'footer' | 'none'; sort_order: number }) =>
@@ -1014,6 +1024,14 @@ export const staticPages = {
   update: (slug: string, data: Partial<{ title: Record<string, string>; content: Record<string, string>; is_published: boolean; placement: 'header' | 'footer' | 'none'; sort_order: number }>) =>
     req<StaticPage>(`/v1/pages/${slug}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (slug: string) => req<void>(`/v1/pages/${slug}`, { method: 'DELETE' }),
+  listAssets: (slug: string) => req<PageAsset[]>(`/v1/pages/${encodeURIComponent(slug)}/assets`),
+  uploadAsset: (slug: string, file: File, onProgress?: (fraction: number) => void): Promise<PageAsset> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return uploadWithProgress<PageAsset>(`/v1/pages/${encodeURIComponent(slug)}/assets`, fd, onProgress)
+  },
+  deleteAsset: (slug: string, assetId: string) =>
+    req<void>(`/v1/pages/${encodeURIComponent(slug)}/assets/${encodeURIComponent(assetId)}`, { method: 'DELETE' }),
 }
 
 // Importer

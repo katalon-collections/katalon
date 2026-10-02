@@ -30,5 +30,18 @@
   "delete": "Delete",
   "cancel": "Cancel",
   "emptyEditor": "Select a page or create a new one.",
-  "deleteConfirm": "Really delete page \"{{slug}}\"?"
+  "deleteConfirm": "Really delete page \"{{slug}}\"?",
+  "assetsHeadline": "Files & Media",
+  "assetsSubtitle": "Upload images, PDF documents, or MP4 videos and embed them via markdown snippet.",
+  "uploadAsset": "Upload file",
+  "uploading": "Uploading…",
+  "assetsSaveFirst": "Please save the page first to attach files.",
+  "loadingAssets": "Loading files…",
+  "assetsEmpty": "No files attached yet. Drag & drop files here or click \"Upload file\".",
+  "insertSnippet": "Insert",
+  "inserted": "Inserted!",
+  "insertSnippetTitle": "Insert into text at cursor position and copy to clipboard",
+  "deleteAssetTitle": "Delete file \"{{filename}}\"",
+  "deleteAssetConfirm": "Really delete file \"{{filename}}\"?",
+  "viewInPortal": "View in portal"
 }

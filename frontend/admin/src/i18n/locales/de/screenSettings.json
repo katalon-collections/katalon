@@ -88,7 +88,7 @@
     "rebuildBtn": "Triple Store neu aufbauen",
     "rebuilding": "Wird gestartet…",
     "rebuildConfirm": "Gesamten Triple Store aus PostgreSQL neu aufbauen? Dieser Vorgang läuft asynchron im Hintergrund.",
-    "rebuildSuccess": "Rebuild gestartet — die Synchronisation läuft im Hintergrund.",
+    "rebuildSuccess": "Rebuild gestartet – die Synchronisation läuft im Hintergrund.",
     "rebuildError": "Fehler beim Starten des Rebuilds",
     "openBuilder": "Zum SPARQL Query Builder →"
   },
@@ -142,7 +142,7 @@
   "terminologie": {
     "nav": "Terminologie",
     "title": "Terminologie",
-    "description": "Fachbegriffe für Kerntypen pro Installation anpassen (z. B. „Werk\" statt „Objekt\"). Wirkt nur auf die Anzeige im Portal — interne Bezeichnungen, API-Routen und Berechtigungen bleiben unverändert.",
+    "description": "Fachbegriffe für Kerntypen pro Installation anpassen (z. B. „Werk\" statt „Objekt\"). Wirkt nur auf die Anzeige im Portal – interne Bezeichnungen, API-Routen und Berechtigungen bleiben unverändert.",
     "singularDE": "Singular Deutsch",
     "singularEN": "Singular Englisch",
     "pluralDE": "Plural Deutsch",

@@ -1,6 +1,6 @@
 {
   "tryItOut": "Ausprobieren",
-  "paused": "Schritt {{current}}/{{total}} — pausiert",
+  "paused": "Schritt {{current}}/{{total}} – pausiert",
   "resume": "Tour fortsetzen",
   "cancel": "Tour abbrechen",
   "locale": {

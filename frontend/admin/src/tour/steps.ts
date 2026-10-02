@@ -17,14 +17,14 @@ export const basicTourSteps: TourStep[] = [
     target: 'body',
     placement: 'center',
     title: 'Willkommen bei Katalon',
-    content: 'Hier richtest du dein Katalogsystem ein. Wir zeigen dir die wichtigsten Schritte — mit "Ausprobieren" pausierst du und probierst selbst etwas aus, mit "Überspringen" steigst du aus. Die Tour lässt sich später jederzeit erneut starten (Einstellungen → Profil).',
+    content: 'Hier richtest du dein Katalogsystem ein. Wir zeigen dir die wichtigsten Schritte – mit "Ausprobieren" pausierst du und probierst selbst etwas aus, mit "Überspringen" steigst du aus. Die Tour lässt sich später jederzeit erneut starten (Einstellungen → Profil).',
   },
   {
     route: 'subtypes',
     target: '[data-tour="nav-subtypes"]',
     placement: 'right',
     title: 'Subtypen (optional)',
-    content: 'Objekte, Entitäten, Orte und Occurrences lassen sich in Subtypen gliedern, z. B. Foto/Gemälde/Dokument bei Objekten. Nicht zwingend — überspringbar, wenn eine flache Struktur reicht.',
+    content: 'Objekte, Entitäten, Orte und Occurrences lassen sich in Subtypen gliedern, z. B. Foto/Gemälde/Dokument bei Objekten. Nicht zwingend – überspringbar, wenn eine flache Struktur reicht.',
   },
   {
     route: 'schema',
@@ -38,7 +38,7 @@ export const basicTourSteps: TourStep[] = [
     target: '[data-tour="field-type-select"]',
     placement: 'left',
     title: 'Spezialfelder',
-    content: 'Neben Text gibt es Vokabular-, Relations-, Autoritäts- und Geo-Felder. Öffne ein Feld zum Bearbeiten und schau dir das Feldtyp-Dropdown an — nicht jetzt konfigurieren nötig.',
+    content: 'Neben Text gibt es Vokabular-, Relations-, Autoritäts- und Geo-Felder. Öffne ein Feld zum Bearbeiten und schau dir das Feldtyp-Dropdown an – nicht jetzt konfigurieren nötig.',
   },
   {
     route: 'vocab',
@@ -52,7 +52,7 @@ export const basicTourSteps: TourStep[] = [
     target: '[data-tour="nav-vocab"]',
     placement: 'right',
     title: 'Relationstypen festlegen',
-    content: 'Relationstypen (z. B. "abgebildet in", "Teil von") sind ebenfalls ein Vokabular — das Vokabular "relation_types" — optional mit Typ-Paar-Beschränkungen je Kombination.',
+    content: 'Relationstypen (z. B. "abgebildet in", "Teil von") sind ebenfalls ein Vokabular – das Vokabular "relation_types" – optional mit Typ-Paar-Beschränkungen je Kombination.',
   },
   {
     route: 'list',
@@ -66,7 +66,7 @@ export const basicTourSteps: TourStep[] = [
     target: '[data-tour="relations-section"]',
     placement: 'left',
     title: 'Verknüpfen',
-    content: 'Verknüpfe das Objekt mit einer Entität, einem Ort oder einer Occurrence — z. B. den Fotografen als Entität.',
+    content: 'Verknüpfe das Objekt mit einer Entität, einem Ort oder einer Occurrence – z. B. den Fotografen als Entität.',
   },
   {
     route: 'form',
@@ -104,7 +104,7 @@ export const advancedTourSteps: TourStep[] = [
     target: '[data-tour="nav-form-variants"]',
     placement: 'right',
     title: 'Formularvarianten',
-    content: 'Mehrere Erfassungsmasken pro Subtyp — z. B. Kurz- vs. Vollerfassung.',
+    content: 'Mehrere Erfassungsmasken pro Subtyp – z. B. Kurz- vs. Vollerfassung.',
   },
   {
     route: 'import',
@@ -118,7 +118,7 @@ export const advancedTourSteps: TourStep[] = [
     target: '[data-tour="nav-schema"]',
     placement: 'right',
     title: 'Normdaten-Anbindung',
-    content: 'GND/Geonames als Feldtyp "Normdaten (Authority)" im Schema-Editor einbinden — Autovervollständigung bei Entitäten und Orten.',
+    content: 'GND/Geonames als Feldtyp "Normdaten (Authority)" im Schema-Editor einbinden – Autovervollständigung bei Entitäten und Orten.',
   },
   {
     route: 'schema',
@@ -146,7 +146,7 @@ export const advancedTourSteps: TourStep[] = [
     target: '[data-tour="nav-audit"]',
     placement: 'right',
     title: 'Audit-Log',
-    content: 'Jede Änderung wird protokolliert — nachvollziehbar wer, wann, was geändert hat.',
+    content: 'Jede Änderung wird protokolliert – nachvollziehbar wer, wann, was geändert hat.',
   },
   {
     route: 'pages',
@@ -167,6 +167,6 @@ export const advancedTourSteps: TourStep[] = [
     target: '[data-tour="nav-export"]',
     placement: 'right',
     title: 'Export',
-    content: 'Bestandstypen als CSV, JSON oder XML exportieren — z. B. für externe Auswertungen oder Migrationen.',
+    content: 'Bestandstypen als CSV, JSON oder XML exportieren – z. B. für externe Auswertungen oder Migrationen.',
   },
 ]

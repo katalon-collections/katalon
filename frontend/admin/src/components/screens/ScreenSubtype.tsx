@@ -379,7 +379,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                 <tr key={s.id}>
                   <td><span className="mono" style={{ fontSize: 12 }}>{s.name}</span></td>
                   <td>
-                    <div>{getLabel(s, '—')}</div>
+                    <div>{getLabel(s, '–')}</div>
                     {(s.concept_id || s.concept_uri) && (
                       <div style={{ marginTop: 3 }}>
                         <a
@@ -406,7 +406,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                       </div>
                     )}
                   </td>
-                  <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '—'}</td>
+                  <td style={{ color: 'var(--fg-2)', maxWidth: 340 }}>{s.description?.trim() || '–'}</td>
                   <td style={{ textAlign: 'center' }}>
                     {s.is_default && <span className="typ" style={{ background: 'var(--accent-50)', color: 'var(--accent-ink)' }}>{t('defaultBadge')}</span>}
                   </td>

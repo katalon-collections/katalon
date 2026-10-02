@@ -1127,6 +1127,11 @@ async def get_page(slug: str, db: DBDep) -> StaticPage:
     return await pages.get_page(slug, db)
 
 
+@router.get("/pages/assets/{asset_id}/{filename}")
+async def serve_page_asset(asset_id: uuid.UUID, filename: str, db: DBDep) -> Response:
+    return await pages.serve_page_asset(asset_id, filename, db)
+
+
 @router.get("/banners/active/portal", response_model=list[banners.BannerRead])
 async def active_portal_banners(db: DBDep, response: Response) -> list[Banner]:
     response.headers["Cache-Control"] = _CONFIG_CACHE

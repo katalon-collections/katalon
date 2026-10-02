@@ -1607,7 +1607,7 @@ function RelationInput({
         <div style={{ display: 'flex', gap: 6 }}>
           {!fixedRelationType && relTypeTerms.length > 0 ? (
             <select className="fld" style={{ flex: 1 }} value={relType} onChange={e => setRelType(e.target.value)}>
-              <option value="">— Relationstyp wählen —</option>
+              <option value="">– Relationstyp wählen –</option>
               {relTypeTerms.map(t => (
                 <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>
               ))}
@@ -1702,7 +1702,7 @@ function RelationInput({
         </div>
         {!fixedRelationType && (relTypeTerms.length > 0 ? (
           <select className="fld" style={{ flex: '0 1 240px' }} value={relType} onChange={e => setRelType(e.target.value)} aria-label="Relationstyp">
-            <option value="">— Relationstyp wählen —</option>
+            <option value="">– Relationstyp wählen –</option>
             {relTypeTerms.map(t => <option key={t.id} value={t.term}>{getLabel(t, t.term)}</option>)}
           </select>
         ) : relTypeVocabId ? (
@@ -1983,6 +1983,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [showDiscardModal, setShowDiscardModal] = useState(false)
+  const [pendingRecordNav, setPendingRecordNav] = useState<{ type: string; id: string } | null>(null)
   const [confirmState, setConfirmState] = useState<{ message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void | Promise<void> } | null>(null)
   useEffect(() => { onDirtyChange?.(isDirty) }, [isDirty])
   const [saving, setSaving]   = useState(false)
@@ -2516,6 +2517,41 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // All user-triggered value mutations go through this wrapper to mark the form dirty
   const setValuesDirty: typeof setValues = (fn) => { setValues(fn); setIsDirty(true) }
 
+  // Links to related records: ask before discarding unsaved changes. Modifier clicks
+  // (new tab/window) are left to the browser since they don't leave this form.
+  function handleRecordLinkClick(e: React.MouseEvent, type: string, id: string) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    e.preventDefault()
+    if (isDirty) {
+      setPendingRecordNav({ type, id })
+      setShowDiscardModal(true)
+      return
+    }
+    navigateToRecord(type, id)
+  }
+
+  function renderRecordLink(type: string, id: string, label: React.ReactNode, style?: CSSProperties) {
+    const route = TYPE_ROUTES[type]
+    // Quick-create runs inside a modal; navigating away would leave it orphaned.
+    if (!route || quickCreate) return <span style={style}>{label}</span>
+    return (
+      <a
+        href={`#${route}/${id}`}
+        onClick={e => handleRecordLinkClick(e, type, id)}
+        style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer', ...style }}
+        onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+        onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+      >
+        {label}
+      </a>
+    )
+  }
+
+  function closeDiscardModal() {
+    setShowDiscardModal(false)
+    setPendingRecordNav(null)
+  }
+
   // Manual edits invalidate the KI-Assistent disclosure for that field path;
   // only the explicit AI-apply call sites re-add an entry (see markAiProvenance).
   function clearAiProvenance(path: string) {
@@ -2701,7 +2737,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       case 'relation':
         return val ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
+            {renderRecordLink((sf.settings?.target_type as string) ?? '', (val as RelationEntry).id, (val as RelationEntry).label, { flex: 1 })}
             <button className="btn sm ico gh" onClick={() => onChange(undefined)} disabled={disabled} title={t('remove')} aria-label={t('remove')}><X size={10} /></button>
           </div>
         ) : (
@@ -3444,7 +3480,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           </span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${targetType}: ${targetId}`}>
             <span style={{ fontSize: 10, color: 'var(--fg-4)', marginRight: 4 }}>{typeLabel[targetType] ?? targetType}</span>
-            <a href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`} onClick={e => { e.preventDefault(); navigateToRecord(targetType, targetId) }} style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+            <a href={`#${TYPE_ROUTES[targetType] ?? targetType}/${targetId}`} onClick={e => handleRecordLinkClick(e, targetType, targetId)} style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
               {relTitles[targetKey] ?? '…'}
             </a>
           </span>
@@ -3959,7 +3995,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
-                      <option value="">— {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} wählen —</option>
+                      <option value="">– {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} wählen –</option>
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
@@ -4000,7 +4036,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       onChange={e => { setParentId(e.target.value || null); setIsDirty(true) }}
                       disabled={justCreated}
                     >
-                      <option value="">— Keine (oberste Ebene) —</option>
+                      <option value="">– Keine (oberste Ebene) –</option>
                       {availableParents
                         .filter(p => p.id !== currentId)
                         .map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
@@ -4363,7 +4399,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
                                 {((val as RelationEntry[] | undefined) ?? []).map((entry, i) => (
                                   <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
-                                    <span style={{ flex: 1 }}>{entry.label}</span>
+                                    {renderRecordLink((f.settings?.target_type as string) ?? '', entry.id, entry.label, { flex: 1 })}
                                     <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{entry.relation_type}</span>
                                     <button type="button" className="btn sm ico gh" onClick={() => removeRelationEntry(f.name, i)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
                                   </div>
@@ -4414,7 +4450,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <>
                             {val && (
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '3px 8px', borderRadius: 999, background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13 }}>
-                                <span style={{ flex: 1 }}>{(val as RelationEntry).label}</span>
+                                {renderRecordLink((f.settings?.target_type as string) ?? '', (val as RelationEntry).id, (val as RelationEntry).label, { flex: 1 })}
                                 <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--mono)' }}>{(val as RelationEntry).relation_type}</span>
                                 <button className="btn sm ico gh" onClick={() => setField(f.name, undefined)} disabled={justCreated} aria-label="Beziehung entfernen" title="Beziehung entfernen"><X size={10} /></button>
                               </div>
@@ -4753,7 +4789,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         onChange={e => { setSelectedCollectionId(e.target.value); setIsDirty(true) }}
                         disabled={justCreated}
                       >
-                        <option value="">— Keine —</option>
+                        <option value="">– Keine –</option>
                         {availableCollections.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
                       </select>
                     </div>
@@ -4850,7 +4886,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                               value={f.media_type ?? ''}
                               onChange={e => handleSetMediaType(f.id, e.target.value || null)}
                             >
-                              <option value="">Typ: —</option>
+                              <option value="">Typ: –</option>
                               {mediaTypeTerms.map(t => (
                                 <option key={t.id} value={t.term}>Typ: {getLabel(t, t.term)}</option>
                               ))}
@@ -4953,7 +4989,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                               <a
                                 href={`#procedures-form/${targetId}`}
-                                onClick={e => { e.preventDefault(); navigateToRecord('procedure', targetId) }}
+                                onClick={e => handleRecordLinkClick(e, 'procedure', targetId)}
                                 style={{ color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                 title={targetId}
                               >
@@ -5039,13 +5075,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                               <a
                                 href={`#form/${targetId}`}
-                                onClick={e => { e.preventDefault(); navigateToRecord('object', targetId) }}
+                                onClick={e => handleRecordLinkClick(e, 'object', targetId)}
                                 style={{ color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                 title={targetId}
                               >
                                 {relTitles[`object/${targetId}`] ?? targetId.slice(0, 8) + '…'}
                               </a>
-                              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{objectStatuses[targetId] || '—'}</span>
+                              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{objectStatuses[targetId] || '–'}</span>
                               <button className="btn sm ico gh dn" onClick={() => handleDeleteRelation(r.id)}><Trash size={11} /></button>
                             </div>
                           )
@@ -5251,7 +5287,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <span style={{ fontWeight: 600 }}>{evt.action}</span>
                             <span style={{ color: 'var(--fg-3)' }}>{new Date(evt.created_at).toLocaleString('de-CH')}</span>
                           </div>
-                          <div style={{ color: 'var(--fg-2)' }}>von {evt.user_name ?? evt.user_id ?? '—'}</div>
+                          <div style={{ color: 'var(--fg-2)' }}>von {evt.user_name ?? evt.user_id ?? '–'}</div>
                           {(() => {
                             const cf = evt.changed_fields as { old?: Record<string, unknown>; new?: Record<string, unknown> } | undefined
                             const newVals = cf?.new
@@ -5263,10 +5299,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                   <div key={field} style={{ color: 'var(--fg-2)' }}>
                                     <span style={{ fontWeight: 600 }}>{field}</span>
                                     {field in oldVals && (
-                                      <>: <span style={{ textDecoration: 'line-through', color: 'var(--fg-3)' }}>{String(oldVals[field] ?? '—')}</span> → </>
+                                      <>: <span style={{ textDecoration: 'line-through', color: 'var(--fg-3)' }}>{String(oldVals[field] ?? '–')}</span> → </>
                                     )}
                                     {!(field in oldVals) && ': '}
-                                    <span>{String(newVals[field] ?? '—')}</span>
+                                    <span>{String(newVals[field] ?? '–')}</span>
                                   </div>
                                 ))}
                               </div>
@@ -5331,11 +5367,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         </div>
       )}
       {showDiscardModal && (
-        <div className="batch-modal-backdrop" onClick={() => setShowDiscardModal(false)} role="dialog" aria-modal="true">
+        <div className="batch-modal-backdrop" onClick={closeDiscardModal} role="dialog" aria-modal="true">
           <div className="batch-modal" onClick={e => e.stopPropagation()} style={{ width: 480 }}>
             <div className="batch-modal-header">
               <h2>{t('unsavedChangesModal.title')}</h2>
-              <button type="button" className="btn sm ico gh" onClick={() => setShowDiscardModal(false)} aria-label="Schließen">
+              <button type="button" className="btn sm ico gh" onClick={closeDiscardModal} aria-label="Schließen">
                 <X size={16} />
               </button>
             </div>
@@ -5350,16 +5386,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               </div>
             </div>
             <div className="batch-modal-footer">
-              <button type="button" className="btn" onClick={() => setShowDiscardModal(false)}>
+              <button type="button" className="btn" onClick={closeDiscardModal}>
                 {t('unsavedChangesModal.stay')}
               </button>
               <button
                 type="button"
                 className="btn danger"
                 onClick={() => {
+                  const target = pendingRecordNav
                   setIsDirty(false)
-                  setShowDiscardModal(false)
-                  onBack?.()
+                  closeDiscardModal()
+                  if (target) navigateToRecord(target.type, target.id)
+                  else onBack?.()
                 }}
               >
                 {t('unsavedChangesModal.discard')}

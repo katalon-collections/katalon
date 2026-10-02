@@ -94,7 +94,7 @@ def extract_message_content(data: dict[str, Any]) -> str:
                 status_code=502,
                 detail=(
                     "KI-Antwort wurde ohne Inhalt abgeschnitten (Token-Limit erreicht, "
-                    "bevor das Modell antworten konnte — z. B. durch Reasoning-Overhead). "
+                    "bevor das Modell antworten konnte – z. B. durch Reasoning-Overhead). "
                     "Output-Token-Limit erhöhen oder ein anderes Modell wählen."
                 ),
             )

@@ -36,8 +36,7 @@ const BROWSE_NAV_ITEMS = [
 ]
 
 function pageLabel(p: StaticPageSummary, locale: string): string {
-  const t = (p.title ?? {}) as Record<string, string>
-  return t[locale] ?? Object.values(t)[0] ?? p.slug
+  return resolveLangText(p.title as Record<string, string>, locale, p.slug)
 }
 
 function LanguageSwitcher() {

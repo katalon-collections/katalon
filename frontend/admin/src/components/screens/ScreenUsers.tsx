@@ -107,7 +107,7 @@ function ApiKeysPanel({ userId }: { userId: string }) {
                     <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>{k.key_prefix}…</td>
                     <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>{new Date(k.created_at).toLocaleDateString('de-DE')}</td>
                     <td style={{ padding: '4px 8px', color: 'var(--fg-3)' }}>
-                      {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '—'}
+                      {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('de-DE') : '–'}
                     </td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>
                       <button className="btn sm ico gh dn" onClick={() => handleRevoke(k.id)} title={t('apiKeyRevokeTitle')}>🗑</button>
@@ -429,7 +429,7 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                       {new Date(u.created_at).toLocaleDateString('de-DE')}
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString('de-DE') : '—'}
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString('de-DE') : '–'}
                     </td>
                     <td>
                       <button

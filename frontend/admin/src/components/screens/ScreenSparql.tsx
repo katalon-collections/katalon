@@ -354,7 +354,7 @@ LIMIT 50
   }
 
   const renderCellContent = (cell?: SparqlQueryResultBinding) => {
-    if (!cell) return <span style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>—</span>
+    if (!cell) return <span style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>–</span>
     if (cell.type === 'uri') {
       // Check if internal URI matching /v1/{recordType}/{uuid} or http(s)://.../v1/{recordType}/{uuid}
       const match = cell.value.match(/\/v1\/(objects|entities|places|occurrences|procedures|collections)\/([0-9a-f-]{36})/i)

@@ -43,7 +43,7 @@
   "errorPasswordWeak": "New password must be at least 8 characters with letters and numbers.",
   "empty": "No users found.",
   "apiKeysTitle": "API Keys",
-  "apiKeyCreated": "✓ Key created — copy now, it will not be shown again:",
+  "apiKeyCreated": "✓ Key created – copy now, it will not be shown again:",
   "apiKeyCopy": "Copy",
   "apiKeyNamePlaceholder": "Name of new key",
   "apiKeyCreateButton": "Create",

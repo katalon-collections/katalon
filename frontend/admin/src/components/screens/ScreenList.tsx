@@ -686,7 +686,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                     )}
                     {lockMap[rec.id] && (
                       <span
-                        title={`Exklusiv gesperrt von ${lockMap[rec.id].locked_by_email}${lockMap[rec.id].reason ? ` — ${lockMap[rec.id].reason}` : ''}`}
+                        title={`Exklusiv gesperrt von ${lockMap[rec.id].locked_by_email}${lockMap[rec.id].reason ? ` – ${lockMap[rec.id].reason}` : ''}`}
                         style={{ marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 10, background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe' }}
                       >
                         Gesperrt
