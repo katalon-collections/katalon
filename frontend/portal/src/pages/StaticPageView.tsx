@@ -4,8 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { renderMarkdown } from '../utils/markdown'
 import { api, type StaticPageSummary } from '../api/client'
 import { useI18n } from '../i18n'
 import { resolveLangText } from '../utils/renderFieldValue'
@@ -40,10 +39,7 @@ export function StaticPageView() {
   const title = resolveLangText(page.title as Record<string, string>, lang, page.slug)
   const content = resolveLangText(page.content as Record<string, string>, lang, '')
 
-  const html = DOMPurify.sanitize(marked.parse(content) as string, {
-    ADD_TAGS: ['video', 'source'],
-    ADD_ATTR: ['controls', 'preload', 'loop', 'muted', 'playsinline', 'type', 'poster'],
-  })
+  const html = renderMarkdown(content)
   const plainText = content.replace(/[#*`_[\]()>]/g, '').slice(0, 160)
 
   return (

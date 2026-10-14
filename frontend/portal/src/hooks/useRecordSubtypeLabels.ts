@@ -35,8 +35,8 @@ export function useRecordSubtypeLabels(locale: string) {
     return () => { cancelled = true }
   }, [])
 
-  return (name: string): string => {
-    const subtype = subtypes.find(s => s.name === name)
+  return (name: string, primaryType?: string): string => {
+    const subtype = subtypes.find(s => s.name === name && (!primaryType || s.primary_type === primaryType))
     if (!subtype) return name
     return [subtype.label?.[locale], subtype.label?.de, subtype.label?.en]
       .find(value => value?.trim()) ?? name

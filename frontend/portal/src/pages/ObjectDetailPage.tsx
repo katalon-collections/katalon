@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, mediaThumbnailUrl, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { api, BASE, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
@@ -23,9 +24,9 @@ function ViewerFallback({ objectId, mediaFiles, title }: { objectId: string; med
   if (mediaFiles.length === 1) {
     return (
       <img
-        src={mediaThumbnailUrl(objectId, mediaFiles[0].id)}
+        src={thumbnailUrl(objectId, mediaFiles[0].id, mediaFiles[0].iiif_identifier)}
         alt={title}
-        style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+        style={{ width: '100%', borderRadius: 10, display: 'block', background: 'var(--viewer-bg, #0f172a)' }}
       />
     )
   }
@@ -34,9 +35,9 @@ function ViewerFallback({ objectId, mediaFiles, title }: { objectId: string; med
       {mediaFiles.map((f, i) => (
         <img
           key={f.id}
-          src={mediaThumbnailUrl(objectId, f.id)}
+          src={thumbnailUrl(objectId, f.id, f.iiif_identifier)}
           alt={`${title} (${i + 1}/${mediaFiles.length})`}
-          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#0f172a' }}
+          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, display: 'block', background: 'var(--viewer-bg, #0f172a)' }}
         />
       ))}
     </div>
@@ -121,7 +122,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   const description = renderFieldValue(m.description, locale) ?? ''
   const primaryImage = readyMedia.find(f => f.is_primary && (f.category ?? 'image') === 'image')
     ?? readyMedia.find(f => (f.category ?? 'image') === 'image')
-  const ogImage = primaryImage ? mediaThumbnailUrl(obj.id, primaryImage.id) : ''
+  const ogImage = primaryImage ? thumbnailUrl(obj.id, primaryImage.id, primaryImage.iiif_identifier) : ''
 
   // Keywords get their own tag-pill rendering below; keep them out of the generic field loop.
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
@@ -138,7 +139,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
     <img
       src={placeholderUrl}
       alt=""
-      style={{ width: '100%', borderRadius: 10, display: 'block', background: '#0f172a' }}
+      style={{ width: '100%', borderRadius: 10, display: 'block', background: 'var(--viewer-bg, #0f172a)' }}
     />
   ) : null
 
@@ -212,6 +213,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         )}
         relations={relations.length > 0 && (
           <RelationsList
+            recordType="object"
             relations={relations}
             currentId={obj.id}
             resolveLabel={resolveRelationType}

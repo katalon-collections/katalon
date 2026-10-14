@@ -476,6 +476,8 @@ export const schema = {
   },
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  /** Several fields of one type in one transaction; triggers at most one reindex. */
+  bulkUpdate: (targetType: string, items: FieldDefinition[]) => req<FieldDefinition[]>(`/v1/schema/${targetType}/bulk`, { method: 'PUT', body: JSON.stringify(items) }),
   delete: (id: string, opts?: { purgeData?: boolean }) => {
     const qs = opts?.purgeData ? '?purge_data=true' : ''
     return req<void>(`/v1/schema/${id}${qs}`, { method: 'DELETE' })
@@ -1341,11 +1343,21 @@ export interface LockInfo {
   locked_at: string
   expires_at: string | null
   reason: string
+  title?: string | null
+  idno?: string | null
 }
 
 export const locks = {
   get: (resourceType: string, resourceId: string) =>
     req<LockInfo | null>(`/v1/locks/${resourceType}/${resourceId}`),
+  list: (params?: { resource_type?: string; user_id?: string; mine?: boolean }) => {
+    const sp = new URLSearchParams()
+    if (params?.resource_type) sp.set('resource_type', params.resource_type)
+    if (params?.user_id) sp.set('user_id', params.user_id)
+    if (params?.mine) sp.set('mine', 'true')
+    const qs = sp.toString()
+    return req<LockInfo[]>(`/v1/locks${qs ? `?${qs}` : ''}`)
+  },
   set: (resourceType: string, resourceId: string, reason?: string, expires_at?: string) =>
     req<LockInfo>('/v1/locks', {
       method: 'POST',
@@ -1360,6 +1372,55 @@ export const locks = {
       method: 'POST',
       body: JSON.stringify({ resource_type: resourceType, resource_ids: resourceIds }),
     }),
+}
+
+export interface DashboardRecentItem {
+  record_type: string
+  record_id: string
+  record_label: string
+  action: string
+  created_at: string
+}
+
+export interface DashboardWorkingSet {
+  id: string
+  name: string
+  record_type: string | null
+  item_count: number
+  updated_at: string
+}
+
+export interface DashboardProcedure {
+  id: string
+  idno: string | null
+  reference_number: string | null
+  title: string
+  procedure_type: string
+  due_date: string | null
+  days_left: number | null
+}
+
+export interface DashboardAuditItem {
+  record_type: string
+  record_id: string
+  record_label: string
+  user_name: string
+  action: string
+  created_at: string
+}
+
+export interface DashboardSummary {
+  recents: DashboardRecentItem[]
+  my_locks: LockInfo[]
+  all_locks: LockInfo[] | null
+  working_sets: DashboardWorkingSet[]
+  due_procedures: DashboardProcedure[]
+  team_activity: DashboardAuditItem[]
+  draft_counts: Record<string, number>
+}
+
+export const dashboard = {
+  summary: () => req<DashboardSummary>('/v1/dashboard/summary'),
 }
 
 export interface AICompleteResponse {

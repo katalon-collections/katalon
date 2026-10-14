@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from 'react'
 import type { MediaFile } from '../api/client'
-import { BASE, mediaThumbnailUrl, PORTAL_API } from '../api/client'
+import { BASE, PORTAL_API } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 
 interface Props {
   objectId: string
@@ -35,7 +36,7 @@ function ModelViewer({ src, alt }: { src: string; alt: string }) {
     return (
       <div
         style={{
-          width: '100%', height: '60vh', borderRadius: 10, background: '#0f172a',
+          width: '100%', height: '60vh', borderRadius: 10, background: 'var(--viewer-bg, #0f172a)',
           display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 14,
         }}
       >
@@ -50,7 +51,7 @@ function ModelViewer({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       camera-controls
       auto-rotate
-      style={{ width: '100%', height: '60vh', borderRadius: 10, background: '#0f172a' }}
+      style={{ width: '100%', height: '60vh', borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}
     />
   )
 }
@@ -91,7 +92,7 @@ function PdfViewer({ src, title }: { src: string; title: string }) {
 
   if (failed) {
     return (
-      <div style={{ padding: 16, borderRadius: 10, background: '#0f172a' }}>
+      <div style={{ padding: 16, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}>
         <a href={src} target="_blank" rel="noreferrer" style={{ color: '#e2e8f0' }}>
           PDF öffnen ({title})
         </a>
@@ -100,7 +101,7 @@ function PdfViewer({ src, title }: { src: string; title: string }) {
   }
   if (!url) {
     return (
-      <div style={{ width: '100%', height: '78vh', borderRadius: 10, background: '#0f172a', display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 14 }}>
+      <div style={{ width: '100%', height: '78vh', borderRadius: 10, background: 'var(--viewer-bg, #0f172a)', display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 14 }}>
         PDF wird geladen…
       </div>
     )
@@ -109,7 +110,7 @@ function PdfViewer({ src, title }: { src: string; title: string }) {
     <iframe
       src={url}
       title={title}
-      style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: '#0f172a' }}
+      style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}
     />
   )
 }
@@ -131,14 +132,14 @@ export function MediaViewer({ objectId, media }: Props) {
         <video
           src={src}
           controls
-          style={{ width: '100%', maxHeight: '78vh', borderRadius: 10, background: '#0f172a' }}
+          style={{ width: '100%', maxHeight: '78vh', borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}
         />
       )
     case 'model':
       return <ModelViewer src={src} alt={media.filename} />
     default:
       return (
-        <div style={{ padding: 16, borderRadius: 10, background: '#0f172a' }}>
+        <div style={{ padding: 16, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}>
           <a href={src} target="_blank" rel="noreferrer" style={{ color: '#e2e8f0' }}>
             Datei öffnen ({media.filename})
           </a>
@@ -196,7 +197,7 @@ export function MediaThumb({ objectId, media, active, onSelect }: {
   onSelect: () => void
 }) {
   const src = fileUrl(objectId, media)
-  const thumbnailSrc = mediaThumbnailUrl(objectId, media.id)
+  const thumbnailSrc = thumbnailUrl(objectId, media.id, media.iiif_identifier)
   const badge = MEDIA_BADGE[media.category]
   const isImage = media.category === 'image'
   const isVideo = media.category === 'video'
@@ -211,7 +212,7 @@ export function MediaThumb({ objectId, media, active, onSelect }: {
       style={{
         position: 'relative', aspectRatio: '1', width: '100%', padding: 0, cursor: 'pointer',
         border: active ? '2px solid var(--accent)' : '1px solid var(--border-s)',
-        borderRadius: 8, overflow: 'hidden', background: '#0f172a',
+        borderRadius: 8, overflow: 'hidden', background: 'var(--viewer-bg, #0f172a)',
       }}
     >
       {isImage ? (

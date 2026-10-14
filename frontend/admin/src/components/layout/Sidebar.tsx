@@ -4,7 +4,7 @@
 import pkg from '../../../package.json'
 import { useTranslation } from 'react-i18next'
 import { getTokenUser } from '../../api/client'
-import { Bell, Bookmark, Box, Code, Download, File, Folder, Globe, History, Gear, Image, Layers, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
+import { Bell, Bookmark, Box, Code, Download, File, Folder, Globe, History, Gear, Image, Layers, LayoutDashboard, Lightning, ListTree, MapPin, Tag, Upload, User, Users } from '../ui/Icons'
 
 type Route = string
 
@@ -20,6 +20,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { gKey: 'sidebar.groups.content' },
+  { id: 'dashboard',        labelKey: 'sidebar.nav.dashboard',        Icon: LayoutDashboard, routes: ['dashboard'] },
   { id: 'list',             labelKey: 'sidebar.nav.list',             Icon: Image,     routes: ['list', 'form'] },
   { id: 'collections-list', labelKey: 'sidebar.nav.collectionsList',  Icon: Folder,    routes: ['collections-list', 'collections-form'] },
   { id: 'entities-list',    labelKey: 'sidebar.nav.entitiesList',     Icon: User,      routes: ['entities-list', 'entities-form'] },

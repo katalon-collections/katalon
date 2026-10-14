@@ -28,8 +28,8 @@
 #                               Kann top-level definiert werden ([[deprecated_env_vars]])
 #                               oder versionsspezifisch ([[releases."1.31.0".deprecated_env_vars]]).
 
-compose_revision = 2
-minimum_installer_version = "0.1.0"
+compose_revision = 3
+minimum_installer_version = "0.3.0"
 
 [requires]
 postgres = ">=16"
@@ -38,3 +38,6 @@ elasticsearch = ">=8.15,<9"
 [[releases."1.40.3".deprecated_env_vars]]
 key = "DEFAULT_ADMIN_PASSWORD"
 note = "Umbenannt in INITIAL_ADMIN_PASSWORD (optional). Die Zeile kann aus der .env entfernt werden."
+
+# Revision 3: Cantaloupe-Derivat-Cache auf Platte (cantaloupe-cache-init, ./cantaloupe-cache)
+# statt tmpfs; braucht das Compose-Template ab katalon-cli 0.3.0.

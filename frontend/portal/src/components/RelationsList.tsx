@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Relation } from '../api/client'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
+import { usePortalConfig } from '../hooks/usePortalConfig'
 import { useI18n } from '../i18n'
+import { matchRelationFacet, relationFacetHref } from '../utils/facets'
 
 
 const TYPE_PATHS: Record<string, string> = {
@@ -45,11 +47,15 @@ interface Props {
   metadata?: Record<string, Record<string, unknown>>
   /** Optional: current record's field definitions (used to find inherited_fields config) */
   fieldDefs?: FieldDefinition[]
+  /** Current record type: enables "more with this …" links via relation facets. */
+  recordType?: string
 }
 
-export function RelationsList({ relations, currentId, resolveLabel, titles = {}, metadata = {}, fieldDefs = [] }: Props) {
+export function RelationsList({ relations, currentId, resolveLabel, titles = {}, metadata = {}, fieldDefs = [], recordType }: Props) {
   const navigate = useNavigate()
   const { t } = useI18n()
+  const portalConfig = usePortalConfig()
+  const ownFacets = recordType ? portalConfig.relation_facets?.[recordType] : undefined
 
   if (relations.length === 0) return null
 
@@ -67,6 +73,7 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
           const resolvedLabel = isFrom ? r.to_label : r.from_label
           const targetLabel = resolvedLabel ?? titles[titleKey] ?? t('common.recordUnavailable')
           const path = typePath(targetType, targetId)
+          const facet = matchRelationFacet(ownFacets, targetType, r.relation_type, isFrom ? 'outgoing' : 'incoming')
 
           const inheritedFieldNames = fieldDefs
             .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType)
@@ -85,13 +92,20 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
                 }}>
                   {resolveLabel(r.relation_type, isFrom)}:
                 </span>
-                <a
-                  href="#"
-                  onClick={e => { e.preventDefault(); navigate(path) }}
-                  style={{ color: 'var(--accent)', textDecoration: 'none', overflowWrap: 'anywhere', minWidth: 0 }}
-                >
-                  {targetLabel}
-                </a>
+                <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                  <a
+                    href="#"
+                    onClick={e => { e.preventDefault(); navigate(path) }}
+                    style={{ color: 'var(--accent)', textDecoration: 'none' }}
+                  >
+                    {targetLabel}
+                  </a>
+                  {facet && recordType && (
+                    <Link className="rel-facet-link" to={relationFacetHref(recordType, facet, targetId)}>
+                      {t('relations.moreWithValue')}
+                    </Link>
+                  )}
+                </span>
               </div>
               {meta && inheritedFieldNames.length > 0 && (
                 <div style={{ paddingLeft: 'calc(9.5rem + 12px)', display: 'flex', flexDirection: 'column', gap: 2 }}>

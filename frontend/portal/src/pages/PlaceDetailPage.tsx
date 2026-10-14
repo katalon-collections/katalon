@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, fetchRecord, mediaThumbnailUrl, type MediaFile, type ObjectSummary, type PlaceSummary, type PortalUser, type Relation } from '../api/client'
+import { api, fetchRecord, type MediaFile, type ObjectSummary, type PlaceSummary, type PortalUser, type Relation } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
@@ -84,7 +85,7 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
             .then((media: MediaFile[]) => {
               const ready = media.filter(mf => mf.status === 'ready')
               const primary = ready.find(mf => mf.is_primary) ?? ready[0]
-              if (primary) thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
+              if (primary) thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
             })
             .catch(() => {})
         ))
@@ -165,9 +166,10 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}
         media={hasCoords ? <StaticMap lat={place.lat!} lon={place.lon!} name={title} /> : undefined}
-        mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
+        mainExtra={linkedObjects.length > 0 && <RelatedObjects recordType="place" objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (
           <RelationsList
+            recordType="place"
             relations={nonObjectRelations}
             currentId={place.id}
             resolveLabel={resolveRelationType}

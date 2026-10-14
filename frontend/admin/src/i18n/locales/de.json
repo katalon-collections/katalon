@@ -49,6 +49,7 @@
       "admin": "Verwaltung"
     },
     "nav": {
+      "dashboard": "Übersicht",
       "list": "Objekte",
       "collectionsList": "Sammlungen",
       "entitiesList": "Entitäten",

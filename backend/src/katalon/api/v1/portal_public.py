@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -99,35 +99,108 @@ async def _maybe_export_rdf(
     )
 
 
-async def _filter_facet_names(
-    db: DBDep, facet_names: list[str] | None, target_types: tuple[str, ...] | list[str]
-) -> list[str] | None:
-    """Whitelist requested facet names against is_facet field definitions.
+class _FacetContext(BaseModel):
+    names: list[str] | None
+    specs: dict[str, tuple[str, str, str]]
+    tree_aggs: dict[str, tuple[str, str, list[str]]]
+    trees: dict[str, dict[str, Any]]
 
-    Index docs carry facet_all_* for every public field, so without this gate
-    anonymous callers could aggregate any public field. Only fields explicitly
-    marked is_facet (plus portal-configured inherited/relation facets) may be
-    aggregated; unknown names are dropped, not rejected.
+
+async def _facet_context(
+    db: DBDep,
+    requested: list[str] | None,
+    target_types: tuple[str, ...] | list[str],
+    expand: dict[str, list[str]],
+) -> _FacetContext:
+    """Resolve requested facet names against the portal facet catalog.
+
+    Unknown names are dropped (anonymous callers may only aggregate configured
+    facets). Every catalog facet contributes its index fields so that filters
+    work even when its panel is not requested. Tree facets get one aggregation
+    for their top level and one per expanded node.
     """
-    from katalon.integrations.elasticsearch import RELATED_FACET_NAMES
+    from katalon.core.models import VocabularyTerm
+    from katalon.services.facet_service import portal_facets
 
-    if not facet_names:
-        return None
-    special = {n for n in facet_names if n in RELATED_FACET_NAMES or n.startswith("inherited_")}
-    direct = [n for n in facet_names if n not in special]
-    allowed = set(special)
-    if direct:
-        rows = await db.execute(
-            select(FieldDefinition.name).where(
-                FieldDefinition.is_facet.is_(True),
-                FieldDefinition.is_deleted.is_(False),
-                FieldDefinition.target_type.in_(target_types),
-                FieldDefinition.name.in_(direct),
+    config = (
+        await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+    ).scalar_one_or_none()
+    catalog = await portal_facets(db, config, list(target_types))
+    merged: dict[str, Any] = {}
+    for per_type in catalog.values():
+        for name, spec in per_type.items():
+            merged.setdefault(name, spec)
+    names = [n for n in requested if n in merged] if requested else None
+    specs = {
+        name: (spec.filter_field, spec.agg_field, spec.kind)
+        for name, spec in merged.items()
+        if spec.kind not in ("related", "inherited")
+    }
+    tree_aggs: dict[str, tuple[str, str, list[str]]] = {}
+    trees: dict[str, dict[str, Any]] = {}
+    for name in names or []:
+        spec = merged[name]
+        if spec.kind != "tree" or not spec.vocabulary_id:
+            continue
+        rows = (
+            await db.execute(
+                select(VocabularyTerm.id, VocabularyTerm.parent_id, VocabularyTerm.label).where(
+                    VocabularyTerm.vocabulary_id == uuid.UUID(spec.vocabulary_id)
+                )
             )
-        )
-        configured = {row[0] for row in rows.all()}
-        allowed.update(n for n in direct if n in configured)
-    return sorted(allowed)
+        ).all()
+        terms = {str(i): (str(p) if p else None, label or {}) for i, p, label in rows}
+        children: dict[str | None, list[str]] = {}
+        for term_id, (parent, _label) in terms.items():
+            children.setdefault(parent, []).append(term_id)
+        trees[name] = {"terms": terms, "children": children}
+        for parent in [None, *[p for p in expand.get(name, []) if p in terms]]:
+            key = f"tree_{name}__{parent or 'root'}"
+            tree_aggs[key] = (name, spec.filter_field, children.get(parent, []))
+    return _FacetContext(names=names, specs=specs, tree_aggs=tree_aggs, trees=trees)
+
+
+def _tree_facets(
+    context: _FacetContext, facets: dict[str, Any], active: dict[str, list[str]]
+) -> dict[str, Any]:
+    """Turn tree_<name>__<parent> buckets into {name: {nodes, paths}}: nodes per
+    parent ("root" for the top level) with label, count, has_children; paths
+    hold the ancestor chain of every active value for the breadcrumb."""
+    out: dict[str, Any] = {}
+    for name, tree in context.trees.items():
+        terms, children = tree["terms"], tree["children"]
+        nodes: dict[str, list[dict[str, Any]]] = {}
+        prefix = f"tree_{name}__"
+        for key in [k for k in facets if k.startswith(prefix)]:
+            parent = key[len(prefix):]
+            nodes[parent] = [
+                {
+                    "id": bucket["value"],
+                    "label": terms.get(bucket["value"], (None, {}))[1],
+                    "count": bucket["count"],
+                    "has_children": bool(children.get(bucket["value"])),
+                }
+                for bucket in facets.pop(key)
+            ]
+        paths: dict[str, list[dict[str, Any]]] = {}
+        for value in active.get(name, []):
+            chain: list[dict[str, Any]] = []
+            current: str | None = value
+            while current and current in terms and len(chain) < 20:
+                chain.insert(0, {"id": current, "label": terms[current][1]})
+                current = terms[current][0]
+            if chain:
+                paths[value] = chain
+        out[name] = {"nodes": nodes, "paths": paths}
+    return out
+
+
+def _expand_params(request: Request) -> dict[str, list[str]]:
+    return {
+        key[7:]: [value for value in request.query_params.getlist(key) if value]
+        for key in request.query_params.keys()
+        if key.startswith("expand_")
+    }
 
 
 class PortalRecordRead(BaseModel):
@@ -240,6 +313,8 @@ class PortalMediaRead(BaseModel):
     license_uri: str | None
     rights_holder: dict[str, Any] | None
     created_at: datetime
+    # IIIF identifier of ready images, for direct /iiif/3/<id>/... thumbnail URLs.
+    iiif_identifier: str | None = None
 
     @computed_field(alias="_links")
     def links(self) -> dict[str, dict[str, str]]:
@@ -264,6 +339,7 @@ class PortalRelationRead(BaseModel):
 
 
 class PortalFieldDefinitionRead(BaseModel):
+    id: uuid.UUID
     name: str
     label: dict[str, Any]
     field_type: str
@@ -312,6 +388,8 @@ class AdvancedSearchRequest(BaseModel):
     status: list[str] = Field(default_factory=list)
     subtype: list[str] = Field(default_factory=list)
     sort: str | None = None
+    # Tree facets: expanded node ids per facet name (children are counted).
+    tree_expand: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class PortalVocabularyRead(BaseModel):
@@ -530,7 +608,10 @@ async def list_collections(
     parent_id: uuid.UUID | None = None,
     top_level: bool = False,
     q: str | None = None,
+    sort: Literal["newest", "largest"] = "newest",
 ) -> dict[str, Any]:
+    """``sort=largest`` orders by the number of public member objects (direct
+    object → collection relations, as counted on the collection page)."""
     staff_user = _staff_user(current_user)
     visibility_user = await _collection_visibility_user(db, staff_user)
     query = select(Collection).where(Collection.deleted_at.is_(None))
@@ -548,9 +629,27 @@ async def list_collections(
             | cast(Collection.metadata_, Text).icontains(q, autoescape=True)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
-    query = (
-        query.order_by(Collection.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
-    )
+    order: list[Any] = [Collection.created_at.desc()]
+    if sort == "largest":
+        public_members = (
+            select(func.count(Relation.id))
+            .where(
+                Relation.to_type == "collection",
+                Relation.to_id == Collection.id,
+                Relation.from_type == "object",
+                exists(
+                    select(Object.id).where(
+                        Object.id == Relation.from_id,
+                        Object.status.in_(PUBLIC_STATUSES),
+                        Object.deleted_at.is_(None),
+                    )
+                ),
+            )
+            .correlate(Collection)
+            .scalar_subquery()
+        )
+        order = [public_members.desc(), Collection.created_at.desc()]
+    query = query.order_by(*order).offset((page - 1) * page_size).limit(page_size)
     items = (await db.execute(query)).scalars().all()
     response_items: list[PortalCollectionRead] = []
     for col in items:
@@ -889,11 +988,17 @@ async def search(
         numeric_filters = _range_filters(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    facet_context = await _facet_context(
+        db,
+        [field.strip() for field in facets.split(",") if field.strip()] if facets else None,
+        (type,) if type else _PUBLIC_TYPES,
+        _expand_params(request),
+    )
     result = await search_service.search(
         query=q,
         record_type=type,
         record_types=None if type else _PUBLIC_TYPES,
-        status="public" if staff_user is None else None,
+        status=PUBLIC_STATUSES if staff_user is None else None,
         status_facet=status if staff_user is not None else None,
         subtype_facet=subtype or None,
         full_visibility_types=full_visibility_types,
@@ -901,16 +1006,15 @@ async def search(
         page_size=page_size,
         extra_filters=extra_filters or None,
         numeric_filters=numeric_filters or None,
-        facet_fields=await _filter_facet_names(
-            db,
-            [field.strip() for field in facets.split(",") if field.strip()] if facets else None,
-            (type,) if type else _PUBLIC_TYPES,
-        ),
+        facet_fields=facet_context.names,
         rel_filters=rel_filters or None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
         sort=sort,
+        facet_specs=facet_context.specs,
+        tree_aggs=facet_context.tree_aggs,
     )
+    result["tree_facets"] = _tree_facets(facet_context, result["facets"], extra_filters)
     return SearchResponse(**result)
 
 
@@ -951,10 +1055,16 @@ async def advanced_search(
         for bounds in numeric_filters.values()
     ):
         raise HTTPException(status_code=422, detail="Ungültiger Zahlenbereich.")
+    facet_context = await _facet_context(
+        db,
+        data.facet_fields,
+        (data.query.record_type,) if data.query.record_type else _PUBLIC_TYPES,
+        data.tree_expand,
+    )
     result = await search_service.search(
         query=data.q,
         record_type=data.query.record_type,
-        status="public" if staff_user is None else None,
+        status=PUBLIC_STATUSES if staff_user is None else None,
         status_facet=data.status if staff_user is not None else None,
         subtype_facet=data.subtype or None,
         full_visibility_types=full_visibility_types,
@@ -962,17 +1072,16 @@ async def advanced_search(
         page_size=data.page_size,
         extra_filters=data.metadata_filters or None,
         numeric_filters=numeric_filters or None,
-        facet_fields=await _filter_facet_names(
-            db,
-            data.facet_fields,
-            (data.query.record_type,) if data.query.record_type else _PUBLIC_TYPES,
-        ),
+        facet_fields=facet_context.names,
         rel_filters=allowed_relation_filters or None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         advanced_filter=advanced_filter,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
         sort=data.sort,
+        facet_specs=facet_context.specs,
+        tree_aggs=facet_context.tree_aggs,
     )
+    result["tree_facets"] = _tree_facets(facet_context, result["facets"], data.metadata_filters)
     return SearchResponse(**result)
 
 
@@ -1136,6 +1245,14 @@ async def serve_page_asset(asset_id: uuid.UUID, filename: str, db: DBDep) -> Res
 async def active_portal_banners(db: DBDep, response: Response) -> list[Banner]:
     response.headers["Cache-Control"] = _CONFIG_CACHE
     return await banners.active_portal_banners(db)
+
+
+@router.get("/portal/footer-assets/{name}", summary="Download an uploaded footer image")
+async def get_footer_asset(name: str) -> FileResponse:
+    response = await portal.serve_footer_asset(name)
+    # Names are random and never reused, so the file can be cached for good.
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 
 @router.get("/theme")

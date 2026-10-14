@@ -751,6 +751,24 @@ class PortalConfig(Base):
     # Fields shown as the result-list subtitle, per record type, in display order.
     # e.g. {"object": ["record_type", "dating"], "entity": ["record_type"]}
     subtitle_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    # Per record type: ordered facet names (fields, relation facets, ...); names
+    # missing here keep their default position after the ordered ones.
+    facet_order: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict[str, Any]
+    )
+    # Per record type: list of relation facets (key, label, target_type,
+    # relation_types, target_subtypes, direction) — see api/v1/portal.py.
+    relation_facets: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict[str, Any]
+    )
+    # Configurable portal footer (columns + bottom line) and one-time usage
+    # notice; empty dicts keep the built-in one-line footer / no notice.
+    footer: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    notice: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict[str, Any])
+    # With a logo: show the site title next to it in the header; hide the hero
+    # title/subtitle when the logo already contains them.
+    header_show_title: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    hero_hide_title: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     browse_enabled_types: Mapped[list[str]] = mapped_column(
         JSONB, default=lambda: ["object", "entity", "place", "occurrence"]
     )

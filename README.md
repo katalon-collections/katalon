@@ -65,7 +65,7 @@ Beim ersten Start generiert Katalon automatisch ein sicheres Admin-Passwort. `in
 Wer den Stack ohne `install.sh` startet (z. B. `docker compose up -d`), findet die Zugangsdaten:
 
 ```bash
-# im API-Container
+# im API-Container (Datei wird beim nächsten API-Neustart gelöscht)
 docker compose exec api cat /var/lib/katalon/first-run-credentials.txt
 
 # oder in den Logs (einmalig beim ersten Start)

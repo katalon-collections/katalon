@@ -19,6 +19,7 @@ celery_app = Celery(
         "katalon.workers.email_tasks",
         "katalon.workers.rdf_tasks",
         "katalon.workers.health_tasks",
+        "katalon.workers.thumbnail_tasks",
     ],
 )
 

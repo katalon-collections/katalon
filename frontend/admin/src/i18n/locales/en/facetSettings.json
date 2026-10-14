@@ -1,0 +1,45 @@
+{
+  "order": {
+    "title": "Order in the portal",
+    "hint": "Drag or move with the arrows. Applies to all active facets of this type.",
+    "empty": "No facets active yet.",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "dragHandle": "Move {{name}}",
+    "kind": {
+      "field": "Field",
+      "date": "Date",
+      "tree": "Hierarchy",
+      "relation": "Relation",
+      "related": "Linked",
+      "inherited": "Inherited"
+    }
+  },
+  "relations": {
+    "title": "Relation facets",
+    "hint": "Facets over linked records, restricted to certain relation types (e.g. \"Composer\"). Changes rebuild this type's search index in the background.",
+    "empty": "No relation facets for this type.",
+    "add": "Add relation facet",
+    "edit": "Edit",
+    "remove": "Remove",
+    "dialogTitleNew": "New relation facet",
+    "dialogTitleEdit": "Edit relation facet",
+    "labelDe": "Label (German)",
+    "labelEn": "Label (English)",
+    "key": "Key",
+    "keyHint": "Lowercase letters, digits and _ – used in search links.",
+    "targetType": "Linked type",
+    "relationTypes": "Relation types",
+    "relationTypesEmpty": "No relation types for this combination in the \"relation_types\" vocabulary.",
+    "subtypes": "Only subtypes (optional, comma-separated)",
+    "direction": "Direction",
+    "directionOutgoing": "This record → linked",
+    "directionIncoming": "Linked → this record",
+    "directionBoth": "Both directions",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "errorKey": "Key is missing, invalid or already in use.",
+    "errorTypes": "Select at least one relation type."
+  },
+  "subfield": "{{group}} › {{field}}"
+}

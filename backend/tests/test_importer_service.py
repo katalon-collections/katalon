@@ -339,3 +339,19 @@ def test_apply_mapping_coerces_url_field() -> None:
     records, _ = apply_mapping(rows, {"link": "link", "links": "links"}, field_defs)
     assert records[0]["link"] == {"value": "https://example.org/a", "label": ""}
     assert records[0]["links"] == [{"value": "https://example.org/b", "label": ""}]
+
+
+def test_apply_mapping_url_subfields_use_url_object_shape() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="links", field_type="group", parent_id=None)
+    link = SimpleNamespace(id=object(), name="link", field_type="url", parent_id=group_id)
+    note = SimpleNamespace(id=object(), name="note", field_type="text", parent_id=group_id)
+    records, _ = apply_mapping(
+        [{"url": ["https://a.org"], "note": ["A", "B"]}],
+        {"url": {"target": "links.link"}, "note": {"target": "links.note"}},
+        {"links": group, "link": link, "note": note},
+    )
+    # Second instance has no URL: left out instead of an empty string.
+    assert records == [
+        {"links": [{"link": {"value": "https://a.org", "label": ""}, "note": "A"}, {"note": "B"}]}
+    ]

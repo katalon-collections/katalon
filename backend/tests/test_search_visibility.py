@@ -11,6 +11,7 @@ import pytest
 from katalon.api.v1 import index_health
 from katalon.api.v1.search import trigger_reindex_type
 from katalon.core.models import Object, Occurrence, Procedure, Relation
+from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.integrations import elasticsearch
 from katalon.services import search_service
 from katalon.services.search_service import build_index_doc, date_bounds
@@ -132,8 +133,28 @@ def test_index_doc_builds_numeric_facet_field() -> None:
     assert doc["number_facet_all_year"] == [1949.0, 1950.0]
 
 
+def _stub_relation_and_facet_lookups(monkeypatch) -> None:
+    """These tests cover inherited relation fields; relation titles, relation
+    facets and derived facet fields have their own coverage."""
+    from katalon.services import search_service
+
+    async def no_titles(*_args, **_kwargs):
+        return {}
+
+    async def no_specs(*_args, **_kwargs):
+        return {}
+
+    async def no_relation_specs(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(search_service, "_load_relation_titles", no_titles)
+    monkeypatch.setattr(search_service, "_cached_field_specs", no_specs)
+    monkeypatch.setattr(search_service, "_cached_relation_specs", no_relation_specs)
+
+
 @pytest.mark.asyncio
-async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
+async def test_index_doc_embeds_and_facets_inherited_relation_fields(monkeypatch) -> None:
+    _stub_relation_and_facet_lookups(monkeypatch)
     object_id = uuid.uuid4()
     occurrence_id = uuid.uuid4()
     obj = Object(
@@ -162,11 +183,6 @@ async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
     class DB:
         def __init__(self):
             self.results = [
-                Result([relation]),
-                Result([
-                    SimpleNamespace(name="title", target_subtype=None, parent_id=None, field_type="text"),
-                    SimpleNamespace(name="publication_year", target_subtype=None, parent_id=None, field_type="text"),
-                ]),
                 Result([]),
                 Result([SimpleNamespace(
                     name="work", target_subtype=None, parent_id=None, field_type="relation",
@@ -197,7 +213,8 @@ async def test_index_doc_embeds_and_facets_inherited_relation_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_index_doc_limits_inherited_fields_to_fixed_relation_type() -> None:
+async def test_index_doc_limits_inherited_fields_to_fixed_relation_type(monkeypatch) -> None:
+    _stub_relation_and_facet_lookups(monkeypatch)
     object_id = uuid.uuid4()
     occurrence_id = uuid.uuid4()
     obj = Object(
@@ -232,10 +249,6 @@ async def test_index_doc_limits_inherited_fields_to_fixed_relation_type() -> Non
     class DB:
         def __init__(self):
             self.results = [
-                Result([relation]),
-                Result([
-                    SimpleNamespace(name="publication_year", target_subtype=None, parent_id=None, field_type="text"),
-                ]),
                 Result([]),
                 Result([SimpleNamespace(
                     name="author", target_subtype=None, parent_id=None, field_type="relation",
@@ -278,10 +291,17 @@ async def test_reindex_type_accepts_procedure(monkeypatch) -> None:
     class _FakeAsyncResult:
         id = "fake-task-id"
 
-    def fake_delay(target_type: str) -> _FakeAsyncResult:
+    def fake_delay(target_type: str, **_kwargs) -> _FakeAsyncResult:
         calls.append(target_type)
         return _FakeAsyncResult()
 
+    import fakeredis
+
+    server = fakeredis.FakeServer()
+    monkeypatch.setattr(
+        "katalon.workers.reindex_state.redis_client",
+        lambda: fakeredis.FakeRedis(server=server, decode_responses=True),
+    )
     monkeypatch.setattr("katalon.workers.index_tasks.bulk_reindex_type_task.delay", fake_delay)
 
     result = await trigger_reindex_type("procedure")
@@ -573,7 +593,7 @@ async def test_search_forces_public_status_for_anonymous_even_with_explicit_stat
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert captured["status"] == "public"
+    assert captured["status"] == PUBLIC_STATUSES
 
 
 @pytest.mark.asyncio

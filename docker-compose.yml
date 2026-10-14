@@ -35,15 +35,32 @@ services:
       timeout: 10s
       retries: 20
 
+  # Legt das Cache-Verzeichnis an und übergibt es dem Cantaloupe-User (UID aus
+  # dem Image, nicht fest verdrahtet). Ändert nur Einträge mit falschem Eigentümer.
+  cantaloupe-cache-init:
+    image: islandora/cantaloupe:main
+    user: "0:0"
+    entrypoint: [ "sh", "-c", "mkdir -p /data/cache && find /data ! -user cantaloupe -exec chown cantaloupe:cantaloupe {} +" ]
+    volumes:
+      - ${CANTALOUPE_CACHE_DIR:-cantaloupe_cache}:/data
+    restart: "no"
+
   cantaloupe:
     image: islandora/cantaloupe:main
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
+      # Derivat-Cache auf Platte (benanntes Volume oder CANTALOUPE_CACHE_DIR=/pfad),
+      # übersteht Neustarts. Ohne Plattenplatz: CANTALOUPE_FILESYSTEMCACHE_PATHNAME=/tmpfs/cache
+      # nutzt stattdessen den tmpfs (Größe CANTALOUPE_CACHE_TMPFS_SIZE, leer nach Neustart).
+      - ${CANTALOUPE_CACHE_DIR:-cantaloupe_cache}:/data
       - type: tmpfs
-        target: /data
+        target: /tmpfs
         tmpfs:
           size: ${CANTALOUPE_CACHE_TMPFS_SIZE:-512m}
-          mode: 1777
+          mode: 1023  # = 0o1777 (Compose liest den Wert dezimal)
+    depends_on:
+      cantaloupe-cache-init:
+        condition: service_completed_successfully
     environment:
       - CANTALOUPE_HEAP_MIN=${CANTALOUPE_HEAP_MIN:-128m}
       - CANTALOUPE_HEAP_MAX=${CANTALOUPE_HEAP_MAX:-256m}
@@ -53,15 +70,22 @@ services:
       - CANTALOUPE_BASE_URI=${CANTALOUPE_PUBLIC_URL:-http://localhost}
       - CANTALOUPE_CACHE_SERVER_DERIVATIVE=FilesystemCache
       - CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED=true
-      - CANTALOUPE_FILESYSTEMCACHE_PATHNAME=/data/cache
+      - CANTALOUPE_FILESYSTEMCACHE_PATHNAME=${CANTALOUPE_FILESYSTEMCACHE_PATHNAME:-/data/cache}
+      # Der Cache-Worker löscht abgelaufene Derivate; ohne ihn wächst der Cache unbegrenzt.
+      - CANTALOUPE_CACHE_SERVER_WORKER_ENABLED=true
+      - CANTALOUPE_CACHE_SERVER_DERIVATIVE_TTL_SECONDS=${CANTALOUPE_CACHE_SERVER_DERIVATIVE_TTL_SECONDS:-2592000}
       - CANTALOUPE_PROCESSOR_MANUALSELECTIONSTRATEGY_JPG=Java2dProcessor
+      # Fallback, falls Cantaloupe ohne das nginx davor erreichbar ist: nie "public".
+      # nginx setzt Cache-Control für /iiif/ ohnehin nach Sichtbarkeit (X-Media-Visibility).
+      - CANTALOUPE_CACHE_CLIENT_PUBLIC=false
+      - CANTALOUPE_CACHE_CLIENT_PRIVATE=true
     healthcheck:
       # Prüft nicht nur, dass der Server antwortet (immer 200), sondern auch,
       # dass der Cantaloupe-Prozess tatsächlich in seinen Cache schreiben
       # kann. Ohne diesen Check bleibt eine kaputte Cache-Ownership
       # unbemerkt: der Server antwortet weiter mit HTTP 200, liefert aber
       # jede Bildanfrage mit 0 Bytes aus.
-      test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3 && runuser -u cantaloupe -- sh -c 'mkdir -p /data/cache && touch /data/cache/.healthcheck && rm -f /data/cache/.healthcheck'" ]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8182/iiif/3 && runuser -u cantaloupe -- sh -c 'd=$${CANTALOUPE_FILESYSTEMCACHE_PATHNAME:-/data/cache}; mkdir -p \"$$d\" && touch \"$$d/.healthcheck\" && rm -f \"$$d/.healthcheck\"'" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -277,4 +301,5 @@ services:
 volumes:
   db_data:
   es_data:
+  cantaloupe_cache:
   oxigraph_data:

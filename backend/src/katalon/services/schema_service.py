@@ -815,6 +815,58 @@ async def count_field_usage(db: AsyncSession, field: FieldDefinition) -> int:
     return count
 
 
+async def count_usage_by_field(db: AsyncSession, target_type: str) -> dict[uuid.UUID, int]:
+    """Usage counts for every active field of ``target_type`` in one table scan.
+
+    Same semantics as ``count_field_usage`` (a record counts once per field if
+    any value is present; subfields count records with a present value in any
+    group instance), but reads each record's metadata only once instead of
+    scanning the table per field.
+    """
+    model = get_target_model(target_type)
+    fields = (
+        (
+            await db.execute(
+                select(FieldDefinition).where(
+                    FieldDefinition.target_type == target_type,
+                    FieldDefinition.is_deleted.is_(False),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    counts: dict[uuid.UUID, int] = {f.id: 0 for f in fields}
+    if model is None or not fields:
+        return counts
+
+    by_id = {f.id: f for f in fields}
+    top_level = [(f.id, f.name) for f in fields if f.parent_id is None]
+    children: list[tuple[uuid.UUID, str, str]] = [
+        (f.id, by_id[f.parent_id].name, f.name)
+        for f in fields
+        if f.parent_id is not None and f.parent_id in by_id
+    ]
+
+    query = select(model.metadata_)
+    if hasattr(model, "deleted_at"):
+        query = query.where(model.deleted_at.is_(None))
+    result = await db.stream_scalars(query.execution_options(yield_per=1000))
+    async for metadata in result:
+        if not metadata or not isinstance(metadata, dict):
+            continue
+        for field_id, name in top_level:
+            if _is_value_present(metadata.get(name)):
+                counts[field_id] += 1
+        for field_id, parent_name, name in children:
+            instances = metadata.get(parent_name)
+            if isinstance(instances, list) and any(
+                isinstance(inst, dict) and _is_value_present(inst.get(name)) for inst in instances
+            ):
+                counts[field_id] += 1
+    return counts
+
+
 async def purge_field_data(
     db: AsyncSession,
     field: FieldDefinition,

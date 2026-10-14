@@ -22,6 +22,10 @@ import enScreenImporter from './locales/en/screenImporter.json'
 import deScreenOAISets from './locales/de/screenOAISets.json'
 import enScreenOAISets from './locales/en/screenOAISets.json'
 import deScreenSettings from './locales/de/screenSettings.json'
+import deFacetSettings from './locales/de/facetSettings.json'
+import dePortalLayout from './locales/de/portalLayout.json'
+import enPortalLayout from './locales/en/portalLayout.json'
+import enFacetSettings from './locales/en/facetSettings.json'
 import enScreenSettings from './locales/en/screenSettings.json'
 import deScreenVocab from './locales/de/screenVocab.json'
 import enScreenVocab from './locales/en/screenVocab.json'
@@ -59,6 +63,8 @@ import deScreenSparql from './locales/de/screenSparql.json'
 import enScreenSparql from './locales/en/screenSparql.json'
 import deScreenWorkingSets from './locales/de/screenWorkingSets.json'
 import enScreenWorkingSets from './locales/en/screenWorkingSets.json'
+import deScreenDashboard from './locales/de/screenDashboard.json'
+import enScreenDashboard from './locales/en/screenDashboard.json'
 
 const STORAGE_KEY = 'katalon.ui_language'
 
@@ -83,6 +89,8 @@ i18next.use(initReactI18next).init({
       screenImporter: deScreenImporter,
       screenOAISets: deScreenOAISets,
       screenSettings: deScreenSettings,
+      facetSettings: deFacetSettings,
+      portalLayout: dePortalLayout,
       screenVocab: deScreenVocab,
       stepMedia: deStepMedia,
       stepResult: deStepResult,
@@ -101,6 +109,7 @@ i18next.use(initReactI18next).init({
       screenStorageLocation: deScreenStorageLocation,
       screenSparql: deScreenSparql,
       screenWorkingSets: deScreenWorkingSets,
+      screenDashboard: deScreenDashboard,
     },
     en: {
       translation: en,
@@ -113,6 +122,8 @@ i18next.use(initReactI18next).init({
       screenImporter: enScreenImporter,
       screenOAISets: enScreenOAISets,
       screenSettings: enScreenSettings,
+      facetSettings: enFacetSettings,
+      portalLayout: enPortalLayout,
       screenVocab: enScreenVocab,
       stepMedia: enStepMedia,
       stepResult: enStepResult,
@@ -131,6 +142,7 @@ i18next.use(initReactI18next).init({
       screenStorageLocation: enScreenStorageLocation,
       screenSparql: enScreenSparql,
       screenWorkingSets: enScreenWorkingSets,
+      screenDashboard: enScreenDashboard,
     },
   },
   lng: detectLanguage(),

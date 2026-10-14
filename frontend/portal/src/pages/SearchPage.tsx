@@ -3,13 +3,17 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, BASE, mediaThumbnailUrl, PORTAL_API, type FacetBucket, type SearchResponse } from '../api/client'
+import { api, BASE, PORTAL_API, type FacetBucket, type FacetKind, type SearchResponse } from '../api/client'
+import { thumbnailSrcSet, thumbnailUrl } from '../utils/thumbnails'
+import { LazyImage } from '../components/LazyImage'
+import { TreeFacetPanel } from '../components/TreeFacetPanel'
 import { saveLastSearch, saveSearchContext } from '../hooks/useBackToSearch'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { t, typeLabel, useI18n } from '../i18n'
 import { decodeAdvancedQuery } from '../utils/advancedSearch'
+import { dateBucketLabel, facetKind, resolveLabel, splitRelationBucket } from '../utils/facets'
 import { QuerySummary } from './AdvancedSearchPage'
 
 function facetLabel(
@@ -32,9 +36,22 @@ function facetLabel(
 
 const DEFAULT_SUBTITLE_FIELDS: string[] = []
 const DEFAULT_SYSTEM_FACETS = ['record_type', 'subtype']
+// Results whose thumbnails load eagerly with high priority (first visible rows).
+const PRIORITY_IMAGES = 8
 // Relation-derived facets — see configuredMetadataFacets: included in the
 // request field list, but rendered as dedicated panels below, not generic ones.
-const RELATED_FACET_NAMES = ['related_entities', 'related_places', 'related_occurrences', 'related_collections']
+const RELATED_FACET_PARAMS: Record<string, string> = {
+  related_entities: 'rel_entity',
+  related_places: 'rel_place',
+  related_occurrences: 'rel_occurrence',
+  related_collections: 'rel_collection',
+}
+const RELATED_FACET_LABELS: Record<string, string> = {
+  related_entities: 'search.relatedEntities',
+  related_places: 'search.relatedPlaces',
+  related_occurrences: 'search.relatedOccurrences',
+  related_collections: 'search.relatedCollections',
+}
 
 function configuredMetadataFacets(config: Record<string, string[]>, recordType: string): string[] {
   const fields = recordType
@@ -198,6 +215,10 @@ export function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
+  const [facetKinds, setFacetKinds] = useState<Record<string, Record<string, FacetKind>>>({})
+  // Expanded nodes per tree facet; kept across filter changes so the open
+  // branches stay open, sent as expand_<name> so the API counts their children.
+  const [treeExpanded, setTreeExpanded] = useState<Record<string, string[]>>({})
   const [subtitleConfig, setSubtitleConfig] = useState<Record<string, string[]>>({})
   const [facetInitialCount, setFacetInitialCount] = useState(10)
   const { locale, t } = useI18n()
@@ -248,6 +269,7 @@ export function SearchPage() {
     api.portal.config()
       .then(c => {
         setFacetConfig(c.facet_fields ?? {})
+        setFacetKinds(c.facet_kinds ?? {})
         setSubtitleConfig(c.subtitle_fields ?? {})
         setFacetInitialCount(c.facet_initial_count || 10)
       })
@@ -275,7 +297,7 @@ export function SearchPage() {
   const relCollection = params.getAll('rel_collection')
   const filterKey = JSON.stringify({ q, typeFilt, statusFilt, subtypeFilt, encodedAdvancedQuery, metaFilters, numericFilters, relEntity, relPlace, relOccurrence, relCollection, sort })
 
-  async function loadPage(pageNum: number): Promise<SearchResponse> {
+  async function loadPage(pageNum: number, expandedTrees = treeExpanded): Promise<SearchResponse> {
     const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
     const searchParams: Record<string, string | number | undefined> = {
       q: q || undefined,
@@ -306,6 +328,9 @@ export function SearchPage() {
       if (range.from) qs.set(`range_${field}_from`, range.from)
       if (range.to) qs.set(`range_${field}_to`, range.to)
     })
+    Object.entries(expandedTrees).forEach(([field, ids]) => {
+      ids.forEach(id => qs.append(`expand_${field}`, id))
+    })
     if (encodedAdvancedQuery) {
       if (!advancedQuery) throw new Error(t('advanced.invalidLink'))
       return api.search.advanced({
@@ -328,6 +353,7 @@ export function SearchPage() {
         status: statusFilt,
         subtype: subtypeFilt,
         sort: sort || undefined,
+        tree_expand: expandedTrees,
       })
     }
     const res = await fetch(`${BASE}${PORTAL_API}/search?${qs.toString()}`)
@@ -418,6 +444,19 @@ export function SearchPage() {
 
   function toggleMetaFilter(field: string, value: string) {
     toggleParam(`meta_${field}`, value)
+  }
+
+  function toggleTreeNode(field: string, id: string) {
+    const current = treeExpanded[field] ?? []
+    const isOpen = current.includes(id)
+    const next = { ...treeExpanded, [field]: isOpen ? current.filter(v => v !== id) : [...current, id] }
+    setTreeExpanded(next)
+    if (isOpen || data?.tree_facets?.[field]?.nodes[id]) return
+    // Only the counts of the newly opened node are missing: fetch them without
+    // replacing the result list.
+    loadPage(1, next)
+      .then(result => setData(prev => (prev ? { ...prev, tree_facets: result.tree_facets } : prev)))
+      .catch(() => {})
   }
 
   function setNumericFilter(field: string, from: string, to: string) {
@@ -546,67 +585,84 @@ export function SearchPage() {
               valueLabel={subtypeLabel}
             />
           )}
-          {configuredMetadataFacets(facetConfig, effectiveType).filter(field => !RELATED_FACET_NAMES.includes(field)).map(field => {
+          {configuredMetadataFacets(facetConfig, effectiveType).map(field => {
+            const kind = facetKind(facetKinds, effectiveType, field)
+            const relatedParam = RELATED_FACET_PARAMS[field]
+            if (relatedParam) {
+              const active = params.getAll(relatedParam)
+              return (
+                <FacetPanel
+                  key={field}
+                  label={t(RELATED_FACET_LABELS[field])}
+                  buckets={data?.facets?.[field] ?? []}
+                  active={active}
+                  onSelect={v => v ? toggleParam(relatedParam, v) : setFilter(relatedParam, '')}
+                  initialCount={facetInitialCount}
+                />
+              )
+            }
+            const baseLabel = kind?.label
+              ? resolveLabel(kind.label, locale, field)
+              : facetLabel(field, fieldLabels, facetConfig, effectiveType)
+            const active = metaFilters[field] ?? []
+            const select = (v: string) => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')
+            if (kind?.kind === 'tree') {
+              return (
+                <TreeFacetPanel
+                  key={field}
+                  label={baseLabel}
+                  tree={data?.tree_facets?.[field]}
+                  active={active}
+                  expanded={treeExpanded[field] ?? []}
+                  onToggleExpand={id => toggleTreeNode(field, id)}
+                  onSelect={select}
+                />
+              )
+            }
+            if (kind?.kind === 'numeric' || (!kind && isNumericFacet(field, fieldLabels, facetConfig, effectiveType))) {
+              const range = numericFilters[field] ?? { from: '', to: '' }
+              return <NumericFacetPanel key={field} label={baseLabel} bounds={data?.numeric_facets?.[field]} from={range.from} to={range.to} onChange={(from, to) => setNumericFilter(field, from, to)} />
+            }
             const buckets = data?.facets?.[`meta_${field}`] ?? []
-            const range = numericFilters[field] ?? { from: '', to: '' }
-            if (isNumericFacet(field, fieldLabels, facetConfig, effectiveType)) {
-              return <NumericFacetPanel key={field} label={facetLabel(field, fieldLabels, facetConfig, effectiveType)} bounds={data?.numeric_facets?.[field]} from={range.from} to={range.to} onChange={(from, to) => setNumericFilter(field, from, to)} />
+            if (kind?.kind === 'relation') {
+              // Buckets are "<id>|<title>"; filter by id, show the title.
+              return (
+                <FacetPanel
+                  key={field}
+                  label={baseLabel}
+                  buckets={buckets.map(b => ({ ...b, value: splitRelationBucket(b.value).id }))}
+                  active={active}
+                  onSelect={select}
+                  initialCount={facetInitialCount}
+                  valueLabel={id => splitRelationBucket(buckets.find(b => splitRelationBucket(b.value).id === id)?.value ?? id).title}
+                />
+              )
+            }
+            if (kind?.kind === 'date') {
+              return (
+                <FacetPanel
+                  key={field}
+                  label={`${baseLabel} (${t(`search.granularity.${kind.granularity ?? 'decade'}`)})`}
+                  buckets={buckets}
+                  active={active}
+                  onSelect={select}
+                  initialCount={facetInitialCount}
+                  valueLabel={bucket => dateBucketLabel(bucket, kind.granularity, locale)}
+                />
+              )
             }
             return (
               <FacetPanel
                 key={field}
-                label={facetLabel(field, fieldLabels, facetConfig, effectiveType)}
+                label={baseLabel}
                 buckets={buckets}
-                active={metaFilters[field] ?? []}
-                onSelect={v => v ? toggleMetaFilter(field, v) : setFilter(`meta_${field}`, '')}
+                active={active}
+                onSelect={select}
                 initialCount={facetInitialCount}
-                translateBooleanValues={isBooleanFacet(field, fieldLabels, facetConfig, effectiveType)}
+                translateBooleanValues={kind ? kind.kind === 'boolean' : isBooleanFacet(field, fieldLabels, facetConfig, effectiveType)}
               />
             )
           })}
-          {(() => {
-            const activeRelated = configuredMetadataFacets(facetConfig, effectiveType)
-            return (
-              <>
-                {activeRelated.includes('related_entities') && (
-                  <FacetPanel
-                    label={t('search.relatedEntities')}
-                    buckets={data?.facets?.['related_entities'] ?? []}
-                    active={relEntity}
-                    onSelect={v => v ? toggleParam('rel_entity', v) : setFilter('rel_entity', '')}
-                    initialCount={facetInitialCount}
-                  />
-                )}
-                {activeRelated.includes('related_places') && (
-                  <FacetPanel
-                    label={t('search.relatedPlaces')}
-                    buckets={data?.facets?.['related_places'] ?? []}
-                    active={relPlace}
-                    onSelect={v => v ? toggleParam('rel_place', v) : setFilter('rel_place', '')}
-                    initialCount={facetInitialCount}
-                  />
-                )}
-                {activeRelated.includes('related_occurrences') && (
-                  <FacetPanel
-                    label={t('search.relatedOccurrences')}
-                    buckets={data?.facets?.['related_occurrences'] ?? []}
-                    active={relOccurrence}
-                    onSelect={v => v ? toggleParam('rel_occurrence', v) : setFilter('rel_occurrence', '')}
-                    initialCount={facetInitialCount}
-                  />
-                )}
-                {activeRelated.includes('related_collections') && (
-                  <FacetPanel
-                    label={t('search.relatedCollections')}
-                    buckets={data?.facets?.['related_collections'] ?? []}
-                    active={relCollection}
-                    onSelect={v => v ? toggleParam('rel_collection', v) : setFilter('rel_collection', '')}
-                    initialCount={facetInitialCount}
-                  />
-                )}
-              </>
-            )
-          })()}
         </aside></div>
 
         <div className="result-list">
@@ -641,14 +697,17 @@ export function SearchPage() {
                 </div>
               )}
               <div className={`result-list__items result-list__items--${effectiveViewMode}`}>
-                {allItems.map(r => {
+                {allItems.map((r, index) => {
                   const path = r.record_type === 'entity' ? `/entities/${r.id}`
                     : r.record_type === 'place' ? `/places/${r.id}`
                     : r.record_type === 'occurrence' ? `/occurrences/${r.id}`
                     : r.record_type === 'collection' ? `/collections/${r.id}`
                     : `/objects/${r.id}`
-                  const thumbUrl = r.primary_media_id ? mediaThumbnailUrl(r.id, r.primary_media_id) : null
+                  const thumbUrl = r.primary_media_id ? thumbnailUrl(r.id, r.primary_media_id, r.primary_media_iiif) : null
                   const fallbackUrl = !thumbUrl && r.record_type === 'object' ? subtypePlaceholder(r.object_type) : ''
+                  const thumbSrcSet = thumbUrl ? thumbnailSrcSet(r.primary_media_iiif) : undefined
+                  // The first results are visible right away: load them first, not lazily.
+                  const priorityImage = index < PRIORITY_IMAGES
                   const isPortrait = r.media_width != null && r.media_height != null && r.media_height > r.media_width
                   const saveContext = () => {
                     saveLastSearch(window.location.pathname + window.location.search)
@@ -670,7 +729,7 @@ export function SearchPage() {
                         {r.record_type === 'object' && (
                           <div className="thumb-sm">
                             {thumbUrl || fallbackUrl ? (
-                              <img src={thumbUrl ?? fallbackUrl} alt="" loading="lazy" />
+                              <LazyImage src={thumbUrl ?? fallbackUrl} srcSet={thumbSrcSet} width={r.media_width} height={r.media_height} priority={priorityImage} />
                             ) : (
                               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                             )}
@@ -699,7 +758,7 @@ export function SearchPage() {
                     <Link key={r.id} className={gridClass} to={path} onClick={saveContext}>
                       {r.record_type === 'object' && (thumbUrl || fallbackUrl) ? (
                         <div className="result-card__thumb" style={aspectRatio ? { aspectRatio: String(aspectRatio) } : undefined}>
-                          <img src={thumbUrl ?? fallbackUrl} alt="" loading="lazy" />
+                          <LazyImage src={thumbUrl ?? fallbackUrl} srcSet={thumbSrcSet} width={r.media_width} height={r.media_height} priority={priorityImage} />
                         </div>
                       ) : (
                         <div className="result-card__thumb result-card__thumb--empty">

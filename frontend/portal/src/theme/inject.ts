@@ -19,6 +19,16 @@ export function applyTheme(theme: ThemeManifest | null): void {
     document.head.appendChild(link)
   }
 
+  const script = themeScriptSrc(theme)
+  if (script && !document.querySelector(`script[data-theme-script]`)) {
+    // Same-origin file from the theme directory only (CSP script-src 'self').
+    const el = document.createElement('script')
+    el.src = script
+    el.defer = true
+    el.dataset.themeScript = 'true'
+    document.head.appendChild(el)
+  }
+
   if (theme?.favicon) {
     const el = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
       ?? Object.assign(document.createElement('link'), { rel: 'icon' })
@@ -26,4 +36,15 @@ export function applyTheme(theme: ThemeManifest | null): void {
     document.head.appendChild(el)
   }
 
+}
+
+const SCRIPT_PATH = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9_./-]*\.js$/
+const DIRECTORY = /^[A-Za-z0-9_-]+$/
+
+/** URL of the theme's optional script, or null unless it is a plain .js path
+ *  inside the theme directory (the API validates this too). */
+export function themeScriptSrc(theme: ThemeManifest | null): string | null {
+  if (!theme?.script || !theme.directory) return null
+  if (!SCRIPT_PATH.test(theme.script) || !DIRECTORY.test(theme.directory)) return null
+  return `/themes/${theme.directory}/${theme.script}`
 }

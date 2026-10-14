@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Karl Krägelin
 
+import logging
 import uuid
 from typing import Any
 
 import httpx
 
 from katalon.config import settings
+from katalon.core.thumbnails import thumbnail_path
+
+logger = logging.getLogger(__name__)
 
 
 def public_iiif_base() -> str:
@@ -39,6 +43,28 @@ async def fetch_image_info(filename: str) -> tuple[int | None, int | None]:
         raise
     except Exception:
         return None, None
+
+
+async def fetch_derivative(
+    client: httpx.AsyncClient, identifier: str, height: int
+) -> bool:
+    """Request one ``full/,<height>`` JPEG derivative so Cantaloupe renders and caches it.
+
+    Talks to Cantaloupe directly (no nginx, no auth). Returns False instead of raising
+    on any failure: warming is an optimisation, a miss only costs the first viewer time.
+    """
+    url = f"{settings.cantaloupe_url}{thumbnail_path(identifier, height)}"
+    try:
+        async with client.stream("GET", url) as resp:
+            async for _ in resp.aiter_bytes():
+                pass
+            if resp.status_code != 200:
+                logger.warning("Thumbnail warm-up: Cantaloupe %s for %s", resp.status_code, url)
+                return False
+        return True
+    except httpx.HTTPError:
+        logger.warning("Thumbnail warm-up failed for %s", url, exc_info=True)
+        return False
 
 
 def _build_canvas(

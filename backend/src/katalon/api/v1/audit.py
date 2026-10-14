@@ -21,7 +21,13 @@ from katalon.core.models import (
 )
 from katalon.core.schemas import AuditLogRead, Page
 from katalon.core.visibility import SEARCHABLE_RECORD_TYPES, readable_record_types
-from katalon.services.audit_service import collapse_value, extract_title, format_label
+from katalon.services.audit_service import (
+    collapse_value,
+    format_label,
+    resolve_record_labels,
+)
+
+_resolve_record_labels = resolve_record_labels
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -131,36 +137,6 @@ def _scrub_unreadable_related(
         for k, v in changed_fields.items()
         if k not in {"related_record_id", "related_record_type", "related_record_label"}
     }
-
-
-async def _resolve_record_labels(db: DBDep, refs: list[tuple[str, uuid.UUID]]) -> dict[uuid.UUID, str]:
-    """Fetch display labels ("title (idno)") for (record_type, record_id) pairs."""
-    by_type: dict[str, list[uuid.UUID]] = {}
-    for record_type, record_id in refs:
-        by_type.setdefault(record_type, []).append(record_id)
-
-    labels: dict[uuid.UUID, str] = {}
-
-    for record_type, model in (
-        ("object", Object),
-        ("entity", Entity),
-        ("place", Place),
-        ("occurrence", Occurrence),
-        ("collection", Collection),
-        ("storage_location", StorageLocation),
-    ):
-        if record_type not in by_type:
-            continue
-        result = await db.execute(select(model.id, model.idno, model.metadata_).where(model.id.in_(by_type[record_type])))
-        for id_, idno, md in result.all():
-            labels[id_] = format_label(extract_title(md), idno, str(id_)[:8])
-
-    if "procedure" in by_type:
-        result = await db.execute(select(Procedure.id, Procedure.idno, Procedure.reference_number).where(Procedure.id.in_(by_type["procedure"])))
-        for id_, idno, reference_number in result.all():
-            labels[id_] = idno or reference_number or str(id_)[:8]
-
-    return labels
 
 
 def _delete_snapshot_label(log: AuditLog) -> str | None:

@@ -480,7 +480,7 @@ export interface HomepageBlock {
   title: Record<string, string>
   content?: Record<string, string> | null
   limit?: number | null
-  collections_mode?: 'selected' | 'top' | 'all' | null
+  collections_mode?: 'selected' | 'top' | 'all' | 'largest' | null
   collection_ids?: string[] | null
 }
 
@@ -509,6 +509,23 @@ export interface PortalConfigRead {
   terminology: Record<string, TerminologyEntry>
   show_iiif_manifest_link: boolean
   meta_label_uppercase: boolean
+  facet_order?: Record<string, string[]>
+  relation_facets?: Record<string, RelationFacet[]>
+  footer?: FooterConfig
+  notice?: NoticeConfig
+  header_show_title?: boolean
+  hero_hide_title?: boolean
+  facet_kinds?: Record<string, Record<string, { kind: string; label?: Record<string, string>; granularity?: string }>>
+}
+
+/** Portal facet over linked records restricted to relation types (e.g. "Komponist_in"). */
+export interface RelationFacet {
+  key: string
+  label: Record<string, string>
+  target_type: 'entity' | 'place' | 'occurrence' | 'collection' | 'object'
+  relation_types: string[]
+  target_subtypes: string[]
+  direction: 'outgoing' | 'incoming' | 'both'
 }
 
 export interface UserRead {
@@ -663,4 +680,26 @@ export interface WorkingSetItemCreate {
 export interface WorkingSetItemUpdate {
   sort_order?: number | null
   note?: string | null
+}
+
+export interface FooterLink { label: Record<string, string>; url: string }
+export interface FooterLogo { src: string; alt: Record<string, string>; href?: string | null }
+export interface FooterColumn {
+  type: 'text' | 'links' | 'logos'
+  title: Record<string, string>
+  content: Record<string, string>
+  links: FooterLink[]
+  include_footer_pages: boolean
+  logos: FooterLogo[]
+}
+export interface FooterConfig {
+  columns: FooterColumn[]
+  bottom: { text: Record<string, string>; links: FooterLink[] }
+}
+export interface NoticeConfig {
+  enabled: boolean
+  version: number
+  title: Record<string, string>
+  text: Record<string, string>
+  accept_label: Record<string, string>
 }

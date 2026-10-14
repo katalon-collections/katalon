@@ -144,26 +144,29 @@ export function Tour({ variant, route, navigate, onDone }: Props) {
 
   return createPortal(
     <>
-      <Joyride
-        steps={toJoyrideSteps(tourSteps)}
-        stepIndex={stepIndex}
-        run={run}
-        continuous
-        showSkipButton
-        showProgress
-        disableScrolling
-        callback={handleCallback}
-        tooltipComponent={renderTooltip}
-        locale={{
-          back: t('locale.back'),
-          close: t('locale.close'),
-          last: t('locale.last'),
-          next: t('locale.next'),
-          nextLabelWithProgress: t('locale.nextLabelWithProgress'),
-          skip: t('locale.skip'),
-        }}
-        styles={{ options: { primaryColor: 'var(--accent, #2563eb)', width: 520, zIndex: 10000 } }}
-      />
+      {/* Unmount while paused/navigating: a mounted Floater would position against a target removed by the route change (popper.js: null.nodeName). */}
+      {run && (
+        <Joyride
+          steps={toJoyrideSteps(tourSteps)}
+          stepIndex={stepIndex}
+          run
+          continuous
+          showSkipButton
+          showProgress
+          disableScrolling
+          callback={handleCallback}
+          tooltipComponent={renderTooltip}
+          locale={{
+            back: t('locale.back'),
+            close: t('locale.close'),
+            last: t('locale.last'),
+            next: t('locale.next'),
+            nextLabelWithProgress: t('locale.nextLabelWithProgress'),
+            skip: t('locale.skip'),
+          }}
+          styles={{ options: { primaryColor: 'var(--accent, #2563eb)', width: 520, zIndex: 10000 } }}
+        />
+      )}
       {!run && (
         <div
           className="bb"

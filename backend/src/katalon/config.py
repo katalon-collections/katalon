@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     oai_admin_email: str = "admin@katalon.dev"
     es_index_name: str = "katalon_records"
     es_reindex_batch_size: int = 500
+    # Upper bound for one _bulk request body. Elasticsearch rejects requests over
+    # http.max_content_length (100 MB default) and large requests stall the
+    # cluster; a single larger document is still sent on its own.
+    es_bulk_max_bytes: int = 10 * 1024 * 1024
 
     geonames_username: str = "demo"
     wikidata_user_agent: str = ""
@@ -95,6 +99,12 @@ class Settings(BaseSettings):
     sparql_query_timeout: float = Field(default=30.0, gt=0)
     sparql_max_query_length: int = Field(default=65536, gt=0)  # 64 KB
     cantaloupe_task_timeout: int = 120  # seconds to wait for Cantaloupe info.json
+    # Thumbnail warm-up (workers/thumbnail_tasks.py): parallel Cantaloupe requests per
+    # run (≈ CPU cores Cantaloupe uses for it) and media files per chained batch task.
+    thumbnail_warm_concurrency: int = 3
+    # Browser cache lifetime of the portal thumbnail redirect (307 → /iiif/...).
+    thumbnail_redirect_max_age: int = 30 * 24 * 3600
+    thumbnail_warm_batch_size: int = 100
 
     ai_request_timeout_seconds: int = 60
 

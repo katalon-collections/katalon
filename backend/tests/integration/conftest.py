@@ -5,7 +5,9 @@ import importlib
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
+import fakeredis
 import pytest
 from httpx import ASGITransport, AsyncClient
 from testcontainers.postgres import PostgresContainer
@@ -119,3 +121,114 @@ async def auth_headers(async_client: AsyncClient) -> dict[str, str]:
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+class FakeES:
+    """Just enough of the ES surface the bulk/full reindex touches, with
+    physical indices and one alias (starts as a legacy concrete index)."""
+
+    def __init__(self) -> None:
+        from katalon.integrations.elasticsearch import INDEX_NAME
+
+        self.name = INDEX_NAME
+        self.indices_data: dict[str, dict[str, dict[str, Any]]] = {INDEX_NAME: {}}
+        self.alias_target: str | None = None  # None: name is a concrete index
+        self.batch_sizes: list[int] = []
+        self.on_first_batch: Any = None
+        self.indices = _FakeIndices(self)
+
+    def resolve(self, index: str) -> str:
+        return self.alias_target if index == self.name and self.alias_target else index
+
+    @property
+    def docs(self) -> dict[str, dict[str, Any]]:
+        return self.indices_data[self.resolve(self.name)]
+
+    async def close(self) -> None:
+        return None
+
+
+class _FakeIndices:
+    def __init__(self, es: FakeES) -> None:
+        self.es = es
+
+    async def refresh(self, **_kwargs: Any) -> None:
+        return None
+
+    async def create(self, index: str, body: Any = None, **_kwargs: Any) -> None:
+        assert index not in self.es.indices_data
+        self.es.indices_data[index] = {}
+        if body and self.es.name in (body.get("aliases") or {}):
+            self.es.alias_target = index
+
+    async def exists(self, index: str) -> bool:
+        return self.es.resolve(index) in self.es.indices_data
+
+    async def put_alias(self, index: str, name: str) -> None:
+        self.es.alias_target = index
+
+    async def exists_alias(self, name: str) -> bool:
+        return name == self.es.name and self.es.alias_target is not None
+
+    async def get_alias(self, name: str) -> Any:
+        class _Resp:
+            body = {self.es.alias_target: {"aliases": {name: {}}}}
+
+        return _Resp()
+
+    async def update_aliases(self, body: dict[str, Any]) -> None:
+        for action in body["actions"]:
+            if "remove_index" in action:
+                del self.es.indices_data[action["remove_index"]["index"]]
+            elif "add" in action:
+                self.es.alias_target = action["add"]["index"]
+
+    async def delete(self, index: str) -> None:
+        self.es.indices_data.pop(index, None)
+
+
+@pytest.fixture
+def fake_es(monkeypatch: pytest.MonkeyPatch) -> FakeES:
+    """In-memory stand-in for the ES calls of the bulk and full reindex."""
+    es = FakeES()
+    import katalon.integrations.elasticsearch as es_module
+
+    async def bulk_index_documents(_es, target_type, docs, *, index=es.name, **_kwargs):
+        es.batch_sizes.append(len(docs))
+        if es.on_first_batch is not None:
+            hook, es.on_first_batch = es.on_first_batch, None
+            await hook()
+        target = es.indices_data[es.resolve(index)]
+        for doc_id, body in docs:
+            target[doc_id] = {"record_type": target_type, **body}
+        return len(docs), []
+
+    async def list_ids_by_type(record_type, **_kwargs):
+        return {i for i, d in es.docs.items() if d.get("record_type") == record_type}
+
+    async def delete_documents(_es, ids, *, index=es.name):
+        ids = list(ids)
+        target = es.indices_data[es.resolve(index)]
+        for doc_id in ids:
+            target.pop(doc_id, None)
+        return len(ids)
+
+    monkeypatch.setattr(es_module, "get_es", lambda: es)
+    monkeypatch.setattr(es_module, "bulk_index_documents", bulk_index_documents)
+    monkeypatch.setattr(es_module, "list_ids_by_type", list_ids_by_type)
+    monkeypatch.setattr(es_module, "delete_documents", delete_documents)
+    return es
+
+
+@pytest.fixture
+def fake_reindex_redis(monkeypatch: pytest.MonkeyPatch) -> fakeredis.FakeServer:
+    """In-memory Redis for reindex coordination (no broker in integration tests)."""
+    from katalon.workers import reindex_state
+
+    server = fakeredis.FakeServer()
+    monkeypatch.setattr(
+        reindex_state,
+        "redis_client",
+        lambda: fakeredis.FakeRedis(server=server, decode_responses=True),
+    )
+    return server

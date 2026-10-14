@@ -183,6 +183,8 @@ export interface CollectionDetail extends CollectionSummary {
 export interface MediaFile {
   id: string; filename: string; mime_type: string; category: string
   status: string; is_primary: boolean; created_at: string
+  /** IIIF identifier of ready images (direct thumbnail URLs); absent on older APIs. */
+  iiif_identifier?: string | null
   license_uri?: string | null
   rights_holder?: { name: string; uri?: string } | null
 }
@@ -213,7 +215,7 @@ export interface HomepageBlock {
   title: Record<string, string>
   content?: Record<string, string> | null
   limit?: number | null
-  collections_mode?: 'selected' | 'top' | 'all' | null
+  collections_mode?: 'selected' | 'top' | 'all' | 'largest' | null
   collection_ids?: string[] | null
 }
 
@@ -243,6 +245,59 @@ export interface PortalConfig {
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
   show_iiif_manifest_link: boolean
+  /** Per record type and facet name: kind and display hints (derived by the API). */
+  facet_kinds?: Record<string, Record<string, FacetKind>>
+  relation_facets?: Record<string, RelationFacetConfig[]>
+  footer?: FooterConfig
+  notice?: NoticeConfig
+  /** With a logo: also show the site title next to it in the header. */
+  header_show_title?: boolean
+  /** With a logo: hide hero title/subtitle (the logo already contains them). */
+  hero_hide_title?: boolean
+}
+
+export interface FooterLink { label: Record<string, string>; url: string }
+export interface FooterLogo { src: string; alt: Record<string, string>; href?: string | null }
+export interface FooterColumn {
+  type: 'text' | 'links' | 'logos'
+  title: Record<string, string>
+  content: Record<string, string>
+  links: FooterLink[]
+  include_footer_pages: boolean
+  logos: FooterLogo[]
+}
+export interface FooterConfig {
+  columns: FooterColumn[]
+  bottom: { text: Record<string, string>; links: FooterLink[] }
+}
+export interface NoticeConfig {
+  enabled: boolean
+  version: number
+  title: Record<string, string>
+  text: Record<string, string>
+  accept_label: Record<string, string>
+}
+
+import type { RelationFacetConfig } from '../utils/facets'
+
+export interface FacetKind {
+  kind: 'terms' | 'numeric' | 'boolean' | 'date' | 'tree' | 'inherited' | 'related' | 'relation'
+  label?: Record<string, string>
+  granularity?: 'decade' | 'century' | 'year'
+}
+
+export interface TreeFacetNode {
+  id: string
+  label: Record<string, string>
+  count: number
+  has_children: boolean
+}
+
+export interface TreeFacet {
+  /** Children per parent id ("root" for the top level), with counts. */
+  nodes: Record<string, TreeFacetNode[]>
+  /** Ancestor chain of every active value (breadcrumb). */
+  paths: Record<string, Array<{ id: string; label: Record<string, string> }>>
 }
 
 export interface Page<T> { total: number; page: number; page_size: number; items: T[] }
@@ -251,10 +306,12 @@ export interface FacetBucket { value: string; count: number }
 export interface NumericFacetBounds { min: number; max: number }
 export interface SearchResponse {
   total: number; page: number; page_size: number
+  tree_facets?: Record<string, TreeFacet>
   items: Array<{
     id: string; record_type: string; title: string; status: string | null; score: number | null
     subtitle_values?: Record<string, string | string[]> | null
     primary_media_id?: string | null
+    primary_media_iiif?: string | null
     media_width?: number | null
     media_height?: number | null
     object_type?: string | null
@@ -265,6 +322,7 @@ export interface SearchResponse {
 }
 
 export interface PortalFieldDefinition {
+  id: string
   name: string
   label: Record<string, string>
   field_type: string
@@ -330,7 +388,7 @@ export const api = {
     get: (id: string) => get<OccurrenceSummary>(`${PORTAL_API}/occurrences/${id}`),
   },
   collections: {
-    list: (p?: { page?: number; q?: string; status?: string; page_size?: number; parent_id?: string; top_level?: boolean }) => {
+    list: (p?: { page?: number; q?: string; status?: string; page_size?: number; parent_id?: string; top_level?: boolean; sort?: 'newest' | 'largest' }) => {
       const qs = new URLSearchParams(
         Object.entries({ page_size: '24', ...p })
           .filter(([, v]) => v != null)

@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.41.0"
+    "version": "1.42.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -229,6 +229,35 @@
           },
           "403": {
             "description": "Insufficient permissions"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/dashboard/summary": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get operational workspace summary for current user",
+        "operationId": "dashboard_get_summary_get_v1_dashboard_summary",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -467,6 +496,142 @@
             }
           }
         }
+      }
+    },
+    "/v1/admin/index-status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get running/queued bulk reindex jobs and their progress per record type",
+        "operationId": "admin_get_index_status_get_v1_admin_index_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/thumbnails/warm": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Progress of the bulk thumbnail warm-up",
+        "operationId": "admin_get_warm_status_get_v1_admin_thumbnails_warm",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarmStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "503": {
+            "description": "Redis unavailable"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Pre-render all thumbnails (primary images first); resumes an interrupted run",
+        "operationId": "admin_start_warm_post_v1_admin_thumbnails_warm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/WarmRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarmStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "503": {
+            "description": "Redis unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/v1/idno/next": {
@@ -3100,6 +3265,127 @@
           },
           "422": {
             "description": "Field 'label'/'idno' is a system field and cannot be deleted"
+          }
+        }
+      }
+    },
+    "/v1/schema/{target_type}/bulk": {
+      "put": {
+        "tags": [
+          "schema"
+        ],
+        "summary": "Update several field definitions of one target type in one transaction",
+        "description": "Applies every item with the same validation as PUT /schema/{field_id}. Either all items are saved or none (first error aborts with its status). Content-affecting changes trigger at most one reindex of the type.",
+        "operationId": "schema_bulk_update_fields_put_v1_schema__target_type__bulk",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Type"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FieldBulkUpdateItem"
+                },
+                "title": "Items"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FieldDefinitionRead"
+                  },
+                  "title": "Response Schema Bulk Update Fields Put V1 Schema  Target Type  Bulk"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Field definition or parent field not found"
+          },
+          "409": {
+            "description": "Field name collision"
+          },
+          "422": {
+            "description": "Invalid item, or an item belongs to another target type"
+          }
+        }
+      }
+    },
+    "/v1/schema/{target_type}/usage-summary": {
+      "get": {
+        "tags": [
+          "schema"
+        ],
+        "summary": "Get record usage counts for all fields of a target type in one scan",
+        "operationId": "schema_get_type_usage_summary_get_v1_schema__target_type__usage_summary",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FieldUsageSummaryItem"
+                  },
+                  "title": "Response Schema Get Type Usage Summary Get V1 Schema  Target Type  Usage Summary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Invalid target type"
           }
         }
       }
@@ -11340,15 +11626,23 @@
         ],
         "summary": "Set a manual lock on a record",
         "operationId": "locks_create_lock_post_v1_locks",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LockCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -11377,7 +11671,14 @@
               }
             }
           }
-        },
+        }
+      },
+      "get": {
+        "tags": [
+          "locks"
+        ],
+        "summary": "List active locks with optional filters by type, user, or current user",
+        "operationId": "locks_list_locks_endpoint_get_v1_locks",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -11385,7 +11686,84 @@
           {
             "APIKeyHeader": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by resource type",
+              "title": "Resource Type"
+            },
+            "description": "Filter by resource type"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by user ID",
+              "title": "User Id"
+            },
+            "description": "Filter by user ID"
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Filter to only current user's locks",
+              "default": false,
+              "title": "Mine"
+            },
+            "description": "Filter to only current user's locks"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LockRead"
+                  },
+                  "title": "Response Locks List Locks Endpoint Get V1 Locks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/locks/{resource_type}/{resource_id}": {
@@ -12438,6 +12816,64 @@
           },
           "403": {
             "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/portal/footer-assets": {
+      "post": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Upload an image for the portal footer (e.g. a funder logo)",
+        "operationId": "portal_upload_footer_asset_post_v1_portal_footer_assets",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_portal_upload_footer_asset_post_v1_portal_footer_assets"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FooterAssetRead"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "413": {
+            "description": "File too large"
+          },
+          "415": {
+            "description": "Unsupported file type (raster images only, no SVG)"
           },
           "422": {
             "description": "Validation Error",
@@ -18046,6 +18482,7 @@
           "portal"
         ],
         "summary": "List Collections",
+        "description": "``sort=largest`` orders by the number of public member objects (direct\nobject → collection relations, as counted on the collection page).",
         "operationId": "portal_list_collections_get_portal_v1_collections",
         "parameters": [
           {
@@ -18112,6 +18549,20 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "newest",
+                "largest"
+              ],
+              "type": "string",
+              "default": "newest",
+              "title": "Sort"
             }
           }
         ],
@@ -19481,6 +19932,46 @@
         }
       }
     },
+    "/portal/v1/portal/footer-assets/{name}": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Download an uploaded footer image",
+        "operationId": "portal_get_footer_asset_get_portal_v1_portal_footer_assets__name_",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portal/v1/theme": {
       "get": {
         "tags": [
@@ -20418,6 +20909,16 @@
               }
             ],
             "title": "Sort"
+          },
+          "tree_expand": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Tree Expand"
           }
         },
         "type": "object",
@@ -21333,6 +21834,20 @@
         ],
         "title": "Body_pages_upload_page_asset_post_v1_pages__slug__assets"
       },
+      "Body_portal_upload_footer_asset_post_v1_portal_footer_assets": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_portal_upload_footer_asset_post_v1_portal_footer_assets"
+      },
       "Body_portal_upload_logo_post_v1_portal_logo": {
         "properties": {
           "file": {
@@ -21658,6 +22173,260 @@
           "fields"
         ],
         "title": "CreateFieldsRequest"
+      },
+      "DashboardAuditItem": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Record Id"
+          },
+          "record_label": {
+            "type": "string",
+            "title": "Record Label"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type",
+          "record_id",
+          "record_label",
+          "user_name",
+          "action",
+          "created_at"
+        ],
+        "title": "DashboardAuditItem"
+      },
+      "DashboardProcedure": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "idno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idno"
+          },
+          "reference_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "procedure_type": {
+            "type": "string",
+            "title": "Procedure Type"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "procedure_type"
+        ],
+        "title": "DashboardProcedure"
+      },
+      "DashboardRecentItem": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Record Id"
+          },
+          "record_label": {
+            "type": "string",
+            "title": "Record Label"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type",
+          "record_id",
+          "record_label",
+          "action",
+          "created_at"
+        ],
+        "title": "DashboardRecentItem"
+      },
+      "DashboardSummary": {
+        "properties": {
+          "recents": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardRecentItem"
+            },
+            "type": "array",
+            "title": "Recents"
+          },
+          "my_locks": {
+            "items": {
+              "$ref": "#/components/schemas/LockRead"
+            },
+            "type": "array",
+            "title": "My Locks"
+          },
+          "all_locks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LockRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Locks"
+          },
+          "working_sets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWorkingSet"
+            },
+            "type": "array",
+            "title": "Working Sets"
+          },
+          "due_procedures": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardProcedure"
+            },
+            "type": "array",
+            "title": "Due Procedures"
+          },
+          "team_activity": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardAuditItem"
+            },
+            "type": "array",
+            "title": "Team Activity"
+          },
+          "draft_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Draft Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recents",
+          "my_locks",
+          "working_sets",
+          "due_procedures",
+          "team_activity",
+          "draft_counts"
+        ],
+        "title": "DashboardSummary"
+      },
+      "DashboardWorkingSet": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "record_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Type"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "default": 0
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updated_at"
+        ],
+        "title": "DashboardWorkingSet"
       },
       "EmailChange": {
         "properties": {
@@ -22578,6 +23347,139 @@
         ],
         "title": "FeaturePermissionUpdate"
       },
+      "FieldBulkUpdateItem": {
+        "properties": {
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Label",
+            "default": {}
+          },
+          "help_text": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Help Text",
+            "default": {}
+          },
+          "field_type": {
+            "type": "string",
+            "title": "Field Type"
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": false
+          },
+          "is_repeatable": {
+            "type": "boolean",
+            "title": "Is Repeatable",
+            "default": false
+          },
+          "is_translatable": {
+            "type": "boolean",
+            "title": "Is Translatable",
+            "default": false
+          },
+          "is_searchable": {
+            "type": "boolean",
+            "title": "Is Searchable",
+            "default": true
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "default": {}
+          },
+          "show_in_detail": {
+            "type": "boolean",
+            "title": "Show In Detail",
+            "default": true
+          },
+          "show_in_list": {
+            "type": "boolean",
+            "title": "Show In List",
+            "default": false
+          },
+          "detail_slot": {
+            "type": "string",
+            "enum": [
+              "main",
+              "sidebar"
+            ],
+            "title": "Detail Slot",
+            "default": "sidebar"
+          },
+          "detail_role": {
+            "type": "string",
+            "enum": [
+              "none",
+              "description"
+            ],
+            "title": "Detail Role",
+            "default": "none"
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "default": true
+          },
+          "is_facet": {
+            "type": "boolean",
+            "title": "Is Facet",
+            "default": false
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_type",
+          "name",
+          "field_type",
+          "id"
+        ],
+        "title": "FieldBulkUpdateItem"
+      },
       "FieldDefinitionCreate": {
         "properties": {
           "target_type": {
@@ -22902,6 +23804,197 @@
         ],
         "title": "FieldUsageResponse"
       },
+      "FieldUsageSummaryItem": {
+        "properties": {
+          "field_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Field Id"
+          },
+          "field_name": {
+            "type": "string",
+            "title": "Field Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "usage_count": {
+            "type": "integer",
+            "title": "Usage Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_id",
+          "field_name",
+          "parent_id",
+          "usage_count"
+        ],
+        "title": "FieldUsageSummaryItem"
+      },
+      "FooterAssetRead": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "FooterAssetRead"
+      },
+      "FooterBottom": {
+        "properties": {
+          "text": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Text"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/FooterLink"
+            },
+            "type": "array",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "title": "FooterBottom"
+      },
+      "FooterColumn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "links",
+              "logos"
+            ],
+            "title": "Type"
+          },
+          "title": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Title"
+          },
+          "content": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Content"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/FooterLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "include_footer_pages": {
+            "type": "boolean",
+            "title": "Include Footer Pages",
+            "default": false
+          },
+          "logos": {
+            "items": {
+              "$ref": "#/components/schemas/FooterLogo"
+            },
+            "type": "array",
+            "title": "Logos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "FooterColumn",
+        "description": "One footer column: Markdown text, a link list, or logos."
+      },
+      "FooterConfig": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/FooterColumn"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Columns"
+          },
+          "bottom": {
+            "$ref": "#/components/schemas/FooterBottom"
+          }
+        },
+        "type": "object",
+        "title": "FooterConfig",
+        "description": "Empty columns and bottom line: the portal keeps its one-line default footer."
+      },
+      "FooterLink": {
+        "properties": {
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Label"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "FooterLink"
+      },
+      "FooterLogo": {
+        "properties": {
+          "src": {
+            "type": "string",
+            "title": "Src"
+          },
+          "alt": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Alt"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          }
+        },
+        "type": "object",
+        "required": [
+          "src"
+        ],
+        "title": "FooterLogo"
+      },
       "FormSectionCreate": {
         "properties": {
           "target_type": {
@@ -23119,6 +24212,138 @@
         ],
         "title": "FormVariantRead"
       },
+      "FullRebuildStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "running",
+              "done",
+              "failed",
+              "error"
+            ],
+            "title": "State"
+          },
+          "queued": {
+            "type": "boolean",
+            "title": "Queued"
+          },
+          "pending_changes": {
+            "type": "boolean",
+            "title": "Pending Changes"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "built": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built"
+          },
+          "indexed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexed"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "current_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "queued",
+          "pending_changes"
+        ],
+        "title": "FullRebuildStatus",
+        "description": "total/built count record types; current_type is the one being built."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -23241,7 +24466,8 @@
                 "enum": [
                   "selected",
                   "top",
-                  "all"
+                  "all",
+                  "largest"
                 ]
               },
               {
@@ -23646,6 +24872,37 @@
         ],
         "title": "IndexHealthResponse"
       },
+      "IndexStatusResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "types": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReindexTypeStatus"
+            },
+            "type": "object",
+            "title": "Types"
+          },
+          "full_rebuild": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FullRebuildStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "types"
+        ],
+        "title": "IndexStatusResponse"
+      },
       "LocalizedText": {
         "properties": {
           "de": {
@@ -23741,6 +24998,28 @@
             "type": "string",
             "title": "Reason",
             "default": ""
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "idno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idno"
           }
         },
         "type": "object",
@@ -24046,6 +25325,45 @@
           "next"
         ],
         "title": "NextIdnoResponse"
+      },
+      "NoticeConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "title": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Title"
+          },
+          "text": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Text"
+          },
+          "accept_label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Accept Label"
+          }
+        },
+        "type": "object",
+        "title": "NoticeConfig",
+        "description": "One-time usage notice; shown once per browser and version."
       },
       "NumericFacetBounds": {
         "properties": {
@@ -25524,6 +26842,63 @@
             "type": "boolean",
             "title": "Show Iiif Manifest Link",
             "default": true
+          },
+          "facet_order": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Facet Order"
+          },
+          "relation_facets": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/RelationFacet"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence",
+                "collection",
+                "procedure"
+              ]
+            },
+            "type": "object",
+            "title": "Relation Facets"
+          },
+          "facet_kinds": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Facet Kinds"
+          },
+          "footer": {
+            "$ref": "#/components/schemas/FooterConfig"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/NoticeConfig"
+          },
+          "header_show_title": {
+            "type": "boolean",
+            "title": "Header Show Title",
+            "default": true
+          },
+          "hero_hide_title": {
+            "type": "boolean",
+            "title": "Hero Hide Title",
+            "default": false
           }
         },
         "type": "object",
@@ -25815,6 +27190,102 @@
               }
             ],
             "title": "Show Iiif Manifest Link"
+          },
+          "facet_order": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "object",
+                    "entity",
+                    "place",
+                    "occurrence",
+                    "collection",
+                    "procedure"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facet Order"
+          },
+          "relation_facets": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelationFacet"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "object",
+                    "entity",
+                    "place",
+                    "occurrence",
+                    "collection",
+                    "procedure"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Facets"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FooterConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoticeConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "header_show_title": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Show Title"
+          },
+          "hero_hide_title": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hero Hide Title"
           }
         },
         "type": "object",
@@ -25901,6 +27372,11 @@
       },
       "PortalFieldDefinitionRead": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -25958,6 +27434,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "name",
           "label",
           "field_type",
@@ -26041,6 +27518,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "iiif_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iiif Identifier"
           },
           "_links": {
             "additionalProperties": {
@@ -27075,6 +28563,126 @@
         ],
         "title": "RecordSubtypeRead"
       },
+      "ReindexTypeStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "running",
+              "done",
+              "failed",
+              "error"
+            ],
+            "title": "State"
+          },
+          "queued": {
+            "type": "boolean",
+            "title": "Queued"
+          },
+          "pending_changes": {
+            "type": "boolean",
+            "title": "Pending Changes"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "built": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built"
+          },
+          "indexed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexed"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "queued",
+          "pending_changes"
+        ],
+        "title": "ReindexTypeStatus"
+      },
       "RelationCreate": {
         "properties": {
           "from_type": {
@@ -27115,6 +28723,66 @@
           "relation_type"
         ],
         "title": "RelationCreate"
+      },
+      "RelationFacet": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,48}$",
+            "title": "Key"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Label"
+          },
+          "target_type": {
+            "type": "string",
+            "enum": [
+              "entity",
+              "place",
+              "occurrence",
+              "collection",
+              "object"
+            ],
+            "title": "Target Type"
+          },
+          "relation_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Relation Types"
+          },
+          "target_subtypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Subtypes"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "outgoing",
+              "incoming",
+              "both"
+            ],
+            "title": "Direction",
+            "default": "outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "target_type",
+          "relation_types"
+        ],
+        "title": "RelationFacet",
+        "description": "A portal facet over linked records restricted to certain relation types,\ne.g. \"Komponist_in\" = entities linked via relation_type ``komponist``."
       },
       "RelationRead": {
         "properties": {
@@ -27617,6 +29285,11 @@
             },
             "type": "object",
             "title": "Numeric Facets"
+          },
+          "tree_facets": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tree Facets"
           }
         },
         "type": "object",
@@ -27710,6 +29383,17 @@
               }
             ],
             "title": "Primary Media Id"
+          },
+          "primary_media_iiif": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Media Iiif"
           },
           "media_width": {
             "anyOf": [
@@ -29074,6 +30758,128 @@
         },
         "type": "object",
         "title": "VocabularyTermUpdate"
+      },
+      "WarmRequest": {
+        "properties": {
+          "primary_only": {
+            "type": "boolean",
+            "title": "Primary Only",
+            "default": false
+          },
+          "restart": {
+            "type": "boolean",
+            "title": "Restart",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "WarmRequest"
+      },
+      "WarmStatus": {
+        "properties": {
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "primary",
+                  "rest",
+                  "done"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "primary_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Only"
+          },
+          "done": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "running"
+        ],
+        "title": "WarmStatus"
       },
       "WorkingSetAddItemsRequest": {
         "properties": {

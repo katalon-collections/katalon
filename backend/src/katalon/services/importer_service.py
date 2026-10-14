@@ -185,12 +185,15 @@ def apply_mapping(
             normalized[selector] = (val, [])
 
     container_targets: dict[str, tuple[str, str]] = {}
+    url_children: set[tuple[str, str]] = set()
     if field_defs:
         groups = {field.id: field.name for field in field_defs.values() if field.field_type == "group"}
         for field in field_defs.values():
             parent_name = groups.get(getattr(field, "parent_id", None))
             if parent_name:
                 container_targets[f"{parent_name}.{field.name}"] = (parent_name, field.name)
+                if field.field_type == "url":
+                    url_children.add((parent_name, field.name))
 
     for row in rows:
         record: dict[str, Any] = {}
@@ -252,10 +255,20 @@ def apply_mapping(
                 record[field_name] = single
         for group_name, group_values in containers.items():
             count = max(len(parts) for parts in group_values.values())
-            record[group_name] = [
-                {child_name: parts[index] if index < len(parts) else "" for child_name, parts in group_values.items()}
-                for index in range(count)
-            ]
+            instances: list[dict[str, Any]] = []
+            for index in range(count):
+                instance: dict[str, Any] = {}
+                for child_name, parts in group_values.items():
+                    part = parts[index] if index < len(parts) else ""
+                    if (group_name, child_name) in url_children:
+                        # Same {value, label} shape as top-level URL fields; a
+                        # plain string here broke the grp_* index mapping.
+                        if part:
+                            instance[child_name] = {"value": part, "label": ""}
+                        continue
+                    instance[child_name] = part
+                instances.append(instance)
+            record[group_name] = instances
         result.append(record)
         idnos.append(row_idno)
     return result, idnos

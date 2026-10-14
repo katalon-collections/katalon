@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
@@ -24,6 +26,7 @@ from katalon.core.models import (
 )
 from katalon.integrations.elasticsearch import search_documents
 
+logger = logging.getLogger(__name__)
 
 def _is_leap_year(year: int) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
@@ -251,6 +254,76 @@ def inherited_facet_name(target_type: str, field_name: str) -> str:
     return f"inherited_{target_type}_{field_name}"
 
 
+def _normalize_url_item(value: Any) -> dict[str, str] | None:
+    """One URL value as {"value"[, "label"]}, or None if empty. An empty label
+    is left out so display/facet extraction falls back to the URL itself."""
+    if isinstance(value, dict):
+        url = str(value.get("value") or "").strip()
+        label = value.get("label")
+        label = label.strip() if isinstance(label, str) else ""
+    elif isinstance(value, str):
+        url, label = value.strip(), ""
+    else:
+        return None
+    if not url:
+        return None
+    return {"value": url, "label": label} if label else {"value": url}
+
+
+def _normalize_url_value(value: Any) -> Any:
+    if isinstance(value, list):
+        items = [item for v in value if (item := _normalize_url_item(v)) is not None]
+        return items or None
+    return _normalize_url_item(value)
+
+
+def normalize_url_values(md: dict[str, Any], field_definitions: Iterable[Any]) -> dict[str, Any]:
+    """Bring every URL value (top-level and inside groups) into one shape.
+
+    Stored URLs are {"value", "label"} when entered in the admin, but imports
+    wrote plain strings for URL sub-fields of groups and empty strings for
+    missing parts. Group instances are indexed as dynamically mapped nested
+    objects (grp_*), so one string next to an object made Elasticsearch reject
+    the whole document. Empty URLs are dropped.
+    """
+    by_id = {f.id: f for f in field_definitions if getattr(f, "id", None) is not None}
+    top_level = {f.name for f in by_id.values() if f.field_type == "url" and f.parent_id is None}
+    in_groups: dict[str, set[str]] = {}
+    for f in by_id.values():
+        parent = by_id.get(f.parent_id) if f.parent_id is not None else None
+        if f.field_type == "url" and parent is not None:
+            in_groups.setdefault(parent.name, set()).add(f.name)
+    if not top_level and not in_groups:
+        return md
+
+    out = dict(md)
+    for name in top_level & out.keys():
+        normalized = _normalize_url_value(out[name])
+        if normalized is None:
+            del out[name]
+        else:
+            out[name] = normalized
+    for group, children in in_groups.items():
+        instances = out.get(group)
+        if not isinstance(instances, list):
+            continue
+        new_instances = []
+        for inst in instances:
+            if not isinstance(inst, dict):
+                new_instances.append(inst)
+                continue
+            inst = dict(inst)
+            for child in children & inst.keys():
+                normalized = _normalize_url_value(inst[child])
+                if normalized is None:
+                    del inst[child]
+                else:
+                    inst[child] = normalized
+            new_instances.append(inst)
+        out[group] = new_instances
+    return out
+
+
 def _build_doc(
     record_type: str,
     record: Any,
@@ -312,6 +385,9 @@ def _build_doc(
         doc["collection_status"] = getattr(record, "collection_status", "active") or "active"
         if media_info:
             doc["primary_media_id"] = media_info["primary_media_id"]
+            # IIIF identifier: the portal builds /iiif/3/<id>/full/,300/... directly
+            # instead of a redirect via the thumbnail route (one request per image).
+            doc["primary_media_iiif"] = media_info["primary_media_iiif"]
             if media_info.get("media_width") is not None:
                 doc["media_width"] = media_info["media_width"]
             if media_info.get("media_height") is not None:
@@ -441,53 +517,246 @@ async def _load_linked_data(
     return result, facets
 
 
-async def _load_relation_titles(record_type: str, record_id: UUID, db: Any) -> dict[str, list[str]]:
-    """Return names of related entities/places/occurrences for denormalisation in ES."""
+def _index_cache(db: Any) -> dict[Any, Any]:
+    """Per-session cache for schema/config lookups during index builds. Bulk
+    reindex sessions live for one run, request sessions for one request, so
+    entries never outlive the change that would invalidate them by much — and
+    every such change requests a rebuild anyway."""
+    info = getattr(db, "info", None)
+    if not isinstance(info, dict):
+        return {}
+    cache: dict[Any, Any] = info.setdefault("katalon_index_cache", {})
+    return cache
+
+
+async def _cached_public_fields(db: Any, record_type: str) -> list[Any]:
+    from katalon.services.public_metadata_service import load_public_fields
+
+    cache = _index_cache(db)
+    key = ("public_fields", record_type)
+    if key not in cache:
+        cache[key] = await load_public_fields(db, record_type)
+    return list(cache[key])
+
+
+async def _load_relation_titles(
+    record_type: str, record_id: UUID, db: Any, relation_specs: list[Any] | None = None
+) -> dict[str, Any]:
+    """Titles of linked public records for denormalisation in ES.
+
+    Returns the ``related_*`` arrays and, for each configured relation facet,
+    ``facet_rel_<key>`` ("<id>|<title>", aggregated and shown) and
+    ``facet_relid_<key>`` (ids, filtered on — two people may share a name).
+    Only records with a public status that are not soft-deleted count, and
+    titles come from their public fields only.
+    """
     from sqlalchemy import and_, or_, select
 
-    from katalon.core.models import Collection, Entity, Occurrence, Place, Relation
-    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+    from katalon.core.models import Collection, Entity, Object, Occurrence, Place, Relation
+    from katalon.core.visibility import PUBLIC_STATUSES
+    from katalon.services.public_metadata_service import filter_public_metadata
 
-    TYPE_MAP: dict[str, tuple[str, Any]] = {
-        "entity": ("related_entities", Entity),
-        "place": ("related_places", Place),
-        "occurrence": ("related_occurrences", Occurrence),
-        "collection": ("related_collections", Collection),
+    related_fields = {
+        "entity": "related_entities",
+        "place": "related_places",
+        "occurrence": "related_occurrences",
+        "collection": "related_collections",
     }
-    related: dict[str, list[str]] = {k: [] for k, _ in TYPE_MAP.values()}
+    models: dict[str, Any] = {
+        "entity": Entity,
+        "place": Place,
+        "occurrence": Occurrence,
+        "collection": Collection,
+        "object": Object,
+    }
+    out: dict[str, Any] = {name: [] for name in related_fields.values()}
+    specs = relation_specs or []
+    for spec in specs:
+        out[spec.agg_field] = []
+        out[spec.filter_field] = []
 
-    stmt = select(Relation).where(
-        or_(
-            and_(Relation.from_type == record_type, Relation.from_id == record_id),
-            and_(Relation.to_type == record_type, Relation.to_id == record_id),
+    relations = (
+        await db.execute(
+            select(Relation).where(
+                or_(
+                    and_(Relation.from_type == record_type, Relation.from_id == record_id),
+                    and_(Relation.to_type == record_type, Relation.to_id == record_id),
+                )
+            )
         )
-    )
-    result = await db.execute(stmt)
-    relations = result.scalars().all()
-
+    ).scalars().all()
+    links: list[tuple[Any, str, Any, str]] = []
     for rel in relations:
         if rel.from_type == record_type and rel.from_id == record_id:
-            other_type, other_id = rel.to_type, rel.to_id
+            links.append((rel, rel.to_type, rel.to_id, "outgoing"))
         else:
-            other_type, other_id = rel.from_type, rel.from_id
+            links.append((rel, rel.from_type, rel.from_id, "incoming"))
 
-        mapping = TYPE_MAP.get(other_type)
-        if not mapping:
-            continue
-        field_name, model = mapping
-        rec = await db.get(model, other_id)
-        if rec:
-            public_fields = await load_public_fields(db, other_type)
+    ids_by_type: dict[str, set[Any]] = {}
+    for _rel, other_type, other_id, _direction in links:
+        wanted = other_type in related_fields or any(s.extra.get("target_type") == other_type for s in specs)
+        if wanted and other_type in models:
+            ids_by_type.setdefault(other_type, set()).add(other_id)
+
+    titles: dict[tuple[str, Any], tuple[str, str | None]] = {}
+    for other_type, ids in ids_by_type.items():
+        model = models[other_type]
+        rows = (await db.execute(select(model).where(model.id.in_(list(ids))))).scalars().all()
+        public_fields = await _cached_public_fields(db, other_type)
+        for rec in rows:
+            if getattr(rec, "deleted_at", None) is not None:
+                continue
+            status = getattr(rec, "status", None)
+            if status is not None and status not in PUBLIC_STATUSES:
+                continue
             subtype = getattr(rec, f"{other_type}_type", None)
             title = _extract_title(
                 filter_public_metadata(rec.metadata_ or {}, public_fields, subtype)
-            )
-            if not title:
-                title = getattr(rec, "idno", None) or ""
+            ) or getattr(rec, "idno", None) or ""
             if title:
-                related[field_name].append(title)
+                titles[(other_type, rec.id)] = (title, subtype)
 
-    return related
+    for rel, other_type, other_id, direction in links:
+        target = titles.get((other_type, other_id))
+        if target is None:
+            continue
+        title, subtype = target
+        if other_type in related_fields:
+            out[related_fields[other_type]].append(title)
+        for spec in specs:
+            cfg = spec.extra
+            if cfg.get("target_type") != other_type:
+                continue
+            if rel.relation_type not in (cfg.get("relation_types") or []):
+                continue
+            if cfg.get("direction", "outgoing") not in ("both", direction):
+                continue
+            subtypes = cfg.get("target_subtypes") or []
+            if subtypes and subtype not in subtypes:
+                continue
+            value = f"{other_id}|{title}"
+            if value not in out[spec.agg_field]:
+                out[spec.agg_field].append(value)
+                out[spec.filter_field].append(str(other_id))
+    return out
+
+
+async def _cached_field_specs(db: Any, record_type: str) -> dict[str, Any]:
+    from katalon.services.facet_service import field_facet_specs
+
+    cache = _index_cache(db)
+    key = ("field_specs", record_type)
+    if key not in cache:
+        cache[key] = (await field_facet_specs(db, (record_type,), facets_only=False)).get(
+            record_type, {}
+        )
+    return dict(cache[key])
+
+
+async def _cached_relation_specs(db: Any, record_type: str) -> list[Any]:
+    from sqlalchemy import select
+
+    from katalon.core.models import PortalConfig
+    from katalon.services.facet_service import relation_facet_specs
+
+    cache = _index_cache(db)
+    key = ("relation_specs", record_type)
+    if key not in cache:
+        config = (
+            await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+        ).scalar_one_or_none()
+        specs = relation_facet_specs(config.relation_facets if config else None)
+        cache[key] = list(specs.get(record_type, {}).values())
+    return list(cache[key])
+
+
+async def _vocabulary_parents(db: Any, vocabulary_id: str) -> dict[str, str | None]:
+    from sqlalchemy import select
+
+    from katalon.core.models import VocabularyTerm
+
+    cache = _index_cache(db)
+    key = ("vocab_parents", vocabulary_id)
+    if key not in cache:
+        rows = await db.execute(
+            select(VocabularyTerm.id, VocabularyTerm.parent_id).where(
+                VocabularyTerm.vocabulary_id == UUID(vocabulary_id)
+            )
+        )
+        cache[key] = {str(i): (str(p) if p else None) for i, p in rows.all()}
+    return dict(cache[key])
+
+
+def _raw_values(value: Any) -> list[Any]:
+    if value is None or value == "":
+        return []
+    return [v for v in value if v not in (None, "")] if isinstance(value, list) else [value]
+
+
+def _string_values(values: list[Any]) -> list[str]:
+    out: list[str] = []
+    for v in values:
+        if isinstance(v, dict):
+            v = v.get("value")
+        if isinstance(v, str) and v.strip():
+            out.append(v.strip())
+    return out
+
+
+async def derive_facet_fields(
+    md: dict[str, Any] | None, specs: dict[str, Any], db: Any
+) -> dict[str, Any]:
+    """Index fields for facets that cannot use the plain facet_all_<field>:
+    group sub-fields, date buckets, and hierarchical vocabulary paths."""
+    from katalon.services.facet_service import date_buckets
+
+    md = md or {}
+    out: dict[str, Any] = {}
+    for name, spec in specs.items():
+        group, child = spec.extra.get("group"), spec.extra.get("child")
+        if group:
+            raw: list[Any] = []
+            for inst in md.get(group) or []:
+                if isinstance(inst, dict):
+                    raw.extend(_raw_values(inst.get(child)))
+        else:
+            raw = _raw_values(md.get(name))
+        if not raw:
+            continue
+        if spec.kind == "date":
+            buckets, rejected = date_buckets(_string_values(raw), spec.granularity or "decade")
+            if rejected:
+                logger.info("date facet %s: ignored implausible values %s", name, rejected[:5])
+            if buckets:
+                out[spec.filter_field] = buckets
+        elif spec.kind == "tree" and spec.vocabulary_id:
+            parents = await _vocabulary_parents(db, spec.vocabulary_id)
+            path: list[str] = []
+            for value in raw:
+                term_id = str(value.get("id")) if isinstance(value, dict) and value.get("id") else None
+                seen: set[str] = set()
+                while term_id and term_id in parents and term_id not in seen:
+                    seen.add(term_id)
+                    if term_id not in path:
+                        path.append(term_id)
+                    term_id = parents[term_id]
+            if path:
+                out[spec.filter_field] = path
+        if group:
+            # Sub-fields get the same keyword facet values as top-level fields.
+            labels = [lbl for v in raw if (lbl := _extract_display_value(v))]
+            if labels:
+                out[f"facet_all_{name}"] = labels
+            if spec.kind == "numeric":
+                numbers = []
+                for v in _advanced_scalar_values(raw):
+                    try:
+                        numbers.append(float(v))
+                    except (TypeError, ValueError):
+                        continue
+                if numbers:
+                    out[f"number_facet_all_{name}"] = numbers
+    return out
 
 
 async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict[str, Any]:
@@ -497,10 +766,13 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     from katalon.core.models import FieldDefinition
     from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 
-    rel_data: dict[str, list[str]] | None = None
+    rel_data: dict[str, Any] | None = None
     media_info: dict[str, Any] | None = None
+    facet_extra: dict[str, Any] = {}
     if db is not None:
-        rel_data = await _load_relation_titles(record_type, record.id, db)
+        rel_data = await _load_relation_titles(
+            record_type, record.id, db, await _cached_relation_specs(db, record_type)
+        )
         if record_type == "object":
             media_info = await _load_primary_media(record.id, db)
 
@@ -511,10 +783,16 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     rows: list[Any] = []
     if db is not None:
         public_fields = await load_public_fields(db, record_type)
-        public_metadata = filter_public_metadata(
-            getattr(record, "metadata_", None),
+        public_metadata = normalize_url_values(
+            filter_public_metadata(
+                getattr(record, "metadata_", None),
+                public_fields,
+                getattr(record, f"{record_type}_type", None),
+            ),
             public_fields,
-            getattr(record, f"{record_type}_type", None),
+        )
+        facet_extra = await derive_facet_fields(
+            public_metadata, await _cached_field_specs(db, record_type), db
         )
         result = await db.execute(
             select(
@@ -552,14 +830,19 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     export_context: dict[str, Any] | None = None
     if db is not None:
         try:
-            from katalon.services.export_context_service import build_export_context_from_db
+            from katalon.services.export_context_service import (
+                INDEX_MAX_INBOUND_RELATIONS,
+                build_export_context_from_db,
+            )
 
-            ctx = await build_export_context_from_db(db, record_type, record.id)
+            ctx = await build_export_context_from_db(
+                db, record_type, record.id, max_inbound=INDEX_MAX_INBOUND_RELATIONS
+            )
             export_context = ctx.to_dict()
         except Exception:
             export_context = None
 
-    return _build_doc(
+    doc = _build_doc(
         record_type,
         record,
         rel_data,
@@ -572,6 +855,8 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
         export_context=export_context,
         media_info=media_info,
     )
+    doc.update(facet_extra)
+    return doc
 
 
 async def _load_primary_media(object_id: Any, db: Any) -> dict[str, Any] | None:
@@ -583,6 +868,7 @@ async def _load_primary_media(object_id: Any, db: Any) -> dict[str, Any] | None:
     """
     from sqlalchemy import select
 
+    from katalon.core.media_storage import iiif_identifier
     from katalon.core.media_validation import media_category
     from katalon.core.models import MediaFile
 
@@ -601,6 +887,7 @@ async def _load_primary_media(object_id: Any, db: Any) -> dict[str, Any] | None:
             continue
         return {
             "primary_media_id": str(media.id),
+            "primary_media_iiif": iiif_identifier(media.iiif_storage_key, media.storage_key),
             "media_width": media.width,
             "media_height": media.height,
         }
@@ -642,7 +929,7 @@ async def remove_record(record_id: UUID, db: AsyncSession, record_type: str | No
 async def search(
     query: str | None = None,
     record_type: str | None = None,
-    status: str | None = None,
+    status: str | tuple[str, ...] | None = None,
     page: int = 1,
     page_size: int = 20,
     extra_filters: dict[str, list[str]] | None = None,
@@ -657,6 +944,8 @@ async def search(
     facet_sort: str = "count",
     sort: str | None = None,
     full_visibility_types: tuple[str, ...] | None = None,
+    facet_specs: dict[str, tuple[str, str, str]] | None = None,
+    tree_aggs: dict[str, tuple[str, str, list[str]]] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -676,6 +965,8 @@ async def search(
         facet_sort=facet_sort,
         sort=sort,
         full_visibility_types=full_visibility_types,
+        facet_specs=facet_specs,
+        tree_aggs=tree_aggs,
     )
 
     hits = raw.get("hits", {})

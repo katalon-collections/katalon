@@ -89,6 +89,20 @@ async def _vocab_fields(
     return result
 
 
+async def request_reindex_for_vocabulary(db: AsyncSession, vocabulary_id: uuid.UUID) -> None:
+    """Rebuild every record type with a field on this vocabulary (after commit).
+
+    Hierarchical vocabulary facets index each value's ancestor path, so moving
+    a term (new parent) changes documents without touching record metadata.
+    """
+    from katalon.workers.enqueue import after_commit
+    from katalon.workers.reindex_state import request_bulk_reindex
+
+    for record_type, fields in (await _vocab_fields(db, vocabulary_id)).items():
+        if fields:
+            after_commit(db, request_bulk_reindex, record_type)
+
+
 def _record_references(
     metadata: dict[str, Any], fields: list[tuple[str | None, FieldDefinition]], term_id: uuid.UUID
 ) -> Iterator[dict[str, Any]]:
@@ -144,10 +158,10 @@ async def remap_references(
                 changed_types.add(record_type)
     if changed_types:
         from katalon.workers.enqueue import after_commit
-        from katalon.workers.index_tasks import bulk_reindex_type_task
+        from katalon.workers.reindex_state import request_bulk_reindex
 
         for record_type in changed_types:
-            after_commit(db, bulk_reindex_type_task, record_type)
+            after_commit(db, request_bulk_reindex, record_type)
     return updated
 
 
@@ -223,9 +237,9 @@ async def remove_references(
 
     if changed_types:
         from katalon.workers.enqueue import after_commit
-        from katalon.workers.index_tasks import bulk_reindex_type_task
+        from katalon.workers.reindex_state import request_bulk_reindex
 
         for record_type in changed_types:
-            after_commit(db, bulk_reindex_type_task, record_type)
+            after_commit(db, request_bulk_reindex, record_type)
 
     return removed

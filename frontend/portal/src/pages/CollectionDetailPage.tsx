@@ -6,24 +6,25 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import {
   api,
-  mediaThumbnailUrl,
   type CollectionDetail,
   type MediaFile,
   type ObjectSummary,
   type PortalUser,
   type Relation,
 } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { facetItems, markdownToPlainText, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { facetHref, MetaRow, richText } from '../components/DetailPageLayout'
+import { facetHref, MetaRow, richText, GroupMetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { RelationsList } from '../components/RelationsList'
 import { useI18n } from '../i18n'
+import { LazyImage } from '../components/LazyImage'
 
 export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
   const { id } = useParams<{ id: string }>()
@@ -92,7 +93,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                     const ready = m.filter(mf => mf.status === 'ready')
                     const primary = ready.find(mf => mf.is_primary) ?? ready[0]
                     if (primary) {
-                      thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
+                      thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
                     }
                   })
                   .catch(() => {})
@@ -344,10 +345,11 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
 
                 {/* Dynamische Schema-Felder (außer bereits dargestellter Titel/Beschreibungen) */}
                 {fieldDefs
-                  .filter(f => !['title', 'name', 'description', 'kurzbeschreibung', 'scope_and_content'].includes(f.name))
+                  .filter(f => !f.parent_id && !['title', 'name', 'description', 'kurzbeschreibung', 'scope_and_content'].includes(f.name))
                   .map(f => {
                     const val = m[f.name]
                     if (val == null || val === '') return null
+                    if (f.field_type === 'group') return <GroupMetaRow key={f.name} field={f} fieldDefs={fieldDefs} value={val} locale={locale} recordType="collection" />
                     const label = f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
                     if (f.is_facet) {
                       const items = facetItems(val, locale, f.field_type)
@@ -361,7 +363,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
 
               {relations.length > 0 && (
                 <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                  <RelationsList relations={relations} currentId={col.id} resolveLabel={resolveRelationType} />
+                  <RelationsList recordType="collection" relations={relations} currentId={col.id} resolveLabel={resolveRelationType} />
                 </div>
               )}
             </div>
@@ -520,7 +522,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                       >
                         <div style={{ width: '100%', aspectRatio: '4/3', background: 'linear-gradient(135deg, #cfd5e1, #a4afc4)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: 'rgba(255,255,255,.5)' }}>
                           {thumb ? (
-                            <img src={thumb} alt={objTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                            <LazyImage src={thumb} alt={objTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                           )}
@@ -562,7 +564,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                             <td style={{ padding: '8px 14px' }}>
                               <div style={{ width: 36, height: 36, borderRadius: 4, background: 'linear-gradient(135deg, #cfd5e1, #a4afc4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.5)' }}>
                                 {thumb ? (
-                                  <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <LazyImage src={thumb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                                 )}

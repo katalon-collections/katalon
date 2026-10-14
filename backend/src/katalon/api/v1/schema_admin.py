@@ -118,6 +118,16 @@ async def _check_field_name_collision(
 async def _validate_field_settings(
     db: DBDep, data: FieldDefinitionCreate, existing: FieldDefinition | None = None
 ) -> None:
+    granularity = data.settings.get("facet_granularity")
+    if granularity not in (None, ""):
+        from katalon.services.facet_service import DATE_GRANULARITIES
+
+        if data.field_type != "date" or granularity not in DATE_GRANULARITIES:
+            raise HTTPException(
+                status_code=422,
+                detail="'facet_granularity' ist nur für Datumsfelder erlaubt: "
+                + ", ".join(DATE_GRANULARITIES),
+            )
     for setting_name in ("validation_regex", "pattern"):
         pattern = data.settings.get(setting_name)
         if pattern is None:
@@ -247,40 +257,20 @@ router = APIRouter(prefix="/schema", tags=["schema"])
 
 
 def _enqueue_reindex(db: DBDep, target_type: str) -> None:
-    """Defer a type-specific ES reindex until ``db`` commits (#392).
+    """Request a type-specific ES reindex once ``db`` commits (#392).
 
-    Saving several facet/visibility checkboxes at once (see #settings/facetten)
-    issues one PUT per changed field, each calling this. bulk_reindex_type_task
-    always rebuilds from current DB state regardless of which field triggered
-    it, so firing it N times back-to-back only multiplies wall-clock time on
-    a large collection without changing the result. Coalesce same-type bursts
-    into a single job via a short-lived Redis claim; on any Redis hiccup, fail
-    open and enqueue anyway — duplicate work beats a silently skipped reindex.
+    bulk_reindex_type_task always rebuilds from current DB state regardless of
+    which field triggered it, so request_bulk_reindex coalesces: at most one
+    waiting job per type, and changes made while a job runs produce exactly
+    one follow-up (see workers/reindex_state.py). Bulk edits should still go
+    through PUT /schema/{target_type}/bulk — one transaction, one request.
     """
     if target_type == "vocabulary_term":
         return
     from katalon.workers.enqueue import after_commit
-    from katalon.workers.index_tasks import bulk_reindex_type_task
+    from katalon.workers.reindex_state import request_bulk_reindex
 
-    if not _claim_reindex_trigger(target_type):
-        return
-    after_commit(db, bulk_reindex_type_task, target_type)
-
-
-def _claim_reindex_trigger(target_type: str, window_seconds: int = 10) -> bool:
-    """True if this call should enqueue; False if another call for the same
-    type already claimed the window (and will pick up this change too)."""
-    try:
-        import redis as redis_lib
-
-        from katalon.config import settings
-
-        client = redis_lib.from_url(settings.redis_url)
-        return bool(
-            client.set(f"katalon:reindex:trigger:{target_type}", "1", nx=True, ex=window_seconds)
-        )
-    except Exception:
-        return True
+    after_commit(db, request_bulk_reindex, target_type)
 
 
 class ImportResult(BaseModel):
@@ -462,10 +452,10 @@ async def _validate_parent(db: DBDep, parent_id: uuid.UUID, field_type: str) -> 
 async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitionRead:
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
-    # A field hidden from the detail view has no public display context to derive
-    # a facet value from — never let is_facet survive with show_in_detail off,
-    # regardless of what the client sent.
-    if not data.show_in_detail:
+    # Facet values come from the public facet_all_* index fields, so a facet
+    # needs a public field. show_in_detail is display only and independent: a
+    # field can be filtered on without being repeated on the detail page.
+    if not data.is_public:
         data.is_facet = False
     # Sub-fields (parent_id set) are embedded as `children` on their group field and are
     # never returned by the top-level schema.list() query the record list view reads from
@@ -540,9 +530,63 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
 async def update_field(
     field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep, current_user: CurrentUser
 ) -> FieldDefinitionRead:
+    field, needs_reindex = await _apply_field_update(db, field_id, data, current_user.id)
+    if needs_reindex:
+        _enqueue_reindex(db, field.target_type)
+    return _fd_read(field)
+
+
+class FieldBulkUpdateItem(FieldDefinitionCreate):
+    id: uuid.UUID
+
+
+@router.put(
+    "/{target_type}/bulk",
+    response_model=list[FieldDefinitionRead],
+    dependencies=[require_role("admin")],
+    summary="Update several field definitions of one target type in one transaction",
+    description=(
+        "Applies every item with the same validation as PUT /schema/{field_id}. "
+        "Either all items are saved or none (first error aborts with its status). "
+        "Content-affecting changes trigger at most one reindex of the type."
+    ),
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Field definition or parent field not found"},
+        409: {"description": "Field name collision"},
+        422: {"description": "Invalid item, or an item belongs to another target type"},
+    },
+)
+async def bulk_update_fields(
+    target_type: str, items: list[FieldBulkUpdateItem], db: DBDep, current_user: CurrentUser
+) -> list[FieldDefinitionRead]:
+    _validate_schema_target_type(target_type)
+    if len({item.id for item in items}) != len(items):
+        raise HTTPException(status_code=422, detail="Feld-IDs müssen eindeutig sein")
+    updated: list[FieldDefinition] = []
+    needs_reindex = False
+    for item in items:
+        if item.target_type != target_type:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Feld {item.id} gehört nicht zum Typ {target_type}",
+            )
+        data = FieldDefinitionCreate.model_validate(item.model_dump(exclude={"id"}))
+        field, changed = await _apply_field_update(db, item.id, data, current_user.id)
+        updated.append(field)
+        needs_reindex = needs_reindex or changed
+    if needs_reindex:
+        _enqueue_reindex(db, target_type)
+    return [_fd_read(field) for field in updated]
+
+
+async def _apply_field_update(
+    db: DBDep, field_id: uuid.UUID, data: FieldDefinitionCreate, user_id: uuid.UUID
+) -> tuple[FieldDefinition, bool]:
+    """Validate and apply one field update; returns (field, needs_reindex)."""
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
-    if not data.show_in_detail:
+    if not data.is_public:
         data.is_facet = False
     if data.parent_id:
         data.show_in_list = False
@@ -592,6 +636,10 @@ async def update_field(
         old_settings.get(key) != field.settings.get(key)
         for key in ("target_type", "fixed_relation_type", "inherited_fields")
     )
+    # Date facet buckets are materialized in the index.
+    facet_granularity_changed = field.field_type == "date" and old_settings.get(
+        "facet_granularity"
+    ) != (field.settings or {}).get("facet_granularity")
     if old_is_translatable != field.is_translatable and not field.parent_id:
         # A field's is_translatable flag is reversible in both directions (#399):
         # existing records are reshaped in the same transaction so the schema and
@@ -609,7 +657,7 @@ async def update_field(
             field,
             enable=field.is_translatable,
             primary_language=primary_language,
-            user_id=current_user.id,
+            user_id=user_id,
         )
         await db.flush()
     if old_is_repeatable != field.is_repeatable and not field.parent_id:
@@ -620,22 +668,21 @@ async def update_field(
         from katalon.services.schema_service import migrate_repeatable_shape
 
         await migrate_repeatable_shape(
-            db, field, enable=field.is_repeatable, user_id=current_user.id
+            db, field, enable=field.is_repeatable, user_id=user_id
         )
         await db.flush()
     # is_facet toggles need no reindex: docs carry facet_all_* for every public
     # field and the portal whitelists aggregations against is_facet at query
     # time. Only content-affecting changes (visibility, inherited relation
     # settings, translatable/repeatable shape, field type) require a rebuild.
-    if (
+    return field, (
         field.is_public != old_is_public
         or inherited_settings_changed
         or old_is_translatable != field.is_translatable
         or old_is_repeatable != field.is_repeatable
         or old_field_type != field.field_type
-    ):
-        _enqueue_reindex(db, field.target_type)
-    return _fd_read(field)
+        or facet_granularity_changed
+    )
 
 
 class FieldUsageResponse(BaseModel):
@@ -648,6 +695,47 @@ class FieldUsageResponse(BaseModel):
     # data-loss confirmation before it is sent (#399).
     repeatable_collapse_count: int | None = None
     type_change_risk_count: int | None = None
+
+
+class FieldUsageSummaryItem(BaseModel):
+    field_id: uuid.UUID
+    field_name: str
+    parent_id: uuid.UUID | None
+    usage_count: int
+
+
+@router.get(
+    "/{target_type}/usage-summary",
+    response_model=list[FieldUsageSummaryItem],
+    dependencies=[require_role("admin")],
+    summary="Get record usage counts for all fields of a target type in one scan",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid target type"},
+    },
+)
+async def get_type_usage_summary(target_type: str, db: DBDep) -> list[FieldUsageSummaryItem]:
+    from katalon.services.schema_service import count_usage_by_field
+
+    _validate_schema_target_type(target_type)
+    counts = await count_usage_by_field(db, target_type)
+    fields = (
+        (
+            await db.execute(
+                select(FieldDefinition)
+                .where(FieldDefinition.id.in_(counts))
+                .order_by(FieldDefinition.sort_order, FieldDefinition.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        FieldUsageSummaryItem(
+            field_id=f.id, field_name=f.name, parent_id=f.parent_id, usage_count=counts[f.id]
+        )
+        for f in fields
+    ]
 
 
 @router.get(

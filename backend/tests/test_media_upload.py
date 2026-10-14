@@ -171,6 +171,8 @@ async def test_list_media_returns_files() -> None:
         assert len(data) == 1
         assert data[0]["filename"] == "test.jpg"
         assert data[0]["status"] == "ready"
+        # Portal builds the thumbnail URL from it without the redirect route.
+        assert data[0]["iiif_identifier"] == "ab%2Ftest.jpg"
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -323,6 +325,8 @@ async def test_portal_media_thumbnail_redirects_to_iiif() -> None:
         assert response.headers["location"].endswith(
             f"/iiif/3/{media_id.hex[:2]}%2F{media_id}--test.tif/full/,300/0/default.jpg"
         )
+        # Cacheable in the browser only: every /iiif/ fetch is still authorized.
+        assert response.headers["cache-control"] == "private, max-age=2592000"
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -411,6 +415,7 @@ async def test_portal_media_thumbnail_denied_for_staff_without_object_read_permi
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/portal/v1/objects/{obj_id}/media/{media_id}/thumbnail")
         assert response.status_code == 404
+        assert "cache-control" not in response.headers
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(try_get_current_user, None)
@@ -500,6 +505,53 @@ async def test_iiif_authorize_accepts_ingress_nginx_original_url(
                 },
             )
         assert response.status_code == expected
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("viewer", "object_status", "media_public", "expected"),
+    [
+        ("anonymous", "published", True, "public"),
+        ("admin", "public", True, "public"),
+        # Staff fetching internal media / media of an internal object: never shared-cacheable.
+        ("admin", "public", False, "restricted"),
+        ("admin", "internal", True, "restricted"),
+    ],
+)
+async def test_iiif_authorize_reports_media_visibility_for_nginx_cache_control(
+    viewer: str, object_status: str, media_public: bool, expected: str
+) -> None:
+    obj_id = uuid.uuid4()
+    media = MediaFile(
+        id=uuid.uuid4(), object_id=obj_id, filename="test.jpg", mime_type="image/jpeg",
+        storage_key="ab/test.jpg", iiif_storage_key="ab/test.jpg", status="ready",
+        is_public=media_public, created_at=datetime.now(),
+    )
+    obj = Object(id=obj_id, idno="OBJ-001", status=object_status, metadata_={})
+    user = None if viewer == "anonymous" else User(
+        id=uuid.uuid4(), email="admin@example.com", role="admin", hashed_password="x"
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mock_result(media))
+    session.get = AsyncMock(return_value=obj)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/v1/media/_authorize",
+                headers={"X-Original-Uri": "/iiif/3/ab%2Ftest.jpg/full/,300/0/default.jpg"},
+            )
+        assert response.status_code == 200
+        assert response.headers["x-media-visibility"] == expected
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(try_get_current_user, None)

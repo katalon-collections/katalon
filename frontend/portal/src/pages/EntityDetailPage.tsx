@@ -4,12 +4,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, fetchRecord, mediaThumbnailUrl, type EntitySummary, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { api, fetchRecord, type EntitySummary, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
 import { RelatedObjects } from '../components/RelatedObjects'
 import { useBackToSearch } from '../hooks/useBackToSearch'
+import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
@@ -31,6 +33,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('entity')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
+  const subtypeLabel = useRecordSubtypeLabels(locale)
   const backSearch = useBackToSearch()
   const portalConfig = usePortalConfig()
 
@@ -57,7 +60,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
             .then((media: MediaFile[]) => {
               const ready = media.filter(mf => mf.status === 'ready')
               const primary = ready.find(mf => mf.is_primary) ?? ready[0]
-              if (primary) thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
+              if (primary) thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
             })
             .catch(() => {})
         ))
@@ -91,7 +94,9 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
 
   const m = entity.metadata_ as Record<string, unknown>
   const title = recordTitle(m, locale, entity.id)
-  const typeLabel = entityTypeLabel(entity.entity_type)
+  // Admin-configured subtype label first (as in search results), built-in label as fallback.
+  const configuredTypeLabel = subtypeLabel(entity.entity_type, 'entity')
+  const typeLabel = configuredTypeLabel !== entity.entity_type ? configuredTypeLabel : entityTypeLabel(entity.entity_type)
   const description = renderFieldValue(m.description, locale) ?? ''
 
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'name' && f.name !== 'title')
@@ -138,9 +143,10 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
         aiProvenance={entity.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}
-        mainExtra={linkedObjects.length > 0 && <RelatedObjects objects={linkedObjects} relations={relations} currentId={entity.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
+        mainExtra={linkedObjects.length > 0 && <RelatedObjects recordType="entity" objects={linkedObjects} relations={relations} currentId={entity.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
         relations={nonObjectRelations.length > 0 && (
           <RelationsList
+            recordType="entity"
             relations={nonObjectRelations}
             currentId={entity.id}
             resolveLabel={resolveRelationType}

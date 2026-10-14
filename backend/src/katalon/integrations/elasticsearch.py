@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import itertools
+import json
 import logging
-from collections.abc import AsyncIterator, Iterable, Sized
+import uuid
+import weakref
+from collections.abc import AsyncIterator, Iterable, Iterator
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from elasticsearch import AsyncElasticsearch, BadRequestError, NotFoundError
@@ -14,8 +19,6 @@ from katalon.config import settings
 from katalon.core.visibility import PUBLIC_STATUSES
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_REINDEX_BATCH_SIZE: int = getattr(settings, "es_reindex_batch_size", 500)
 
 # Relation-derived facets (object/entity/place/occurrence/collection docs all carry
 # these denormalized fields). Toggled per record type via portal_config.facet_fields,
@@ -57,9 +60,33 @@ class ReindexBatchError(RuntimeError):
         self.indexed_count = indexed_count
 
 
+# One client per event loop: aiohttp sessions are bound to the loop that
+# created them. The API process runs one loop (one pooled client for its
+# lifetime); each Celery task runs its own asyncio.run loop and closes its
+# client via close_es() before the loop ends. Previously every call created a
+# client and most callers never closed it — one leaked HTTP session per
+# indexed record in the worker.
+_clients: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, AsyncElasticsearch] = (
+    weakref.WeakKeyDictionary()
+)
+
+
 def get_es() -> AsyncElasticsearch:
-    """Create a fresh ES client. Not cached – must be used within a single event loop."""
-    return AsyncElasticsearch(settings.elasticsearch_url)
+    """Return the ES client of the running event loop (created on first use).
+    Callers must not close it; the loop owner calls ``close_es()``."""
+    loop = asyncio.get_running_loop()
+    client = _clients.get(loop)
+    if client is None:
+        client = AsyncElasticsearch(settings.elasticsearch_url)
+        _clients[loop] = client
+    return client
+
+
+async def close_es() -> None:
+    """Close the running loop's client (API shutdown, end of a worker task)."""
+    client = _clients.pop(asyncio.get_running_loop(), None)
+    if client is not None:
+        await client.close()
 
 
 INDEX_SETTINGS: dict[str, Any] = {
@@ -75,6 +102,10 @@ INDEX_SETTINGS: dict[str, Any] = {
         }
     },
     "mappings": {
+        # Dynamically mapped values (group instances under grp_*) must never be
+        # guessed as dates: an EDTF value like "1884/1919" or "1890/" next to a
+        # detected "1918-03-21" made Elasticsearch reject the whole document.
+        "date_detection": False,
         "dynamic_templates": [
             {
                 "facet_fields": {
@@ -104,6 +135,8 @@ INDEX_SETTINGS: dict[str, Any] = {
             "subtype": {"type": "keyword"},
             "object_type": {"type": "keyword"},
             "primary_media_id": {"type": "keyword"},
+            # Returned only, never queried.
+            "primary_media_iiif": {"type": "keyword", "index": False, "doc_values": False},
             "media_width": {"type": "integer"},
             "media_height": {"type": "integer"},
             "title": {
@@ -146,156 +179,192 @@ INDEX_SETTINGS: dict[str, Any] = {
     },
 }
 
+# The name every read and write uses. On current installations it is an alias
+# onto a dated physical index (`<name>_<YYYYmmddHHMMSS>_<random>`), so a full rebuild can
+# fill a fresh index and switch atomically. Older installations still have a
+# concrete index under this name; the first full rebuild replaces it with the
+# alias in the same atomic request.
 INDEX_NAME = settings.es_index_name
-ALIAS_NAME = "katalon"  # stable alias used by all queries
+# While a full rebuild fills a new physical index, single-document writes go to
+# both indices so the new one does not miss them (see workers/index_tasks.py).
+SHADOW_INDEX_KEY = f"katalon:reindex:shadow:{INDEX_NAME}"
+
+
+def new_physical_index_name() -> str:
+    # Timestamp for operators, random suffix so two indices created within the
+    # same second (fresh install + immediate rebuild) never collide.
+    return f"{INDEX_NAME}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
 
 async def ensure_index() -> None:
     es = get_es()
-    exists = await es.indices.exists(index=INDEX_NAME)
-    if not exists:
-        await es.indices.create(index=INDEX_NAME, body=INDEX_SETTINGS)
-    else:
-        # Idempotently apply mapping changes (e.g. new fields)
+    if await es.indices.exists(index=INDEX_NAME):
+        # Alias or legacy concrete index: idempotently apply mapping additions.
         await es.indices.put_mapping(index=INDEX_NAME, body=INDEX_SETTINGS["mappings"])
-    # Ensure the alias points to the main index
-    alias_exists = await es.indices.exists_alias(name=ALIAS_NAME)
-    if not alias_exists:
-        await es.indices.put_alias(index=INDEX_NAME, name=ALIAS_NAME)
+        return
+    await create_physical_index(new_physical_index_name(), alias=True)
 
 
-async def reindex_type(
-    target_type: str,
-    records: Iterable[tuple[str, dict[str, Any]]],
-    *,
-    batch_size: int = DEFAULT_REINDEX_BATCH_SIZE,
-    raise_on_error: bool = True,
-) -> int:
-    """Delete all docs of target_type and re-index the supplied records in batches.
+async def create_physical_index(name: str, *, alias: bool = False) -> None:
+    body: dict[str, Any] = dict(INDEX_SETTINGS)
+    if alias:
+        body["aliases"] = {INDEX_NAME: {}}
+    await get_es().indices.create(index=name, body=body)
 
-    Returns the number of documents successfully indexed.
-    """
-    if batch_size <= 0:
-        raise ValueError(f"batch_size must be positive, got {batch_size}")
 
+async def swap_alias(new_index: str) -> list[str]:
+    """Point INDEX_NAME at ``new_index`` atomically and delete the indices it
+    pointed at before. Returns the previous index names (cleanup failures are logged)."""
     es = get_es()
-    try:
-        # Delete existing docs for this type
-        await es.delete_by_query(
-            index=INDEX_NAME,
-            body={"query": {"term": {"record_type": target_type}}},
-            refresh=True,
-        )
-
-        total_records = len(records) if isinstance(records, Sized) else None
-        if total_records == 0:
-            return 0
-        total_batches = (
-            (total_records + batch_size - 1) // batch_size if total_records is not None else None
-        )
-
-        total_indexed = 0
-        failed_batches: list[dict[str, Any]] = []
-
-        for batch_idx, batch in enumerate(
-            itertools.batched(records, batch_size, strict=False), start=1
-        ):
-            batch_label = (
-                f"{batch_idx}/{total_batches}" if total_batches is not None else str(batch_idx)
-            )
-            ops: list[dict[str, Any]] = []
-            doc_ids: list[str] = []
-            for doc_id, body in batch:
-                ops.append({"index": {"_index": INDEX_NAME, "_id": doc_id}})
-                ops.append(body)
-                doc_ids.append(doc_id)
-
+    if await es.indices.exists_alias(name=INDEX_NAME):
+        old = [name for name in (await es.indices.get_alias(name=INDEX_NAME)).body if name != new_index]
+        actions: list[dict[str, Any]] = [
+            {"remove": {"index": name, "alias": INDEX_NAME}} for name in old
+        ]
+        actions.append({"add": {"index": new_index, "alias": INDEX_NAME}})
+        await es.indices.update_aliases(body={"actions": actions})
+        for name in old:
             try:
-                resp = await es.bulk(body=ops, refresh=False)
-                items = resp.get("items", [])
-                item_errors = [item for item in items if "error" in item.get("index", {})]
-                if item_errors:
-                    for item in item_errors:
-                        idx_info = item.get("index", {})
-                        err_doc_id = idx_info.get("_id", "unknown")
-                        err_detail = idx_info.get("error", {})
-                        logger.error(
-                            "reindex_type(%s) item error in batch %s for record %s: %s",
-                            target_type,
-                            batch_label,
-                            err_doc_id,
-                            err_detail,
-                        )
-                    failed_batches.append(
-                        {
-                            "batch": batch_idx,
-                            "batch_label": batch_label,
-                            "error_type": "item_errors",
-                            "doc_ids": [
-                                item.get("index", {}).get("_id", "") for item in item_errors
-                            ],
-                            "error": f"{len(item_errors)} item error(s) in batch",
-                        }
-                    )
-                indexed_in_batch = len(batch) - len(item_errors)
-                total_indexed += indexed_in_batch
-            except Exception as exc:
-                logger.exception(
-                    "reindex_type(%s) bulk request failed on batch %s (%d records): %s. Record IDs: %s",
-                    target_type,
-                    batch_label,
-                    len(batch),
-                    exc,
-                    doc_ids[:10],
-                )
-                failed_batches.append(
-                    {
-                        "batch": batch_idx,
-                        "batch_label": batch_label,
-                        "error_type": "bulk_exception",
-                        "doc_ids": doc_ids,
-                        "error": str(exc),
-                    }
-                )
-
-        # Always refresh the index so successfully indexed documents are searchable and not lost
-        if total_indexed > 0:
-            try:
-                await es.indices.refresh(index=INDEX_NAME)
+                await es.indices.delete(index=name)
             except Exception:
-                logger.warning(
-                    "Failed to refresh index %s after reindex_type(%s)",
-                    INDEX_NAME,
+                logger.warning("old index %s could not be removed after alias switch", name, exc_info=True)
+        return old
+    if not await es.indices.exists(index=INDEX_NAME):
+        await es.indices.put_alias(index=new_index, name=INDEX_NAME)
+        return []
+    # Legacy concrete index under the alias name: remove it in the same atomic
+    # request that creates the alias, so the name never resolves to nothing.
+    await es.indices.update_aliases(
+        body={
+            "actions": [
+                {"remove_index": {"index": INDEX_NAME}},
+                {"add": {"index": new_index, "alias": INDEX_NAME}},
+            ]
+        }
+    )
+    return [INDEX_NAME]
+
+
+async def delete_physical_index(name: str) -> None:
+    try:
+        await get_es().indices.delete(index=name)
+    except NotFoundError:
+        pass
+
+
+async def _shadow_index() -> str | None:
+    """Target of an in-progress full rebuild, if any. Redis errors are logged
+    and ignored: the rebuild's catch-up pass re-reads changed records anyway."""
+    try:
+        import redis.asyncio as redis_async
+
+        client = redis_async.from_url(settings.redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
+        try:
+            value = await client.get(SHADOW_INDEX_KEY)
+        finally:
+            await client.aclose()
+        return str(value) if value else None
+    except Exception as exc:
+        logger.warning("could not read reindex shadow index: %s", exc)
+        return None
+
+
+def _ndjson_line(data: dict[str, Any]) -> bytes:
+    return json.dumps(data, ensure_ascii=False, default=str).encode("utf-8") + b"\n"
+
+
+def _bulk_chunks(
+    target_type: str, docs: list[tuple[str, dict[str, Any]]], max_bytes: int, index: str
+) -> Iterator[tuple[list[bytes], list[str]]]:
+    """Serialize docs once and group them into request bodies of at most
+    ``max_bytes`` (a single larger document forms its own request)."""
+    lines: list[bytes] = []
+    ids: list[str] = []
+    size = 0
+    for doc_id, body in docs:
+        action = _ndjson_line({"index": {"_index": index, "_id": doc_id}})
+        source = _ndjson_line({"record_type": target_type, **body})
+        item_size = len(action) + len(source)
+        if lines and size + item_size > max_bytes:
+            yield lines, ids
+            lines, ids, size = [], [], 0
+        lines += [action, source]
+        ids.append(doc_id)
+        size += item_size
+    if lines:
+        yield lines, ids
+
+
+async def bulk_index_documents(
+    es: AsyncElasticsearch,
+    target_type: str,
+    docs: list[tuple[str, dict[str, Any]]],
+    *,
+    max_bytes: int | None = None,
+    index: str = INDEX_NAME,
+) -> tuple[int, list[str]]:
+    """Index docs (overwriting by id) in byte-bounded _bulk requests.
+    Returns (indexed count, failed ids).
+
+    Used by the streaming bulk reindex, which overwrites documents in place
+    instead of deleting the whole type first — the portal keeps serving the
+    previous state of a record until its new document lands.
+    """
+    limit = max_bytes or settings.es_bulk_max_bytes
+    indexed = 0
+    failed: list[str] = []
+    for lines, ids in _bulk_chunks(target_type, docs, limit, index):
+        try:
+            # Pre-serialized NDJSON lines are forwarded unchanged by the client.
+            resp = await es.bulk(operations=cast(Any, lines), refresh=False)
+        except Exception as exc:
+            logger.exception(
+                "bulk index for '%s' failed (%d docs, %d bytes): %s",
+                target_type,
+                len(ids),
+                sum(len(line) for line in lines),
+                exc,
+            )
+            failed.extend(ids)
+            continue
+        chunk_failed = 0
+        for item in resp.get("items", []):
+            info = item.get("index", {})
+            if "error" in info:
+                chunk_failed += 1
+                failed.append(str(info.get("_id", "")))
+                logger.error(
+                    "bulk index item error for %s/%s: %s",
                     target_type,
-                    exc_info=True,
+                    info.get("_id"),
+                    info["error"],
                 )
+        indexed += len(ids) - chunk_failed
+    return indexed, failed
 
-        if failed_batches and raise_on_error:
-            failed_count = sum(len(fb["doc_ids"]) for fb in failed_batches)
-            details = "; ".join(
-                f"Batch {fb['batch_label']} ({len(fb['doc_ids'])} records, e.g. {fb['doc_ids'][:3]}): {fb['error']}"
-                for fb in failed_batches
-            )
-            msg = (
-                f"Reindex for '{target_type}' completed with failures: "
-                f"{len(failed_batches)} batch(es) failed ({failed_count} records not indexed). "
-                f"{total_indexed} records successfully indexed. Details: {details}"
-            )
-            raise ReindexBatchError(
-                msg,
-                target_type=target_type,
-                failed_batches=failed_batches,
-                indexed_count=total_indexed,
-            )
 
-        return total_indexed
-    finally:
-        await es.close()
+async def delete_documents(
+    es: AsyncElasticsearch, doc_ids: Iterable[str], *, index: str = INDEX_NAME
+) -> int:
+    """Delete documents by id (missing ids are ignored). Returns deleted count."""
+    ids = list(doc_ids)
+    deleted = 0
+    for batch in itertools.batched(ids, 1000, strict=False):
+        resp = await es.delete_by_query(
+            index=index, body={"query": {"ids": {"values": list(batch)}}}, refresh=False
+        )
+        deleted += int(resp.get("deleted", 0))
+    return deleted
 
 
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
     es = get_es()
     await es.index(index=INDEX_NAME, id=doc_id, body=body, refresh=True)
+    if shadow := await _shadow_index():
+        try:
+            await es.index(index=shadow, id=doc_id, body=body, refresh=False)
+        except Exception:
+            logger.warning("shadow write to %s failed for %s", shadow, doc_id, exc_info=True)
 
 
 async def count_by_type(record_type: str) -> int:
@@ -365,16 +434,19 @@ async def iter_hits_by_type(
 
 async def delete_document(doc_id: str) -> None:
     es = get_es()
-    try:
-        await es.delete(index=INDEX_NAME, id=doc_id)
-    except NotFoundError:
-        pass
+    for index in (INDEX_NAME, await _shadow_index()):
+        if index is None:
+            continue
+        try:
+            await es.delete(index=index, id=doc_id)
+        except NotFoundError:
+            pass
 
 
 async def search_documents(
     query: str | None,
     record_type: str | None,
-    status: str | None,
+    status: str | tuple[str, ...] | None,
     from_: int,
     size: int,
     extra_filters: dict[str, list[str]] | None = None,
@@ -388,8 +460,16 @@ async def search_documents(
     facet_sort: str = "count",
     sort: str | None = None,
     full_visibility_types: tuple[str, ...] | None = None,
+    facet_specs: dict[str, tuple[str, str, str]] | None = None,
+    tree_aggs: dict[str, tuple[str, str, list[str]]] | None = None,
 ) -> dict[str, Any]:
+    """``facet_specs`` maps a facet name to (filter field, aggregation field,
+    kind) for facets whose index fields differ from facet_all_<name> (date
+    buckets, vocabulary paths, relation facets; see services/facet_service).
+    ``tree_aggs`` maps an aggregation key to (facet name, field, term ids):
+    counts for exactly those ids, e.g. the children of one expanded node."""
     es = get_es()
+    specs = facet_specs or {}
 
     must: list[dict[str, Any]] = []
     # Filters that narrow every facet's own aggregation too, including itself
@@ -424,7 +504,11 @@ async def search_documents(
         # Security-enforced status (e.g. anonymous callers locked to "public") is
         # never excluded from its own aggregation — unlike status_facet below, it
         # must not leak counts for statuses the caller is not allowed to see.
-        base_filters.append({"term": {"status": status}})
+        base_filters.append(
+            {"terms": {"status": list(status)}}
+            if isinstance(status, tuple)
+            else {"term": {"status": status}}
+        )
     if full_visibility_types is not None:
         # Every hit must be either publicly visible, or of a record_type the
         # caller has an explicit read permission for (see
@@ -444,6 +528,8 @@ async def search_documents(
         # Direct fields aggregate against facet_all_* (present for every public
         # field, so is_facet toggles need no reindex). inherited_* facets keep
         # their legacy top-level facet_* document fields.
+        if field in specs:
+            return specs[field][0]
         return f"facet_{field}" if field.startswith("inherited_") else f"facet_all_{field}"
 
     # Exclusion-aware facet filters: each is additive (multi-select, OR within the
@@ -522,6 +608,16 @@ async def search_documents(
         if field in RELATED_FACET_NAMES:
             aggs[field] = _self_excluding_agg(field, field, 30, {"_count": "desc"})
             continue
+        kind = specs[field][2] if field in specs else "terms"
+        if kind == "tree":
+            continue  # counted per node via tree_aggs
+        if kind == "date":
+            # Chronological, and enough buckets for every year of a few centuries.
+            aggs[f"meta_{field}"] = _self_excluding_agg(specs[field][1], field, 500, {"_key": "asc"})
+            continue
+        if kind == "relation":
+            aggs[f"meta_{field}"] = _self_excluding_agg(specs[field][1], field, 100, facet_order)
+            continue
         aggs[f"meta_{field}"] = _self_excluding_agg(_facet_doc_field(field), field, 100, facet_order)
         numeric_aggregation_filters = [
             value for name, value in numeric_facet_filters.items() if name != field
@@ -545,6 +641,13 @@ async def search_documents(
             },
         }
 
+    for agg_key, (facet_name, terms_field, ids) in (tree_aggs or {}).items():
+        if not ids:
+            continue
+        agg = _self_excluding_agg(terms_field, facet_name, len(ids), {"_count": "desc"})
+        agg["aggs"]["filtered"]["aggs"]["values"]["terms"]["include"] = ids
+        aggs[agg_key] = agg
+
     SORT_CLAUSES: dict[str, list[dict[str, Any]]] = {
         "idno_asc": [{"idno.keyword": "asc"}],
         "title_asc": [{"title.raw": "asc"}],
@@ -567,6 +670,8 @@ async def search_documents(
             result = await es.search(index=INDEX_NAME, body=query_body)
         except BadRequestError as exc:
             from fastapi import HTTPException
+
+            logger.info("search rejected by Elasticsearch: %s", exc)
 
             raise HTTPException(
                 status_code=422, detail="Die Suchanfrage enthält ungültige Suchsyntax."
@@ -625,11 +730,11 @@ async def search_ids_by_filter(
     es = get_es()
     filters: list[dict[str, Any]] = [
         {"term": {"record_type": record_type}},
-        {"term": {"status": "public"}},
+        {"terms": {"status": list(PUBLIC_STATUSES)}},
         advanced_filter,
     ]
     result = await es.search(
-        index=ALIAS_NAME,
+        index=INDEX_NAME,
         body={
             "query": {"bool": {"filter": filters}},
             "_source": False,

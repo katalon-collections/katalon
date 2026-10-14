@@ -3,11 +3,22 @@
 
 import json
 import uuid
+from collections.abc import Iterable
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import AuditLog
+from katalon.core.models import (
+    AuditLog,
+    Collection,
+    Entity,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+    StorageLocation,
+)
 from katalon.core.schemas import RECORD_TYPES
 
 _LOGGABLE_RECORD_TYPES: frozenset[str] = frozenset(RECORD_TYPES)
@@ -57,6 +68,44 @@ def delete_label_fields(idno: str | None, metadata: dict[str, Any] | None) -> di
     if title:
         fields["title"] = title
     return fields
+
+
+async def resolve_record_labels(
+    db: AsyncSession, refs: Iterable[tuple[str, uuid.UUID]]
+) -> dict[uuid.UUID, str]:
+    """Fetch display labels ("title (idno)") for (record_type, record_id) pairs."""
+    by_type: dict[str, list[uuid.UUID]] = {}
+    for record_type, record_id in refs:
+        by_type.setdefault(record_type, []).append(record_id)
+
+    labels: dict[uuid.UUID, str] = {}
+
+    for record_type, model in (
+        ("object", Object),
+        ("entity", Entity),
+        ("place", Place),
+        ("occurrence", Occurrence),
+        ("collection", Collection),
+        ("storage_location", StorageLocation),
+    ):
+        if record_type not in by_type:
+            continue
+        result = await db.execute(
+            select(model.id, model.idno, model.metadata_).where(model.id.in_(by_type[record_type]))
+        )
+        for id_, idno, md in result.all():
+            labels[id_] = format_label(extract_title(md), idno, str(id_)[:8])
+
+    if "procedure" in by_type:
+        result = await db.execute(
+            select(Procedure.id, Procedure.idno, Procedure.reference_number).where(
+                Procedure.id.in_(by_type["procedure"])
+            )
+        )
+        for id_, idno, reference_number in result.all():
+            labels[id_] = idno or reference_number or str(id_)[:8]
+
+    return labels
 
 
 def collapse_value(value: object) -> object | None:

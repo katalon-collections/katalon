@@ -17,6 +17,7 @@ from katalon.core.dependencies import (
     require_feature,
 )
 from katalon.core.schemas import RECORD_TYPES
+from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services import export_service, metadata_format_service
 from katalon.services.metadata_mapping_service import mapped_record_types
 
@@ -154,7 +155,7 @@ async def export_single_record_route(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     has_perm = await has_record_permission(db, current_user, norm_type, "read") if current_user else False
-    if not has_perm and ctx.record.status != "public":
+    if not has_perm and ctx.record.status not in PUBLIC_STATUSES:
         raise HTTPException(status_code=404, detail=f"{norm_type.capitalize()} nicht gefunden")
 
     from katalon.integrations.metadata_format import CompiledMappingSet

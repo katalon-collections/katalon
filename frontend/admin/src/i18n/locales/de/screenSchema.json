@@ -130,7 +130,7 @@
     "showInList": "In Listenansicht zeigen",
     "isPublic": "Öffentlich über APIs ausgeben",
     "isFacet": "Als Facette verwenden",
-    "isFacetDisabledHint": "Nur verfügbar, wenn „In Detailansicht zeigen” aktiv ist.",
+    "isFacetDisabledHint": "Nur für öffentliche Felder verfügbar.",
     "systemLabelHint": "Systemfeld: Dieses Feld wird immer im Bereich „Stammdaten” angezeigt, unabhängig von diesen Einstellungen.",
     "systemFieldBadge": "System",
     "isSearchable": "In Suche einbeziehen",
@@ -193,7 +193,13 @@
     "pidProvider": "PID-Anbieter",
     "pidProviderDnbUrn": "URN (Deutsche Nationalbibliothek)",
     "pidProviderArk": "ARK (lokal vergeben)",
-    "pidProviderHint": "PIDs werden ausschließlich über „Reservieren“ oder automatisch beim Veröffentlichen vergeben – manuelle Eingabe ist nicht möglich."
+    "pidProviderHint": "PIDs werden ausschließlich über „Reservieren“ oder automatisch beim Veröffentlichen vergeben – manuelle Eingabe ist nicht möglich.",
+    "facetGranularity": "Gruppierung als Portal-Facette",
+    "facetGranularityNone": "Keine (Datum nicht gruppieren)",
+    "facetGranularityDecade": "Dekade",
+    "facetGranularityCentury": "Jahrhundert",
+    "facetGranularityYear": "Jahr",
+    "facetGranularityHint": "Wirkt, wenn das Feld als Facette aktiv ist. Intervalle zählen in jedem überdeckten Zeitraum, sehr lange (über 50 Jahre) nur am Anfang und Ende. Eine Änderung baut den Suchindex neu auf."
   },
   "subFieldForm": {
     "internalName": "Interner Name",

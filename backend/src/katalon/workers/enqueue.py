@@ -79,6 +79,8 @@ def enqueue_or_503(task: Any, *args: Any, **kwargs: Any) -> str:
 def after_commit(db: AsyncSession, task: Any, *args: Any, **kwargs: Any) -> None:
     """Defer ``enqueue(task, *args, **kwargs)`` until ``db``'s transaction commits.
 
+    ``task`` is a Celery task or a plain callable that does its own enqueueing.
+
     Appends to a plain list on ``db.info`` — no broker interaction happens
     here, so this can never itself turn a write into a 500. Draining
     (``run_after_commit_hooks``) only happens where the caller has just
@@ -101,7 +103,20 @@ async def run_after_commit_hooks(db: AsyncSession) -> None:
     if not hooks:
         return
     for task, args, kwargs in hooks:
-        enqueue(task, *args, **kwargs)
+        if hasattr(task, "delay"):
+            enqueue(task, *args, **kwargs)
+            continue
+        # Plain callables (e.g. reindex_state.request_bulk_reindex, which
+        # coalesces before enqueueing) get the same never-break-the-request
+        # treatment as a broker error.
+        try:
+            task(*args, **kwargs)
+        except Exception:
+            logger.warning(
+                "after-commit hook %s failed — continuing",
+                getattr(task, "__name__", task),
+                exc_info=True,
+            )
 
 
 def discard_after_commit_hooks(db: AsyncSession) -> None:

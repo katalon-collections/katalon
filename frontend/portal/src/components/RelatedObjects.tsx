@@ -4,9 +4,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ObjectSummary, Relation } from '../api/client'
+import { usePortalConfig } from '../hooks/usePortalConfig'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
-import { useI18n } from '../i18n'
+import { typeLabel, useI18n } from '../i18n'
+import { matchRelationFacet, relationFacetHref, resolveLabel as resolveText, type RelationFacetConfig } from '../utils/facets'
 import { recordTitle } from '../utils/renderFieldValue'
+import { LazyImage } from './LazyImage'
 
 interface Props {
   objects: ObjectSummary[]
@@ -14,11 +17,24 @@ interface Props {
   currentId: string
   thumbnails: Record<string, string>
   resolveLabel: (code: string, isFrom: boolean) => string
+  /** Type of the current record: enables links to the object search filtered by
+   *  a relation facet ("postcards with this person as composer"). */
+  recordType?: string
 }
 
-export function RelatedObjects({ objects, relations, currentId, thumbnails, resolveLabel }: Props) {
+export function RelatedObjects({ objects, relations, currentId, thumbnails, resolveLabel, recordType }: Props) {
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const { t, locale } = useI18n()
+  const portalConfig = usePortalConfig()
+  const facetLinks = recordType
+    ? [...new Map(
+      relations
+        .filter(r => r.from_type === 'object' && r.to_id === currentId)
+        .map(r => matchRelationFacet(portalConfig.relation_facets?.object, recordType, r.relation_type, 'outgoing'))
+        .filter((facet): facet is RelationFacetConfig => !!facet)
+        .map(facet => [facet.key, facet]),
+    ).values()]
+    : []
   const subtypePlaceholder = useSubtypePlaceholder('object')
 
   useEffect(() => setSelectedType(null), [currentId])
@@ -37,6 +53,15 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
   return (
     <section style={{ marginTop: 8 }}>
       <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{t('common.relatedObjects')}</h2>
+      {facetLinks.length > 0 && (
+        <div className="rel-facet-links">
+          {facetLinks.map(facet => (
+            <Link key={facet.key} className="tag tag-link" to={relationFacetHref('object', facet, currentId)}>
+              {t('relations.searchByRole', { type: typeLabel('object', { plural: true }), role: resolveText(facet.label, locale, facet.key) })}
+            </Link>
+          ))}
+        </div>
+      )}
       {relationTypes.length > 1 && (
         <div className="relation-filter">
           <button type="button" className="tag relation-filter__chip" aria-pressed={selectedType === null} onClick={() => setSelectedType(null)}>
@@ -64,7 +89,7 @@ export function RelatedObjects({ objects, relations, currentId, thumbnails, reso
               <div className="thumb">
                 {(() => {
                   const src = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
-                  return src ? <img src={src} alt="" loading="lazy" /> : null
+                  return src ? <LazyImage src={src} /> : null
                 })()}
               </div>
               <div className="info">

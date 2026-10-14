@@ -1,0 +1,50 @@
+{
+  "nav": "Fußzeile & Hinweis",
+  "header": {
+    "showTitle": "Titel neben dem Logo in der Kopfzeile anzeigen",
+    "hideHeroTitle": "Titel und Untertitel auf der Startseite ausblenden (das Logo enthält sie)",
+    "hint": "Wirkt nur mit hinterlegtem Logo."
+  },
+  "footer": {
+    "title": "Fußzeile",
+    "hint": "Spalten mit Text (Markdown), Links oder Logos. Ohne Spalten und Fußzeilentext bleibt die einzeilige Standard-Fußzeile.",
+    "addColumn": "Spalte hinzufügen",
+    "columnType": "Spaltentyp",
+    "type": { "text": "Text", "links": "Links", "logos": "Logos" },
+    "columnTitle": "Überschrift",
+    "content": "Text (Markdown)",
+    "moveUp": "Spalte nach oben",
+    "moveDown": "Spalte nach unten",
+    "removeColumn": "Spalte entfernen",
+    "linkLabel": "Linktext",
+    "url": "URL oder Pfad",
+    "urlHint": "https://… für externe Seiten, /page/impressum für Seiten im Portal.",
+    "addLink": "Link hinzufügen",
+    "removeLink": "Link entfernen",
+    "includeFooterPages": "Seiten mit Platzierung „Fußzeile“ anhängen",
+    "logoSrc": "Bild (URL oder Pfad, z. B. /themes/<name>/logo.png)",
+    "logoAlt": "Alternativtext",
+    "logoHref": "Verlinkung (optional)",
+    "upload": "Bild hochladen",
+    "uploading": "Lädt hoch…",
+    "uploadHint": "JPEG, PNG, WebP oder GIF bis 5 MB.",
+    "addLogo": "Logo hinzufügen",
+    "removeLogo": "Logo entfernen",
+    "bottom": "Fußzeilen-Zeile",
+    "bottomText": "Text (Markdown)"
+  },
+  "notice": {
+    "title": "Nutzungshinweis",
+    "hint": "Wird jedem Besucher einmal pro Browser als Dialog gezeigt, bevor das Portal genutzt wird.",
+    "enabled": "Nutzungshinweis anzeigen",
+    "dialogTitle": "Überschrift",
+    "text": "Text (Markdown)",
+    "acceptLabel": "Beschriftung der Schaltfläche",
+    "version": "Version {{version}}",
+    "showAgain": "Allen erneut anzeigen",
+    "showAgainHint": "Erhöht die Version: Auch wer den Hinweis bestätigt hat, sieht ihn nach dem Speichern noch einmal."
+  },
+  "save": "Speichern",
+  "saving": "Speichert…",
+  "saved": "Gespeichert"
+}

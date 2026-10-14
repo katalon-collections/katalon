@@ -16,7 +16,9 @@ from katalon.config import settings
 from katalon.core.dependencies import DBDep
 from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
+from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services import metadata_format_service, oaipmh_service
+from katalon.services.export_context_service import expand_omitted_contexts
 from katalon.services.metadata_mapping_service import (
     get_mapping_index,
     mapped_format_keys,
@@ -67,12 +69,12 @@ async def _es_search_for_oai(
             result = await es.get(index=INDEX_NAME, id=identifier)
         except NotFoundError:
             return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
-        if result.get("found") and result.get("_source", {}).get("status") == "public":
+        if result.get("found") and result.get("_source", {}).get("status") in PUBLIC_STATUSES:
             return {"hits": {"hits": [result], "total": {"value": 1}}, "aggregations": {}}
         return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
 
     # Always restrict OAI-PMH to public records
-    filters.append({"term": {"status": "public"}})
+    filters.append({"terms": {"status": list(PUBLIC_STATUSES)}})
 
     if record_types:
         filters.append({"terms": {"record_type": sorted(record_types)}})
@@ -195,6 +197,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             hits = es_result.get("hits", {}).get("hits", [])
             total = es_result.get("hits", {}).get("total", {}).get("value", 0)
             mapping_index = await get_mapping_index(db, prefix)
+            await expand_omitted_contexts(db, hits)
             xml = oaipmh_service.list_records(
                 hits, total, offset, set_spec, from_, until, prefix, base_url, available[prefix], mapping_index
             )
@@ -287,6 +290,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
             else:
                 mapping_index = await get_mapping_index(db, prefix)
+                await expand_omitted_contexts(db, hits[:1])
                 xml = oaipmh_service.get_record(
                     hits[0], base_url, identifier, prefix, available[prefix], mapping_index
                 )

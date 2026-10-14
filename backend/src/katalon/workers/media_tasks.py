@@ -23,7 +23,7 @@ from katalon.core.media_storage import (
     storage_key,
 )
 from katalon.workers.celery_app import celery_app
-from katalon.workers.enqueue import after_commit, run_after_commit_hooks
+from katalon.workers.enqueue import after_commit, enqueue, run_after_commit_hooks
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,12 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
         if obj is not None:
             await index_record("object", obj, session)
             await run_after_commit_hooks(session)
+        # Pre-render the portal thumbnails so the first visitor gets them from cache.
+        from katalon.core.media_validation import media_category
+        from katalon.workers.thumbnail_tasks import warm_thumbnails
+
+        if media_category(media.mime_type) == "image":
+            enqueue(warm_thumbnails, [str(media.id)])
         return {"status": "ok", "manifest": manifest}
 
 

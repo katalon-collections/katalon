@@ -49,6 +49,7 @@
       "admin": "Administration"
     },
     "nav": {
+      "dashboard": "Overview",
       "list": "Objects",
       "collectionsList": "Collections",
       "entitiesList": "Entities",

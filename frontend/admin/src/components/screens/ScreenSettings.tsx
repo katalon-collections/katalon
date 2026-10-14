@@ -5,7 +5,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, TerminologyEntry } from '../../types'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, RelationFacet, TerminologyEntry } from '../../types'
+import { FacetOrderList, type FacetOrderItem } from './settings/FacetOrderList'
+import { RelationFacetsEditor } from './settings/RelationFacetsEditor'
+import { SectionFooterNotice } from './settings/SectionFooterNotice'
+import { CollectionPicker } from './settings/CollectionPicker'
 import type { TourVariant } from '../tour/Tour'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { LabelEditor } from '../ui/LabelEditor'
@@ -18,7 +22,7 @@ interface Props {
   onStartTour?: (variant: TourVariant) => void
 }
 
-type Section = 'profil' | 'portal' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'papierkorb' | 'gefahrenbereich' | 'ueber'
+type Section = 'profil' | 'portal' | 'fusszeile' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'papierkorb' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
   { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
@@ -286,6 +290,9 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [metaRowLayout, setMetaRowLayout] = useState(config.meta_row_layout ?? 'stacked')
   const [metaLabelUppercase, setMetaLabelUppercase] = useState(config.meta_label_uppercase ?? false)
   const [showIiifManifestLink, setShowIiifManifestLink] = useState(config.show_iiif_manifest_link ?? true)
+  const [headerShowTitle, setHeaderShowTitle] = useState(config.header_show_title ?? true)
+  const [heroHideTitle, setHeroHideTitle] = useState(config.hero_hide_title ?? false)
+  const { t: tLayout } = useTranslation('portalLayout')
   const [lang, setLang] = useState(localStorage.getItem('katalon_lang') ?? 'de')
 
   const ct = config.color_tokens ?? {}
@@ -308,6 +315,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           detail_sidebar_position: detailSidebarPosition,
           meta_row_layout: metaRowLayout,
           meta_label_uppercase: metaLabelUppercase,
+          header_show_title: headerShowTitle,
+          hero_hide_title: heroHideTitle,
           show_iiif_manifest_link: showIiifManifestLink,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
@@ -372,6 +381,15 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
             </div>
             <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 8, opacity: logoUrl ? 1 : 0.6 }}>
+              <input type="checkbox" className="ck" checked={headerShowTitle} onChange={e => setHeaderShowTitle(e.target.checked)} />
+              {tLayout('header.showTitle')}
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 4, opacity: logoUrl ? 1 : 0.6 }}>
+              <input type="checkbox" className="ck" checked={heroHideTitle} onChange={e => setHeroHideTitle(e.target.checked)} />
+              {tLayout('header.hideHeroTitle')}
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{tLayout('header.hint')}</div>
           </div>
           <div className="field">
             <div className="lbl">Platzhalter-Bild <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(für Objekte ohne Bild)</span></div>
@@ -621,15 +639,15 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
                         onChange={e => update(block.id, { collections_mode: e.target.value as HomepageBlock['collections_mode'] })}>
                         <option value="top">{t('startseite.collectionsModeTop')}</option>
                         <option value="all">{t('startseite.collectionsModeAll')}</option>
+                        <option value="largest">{t('startseite.collectionsModeLargest')}</option>
                         <option value="selected">{t('startseite.collectionsModeSelected')}</option>
                       </select>
                     </div>
                     {block.collections_mode === 'selected' ? (
                       <div className="field">
                         <div className="lbl">{t('startseite.collectionIdsLabel')}</div>
-                        <textarea className="fld mono" rows={3} value={(block.collection_ids ?? []).join('\n')}
-                          onChange={e => update(block.id, { collection_ids: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-                          style={{ resize: 'vertical', fontSize: 12 }} />
+                        <CollectionPicker value={block.collection_ids ?? []}
+                          onChange={ids => update(block.id, { collection_ids: ids })} />
                       </div>
                     ) : (
                       <div className="field">
@@ -857,6 +875,23 @@ const RELATED_FACET_DEFS = [
   { name: 'related_collections', label: 'Sammlungen' },
 ] as const
 const RELATED_FACET_NAMES: readonly string[] = RELATED_FACET_DEFS.map(f => f.name)
+const SUBFIELD_SEPARATOR = '__'
+
+/** Group sub-fields that can be facets ("<group>__<child>" in facet_fields). */
+function facetSubfields(fields: FieldDefinition[]): { name: string; group: FieldDefinition; child: FieldDefinition }[] {
+  return fields
+    .filter(f => f.field_type === 'group' && f.is_public)
+    .flatMap(group => (group.children ?? [])
+      .filter(child => child.is_public && child.field_type !== 'group')
+      .map(child => ({ name: `${group.name}${SUBFIELD_SEPARATOR}${child.name}`, group, child })))
+}
+
+/** Configured order first, remaining names in their default order. */
+function applyOrder(names: string[], order: string[] | undefined): string[] {
+  if (!order?.length) return names
+  const head = order.filter(name => names.includes(name))
+  return [...head, ...names.filter(name => !head.includes(name))]
+}
 
 function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
   const [activeType, setActiveType] = useState<string>('object')
@@ -879,6 +914,9 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       return Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, base[key] ?? []]))
     }
   )
+  const [relationFacets, setRelationFacets] = useState<Record<string, RelationFacet[]>>(() => config.relation_facets ?? {})
+  const [facetOrder, setFacetOrder] = useState<Record<string, string[]>>(() => config.facet_order ?? {})
+  const { t: tFacets, i18n } = useTranslation('facetSettings')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -895,7 +933,10 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       setFacetFields(() => {
         const base = config.facet_fields ?? {}
         return Object.fromEntries(RECORD_TYPES.map(({ key }) => {
-          const direct = (byType[key] ?? []).filter(f => f.is_facet && f.show_in_detail).map(f => f.name)
+          const direct = [
+            ...(byType[key] ?? []).filter(f => f.is_facet && f.is_public).map(f => f.name),
+            ...facetSubfields(byType[key] ?? []).filter(sub => sub.child.is_facet).map(sub => sub.name),
+          ]
           const inherited = (base[key] ?? []).filter(name => name.startsWith('inherited_') || RELATED_FACET_NAMES.includes(name))
           return [key, [...direct, ...inherited]]
         }))
@@ -947,6 +988,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       // Inherited facets (from relation settings) have no FieldDefinition row,
       // so they are still stored in portal_config.facet_fields.
       const schemaUpdates: Promise<unknown>[] = []
+      const changedByType: Record<string, FieldDefinition[]> = {}
       const inheritedToSave: Record<string, string[]> = { _system: systemFacets }
       const subtitleToSave: Record<string, string[]> = {}
 
@@ -956,12 +998,21 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
         for (const f of fieldsByType[key] ?? []) {
           const shouldBeFacet = selected.includes(f.name)
-          if (f.is_facet !== shouldBeFacet) {
-            const { id, ...payload } = f
+          if (f.field_type !== 'group' && f.is_facet !== shouldBeFacet) {
+            const payload = { ...f, is_facet: shouldBeFacet }
             delete payload.children
-            schemaUpdates.push(schema.update(id, { ...payload, is_facet: shouldBeFacet }))
+            ;(changedByType[key] ??= []).push(payload)
           }
         }
+        for (const sub of facetSubfields(fieldsByType[key] ?? [])) {
+          const shouldBeFacet = selected.includes(sub.name)
+          if (sub.child.is_facet !== shouldBeFacet) {
+            const payload = { ...sub.child, is_facet: shouldBeFacet }
+            delete payload.children
+            ;(changedByType[key] ??= []).push(payload)
+          }
+        }
+        if (changedByType[key]?.length) schemaUpdates.push(schema.bulkUpdate(key, changedByType[key]))
 
         // Subtitle fields may only reference the system pseudo-fields (record_type,
         // status, idno — always resolvable, idno has no FieldDefinition/facet) or a
@@ -989,7 +1040,11 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
             const selected = facetFields[key] ?? []
             next[key] = (prev[key] ?? []).map(f => ({
               ...f,
-              is_facet: selected.includes(f.name),
+              is_facet: f.field_type === 'group' ? f.is_facet : selected.includes(f.name),
+              children: f.children?.map(child => ({
+                ...child,
+                is_facet: selected.includes(`${f.name}${SUBFIELD_SEPARATOR}${child.name}`),
+              })),
             }))
           }
           return next
@@ -1003,6 +1058,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           subtitle_fields: subtitleToSave,
           facet_sort: facetSort,
           facet_initial_count: facetInitialCount,
+          relation_facets: Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, relationFacets[key] ?? []])),
+          facet_order: Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, orderItemsFor(key).map(item => item.name)])),
         }),
       })
 
@@ -1012,7 +1069,41 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
     finally { setSaving(false) }
   }
 
-  const fields = (fieldsByType[activeType] ?? []).filter(f => f.show_in_detail)
+  function orderItemsFor(type: string): FacetOrderItem[] {
+    const lang = i18n.language?.slice(0, 2) || 'de'
+    const typeFields = fieldsByType[type] ?? []
+    const subfields = facetSubfields(typeFields)
+    const inherited = inheritedFacetFieldsFor(type)
+    const kinds = config.facet_kinds?.[type] ?? {}
+    const items: FacetOrderItem[] = (facetFields[type] ?? []).map(name => {
+      const field = typeFields.find(f => f.name === name)
+      const sub = subfields.find(s => s.name === name)
+      const def = field ?? sub?.child
+      const label = sub
+        ? tFacets('subfield', { group: sub.group.label?.[lang] || sub.group.label?.de || sub.group.name, field: sub.child.label?.[lang] || sub.child.label?.de || sub.child.name })
+        : field
+          ? field.label?.[lang] || field.label?.de || field.label?.en || name
+          : RELATED_FACET_DEFS.find(r => r.name === name)?.label ?? inherited.find(i => i.name === name)?.label ?? name
+      const kind: FacetOrderItem['kind'] = RELATED_FACET_NAMES.includes(name)
+        ? 'related'
+        : name.startsWith('inherited_')
+          ? 'inherited'
+          : def?.field_type === 'date' && def.settings?.facet_granularity
+            ? 'date'
+            : kinds[name]?.kind === 'tree'
+              ? 'tree'
+              : 'field'
+      return { name, label, kind }
+    })
+    for (const facet of relationFacets[type] ?? []) {
+      items.push({ name: `relfacet_${facet.key}`, label: facet.label?.[lang] || facet.label?.de || facet.key, kind: 'relation' })
+    }
+    const ordered = applyOrder(items.map(item => item.name), facetOrder[type])
+    return ordered.map(name => items.find(item => item.name === name)!)
+  }
+
+  const fields = (fieldsByType[activeType] ?? []).filter(f => f.is_public && f.field_type !== 'group')
+  const subfields = facetSubfields(fieldsByType[activeType] ?? [])
   const selected = facetFields[activeType] ?? []
   const inheritedFacetFields = inheritedFacetFieldsFor(activeType)
   const subtitleSelected = subtitleFields[activeType] ?? []
@@ -1113,6 +1204,23 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
               </label>
             ))}
+            {subfields.map(sub => (
+              <label key={sub.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  className="ck"
+                  checked={selected.includes(sub.name)}
+                  onChange={() => toggle(activeType, sub.name)}
+                />
+                <span style={{ flex: 1 }}>
+                  {tFacets('subfield', {
+                    group: sub.group.label?.de || sub.group.label?.en || sub.group.name,
+                    field: sub.child.label?.de || sub.child.label?.en || sub.child.name,
+                  })}
+                </span>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{sub.name}</span>
+              </label>
+            ))}
             {inheritedFacetFields.length > 0 && (
               <>
                 <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
@@ -1150,6 +1258,29 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           </div>
         </div>
       )}
+
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>{tFacets('relations.title')}</h4>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{tFacets('relations.hint')}</p>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="bd">
+          <RelationFacetsEditor
+            recordType={activeType}
+            value={relationFacets[activeType] ?? []}
+            onChange={next => setRelationFacets(prev => ({ ...prev, [activeType]: next }))}
+          />
+        </div>
+      </div>
+
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>{tFacets('order.title')}</h4>
+      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{tFacets('order.hint')}</p>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="bd">
+          <FacetOrderList
+            items={orderItemsFor(activeType)}
+            onChange={names => setFacetOrder(prev => ({ ...prev, [activeType]: names }))}
+          />
+        </div>
+      </div>
 
       <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>Ergebnis-Untertitel</h4>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
@@ -2220,10 +2351,11 @@ function SectionAutoPurge() {
   )
 }
 
-const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string }[] = [
+const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string; i18nKey?: string }[] = [
   { id: 'profil',   label: 'Profil' },
   { id: 'ueber',    label: 'Über Katalon' },
   { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
+  { id: 'fusszeile', label: 'Fußzeile & Hinweis', adminOnly: true, i18nKey: 'portalLayout:nav' },
   { id: 'startseite', label: 'Startseite', adminOnly: true },
   { id: 'terminologie', label: 'Terminologie', adminOnly: true },
   { id: 'facetten', label: 'Facetten', adminOnly: true },
@@ -2248,6 +2380,8 @@ function initialSection(): Section {
 
 export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: Props) {
   const [section, setSection] = useState<Section>(initialSection)
+  const { t: tNav } = useTranslation()
+  const navLabel = (n: (typeof NAV)[number]) => (n.i18nKey ? tNav(n.i18nKey) : n.label)
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
   const [sparqlStatus, setSparqlStatus] = useState<SparqlStatus | null>(null)
   const [loading, setLoading] = useState(isAdmin)
@@ -2285,7 +2419,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
               setSection(n.id)
               window.history.replaceState(null, '', `#settings/${n.id}`)
             }}>
-              {n.label}
+              {navLabel(n)}
             </button>
           ))}
         </div>
@@ -2303,7 +2437,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
               window.history.replaceState(null, '', `#settings/${next}`)
             }}
           >
-            {navItems.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+            {navItems.map(n => <option key={n.id} value={n.id}>{navLabel(n)}</option>)}
           </select>
         </div>
 
@@ -2314,6 +2448,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
           {!loading && section === 'ueber' && <SectionUeber />}
           {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && config && section === 'fusszeile' && <SectionFooterNotice config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'startseite' && <SectionStartseite config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'terminologie' && <SectionTerminologie config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'facetten' && <SectionFacetten config={config} onSaved={setConfig} />}

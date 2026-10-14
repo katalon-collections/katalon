@@ -10,13 +10,27 @@ import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow } from './RelationFieldRow'
-import { api, type VocabTerm } from '../api/client'
+import { api, type FacetKind, type VocabTerm } from '../api/client'
+import { dateBucketOf } from '../utils/facets'
 
 /** Search-page link for one facet value of a field marked `is_facet`, scoped to the
  *  record's own type. Numeric fields use the range filter (exact value as both bounds);
  *  everything else uses the single-value metadata filter. */
-export function facetHref(recordType: string, field: Pick<FieldDefinition, 'name' | 'field_type'>, raw: string): string {
-  const encoded = encodeURIComponent(raw)
+export function facetHref(
+  recordType: string,
+  field: Pick<FieldDefinition, 'name' | 'field_type'>,
+  raw: string,
+  kind?: FacetKind,
+  id?: string,
+): string {
+  // Hierarchical vocabulary facets filter by term id (incl. narrower terms),
+  // date facets by the value's bucket (decade/century/year).
+  const value = kind?.kind === 'tree' && id
+    ? id
+    : kind?.kind === 'date'
+      ? dateBucketOf(raw, kind.granularity) ?? raw
+      : raw
+  const encoded = encodeURIComponent(value)
   const query = field.field_type === 'number'
     ? `range_${field.name}_from=${encoded}&range_${field.name}_to=${encoded}`
     : `meta_${field.name}=${encoded}`
@@ -161,6 +175,77 @@ function AiDisclosureNote({ model, at, locale }: { model: string; at: string; lo
   )
 }
 
+/** Renders one sub-field value of a group entry: facet links for sub-fields marked
+ *  `is_facet` (filtered as `<group>__<child>`), external links for url/authority/pid,
+ *  formatted text otherwise. Returns null when the entry has no value for it. */
+function GroupChildValue({ group, child, value, locale, recordType, vocabularyLabels }: { group: FieldDefinition; child: FieldDefinition; value: unknown; locale: string; recordType: string; vocabularyLabels: ReadonlyMap<string, string> }) {
+  const facetKinds = usePortalConfig().facet_kinds
+  if (child.is_facet) {
+    const items = facetItems(value, locale, child.field_type, vocabularyLabels)
+    if (items.length === 0) return null
+    const facetField = { name: `${group.name}__${child.name}`, field_type: child.field_type }
+    const kind = facetKinds?.[recordType]?.[facetField.name]
+    return <>{items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, facetField, item.raw, kind, item.id)} style={{ marginRight: 4 }}>{item.display}</Link>)}</>
+  }
+  const entries = child.field_type === 'url' || child.field_type === 'authority' || child.field_type === 'pid'
+    ? (Array.isArray(value) ? value : [value])
+    : [value]
+  const nodes = entries.map((entry, i) => {
+    const rendered = renderFieldValue(entry, locale, child.field_type, vocabularyLabels)
+    if (!rendered) return null
+    const href = child.field_type === 'url'
+      ? urlHref(entry)
+      : child.field_type === 'authority'
+        ? authorityUrl(entry)
+        : child.field_type === 'pid'
+          ? pidUrl(entry)
+          : undefined
+    return <Fragment key={i}>{i > 0 && ', '}{href ? <a href={href} target="_blank" rel="noreferrer">{rendered}</a> : rendered}</Fragment>
+  }).filter(Boolean)
+  return nodes.length > 0 ? <>{nodes}</> : null
+}
+
+/** One line per group entry: "Sub-field: value · Sub-field: value"; a group with a
+ *  single visible sub-field shows the value alone. Returns null without any value. */
+function groupEntryLines(group: FieldDefinition, children: FieldDefinition[], value: unknown, locale: string, recordType: string, vocabularyLabels: ReadonlyMap<string, string>): ReactNode[] {
+  if (children.length === 0) return []
+  const entries = (Array.isArray(value) ? value : [value])
+    .filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+  return entries.flatMap((entry, index) => {
+    const parts = children.flatMap(child => {
+      const raw = entry[child.name]
+      if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return []
+      if (child.field_type !== 'boolean' && !renderFieldValue(raw, locale, child.field_type, vocabularyLabels)) return []
+      return [{ child, node: <GroupChildValue group={group} child={child} value={raw} locale={locale} recordType={recordType} vocabularyLabels={vocabularyLabels} /> }]
+    })
+    if (parts.length === 0) return []
+    return [
+      <div key={index} className="group-entry">
+        {parts.map(({ child, node }, i) => (
+          <Fragment key={child.name}>
+            {i > 0 && <span className="group-sep" aria-hidden="true"> · </span>}
+            {children.length > 1 && <span className="group-key">{fieldLabel(child, locale)}: </span>}
+            {node}
+          </Fragment>
+        ))}
+      </div>,
+    ]
+  })
+}
+
+/** Sidebar row for a group field, for pages that render their fields themselves. */
+export function GroupMetaRow({ field, fieldDefs, value, locale, recordType }: { field: FieldDefinition; fieldDefs: FieldDefinition[]; value: unknown; locale: string; recordType: string }) {
+  const children = fieldDefs.filter(f => f.parent_id === field.id && f.show_in_detail)
+  const lines = groupEntryLines(field, children, value, locale, recordType, new Map())
+  if (lines.length === 0) return null
+  return (
+    <div className="meta-row">
+      <span className="key">{fieldLabel(field, locale)}</span>
+      <span className="val">{lines}</span>
+    </div>
+  )
+}
+
 export function richText(value: string): ReactNode {
   return (
     <div className="prose" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }} />
@@ -168,13 +253,27 @@ export function richText(value: string): ReactNode {
 }
 
 /** A field placed in the main column: labeled block, markdown for richtext fields. */
-function MainField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string> }) {
+function MainField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels, groupChildren }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string>; groupChildren: FieldDefinition[] }) {
+  const facetKinds = usePortalConfig().facet_kinds
+  if (field.field_type === 'group') {
+    const lines = groupEntryLines(field, groupChildren, value, locale, recordType, vocabularyLabels)
+    if (lines.length === 0) return null
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
+          {fieldLabel(field, locale)}
+        </div>
+        <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>{lines}</div>
+      </div>
+    )
+  }
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
   }
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type, vocabularyLabels)
     if (items.length === 0) return null
+    const kind = facetKinds?.[recordType]?.[field.name]
     return (
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
@@ -182,7 +281,7 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
           {aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, field, item.raw)}>{item.display}</Link>)}
+          {items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, field, item.raw, kind, item.id)}>{item.display}</Link>)}
         </div>
       </div>
     )
@@ -213,14 +312,26 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
 }
 
 /** A field placed in the sidebar: compact key/value row. */
-function SidebarField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string> }) {
+function SidebarField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels, groupChildren }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string>; groupChildren: FieldDefinition[] }) {
+  const facetKinds = usePortalConfig().facet_kinds
+  if (field.field_type === 'group') {
+    const lines = groupEntryLines(field, groupChildren, value, locale, recordType, vocabularyLabels)
+    if (lines.length === 0) return null
+    return (
+      <div className="meta-row">
+        <span className="key">{fieldLabel(field, locale)}</span>
+        <span className="val">{lines}</span>
+      </div>
+    )
+  }
   if (field.field_type === 'relation') {
     return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
   }
   const label = <>{fieldLabel(field, locale)}{aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}</>
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type, vocabularyLabels)
-    return <MetaRow label={label} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw) }))} />
+    const kind = facetKinds?.[recordType]?.[field.name]
+    return <MetaRow label={label} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw, kind, item.id) }))} />
   }
   const rendered = renderFieldValue(value, locale, field.field_type, vocabularyLabels)
   const href = field.field_type === 'url'
@@ -268,7 +379,16 @@ export function DetailPageLayout({
   const { meta_label_uppercase } = usePortalConfig()
   const vocabularyLabels = useVocabularyLabels(recordType, fieldDefs, metadata, locale)
   const resolveRelationType = useRelationTypeLabels(locale)
-  const detailFields = fieldDefs.filter(f => f.show_in_detail)
+  // Sub-fields of groups are rendered inside their group, never as top-level fields.
+  const groupChildren = useMemo(() => {
+    const byParent = new Map<string, FieldDefinition[]>()
+    for (const f of fieldDefs) {
+      if (!f.parent_id || !f.show_in_detail) continue
+      byParent.set(f.parent_id, [...(byParent.get(f.parent_id) ?? []), f])
+    }
+    return byParent
+  }, [fieldDefs])
+  const detailFields = fieldDefs.filter(f => f.show_in_detail && !f.parent_id)
   const descriptionField = detailFields.find(f => f.detail_role === 'description')
   const description = descriptionField
     ? renderFieldValue(metadata[descriptionField.name], locale, descriptionField.field_type, vocabularyLabels)
@@ -290,13 +410,14 @@ export function DetailPageLayout({
         aiProvenance: aiProvenance?.[f.name],
         resolveRelationType,
         vocabularyLabels,
+        groupChildren: groupChildren.get(f.id) ?? [],
       }),
     }))
 
   const sidebar = (
     <aside className={`detail-meta${metaRowLayout === 'inline' ? ' detail-meta--inline' : ''}`}>
       {sidebarBefore}
-      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} resolveRelationType={resolveRelationType} vocabularyLabels={vocabularyLabels} />)}
+      {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} resolveRelationType={resolveRelationType} vocabularyLabels={vocabularyLabels} groupChildren={groupChildren.get(f.id) ?? []} />)}
       {sidebarExtra}
     </aside>
   )

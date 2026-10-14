@@ -6,6 +6,8 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import './styles.css'
 import { loadAndApplyTheme } from './theme/loader'
+import { SiteFooter } from './components/SiteFooter'
+import { UsageNotice } from './components/UsageNotice'
 import { api, BASE, PORTAL_API, currentUser, logout as endSession, restoreSession, type PortalUser, type StaticPageSummary } from './api/client'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
@@ -22,6 +24,7 @@ import { BannerBar } from './components/BannerBar'
 import { useI18n, typeLabel, setSupportedLocales, setTerminology } from './i18n'
 import { resolveLangText } from './utils/renderFieldValue'
 import { usePortalConfig } from './hooks/usePortalConfig'
+import { ScrollToTop } from './components/ScrollToTop'
 
 // Lazy: only page pulling in @samvera/clover-iiif + openseadragon; keep that chunk
 // out of every other route's initial bundle.
@@ -188,7 +191,10 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
 
   return (
     <header ref={headerRef} className="site-header">
-      <Link ref={logoRef} to="/" className="logo">{siteTitle}</Link>
+      <Link ref={logoRef} to="/" className={`logo${config.logo_url ? ' logo--image' : ''}`} aria-label={config.logo_url && config.header_show_title === false ? siteTitle : undefined}>
+        {config.logo_url && <img className="logo__img" src={config.logo_url} alt={config.header_show_title === false ? siteTitle : ''} />}
+        {(!config.logo_url || config.header_show_title !== false) && <span className="logo__text">{siteTitle}</span>}
+      </Link>
       <Link to="/" className="home-icon" aria-label={t('nav.home')} title={t('nav.home')}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9.5 10 3l7 6.5" /><path d="M5 8v8h10V8" />
@@ -269,29 +275,6 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   )
 }
 
-function Footer() {
-  const { locale } = useI18n()
-  const config = usePortalConfig()
-  const [pages, setPages] = useState<StaticPageSummary[]>([])
-  useEffect(() => { api.pages.list().then(ps => setPages(ps.filter(p => p.placement === 'footer'))).catch(() => {}) }, [])
-  return (
-    <footer className="site-footer">
-      {resolveLangText(config.site_title, locale, 'Katalon')} · Metadata Management System
-      {pages.map(p => {
-        const label = pageLabel(p, locale)
-        return (
-          <span key={p.slug}>
-            {' · '}
-            <Link to={`/page/${p.slug}`} style={{ color: 'inherit' }}>{label}</Link>
-          </span>
-        )
-      })}
-      {' · '}
-      <a href="/api/docs" style={{ color: 'inherit' }}>API</a>
-    </footer>
-  )
-}
-
 function AppInner() {
   const [user, setUser] = useState<PortalUser | null>(() => currentUser())
   const config = usePortalConfig()
@@ -323,6 +306,7 @@ function AppInner() {
       >
         <meta name="description" content="Metadata Management System für Sammlungen" />
       </Helmet>
+      <ScrollToTop />
       <a href="#main-content" className="skip-link">{t('nav.skipToContent')}</a>
       <BannerBar />
       <Header user={user} onLogout={logout} />
@@ -341,7 +325,8 @@ function AppInner() {
           <Route path="/collections/:id" element={<CollectionDetailPage user={user} />} />
         </Routes>
       </main>
-      <Footer />
+      <SiteFooter />
+      <UsageNotice />
     </>
   )
 }

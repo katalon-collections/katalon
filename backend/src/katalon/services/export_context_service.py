@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
@@ -20,6 +21,7 @@ from katalon.core.models import (
     RecordSubtype,
     Relation,
 )
+from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.integrations.metadata_format import (
     ExportMediaItem,
     ExportRecordContext,
@@ -41,20 +43,39 @@ _MODEL_MAP: dict[str, type[Any]] = {
 _EXCLUDED_RELATION_TARGET_TYPES: set[str] = {"storage_location", "procedure"}
 
 
+# Inbound relations embedded in the export context stored in the search index.
+# A collection with 30,000 member postcards otherwise produced a 46 MB document
+# (every member with all its public field values). Above this count the index
+# copy omits inbound relations and exporters rebuild the full context from the
+# database for that one record (see expand_omitted_contexts).
+INDEX_MAX_INBOUND_RELATIONS = 200
+
+
+def _is_deleted(record: Any) -> bool:
+    # Records soft-delete via deleted_at; they have no is_deleted column.
+    return getattr(record, "deleted_at", None) is not None
+
+
 async def build_export_context_from_db(
     db: AsyncSession,
     record_type: str,
     record_id: uuid.UUID,
     base_url: str = "",
+    *,
+    max_inbound: int | None = None,
 ) -> ExportRecordContext:
-    """Build a complete, security-filtered ExportRecordContext directly from PostgreSQL."""
+    """Build a complete, security-filtered ExportRecordContext directly from PostgreSQL.
+
+    ``max_inbound``: if the record has more inbound relations, they are left
+    out and counted in ``inbound_relations_omitted`` (index copy only).
+    """
     clean_base = (base_url or settings.katalon_base_url or "").rstrip("/")
     model = _MODEL_MAP.get(record_type)
     if not model:
         raise ValueError(f"Nicht unterstützter Datensatztyp: {record_type}")
 
     record = await db.get(model, record_id)
-    if not record or getattr(record, "is_deleted", False):
+    if not record or _is_deleted(record):
         raise ValueError(f"Datensatz {record_type}/{record_id} nicht gefunden oder gelöscht.")
 
     # 1. Record summary
@@ -111,62 +132,77 @@ async def build_export_context_from_db(
     fields = filter_public_metadata(raw_md, public_fields, subtype)
 
     # 3. Public relations only (excluding storage_location & procedure; excluding deleted/non-public targets)
-    async def _resolve_relation(
-        other_type: str, other_id: uuid.UUID, relation_type: str, rel_metadata: dict[str, Any], rel_id: uuid.UUID, direction: str
-    ) -> ExportRelation | None:
-        if other_type in _EXCLUDED_RELATION_TARGET_TYPES:
-            return None
-        other_model = _MODEL_MAP.get(other_type)
-        if not other_model:
-            return None
-        other_rec = await db.get(other_model, other_id)
-        if not other_rec or getattr(other_rec, "is_deleted", False):
-            return None
-        other_status = getattr(other_rec, "status", "public")
-        if other_status not in ("public", None):
-            return None
-
-        other_md = getattr(other_rec, "metadata_", None) or {}
-        other_title = getattr(other_rec, "title", None) or _extract_title(other_md) or getattr(other_rec, "idno", None) or ""
-
-        other_public_fields = await load_public_fields(db, other_type)
-        other_subtype = getattr(other_rec, f"{other_type}_type", None) or getattr(other_rec, "subtype", None)
-        filtered_other_values = filter_public_metadata(other_md, other_public_fields, other_subtype)
-
-        return ExportRelation(
-            id=str(rel_id),
-            direction=direction,
-            relation_type=relation_type,
-            target_type=other_type,
-            target_id=str(other_id),
-            target_label=str(other_title) if other_title else None,
-            target_idno=getattr(other_rec, "idno", None),
-            metadata=dict(rel_metadata or {}),
-            target_values=filtered_other_values,
+    outbound = (
+        await db.execute(
+            select(Relation).where(Relation.from_type == record_type, Relation.from_id == record_id)
         )
+    ).scalars().all()
+    inbound_filter = (Relation.to_type == record_type, Relation.to_id == record_id)
+    inbound_count = (
+        await db.execute(select(func.count()).select_from(Relation).where(*inbound_filter))
+    ).scalar_one()
+    omitted = 0
+    if max_inbound is not None and inbound_count > max_inbound:
+        inbound: Sequence[Relation] = []
+        omitted = inbound_count
+    else:
+        inbound = (await db.execute(select(Relation).where(*inbound_filter))).scalars().all()
+
+    pending = [
+        (rel, rel.to_type, rel.to_id, "outbound") for rel in outbound
+    ] + [(rel, rel.from_type, rel.from_id, "inbound") for rel in inbound]
+
+    # Load every target once per type (was: one get + one field query per relation).
+    ids_by_type: dict[str, set[uuid.UUID]] = {}
+    for _rel, other_type, other_id, _direction in pending:
+        if other_type in _MODEL_MAP and other_type not in _EXCLUDED_RELATION_TARGET_TYPES:
+            ids_by_type.setdefault(other_type, set()).add(other_id)
+    targets: dict[tuple[str, uuid.UUID], Any] = {}
+    public_fields_by_type: dict[str, Any] = {}
+    for other_type, ids in ids_by_type.items():
+        other_model = _MODEL_MAP[other_type]
+        id_list = list(ids)
+        for start in range(0, len(id_list), 1000):
+            rows = await db.execute(
+                select(other_model).where(other_model.id.in_(id_list[start : start + 1000]))
+            )
+            for other_rec in rows.scalars():
+                targets[(other_type, other_rec.id)] = other_rec
+        public_fields_by_type[other_type] = await load_public_fields(db, other_type)
 
     relations: list[ExportRelation] = []
-    outbound_res = await db.execute(
-        select(Relation).where(
-            Relation.from_type == record_type,
-            Relation.from_id == record_id,
+    for rel, other_type, other_id, direction in pending:
+        other_rec = targets.get((other_type, other_id))
+        if other_rec is None or _is_deleted(other_rec):
+            continue
+        other_status = getattr(other_rec, "status", None)
+        if other_status is not None and other_status not in PUBLIC_STATUSES:
+            continue
+        other_md = getattr(other_rec, "metadata_", None) or {}
+        other_title = (
+            getattr(other_rec, "title", None)
+            or _extract_title(other_md)
+            or getattr(other_rec, "idno", None)
+            or ""
         )
-    )
-    for rel in outbound_res.scalars().all():
-        resolved = await _resolve_relation(rel.to_type, rel.to_id, rel.relation_type, rel.metadata_, rel.id, "outbound")
-        if resolved:
-            relations.append(resolved)
-
-    inbound_res = await db.execute(
-        select(Relation).where(
-            Relation.to_type == record_type,
-            Relation.to_id == record_id,
+        other_subtype = getattr(other_rec, f"{other_type}_type", None) or getattr(
+            other_rec, "subtype", None
         )
-    )
-    for rel in inbound_res.scalars().all():
-        resolved = await _resolve_relation(rel.from_type, rel.from_id, rel.relation_type, rel.metadata_, rel.id, "inbound")
-        if resolved:
-            relations.append(resolved)
+        relations.append(
+            ExportRelation(
+                id=str(rel.id),
+                direction=direction,
+                relation_type=rel.relation_type,
+                target_type=other_type,
+                target_id=str(other_id),
+                target_label=str(other_title) if other_title else None,
+                target_idno=getattr(other_rec, "idno", None),
+                metadata=dict(rel.metadata_ or {}),
+                target_values=filter_public_metadata(
+                    other_md, public_fields_by_type[other_type], other_subtype
+                ),
+            )
+        )
 
     # 4. Public media representations only (non-public media excluded)
     media: list[ExportMediaItem] = []
@@ -214,4 +250,24 @@ async def build_export_context_from_db(
         fields=fields,
         relations=relations,
         media=media,
+        inbound_relations_omitted=omitted,
     )
+
+
+async def expand_omitted_contexts(db: AsyncSession, hits: list[dict[str, Any]]) -> None:
+    """Replace index copies that left out inbound relations with the full
+    context from the database, in place. Only records above
+    INDEX_MAX_INBOUND_RELATIONS are affected (e.g. large collections)."""
+    for hit in hits:
+        source = hit.get("_source") or {}
+        ec = source.get("export_context")
+        if not isinstance(ec, dict) or not ec.get("inbound_relations_omitted"):
+            continue
+        record = ec.get("record") or {}
+        try:
+            full = await build_export_context_from_db(
+                db, str(record.get("record_type")), uuid.UUID(str(record.get("id")))
+            )
+        except ValueError:
+            continue
+        source["export_context"] = full.to_dict()

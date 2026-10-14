@@ -119,7 +119,7 @@ async def test_build_export_context_from_db_security_filtering() -> None:
     mock_obj.status = "public"
     mock_obj.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     mock_obj.updated_at = datetime(2026, 1, 2, tzinfo=UTC)
-    mock_obj.is_deleted = False
+    mock_obj.deleted_at = None
     mock_obj.metadata_ = {
         "public_title": "Öffentlicher Titel",
         "internal_notes": "Streng vertrauliche Kuratoren-Notiz",
@@ -148,7 +148,7 @@ async def test_build_export_context_from_db_security_filtering() -> None:
     mock_entity.title = "Öffentlicher Fotograf"
     mock_entity.idno = "GND-999"
     mock_entity.status = "public"
-    mock_entity.is_deleted = False
+    mock_entity.deleted_at = None
     mock_entity.metadata_ = {"name": "Öffentlicher Fotograf"}
 
     # 2. Excluded relation: storage_location (internal logistics!)
@@ -207,6 +207,14 @@ async def test_build_export_context_from_db_security_filtering() -> None:
         s = str(stmt)
         if "relations.from_type = " in s:
             return res_rels
+        if "count(" in s:
+            res_count = MagicMock()
+            res_count.scalar_one.return_value = 0
+            return res_count
+        if "FROM entities" in s:
+            res_entities = MagicMock()
+            res_entities.scalars.return_value = [mock_entity]
+            return res_entities
         if "relations.to_type = " in s:
             res_empty = MagicMock()
             res_empty.scalars.return_value.all.return_value = []

@@ -112,6 +112,9 @@ class ExportRecordContext(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     relations: list[ExportRelation] = Field(default_factory=list)
     media: list[ExportMediaItem] = Field(default_factory=list)
+    # >0 only on the copy stored in the search index when inbound relations
+    # were left out for size; see export_context_service.expand_omitted_contexts.
+    inbound_relations_omitted: int = 0
 
     @classmethod
     def from_hit(cls, hit: dict[str, Any]) -> ExportRecordContext:

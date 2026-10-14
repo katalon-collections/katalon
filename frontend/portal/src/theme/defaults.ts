@@ -16,6 +16,8 @@ export const DEFAULT_TOKENS: Record<string, string> = {
   '--fg-4':         '#677083',
   '--header-bg':    '#0b1a33',
   '--header-fg':    '#ffffff',
+  // Dark stage behind the IIIF viewer, media player and media thumbnails.
+  '--viewer-bg':    '#0f172a',
 }
 
 export interface ThemeManifest {
@@ -25,4 +27,8 @@ export interface ThemeManifest {
   fonts?: { body?: string | null; mono?: string | null }
   logo?: string | null
   favicon?: string | null
+  /** Optional script file inside the theme directory (theme.json "script"). */
+  script?: string | null
+  /** Theme directory name under /themes/ (added by the API). */
+  directory?: string | null
 }

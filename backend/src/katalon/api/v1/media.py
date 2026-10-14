@@ -40,7 +40,8 @@ from katalon.core.media_validation import (
     verified_image_mime,
 )
 from katalon.core.models import AdminConfig, MediaFile, Object, User
-from katalon.core.visibility import ensure_publicly_visible
+from katalon.core.thumbnails import thumbnail_path
+from katalon.core.visibility import PUBLIC_STATUSES, ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
 from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
@@ -83,9 +84,10 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "object": {"href": f"/v1/objects/{f.object_id}"},
         "file": {"href": f"/v1/objects/{f.object_id}/media/{f.id}/file"},
     }
+    identifier: str | None = None
     if f.status == "ready" and media_category(f.mime_type) == "image":
         identifier = iiif_identifier(f.iiif_storage_key, f.storage_key)
-        links["thumbnail"] = {"href": f"{public_iiif_base()}/iiif/3/{identifier}/full/,300/0/default.jpg"}
+        links["thumbnail"] = {"href": f"{public_iiif_base()}{thumbnail_path(identifier)}"}
     if f.license_uri and _is_absolute_http_url(f.license_uri):
         links["license"] = {"href": f.license_uri}
     return {
@@ -100,6 +102,7 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "license_uri": f.license_uri,
         "rights_holder": f.rights_holder,
         "created_at": f.created_at.isoformat(),
+        "iiif_identifier": identifier,
         "_links": links,
     }
 
@@ -412,7 +415,13 @@ async def serve_media_thumbnail(
     # Host-relative redirect (not public_iiif_base()) so the browser treats it as
     # same-origin: authorizedFetch() only keeps the Authorization header across a
     # redirect when scheme+host+port match, which a cross-scheme absolute URL breaks.
-    return RedirectResponse(f"/iiif/3/{identifier}/full/,300/0/default.jpg")
+    # Cacheable: every /iiif/ fetch is still authorized by nginx (auth_request), so a
+    # cached redirect never releases an image that has since become non-public.
+    # "private" because staff get redirects to internal media.
+    return RedirectResponse(
+        thumbnail_path(identifier),
+        headers={"Cache-Control": f"private, max-age={settings.thumbnail_redirect_max_age}"},
+    )
 
 
 @router.delete(
@@ -503,7 +512,17 @@ async def authorize_media(request: Request, db: DBDep, current_user: OptionalCur
     if visibility_user is None and not media.is_public:
         raise HTTPException(status_code=403)
 
-    return Response(status_code=200)
+    # nginx sets Cache-Control from this (auth_request_set): only what anonymous
+    # visitors may see is cacheable by shared caches, everything else stays private.
+    anonymous_visible = (
+        media.is_public
+        and getattr(obj, "deleted_at", None) is None
+        and obj.status in PUBLIC_STATUSES
+    )
+    return Response(
+        status_code=200,
+        headers={"X-Media-Visibility": "public" if anonymous_visible else "restricted"},
+    )
 
 
 @internal_router.get(

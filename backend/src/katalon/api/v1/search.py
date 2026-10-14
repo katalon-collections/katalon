@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, require_role
 from katalon.core.limiter import limiter
 from katalon.core.schemas import RECORD_TYPES
-from katalon.core.visibility import readable_record_types
+from katalon.core.visibility import PUBLIC_STATUSES, readable_record_types
 from katalon.services import search_service
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -37,6 +37,8 @@ class SearchResult(BaseModel):
     score: float | None = None
     subtitle_values: dict[str, str | list[str]] | None = None
     primary_media_id: str | None = None
+    # IIIF identifier of the primary image (absent in documents indexed before 1.42).
+    primary_media_iiif: str | None = None
     media_width: int | None = None
     media_height: int | None = None
     object_type: str | None = None
@@ -50,6 +52,9 @@ class SearchResponse(BaseModel):
     items: list[SearchResult]
     facets: dict[str, list[FacetBucket]]
     numeric_facets: dict[str, NumericFacetBounds] = Field(default_factory=dict)
+    # Portal tree facets (hierarchical vocabularies): {name: {nodes: {parent:
+    # [{id, label, count, has_children}]}, paths: {active id: [{id, label}]}}}
+    tree_facets: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminSearchResult(BaseModel):
@@ -156,8 +161,9 @@ async def search(
 ) -> SearchResponse:
     # Unauthenticated callers may only ever see public records — never let an
     # explicit status= query param override this (was bypassable before).
+    anonymous_status: str | tuple[str, ...] | None = status
     if current_user is None:
-        status = "public"
+        anonymous_status = PUBLIC_STATUSES
     full_visibility_types = await readable_record_types(db, current_user)
 
     # Extra metadata filters: any query param starting with "meta_"
@@ -195,7 +201,7 @@ async def search(
         result = await search_service.search(
             query=q,
             record_type=type,
-            status=status,
+            status=anonymous_status,
             page=page,
             page_size=page_size,
             extra_filters=extra_filters or None,
@@ -221,10 +227,10 @@ async def search(
     },
 )
 async def trigger_reindex() -> dict[str, str]:
-    from katalon.workers.enqueue import enqueue_or_503
-    from katalon.workers.index_tasks import reindex_all_task
+    from katalon.workers.reindex_state import request_full_rebuild
 
-    enqueue_or_503(reindex_all_task)
+    # Coalesces with an already waiting full rebuild.
+    request_full_rebuild(strict=True)
     return {"status": "queued"}
 
 
@@ -245,8 +251,8 @@ async def trigger_reindex_type(target_type: str) -> dict[str, str]:
         raise HTTPException(
             status_code=422, detail=f"Ungültiger Typ. Erlaubt: {', '.join(sorted(RECORD_TYPES))}"
         )
-    from katalon.workers.enqueue import enqueue_or_503
-    from katalon.workers.index_tasks import bulk_reindex_type_task
+    from katalon.workers.reindex_state import request_bulk_reindex
 
-    enqueue_or_503(bulk_reindex_type_task, target_type)
+    # Coalesces with an already waiting job; a running one follows up once.
+    request_bulk_reindex(target_type, strict=True)
     return {"status": "queued", "target_type": target_type}

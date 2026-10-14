@@ -7,6 +7,7 @@ import { getTokenUser, hasToken, logout, onUnauthorized, restoreSession } from '
 import { Alert, X } from '../ui/Icons'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { ScreenDashboard } from '../screens/ScreenDashboard'
 import { ScreenList } from '../screens/ScreenList'
 import { ScreenSchema } from '../screens/ScreenSchema'
 import { ScreenVocab } from '../screens/ScreenVocab'
@@ -75,6 +76,7 @@ function getExportCrumbs(appTitle: string, editId: string | null): Crumb[] {
 }
 
 const CRUMBS: Record<string, Crumb[]> = {
+  dashboard:          [{ label: 'Katalon' }, { label: 'Übersicht' }],
   list:               [{ label: 'Katalon' }, { label: 'Objekte' }],
   form:               [{ label: 'Katalon' }, { label: 'Objekte', route: 'list' }, { label: 'Bearbeiten' }],
   'collections-list': [{ label: 'Katalon' }, { label: 'Sammlungen' }],
@@ -116,7 +118,7 @@ function adminDocumentTitle(appTitle: string, route: string, crumbs: Crumb[]): s
 }
 
 function hashToState(hash: string): { route: string; editId: string | null } {
-  const withoutHash = hash.replace(/^#/, '') || 'list'
+  const withoutHash = hash.replace(/^#/, '') || 'dashboard'
   const h = withoutHash.split('?')[0]
   const slash = h.indexOf('/')
   if (slash === -1) return { route: h, editId: null }
@@ -201,8 +203,8 @@ export function AppShell() {
   // instead of silently rendering a blank placeholder.
   useEffect(() => {
     if (!loggedIn || route in CRUMBS) return
-    window.history.replaceState({ route: 'list', editId: null }, '', '#list')
-    setRoute('list')
+    window.history.replaceState({ route: 'dashboard', editId: null }, '', '#dashboard')
+    setRoute('dashboard')
     setEditId(null)
   }, [loggedIn, route])
 
@@ -262,6 +264,7 @@ export function AppShell() {
 
   function renderScreen() {
     switch (route) {
+      case 'dashboard':         return <ScreenDashboard onNavigate={(r, id) => safeNavigate(r, id)} />
       case 'list':              return <ScreenList recordType="object"     onOpen={(id) => navigate('form', id)} initialTab={editId} onTabChange={(t) => navigate('list', t)} />
       case 'form':              return <ScreenForm recordType="object"     recordId={editId ?? undefined} onBack={() => navigate('list')} onSaved={(id) => navigate('form', id)} onDirtyChange={(d) => { isDirtyRef.current = d }} />
       case 'collections-list':  return <ScreenList recordType="collection" onOpen={(id) => navigate('collections-form', id)} initialTab={editId} onTabChange={(t) => navigate('collections-list', t)} />

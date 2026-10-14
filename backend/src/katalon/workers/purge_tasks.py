@@ -6,12 +6,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Coroutine
+from collections.abc import AsyncIterator, Coroutine
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.pool import NullPool
 
 from katalon.core.models import Collection, Entity, Object, Occurrence, Place, StorageLocation
 from katalon.workers.celery_app import celery_app
@@ -34,6 +41,25 @@ _MODEL_MAP = _PURGEABLE_MODELS
 
 def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
+
+
+def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
+    """Per-run NullPool engine. Each task runs in its own ``asyncio.run`` loop
+    (and, with ``--pool=threads``, its own thread); the API's pooled global
+    engine would hand out connections bound to a previous run's loop
+    ("Future attached to a different loop")."""
+    from katalon.config import settings
+
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
+
+
+@asynccontextmanager
+async def engine_scope(engine: AsyncEngine) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        await engine.dispose()
 
 
 async def _purge_records(
@@ -140,11 +166,11 @@ async def _do_purge() -> dict[str, int]:
     from sqlalchemy import select as _select
 
     from katalon.core.models import AdminConfig
-    from katalon.database import AsyncSessionLocal
     from katalon.workers.enqueue import run_after_commit_hooks
 
     totals: dict[str, int] = {}
-    async with AsyncSessionLocal() as session:
+    session_factory, engine = _make_session()
+    async with engine_scope(engine), session_factory() as session:
         config = await session.scalar(_select(AdminConfig).where(AdminConfig.key == "default"))
         if config is not None and not config.auto_purge_enabled:
             logger.info("Auto-purge disabled via AdminConfig — skipping run")
@@ -166,10 +192,10 @@ def purge_soft_deleted() -> dict[str, int]:
 
 
 async def _sweep_pending_media() -> dict[str, int]:
-    from katalon.database import AsyncSessionLocal
     from katalon.services.media_deletion_service import sweep_pending_media_deletes
 
-    async with AsyncSessionLocal() as session:
+    session_factory, engine = _make_session()
+    async with engine_scope(engine), session_factory() as session:
         report = await sweep_pending_media_deletes(session)
         await session.commit()
     return report

@@ -32,6 +32,9 @@ type SubFieldFormState = {
   field_type: SubFieldType
   is_required: boolean
   is_public: boolean
+  /** Kept from the stored field: facets are toggled in the facet settings. */
+  is_facet: boolean
+  facet_granularity: '' | 'decade' | 'century' | 'year'
   sort_order: number
   validation_regex: string
   vocabulary_id: string
@@ -60,6 +63,8 @@ type FieldFormState = {
   validation_regex: string
   authority_source: string
   pid_provider: string
+  /** Date fields: portal facet buckets ('' = no date facet grouping). */
+  facet_granularity: '' | 'decade' | 'century' | 'year'
   show_in_detail: boolean
   show_in_list: boolean
   detail_slot: 'main' | 'sidebar'
@@ -86,7 +91,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', facet_granularity: '', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -105,6 +110,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     validation_regex: (f.settings?.validation_regex as string) ?? '',
     authority_source: (f.settings?.source as string) ?? 'gnd',
     pid_provider: (f.settings?.pid_provider as string) ?? 'dnb_urn',
+    facet_granularity: (f.settings?.facet_granularity as FieldFormState['facet_granularity']) ?? '',
     show_in_detail: f.show_in_detail ?? true,
     show_in_list: f.show_in_list ?? false,
     detail_slot: f.detail_slot ?? 'sidebar',
@@ -162,7 +168,7 @@ function toSlug(label: string): string {
 }
 
 function emptySubFieldForm(sortOrder: number, authoritySource: string): SubFieldFormState {
-  return { name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_public: true, sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
+  return { name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_public: true, is_facet: false, facet_granularity: '', sort_order: sortOrder, validation_regex: '', vocabulary_id: '', relation_target_type: 'entity', relation_type_vocab: '', authority_source: authoritySource, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false }
 }
 
 function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, aiAvailable, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield, onRequestHardDeleteSubfield, onRestoreSubfield, isAdmin }: FieldDetailProps) {
@@ -198,6 +204,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       field_type: sf.field_type as SubFieldType,
       is_required: sf.is_required,
       is_public: sf.is_public ?? true,
+      is_facet: sf.is_facet ?? false,
+      facet_granularity: (sf.settings?.facet_granularity as SubFieldFormState['facet_granularity']) ?? '',
       sort_order: sf.sort_order,
       validation_regex: (sf.settings?.validation_regex as string) ?? '',
       vocabulary_id: (sf.settings?.vocabulary_id as string) ?? '',
@@ -241,11 +249,13 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
       show_in_detail: true,
       show_in_list: false,
       is_public: subFieldForm.is_public,
-      is_facet: false,
+      // Facet state is managed in the facet settings; never reset it here.
+      is_facet: subFieldForm.is_public && subFieldForm.is_facet,
       is_searchable: true,
       settings: {
         ...(subFieldForm.validation_regex.trim() ? { validation_regex: subFieldForm.validation_regex.trim() } : {}),
         ...((subFieldForm.field_type === 'vocab' || subFieldForm.field_type === 'vocab_free') && subFieldForm.vocabulary_id ? { vocabulary_id: subFieldForm.vocabulary_id } : {}),
+        ...(subFieldForm.field_type === 'date' && subFieldForm.facet_granularity ? { facet_granularity: subFieldForm.facet_granularity } : {}),
         ...(subFieldForm.field_type === 'relation' ? {
           target_type: subFieldForm.relation_target_type,
           relation_type_vocab: subFieldForm.relation_type_vocab,
@@ -467,6 +477,23 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             {!isNew && <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.authorityChangeWarning')}</div>}
           </div>
         )}
+        {form.field_type === 'date' && !isVocabularyTerm && (
+          <div className="field">
+            <label className="lbl" htmlFor="field-facet-granularity">{t('fieldDetail.facetGranularity')}</label>
+            <select
+              id="field-facet-granularity"
+              className="fld"
+              value={form.facet_granularity}
+              onChange={e => set('facet_granularity', e.target.value as FieldFormState['facet_granularity'])}
+            >
+              <option value="">{t('fieldDetail.facetGranularityNone')}</option>
+              <option value="decade">{t('fieldDetail.facetGranularityDecade')}</option>
+              <option value="century">{t('fieldDetail.facetGranularityCentury')}</option>
+              <option value="year">{t('fieldDetail.facetGranularityYear')}</option>
+            </select>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.facetGranularityHint')}</div>
+          </div>
+        )}
         {form.field_type === 'pid' && !isVocabularyTerm && (
           <div className="field">
             <div className="lbl">{t('fieldDetail.pidProvider')}</div>
@@ -511,7 +538,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                     checked={form.show_in_detail}
                     onChange={e => {
                       const checked = e.target.checked
-                      onChange({ ...form, show_in_detail: checked, is_facet: checked ? form.is_facet : false })
+                      set('show_in_detail', checked)
                     }}
                   />
                   <span style={{ fontSize: 13 }}>{t('fieldDetail.showInDetail')}</span>
@@ -521,18 +548,26 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <span style={{ fontSize: 13 }}>{t('fieldDetail.showInList')}</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" className="ck" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    className="ck"
+                    checked={form.is_public}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      onChange({ ...form, is_public: checked, is_facet: checked ? form.is_facet : false })
+                    }}
+                  />
                   <span style={{ fontSize: 13 }}>{t('fieldDetail.isPublic')}</span>
                 </label>
                 <label
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: form.show_in_detail ? 1 : 0.5 }}
-                  title={form.show_in_detail ? undefined : t('fieldDetail.isFacetDisabledHint')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: form.is_public ? 1 : 0.5 }}
+                  title={form.is_public ? undefined : t('fieldDetail.isFacetDisabledHint')}
                 >
                   <input
                     type="checkbox"
                     className="ck"
                     checked={form.is_facet}
-                    disabled={!form.show_in_detail}
+                    disabled={!form.is_public}
                     onChange={e => set('is_facet', e.target.checked)}
                   />
                   <span style={{ fontSize: 13 }}>{t('fieldDetail.isFacet')}</span>
@@ -892,6 +927,23 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
         <div className="field">
           <div className="lbl">{t('subFieldForm.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
           <input className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder={t('subFieldForm.validationRegexPlaceholder')} />
+        </div>
+      )}
+      {sf.field_type === 'date' && (
+        <div className="field">
+          <label className="lbl" htmlFor="subfield-facet-granularity">{t('fieldDetail.facetGranularity')}</label>
+          <select
+            id="subfield-facet-granularity"
+            className="fld"
+            value={sf.facet_granularity}
+            onChange={e => set('facet_granularity', e.target.value as SubFieldFormState['facet_granularity'])}
+          >
+            <option value="">{t('fieldDetail.facetGranularityNone')}</option>
+            <option value="decade">{t('fieldDetail.facetGranularityDecade')}</option>
+            <option value="century">{t('fieldDetail.facetGranularityCentury')}</option>
+            <option value="year">{t('fieldDetail.facetGranularityYear')}</option>
+          </select>
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.facetGranularityHint')}</div>
         </div>
       )}
       {(sf.field_type === 'vocab' || sf.field_type === 'vocab_free') && (
@@ -1691,6 +1743,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
         ...(form.validation_regex.trim() ? { validation_regex: form.validation_regex.trim() } : {}),
         ...(form.field_type === 'authority' ? { source: form.authority_source } : {}),
         ...(form.field_type === 'pid' && form.target_type !== 'vocabulary_term' ? { pid_provider: form.pid_provider } : {}),
+        ...(form.field_type === 'date' && form.facet_granularity ? { facet_granularity: form.facet_granularity } : {}),
         ...((form.field_type === 'vocab' || form.field_type === 'vocab_free') && form.vocabulary_id ? { vocabulary_id: form.vocabulary_id } : {}),
         ...(form.field_type === 'relation' ? {
           target_type: form.relation_target_type,

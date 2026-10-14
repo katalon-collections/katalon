@@ -4,6 +4,30 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.42.0]
+
+- **Übersicht im Admin:** Der neue Schreibtisch bündelt zuletzt bearbeitete Datensätze,
+  eigene Sperren, Arbeitslisten und anstehende Vorgangsfristen. Die Bereiche lassen sich
+  ein- und ausblenden; Administrator:innen sehen zusätzlich Team-Aktivität und Systemzustand.
+- **Gezieltere Portal-Facetten:** Beziehungen können nach Beziehungsart, Richtung und
+  Ziel-Subtyp gefiltert werden. Datumsfelder lassen sich nach Jahr, Jahrzehnt oder Jahrhundert
+  gruppieren; hierarchische Vokabulare erscheinen als Baum mit Unterbegriffen.
+- **Facetten für Gruppen-Unterfelder:** Auch einzelne Unterfelder können als Filter dienen.
+  Die Reihenfolge der Facetten lässt sich pro Datensatztyp festlegen. Ein öffentliches Feld
+  kann Filter sein, ohne auf der Detailseite angezeigt zu werden.
+- **Portal-Fußzeile und Nutzungshinweis:** Texte, Links und Logos bilden eine konfigurierbare
+  Fußzeile. Ein Nutzungshinweis kann einmal pro Browser angezeigt und bei Bedarf erneut
+  zur Bestätigung vorgelegt werden.
+- **Logo und Theme-Skript:** Das Logo kann auch in der Kopfzeile erscheinen und den Titel
+  ersetzen. Eigene Themes können ein JavaScript aus ihrem Theme-Verzeichnis laden.
+- **Größte Sammlungen auf der Startseite:** Sammlungsblöcke können nach der Zahl öffentlicher
+  Objekte sortiert werden. Einzelne Sammlungen lassen sich über eine Suche auswählen.
+- **Vorschaubilder vorberechnen:** Neue Bilder werden für die Portal-Vorschau vorgewärmt;
+  für vorhandene Bestände gibt es einen fortsetzbaren Vorwärmlauf. Der Bild-Cache bleibt
+  bei Container-Neustarts erhalten.
+- **Index-Neuaufbau mit Fortschritt:** Ein vollständiger Neuaufbau erstellt einen frischen
+  Suchindex und schaltet erst danach um. Der Fortschritt ist über die Admin-API abrufbar.
+
 ## [1.40.3]
 
 - **Eigenes Startpasswort für den ersten Admin:** `INITIAL_ADMIN_PASSWORD` legt das

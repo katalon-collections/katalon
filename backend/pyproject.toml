@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.41.0"
+version = "1.42.0"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.14"
@@ -47,6 +47,7 @@ dev = [
     "testcontainers[postgres]>=4.4.0",
     "locust>=2.29.0",
     "pytest-archon>=0.0.7",
+    "fakeredis[lua]>=2.26",
 ]
 
 [project.scripts]

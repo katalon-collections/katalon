@@ -8,6 +8,7 @@ Commands:
     katalon-manage import-csv
     katalon-manage import-xml
     katalon-manage reset-admin
+    katalon-manage warm-thumbnails
 """
 
 from __future__ import annotations
@@ -160,3 +161,27 @@ def create_user(email: str, password: str, role: str) -> None:
 
 def main() -> None:
     cli()
+
+
+@cli.command(name="warm-thumbnails")
+@click.option("--primary-only", is_flag=True, help="Only the primary image of each object.")
+@click.option("--restart", is_flag=True, help="Start over instead of resuming an interrupted run.")
+@click.option("--status", "show_status", is_flag=True, help="Only show the progress of the current run.")
+def warm_thumbnails(primary_only: bool, restart: bool, show_status: bool) -> None:
+    """Pre-render portal thumbnails in Cantaloupe's cache (runs in the worker).
+
+    Primary images first, then the rest; batches run one after another with
+    THUMBNAIL_WARM_CONCURRENCY parallel requests. Re-running resumes an
+    interrupted run; a running one is not started twice.
+    """
+    from katalon.workers.thumbnail_tasks import bulk_status, start_bulk_sync
+
+    state = bulk_status() if show_status else start_bulk_sync(primary_only=primary_only, restart=restart)
+    if not state.get("phase"):
+        click.echo("Kein Vorwärm-Lauf bekannt.")
+        return
+    total = state.get("total") or 0
+    done = state.get("done", 0) + state.get("failed", 0)
+    phase = {"primary": "Hauptbilder", "rest": "weitere Bilder", "done": "fertig"}.get(state["phase"], state["phase"])
+    running = "läuft" if state.get("running") else "angehalten" if state["phase"] != "done" else "abgeschlossen"
+    click.echo(f"Vorschaubilder: {done}/{total} ({phase}, {running}); Fehler: {state.get('failed', 0)}")

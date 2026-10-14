@@ -579,12 +579,12 @@ def import_records_task(
             await run_after_commit_hooks(session)
 
         # Trigger bulk reindex for this type so all records are consistently indexed.
-        # Runs after the commit above, so the standard swallow-and-log enqueue() is
+        # Runs after the commit above, so a direct (swallow-and-log) request is
         # correct here (not after_commit — the session is already closed).
         if created > 0 or updated > 0:
-            from katalon.workers.index_tasks import bulk_reindex_type_task
+            from katalon.workers.reindex_state import request_bulk_reindex
 
-            enqueue(bulk_reindex_type_task, record_type)
+            request_bulk_reindex(record_type)
 
         return {
             "created": created,

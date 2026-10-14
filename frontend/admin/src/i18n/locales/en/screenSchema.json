@@ -130,7 +130,7 @@
     "showInList": "Show in list view",
     "isPublic": "Public via APIs",
     "isFacet": "Use as facet",
-    "isFacetDisabledHint": "Only available while \"Show in detail view\" is enabled.",
+    "isFacetDisabledHint": "Only available for public fields.",
     "systemLabelHint": "System field: this field is always shown in the \"Base data\" section, regardless of these settings.",
     "systemFieldBadge": "System",
     "isSearchable": "Include in search",
@@ -193,7 +193,13 @@
     "pidProvider": "PID provider",
     "pidProviderDnbUrn": "URN (German National Library)",
     "pidProviderArk": "ARK (minted locally)",
-    "pidProviderHint": "PIDs are only assigned via the mint button or automatically on publish – manual entry is not possible."
+    "pidProviderHint": "PIDs are only assigned via the mint button or automatically on publish – manual entry is not possible.",
+    "facetGranularity": "Grouping as portal facet",
+    "facetGranularityNone": "None (do not group dates)",
+    "facetGranularityDecade": "Decade",
+    "facetGranularityCentury": "Century",
+    "facetGranularityYear": "Year",
+    "facetGranularityHint": "Applies when the field is an active facet. Intervals count in every period they cover, very long ones (over 50 years) only at start and end. Changing it rebuilds the search index."
   },
   "subFieldForm": {
     "internalName": "Internal Name",

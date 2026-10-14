@@ -53,3 +53,47 @@ async def test_naive_expires_at_passes_through():
     await set_lock(db, "object", uuid.uuid4(), user, expires_at=naive)
 
     assert db.added[0].expires_at == naive
+
+
+async def test_list_active_locks():
+    from katalon.core.models import ResourceLock
+    from katalon.services.lock_service import list_active_locks
+
+    u_id = uuid.uuid4()
+    o_id = uuid.uuid4()
+    mock_lock = ResourceLock(
+        resource_type="object",
+        resource_id=o_id,
+        locked_by=u_id,
+        locked_at=datetime(2026, 10, 7, 10, 0, 0),
+        reason="Katalogisierung",
+    )
+
+    class _MockResult:
+        def all(self):
+            return [(mock_lock, "curator@example.org")]
+
+    class _MockResultEmpty:
+        def all(self):
+            return [(o_id, "OBJ-001", {"title": "Testgemälde"})]
+
+    class _MockSession:
+        def __init__(self):
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            if self.calls == 1:
+                return _MockResult()
+            return _MockResultEmpty()
+
+    db = _MockSession()
+    locks = await list_active_locks(db, user_id=u_id)
+    assert len(locks) == 1
+    assert locks[0].resource_type == "object"
+    assert locks[0].resource_id == o_id
+    assert locks[0].locked_by_email == "curator@example.org"
+    assert locks[0].reason == "Katalogisierung"
+    assert locks[0].idno == "OBJ-001"
+    assert locks[0].title == "Testgemälde"
+

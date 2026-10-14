@@ -70,6 +70,7 @@ function settingsResults(language: string): AdminSearchResult[] {
 const DOCS_ROOT = 'https://katalon-collections.github.io/katalon-docs'
 
 const ROUTE_DOCS: Record<string, string> = {
+  dashboard: `${DOCS_ROOT}/`,
   schema: `${DOCS_ROOT}/administration/schema/`,
   import: `${DOCS_ROOT}/administration/import/`,
   'form-variants': `${DOCS_ROOT}/administration/formularvarianten/`,

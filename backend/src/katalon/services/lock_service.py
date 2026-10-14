@@ -15,7 +15,18 @@ from fastapi import HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import ResourceLock, User
+from katalon.core.models import (
+    Collection,
+    Entity,
+    Object,
+    Occurrence,
+    Place,
+    Procedure,
+    ResourceLock,
+    StorageLocation,
+    User,
+)
+from katalon.services.search_service import _extract_title
 
 
 def _now() -> datetime:
@@ -29,6 +40,10 @@ class LockInfo:
     locked_at: datetime
     expires_at: datetime | None
     reason: str
+    resource_type: str = ""
+    resource_id: uuid.UUID | None = None
+    title: str | None = None
+    idno: str | None = None
 
 
 async def set_lock(
@@ -207,3 +222,73 @@ async def enforce_not_locked(
                 "reason": lock.reason,
             },
         )
+
+
+async def list_active_locks(
+    db: AsyncSession,
+    *,
+    resource_type: str | None = None,
+    user_id: uuid.UUID | None = None,
+) -> list[LockInfo]:
+    query = (
+        select(ResourceLock, User.email)
+        .join(User, User.id == ResourceLock.locked_by, isouter=True)
+        .where(
+            (ResourceLock.expires_at.is_(None)) | (ResourceLock.expires_at > _now()),
+        )
+    )
+    if user_id:
+        query = query.where(ResourceLock.locked_by == user_id)
+    if resource_type:
+        query = query.where(ResourceLock.resource_type == resource_type)
+    query = query.order_by(ResourceLock.locked_at.desc())
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    by_type: dict[str, list[uuid.UUID]] = {}
+    for lock, _ in rows:
+        by_type.setdefault(lock.resource_type, []).append(lock.resource_id)
+
+    titles: dict[tuple[str, uuid.UUID], tuple[str | None, str | None]] = {}
+
+    for r_type, model in (
+        ("object", Object),
+        ("entity", Entity),
+        ("place", Place),
+        ("occurrence", Occurrence),
+        ("collection", Collection),
+        ("storage_location", StorageLocation),
+    ):
+        if r_type in by_type:
+            res = await db.execute(
+                select(model.id, model.idno, model.metadata_).where(model.id.in_(by_type[r_type]))
+            )
+            for m_id, m_idno, m_md in res.all():
+                t = _extract_title(m_md or {}) or m_idno or str(m_id)[:8]
+                titles[(r_type, m_id)] = (t, m_idno)
+
+    if "procedure" in by_type:
+        res = await db.execute(
+            select(Procedure.id, Procedure.idno, Procedure.reference_number, Procedure.metadata_).where(
+                Procedure.id.in_(by_type["procedure"])
+            )
+        )
+        for p_id, p_idno, p_ref, p_md in res.all():
+            t = _extract_title(p_md or {}) or p_ref or p_idno or str(p_id)[:8]
+            titles[("procedure", p_id)] = (t, p_ref or p_idno)
+
+    return [
+        LockInfo(
+            locked_by=lock.locked_by,
+            locked_by_email=email or "",
+            locked_at=lock.locked_at,
+            expires_at=lock.expires_at,
+            reason=lock.reason,
+            resource_type=lock.resource_type,
+            resource_id=lock.resource_id,
+            title=titles.get((lock.resource_type, lock.resource_id), (None, None))[0],
+            idno=titles.get((lock.resource_type, lock.resource_id), (None, None))[1],
+        )
+        for lock, email in rows
+    ]

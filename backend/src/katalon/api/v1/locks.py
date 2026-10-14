@@ -6,7 +6,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from katalon.core.dependencies import (
@@ -16,13 +16,14 @@ from katalon.core.dependencies import (
     require_role,
 )
 from katalon.core.models import User
-from katalon.core.schemas import RECORD_TYPES
+from katalon.core.schemas import RECORD_TYPES, LockRead
 from katalon.services.audit_service import log_change
 from katalon.services.lock_service import (
     LockInfo,
     force_unlock,
     get_lock,
     get_locks_batch,
+    list_active_locks,
     release_lock,
     set_lock,
 )
@@ -35,16 +36,6 @@ class LockCreate(BaseModel):
     resource_id: uuid.UUID
     reason: str = Field(default="", max_length=256)
     expires_at: datetime | None = None
-
-
-class LockRead(BaseModel):
-    resource_type: str
-    resource_id: str
-    locked_by: str
-    locked_by_email: str
-    locked_at: datetime
-    expires_at: datetime | None = None
-    reason: str = ""
 
 
 class BatchLockRequest(BaseModel):
@@ -136,6 +127,28 @@ async def batch_get_locks(data: BatchLockRequest, db: DBDep, current_user: Curre
 
 
 @router.get(
+    "",
+    response_model=list[LockRead],
+    summary="List active locks with optional filters by type, user, or current user",
+)
+async def list_locks_endpoint(
+    db: DBDep,
+    current_user: CurrentUser,
+    resource_type: str | None = Query(None, description="Filter by resource type"),
+    user_id: uuid.UUID | None = Query(None, description="Filter by user ID"),
+    mine: bool = Query(False, description="Filter to only current user's locks"),
+) -> list[LockRead]:
+    if resource_type:
+        _validate_resource_type(resource_type)
+    target_user = current_user.id if mine else user_id
+    active = await list_active_locks(db, resource_type=resource_type, user_id=target_user)
+    return [
+        _to_read(lock_item.resource_type, str(lock_item.resource_id) if lock_item.resource_id else "", lock_item)
+        for lock_item in active
+    ]
+
+
+@router.get(
     "/{resource_type}/{resource_id}",
     response_model=LockRead | None,
     summary="Get lock info for a record",
@@ -157,4 +170,6 @@ def _to_read(resource_type: str, resource_id: str, info: LockInfo) -> LockRead:
         locked_at=info.locked_at,
         expires_at=info.expires_at,
         reason=info.reason,
+        title=info.title,
+        idno=info.idno,
     )

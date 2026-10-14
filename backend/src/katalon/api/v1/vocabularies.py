@@ -27,6 +27,7 @@ from katalon.services.vocabulary_reference_service import (
     remap_references,
     remove_references,
     reparent_children,
+    request_reindex_for_vocabulary,
 )
 
 router = APIRouter(prefix="/vocabularies", tags=["vocabularies"])
@@ -345,8 +346,11 @@ async def update_term(term_id: uuid.UUID, data: VocabularyTermUpdate, db: DBDep)
         if errors:
             raise HTTPException(status_code=422, detail=errors)
         dump["metadata_"] = prepared_meta
+    parent_changed = "parent_id" in dump and dump["parent_id"] != term.parent_id
     for k, v in dump.items():
         setattr(term, k, v)
+    if parent_changed and vocab.is_hierarchical:
+        await request_reindex_for_vocabulary(db, vocab.id)
     await db.commit()
     return term
 
@@ -430,6 +434,7 @@ async def delete_term(
         target_ids = await get_term_subtree_ids(db, term_id)
     elif reparent and child_count > 0:
         await reparent_children(db, term_id, term.parent_id)
+        await request_reindex_for_vocabulary(db, term.vocabulary_id)
 
     usage_count = sum([await count_references(db, term.vocabulary_id, tid) for tid in target_ids])
     if usage_count and replacement_term_id is None and not force and not remove_from_records:

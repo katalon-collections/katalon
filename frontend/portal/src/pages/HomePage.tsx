@@ -3,11 +3,15 @@
 
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, mediaThumbnailUrl, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type MediaFile } from '../api/client'
+import { api, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type MediaFile, type PortalFieldDefinition } from '../api/client'
+import { thumbnailUrl } from '../utils/thumbnails'
 import { recordTitle, resolveLangText } from '../utils/renderFieldValue'
+import { renderMarkdown } from '../utils/markdown'
+import { recordSubtitle } from '../utils/objectSubtitle'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useI18n } from '../i18n'
+import { LazyImage } from '../components/LazyImage'
 
 const DEFAULT_CONFIG: PortalConfig = {
   site_title: { de: 'Sammlung' },
@@ -36,10 +40,6 @@ function objTitle(obj: ObjectSummary, locale: string) {
   const m = obj.metadata_ as Record<string, unknown>
   return recordTitle(m, locale, obj.idno ?? obj.id)
 }
-function objSub(obj: ObjectSummary) {
-  const m = obj.metadata_ as Record<string, unknown>
-  return [String(m.creator ?? m.photographer ?? ''), String(m.year ?? m.date ?? '')].filter(Boolean).join(' · ')
-}
 
 function BlockHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -47,20 +47,27 @@ function BlockHeading({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ObjectGrid({ objects, thumbnails, locale }: { objects: ObjectSummary[]; thumbnails: Record<string, string>; locale: string }) {
+function ObjectGrid({ objects, thumbnails, locale, subtitleFields, fieldDefs }: {
+  objects: ObjectSummary[]
+  thumbnails: Record<string, string>
+  locale: string
+  subtitleFields: string[] | undefined
+  fieldDefs: PortalFieldDefinition[]
+}) {
   const subtypePlaceholder = useSubtypePlaceholder('object')
   return (
     <div className="obj-grid">
       {objects.map(obj => {
         const src = thumbnails[obj.id] || subtypePlaceholder(obj.object_type)
+        const subtitle = recordSubtitle(obj, 'object', subtitleFields, fieldDefs, locale)
         return (
           <Link key={obj.id} className="obj-card" to={`/objects/${obj.id}`}>
             <div className="thumb">
-              {src ? <img src={src} alt="" loading="lazy" /> : null}
+              {src ? <LazyImage src={src} /> : null}
             </div>
             <div className="info">
               <div className="title">{objTitle(obj, locale)}</div>
-              {objSub(obj) && <div className="meta">{objSub(obj)}</div>}
+              {subtitle && <div className="meta">{subtitle}</div>}
             </div>
           </Link>
         )
@@ -93,7 +100,13 @@ function TextBlock({ block, locale }: { block: HomepageBlock; locale: string }) 
   const content = block.content ?? {}
   const text = content[locale] ?? Object.values(content)[0] ?? ''
   if (!text) return null
-  return <p style={{ whiteSpace: 'pre-wrap', color: 'var(--fg-2)', lineHeight: 1.6 }}>{text}</p>
+  return (
+    <div
+      className="prose"
+      style={{ color: 'var(--fg-2)', lineHeight: 1.6 }}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(text, { breaks: true }) }}
+    />
+  )
 }
 
 function blockTitle(block: HomepageBlock, locale: string, fallback: string): string {
@@ -107,6 +120,7 @@ export function HomePage() {
   const [recent, setRecent] = useState<ObjectSummary[]>([])
   const [collectionsByBlock, setCollectionsByBlock] = useState<Record<string, CollectionSummary[]>>({})
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [objectFieldDefs, setObjectFieldDefs] = useState<PortalFieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const { t, locale } = useI18n()
@@ -126,6 +140,14 @@ export function HomePage() {
         const curatedBlock = blocks.find(b => b.type === 'curated')
         const objectsBlock = blocks.find(b => b.type === 'objects')
         const collectionBlocks = blocks.filter(b => b.type === 'collections')
+
+        // Field definitions are only needed to render configured schema fields
+        // in card subtitles (record_type/status/idno need none).
+        const subtitleSchemaFields = (c.subtitle_fields?.object ?? [])
+          .filter(name => !['record_type', 'status', 'idno'].includes(name))
+        if ((curatedBlock || objectsBlock) && subtitleSchemaFields.length > 0) {
+          api.portal.schema('object').then(setObjectFieldDefs).catch(() => {})
+        }
 
         const curatedIds = curatedBlock ? (c.featured_object_ids ?? []).slice(0, curatedBlock.limit ?? 100) : []
         const curatedItems: ObjectSummary[] = []
@@ -155,7 +177,11 @@ export function HomePage() {
                 )
                 setCollectionsByBlock(prev => ({ ...prev, [block.id]: items }))
               } else {
-                const res = await api.collections.list({ page_size: limit, top_level: mode !== 'all' })
+                const res = await api.collections.list(
+                  mode === 'largest'
+                    ? { page_size: limit, sort: 'largest' }
+                    : { page_size: limit, top_level: mode !== 'all' },
+                )
                 setCollectionsByBlock(prev => ({ ...prev, [block.id]: res.items }))
               }
             } catch {
@@ -173,7 +199,7 @@ export function HomePage() {
                 const ready = media.filter((m: MediaFile) => m.status === 'ready')
                 const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
                 if (primary) {
-                  thumbMap[obj.id] = mediaThumbnailUrl(obj.id, primary.id)
+                  thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
                 }
               })
               .catch(() => {})
@@ -203,11 +229,18 @@ export function HomePage() {
       <div className="hero">
         <div className="container">
           {config.logo_url && (
-            <img src={config.logo_url} alt="Logo" style={{ maxHeight: 64, marginBottom: 16 }} />
+            // The logo carries the title when hero_hide_title is set: then it is the heading's content.
+            config.hero_hide_title
+              ? <h1 style={{ margin: 0 }}><img src={config.logo_url} alt={resolveLangText(config.site_title, locale)} style={{ maxHeight: 96, marginBottom: 16 }} /></h1>
+              : <img src={config.logo_url} alt="" style={{ maxHeight: 64, marginBottom: 16 }} />
           )}
-          <h1>{resolveLangText(config.site_title, locale)}</h1>
-          {resolveLangText(config.site_subtitle, locale) && (
-            <p style={{ fontSize: 18, opacity: 0.85 }}>{resolveLangText(config.site_subtitle, locale)}</p>
+          {!(config.logo_url && config.hero_hide_title) && (
+            <>
+              <h1>{resolveLangText(config.site_title, locale)}</h1>
+              {resolveLangText(config.site_subtitle, locale) && (
+                <p style={{ fontSize: 18, opacity: 0.85 }}>{resolveLangText(config.site_subtitle, locale)}</p>
+              )}
+            </>
           )}
           {resolveLangText(config.hero_text, locale) && <p>{resolveLangText(config.hero_text, locale)}</p>}
           <form className="hero-search" onSubmit={search}>
@@ -255,7 +288,7 @@ export function HomePage() {
             return (
               <div key={block.id}>
                 <BlockHeading>{blockTitle(block, locale, t('home.highlights'))}</BlockHeading>
-                <ObjectGrid objects={curated} thumbnails={thumbnails} locale={locale} />
+                <ObjectGrid objects={curated} thumbnails={thumbnails} locale={locale} subtitleFields={config.subtitle_fields?.object} fieldDefs={objectFieldDefs} />
               </div>
             )
           }
@@ -263,7 +296,7 @@ export function HomePage() {
             return (
               <div key={block.id}>
                 <BlockHeading>{blockTitle(block, locale, t('home.recent'))}</BlockHeading>
-                <ObjectGrid objects={recent} thumbnails={thumbnails} locale={locale} />
+                <ObjectGrid objects={recent} thumbnails={thumbnails} locale={locale} subtitleFields={config.subtitle_fields?.object} fieldDefs={objectFieldDefs} />
               </div>
             )
           }

@@ -154,6 +154,18 @@ input, select, textarea { font-family: inherit; }
 .facet-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; border: 0; background: transparent; color: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .facet-item:hover { color: var(--accent, #1e3a8a); }
 .facet-item .ct { font-size: 11px; color: var(--fg-4, #677083); font-family: 'IBM Plex Mono', monospace; }
+.rel-facet-link { margin-left: 8px; font-size: 11px; color: var(--fg-3, #5b6474); text-decoration: underline; text-underline-offset: 2px; }
+.rel-facet-link:hover { color: var(--accent, #1e3a8a); }
+.rel-facet-links { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.tree-facet-level { list-style: none; margin: 0; padding: 0; }
+.tree-facet-level .tree-facet-level { padding-left: 14px; border-left: 1px solid var(--border, #e2e8f0); margin-left: 7px; }
+.tree-facet-row { display: flex; align-items: center; gap: 2px; }
+.tree-facet-toggle { flex: 0 0 18px; width: 18px; height: 22px; padding: 0; border: 0; background: transparent; color: var(--fg-3, #5b6474); cursor: pointer; font-size: 11px; }
+.tree-facet-toggle:focus-visible, .tree-facet-crumb button:focus-visible { outline: 2px solid var(--accent, #1e3a8a); outline-offset: 1px; }
+.tree-facet-crumb { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 6px; padding: 4px 8px; border-radius: 4px; background: var(--panel, #f1f5f9); font-size: 12px; }
+.tree-facet-crumb button { border: 0; background: transparent; cursor: pointer; font-size: 14px; line-height: 1; color: var(--fg-3, #5b6474); }
+.tree-facet-search { width: 100%; box-sizing: border-box; margin: 4px 0; padding: 4px 8px; font-size: 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 4px; background: var(--panel, #fff); color: inherit; }
+.tree-facet-loading { padding: 2px 0 2px 20px; font-size: 12px; color: var(--fg-3, #5b6474); }
 .facet-reset { width: 100%; margin-top: 6px; padding: 8px 0 0; border: 0; border-top: 1px solid var(--border, #e4e6eb); background: transparent; color: var(--accent, #1e3a8a); font-size: 12px; text-align: left; cursor: pointer; }
 .facet-reset:hover { color: var(--accent-hover, #15296b); }
 .facet-more { width: 100%; margin-top: 4px; padding: 4px 0; border: 0; background: transparent; color: var(--accent, #1e3a8a); font-size: 12px; text-align: left; cursor: pointer; }
@@ -274,7 +286,7 @@ input, select, textarea { font-family: inherit; }
 }
 /* A record with nothing in the main column (no media, no relations, ...) shows the
    metadata panel alone instead of leaving a wide empty column beside a narrow one. */
-.detail-viewer { background: #0f172a; border-radius: 10px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.3); font-size: 14px; }
+.detail-viewer { background: var(--viewer-bg, #0f172a); border-radius: 10px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.3); font-size: 14px; }
 .collection-detail-grid { display: grid; grid-template-columns: minmax(280px, 320px) 1fr; gap: 32px; align-items: start; }
 .detail-meta { background: var(--panel, #fff); border: 1px solid var(--border, #e4e6eb); border-radius: 10px; padding: 20px; align-self: start; }
 .meta-row { display: flex; flex-direction: column; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border, #e4e6eb); }
@@ -349,9 +361,33 @@ input, select, textarea { font-family: inherit; }
 
 /* Clover IIIF overrides */
 .clover-viewer-media-search { display: none !important; }
+/* Clover's accent (navigator frame, active page, buttons) follows the theme accent.
+   On :root because Clover renders some popovers outside .clover-viewer. */
+:root { --clover-color-accent: var(--accent, #1e3a8a); }
 
 /* Footer */
 .site-footer { background: var(--header-bg, #0b1a33); color: rgba(255,255,255,.5); text-align: center; padding: 24px; font-size: 12.5px; margin-top: auto; }
+.site-footer--configured { text-align: left; padding: 32px 24px 20px; color: rgba(255,255,255,.75); }
+.site-footer--configured a { color: inherit; }
+.site-footer__columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px 32px; max-width: 1200px; margin: 0 auto; }
+.site-footer__title { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: rgba(255,255,255,.95); }
+.site-footer__text { font-size: 12.5px; line-height: 1.6; }
+.site-footer__text p { margin: 0 0 8px; }
+.site-footer__links, .site-footer__logos, .site-footer__bottom-links { list-style: none; margin: 0; padding: 0; }
+.site-footer__links li { margin: 0 0 6px; }
+.site-footer__logos { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.site-footer__logos img { max-height: 56px; max-width: 180px; display: block; }
+.site-footer__bottom { max-width: 1200px; margin: 24px auto 0; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.15); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: 12px; }
+.site-footer__bottom-text p { margin: 0; }
+.site-footer__bottom-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.site-header .logo--image { display: inline-flex; align-items: center; gap: 10px; }
+.site-header .logo__img { display: block; max-height: 36px; width: auto; }
+.usage-notice-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(10, 15, 25, .55); }
+.usage-notice { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--panel, #fff); color: var(--fg, #181a1f); border-radius: 8px; padding: 24px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.usage-notice h2 { font-size: 18px; margin: 0 0 12px; }
+.usage-notice__actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.usage-notice__accept { background: var(--accent, #1e3a8a); color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; font-weight: 600; font-size: 14px; cursor: pointer; min-height: 44px; }
+.usage-notice__accept:focus-visible { outline: 3px solid var(--accent-100, #dde3f5); outline-offset: 2px; }
 
 /* Header autocomplete dropdown */
 .search-suggestions {
@@ -471,6 +507,9 @@ input, select, textarea { font-family: inherit; }
   }
   .facets-wrap {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: 80;
+    /* Desktop sets align-self: start, which keeps the fixed grid child from
+       stretching between top and bottom: the drawer ended at its content. */
+    align-self: auto;
     width: min(85vw, 320px); max-height: none;
     transform: translateX(100%); transition: transform .2s ease-out;
     background: var(--bg, #f4f5f7); padding: 16px; overflow-y: auto;
@@ -522,3 +561,7 @@ input, select, textarea { font-family: inherit; }
 .prose img { max-width: 100%; height: auto; border-radius: 6px; margin: 1em 0; }
 .prose video { max-width: 100%; height: auto; border-radius: 6px; margin: 1em 0; display: block; background: #000; }
 
+
+/* Group fields on detail pages: one line per entry */
+.group-entry + .group-entry { margin-top: 4px; }
+.group-key { color: var(--fg-3, #6b7280); }

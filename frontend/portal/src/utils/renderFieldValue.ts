@@ -183,16 +183,20 @@ export function facetItems(
   locale?: string,
   fieldType?: string,
   vocabularyLabels?: ReadonlyMap<string, string>,
-): { display: string; raw: string }[] {
+): { display: string; raw: string; id?: string }[] {
   const entries = Array.isArray(value) ? value : [value]
   return entries
     .map(item => {
       const raw = facetRawValue(item)
       if (raw === null) return null
       const display = renderFieldValue(item, locale, fieldType, vocabularyLabels) ?? raw
-      return { display, raw }
+      // Vocabulary entries carry a term id: hierarchical facets filter by it.
+      const id = item && typeof item === 'object' && typeof (item as Record<string, unknown>).id === 'string'
+        ? (item as Record<string, string>).id
+        : undefined
+      return id ? { display, raw, id } : { display, raw }
     })
-    .filter((entry): entry is { display: string; raw: string } => entry !== null)
+    .filter((entry): entry is { display: string; raw: string; id?: string } => entry !== null)
 }
 
 /** Pick a human-readable display title from record metadata.

@@ -61,8 +61,14 @@ function resolveInitial(): string {
 
 let currentLocale = resolveInitial()
 const listeners = new Set<() => void>()
+// Bumped on every change (locale, supported locales, terminology). It is the
+// useSyncExternalStore snapshot: with the locale alone as snapshot, a
+// terminology update arriving after first render left the snapshot unchanged
+// and React skipped the re-render — the header kept the default labels.
+let revision = 0
 
 function emit() {
+  revision++
   listeners.forEach(l => l())
 }
 
@@ -122,9 +128,9 @@ const subscribe = (cb: () => void) => {
     listeners.delete(cb)
   }
 }
-const getSnapshot = () => currentLocale
+const getSnapshot = () => revision
 
 export function useI18n() {
-  const locale = useSyncExternalStore(subscribe, getSnapshot)
-  return { locale, t, setLocale }
+  useSyncExternalStore(subscribe, getSnapshot)
+  return { locale: currentLocale, t, setLocale }
 }

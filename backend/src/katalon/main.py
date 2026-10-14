@@ -35,6 +35,7 @@ from katalon.api.v1 import (
     batch,
     collections,
     crawlers,
+    dashboard,
     dnb_urn_mock,
     entities,
     export,
@@ -67,6 +68,7 @@ from katalon.api.v1 import (
     sparql,
     storage_locations,
     theme,
+    thumbnail_warmup,
     users,
     vocabularies,
     working_sets,
@@ -179,7 +181,16 @@ async def _ensure_admin() -> None:
         result = await db.execute(
             select(User).where(User.role.in_(("admin", "superuser"))).limit(1)
         )
-        if result.scalar_one_or_none() is None:
+        if result.scalar_one_or_none() is not None:
+            # Admin existiert (zweiter Start oder später): Credentials-Datei entfernen.
+            try:
+                Path(settings.first_run_credentials_path).unlink(missing_ok=True)
+            except OSError:
+                logger.exception(
+                    "Could not delete first-run credentials file: %s",
+                    settings.first_run_credentials_path,
+                )
+        else:
             base_url = settings.katalon_base_url.strip()
             if base_url:
                 derived_admin_email = _derive_admin_email_from_base_url(base_url)
@@ -412,7 +423,10 @@ async def _ensure_label_fields() -> None:
                         is_repeatable=False,
                         is_searchable=True,
                         sort_order=0,
-                        show_in_detail=True,
+                        # The title is already the detail page's <h1>; repeating it as a
+                        # field is opt-in. Only affects newly created label fields —
+                        # existing installations keep their setting.
+                        show_in_detail=False,
                         show_in_list=True,
                     )
                 )
@@ -577,6 +591,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         pass  # ES may not be available in all environments
     yield
+    from katalon.integrations.elasticsearch import close_es
+
+    await close_es()
 
 
 try:
@@ -722,8 +739,11 @@ app.add_middleware(
 _authenticated = [Depends(get_current_user)]
 
 app.include_router(admin_config.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(dashboard.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(ai.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(index_health.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(index_health.status_router, prefix="/v1", dependencies=_authenticated)
+app.include_router(thumbnail_warmup.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(idno.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(auth.router, prefix="/v1")
 app.include_router(banners.router, prefix="/v1", dependencies=_authenticated)
@@ -903,8 +923,6 @@ async def health(response: Response) -> dict[str, object]:
     except Exception as exc:
         logger.warning("Health check: elasticsearch unreachable", exc_info=True)
         checks["elasticsearch"] = f"error: {exc.__class__.__name__}"
-    finally:
-        await es.close()
 
     redis_result = _check_redis()
     checks["redis"] = cast(str, redis_result["redis"])

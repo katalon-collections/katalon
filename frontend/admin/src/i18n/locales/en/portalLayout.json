@@ -1,0 +1,50 @@
+{
+  "nav": "Footer & notice",
+  "header": {
+    "showTitle": "Show the title next to the logo in the header",
+    "hideHeroTitle": "Hide title and subtitle on the homepage (the logo contains them)",
+    "hint": "Only applies when a logo is set."
+  },
+  "footer": {
+    "title": "Footer",
+    "hint": "Columns with text (Markdown), links or logos. Without columns and bottom text, the one-line default footer stays.",
+    "addColumn": "Add column",
+    "columnType": "Column type",
+    "type": { "text": "Text", "links": "Links", "logos": "Logos" },
+    "columnTitle": "Heading",
+    "content": "Text (Markdown)",
+    "moveUp": "Move column up",
+    "moveDown": "Move column down",
+    "removeColumn": "Remove column",
+    "linkLabel": "Link text",
+    "url": "URL or path",
+    "urlHint": "https://… for external sites, /page/imprint for portal pages.",
+    "addLink": "Add link",
+    "removeLink": "Remove link",
+    "includeFooterPages": "Append pages placed in the footer",
+    "logoSrc": "Image (URL or path, e.g. /themes/<name>/logo.png)",
+    "logoAlt": "Alt text",
+    "logoHref": "Link (optional)",
+    "upload": "Upload image",
+    "uploading": "Uploading…",
+    "uploadHint": "JPEG, PNG, WebP or GIF up to 5 MB.",
+    "addLogo": "Add logo",
+    "removeLogo": "Remove logo",
+    "bottom": "Bottom line",
+    "bottomText": "Text (Markdown)"
+  },
+  "notice": {
+    "title": "Usage notice",
+    "hint": "Shown to every visitor once per browser as a dialog before using the portal.",
+    "enabled": "Show usage notice",
+    "dialogTitle": "Heading",
+    "text": "Text (Markdown)",
+    "acceptLabel": "Button label",
+    "version": "Version {{version}}",
+    "showAgain": "Show to everyone again",
+    "showAgainHint": "Increases the version: visitors who accepted the notice see it once more after saving."
+  },
+  "save": "Save",
+  "saving": "Saving…",
+  "saved": "Saved"
+}

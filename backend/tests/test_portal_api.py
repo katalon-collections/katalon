@@ -23,6 +23,7 @@ from katalon.core.models import (
     User,
     VocabularyTerm,
 )
+from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.database import get_db
 from katalon.integrations import elasticsearch
 from katalon.main import app
@@ -322,6 +323,8 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
     assert response.status_code == 200
     assert response.json() == [
         {
+            # id links group sub-fields (parent_id) to their group in the portal.
+            "id": str(field.id),
             "name": "material",
             "label": {"de": "Material"},
             "field_type": "text",
@@ -411,6 +414,17 @@ async def test_portal_config_rewrites_uploaded_logo_url(monkeypatch) -> None:
     assert response.json()["browse_enabled_types"] == ["object", "entity", "place", "occurrence"]
 
 
+async def _empty_facet_context(*_args, **_kwargs):
+    return portal_public._FacetContext(names=None, specs={}, tree_aggs={}, trees={})
+
+
+def _no_vocabularies() -> MagicMock:
+    """Result of facet_service.hierarchical_vocabulary_ids (no hierarchical vocab)."""
+    result = MagicMock()
+    result.all.return_value = []
+    return result
+
+
 @pytest.mark.parametrize(
     ("saved_facets", "expected_system_facets"),
     [
@@ -426,11 +440,11 @@ async def test_portal_config_preserves_system_facet_visibility(
     config_result = MagicMock()
     config_result.scalar_one_or_none.return_value = PortalConfig(facet_fields=saved_facets)
     facet_result = MagicMock()
-    facet_result.all.return_value = []
+    facet_result.scalars.return_value.all.return_value = []
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
     session = AsyncMock()
-    session.execute.side_effect = [config_result, facet_result, admin_result]
+    session.execute.side_effect = [config_result, facet_result, _no_vocabularies(), admin_result]
 
     async def override_db():
         yield session
@@ -453,11 +467,11 @@ async def test_portal_config_returns_facet_display_settings() -> None:
         facet_sort="alpha", facet_initial_count=25
     )
     facet_result = MagicMock()
-    facet_result.all.return_value = []
+    facet_result.scalars.return_value.all.return_value = []
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
     session = AsyncMock()
-    session.execute.side_effect = [config_result, facet_result, admin_result]
+    session.execute.side_effect = [config_result, facet_result, _no_vocabularies(), admin_result]
 
     async def override_db():
         yield session
@@ -480,11 +494,11 @@ async def test_portal_config_returns_meta_label_uppercase() -> None:
     config_result = MagicMock()
     config_result.scalar_one_or_none.return_value = PortalConfig(meta_label_uppercase=True)
     facet_result = MagicMock()
-    facet_result.all.return_value = []
+    facet_result.scalars.return_value.all.return_value = []
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
     session = AsyncMock()
-    session.execute.side_effect = [config_result, facet_result, admin_result]
+    session.execute.side_effect = [config_result, facet_result, _no_vocabularies(), admin_result]
 
     async def override_db():
         yield session
@@ -522,15 +536,30 @@ async def test_portal_config_update_returns_resolved_facets() -> None:
     config_result2.scalar_one_or_none.return_value = portal_cfg
     from types import SimpleNamespace
 
-    facet_row = SimpleNamespace(target_type="object", name="material")
+    facet_row = SimpleNamespace(
+        id=uuid.uuid4(),
+        parent_id=None,
+        target_type="object",
+        name="material",
+        field_type="text",
+        settings={},
+        is_facet=True,
+        sort_order=0,
+    )
     facet_result = MagicMock()
-    facet_result.all.return_value = [facet_row]
+    facet_result.scalars.return_value.all.return_value = [facet_row]
 
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
 
     session = AsyncMock()
-    session.execute.side_effect = [config_result1, config_result2, facet_result, admin_result]
+    session.execute.side_effect = [
+        config_result1,
+        config_result2,
+        facet_result,
+        _no_vocabularies(),
+        admin_result,
+    ]
 
     async def override_db():
         yield session
@@ -581,12 +610,18 @@ async def test_portal_config_saves_and_returns_terminology_overrides() -> None:
     config_result2 = MagicMock()
     config_result2.scalar_one_or_none.return_value = portal_cfg
     facet_result = MagicMock()
-    facet_result.all.return_value = []
+    facet_result.scalars.return_value.all.return_value = []
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
 
     session = AsyncMock()
-    session.execute.side_effect = [config_result1, config_result2, facet_result, admin_result]
+    session.execute.side_effect = [
+        config_result1,
+        config_result2,
+        facet_result,
+        _no_vocabularies(),
+        admin_result,
+    ]
 
     async def override_db():
         yield session
@@ -661,12 +696,18 @@ async def test_portal_config_saves_and_returns_homepage_blocks() -> None:
     config_result2 = MagicMock()
     config_result2.scalar_one_or_none.return_value = portal_cfg
     facet_result = MagicMock()
-    facet_result.all.return_value = []
+    facet_result.scalars.return_value.all.return_value = []
     admin_result = MagicMock()
     admin_result.scalar_one_or_none.return_value = None
 
     session = AsyncMock()
-    session.execute.side_effect = [config_result1, config_result2, facet_result, admin_result]
+    session.execute.side_effect = [
+        config_result1,
+        config_result2,
+        facet_result,
+        _no_vocabularies(),
+        admin_result,
+    ]
 
     async def override_db():
         yield session
@@ -726,6 +767,7 @@ async def test_portal_config_rejects_unknown_homepage_block_type() -> None:
 async def test_portal_search_rejects_procedures(monkeypatch) -> None:
     search = AsyncMock()
     monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    monkeypatch.setattr("katalon.api.v1.portal_public._facet_context", _empty_facet_context)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/portal/v1/search?type=procedure")
@@ -822,7 +864,7 @@ async def test_portal_advanced_search_uses_validated_filter(monkeypatch) -> None
     assert response.status_code == 200
     assert search.await_args.kwargs["advanced_filter"] == advanced_filter
     assert search.await_args.kwargs["record_type"] == "object"
-    assert search.await_args.kwargs["status"] == "public"
+    assert search.await_args.kwargs["status"] == PUBLIC_STATUSES
 
 
 @pytest.mark.asyncio
@@ -842,6 +884,7 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
         yield session
 
     monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    monkeypatch.setattr("katalon.api.v1.portal_public._facet_context", _empty_facet_context)
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -854,7 +897,7 @@ async def test_portal_search_limits_elasticsearch_to_public_record_types(monkeyp
     assert response.status_code == 200
     assert captured["record_type"] is None
     assert captured["record_types"] == ("object", "entity", "place", "occurrence", "collection")
-    assert captured["status"] == "public"
+    assert captured["status"] == PUBLIC_STATUSES
     assert captured["extra_filters"] == {"event_date": ["Paläolithikum", "Neolithikum"]}
     assert captured["subtitle_fields"] == {"object": ["creator"]}
 
@@ -875,6 +918,7 @@ async def test_portal_search_forwards_numeric_range_filters(monkeypatch) -> None
         yield session
 
     monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    monkeypatch.setattr("katalon.api.v1.portal_public._facet_context", _empty_facet_context)
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -911,6 +955,7 @@ async def test_portal_search_restricts_staff_without_object_read_permission(monk
         yield session
 
     monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    monkeypatch.setattr("katalon.api.v1.portal_public._facet_context", _empty_facet_context)
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
     try:
@@ -951,6 +996,7 @@ async def test_portal_advanced_search_restricts_staff_without_object_read_permis
         yield session
 
     monkeypatch.setattr(portal_public.search_service, "search", search)
+    monkeypatch.setattr(portal_public, "_facet_context", _empty_facet_context)
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[try_get_current_user] = lambda: no_permission_user
     try:
@@ -1000,6 +1046,7 @@ async def test_portal_search_forwards_rel_collection(monkeypatch) -> None:
         yield session
 
     monkeypatch.setattr("katalon.api.v1.portal_public.search_service.search", search)
+    monkeypatch.setattr("katalon.api.v1.portal_public._facet_context", _empty_facet_context)
     app.dependency_overrides[get_db] = override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -1221,34 +1268,3 @@ async def test_portal_schema_cache_header_depends_on_the_viewer() -> None:
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(try_get_current_user, None)
-
-
-@pytest.mark.asyncio
-async def test_filter_facet_names_whitelists_only_is_facet_fields() -> None:
-    """Anonymous callers may aggregate only fields explicitly marked is_facet
-    (docs carry facet_all_* for every public field, so without this gate any
-    public field would become aggregatable)."""
-    db = AsyncMock()
-    rows = MagicMock()
-    rows.all.return_value = [("material",), ("year",)]
-    db.execute.return_value = rows
-
-    result = await portal_public._filter_facet_names(
-        db,
-        ["material", "year", "not_a_facet", "inherited_entity_ort", "related_entities"],
-        ("object",),
-    )
-
-    assert result == ["inherited_entity_ort", "material", "related_entities", "year"]
-
-
-@pytest.mark.asyncio
-async def test_filter_facet_names_allows_facet_across_any_searched_type() -> None:
-    db = AsyncMock()
-    rows = MagicMock()
-    rows.all.return_value = [("ort",)]
-    db.execute.return_value = rows
-
-    result = await portal_public._filter_facet_names(db, ["ort"], ("object", "entity", "place"))
-
-    assert result == ["ort"]

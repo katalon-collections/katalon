@@ -2,27 +2,11 @@
 # Copyright (c) 2026 Karl Krägelin
 
 import asyncio
-import threading
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
-
-
-class _FakeRedis:
-    """Stand-in for redis.from_url in bulk_reindex_type_task's lock — no broker
-    is available in the integration test environment (see tests/test_index_tasks.py
-    for the same fake used at the unit-test level)."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-
-    def lock(self, _name, **_kwargs):
-        return self._lock
-
-    def close(self) -> None:
-        return None
 
 
 @pytest.mark.asyncio
@@ -803,7 +787,7 @@ async def test_reconciliation_does_not_resurrect_soft_deleted_records(
 
 @pytest.mark.asyncio
 async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(
-    async_client, auth_headers, monkeypatch
+    async_client, auth_headers, fake_es, fake_reindex_redis
 ) -> None:
     from katalon.workers import index_tasks
 
@@ -820,25 +804,15 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(
     delete_response = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
     assert delete_response.status_code == 204
 
-    indexed: list[str] = []
-    reindexed_types: list[str] = []
-
-    async def _fake_reindex_type(record_type: str, records: list) -> int:
-        reindexed_types.append(record_type)
-        indexed.extend(rid for rid, _ in records)
-        return len(records)
-
-    monkeypatch.setattr("katalon.integrations.elasticsearch.reindex_type", _fake_reindex_type)
-    monkeypatch.setattr("redis.from_url", lambda *_args, **_kwargs: _FakeRedis())
+    es = fake_es
     report = await asyncio.to_thread(index_tasks.bulk_reindex_type_task, "object")
-    assert object_id not in indexed
+    assert object_id not in es.docs
     assert report["status"] == "ok"
 
-    indexed.clear()
-    reindexed_types.clear()
-    await asyncio.to_thread(index_tasks.reindex_all_task)
-    assert object_id not in indexed
-    assert reindexed_types == [
+    es.docs.clear()
+    report = await asyncio.to_thread(index_tasks.reindex_all_task)
+    assert object_id not in es.docs
+    assert list(report["types"]) == [
         "object",
         "entity",
         "place",
@@ -847,3 +821,4 @@ async def test_bulk_reindex_and_reindex_all_skip_soft_deleted(
         "collection",
         "storage_location",
     ]
+    assert {r["status"] for r in report["types"].values()} == {"ok"}

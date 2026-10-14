@@ -1,0 +1,45 @@
+{
+  "order": {
+    "title": "Reihenfolge im Portal",
+    "hint": "Ziehen oder mit den Pfeilen verschieben. Gilt für alle aktiven Facetten dieses Typs.",
+    "empty": "Noch keine Facetten aktiv.",
+    "moveUp": "{{name}} nach oben",
+    "moveDown": "{{name}} nach unten",
+    "dragHandle": "{{name}} verschieben",
+    "kind": {
+      "field": "Feld",
+      "date": "Datum",
+      "tree": "Hierarchie",
+      "relation": "Beziehung",
+      "related": "Verknüpft",
+      "inherited": "Geerbt"
+    }
+  },
+  "relations": {
+    "title": "Beziehungsfacetten",
+    "hint": "Facetten über verknüpfte Datensätze, eingeschränkt auf bestimmte Beziehungsarten (z. B. „Komponist_in“). Änderungen bauen den Suchindex dieses Typs im Hintergrund neu auf.",
+    "empty": "Keine Beziehungsfacetten für diesen Typ.",
+    "add": "Beziehungsfacette hinzufügen",
+    "edit": "Bearbeiten",
+    "remove": "Entfernen",
+    "dialogTitleNew": "Neue Beziehungsfacette",
+    "dialogTitleEdit": "Beziehungsfacette bearbeiten",
+    "labelDe": "Bezeichnung (Deutsch)",
+    "labelEn": "Bezeichnung (Englisch)",
+    "key": "Schlüssel",
+    "keyHint": "Kleinbuchstaben, Ziffern und _ – wird in Such-Links verwendet.",
+    "targetType": "Verknüpfter Typ",
+    "relationTypes": "Beziehungsarten",
+    "relationTypesEmpty": "Keine Beziehungsarten für diese Kombination im Vokabular „relation_types“.",
+    "subtypes": "Nur Subtypen (optional, kommagetrennt)",
+    "direction": "Richtung",
+    "directionOutgoing": "Dieser Datensatz → verknüpfter",
+    "directionIncoming": "Verknüpfter → dieser Datensatz",
+    "directionBoth": "Beide Richtungen",
+    "cancel": "Abbrechen",
+    "apply": "Übernehmen",
+    "errorKey": "Schlüssel fehlt, ist ungültig oder schon vergeben.",
+    "errorTypes": "Mindestens eine Beziehungsart wählen."
+  },
+  "subfield": "{{group}} › {{field}}"
+}

@@ -10,7 +10,8 @@ interface Props {
 }
 
 const options = {
-  background: '#0f172a',
+  // Clover writes this into --clover-viewer-background; themes set --viewer-bg.
+  background: 'var(--viewer-bg, #0f172a)',
   showTitle: false,
   showIIIFBadge: false,
   showDownload: false,

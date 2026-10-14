@@ -116,6 +116,7 @@ async def test_ensure_admin_is_one_shot_when_superuser_exists(monkeypatch, tmp_p
         str(credentials_path),
         raising=False,
     )
+    credentials_path.write_text("stale", encoding="utf-8")
 
     await main_module._ensure_admin()
 

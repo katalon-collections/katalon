@@ -928,3 +928,15 @@ class WorkingSetRead(WorkingSetBase):
 
 class WorkingSetDetailRead(WorkingSetRead):
     items: list[WorkingSetItemRead] = []
+
+
+class LockRead(BaseModel):
+    resource_type: str
+    resource_id: str
+    locked_by: str
+    locked_by_email: str
+    locked_at: datetime
+    expires_at: datetime | None = None
+    reason: str = ""
+    title: str | None = None
+    idno: str | None = None
