@@ -9,6 +9,7 @@ Commands:
     katalon-manage import-xml
     katalon-manage reset-admin
     katalon-manage warm-thumbnails
+    katalon-manage lido-report
 """
 
 from __future__ import annotations
@@ -185,3 +186,44 @@ def warm_thumbnails(primary_only: bool, restart: bool, show_status: bool) -> Non
     phase = {"primary": "Hauptbilder", "rest": "weitere Bilder", "done": "fertig"}.get(state["phase"], state["phase"])
     running = "läuft" if state.get("running") else "angehalten" if state["phase"] != "done" else "abgeschlossen"
     click.echo(f"Vorschaubilder: {done}/{total} ({phase}, {running}); Fehler: {state.get('failed', 0)}")
+
+
+@cli.command(name="lido-report")
+@click.option("--mapping-set", "mapping_set_id", required=True, help="ID of the export mapping set.")
+@click.option(
+    "--output", "output", type=click.Path(dir_okay=False, writable=True), default=None,
+    help="Write the CSV to this file instead of stdout.",
+)
+def lido_report(mapping_set_id: str, output: str | None) -> None:
+    """Check all public records against a mapping set (required fields, rights checks).
+
+    Prints the number of affected records per problem to stderr and one CSV row
+    per problem (lidoRecID, record ID, message).
+    """
+    import asyncio
+    import csv
+    import sys
+    import uuid
+    from contextlib import nullcontext
+
+    from katalon.database import AsyncSessionLocal
+    from katalon.services.export_report_service import ExportReport, build_report
+
+    async def _build() -> ExportReport:
+        async with AsyncSessionLocal() as db:
+            return await build_report(db, uuid.UUID(mapping_set_id))
+
+    try:
+        report = asyncio.run(_build())
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Geprüft: {report.checked}, mit Fehlern: {len(report.problems)}", err=True)
+    for kind, count in report.counts().most_common():
+        click.echo(f"  {count:>6}  {kind}", err=True)
+    target = open(output, "w", newline="", encoding="utf-8") if output else nullcontext(sys.stdout)  # noqa: SIM115
+    with target as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["lidoRecID", "record_id", "fehler"])
+        for problem in report.problems:
+            for message in problem.messages:
+                writer.writerow([problem.rec_id, problem.record_id, message])

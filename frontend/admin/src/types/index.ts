@@ -211,6 +211,8 @@ export interface LidoEventConfig {
   id: string
   type: string
   label: LocalizedText
+  /** LIDO terminology URI of the event type (e.g. lido00007 for production). */
+  type_concept_uri?: string
   is_preset?: boolean
 }
 
@@ -222,6 +224,8 @@ export interface ExportProfileCapabilities {
   targets: ExportTargetCapability[]
   validators: ValidatorDependency[]
   loss_boundaries: LocalizedText[]
+  /** settings_schema of templated targets the editor builds itself (LIDO: event sub-targets). */
+  template_settings?: Record<string, Record<string, unknown>>
 }
 
 export interface MappingDiagnostic {
@@ -589,6 +593,16 @@ export interface RecordSubtype {
   concept_id?: string | null
   concept_uri?: string | null
   concept_label?: string | null
+  /** Further authority concepts (e.g. AAT next to a preferred GND concept). */
+  concept_alternatives?: SubtypeConceptAlternative[]
+}
+
+export interface SubtypeConceptAlternative {
+  source?: string
+  id?: string
+  uri?: string
+  label?: string
+  lang?: string
 }
 
 export interface Banner {

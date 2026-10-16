@@ -109,7 +109,10 @@ def test_export_record_context_from_hit_fallback() -> None:
 
 
 @pytest.mark.asyncio
-async def test_build_export_context_from_db_security_filtering() -> None:
+async def test_build_export_context_from_db_security_filtering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(export_context_service.settings, "cantaloupe_public_url", "")
     rec_id = uuid.uuid4()
     mock_obj = MagicMock(spec=Object)
     mock_obj.id = rec_id
@@ -150,6 +153,7 @@ async def test_build_export_context_from_db_security_filtering() -> None:
     mock_entity.status = "public"
     mock_entity.deleted_at = None
     mock_entity.metadata_ = {"name": "Öffentlicher Fotograf"}
+    mock_entity.entity_type = "ind"
 
     # 2. Excluded relation: storage_location (internal logistics!)
     rel_storage = MagicMock(spec=Relation)
@@ -171,6 +175,11 @@ async def test_build_export_context_from_db_security_filtering() -> None:
     mf_pub.iiif_storage_key = "iiif/scan"
     mf_pub.license_uri = "https://creativecommons.org/publicdomain/zero/1.0/"
     mf_pub.rights_holder = {"name": "Museum"}
+    mf_pub.credit_line = "Veröffentlichung genehmigt."
+    mf_pub.width = 1200
+    mf_pub.height = 800
+    mf_pub.status = "ready"
+    mf_pub.storage_key = "originals/scan.jpg"
 
     # 2. Non-public media (is_public=False)
     mf_priv = MagicMock(spec=MediaFile)
@@ -258,6 +267,13 @@ async def test_build_export_context_from_db_security_filtering() -> None:
         media_filenames = {m.filename for m in ctx.media}
         assert "internal_condition_report.pdf" not in media_filenames
         assert "public_scan.jpg" in media_filenames
+        media = ctx.media[0]
+        # Cantaloupe identifies images by the encoded IIIF storage key, not the media UUID.
+        assert media.iiif_base == "https://katalon.example.org/iiif/3/iiif%2Fscan"
+        assert media.iiif_url == "https://katalon.example.org/iiif/3/iiif%2Fscan/full/max/0/default.jpg"
+        assert media.credit_line == "Veröffentlichung genehmigt."
+        assert media.rights_statement_label == "CC0 1.0"
+        assert ctx.relations[0].target_subtype == "ind"
         assert len(ctx.media) == 1
         assert ctx.media[0].is_primary is True
         assert "iiif" in (ctx.media[0].iiif_url or "")

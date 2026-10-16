@@ -23,6 +23,22 @@ from katalon.services import oaipmh_service
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
+def _minimal_rules() -> list[MappingSpec]:
+    """Title from the record + a constant work type: the two LIDO required fields."""
+    return [
+        MappingSpec(
+            source_kind=SourceKind.RECORD,
+            source_config={"property": "title"},
+            target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+        ),
+        MappingSpec(
+            source_kind=SourceKind.CONSTANT,
+            source_config={"value": "Objekt"},
+            target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+        ),
+    ]
+
+
 @pytest.fixture
 def bpk_fixture() -> ExportRecordContext:
     fixture_path = FIXTURES_DIR / "bpk_os_ub_0029908.json"
@@ -278,7 +294,7 @@ def test_lido_requires_title_and_work_type_mappings() -> None:
     assert {diagnostic.code for diagnostic in diagnostics} == {"required_target_missing"}
     assert len(diagnostics) == 2
 
-def test_lido_work_type_allows_only_one_source_rule() -> None:
+def test_lido_work_type_allows_several_source_rules() -> None:
     target = "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
     capability = next(capability for capability in LidoFormat().capabilities().targets if capability.key == target)
     diagnostics = LidoFormat().validate_mapping(
@@ -293,8 +309,9 @@ def test_lido_work_type_allows_only_one_source_rule() -> None:
         )
     )
 
-    assert capability.cardinality == "one"
-    assert [diagnostic.code for diagnostic in diagnostics] == ["cardinality_exceeded"]
+    # Subtype authority data and a local field (e.g. "Kartentypus") side by side.
+    assert capability.cardinality == "many"
+    assert diagnostics == []
 
 
 def test_lido_requires_an_event_type_for_event_mappings() -> None:
@@ -434,10 +451,11 @@ def test_oai_get_record_and_list_records_with_lido(bpk_fixture: ExportRecordCont
     assert "Historische Bildpostkarten" not in list_rec_xml
 
 
-def test_oai_get_record_missing_required_field_returns_cannot_disseminate(
+def test_oai_record_missing_required_field_is_reported_as_deleted(
     bpk_fixture: ExportRecordContext,
 ) -> None:
-    """No title mapping configured -> record must not be exported with an empty appellationValue."""
+    """No title mapping configured -> no LIDO with an empty appellationValue; the record is
+    reported as deleted so incremental harvesters drop an earlier copy."""
     fmt = LidoFormat()
     hit = {
         "_id": bpk_fixture.record.id,
@@ -456,8 +474,9 @@ def test_oai_get_record_missing_required_field_returns_cannot_disseminate(
         prefix="lido",
         metadata_format=fmt,
     )
-    assert "cannotDisseminateFormat" in xml_str
-    assert "<GetRecord>" not in xml_str
+    assert '<header status="deleted">' in xml_str
+    assert "<metadata>" not in xml_str
+    assert "<datestamp>2026-07-08T10:24:32Z</datestamp>" in xml_str
 
     list_xml = oaipmh_service.list_records(
         hits=[hit],
@@ -470,8 +489,8 @@ def test_oai_get_record_missing_required_field_returns_cannot_disseminate(
         base_url="http://test/oai",
         metadata_format=fmt,
     )
-    assert "noRecordsMatch" in list_xml
-    assert "<ListRecords>" not in list_xml
+    assert '<header status="deleted">' in list_xml
+    assert "lido:lidoWrap" not in list_xml
 
 
 # ---------------------------------------------------------------------------
@@ -552,8 +571,8 @@ def test_group_vocab_rights_value_extracts_label_not_python_repr() -> None:
     assert "<lido:term>CC0 1.0</lido:term>" in xml_str
 
 
-def test_group_vocab_value_prefers_uri_over_label() -> None:
-    """When a vocab sub-value carries a resolved `uri`, prefer it over the label."""
+def test_group_vocab_value_with_uri_renders_concept_id_and_label() -> None:
+    """A vocab sub-value with a resolved `uri` yields rightsType conceptID (URI) + term (label)."""
     ctx = ExportRecordContext(
         record=ExportRecordSummary(id="rights-002", idno="RIGHTS-002", record_type="object", title="Test"),
         fields={
@@ -570,8 +589,15 @@ def test_group_vocab_value_prefers_uri_over_label() -> None:
     )
     xml_str = ET.tostring(fmt.render(ctx, cms), encoding="unicode")
 
-    assert "http://creativecommons.org/publicdomain/zero/1.0/" in xml_str
-    assert "CC0 1.0" not in xml_str
+    root = ET.fromstring(xml_str)
+    ns = {"lido": LIDO_NS}
+    rights_type = root.find(".//lido:rightsWorkSet/lido:rightsType", ns)
+    assert rights_type is not None
+    # The stored spelling is kept (only an allowed_license_uris list rewrites it).
+    assert rights_type.findtext("lido:conceptID", namespaces=ns) == (
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+    )
+    assert rights_type.findtext("lido:term", namespaces=ns) == "CC0 1.0"
 
 
 def test_lido_multiple_events_rendered_as_separate_event_sets() -> None:
@@ -705,7 +731,10 @@ def test_lido_object_work_type_from_subtype_normdaten() -> None:
     assert concept_id is not None
     assert concept_id.text == "http://vocab.getty.edu/aat/300033618"
     assert concept_id.attrib.get("{http://www.lido-schema.org}source") == "AAT"
-    assert concept_id.attrib.get("{http://www.lido-schema.org}type") == "URI"
+    assert (
+        concept_id.attrib.get("{http://www.lido-schema.org}type")
+        == "http://terminology.lido-schema.org/lido00099"
+    )
 
     term = work_type.find("{http://www.lido-schema.org}term")
     assert term is not None
@@ -779,11 +808,13 @@ def test_lido_emits_ddb_record_metadata_defaults() -> None:
             idno="INV-2026-03",
             record_type="object",
             title="DDB-Testobjekt",
+            updated_at="2026-03-01T09:30:00",
         )
     )
     mapping_set = CompiledMappingSet(
         format_key="lido",
         record_type="object",
+        rules=_minimal_rules(),
         institution_config={
             "isil": "DE-MUS-123",
             "institution_name": "Testmuseum",
@@ -807,7 +838,7 @@ def test_lido_emits_ddb_record_metadata_defaults() -> None:
     )
     assert (
         record_wrap.findtext("lido:recordSource/lido:legalBodyID", namespaces=ns)
-        == "https://ld.zdb-services.de/resource/organisations/DE-MUS-123"
+        == "https://sigel.staatsbibliothek-berlin.de/suche?isil=DE-MUS-123"
     )
     assert (
         record_wrap.findtext("lido:recordRights/lido:rightsType/lido:conceptID", namespaces=ns)
@@ -817,18 +848,25 @@ def test_lido_emits_ddb_record_metadata_defaults() -> None:
         record_wrap.findtext("lido:recordInfoSet/lido:recordInfoLink", namespaces=ns)
         == "https://sammlung.example.test/objects/obj-789"
     )
-    assert record_wrap.findtext("lido:recordInfoSet/lido:recordMetadataDate", namespaces=ns)
+    metadata_date = record_wrap.find("lido:recordInfoSet/lido:recordMetadataDate", ns)
+    assert metadata_date is not None
+    # The record's own change date, not the export time (stable across harvests).
+    assert metadata_date.text == "2026-03-01T09:30:00"
+    assert metadata_date.attrib[f"{{{LIDO_NS}}}type"] == "http://terminology.lido-schema.org/lido00471"
 
 
 def test_lido_marks_production_events_with_the_lido_concept() -> None:
     ctx = ExportRecordContext(
-        record=ExportRecordSummary(id="obj-production", idno="INV-2026-04", record_type="object"),
+        record=ExportRecordSummary(
+            id="obj-production", idno="INV-2026-04", record_type="object", title="Objekt"
+        ),
         fields={"year": "1900"},
     )
     mapping_set = CompiledMappingSet(
         format_key="lido",
         record_type="object",
         rules=[
+            *_minimal_rules(),
             MappingSpec(
                 source_kind=SourceKind.FIELD,
                 source_config={"field_name": "year"},

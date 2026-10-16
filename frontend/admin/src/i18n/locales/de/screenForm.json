@@ -105,5 +105,11 @@
     "exporting": "Exportiert…",
     "formatsTitle": "Verfügbare Formate",
     "failed": "Export fehlgeschlagen: {{error}}"
-  }
+  },
+  "mediaRightsToggle": "Rechteangaben",
+  "mediaLicenseUriPlaceholder": "Lizenz-URI",
+  "mediaRightsHolderPlaceholder": "Rechteinhaber",
+  "mediaRightsHolderUriPlaceholder": "Rechteinhaber-URI",
+  "mediaCreditLinePlaceholder": "Freigabehinweis / Credit Line",
+  "mediaCreditLineHelp": "Hinweis zur Veröffentlichung, z. B. „Veröffentlichung genehmigt von …“. Erscheint im Portal und im LIDO-Export (rightsResource/creditLine)."
 }

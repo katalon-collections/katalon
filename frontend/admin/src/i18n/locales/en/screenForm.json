@@ -105,5 +105,11 @@
     "exporting": "Exporting…",
     "formatsTitle": "Available Formats",
     "failed": "Export failed: {{error}}"
-  }
+  },
+  "mediaRightsToggle": "Rights",
+  "mediaLicenseUriPlaceholder": "License URI",
+  "mediaRightsHolderPlaceholder": "Rights holder",
+  "mediaRightsHolderUriPlaceholder": "Rights holder URI",
+  "mediaCreditLinePlaceholder": "Permission note / credit line",
+  "mediaCreditLineHelp": "Note on publication, e.g. \"Published with permission of …\". Shown in the portal and in the LIDO export (rightsResource/creditLine)."
 }

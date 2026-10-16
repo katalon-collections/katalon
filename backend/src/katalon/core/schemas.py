@@ -208,6 +208,14 @@ class ImportMappingRead(BaseModel):
     updated_at: datetime
 
 
+class SubtypeConceptAlternative(BaseModel):
+    source: str | None = None
+    id: str | None = None
+    uri: str | None = None
+    label: str | None = None
+    lang: str | None = None
+
+
 class RecordSubtypeCreate(BaseModel):
     primary_type: str
     name: str
@@ -220,6 +228,8 @@ class RecordSubtypeCreate(BaseModel):
     concept_id: str | None = None
     concept_uri: str | None = None
     concept_label: str | None = None
+    # None on update = keep stored alternatives (clients that predate the field).
+    concept_alternatives: list[SubtypeConceptAlternative] | None = None
 
 
 class RecordSubtypeRead(RecordSubtypeCreate):

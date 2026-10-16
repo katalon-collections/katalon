@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import uuid
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -101,6 +102,7 @@ def _serialize(f: MediaFile) -> dict[str, Any]:
         "media_type": f.media_type,
         "license_uri": f.license_uri,
         "rights_holder": f.rights_holder,
+        "credit_line": f.credit_line,
         "created_at": f.created_at.isoformat(),
         "iiif_identifier": identifier,
         "_links": links,
@@ -226,6 +228,7 @@ class MediaPatch(BaseModel):
     is_public: bool | None = None
     license_uri: str | None = None
     rights_holder: dict[str, Any] | None = None
+    credit_line: str | None = None
 
 
 async def _reindex_object(object_id: uuid.UUID, db: Any) -> None:
@@ -265,6 +268,7 @@ async def patch_media(
         "media_type": media.media_type,
         "license_uri": media.license_uri,
         "rights_holder": media.rights_holder,
+        "credit_line": media.credit_line,
         "is_primary": media.is_primary,
         "is_public": media.is_public,
     }
@@ -275,6 +279,8 @@ async def patch_media(
         media.license_uri = data.license_uri
     if "rights_holder" in data.model_fields_set:
         media.rights_holder = data.rights_holder
+    if "credit_line" in data.model_fields_set:
+        media.credit_line = (data.credit_line or "").strip() or None
     if data.is_public is not None:
         media.is_public = data.is_public
 
@@ -293,6 +299,7 @@ async def patch_media(
         "media_type": media.media_type,
         "license_uri": media.license_uri,
         "rights_holder": media.rights_holder,
+        "credit_line": media.credit_line,
         "is_primary": media.is_primary,
         "is_public": media.is_public,
     })
@@ -303,8 +310,16 @@ async def patch_media(
             action="media_update", changed_fields=diff,
         )
 
+    changed = (diff or {}).get("new", {})
+    rights_changed = any(k in changed for k in ("license_uri", "rights_holder", "credit_line"))
+    if rights_changed or "is_public" in changed:
+        # Media rights are part of the object's export (LIDO resourceSet), so the
+        # object's datestamp must move or incremental OAI harvests miss the change.
+        obj = await db.get(Object, object_id)
+        if obj is not None:
+            obj.updated_at = datetime.now(UTC).replace(tzinfo=None)
     await db.flush()
-    if data.is_primary is not None or data.is_public is not None:
+    if data.is_primary is not None or data.is_public is not None or rights_changed:
         await _reindex_object(object_id, db)
     return _serialize(media)
 

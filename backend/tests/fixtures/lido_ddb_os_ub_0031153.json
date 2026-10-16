@@ -1,0 +1,113 @@
+{
+  "record": {
+    "id": "7f1c2d3e-0000-4000-8000-000000031153",
+    "idno": "os_ub_0031153",
+    "record_type": "object",
+    "target_subtype": "postkarte",
+    "title": "Drunten im Unterland da ist's halt fein [...]",
+    "status": "public",
+    "created_at": "2026-09-20T08:00:00",
+    "updated_at": "2026-10-02T14:31:07",
+    "subtype_concept_source": "gnd",
+    "subtype_concept_id": "4046902-5",
+    "subtype_concept_uri": "https://d-nb.info/gnd/4046902-5",
+    "subtype_concept_label": "Postkarte",
+    "subtype_concept_alternatives": [
+      {"source": "aat", "id": "300026816", "uri": "http://vocab.getty.edu/aat/300026816", "label": "postcards", "lang": "en"}
+    ]
+  },
+  "fields": {
+    "title": "Drunten im Unterland da ist's halt fein [...] ",
+    "kartentypus": {"id": "a1000000-0000-4000-8000-000000000001", "label": "Ansichtskarte / Motivkarte"},
+    "kategorie": {"id": "a1000000-0000-4000-8000-000000000002", "label": "16.02. Sonstiges"},
+    "beschriftung_gedruckt": [
+      {
+        "beschriftung_gedruck_vorder": "Drunten im Unterland da ist's halt fein -<br />Schlehen im Oberland Trauben im Unterland Drunten im Unterland möcht i wohl sein.",
+        "beschriftung_gedruck_rueck": "“Drunten im Unterland”.\n"
+      }
+    ],
+    "beschreibung": "<p>Ein Mann steht mit einer Axt am Rande eines Waldes und blickt hinunter auf eine Hügellandschaft. Durch die Landschaft schlängelt sich ein Fluss &ndash; am Himmel sind Wolken zu sehen. Ganz oben auf der Karte ist in einem Kasten ein Textausschnitt aus dem Volkslied &bdquo;Drunten im Unterland da ist's halt fein&ldquo; abgedruckt.</p>&nbsp;",
+    "kuerzere_seite": "9,2 cm",
+    "laengere_seite": "13,9",
+    "material": {"id": "a1000000-0000-4000-8000-000000000003", "label": "Karton"},
+    "technik": {"id": "a1000000-0000-4000-8000-000000000004", "label": "Autotypie (farbig)"},
+    "datierung": "1905/",
+    "datierungsart": {"id": "a1000000-0000-4000-8000-000000000005", "label": "Datierung durch Form der Karte"},
+    "frankierung": {"id": "a1000000-0000-4000-8000-000000000006", "label": "nicht frankiert"},
+    "stempel": {"id": "a1000000-0000-4000-8000-000000000007", "label": "nicht gestempelt"},
+    "beschrieben": {"id": "a1000000-0000-4000-8000-000000000008", "label": "unbeschrieben"},
+    "gelaufen": {"id": "a1000000-0000-4000-8000-000000000009", "label": "nicht gelaufen"},
+    "schlagworte": [
+      {"id": "a1000000-0000-4000-8000-000000000010", "label": "Wald"},
+      {"id": "a1000000-0000-4000-8000-000000000011", "label": "Baum "}
+    ],
+    "aat_schlagworte": [
+      {"source": "aat", "external_id": "300008707", "label": "rivers "}
+    ],
+    "serie": "Volksliederkarten von Paul Hey",
+    "foerderer": "Digitalisierung und Erschließung gefördert durch die Dieter Fuchs Stiftung.",
+    "rights": [
+      {"rechtemodell": {"id": "a1000000-0000-4000-8000-000000000012", "label": "CC BY-NC 4.0", "uri": "https://creativecommons.org/licenses/by-nc/4.0/"}}
+    ]
+  },
+  "relations": [
+    {
+      "id": "r-1", "direction": "outbound", "relation_type": "member_of",
+      "target_type": "collection", "target_id": "c-1", "target_label": "Sammlung Silcher-Museum"
+    },
+    {
+      "id": "r-2", "direction": "outbound", "relation_type": "creator",
+      "target_type": "entity", "target_id": "e-1", "target_subtype": "unternehmen",
+      "target_label": "Verlag des Vereins für das Deutschtum im Ausland",
+      "target_relations": [
+        {"id": "r-2a", "direction": "outbound", "relation_type": "ansaessig", "target_type": "place", "target_id": "p-berlin", "target_label": "Berlin",
+         "target_values": {"geonames": {"source": "geonames", "external_id": "2950159", "label": "Berlin"}, "gnd": {"source": "gnd", "external_id": "4005728-8", "label": "Berlin"}}}
+      ]
+    },
+    {
+      "id": "r-3", "direction": "outbound", "relation_type": "creator",
+      "target_type": "entity", "target_id": "e-2", "target_subtype": "unternehmen",
+      "target_label": "Novitas Verlag Otto Kellner",
+      "target_relations": [
+        {"id": "r-3a", "direction": "outbound", "relation_type": "ansaessig", "target_type": "place", "target_id": "p-berlin", "target_label": "Berlin",
+         "target_values": {"geonames": {"source": "geonames", "external_id": "2950159", "label": "Berlin"}, "gnd": {"source": "gnd", "external_id": "4005728-8", "label": "Berlin"}}},
+        {"id": "r-3b", "direction": "outbound", "relation_type": "ansaessig", "target_type": "place", "target_id": "p-wien", "target_label": "Wien (A)",
+         "target_values": {"geonames": {"source": "geonames", "external_id": "2761369", "label": "Wien"}}}
+      ]
+    },
+    {
+      "id": "r-4", "direction": "outbound", "relation_type": "creator",
+      "target_type": "entity", "target_id": "e-3", "target_subtype": "unternehmen",
+      "target_label": "Faber",
+      "target_relations": [
+        {"id": "r-4a", "direction": "outbound", "relation_type": "ansaessig", "target_type": "place", "target_id": "p-magdeburg", "target_label": "Magdeburg",
+         "target_values": {"geonames": {"source": "geonames", "external_id": "2874545", "label": "Magdeburg"}}},
+        {"id": "r-4b", "direction": "outbound", "relation_type": "gruendungsort", "target_type": "place", "target_id": "p-x", "target_label": "Nicht gemappt"}
+      ]
+    },
+    {
+      "id": "r-5", "direction": "outbound", "relation_type": "maler",
+      "target_type": "entity", "target_id": "e-4", "target_subtype": "ind",
+      "target_label": "Paul Hey",
+      "target_values": {
+        "lobid": {"source": "gnd", "external_id": "116785861", "label": "Hey, Paul"},
+        "gnd_link": {"value": "http://d-nb.info/gnd/116785861", "label": "GND"},
+        "wikidata": {"source": "wikidata", "external_id": "Q2060171", "label": "Paul Hey"}
+      }
+    }
+  ],
+  "media": [
+    {
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "filename": "os_ub_0031153_v.jpg",
+      "mime_type": "image/jpeg",
+      "is_primary": true,
+      "is_public": true,
+      "url": "https://bpk.katalon-collections.de/v1/media/b2000000-0000-4000-8000-000000000001/download",
+      "iiif_base": "https://bpk.katalon-collections.de/iiif/3/b2000000-0000-4000-8000-000000000001",
+      "license_uri": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "rights_holder": "Renate Wachnitz, geb. Hey",
+      "credit_line": "Veröffentlichung genehmigt von Renate Wachnitz, geb. Hey. Jede weitere Verwendung bedarf der Genehmigung der Rechteinhaberin."
+    }
+  ]
+}

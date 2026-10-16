@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Soll-Ausgabe (LIDO 1.0, DDB-konform) für os_ub_0031153, gerendert aus
+  lido_ddb_os_ub_0031153.json mit lido_ddb_mapping.yaml. Grundlage: Anhang A der
+  DDB-Aufgabe (CA-Export + DDB-Rückmeldung 2026-10); die dort mit "…" ausgelassenen
+  Teile (weitere Verlage, Orte, Schlagwörter) sind synthetisch ergänzt.
+-->
+<lido:lidoWrap xmlns:lido="http://www.lido-schema.org" xmlns:gml="http://www.opengis.net/gml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.lido-schema.org http://www.lido-schema.org/schema/v1.0/lido-v1.0.xsd">
+  <lido:lido>
+    <lido:lidoRecID lido:type="http://terminology.lido-schema.org/lido00100">DE-3066--os_ub_0031153</lido:lidoRecID>
+    <lido:category>
+      <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="CIDOC CRM">http://www.cidoc-crm.org/cidoc-crm/E22_Human-Made_Object</lido:conceptID>
+      <lido:term>Human-Made Object</lido:term>
+    </lido:category>
+    <lido:descriptiveMetadata xml:lang="de">
+      <lido:objectClassificationWrap>
+        <lido:objectWorkTypeWrap>
+          <lido:objectWorkType>
+            <lido:conceptID lido:pref="http://terminology.lido-schema.org/lido00169" lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GND">https://d-nb.info/gnd/4046902-5</lido:conceptID>
+            <lido:conceptID lido:pref="http://terminology.lido-schema.org/lido00170" lido:type="http://terminology.lido-schema.org/lido00099" lido:source="AAT">http://vocab.getty.edu/aat/300026816</lido:conceptID>
+            <lido:term lido:pref="http://terminology.lido-schema.org/lido00169" xml:lang="de">Postkarte</lido:term>
+            <lido:term lido:pref="http://terminology.lido-schema.org/lido00170" xml:lang="en">postcards</lido:term>
+          </lido:objectWorkType>
+          <lido:objectWorkType lido:type="Kartentypus">
+            <lido:term>Ansichtskarte / Motivkarte</lido:term>
+          </lido:objectWorkType>
+        </lido:objectWorkTypeWrap>
+        <lido:classificationWrap>
+          <lido:classification lido:type="Kategorie">
+            <lido:term>16.02. Sonstiges</lido:term>
+          </lido:classification>
+          <lido:classification lido:type="http://terminology.lido-schema.org/lido01135">
+            <lido:term>Sammlung Silcher-Museum</lido:term>
+          </lido:classification>
+        </lido:classificationWrap>
+      </lido:objectClassificationWrap>
+      <lido:objectIdentificationWrap>
+        <lido:titleWrap>
+          <lido:titleSet>
+            <lido:appellationValue lido:pref="http://terminology.lido-schema.org/lido00169">Drunten im Unterland da ist's halt fein [...]</lido:appellationValue>
+          </lido:titleSet>
+        </lido:titleWrap>
+        <lido:inscriptionsWrap>
+          <lido:inscriptions>
+            <lido:inscriptionTranscription>Drunten im Unterland da ist's halt fein - Schlehen im Oberland Trauben im Unterland Drunten im Unterland möcht i wohl sein.</lido:inscriptionTranscription>
+            <lido:inscriptionDescription>
+              <lido:descriptiveNoteValue>gedruckt, Vorderseite</lido:descriptiveNoteValue>
+            </lido:inscriptionDescription>
+          </lido:inscriptions>
+          <lido:inscriptions>
+            <lido:inscriptionTranscription>“Drunten im Unterland”.</lido:inscriptionTranscription>
+            <lido:inscriptionDescription>
+              <lido:descriptiveNoteValue>gedruckt, Rückseite</lido:descriptiveNoteValue>
+            </lido:inscriptionDescription>
+          </lido:inscriptions>
+        </lido:inscriptionsWrap>
+        <lido:repositoryWrap>
+          <lido:repositorySet lido:type="http://terminology.lido-schema.org/lido00475">
+            <lido:repositoryName>
+              <lido:legalBodyID lido:type="http://terminology.lido-schema.org/lido00100" lido:source="ISIL">https://sigel.staatsbibliothek-berlin.de/suche?isil=DE-3066</lido:legalBodyID>
+              <lido:legalBodyName>
+                <lido:appellationValue>Historische Bildpostkarten - Universität Osnabrück</lido:appellationValue>
+              </lido:legalBodyName>
+              <lido:legalBodyWeblink>https://bildpostkarten.uni-osnabrueck.de/</lido:legalBodyWeblink>
+            </lido:repositoryName>
+            <lido:workID lido:type="Objekt-Signatur">os_ub_0031153</lido:workID>
+            <lido:repositoryLocation>
+              <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GeoNames">https://sws.geonames.org/2856883/</lido:placeID>
+              <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="TGN">http://vocab.getty.edu/tgn/7005252</lido:placeID>
+              <lido:namePlaceSet>
+                <lido:appellationValue>Osnabrück</lido:appellationValue>
+              </lido:namePlaceSet>
+            </lido:repositoryLocation>
+          </lido:repositorySet>
+        </lido:repositoryWrap>
+        <lido:objectDescriptionWrap>
+          <lido:objectDescriptionSet lido:type="Beschreibung">
+            <lido:descriptiveNoteValue>Ein Mann steht mit einer Axt am Rande eines Waldes und blickt hinunter auf eine Hügellandschaft. Durch die Landschaft schlängelt sich ein Fluss – am Himmel sind Wolken zu sehen. Ganz oben auf der Karte ist in einem Kasten ein Textausschnitt aus dem Volkslied „Drunten im Unterland da ist's halt fein“ abgedruckt.</lido:descriptiveNoteValue>
+          </lido:objectDescriptionSet>
+        </lido:objectDescriptionWrap>
+        <lido:objectMeasurementsWrap>
+          <lido:objectMeasurementsSet>
+            <lido:displayObjectMeasurements>9,2 × 13,9 cm</lido:displayObjectMeasurements>
+            <lido:objectMeasurements>
+              <lido:measurementsSet>
+                <lido:measurementType>Kürzere Seite</lido:measurementType>
+                <lido:measurementUnit>cm</lido:measurementUnit>
+                <lido:measurementValue>9.2</lido:measurementValue>
+              </lido:measurementsSet>
+              <lido:measurementsSet>
+                <lido:measurementType>Längere Seite</lido:measurementType>
+                <lido:measurementUnit>cm</lido:measurementUnit>
+                <lido:measurementValue>13.9</lido:measurementValue>
+              </lido:measurementsSet>
+            </lido:objectMeasurements>
+          </lido:objectMeasurementsSet>
+        </lido:objectMeasurementsWrap>
+      </lido:objectIdentificationWrap>
+      <lido:eventWrap>
+        <lido:eventSet>
+          <lido:event>
+            <lido:eventType>
+              <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="LIDO-Terminologie">http://terminology.lido-schema.org/lido00007</lido:conceptID>
+              <lido:term>Herstellung</lido:term>
+            </lido:eventType>
+            <lido:eventActor>
+              <lido:actorInRole>
+                <lido:actor lido:type="http://terminology.lido-schema.org/lido00164">
+                  <lido:nameActorSet>
+                    <lido:appellationValue lido:pref="http://terminology.lido-schema.org/lido00169">Verlag des Vereins für das Deutschtum im Ausland</lido:appellationValue>
+                  </lido:nameActorSet>
+                </lido:actor>
+                <lido:roleActor>
+                  <lido:term>Verlag, Herausgeber</lido:term>
+                </lido:roleActor>
+              </lido:actorInRole>
+            </lido:eventActor>
+            <lido:eventActor>
+              <lido:actorInRole>
+                <lido:actor lido:type="http://terminology.lido-schema.org/lido00164">
+                  <lido:nameActorSet>
+                    <lido:appellationValue lido:pref="http://terminology.lido-schema.org/lido00169">Novitas Verlag Otto Kellner</lido:appellationValue>
+                  </lido:nameActorSet>
+                </lido:actor>
+                <lido:roleActor>
+                  <lido:term>Verlag, Herausgeber</lido:term>
+                </lido:roleActor>
+              </lido:actorInRole>
+            </lido:eventActor>
+            <lido:eventActor>
+              <lido:actorInRole>
+                <lido:actor lido:type="http://terminology.lido-schema.org/lido00164">
+                  <lido:nameActorSet>
+                    <lido:appellationValue lido:pref="http://terminology.lido-schema.org/lido00169">Faber</lido:appellationValue>
+                  </lido:nameActorSet>
+                </lido:actor>
+                <lido:roleActor>
+                  <lido:term>Verlag, Herausgeber</lido:term>
+                </lido:roleActor>
+              </lido:actorInRole>
+            </lido:eventActor>
+            <lido:eventPlace>
+              <lido:displayPlace>Berlin</lido:displayPlace>
+              <lido:place>
+                <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GeoNames">https://sws.geonames.org/2950159/</lido:placeID>
+                <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GND">https://d-nb.info/gnd/4005728-8</lido:placeID>
+                <lido:namePlaceSet>
+                  <lido:appellationValue>Berlin</lido:appellationValue>
+                </lido:namePlaceSet>
+              </lido:place>
+            </lido:eventPlace>
+            <lido:eventPlace>
+              <lido:displayPlace>Wien (A)</lido:displayPlace>
+              <lido:place>
+                <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GeoNames">https://sws.geonames.org/2761369/</lido:placeID>
+                <lido:namePlaceSet>
+                  <lido:appellationValue>Wien (A)</lido:appellationValue>
+                </lido:namePlaceSet>
+              </lido:place>
+            </lido:eventPlace>
+            <lido:eventPlace>
+              <lido:displayPlace>Magdeburg</lido:displayPlace>
+              <lido:place>
+                <lido:placeID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GeoNames">https://sws.geonames.org/2874545/</lido:placeID>
+                <lido:namePlaceSet>
+                  <lido:appellationValue>Magdeburg</lido:appellationValue>
+                </lido:namePlaceSet>
+              </lido:place>
+            </lido:eventPlace>
+            <lido:eventMaterialsTech>
+              <lido:materialsTech>
+                <lido:termMaterialsTech lido:type="http://terminology.lido-schema.org/lido00132">
+                  <lido:term>Karton</lido:term>
+                </lido:termMaterialsTech>
+                <lido:termMaterialsTech lido:type="http://terminology.lido-schema.org/lido00131">
+                  <lido:term>Autotypie (farbig)</lido:term>
+                </lido:termMaterialsTech>
+              </lido:materialsTech>
+            </lido:eventMaterialsTech>
+          </lido:event>
+        </lido:eventSet>
+        <lido:eventSet>
+          <lido:event>
+            <lido:eventType>
+              <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="LIDO-Terminologie">http://terminology.lido-schema.org/lido00012</lido:conceptID>
+              <lido:term>Geistige Schöpfung</lido:term>
+            </lido:eventType>
+            <lido:eventActor>
+              <lido:actorInRole>
+                <lido:actor lido:type="http://terminology.lido-schema.org/lido00163">
+                  <lido:actorID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="GND">https://d-nb.info/gnd/116785861</lido:actorID>
+                  <lido:actorID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="Wikidata">http://www.wikidata.org/entity/Q2060171</lido:actorID>
+                  <lido:nameActorSet>
+                    <lido:appellationValue lido:pref="http://terminology.lido-schema.org/lido00169">Paul Hey</lido:appellationValue>
+                  </lido:nameActorSet>
+                </lido:actor>
+                <lido:roleActor>
+                  <lido:term>Maler / Zeichner / Illustrator</lido:term>
+                </lido:roleActor>
+              </lido:actorInRole>
+            </lido:eventActor>
+          </lido:event>
+        </lido:eventSet>
+        <lido:eventSet>
+          <lido:event>
+            <lido:eventType>
+              <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="LIDO-Terminologie">http://terminology.lido-schema.org/lido00011</lido:conceptID>
+              <lido:term>Gebrauch</lido:term>
+            </lido:eventType>
+            <lido:eventDate>
+              <lido:displayDate lido:label="Datierung durch Form der Karte">nach 1905</lido:displayDate>
+              <lido:date>
+                <lido:earliestDate>1905</lido:earliestDate>
+              </lido:date>
+            </lido:eventDate>
+            <lido:eventDescriptionSet>
+              <lido:descriptiveNoteValue>nicht frankiert</lido:descriptiveNoteValue>
+            </lido:eventDescriptionSet>
+            <lido:eventDescriptionSet>
+              <lido:descriptiveNoteValue>nicht gestempelt</lido:descriptiveNoteValue>
+            </lido:eventDescriptionSet>
+            <lido:eventDescriptionSet>
+              <lido:descriptiveNoteValue>unbeschrieben</lido:descriptiveNoteValue>
+            </lido:eventDescriptionSet>
+            <lido:eventDescriptionSet>
+              <lido:descriptiveNoteValue>nicht gelaufen</lido:descriptiveNoteValue>
+            </lido:eventDescriptionSet>
+          </lido:event>
+        </lido:eventSet>
+      </lido:eventWrap>
+      <lido:objectRelationWrap>
+        <lido:subjectWrap>
+          <lido:subjectSet>
+            <lido:subject>
+              <lido:subjectConcept>
+                <lido:term>Wald</lido:term>
+              </lido:subjectConcept>
+            </lido:subject>
+          </lido:subjectSet>
+          <lido:subjectSet>
+            <lido:subject>
+              <lido:subjectConcept>
+                <lido:term>Baum</lido:term>
+              </lido:subjectConcept>
+            </lido:subject>
+          </lido:subjectSet>
+          <lido:subjectSet>
+            <lido:subject>
+              <lido:subjectConcept>
+                <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="AAT">http://vocab.getty.edu/aat/300008707</lido:conceptID>
+                <lido:term xml:lang="en">rivers</lido:term>
+              </lido:subjectConcept>
+            </lido:subject>
+          </lido:subjectSet>
+        </lido:subjectWrap>
+        <lido:relatedWorksWrap>
+          <lido:relatedWorkSet>
+            <lido:relatedWork>
+              <lido:displayObject>Volksliederkarten von Paul Hey</lido:displayObject>
+            </lido:relatedWork>
+            <lido:relatedWorkRelType>
+              <lido:term>Teil von (Serie)</lido:term>
+            </lido:relatedWorkRelType>
+          </lido:relatedWorkSet>
+        </lido:relatedWorksWrap>
+      </lido:objectRelationWrap>
+    </lido:descriptiveMetadata>
+    <lido:administrativeMetadata xml:lang="de">
+      <lido:rightsWorkWrap>
+        <lido:rightsWorkSet>
+          <lido:rightsHolder>
+            <lido:legalBodyID lido:type="http://terminology.lido-schema.org/lido00100" lido:source="ISIL">https://sigel.staatsbibliothek-berlin.de/suche?isil=DE-3066</lido:legalBodyID>
+            <lido:legalBodyName>
+              <lido:appellationValue>Historische Bildpostkarten - Universität Osnabrück</lido:appellationValue>
+            </lido:legalBodyName>
+            <lido:legalBodyWeblink>https://bildpostkarten.uni-osnabrueck.de/</lido:legalBodyWeblink>
+          </lido:rightsHolder>
+        </lido:rightsWorkSet>
+      </lido:rightsWorkWrap>
+      <lido:recordWrap>
+        <lido:recordID lido:type="http://terminology.lido-schema.org/lido00100">os_ub_0031153</lido:recordID>
+        <lido:recordType>
+          <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="LIDO-Terminologie">http://terminology.lido-schema.org/lido00141</lido:conceptID>
+          <lido:term>Einzelobjekt</lido:term>
+        </lido:recordType>
+        <lido:recordSource>
+          <lido:legalBodyID lido:type="http://terminology.lido-schema.org/lido00100" lido:source="ISIL">https://sigel.staatsbibliothek-berlin.de/suche?isil=DE-3066</lido:legalBodyID>
+          <lido:legalBodyName>
+            <lido:appellationValue>Historische Bildpostkarten - Universität Osnabrück</lido:appellationValue>
+          </lido:legalBodyName>
+          <lido:legalBodyWeblink>https://bildpostkarten.uni-osnabrueck.de/</lido:legalBodyWeblink>
+        </lido:recordSource>
+        <lido:recordRights>
+          <lido:rightsType>
+            <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="CC">https://creativecommons.org/publicdomain/zero/1.0/</lido:conceptID>
+            <lido:term>CC0 1.0</lido:term>
+          </lido:rightsType>
+          <lido:rightsHolder>
+            <lido:legalBodyID lido:type="http://terminology.lido-schema.org/lido00100" lido:source="ISIL">https://sigel.staatsbibliothek-berlin.de/suche?isil=DE-3066</lido:legalBodyID>
+            <lido:legalBodyName>
+              <lido:appellationValue>Historische Bildpostkarten - Universität Osnabrück</lido:appellationValue>
+            </lido:legalBodyName>
+          </lido:rightsHolder>
+          <lido:creditLine>Digitalisierung und Erschließung gefördert durch die Dieter Fuchs Stiftung.</lido:creditLine>
+        </lido:recordRights>
+        <lido:recordInfoSet>
+          <lido:recordInfoLink>https://bpk.katalon-collections.de/objects/7f1c2d3e-0000-4000-8000-000000031153</lido:recordInfoLink>
+          <lido:recordMetadataDate lido:type="http://terminology.lido-schema.org/lido00471">2026-10-02T14:31:07</lido:recordMetadataDate>
+        </lido:recordInfoSet>
+      </lido:recordWrap>
+      <lido:resourceWrap>
+        <lido:resourceSet>
+          <lido:resourceID lido:type="http://terminology.lido-schema.org/lido00100">b2000000-0000-4000-8000-000000000001</lido:resourceID>
+          <lido:resourceRepresentation lido:type="http://terminology.lido-schema.org/lido00464">
+            <lido:linkResource lido:formatResource="image/jpeg">https://bpk.katalon-collections.de/iiif/3/b2000000-0000-4000-8000-000000000001/full/max/0/default.jpg</lido:linkResource>
+          </lido:resourceRepresentation>
+          <lido:resourceRepresentation lido:type="http://terminology.lido-schema.org/lido00465">
+            <lido:linkResource lido:formatResource="image/jpeg">https://bpk.katalon-collections.de/iiif/3/b2000000-0000-4000-8000-000000000001/full/!400,400/0/default.jpg</lido:linkResource>
+          </lido:resourceRepresentation>
+          <lido:resourceType>
+            <lido:term>image</lido:term>
+          </lido:resourceType>
+          <lido:rightsResource>
+            <lido:rightsType>
+              <lido:conceptID lido:type="http://terminology.lido-schema.org/lido00099" lido:source="CC">http://creativecommons.org/licenses/by-nc/4.0/</lido:conceptID>
+              <lido:term>CC BY-NC 4.0</lido:term>
+            </lido:rightsType>
+            <lido:rightsHolder>
+              <lido:legalBodyName>
+                <lido:appellationValue>Renate Wachnitz, geb. Hey</lido:appellationValue>
+              </lido:legalBodyName>
+            </lido:rightsHolder>
+            <lido:creditLine>Veröffentlichung genehmigt von Renate Wachnitz, geb. Hey. Jede weitere Verwendung bedarf der Genehmigung der Rechteinhaberin.</lido:creditLine>
+          </lido:rightsResource>
+        </lido:resourceSet>
+      </lido:resourceWrap>
+    </lido:administrativeMetadata>
+  </lido:lido>
+</lido:lidoWrap>

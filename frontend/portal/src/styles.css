@@ -153,6 +153,10 @@ input, select, textarea { font-family: inherit; }
 .facets-backdrop { display: none; }
 .facet-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 0; border: 0; background: transparent; color: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .facet-item:hover { color: var(--accent, #1e3a8a); }
+.active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.active-filter { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 32px; padding: 4px 12px; border: 1px solid var(--border, #e4e6eb); border-radius: 999px; background: var(--accent-50, #eef2fb); color: var(--accent-ink, #1e3a8a); font-size: 13px; text-align: left; cursor: pointer; }
+.active-filter span:first-child { overflow-wrap: anywhere; }
+.active-filter:hover { border-color: var(--accent, #1e3a8a); }
 .facet-item .ct { font-size: 11px; color: var(--fg-4, #677083); font-family: 'IBM Plex Mono', monospace; }
 .rel-facet-link { margin-left: 8px; font-size: 11px; color: var(--fg-3, #5b6474); text-decoration: underline; text-underline-offset: 2px; }
 .rel-facet-link:hover { color: var(--accent, #1e3a8a); }
@@ -160,7 +164,7 @@ input, select, textarea { font-family: inherit; }
 .tree-facet-level { list-style: none; margin: 0; padding: 0; }
 .tree-facet-level .tree-facet-level { padding-left: 14px; border-left: 1px solid var(--border, #e2e8f0); margin-left: 7px; }
 .tree-facet-row { display: flex; align-items: center; gap: 2px; }
-.tree-facet-toggle { flex: 0 0 18px; width: 18px; height: 22px; padding: 0; border: 0; background: transparent; color: var(--fg-3, #5b6474); cursor: pointer; font-size: 11px; }
+.tree-facet-toggle { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--fg-3, #5b6474); cursor: pointer; font-size: 20px; }
 .tree-facet-toggle:focus-visible, .tree-facet-crumb button:focus-visible { outline: 2px solid var(--accent, #1e3a8a); outline-offset: 1px; }
 .tree-facet-crumb { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 6px; padding: 4px 8px; border-radius: 4px; background: var(--panel, #f1f5f9); font-size: 12px; }
 .tree-facet-crumb button { border: 0; background: transparent; cursor: pointer; font-size: 14px; line-height: 1; color: var(--fg-3, #5b6474); }
@@ -309,7 +313,12 @@ input, select, textarea { font-family: inherit; }
 .bc .sep { color: var(--fg-4, #677083); }
 
 /* Pagination */
-.pagination { display: flex; gap: 4px; justify-content: center; margin-top: 32px; }
+.pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; margin-top: 32px; }
+.pagination-pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.page-jump { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: 13px; }
+.page-jump input { width: 80px; min-height: 34px; padding: 4px 8px; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; background: var(--panel, #fff); color: inherit; }
+.page-jump button { min-height: 34px; padding: 4px 12px; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; background: var(--panel, #fff); color: inherit; cursor: pointer; }
+.page-jump-error { flex-basis: 100%; margin: 0; text-align: center; color: var(--fg-3, #5a6173); font-size: 13px; }
 .page-btn { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--border, #e4e6eb); border-radius: 6px; background: var(--panel, #fff); cursor: pointer; font-size: 13px; }
 .page-btn.active { background: var(--accent, #1e3a8a); color: #fff; border-color: var(--accent, #1e3a8a); }
 .page-ellipsis { width: 34px; height: 34px; display: grid; place-items: center; font-size: 13px; color: var(--fg-3, #9ca3af); }
@@ -447,7 +456,8 @@ input, select, textarea { font-family: inherit; }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .relation-filter__chip { min-height: 44px; }
+  .relation-filter__chip, .active-filter { min-height: 44px; }
+  .page-jump input, .page-jump button { min-height: 44px; }
   .search-header { margin-top: -24px; }
   /* iOS Safari zooms the page in on focus of any input/select with font-size below 16px
      and never zooms back out; keep all form controls at >=16px to prevent that. */

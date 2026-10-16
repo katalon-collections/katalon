@@ -187,6 +187,8 @@ export interface MediaFile {
   iiif_identifier?: string | null
   license_uri?: string | null
   rights_holder?: { name: string; uri?: string } | null
+  /** Permission note ("Veröffentlichung genehmigt von …"). */
+  credit_line?: string | null
 }
 
 export interface Relation {

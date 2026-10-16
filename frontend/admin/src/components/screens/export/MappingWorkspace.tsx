@@ -17,6 +17,7 @@ import type {
 import { ChevD, ChevL, ChevU, Plus, Trash, X } from '../../ui/Icons'
 import { ExportGuidance } from './ExportGuidance'
 import { ExportPreview } from './ExportPreview'
+import { LIDO_DELIVERY_KEYS, LidoDeliverySettings, lidoDeliveryConfig, lidoDeliveryState } from './LidoDeliverySettings'
 import { PublishMapping } from './PublishMapping'
 import { RuleEditor } from './RuleEditor'
 import { SourcePicker, type SourceDraft } from './SourcePicker'
@@ -50,16 +51,17 @@ const LIDO_LEGACY_TARGET_ALIAS: Record<string, string> = {
 function buildLidoEventTargets(
   event: LidoEventConfig,
   t: (key: string, options?: Record<string, unknown>) => string,
+  templateSettings: Record<string, Record<string, unknown>> = {},
 ): ExportTargetCapability[] {
   const { id, label } = event
-  return [
+  const targets: ExportTargetCapability[] = [
     {
       key: `lido:events/${id}/actor`,
       group: 'events',
       label: { de: `${label.de}: ${t('eventActorLabel')}`, en: `${label.en}: ${t('eventActorLabel')}` },
       help: { de: t('eventActorHelp'), en: t('eventActorHelp') },
       source_kinds: ['field', 'relation'],
-      accepted_field_types: ['text', 'relation'],
+      accepted_field_types: ['text', 'relation', 'authority'],
       cardinality: 'many',
       required: false,
       editor_kind: 'default',
@@ -107,20 +109,69 @@ function buildLidoEventTargets(
       label: { de: `${label.de}: ${t('eventPlaceLabel')}`, en: `${label.en}: ${t('eventPlaceLabel')}` },
       help: { de: t('eventPlaceHelp'), en: t('eventPlaceHelp') },
       source_kinds: ['field', 'relation'],
-      accepted_field_types: ['text', 'geo', 'relation'],
+      accepted_field_types: ['text', 'geo', 'relation', 'authority', 'vocab'],
+      cardinality: 'many',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/materials_tech_term`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventMaterialsTechTermLabel')}`, en: `${label.en}: ${t('eventMaterialsTechTermLabel')}` },
+      help: { de: t('eventMaterialsTechTermHelp'), en: t('eventMaterialsTechTermHelp') },
+      source_kinds: ['field', 'constant'],
+      accepted_field_types: ['text', 'vocab', 'vocab_free', 'authority'],
+      cardinality: 'many',
+      required: false,
+      editor_kind: 'default',
+      settings_schema: {},
+    },
+    {
+      key: `lido:events/${id}/description`,
+      group: 'events',
+      label: { de: `${label.de}: ${t('eventDescriptionLabel')}`, en: `${label.en}: ${t('eventDescriptionLabel')}` },
+      help: { de: t('eventDescriptionHelp'), en: t('eventDescriptionHelp') },
+      source_kinds: ['field', 'constant'],
+      accepted_field_types: [],
       cardinality: 'many',
       required: false,
       editor_kind: 'default',
       settings_schema: {},
     },
   ]
+  // Settings for each event sub-target come from the backend profile (key = last path part).
+  return targets.map(target => ({
+    ...target,
+    settings_schema: templateSettings[target.key.split('/').pop() ?? ''] ?? target.settings_schema,
+  }))
 }
 
-function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onSave }: {
+/** One free key/value row; ``json`` marks values that were not plain strings
+ *  (lists, objects, booleans) and are edited and saved as JSON. */
+interface CustomRow { key: string; value: string; json?: boolean }
+
+function toCustomRow(key: string, value: unknown): CustomRow {
+  return typeof value === 'string'
+    ? { key, value }
+    : { key, value: JSON.stringify(value), json: true }
+}
+
+function fromCustomRow(row: CustomRow): unknown {
+  if (!row.json) return row.value
+  try {
+    return JSON.parse(row.value)
+  } catch {
+    return row.value
+  }
+}
+
+function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, fields = [], onSave }: {
   config: Record<string, unknown>
   busy: boolean
   isLido: boolean
   isMetsMods?: boolean
+  fields?: FieldDefinition[]
   onSave: (config: Record<string, unknown>) => Promise<boolean>
 }) {
   const { t } = useTranslation('screenExport')
@@ -138,8 +189,9 @@ function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onS
       record_rights: true,
       lido_events: true,
       mods_elements: true,
+      ...(isLido ? Object.fromEntries(LIDO_DELIVERY_KEYS.map(key => [key, true as const])) : {}),
     }),
-    []
+    [isLido]
   )
 
   const [institutionName, setInstitutionName] = useState<string>(
@@ -159,11 +211,12 @@ function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onS
     () => String(config.record_rights ?? 'https://creativecommons.org/publicdomain/zero/1.0/')
   )
 
-  const [customRows, setCustomRows] = useState<{ key: string; value: string }[]>(() =>
+  const [customRows, setCustomRows] = useState<CustomRow[]>(() =>
     Object.entries(config)
       .filter(([key]) => !STANDARD_KEYS[key])
-      .map(([key, value]) => ({ key, value: String(value ?? '') }))
+      .map(([key, value]) => toCustomRow(key, value))
   )
+  const [delivery, setDelivery] = useState<Record<string, unknown>>(() => lidoDeliveryState(config))
   const [showCustom, setShowCustom] = useState(() => customRows.length > 0)
   const [dirty, setDirty] = useState(false)
   const [open, setOpen] = useState(() => !institutionName.trim())
@@ -178,13 +231,14 @@ function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onS
     setRecordRights(String(config.record_rights ?? 'https://creativecommons.org/publicdomain/zero/1.0/'))
     const nextCustom = Object.entries(config)
       .filter(([key]) => !STANDARD_KEYS[key])
-      .map(([key, value]) => ({ key, value: String(value ?? '') }))
+      .map(([key, value]) => toCustomRow(key, value))
     setCustomRows(nextCustom)
+    setDelivery(lidoDeliveryState(config))
     setShowCustom(nextCustom.length > 0)
     setDirty(false)
   }, [config, STANDARD_KEYS])
 
-  function updateCustomRow(i: number, patch: Partial<{ key: string; value: string }>) {
+  function updateCustomRow(i: number, patch: Partial<CustomRow>) {
     setCustomRows(r => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
     setDirty(true)
   }
@@ -213,9 +267,11 @@ function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onS
     if ((isLido || isMetsMods) && portalHost.trim()) next.portal_host = portalHost.trim()
     if ((isLido || isMetsMods) && recordRights.trim()) next.record_rights = recordRights.trim()
 
+    if (isLido) Object.assign(next, lidoDeliveryConfig(delivery))
+
     for (const row of customRows) {
       if (row.key.trim()) {
-        next[row.key.trim()] = row.value
+        next[row.key.trim()] = fromCustomRow(row)
       }
     }
     if (await onSave(next)) {
@@ -362,6 +418,17 @@ function InstitutionConfigEditor({ config, busy, isLido, isMetsMods = false, onS
         )}
       </div>
 
+      {isLido && (
+        <LidoDeliverySettings
+          value={delivery}
+          fields={fields}
+          onChange={next => {
+            setDelivery(next)
+            setDirty(true)
+          }}
+        />
+      )}
+
       {/* Custom parameters section */}
       <div style={{ borderTop: '1px solid var(--border-s)', paddingTop: 12, marginBottom: 16 }}>
         <button
@@ -479,7 +546,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       const nonEventTargets = profile.targets.filter(trg => trg.group !== 'events')
       const eventTargets: ExportTargetCapability[] = []
       for (const ev of lidoEvents) {
-        eventTargets.push(...buildLidoEventTargets(ev, t))
+        eventTargets.push(...buildLidoEventTargets(ev, t, profile.template_settings ?? {}))
       }
       return [...nonEventTargets, ...eventTargets]
     }
@@ -550,7 +617,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       return [...nonNoteTargets, ...noteTargets]
     }
     return profile.targets
-  }, [isLido, isMetsMods, profile.targets, lidoEvents, configuredModsElements, draftSet?.rules, t])
+  }, [isLido, isMetsMods, profile.targets, profile.template_settings, lidoEvents, configuredModsElements, draftSet?.rules, t])
 
   const availableModsTargets = useMemo(() => {
     if (!isMetsMods) return []
@@ -1010,7 +1077,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
       {draftSet && (
         <>
           {!compact && (
-            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} isLido={isLido} isMetsMods={isMetsMods} onSave={updateInstitutionConfig} />
+            <InstitutionConfigEditor key={draftSet.id} config={draftSet.institution_config} busy={busy} isLido={isLido} isMetsMods={isMetsMods} fields={fields} onSave={updateInstitutionConfig} />
           )}
 
           {compact ? (
@@ -1035,6 +1102,7 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
                             editorKind={target.editor_kind}
                             disabled={busyRuleId === rules[0].id}
                             relationTypeOptions={relationTypeOptions}
+                            settingsSchema={target.settings_schema}
                             value={{ source_kind: rules[0].source_kind, source_config: rules[0].source_config, settings: rules[0].settings }}
                             onChange={draft => updateRule(rules[0].id, draft)}
                           />

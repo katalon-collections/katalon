@@ -42,5 +42,9 @@
   "authoritySourceGnd": "GND",
   "authoritySourceWikidata": "Wikidata",
   "authorityClear": "Remove",
-  "authorityDirectUri": "Direct authority URI"
+  "authorityDirectUri": "Direct authority URI",
+  "alternativeConceptsTitle": "Further concepts",
+  "alternativeConceptsHint": "e.g. AAT in addition to GND; exported as alternative terms in LIDO",
+  "alternativeConceptLang": "Language",
+  "alternativeConceptRemove": "Remove concept"
 }

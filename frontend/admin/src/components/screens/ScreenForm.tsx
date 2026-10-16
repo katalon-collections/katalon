@@ -839,13 +839,14 @@ function buildRightsHolder(name: string, uri: string): { name: string; uri?: str
 
 function mediaRightsFromInputs(root: ParentNode | null) {
   const value = (field: string) =>
-    (root?.querySelector<HTMLInputElement>(`input[data-media-rights="${field}"]`)?.value ?? '').trim()
+    (root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-media-rights="${field}"]`)?.value ?? '').trim()
   const licenseUri = value('license_uri')
   const rightsName = value('rights_holder_name')
   const rightsUri = value('rights_holder_uri')
   return {
     license_uri: licenseUri || null,
     rights_holder: buildRightsHolder(rightsName, rightsUri),
+    credit_line: value('credit_line') || null,
   }
 }
 
@@ -3316,7 +3317,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (errors.length > 0) setUploadError(errors.join('; '))
   }
 
-  async function handleMediaRights(mediaId: string, data: { license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null }) {
+  async function handleMediaRights(mediaId: string, data: { license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null; credit_line?: string | null }) {
     if (!savedId) return
     try {
       const updated = await media.patch(savedId, mediaId, data)
@@ -4893,13 +4894,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             </select>
                             <div style={{ borderTop: '1px solid var(--border-s)' }}>
                               <button type="button" onClick={() => setOpenRightsMediaId(current => current === f.id ? null : f.id)} style={{ width: '100%', padding: '5px 8px', border: 0, background: 'none', textAlign: 'left', fontSize: 10, color: 'var(--fg)' }}>
-                                Rechteangaben {openRightsMediaId === f.id ? '⌃' : '⌄'}
+                                {t('mediaRightsToggle')} {openRightsMediaId === f.id ? '⌃' : '⌄'}
                               </button>
                               {(f.license_uri || f.rights_holder?.name) && <div style={{ padding: '0 8px 5px', fontSize: 10, color: 'var(--fg)' }}>{[f.license_uri, f.rights_holder?.name].filter(Boolean).join(' · ')}</div>}
                               {openRightsMediaId === f.id && <div style={{ padding: '0 6px 6px', display: 'grid', gap: 4 }}>
-                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.license_uri ?? ''} data-media-rights="license_uri" list="media-license-options" placeholder="Lizenz-URI" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
-                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.name ?? ''} data-media-rights="rights_holder_name" placeholder="Rechteinhaber" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
-                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.uri ?? ''} data-media-rights="rights_holder_uri" placeholder="Rechteinhaber-URI" onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.license_uri ?? ''} data-media-rights="license_uri" list="media-license-options" placeholder={t('mediaLicenseUriPlaceholder')} aria-label={t('mediaLicenseUriPlaceholder')} onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.name ?? ''} data-media-rights="rights_holder_name" placeholder={t('mediaRightsHolderPlaceholder')} aria-label={t('mediaRightsHolderPlaceholder')} onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <input className="fld" style={{ fontSize: 10, padding: '3px 5px' }} defaultValue={f.rights_holder?.uri ?? ''} data-media-rights="rights_holder_uri" placeholder={t('mediaRightsHolderUriPlaceholder')} aria-label={t('mediaRightsHolderUriPlaceholder')} onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
+                                <textarea className="fld" rows={2} style={{ fontSize: 10, padding: '3px 5px', resize: 'vertical' }} defaultValue={f.credit_line ?? ''} data-media-rights="credit_line" placeholder={t('mediaCreditLinePlaceholder')} aria-label={t('mediaCreditLinePlaceholder')} title={t('mediaCreditLineHelp')} onBlur={e => handleMediaRights(f.id, mediaRightsFromInputs(e.currentTarget.parentElement))} />
                               </div>}
                             </div>
                           </div>

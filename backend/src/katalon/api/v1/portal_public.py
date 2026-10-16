@@ -312,6 +312,7 @@ class PortalMediaRead(BaseModel):
     media_type: str | None
     license_uri: str | None
     rights_holder: dict[str, Any] | None
+    credit_line: str | None = None
     created_at: datetime
     # IIIF identifier of ready images, for direct /iiif/3/<id>/... thumbnail URLs.
     iiif_identifier: str | None = None

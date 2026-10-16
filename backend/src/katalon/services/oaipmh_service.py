@@ -7,6 +7,8 @@ import base64
 import json
 import logging
 import xml.etree.ElementTree as ET
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,6 +19,7 @@ from katalon.integrations.metadata_format import (
     MetadataFormat,
 )
 from katalon.services.metadata_mapping_service import MappingIndex
+from katalon.services.oai_state_service import DeletedRecord
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
@@ -41,8 +44,17 @@ def encode_token(
     from_: str | None,
     until: str | None,
     prefix: str,
+    *,
+    phase: str = "records",
+    total: int | None = None,
 ) -> str:
-    data = {"o": offset, "sa": search_after, "s": set_spec, "f": from_, "u": until, "p": prefix}
+    """``phase`` "records" pages through live records (search_after = ES sort values),
+    "deleted" through deleted records (search_after = [deleted_at, record_id])."""
+    data: dict[str, Any] = {"o": offset, "sa": search_after, "s": set_spec, "f": from_, "u": until, "p": prefix}
+    if phase != "records":
+        data["ph"] = phase
+    if total is not None:
+        data["t"] = total
     return base64.urlsafe_b64encode(json.dumps(data, separators=(",", ":")).encode()).decode()
 
 
@@ -55,7 +67,18 @@ def decode_token(token: str) -> dict[str, Any]:
         "from_": data.get("f"),
         "until": data.get("u"),
         "prefix": data.get("p", "oai_dc"),
+        "phase": data.get("ph", "records"),
+        "total": data.get("t"),
     }
+
+
+@dataclass(frozen=True)
+class Resumption:
+    """resumptionToken of one list page; ``token`` None marks the last page."""
+
+    token: str | None
+    complete_list_size: int
+    cursor: int
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +110,20 @@ def _datestamp(ts: str | None) -> str:
 # ---------------------------------------------------------------------------
 # Format-agnostic record rendering (delegates to the metadata_format_service registry)
 # ---------------------------------------------------------------------------
+
+def _record_errors(
+    hit: dict[str, Any],
+    metadata_format: MetadataFormat,
+    mapping_index: MappingIndex | dict[str, Any] | None,
+) -> list[str]:
+    ctx = ExportRecordContext.from_hit(hit)
+    record_mappings = (mapping_index or {}).get(ctx.record.record_type)
+    if record_mappings is None:
+        record_mappings = CompiledMappingSet(
+            format_key=metadata_format.key, record_type=ctx.record.record_type
+        )
+    return metadata_format.required_field_errors(ctx, record_mappings)
+
 
 def _hit_to_oai_record(
     hit: dict[str, Any],
@@ -135,6 +172,62 @@ def _hit_to_oai_header(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
     return header
 
 
+def _deleted_header(record_type: str, record_id: str, datestamp: str, set_spec: str | None) -> ET.Element:
+    header = ET.Element("header", status="deleted")
+    ET.SubElement(header, "identifier").text = f"oai:{settings.oai_repository_domain}:{record_type}:{record_id}"
+    ET.SubElement(header, "datestamp").text = datestamp
+    if set_spec:
+        ET.SubElement(header, "setSpec").text = set_spec
+    return header
+
+
+def _deleted_record_header(item: DeletedRecord, set_spec: str | None) -> ET.Element:
+    return _deleted_header(
+        item.record_type, item.record_id, item.deleted_at.strftime("%Y-%m-%dT%H:%M:%SZ"), set_spec
+    )
+
+
+def _hit_deleted_header(hit: dict[str, Any], set_spec: str | None) -> ET.Element:
+    """A live record this format cannot disseminate (e.g. failed rights checks) is reported as
+    deleted, so incremental harvesters drop an earlier copy of it."""
+    ctx = ExportRecordContext.from_hit(hit)
+    return _deleted_header(
+        ctx.record.record_type, ctx.record.id, _datestamp(ctx.record.updated_at), set_spec
+    )
+
+
+def _append_resumption(
+    parent: ET.Element,
+    resumption: Resumption | None,
+    hits: list[dict[str, Any]],
+    total: int,
+    offset: int,
+    set_spec: str | None,
+    from_: str | None,
+    until: str | None,
+    prefix: str,
+) -> None:
+    if resumption is None:
+        # Records only (callers without deleted-record support).
+        next_offset = offset + len(hits)
+        token = (
+            encode_token(next_offset, hits[-1].get("sort"), set_spec, from_, until, prefix)
+            if hits and next_offset < total
+            else None
+        )
+        resumption = Resumption(token, total, offset)
+    if resumption.complete_list_size <= 0 and not resumption.token:
+        return
+    rt = ET.SubElement(
+        parent,
+        "resumptionToken",
+        completeListSize=str(resumption.complete_list_size),
+        cursor=str(resumption.cursor),
+    )
+    if resumption.token:
+        rt.text = resumption.token
+
+
 # ---------------------------------------------------------------------------
 # Verb responses
 # ---------------------------------------------------------------------------
@@ -149,7 +242,9 @@ def identify(base_url: str, repo_name: str, admin_email: str, earliest: str) -> 
     ET.SubElement(ident, "protocolVersion").text = "2.0"
     ET.SubElement(ident, "adminEmail").text = admin_email
     ET.SubElement(ident, "earliestDatestamp").text = earliest
-    ET.SubElement(ident, "deletedRecord").text = "no"
+    # Depublished/deleted records are reported, but rows may be lost (e.g. records
+    # removed before the tracking table existed), hence "transient".
+    ET.SubElement(ident, "deletedRecord").text = "transient"
     ET.SubElement(ident, "granularity").text = "YYYY-MM-DDThh:mm:ssZ"
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
@@ -183,6 +278,61 @@ def list_sets(sets: list[Any], base_url: str) -> str:
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
+def _list_page(
+    verb: str,
+    hits: list[dict[str, Any]],
+    total: int,
+    offset: int,
+    set_spec: str | None,
+    from_: str | None,
+    until: str | None,
+    prefix: str,
+    base_url: str,
+    metadata_format: MetadataFormat | None,
+    mapping_index: MappingIndex | dict[str, Any] | None,
+    deleted: Sequence[DeletedRecord],
+    resumption: Resumption | None,
+) -> str:
+    root = _root()
+    req_attrs: dict[str, str] = {"verb": verb, "metadataPrefix": prefix}
+    if set_spec:
+        req_attrs["set"] = set_spec
+    if from_:
+        req_attrs["from"] = from_
+    if until:
+        req_attrs["until"] = until
+    req = ET.SubElement(root, "request", req_attrs)
+    req.text = base_url
+
+    if not hits and not deleted:
+        return _error(root, "noRecordsMatch", "No records match the query.")
+
+    container = ET.SubElement(root, verb)
+    for hit in hits:
+        if verb == "ListRecords":
+            assert metadata_format is not None
+            el = _hit_to_oai_record(hit, set_spec, metadata_format, mapping_index)
+            if el is None:
+                el = ET.Element("record")
+                el.append(_hit_deleted_header(hit, set_spec))
+            container.append(el)
+        elif metadata_format is not None and _record_errors(hit, metadata_format, mapping_index):
+            container.append(_hit_deleted_header(hit, set_spec))
+        else:
+            container.append(_hit_to_oai_header(hit, set_spec))
+    for item in deleted:
+        header = _deleted_record_header(item, set_spec)
+        if verb == "ListRecords":
+            record = ET.Element("record")
+            record.append(header)
+            container.append(record)
+        else:
+            container.append(header)
+
+    _append_resumption(container, resumption, hits, total, offset, set_spec, from_, until, prefix)
+    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+
+
 def list_records(
     hits: list[dict[str, Any]],
     total: int,
@@ -194,42 +344,14 @@ def list_records(
     base_url: str,
     metadata_format: MetadataFormat,
     mapping_index: MappingIndex | dict[str, Any] | None = None,
+    *,
+    deleted: Sequence[DeletedRecord] = (),
+    resumption: Resumption | None = None,
 ) -> str:
-    root = _root()
-    req_attrs: dict[str, str] = {"verb": "ListRecords", "metadataPrefix": prefix}
-    if set_spec:
-        req_attrs["set"] = set_spec
-    if from_:
-        req_attrs["from"] = from_
-    if until:
-        req_attrs["until"] = until
-    req = ET.SubElement(root, "request", req_attrs)
-    req.text = base_url
-
-    if not hits:
-        return _error(root, "noRecordsMatch", "No records match the query.")
-
-    record_els = [
-        el for hit in hits
-        if (el := _hit_to_oai_record(hit, set_spec, metadata_format, mapping_index)) is not None
-    ]
-    if not record_els:
-        return _error(root, "noRecordsMatch", "No records match the query.")
-
-    lr = ET.SubElement(root, "ListRecords")
-    for el in record_els:
-        lr.append(el)
-
-    next_offset = offset + len(hits)
-    if next_offset < total:
-        next_search_after = hits[-1].get("sort")
-        token = encode_token(next_offset, next_search_after, set_spec, from_, until, prefix)
-        rt = ET.SubElement(lr, "resumptionToken", completeListSize=str(total), cursor=str(offset))
-        rt.text = token
-    elif total > 0:
-        ET.SubElement(lr, "resumptionToken", completeListSize=str(total), cursor=str(offset))
-
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    return _list_page(
+        "ListRecords", hits, total, offset, set_spec, from_, until, prefix, base_url,
+        metadata_format, mapping_index, deleted, resumption,
+    )
 
 
 def list_identifiers(
@@ -241,35 +363,16 @@ def list_identifiers(
     until: str | None,
     prefix: str,
     base_url: str,
+    metadata_format: MetadataFormat | None = None,
+    mapping_index: MappingIndex | dict[str, Any] | None = None,
+    *,
+    deleted: Sequence[DeletedRecord] = (),
+    resumption: Resumption | None = None,
 ) -> str:
-    root = _root()
-    req_attrs: dict[str, str] = {"verb": "ListIdentifiers", "metadataPrefix": prefix}
-    if set_spec:
-        req_attrs["set"] = set_spec
-    if from_:
-        req_attrs["from"] = from_
-    if until:
-        req_attrs["until"] = until
-    req = ET.SubElement(root, "request", req_attrs)
-    req.text = base_url
-
-    if not hits:
-        return _error(root, "noRecordsMatch", "No records match the query.")
-
-    li = ET.SubElement(root, "ListIdentifiers")
-    for hit in hits:
-        li.append(_hit_to_oai_header(hit, set_spec))
-
-    next_offset = offset + len(hits)
-    if next_offset < total:
-        next_search_after = hits[-1].get("sort")
-        token = encode_token(next_offset, next_search_after, set_spec, from_, until, prefix)
-        rt = ET.SubElement(li, "resumptionToken", completeListSize=str(total), cursor=str(offset))
-        rt.text = token
-    elif total > 0:
-        ET.SubElement(li, "resumptionToken", completeListSize=str(total), cursor=str(offset))
-
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    return _list_page(
+        "ListIdentifiers", hits, total, offset, set_spec, from_, until, prefix, base_url,
+        metadata_format, mapping_index, deleted, resumption,
+    )
 
 
 def get_record(
@@ -286,13 +389,20 @@ def get_record(
     req.text = base_url
     record_el = _hit_to_oai_record(hit, None, metadata_format, mapping_index)
     if record_el is None:
-        return _error(
-            root,
-            "cannotDisseminateFormat",
-            f"Datensatz erfüllt nicht die Pflichtfelder für Format '{prefix}'.",
-        )
+        record_el = ET.Element("record")
+        record_el.append(_hit_deleted_header(hit, None))
     gr = ET.SubElement(root, "GetRecord")
     gr.append(record_el)
+    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+
+
+def get_deleted_record(item: DeletedRecord, base_url: str, identifier: str, prefix: str) -> str:
+    root = _root()
+    req = ET.SubElement(root, "request", verb="GetRecord", metadataPrefix=prefix,
+                        identifier=identifier)
+    req.text = base_url
+    record_el = ET.SubElement(ET.SubElement(root, "GetRecord"), "record")
+    record_el.append(_deleted_record_header(item, None))
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 

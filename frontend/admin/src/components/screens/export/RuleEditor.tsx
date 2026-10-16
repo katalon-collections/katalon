@@ -61,6 +61,7 @@ export function RuleEditor({ target, rules, fields, diagnostics, busyRuleId, rel
                 editorKind={target.editor_kind}
                 disabled={busyRuleId === rule.id}
                 relationTypeOptions={relationTypeOptions}
+                settingsSchema={target.settings_schema}
                 value={{ source_kind: rule.source_kind, source_config: rule.source_config, settings: rule.settings }}
                 onChange={draft => onUpdate(rule.id, draft)}
               />

@@ -4,7 +4,7 @@
 """Tests for media upload API endpoints."""
 import uuid
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -217,25 +217,35 @@ async def test_patch_media_rights(override_auth) -> None:
         is_primary=True,
         created_at=datetime.now(),
     )
+    old_stamp = datetime(2020, 1, 1)
+    obj = MagicMock(updated_at=old_stamp)
     session = AsyncMock()
     session.execute = AsyncMock(return_value=_mock_result(media_file))
+    session.get = AsyncMock(return_value=obj)
+    reindex = AsyncMock()
 
     async def override_db():
         yield session
 
     app.dependency_overrides[get_db] = override_db
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.patch(
-                f"/v1/objects/{obj_id}/media/{media_id}",
-                json={
-                    "license_uri": "https://creativecommons.org/licenses/by/4.0/",
-                    "rights_holder": {"name": "Museum", "uri": "https://example.org/museum"},
-                },
-            )
+        with patch("katalon.api.v1.media._reindex_object", reindex):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.patch(
+                    f"/v1/objects/{obj_id}/media/{media_id}",
+                    json={
+                        "license_uri": "https://creativecommons.org/licenses/by/4.0/",
+                        "rights_holder": {"name": "Museum", "uri": "https://example.org/museum"},
+                        "credit_line": "  Veröffentlichung genehmigt.  ",
+                    },
+                )
         assert response.status_code == 200
         assert response.json()["rights_holder"]["name"] == "Museum"
+        assert response.json()["credit_line"] == "Veröffentlichung genehmigt."
         assert media_file.license_uri.endswith("/by/4.0/")
+        # Rights are part of the object's export: datestamp moves, index is refreshed.
+        assert obj.updated_at > old_stamp
+        reindex.assert_awaited_once()
     finally:
         app.dependency_overrides.pop(get_db, None)
 

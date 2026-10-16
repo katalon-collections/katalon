@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { authority, subtypes } from '../../api/client'
-import type { RecordSubtype } from '../../types'
+import type { RecordSubtype, SubtypeConceptAlternative } from '../../types'
 import { getLabel } from '../../types'
 import { Edit, Plus, Trash, X } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
@@ -42,6 +42,7 @@ interface FormState {
   concept_id: string
   concept_uri: string
   concept_label: string
+  concept_alternatives: SubtypeConceptAlternative[]
 }
 
 function emptyForm(primaryType: string, conceptSource = ''): FormState {
@@ -57,6 +58,7 @@ function emptyForm(primaryType: string, conceptSource = ''): FormState {
     concept_id: '',
     concept_uri: '',
     concept_label: '',
+    concept_alternatives: [],
   }
 }
 
@@ -73,6 +75,7 @@ function subtypeToForm(s: RecordSubtype): FormState {
     concept_id: s.concept_id ?? '',
     concept_uri: s.concept_uri ?? '',
     concept_label: s.concept_label ?? '',
+    concept_alternatives: (s.concept_alternatives ?? []).map(alt => ({ ...alt })),
   }
 }
 
@@ -164,6 +167,9 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
         concept_id: form.concept_id ? form.concept_id.trim() : null,
         concept_uri: form.concept_uri ? form.concept_uri.trim() : null,
         concept_label: form.concept_label ? form.concept_label.trim() : null,
+        concept_alternatives: form.concept_alternatives
+          .filter(alt => alt.id || alt.uri)
+          .map(alt => ({ ...alt, lang: alt.lang?.trim() || undefined })),
       }
       if (editId) {
         await subtypes.update(editId, payload)
@@ -339,6 +345,13 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                   />
                 </div>
               )}
+              {(form.concept_id || form.concept_uri) && (
+                <AlternativeConcepts
+                  sources={enabledAuthoritySources}
+                  value={form.concept_alternatives}
+                  onChange={next => setForm(prev => ({ ...prev, concept_alternatives: next }))}
+                />
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -447,6 +460,77 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
           danger
           onConfirm={confirmDelete}
           onCancel={() => setConfirmTarget(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+
+/** Further authority concepts for the same subtype (e.g. AAT next to GND), exported as
+ *  alternative conceptID/term in LIDO objectWorkType. */
+function AlternativeConcepts({ sources, value, onChange }: {
+  sources: string[]
+  value: SubtypeConceptAlternative[]
+  onChange: (next: SubtypeConceptAlternative[]) => void
+}) {
+  const { t } = useTranslation('screenSubtype')
+  const [source, setSource] = useState('')
+  const active = source || sources[0] || ''
+  return (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-s)' }}>
+      <div className="lbl" style={{ marginBottom: 6 }}>
+        {t('alternativeConceptsTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('alternativeConceptsHint')})</span>
+      </div>
+      {value.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {value.map((alt, i) => (
+            <li key={`${alt.source}-${alt.id}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ fontWeight: 600 }}>{alt.source?.toUpperCase()}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>{alt.label || alt.id || alt.uri}</span>
+              <input
+                className="fld"
+                style={{ width: 64, fontSize: 12, padding: '2px 6px' }}
+                aria-label={t('alternativeConceptLang')}
+                placeholder={t('alternativeConceptLang')}
+                value={alt.lang ?? ''}
+                onChange={e => onChange(value.map((item, idx) => idx === i ? { ...item, lang: e.target.value } : item))}
+              />
+              <button
+                type="button"
+                className="btn sm ico gh"
+                aria-label={t('alternativeConceptRemove')}
+                title={t('alternativeConceptRemove')}
+                onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+              >
+                <X size={12} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        {sources.map(src => (
+          <button
+            key={src}
+            type="button"
+            className={`btn sm ${active === src ? 'pri' : 'gh'}`}
+            style={{ fontSize: 11, padding: '2px 8px' }}
+            onClick={() => setSource(src)}
+          >
+            {t(AUTHORITY_SOURCE_LABELS[src] ?? src)}
+          </button>
+        ))}
+      </div>
+      {active && (
+        <AuthorityInput
+          key={`${active}-${value.length}`}
+          source={active}
+          value={null}
+          onChange={v => {
+            // URI is derived from source + ID on export (canonical Linked-Data form).
+            if (v) onChange([...value, { source: v.source, id: v.external_id, label: v.label, lang: active === 'aat' ? 'en' : '' }])
+          }}
         />
       )}
     </div>

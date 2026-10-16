@@ -591,8 +591,17 @@ async def preview_mapping_set(
 
     cms = compile_mapping_set(mapping_set)
     diagnostics = fmt.validate_mapping(cms)
+    via_types = await export_context_service.collect_via_relation_types(
+        db, extra_rules=cms.rules
+    )
     ctx = await export_context_service.build_export_context_from_db(
-        db, mapping_set.record_type, record_id
+        db, mapping_set.record_type, record_id, via_relation_types=via_types
+    )
+    # Record-level problems (e.g. configured rights checks) show up next to the preview, like in
+    # the OAI export, where such records are left out.
+    diagnostics.extend(
+        MappingDiagnostic(code="record_invalid", message=message, level="warning")
+        for message in fmt.required_field_errors(ctx, cms)
     )
     element = fmt.render(ctx, cms)
     xml = ET.tostring(element, encoding="unicode")
@@ -696,10 +705,13 @@ async def export_mapping_set_to_yaml(db: AsyncSession, set_id: uuid.UUID) -> tup
 
     rules_data: list[dict[str, Any]] = []
     for r in sorted(mapping_set.rules, key=lambda x: x.sort_order):
+        configured_name = (r.source_config or {}).get("field_name")
         field_name = (
-            r.field_definition.name
+            configured_name  # "group.child" paths are kept verbatim
+            if isinstance(configured_name, str) and "." in configured_name
+            else r.field_definition.name
             if r.field_definition
-            else (r.source_config or {}).get("field_name")
+            else configured_name
         )
         rule_dict: dict[str, Any] = {
             "rule_key": str(r.rule_key),
@@ -877,7 +889,17 @@ async def import_mapping_set_from_yaml(
         field_name = r.get("field_name") or source_cfg.get("field_name")
         field_def_id = None
         if source_kind == "field" or field_name:
-            if field_name:
+            if field_name and "." in str(field_name):
+                # Sub-field of a group, addressed as "group.child".
+                group_name, child_name = str(field_name).split(".", 1)
+                group_fd = field_by_name.get(group_name)
+                source_cfg["field_name"] = str(field_name)
+                if not group_fd or group_fd.field_type != "group" or child_name not in field_by_name:
+                    warnings.append(
+                        f"Gruppenfeld '{field_name}' existiert nicht für Typ '{target_set.record_type}'. "
+                        f"Regel für '{target_key}' wurde trotzdem importiert."
+                    )
+            elif field_name:
                 fd = field_by_name.get(field_name)
                 if fd:
                     field_def_id = fd.id

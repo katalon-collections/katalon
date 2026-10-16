@@ -1,0 +1,173 @@
+schema_version: '1.0'
+format_key: lido
+profile_id: lido_core
+profile_version: '1.0'
+record_type: object
+name: LIDO DDB Bildpostkarten
+institution_config:
+  # Beispiel DDB: Rechteprüfung und Lizenzkorb (Schreibweise wie im CA-Altexport,
+  # vor einer Lieferung gegen die aktuelle DDB-Liste prüfen).
+  require_media_license: true
+  allowed_license_uris:
+  - https://creativecommons.org/publicdomain/zero/1.0/
+  - http://creativecommons.org/publicdomain/mark/1.0/
+  - http://creativecommons.org/licenses/by/4.0/
+  - http://creativecommons.org/licenses/by-sa/4.0/
+  - http://creativecommons.org/licenses/by-nd/4.0/
+  - http://creativecommons.org/licenses/by-nc/4.0/
+  - http://creativecommons.org/licenses/by-nc-sa/4.0/
+  - http://creativecommons.org/licenses/by-nc-nd/4.0/
+  - http://creativecommons.org/licenses/by/3.0/
+  - http://creativecommons.org/licenses/by-sa/3.0/
+  - http://creativecommons.org/licenses/by-nd/3.0/
+  - http://creativecommons.org/licenses/by-nc/3.0/
+  - http://creativecommons.org/licenses/by-nc-sa/3.0/
+  - http://creativecommons.org/licenses/by-nc-nd/3.0/
+  - http://rightsstatements.org/vocab/InC/1.0/
+  - http://rightsstatements.org/vocab/InC-EDU/1.0/
+  - http://rightsstatements.org/vocab/InC-OW-EU/1.0/
+  - http://rightsstatements.org/vocab/NoC-NC/1.0/
+  - http://rightsstatements.org/vocab/NoC-OKLR/1.0/
+  - http://rightsstatements.org/vocab/NKC/1.0/
+  - http://rightsstatements.org/vocab/CNE/1.0/
+  - http://rightsstatements.org/vocab/UND/1.0/
+  isil: DE-3066
+  institution_name: Historische Bildpostkarten - Universität Osnabrück
+  website: https://bildpostkarten.uni-osnabrueck.de/
+  location: Osnabrück
+  location_place_ids:
+  - {source: geonames, id: '2856883'}
+  - {source: tgn, id: '7005252'}
+  portal_host: https://bpk.katalon-collections.de
+  record_rights: https://creativecommons.org/publicdomain/zero/1.0/
+  record_rights_holder: true
+  rights_work_holder: true
+  resource_sets: true
+  resource_rights_fallback: object_field:rights.rechtemodell
+  actor_types: {ind: person, unternehmen: corporation, verlag: corporation}
+  actor_id_fields:
+  - {field: lobid, source: gnd}
+  - {field: gnd_link, source: gnd}
+  - {field: wikidata, source: wikidata}
+  - {field: ulan3, source: ulan}
+  - {field: viaf, source: viaf}
+  place_id_fields:
+  - {field: geonames, source: geonames}
+  - {field: gnd, source: gnd}
+  lido_events:
+  - {id: production, type: Herstellung, type_concept_uri: 'http://terminology.lido-schema.org/lido00007'}
+  - {id: creation, type: Geistige Schöpfung, type_concept_uri: 'http://terminology.lido-schema.org/lido00012'}
+  - {id: use, type: Gebrauch, type_concept_uri: 'http://terminology.lido-schema.org/lido00011'}
+rules:
+- source_kind: record
+  source_config: {property: target_subtype}
+  target_key: lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType
+  sort_order: 10
+- source_kind: field
+  field_name: kartentypus
+  target_key: lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType
+  settings: {type: Kartentypus}
+  sort_order: 20
+- source_kind: field
+  field_name: kategorie
+  target_key: lido:objectClassificationWrap/lido:classificationWrap/lido:classification
+  settings: {type: Kategorie}
+  sort_order: 30
+- source_kind: relation
+  source_config: {relation_type: member_of, target_type: collection}
+  target_key: lido:objectClassificationWrap/lido:classificationWrap/lido:classification
+  settings: {type: 'http://terminology.lido-schema.org/lido01135'}
+  sort_order: 40
+- source_kind: field
+  field_name: title
+  target_key: lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue
+  sort_order: 50
+- source_kind: field
+  field_name: beschriftung_gedruckt.beschriftung_gedruck_vorder
+  target_key: lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription
+  settings: {description: 'gedruckt, Vorderseite'}
+  sort_order: 60
+- source_kind: field
+  field_name: beschriftung_gedruckt.beschriftung_gedruck_rueck
+  target_key: lido:objectIdentificationWrap/lido:inscriptionsWrap/lido:inscriptions/lido:inscriptionTranscription
+  settings: {description: 'gedruckt, Rückseite'}
+  sort_order: 70
+- source_kind: field
+  field_name: beschreibung
+  target_key: lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue
+  settings: {type: Beschreibung}
+  sort_order: 80
+- source_kind: field
+  field_name: kuerzere_seite
+  target_key: lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:objectMeasurements/lido:measurementsSet
+  settings: {measurement_type: Kürzere Seite, unit: cm}
+  sort_order: 90
+- source_kind: field
+  field_name: laengere_seite
+  target_key: lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:objectMeasurements/lido:measurementsSet
+  settings: {measurement_type: Längere Seite, unit: cm}
+  sort_order: 100
+- source_kind: relation
+  source_config: {relation_type: creator}
+  target_key: lido:events/production/actor
+  settings: {role: 'Verlag, Herausgeber'}
+  sort_order: 110
+- source_kind: relation
+  source_config:
+    relation_type: creator
+    via: {relation_type: ansaessig, target_type: place}
+  target_key: lido:events/production/place
+  sort_order: 120
+- source_kind: field
+  field_name: material
+  target_key: lido:events/production/materials_tech_term
+  settings: {kind: material}
+  sort_order: 130
+- source_kind: field
+  field_name: technik
+  target_key: lido:events/production/materials_tech_term
+  settings: {kind: technique}
+  sort_order: 140
+- source_kind: relation
+  source_config: {relation_type: maler}
+  target_key: lido:events/creation/actor
+  settings: {role: Maler / Zeichner / Illustrator}
+  sort_order: 150
+- source_kind: field
+  field_name: datierung
+  target_key: lido:events/use/date
+  settings: {label_field: datierungsart}
+  sort_order: 160
+- source_kind: field
+  field_name: frankierung
+  target_key: lido:events/use/description
+  sort_order: 170
+- source_kind: field
+  field_name: stempel
+  target_key: lido:events/use/description
+  sort_order: 180
+- source_kind: field
+  field_name: beschrieben
+  target_key: lido:events/use/description
+  sort_order: 190
+- source_kind: field
+  field_name: gelaufen
+  target_key: lido:events/use/description
+  sort_order: 200
+- source_kind: field
+  field_name: schlagworte
+  target_key: lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term
+  sort_order: 210
+- source_kind: field
+  field_name: aat_schlagworte
+  target_key: lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term
+  sort_order: 220
+- source_kind: field
+  field_name: serie
+  target_key: lido:objectRelationWrap/lido:relatedWorksWrap/lido:relatedWorkSet/lido:relatedWork/lido:displayObject
+  settings: {rel_type: Teil von (Serie)}
+  sort_order: 230
+- source_kind: field
+  field_name: foerderer
+  target_key: lido:recordWrap/lido:recordRights/lido:creditLine
+  sort_order: 240

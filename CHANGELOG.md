@@ -4,6 +4,27 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.43.0]
+
+- **Gewählte Filter im Blick:** Die Portalsuche zeigt aktive Filter direkt unter der
+  Trefferzahl an. Einzelne Auswahlen lassen sich dort entfernen, ohne die übrige Suche
+  neu aufzubauen.
+- **Direkt zur gewünschten Ergebnisseite:** Neben den Seitenzahlen lässt sich eine
+  Zielseite eingeben und per Enter oder „Los“ öffnen. Ist eine Seite wegen der Größe
+  der Trefferliste nicht abrufbar, erscheint ein Hinweis zum Eingrenzen der Suche;
+  die aktuelle Trefferseite bleibt sichtbar.
+- **LIDO-Export für Aggregatoren konfigurierbar:** Mapping-Sets können Lizenzpflichten
+  und erlaubte Lizenz-URIs prüfen, jedes öffentliche Medium mit IIIF-Vorschau und
+  Rechteangaben ausgeben sowie Gruppen-Unterfelder, mehrstufige Ortsbeziehungen,
+  strukturierte Maße und weitere Normdaten abbilden. Ein Prüfbericht listet nicht
+  auslieferbare Datensätze als CSV auf.
+- **Löschmeldungen per OAI-PMH:** Gelöschte, zurückgezogene oder im Zielformat nicht
+  auslieferbare Datensätze werden bei Abrufen als gelöscht gemeldet, damit externe
+  Portale sie bei inkrementellen Abrufen entfernen.
+- **Freigabehinweis je Medium und weitere Subtyp-Konzepte:** Medien unterstützen einen
+  Freigabehinweis (Credit Line) für Portal und Export; Subtypen können neben dem
+  Hauptbegriff weitere Normdaten-Konzepte (z. B. AAT neben GND) führen.
+
 ## [1.42.0]
 
 - **Übersicht im Admin:** Der neue Schreibtisch bündelt zuletzt bearbeitete Datensätze,

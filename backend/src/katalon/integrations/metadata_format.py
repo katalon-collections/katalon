@@ -62,6 +62,9 @@ class ExportProfileCapabilities(BaseModel):
     targets: list[ExportTargetCapability]
     validators: list[ValidatorDependency] = Field(default_factory=list)
     loss_boundaries: list[LocalizedText] = Field(default_factory=list)
+    # settings_schema of templated targets the editor instantiates itself
+    # (LIDO: per-event sub-targets lido:events/{id}/{sub}, keyed by sub).
+    template_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 
@@ -79,6 +82,9 @@ class ExportRecordSummary(BaseModel):
     subtype_concept_id: str | None = None
     subtype_concept_uri: str | None = None
     subtype_concept_label: str | None = None
+    # Further authority concepts of the subtype ({source, id, uri, label, lang}),
+    # emitted after the preferred concept (e.g. AAT next to GND).
+    subtype_concept_alternatives: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ExportRelation(BaseModel):
@@ -90,7 +96,11 @@ class ExportRelation(BaseModel):
     target_label: str | None = None
     target_idno: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    target_subtype: str | None = None
     target_values: dict[str, Any] = Field(default_factory=dict)
+    # Second-level relations of the target (only types a published mapping asks
+    # for via source_config.via, only public targets).
+    target_relations: list[ExportRelation] = Field(default_factory=list)
 
 
 class ExportMediaItem(BaseModel):
@@ -105,6 +115,13 @@ class ExportMediaItem(BaseModel):
     license_uri: str | None = None
     rights_holder: str | None = None
     rights_holder_uri: str | None = None
+    credit_line: str | None = None
+    rights_statement_label: str | None = None
+    width: int | None = None
+    height: int | None = None
+    # IIIF Image API base of this image (".../iiif/3/{identifier}"), None for non-images.
+    iiif_base: str | None = None
+    iiif_manifest_url: str | None = None
 
 
 class ExportRecordContext(BaseModel):

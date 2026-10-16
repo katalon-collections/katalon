@@ -407,6 +407,10 @@ class RecordSubtype(Base):
     concept_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     concept_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     concept_label: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Further concepts for the same subtype: [{source, id, uri, label, lang}]
+    concept_alternatives: Mapped[list[Any]] = mapped_column(
+        JSONB, default=list[Any], server_default="[]"
+    )
 
     __table_args__ = (
         UniqueConstraint("primary_type", "name", name="uq_record_subtypes_primary_name"),
@@ -592,6 +596,8 @@ class MediaFile(Base):
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
     license_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     rights_holder: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Release/permission note ("Veröffentlichung genehmigt von ..."), not a holder name.
+    credit_line: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
@@ -794,6 +800,22 @@ class PortalConfig(Base):
 # ---------------------------------------------------------------------------
 # OAI-PMH Sets (query-based, admin-configurable)
 # ---------------------------------------------------------------------------
+
+
+class OaiRecordState(Base):
+    """One row per record that has been publicly disseminated via OAI-PMH.
+
+    ``deleted_at`` is set when the record stops being public (depublished or
+    deleted) and cleared when it becomes public again. OAI-PMH reports such
+    records as deleted (deletedRecord policy "transient"). Records that were
+    never public get no row, so their identifiers never leave the system.
+    """
+
+    __tablename__ = "oai_record_states"
+
+    record_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
 
 class OAISet(Base):

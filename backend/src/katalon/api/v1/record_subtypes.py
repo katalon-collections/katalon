@@ -87,6 +87,9 @@ async def create_record_subtype(data: RecordSubtypeCreate, db: DBDep) -> RecordS
         concept_id=data.concept_id,
         concept_uri=data.concept_uri,
         concept_label=data.concept_label,
+        concept_alternatives=[
+            c.model_dump(exclude_none=True) for c in data.concept_alternatives or []
+        ],
     )
     if subtype.is_default:
         await _unset_default_for_type(db, subtype.primary_type, keep_id=None)
@@ -142,6 +145,10 @@ async def update_record_subtype(
     subtype.concept_id = data.concept_id
     subtype.concept_uri = data.concept_uri
     subtype.concept_label = data.concept_label
+    if data.concept_alternatives is not None:
+        subtype.concept_alternatives = [
+            c.model_dump(exclude_none=True) for c in data.concept_alternatives
+        ]
     await db.flush()
     return subtype
 

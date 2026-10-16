@@ -25,8 +25,60 @@ export interface SourcePickerProps {
   editorKind?: string
   disabled?: boolean
   relationTypeOptions?: { term: string; label: Record<string, string> }[]
+  /** Target settings (settings_schema from the export profile): rendered as extra inputs. */
+  settingsSchema?: Record<string, unknown>
   onChange: (next: SourceDraft) => void
 }
+
+interface SettingSpec {
+  title?: Record<string, string>
+  description?: Record<string, string>
+  enum?: string[]
+  widget?: string
+}
+
+function schemaEntries(schema: Record<string, unknown> | undefined): [string, SettingSpec][] {
+  const props = schema?.properties
+  if (!props || typeof props !== 'object') return []
+  return Object.entries(props as Record<string, SettingSpec>)
+}
+
+/** Group sub-fields become selectable as "group.child" (export rules address them that way). */
+export function withGroupPaths(fields: FieldDefinition[]): FieldDefinition[] {
+  const flat: FieldDefinition[] = []
+  for (const f of fields) {
+    flat.push(f)
+    for (const child of f.children ?? []) flat.push({ ...child, parent_id: f.id })
+  }
+  const byId = new Map(flat.map(f => [f.id, f]))
+  const seen = new Set<string>()
+  const result: FieldDefinition[] = []
+  for (const f of flat) {
+    const parent = f.parent_id ? byId.get(f.parent_id) : undefined
+    const entry = parent
+      ? {
+          ...f,
+          name: `${parent.name}.${f.name}`,
+          label: Object.fromEntries(
+            Object.entries(f.label ?? {}).map(([lang, text]) => [lang, `${parent.label?.[lang] || parent.name} › ${text}`]),
+          ),
+        }
+      : f
+    if (!seen.has(entry.name)) {
+      seen.add(entry.name)
+      result.push(entry)
+    }
+  }
+  return result
+}
+
+const VIA_TARGET_TYPES = [
+  ['place', 'recordTypePlace'],
+  ['entity', 'recordTypeEntity'],
+  ['occurrence', 'recordTypeOccurrence'],
+  ['collection', 'recordTypeCollection'],
+  ['object', 'recordTypeObject'],
+] as const
 
 const RECORD_PROPERTIES = ['idno', 'canonical_url', 'id', 'created_at', 'updated_at']
 const WORK_TYPE_KINDS: SourceKind[] = ['record', 'constant', 'field']
@@ -107,7 +159,7 @@ function CommitInput({ value, placeholder, ariaLabel, onCommit, disabled }: {
   )
 }
 
-function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
+export function FieldSearch({ value, fields, disabled, placeholder, onChange }: {
   value: string
   fields: FieldDefinition[]
   disabled?: boolean
@@ -303,20 +355,50 @@ function NoteTypeSearch({ value, isDe, disabled, placeholder, onChange }: {
   )
 }
 
-export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, editorKind, disabled, relationTypeOptions, onChange }: SourcePickerProps) {
+export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, editorKind, disabled, relationTypeOptions, settingsSchema, onChange }: SourcePickerProps) {
   const { t, i18n } = useTranslation('screenExport')
   const isDe = !i18n.language?.startsWith('en')
+  const lang = isDe ? 'de' : 'en'
 
   const isLidoWorkType = editorKind === 'lido_work_type'
   const isModsNote = editorKind === 'mods_note'
+  const settingEntries = schemaEntries(settingsSchema)
+  const supportsVia = settingsSchema?.supports_via === true
+  const via = (value.source_config.via ?? {}) as { relation_type?: string; target_type?: string }
 
   function setKind(kind: SourceKind) {
+    // Target settings (e.g. a type or role) do not depend on the source kind: keep them.
+    const kept = Object.fromEntries(
+      Object.entries(value.settings).filter(([key]) => settingEntries.some(([k]) => k === key)),
+    )
     onChange({
       source_kind: kind,
       source_config: kind === 'record' && isLidoWorkType ? { property: 'target_subtype' } : {},
-      settings: isModsNote && value.settings.type ? { type: value.settings.type } : {},
+      settings: { ...kept, ...(isModsNote && value.settings.type ? { type: value.settings.type } : {}) },
     })
   }
+
+  function setSetting(key: string, next: string) {
+    onChange({ ...value, settings: { ...value.settings, [key]: next || undefined } })
+  }
+
+  function setVia(patch: { relation_type?: string; target_type?: string }) {
+    const nextVia = { ...via, ...patch }
+    const cleaned = Object.fromEntries(Object.entries(nextVia).filter(([, v]) => v))
+    const rest = Object.fromEntries(Object.entries(value.source_config).filter(([key]) => key !== 'via'))
+    onChange({
+      ...value,
+      source_config: cleaned.relation_type ? { ...rest, via: cleaned } : rest,
+    })
+  }
+
+  // Settings the kind-specific inputs below already render.
+  const builtInSettings = new Set<string>([
+    ...(value.source_kind === 'relation' ? ['role'] : []),
+    ...(isModsNote ? ['type'] : []),
+    'prefix',
+  ])
+  const extraSettings = settingEntries.filter(([key]) => !builtInSettings.has(key))
 
   const kindLabels: Record<SourceKind, string> = isLidoWorkType ? {
     field: t('sourceKindWorkTypeField'),
@@ -335,7 +417,8 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
     ? WORK_TYPE_KINDS.filter(kind => allowedKinds.includes(kind))
     : allowedKinds
 
-  const eligibleFields = fields.filter(f => acceptedFieldTypes.length === 0 || acceptedFieldTypes.includes(f.field_type))
+  const pathFields = withGroupPaths(fields)
+  const eligibleFields = pathFields.filter(f => f.field_type !== 'group' && (acceptedFieldTypes.length === 0 || acceptedFieldTypes.includes(f.field_type)))
 
 
   return (
@@ -466,6 +549,50 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
               onCommit={v => onChange({ ...value, settings: { ...value.settings, role: v || undefined } })}
             />
           </div>
+          {supportsVia && (
+            <>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                  <label style={{ ...lbl, marginBottom: 0 }}>{t('sourceViaRelationLabel')}</label>
+                  <HelpPopover title={t('sourceViaRelationLabel')} content={<div style={{ fontSize: 12 }}>{t('sourceViaRelationHelp')}</div>} />
+                </div>
+                <select
+                  className="fld"
+                  style={fld}
+                  aria-label={t('sourceViaRelationLabel')}
+                  value={via.relation_type ?? ''}
+                  disabled={disabled}
+                  onChange={e => setVia({ relation_type: e.target.value })}
+                >
+                  <option value="">{t('sourceViaNone')}</option>
+                  {(relationTypeOptions ?? []).map(o => (
+                    <option key={o.term} value={o.term}>{o.label?.[lang] || o.label?.de || o.term}</option>
+                  ))}
+                  {via.relation_type && !(relationTypeOptions ?? []).some(o => o.term === via.relation_type) && (
+                    <option value={via.relation_type}>{via.relation_type}</option>
+                  )}
+                </select>
+              </div>
+              {via.relation_type && (
+                <div>
+                  <label style={lbl}>{t('sourceViaTargetTypeLabel')}</label>
+                  <select
+                    className="fld"
+                    style={fld}
+                    aria-label={t('sourceViaTargetTypeLabel')}
+                    value={via.target_type ?? ''}
+                    disabled={disabled}
+                    onChange={e => setVia({ target_type: e.target.value })}
+                  >
+                    <option value="">{t('sourceViaAnyType')}</option>
+                    {VIA_TARGET_TYPES.map(([type, labelKey]) => (
+                      <option key={type} value={type}>{t(labelKey)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -516,6 +643,46 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
           </select>
         </div>
       )}
+
+      {extraSettings.map(([key, spec]) => {
+        const label = spec.title?.[lang] || spec.title?.de || key
+        const current = String(value.settings[key] ?? '')
+        return (
+          <div key={key}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+              <label style={{ ...lbl, marginBottom: 0 }}>{label}</label>
+              {spec.description?.[lang] && (
+                <HelpPopover title={label} content={<div style={{ fontSize: 12 }}>{spec.description[lang]}</div>} />
+              )}
+            </div>
+            {spec.widget === 'field' ? (
+              <FieldSearch
+                value={current}
+                fields={pathFields.filter(f => f.field_type !== 'group')}
+                disabled={disabled}
+                placeholder={t('sourceFieldSearchPlaceholder')}
+                onChange={next => setSetting(key, next)}
+              />
+            ) : spec.enum ? (
+              <select
+                className="fld"
+                style={fld}
+                aria-label={label}
+                value={current}
+                disabled={disabled}
+                onChange={e => setSetting(key, e.target.value)}
+              >
+                <option value="">{t('sourceFieldChoose')}</option>
+                {spec.enum.map(option => (
+                  <option key={option} value={option}>{t(`settingOption_${option}`, option)}</option>
+                ))}
+              </select>
+            ) : (
+              <CommitInput value={current} ariaLabel={label} disabled={disabled} onCommit={next => setSetting(key, next)} />
+            )}
+          </div>
+        )
+      })}
 
       {isModsNote && (
         <div>

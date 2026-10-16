@@ -904,11 +904,15 @@ async def index_record(record_type: str, record: Any, db: AsyncSession) -> None:
     must never see this record before it is durably visible in Postgres.
     """
     from katalon.config import settings
+    from katalon.services import oai_state_service
     from katalon.workers.enqueue import after_commit
     from katalon.workers.index_tasks import index_record_task
     from katalon.workers.rdf_tasks import sync_rdf_record_task
 
     doc = await build_index_doc(record_type, record, db)
+    # Same transaction as the record change: OAI-PMH reports a depublished or
+    # deleted record as deleted only if this commit goes through.
+    await oai_state_service.track(db, record_type, record)
     after_commit(db, index_record_task, record_type, str(record.id), doc)
     if settings.oxigraph_enabled:
         after_commit(db, sync_rdf_record_task, record_type, str(record.id))
@@ -917,10 +921,12 @@ async def index_record(record_type: str, record: Any, db: AsyncSession) -> None:
 async def remove_record(record_id: UUID, db: AsyncSession, record_type: str | None = None) -> None:
     """Defer ES/RDF removal until ``db`` commits — see ``index_record``."""
     from katalon.config import settings
+    from katalon.services import oai_state_service
     from katalon.workers.enqueue import after_commit
     from katalon.workers.index_tasks import remove_record_task
     from katalon.workers.rdf_tasks import remove_rdf_record_task
 
+    await oai_state_service.mark_withdrawn(db, record_type, record_id)
     after_commit(db, remove_record_task, str(record_id))
     if settings.oxigraph_enabled:
         after_commit(db, remove_rdf_record_task, record_type, str(record_id))

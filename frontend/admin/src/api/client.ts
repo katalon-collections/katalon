@@ -794,6 +794,7 @@ export interface MediaFile {
   media_type: string | null
   license_uri: string | null
   rights_holder: { name: string; uri?: string } | null
+  credit_line?: string | null
   created_at: string
   _links?: { thumbnail?: { href: string } }
 }
@@ -870,7 +871,7 @@ export const media = {
     formData.append('file', file)
     return uploadWithProgress<MediaFile>(`/v1/objects/${objectId}/media`, formData, onProgress)
   },
-  patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean; is_public?: boolean; license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null }) =>
+  patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean; is_public?: boolean; license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null; credit_line?: string | null }) =>
     req<MediaFile>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
   batchImport: async (archive: File | null, mapping: File | null, files: File[]): Promise<{ status: string; task_id: string; batch_id: string }> => {

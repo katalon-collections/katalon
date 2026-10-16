@@ -7,11 +7,14 @@ import type { ExportMappingRule, ExportTargetCapability, LidoEventConfig, Locali
 import { ConfirmModal } from '../../ui/ConfirmModal'
 import { AlertCircle, Check, Plus, Trash, X } from '../../ui/Icons'
 
-const EVENT_PRESETS: { id: string; type: string; label: LocalizedText }[] = [
+const LIDO_TERM = 'http://terminology.lido-schema.org/'
+const EVENT_PRESETS: { id: string; type: string; label: LocalizedText; type_concept_uri?: string }[] = [
+  { id: 'creation', type: 'Geistige Schöpfung', label: { de: 'Geistige Schöpfung', en: 'Creation (intellectual)' }, type_concept_uri: `${LIDO_TERM}lido00012` },
+  { id: 'expression', type: 'Schöpfung der Expression', label: { de: 'Schöpfung der Expression', en: 'Expression creation' }, type_concept_uri: `${LIDO_TERM}lido00484` },
   { id: 'acquisition', type: 'Erwerb', label: { de: 'Erwerb / Zugang', en: 'Acquisition / Ingestion' } },
   { id: 'discovery', type: 'Fund', label: { de: 'Fund / Ausgrabung', en: 'Discovery / Finding' } },
   { id: 'restoration', type: 'Restaurierung', label: { de: 'Restaurierung / Konservierung', en: 'Restoration / Conservation' } },
-  { id: 'usage', type: 'Nutzung', label: { de: 'Nutzung / Verwendung', en: 'Use / Operation' } },
+  { id: 'usage', type: 'Gebrauch', label: { de: 'Gebrauch / Nutzung', en: 'Use' }, type_concept_uri: `${LIDO_TERM}lido00011` },
 ]
 
 function hasConfiguredSource(rule: ExportMappingRule): boolean {
@@ -69,6 +72,7 @@ export function TargetNavigator({
   const [showModsMenu, setShowModsMenu] = useState(false)
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [customName, setCustomName] = useState('')
+  const [customUri, setCustomUri] = useState('')
 
   function handleAddCustom() {
     const trimmed = customName.trim()
@@ -78,8 +82,10 @@ export function TargetNavigator({
       id,
       type: trimmed,
       label: { de: trimmed, en: trimmed },
+      ...(customUri.trim() ? { type_concept_uri: customUri.trim() } : {}),
     })
     setCustomName('')
+    setCustomUri('')
     setShowCustomInput(false)
   }
 
@@ -240,6 +246,14 @@ export function TargetNavigator({
                             }
                           }}
                         />
+                        <input
+                          className="fld sm"
+                          style={{ width: '100%', marginBottom: 6 }}
+                          placeholder={t('customEventUriPlaceholder')}
+                          aria-label={t('customEventUriLabel')}
+                          value={customUri}
+                          onChange={e => setCustomUri(e.target.value)}
+                        />
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button
                             type="button"
@@ -247,6 +261,7 @@ export function TargetNavigator({
                             onClick={() => {
                               setShowCustomInput(false)
                               setCustomName('')
+                              setCustomUri('')
                             }}
                           >
                             {t('cancelBtn')}
@@ -297,6 +312,7 @@ export function TargetNavigator({
                                 id: `${preset.id}_${Date.now().toString(36)}`,
                                 type: preset.type,
                                 label: preset.label,
+                                ...(preset.type_concept_uri ? { type_concept_uri: preset.type_concept_uri } : {}),
                               })
                             }}
                           >

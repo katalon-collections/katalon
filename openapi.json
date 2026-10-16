@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.42.0"
+    "version": "1.43.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -23183,6 +23183,14 @@
             },
             "type": "array",
             "title": "Loss Boundaries"
+          },
+          "template_settings": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Template Settings"
           }
         },
         "type": "object",
@@ -25262,6 +25270,17 @@
               }
             ],
             "title": "Rights Holder"
+          },
+          "credit_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Line"
           }
         },
         "type": "object",
@@ -27514,6 +27533,17 @@
             ],
             "title": "Rights Holder"
           },
+          "credit_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Line"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -28460,6 +28490,20 @@
               }
             ],
             "title": "Concept Label"
+          },
+          "concept_alternatives": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SubtypeConceptAlternative"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Alternatives"
           }
         },
         "type": "object",
@@ -28548,6 +28592,20 @@
               }
             ],
             "title": "Concept Label"
+          },
+          "concept_alternatives": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SubtypeConceptAlternative"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Alternatives"
           },
           "id": {
             "type": "string",
@@ -29889,6 +29947,67 @@
           "_links"
         ],
         "title": "StorageLocationRead"
+      },
+      "SubtypeConceptAlternative": {
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          }
+        },
+        "type": "object",
+        "title": "SubtypeConceptAlternative"
       },
       "TermUsageResponse": {
         "properties": {

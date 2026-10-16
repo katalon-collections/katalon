@@ -150,11 +150,12 @@ export function MediaViewer({ objectId, media }: Props) {
 
 /**
  * Collapsible license/attribution block for a single media file, shown as
- * "Rechteangaben ⌄ <license url> · <rights holder name>".
+ * "Rechteangaben ⌄ <license url> · <rights holder name>", plus the permission
+ * note (credit line) on its own line.
  */
 export function RightsStatement({ media, label }: { media: MediaFile; label: string }) {
-  const { license_uri, rights_holder } = media
-  if (!license_uri && !rights_holder?.name) return null
+  const { license_uri, rights_holder, credit_line } = media
+  if (!license_uri && !rights_holder?.name && !credit_line) return null
 
   return (
     <details style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-3)' }}>
@@ -173,6 +174,7 @@ export function RightsStatement({ media, label }: { media: MediaFile; label: str
             </a>
           ) : rights_holder.name
         )}
+        {credit_line && <div style={{ marginTop: 4 }}>{credit_line}</div>}
       </div>
     </details>
   )

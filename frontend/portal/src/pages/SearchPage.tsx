@@ -214,6 +214,8 @@ export function SearchPage() {
   const [allItems, setAllItems] = useState<SearchResponse['items']>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [jumpPage, setJumpPage] = useState('')
+  const [jumpError, setJumpError] = useState('')
   const [facetConfig, setFacetConfig] = useState<Record<string, string[]>>({ _system: DEFAULT_SYSTEM_FACETS })
   const [facetKinds, setFacetKinds] = useState<Record<string, Record<string, FacetKind>>>({})
   // Expanded nodes per tree facet; kept across filter changes so the open
@@ -366,6 +368,8 @@ export function SearchPage() {
     let cancelled = false
     setLoading(true)
     setError('')
+    setJumpPage('')
+    setJumpError('')
     if (infinite) nextPageRef.current = 1
     pageKeyRef.current = filterKey
     const fetchPage = infinite ? 1 : page
@@ -471,6 +475,19 @@ export function SearchPage() {
   }
 
   function setPage(n: number) {
+    if (!data || !Number.isInteger(n) || n < 1 || n > totalPages) {
+      setJumpError(t('search.pageInvalid', { total: totalPages }))
+      return
+    }
+    // Match Elasticsearch's 10,000-hit window at either end; relevance with
+    // a text query cannot use the reversed tail (search_documents).
+    const from = (n - 1) * data.page_size
+    const reversible = !q || ['idno_asc', 'title_asc', 'newest', 'oldest'].includes(sort)
+    if (from + data.page_size > 10_000 && (!reversible || data.total - from > 10_000)) {
+      setJumpError(t('search.pageUnavailable'))
+      return
+    }
+    setJumpError('')
     const next = new URLSearchParams(params)
     next.set('page', String(n))
     setParams(next)
@@ -487,6 +504,54 @@ export function SearchPage() {
   const statusFacet: FacetBucket[] = data?.facets?.['by_status'] ?? []
   const subtypeFacet: FacetBucket[] = data?.facets?.['by_subtype'] ?? []
   const systemFacets = facetConfig._system ?? DEFAULT_SYSTEM_FACETS
+  const activeFilters: { keys: string[]; value?: string; label: string }[] = []
+  const addFilter = (key: string, value: string, label: string) => {
+    activeFilters.push({ keys: [key], value, label })
+  }
+  if (!advancedQuery && systemFacets.includes('record_type') && typeFilt) {
+    addFilter('type', typeFilt, `${t('search.typeFacet')}: ${typeLabel(typeFilt)}`)
+  }
+  if (systemFacets.includes('status')) statusFilt.forEach(value => addFilter('status', value, `${t('search.statusFacet')}: ${typeLabel(value)}`))
+  if (systemFacets.includes('subtype')) subtypeFilt.forEach(value => addFilter('subtype', value, `${t('search.subtypeFacet')}: ${subtypeLabel(value)}`))
+  Object.entries(RELATED_FACET_PARAMS).forEach(([field, key]) => {
+    params.getAll(key).forEach(value => addFilter(key, value, `${t(RELATED_FACET_LABELS[field])}: ${value}`))
+  })
+  const metadataLabel = (field: string) => {
+    const kind = facetKind(facetKinds, effectiveType, field)
+    return kind?.label ? resolveLabel(kind.label, locale, field) : facetLabel(field, fieldLabels, facetConfig, effectiveType)
+  }
+  Object.entries(metaFilters).forEach(([field, values]) => {
+    const kind = facetKind(facetKinds, effectiveType, field)
+    values.forEach(value => {
+      let label = value
+      if (kind?.kind === 'relation') {
+        const bucket = data?.facets?.[`meta_${field}`]?.find(b => splitRelationBucket(b.value).id === value)
+        label = splitRelationBucket(bucket?.value ?? value).title
+      } else if (kind?.kind === 'tree') {
+        label = data?.tree_facets?.[field]?.paths[value]?.map(node => resolveLabel(node.label, locale, node.id)).join(' › ') || value
+      } else if (kind?.kind === 'date') {
+        label = dateBucketLabel(value, kind.granularity, locale)
+      } else if ((kind ? kind.kind === 'boolean' : isBooleanFacet(field, fieldLabels, facetConfig, effectiveType)) && ['true', 'false'].includes(value.toLowerCase())) {
+        label = t(value.toLowerCase() === 'true' ? 'advanced.yes' : 'advanced.no')
+      }
+      addFilter(`meta_${field}`, value, `${metadataLabel(field)}: ${label}`)
+    })
+  })
+  Object.entries(numericFilters).forEach(([field, range]) => {
+    if (!range.from && !range.to) return
+    const value = range.from && range.to ? `${range.from}–${range.to}` : range.from ? `≥ ${range.from}` : `≤ ${range.to}`
+    activeFilters.push({ keys: [`range_${field}_from`, `range_${field}_to`], label: `${metadataLabel(field)}: ${value}` })
+  })
+
+  function removeFilter(filter: typeof activeFilters[number]) {
+    const next = new URLSearchParams(params)
+    filter.keys.forEach(key => {
+      if (filter.value === undefined) next.delete(key)
+      else next.delete(key, filter.value)
+    })
+    next.delete('page')
+    setParams(next)
+  }
 
   return (
     <div className="container page">
@@ -543,6 +608,21 @@ export function SearchPage() {
             </label>
           </div>
         </div>
+        {activeFilters.length > 0 && (
+          <div className="active-filters" role="group" aria-label={t('search.openFilters')}>
+            {activeFilters.map(filter => (
+              <button
+                type="button"
+                key={`${filter.keys[0]}:${filter.value ?? ''}`}
+                className="active-filter"
+                aria-label={`${t('search.removeFilter')}: ${filter.label}`}
+                onClick={() => removeFilter(filter)}
+              >
+                <span>{filter.label}</span><span aria-hidden="true">×</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="search-layout">
@@ -784,6 +864,7 @@ export function SearchPage() {
 
       {!infinite && totalPages > 1 && (
         <nav className="pagination" aria-label={t('search.pagination')}>
+          <div className="pagination-pages">
           {(() => {
             const pages: (number | '...')[] = []
             const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
@@ -801,6 +882,14 @@ export function SearchPage() {
                 : <button key={n} className={`page-btn${n === page ? ' active' : ''}`} aria-current={n === page ? 'page' : undefined} onClick={() => setPage(n as number)}>{n}</button>
             )
           })()}
+          </div>
+          <form className="page-jump" onSubmit={event => { event.preventDefault(); setPage(Number(jumpPage)) }}>
+            <label htmlFor="page-jump-input">{t('search.page')}</label>
+            <input id="page-jump-input" type="number" min={1} max={totalPages} step={1} required value={jumpPage} placeholder={String(page)} onChange={event => { setJumpPage(event.target.value); setJumpError('') }} aria-invalid={!!jumpError} aria-describedby={jumpError ? 'page-jump-error' : undefined} />
+            <span>{t('search.pageOf', { total: totalPages })}</span>
+            <button type="submit" disabled={loading}>{t('search.pageGo')}</button>
+          </form>
+          {jumpError && <p id="page-jump-error" className="page-jump-error" role="alert">{jumpError}</p>}
         </nav>
       )}
       {showScrollTop && (
