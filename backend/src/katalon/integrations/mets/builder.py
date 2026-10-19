@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from katalon.integrations.metadata_format import (
+    HTML_TAG_RE,
     CompiledMappingSet,
     ExportRecordContext,
     MappingSpec,
@@ -55,7 +56,7 @@ def _clean_text(val: Any) -> str:
         return ""
     if (val := _extract_display_value(val)) is None:
         return ""
-    return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(val))).strip())
+    return html.unescape(re.sub(r"\s+", " ", HTML_TAG_RE.sub(" ", str(val))).strip())
 
 
 def _rule_values(ctx: ExportRecordContext, rule: MappingSpec) -> list[str]:

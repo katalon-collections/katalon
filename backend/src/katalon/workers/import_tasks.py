@@ -61,12 +61,11 @@ def import_records_task(
     from fastapi import HTTPException
     from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import insert
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.exc import StaleDataError
-    from sqlalchemy.pool import NullPool
 
-    from katalon.config import settings
     from katalon.core.dependencies import has_feature_permission, has_record_permission
+    from katalon.core.isolated_session import make_session
     from katalon.core.models import (
         AdminConfig,
         Entity,
@@ -92,8 +91,7 @@ def import_records_task(
     from katalon.services.subtype_service import ensure_subtype_exists
 
     # NullPool avoids binding connections to a previous event loop across Celery task invocations
-    _engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    AsyncSessionLocal = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+    AsyncSessionLocal, _engine = make_session()
 
     model_map: dict[str, type[Object] | type[Entity] | type[Place] | type[Occurrence]] = {
         "object": Object,

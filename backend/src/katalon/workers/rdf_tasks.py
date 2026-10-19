@@ -8,9 +8,8 @@ import logging
 from collections.abc import Coroutine
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-
 from katalon.config import settings
+from katalon.core.isolated_session import make_session as _make_session
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -19,15 +18,6 @@ logger = logging.getLogger(__name__)
 def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     """Run a coroutine in a fresh event loop."""
     return asyncio.run(coro)
-
-
-def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
-    """Create a fresh async session with NullPool to avoid event-loop binding issues."""
-    from sqlalchemy.ext.asyncio import create_async_engine
-    from sqlalchemy.pool import NullPool
-
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
 
 
 @celery_app.task(

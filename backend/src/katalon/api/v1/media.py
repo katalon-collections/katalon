@@ -8,7 +8,6 @@ import shutil
 import tempfile
 import uuid
 import zipfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -46,6 +45,7 @@ from katalon.core.visibility import PUBLIC_STATUSES, ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
 from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
+from katalon.services.media_service import touch_object
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
@@ -213,11 +213,15 @@ async def upload_media(object_id: uuid.UUID, file: UploadFile, db: DBDep, curren
         action="media_add",
         changed_fields={"filename": media.filename, "mime_type": media.mime_type},
     )
+    await touch_object(db, object_id)
     await db.commit()
 
     if category == "image":
+        # The tile worker reindexes the object once the image is ready.
         from katalon.workers.enqueue import after_commit
         after_commit(db, generate_iiif_tiles, str(file_id))
+    else:
+        await _reindex_object(object_id, db)
 
     return _serialize(media)
 
@@ -310,16 +314,10 @@ async def patch_media(
             action="media_update", changed_fields=diff,
         )
 
-    changed = (diff or {}).get("new", {})
-    rights_changed = any(k in changed for k in ("license_uri", "rights_holder", "credit_line"))
-    if rights_changed or "is_public" in changed:
-        # Media rights are part of the object's export (LIDO resourceSet), so the
-        # object's datestamp must move or incremental OAI harvests miss the change.
-        obj = await db.get(Object, object_id)
-        if obj is not None:
-            obj.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    if diff:
+        await touch_object(db, object_id)
     await db.flush()
-    if data.is_primary is not None or data.is_public is not None or rights_changed:
+    if diff:
         await _reindex_object(object_id, db)
     return _serialize(media)
 
@@ -473,6 +471,7 @@ async def delete_media(object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, cur
         action="media_delete",
         changed_fields={"filename": media.filename},
     )
+    await touch_object(db, object_id)
     await db.commit()
 
     if await finalize_pending_delete(media):

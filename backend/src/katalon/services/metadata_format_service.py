@@ -43,10 +43,10 @@ async def _load_registry() -> dict[str, MetadataFormat]:
     try:
         from sqlalchemy import select
 
+        from katalon.core.isolated_session import isolated_session
         from katalon.core.models import MetadataFormat as MetadataFormatModel
-        from katalon.database import AsyncSessionLocal
 
-        async with AsyncSessionLocal() as session:
+        async with isolated_session("katalon-registry") as session:
             result = await session.execute(select(MetadataFormatModel))
             db_formats = result.scalars().all()
 

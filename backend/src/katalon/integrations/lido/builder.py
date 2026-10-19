@@ -22,6 +22,7 @@ from katalon.integrations.licenses import (
     normalize_license_uri,
 )
 from katalon.integrations.metadata_format import (
+    HTML_TAG_RE,
     CompiledMappingSet,
     ExportMediaItem,
     ExportRecordContext,
@@ -129,7 +130,7 @@ def _clean_text(val: Any) -> str:
     if isinstance(val, dict | list) and (val := _display_value(val)) is None:
         return ""
     text = html.unescape(str(val))
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = HTML_TAG_RE.sub(" ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 

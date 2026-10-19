@@ -527,6 +527,8 @@ def _check_production_secrets() -> None:
     # Only the empty-KATALON_BASE_URL fallback in _ensure_admin uses this password.
     if not settings.katalon_base_url.strip() and settings.initial_admin_password in _DEFAULT_PASSWORDS | {""}:
         errors.append("INITIAL_ADMIN_PASSWORD is set to a well-known default — change it before going live")
+    if settings.oai_contact_email == "admin@katalon.dev":
+        logger.warning("OAI_ADMIN_EMAIL is not set — OAI-PMH Identify reports a placeholder address")
     if errors:
         raise RuntimeError("Refusing to start in production mode:\n" + "\n".join(f"  - {e}" for e in errors))
 

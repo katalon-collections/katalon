@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     first_run_credentials_path: str = "/var/lib/katalon/first-run-credentials.txt"
 
     oai_admin_email: str = "admin@katalon.dev"
+    # Public URL of the OAI-PMH endpoint (e.g. https://katalon.example.org/oai). Empty:
+    # derived from the request, which relies on Host and X-Forwarded-Proto from the proxy.
+    oai_base_url: str = ""
     es_index_name: str = "katalon_records"
     es_reindex_batch_size: int = 500
     # Upper bound for one _bulk request body. Elasticsearch rejects requests over
@@ -208,6 +211,11 @@ class Settings(BaseSettings):
         if self.smtp_starttls == self.smtp_ssl_tls:
             raise ValueError("Exactly one of SMTP_STARTTLS and SMTP_SSL_TLS must be true")
         return self
+
+    @property
+    def oai_contact_email(self) -> str:
+        """adminEmail for OAI-PMH Identify; Compose passes unset variables as empty strings."""
+        return self.oai_admin_email.strip() or self.default_admin_email.strip() or "admin@katalon.dev"
 
     @property
     def oai_repository_domain(self) -> str:

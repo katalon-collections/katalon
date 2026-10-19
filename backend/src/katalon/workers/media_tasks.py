@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from katalon.core.isolated_session import make_session
 from katalon.core.media_storage import (
     LocalStorage,
     StorageBackend,
@@ -86,9 +86,7 @@ async def _local_source_path(storage: Any, key: str) -> tuple[Path, list[Path]]:
 
 
 def _worker_session() -> async_sessionmaker[AsyncSession]:
-    from katalon.config import settings
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    return make_session()[0]
 
 
 async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
@@ -127,6 +125,10 @@ async def _process(media_file_id: uuid.UUID) -> dict[str, Any]:
         media.width = width
         media.height = height
         media.status = "ready"
+        # Ready images get IIIF links in the export.
+        from katalon.services.media_service import touch_object
+
+        await touch_object(session, media.object_id)
         await session.commit()
         # The object's search document caches primary media id/dimensions – refresh it
         # now that the media left the pending state.

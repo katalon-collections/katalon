@@ -70,3 +70,18 @@ def test_workers_do_not_import_api() -> None:
         .should_not_import("katalon.api*")
         .check("katalon")
     )
+
+
+def test_workers_do_not_import_global_engine() -> None:
+    """Celery tasks run in their own event loops; the pooled global engine in
+    ``katalon.database`` would leave connections open server-side once a loop is gone.
+    Workers open sessions via ``katalon.core.isolated_session`` instead.
+
+    Direct imports only: ``core.models`` imports ``database`` for ``Base``.
+    """
+    (
+        archrule("workers_do_not_import_global_engine")
+        .match("katalon.workers*")
+        .should_not_import("katalon.database")
+        .check("katalon", only_direct_imports=True)
+    )

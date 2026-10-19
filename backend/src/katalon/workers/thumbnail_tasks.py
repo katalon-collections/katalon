@@ -30,10 +30,10 @@ from typing import Any
 import httpx
 from redis.exceptions import LockNotOwnedError
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import katalon.config as config
+from katalon.core.isolated_session import isolated_session
 from katalon.core.media_storage import iiif_identifier
 from katalon.core.media_validation import ALLOWED_IMAGE_MIME
 from katalon.core.thumbnails import THUMBNAIL_HEIGHTS
@@ -67,13 +67,9 @@ def _image_media_query() -> Any:
 
 
 async def _with_session[T](work: Any) -> T:
-    engine = create_async_engine(config.settings.database_url, poolclass=NullPool)
-    try:
-        async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as session:
-            result: T = await work(session)
-            return result
-    finally:
-        await engine.dispose()
+    async with isolated_session() as session:
+        result: T = await work(session)
+        return result
 
 
 async def warm_identifiers(identifiers: list[str]) -> tuple[int, int]:

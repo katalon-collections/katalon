@@ -3,6 +3,7 @@
 
 """Tests for media Celery task internals."""
 import uuid
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -86,6 +87,8 @@ async def test_process_fetches_info_builds_manifest_sets_ready() -> None:
     assert media.status == "ready"
     assert media.iiif_manifest is None
     assert (media.width, media.height) == (1200, 800)
+    # Ready images add IIIF links to the export: the object's datestamp moves.
+    assert isinstance(session.get.return_value.updated_at, datetime)
     session.commit.assert_awaited()
 
 

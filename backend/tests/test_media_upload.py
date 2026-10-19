@@ -743,3 +743,37 @@ async def test_direct_media_download_draft_object_returns_404_for_anonymous() ->
     finally:
         app.dependency_overrides.pop(get_db, None)
 
+
+
+@pytest.mark.asyncio
+async def test_delete_media_moves_object_datestamp(override_auth) -> None:
+    obj_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    media_file = MediaFile(
+        id=media_id, object_id=obj_id, filename="test.jpg", mime_type="image/jpeg",
+        storage_key="ab/test.jpg", status="ready", is_primary=True, created_at=datetime.now(),
+    )
+    old_stamp = datetime(2020, 1, 1)
+    obj = MagicMock(updated_at=old_stamp)
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mock_result(media_file))
+    session.get = AsyncMock(return_value=obj)
+    reindex = AsyncMock()
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        with (
+            patch("katalon.api.v1.media._reindex_object", reindex),
+            patch("katalon.api.v1.media.finalize_pending_delete", AsyncMock(return_value=False)),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.delete(f"/v1/objects/{obj_id}/media/{media_id}")
+        assert response.status_code == 204
+        # A removed image leaves the export: incremental harvests must see the object again.
+        assert obj.updated_at > old_stamp
+        reindex.assert_awaited_once()
+    finally:
+        app.dependency_overrides.pop(get_db, None)

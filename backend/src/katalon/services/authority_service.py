@@ -63,10 +63,10 @@ async def _load_registry() -> dict[str, AuthoritySource]:
     try:
         from sqlalchemy import select
 
+        from katalon.core.isolated_session import isolated_session
         from katalon.core.models import AuthoritySource as AuthoritySourceModel
-        from katalon.database import AsyncSessionLocal
 
-        async with AsyncSessionLocal() as session:
+        async with isolated_session("katalon-registry") as session:
             result = await session.execute(select(AuthoritySourceModel))
             db_sources = result.scalars().all()
 

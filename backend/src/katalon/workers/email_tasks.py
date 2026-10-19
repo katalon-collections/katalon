@@ -12,26 +12,14 @@ from datetime import UTC, datetime
 from email.message import EmailMessage
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-from sqlalchemy.pool import NullPool
 
 from katalon.config import settings
+from katalon.core.isolated_session import make_session as _make_session
 from katalon.core.models import PasswordResetToken, User
 from katalon.services.secret_service import decrypt_value
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-
-def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
-    """Create task-local DB resources; Celery runs each task in a fresh loop."""
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
 
 
 def _message(recipient: str, subject: str, text_body: str, html_body: str | None) -> EmailMessage:

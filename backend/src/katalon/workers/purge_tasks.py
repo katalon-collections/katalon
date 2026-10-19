@@ -6,20 +6,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Coroutine
-from contextlib import asynccontextmanager
+from collections.abc import Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
     AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
 )
-from sqlalchemy.pool import NullPool
 
+from katalon.core.isolated_session import engine_scope
+from katalon.core.isolated_session import make_session as _make_session
 from katalon.core.models import Collection, Entity, Object, Occurrence, Place, StorageLocation
 from katalon.workers.celery_app import celery_app
 
@@ -41,25 +38,6 @@ _MODEL_MAP = _PURGEABLE_MODELS
 
 def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
-
-
-def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
-    """Per-run NullPool engine. Each task runs in its own ``asyncio.run`` loop
-    (and, with ``--pool=threads``, its own thread); the API's pooled global
-    engine would hand out connections bound to a previous run's loop
-    ("Future attached to a different loop")."""
-    from katalon.config import settings
-
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
-
-
-@asynccontextmanager
-async def engine_scope(engine: AsyncEngine) -> AsyncIterator[None]:
-    try:
-        yield
-    finally:
-        await engine.dispose()
 
 
 async def _purge_records(

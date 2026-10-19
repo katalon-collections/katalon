@@ -201,7 +201,7 @@ async def _harvest_page(
 async def oai_endpoint(request: Request, db: DBDep) -> Response:
     params = dict(request.query_params)
     verb = params.get("verb", "")
-    base_url = str(request.url).split("?")[0]
+    base_url = settings.oai_base_url.strip() or str(request.url).split("?")[0]
 
     try:
         # --- Identify ---
@@ -209,7 +209,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
             config_res = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
             config = config_res.scalar_one_or_none()
             repo_name = (resolve_lang_text(config.site_title) if config else "") or "Katalon"
-            admin_email = getattr(settings, "oai_admin_email", settings.default_admin_email)
+            admin_email = settings.oai_contact_email
             earliest = "2024-01-01T00:00:00Z"
             xml = oaipmh_service.identify(base_url, repo_name, admin_email, earliest)
 

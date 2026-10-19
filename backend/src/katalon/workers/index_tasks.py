@@ -9,9 +9,9 @@ from collections.abc import Coroutine, Sequence
 from typing import Any
 
 from celery.signals import worker_ready, worker_shutdown
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from katalon.config import settings
+from katalon.core.isolated_session import make_session as _make_session
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -52,17 +52,6 @@ def _run[T](coro: Coroutine[Any, Any, T]) -> T:
             await close_es()
 
     return asyncio.run(_with_cleanup())
-
-
-def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
-    """Create a fresh async session with NullPool to avoid event-loop binding issues."""
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-    from sqlalchemy.pool import NullPool
-
-    from katalon.config import settings
-
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
 
 
 def _log_index_failure(record_type: str, record_id: str, error: str) -> None:
@@ -373,9 +362,20 @@ async def _stream_reindex(
 
             for batch in itertools.batched(ids, REINDEX_BATCH_SIZE, strict=False):
                 parts = [batch[i :: len(sessions)] for i in range(len(sessions))]
-                results = await asyncio.gather(
-                    *(_build(s, p) for s, p in zip(sessions, parts, strict=True) if p)
-                )
+                # TaskGroup, not gather: when one build fails, its siblings must be
+                # cancelled and awaited before the sessions close. Otherwise they are
+                # cancelled mid-query by asyncio.run and their connections stay open
+                # server-side ("idle in transaction") for the life of the worker.
+                try:
+                    async with asyncio.TaskGroup() as group:
+                        build_tasks = [
+                            group.create_task(_build(s, p))
+                            for s, p in zip(sessions, parts, strict=True)
+                            if p
+                        ]
+                except ExceptionGroup as group_error:
+                    raise group_error.exceptions[0] from None
+                results = [task.result() for task in build_tasks]
                 docs = [doc for part in results for doc in part]
                 built += len(docs)
                 ok, batch_failed = await bulk_index_documents(

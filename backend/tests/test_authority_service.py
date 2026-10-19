@@ -193,7 +193,7 @@ class _FakeSession:
 
 
 def _fake_session_local(rows: list[_FakeDBRow]):
-    def _factory() -> _FakeSession:
+    def _factory(*_args: Any) -> _FakeSession:
         return _FakeSession(rows)
     return _factory
 
@@ -201,7 +201,7 @@ def _fake_session_local(rows: list[_FakeDBRow]):
 @pytest.mark.asyncio
 async def test_load_registry_excludes_disabled_db_source() -> None:
     rows = [_FakeDBRow(id="gnd", is_enabled=False)]
-    with patch("katalon.database.AsyncSessionLocal", _fake_session_local(rows)):
+    with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
         registry = await authority_service._load_registry()
     assert "gnd" not in registry
     assert "viaf" in registry
@@ -210,6 +210,6 @@ async def test_load_registry_excludes_disabled_db_source() -> None:
 @pytest.mark.asyncio
 async def test_load_registry_keeps_enabled_db_source() -> None:
     rows = [_FakeDBRow(id="gnd", is_enabled=True)]
-    with patch("katalon.database.AsyncSessionLocal", _fake_session_local(rows)):
+    with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
         registry = await authority_service._load_registry()
     assert "gnd" in registry

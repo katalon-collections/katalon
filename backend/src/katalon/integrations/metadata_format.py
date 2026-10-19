@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
@@ -12,6 +13,10 @@ from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+# Real markup only: "<p>", "</em>", "<br/>", "<a href=...>". Vocabulary qualifiers such as
+# "Himmel < religiös >" have a space after "<" and stay text.
+HTML_TAG_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>")
 
 
 class SourceKind(StrEnum):

@@ -9,14 +9,7 @@ import uuid
 from collections.abc import Coroutine
 from typing import Any
 
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-from sqlalchemy.pool import NullPool
-
+from katalon.core.isolated_session import make_session as _make_session
 from katalon.workers.celery_app import celery_app
 from katalon.workers.email_tasks import send_user_email
 from katalon.workers.enqueue import enqueue, run_after_commit_hooks
@@ -26,18 +19,6 @@ logger = logging.getLogger(__name__)
 
 def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
-
-
-def _make_session() -> tuple[async_sessionmaker[AsyncSession], AsyncEngine]:
-    # Imported here, not at module level: the test harness reloads
-    # katalon.config per test session to pick up the ephemeral testcontainer
-    # DB URL, and a module-level `from katalon.config import settings`
-    # would keep a stale pre-reload Settings instance (see import_tasks.py,
-    # which uses the same call-time-import convention for this reason).
-    from katalon.config import settings
-
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False), engine
 
 
 def _queue_batch_notification(

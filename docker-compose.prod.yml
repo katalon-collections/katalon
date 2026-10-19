@@ -64,6 +64,7 @@ services:
       KATALON_BASE_URL: ${KATALON_BASE_URL}
       FIRST_RUN_CREDENTIALS_PATH: ${FIRST_RUN_CREDENTIALS_PATH:-/var/lib/katalon/first-run-credentials.txt}
       OAI_ADMIN_EMAIL: ${OAI_ADMIN_EMAIL}
+      OAI_BASE_URL: ${OAI_BASE_URL:-}
       CORS_ORIGINS: ${CORS_ORIGINS}
       DEBUG: "false"
     deploy:

@@ -225,6 +225,16 @@ def test_html_line_breaks_inside_words_do_not_glue_words() -> None:
     assert ">Unter land &amp; Ober land<" in xml
 
 
+def test_vocabulary_qualifiers_in_angle_brackets_survive() -> None:
+    cms = _minimal([MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "s"},
+                                target_key="lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term")])
+    xml = _render(_ctx(fields={"s": [{"label": "Himmel < religiös >"}, "Himmel < naturwissenschaftlich >",
+                                     "<em>Volkslied</em> < deutsch >"]}), cms)
+    assert "<lido:term>Himmel &lt; religiös &gt;</lido:term>" in xml
+    assert "<lido:term>Himmel &lt; naturwissenschaftlich &gt;</lido:term>" in xml
+    assert "<lido:term>Volkslied &lt; deutsch &gt;</lido:term>" in xml
+
+
 def test_identical_repetitions_are_deduplicated() -> None:
     cms = _minimal([MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "s"},
                                 target_key="lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term")])
