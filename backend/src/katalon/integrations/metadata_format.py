@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import html
 import re
 import uuid
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -17,6 +19,29 @@ from pydantic import BaseModel, Field
 # Real markup only: "<p>", "</em>", "<br/>", "<a href=...>". Vocabulary qualifiers such as
 # "Himmel < religiös >" have a space after "<" and stay text.
 HTML_TAG_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>")
+
+
+def plain_text(value: str) -> str:
+    """Export text without markup: rich-text tags removed, entities decoded, whitespace
+    collapsed. Vocabulary qualifiers like "Himmel < religiös >" are not tags and stay."""
+    return html.unescape(re.sub(r"\s+", " ", HTML_TAG_RE.sub(" ", value)).strip())
+
+
+def utc_timestamp(value: str | datetime | None) -> str | None:
+    """``YYYY-MM-DDThh:mm:ssZ`` for an export timestamp (OAI datestamp, LIDO dates).
+
+    Record timestamps are stored as naive UTC; values with an offset are converted.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC)
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class SourceKind(StrEnum):
@@ -129,14 +154,22 @@ class ExportMediaItem(BaseModel):
     iiif_manifest_url: str | None = None
 
 
+# Shape of ExportRecordContext as stored in the search index. Bump whenever the context
+# gains, loses or reshapes data an exporter reads (new media keys, field order, ...).
+# Index copies with an older version are rebuilt from the database at export time
+# (export_context_service.refresh_index_contexts) until the next full reindex.
+EXPORT_CONTEXT_VERSION = 2
+
+
 class ExportRecordContext(BaseModel):
     record: ExportRecordSummary
     fields: dict[str, Any] = Field(default_factory=dict)
     relations: list[ExportRelation] = Field(default_factory=list)
     media: list[ExportMediaItem] = Field(default_factory=list)
     # >0 only on the copy stored in the search index when inbound relations
-    # were left out for size; see export_context_service.expand_omitted_contexts.
+    # were left out for size; see export_context_service.refresh_index_contexts.
     inbound_relations_omitted: int = 0
+    schema_version: int = EXPORT_CONTEXT_VERSION
 
     @classmethod
     def from_hit(cls, hit: dict[str, Any]) -> ExportRecordContext:

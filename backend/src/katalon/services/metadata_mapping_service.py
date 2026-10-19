@@ -574,9 +574,12 @@ async def validate_mapping_set(
 async def preview_mapping_set(
     db: AsyncSession,
     set_id: uuid.UUID,
-    record_id: uuid.UUID,
+    record_ref: uuid.UUID | str,
 ) -> tuple[str, list[MappingDiagnostic]]:
-    """Render one record through a mapping set's draft/published rules for live preview."""
+    """Render one record through a mapping set's draft/published rules for live preview.
+
+    ``record_ref`` is the record's UUID or its inventory number (idno).
+    """
     import xml.etree.ElementTree as ET
 
     from katalon.services import export_context_service, metadata_format_service
@@ -593,6 +596,9 @@ async def preview_mapping_set(
     diagnostics = fmt.validate_mapping(cms)
     via_types = await export_context_service.collect_via_relation_types(
         db, extra_rules=cms.rules
+    )
+    record_id = await export_context_service.resolve_record_id(
+        db, mapping_set.record_type, str(record_ref)
     )
     ctx = await export_context_service.build_export_context_from_db(
         db, mapping_set.record_type, record_id, via_relation_types=via_types
@@ -963,7 +969,24 @@ async def import_mapping_set_from_yaml(
 # ---------------------------------------------------------------------------
 
 
+def _sub_field(raw: Any, child: str) -> list[Any]:
+    """Values of one sub-field across the entries of a group field."""
+    out: list[Any] = []
+    for entry in raw if isinstance(raw, list) else [raw]:
+        if isinstance(entry, dict) and child in entry:
+            value = entry[child]
+            out.extend(value if isinstance(value, list) else [value])
+    return out
+
+
 def extract_values(src: dict[str, Any] | ExportRecordContext, field_name: str) -> list[str]:
+    """Display values of a field; ``group.child`` addresses a sub-field of a group (the
+    admin field picker offers these paths for every format)."""
+    group, _, child = field_name.partition(".")
+    if child:
+        fields = src.fields if isinstance(src, ExportRecordContext) else (src.get("metadata") or {})
+        if group in fields:
+            return [v for v in _flatten_value(_sub_field(fields[group], child)) if v]
     if isinstance(src, ExportRecordContext):
         raw = src.fields.get(field_name)
         if raw is None and field_name in {"idno", "title"}:

@@ -71,6 +71,31 @@ def migration_required(current_tag: str, prev_tag: str | None) -> bool:
     return bool(diff.strip())
 
 
+EXPORT_CONTEXT_FILE = "backend/src/katalon/integrations/metadata_format.py"
+_EXPORT_CONTEXT_VERSION = re.compile(r"^EXPORT_CONTEXT_VERSION = (\d+)", re.MULTILINE)
+
+
+def export_context_version(ref: str) -> int:
+    """EXPORT_CONTEXT_VERSION at a git ref; 0 before it existed (Katalon < 1.43.2)."""
+    text = run("git", "show", f"{ref}:{EXPORT_CONTEXT_FILE}", check=False)
+    match = _EXPORT_CONTEXT_VERSION.search(text)
+    return int(match.group(1)) if match else 0
+
+
+def reindex_required(current_tag: str, prev_tag: str | None, meta: dict[str, Any], version: str) -> bool:
+    """True if index copies written by the previous release are stale.
+
+    Detected from EXPORT_CONTEXT_VERSION; ``[releases."x.y.z"] reindex_required = true``
+    in release-meta.toml forces it for other index changes.
+    """
+    v_meta = meta.get("releases", {}).get(version) or {}
+    if v_meta.get("reindex_required"):
+        return True
+    if prev_tag is None:
+        return False  # erste Installation baut den Index ohnehin neu
+    return export_context_version(current_tag) != export_context_version(prev_tag)
+
+
 def is_breaking(version: str, changelog_path: Path | None = None) -> bool:
     target = changelog_path or (REPO_ROOT / "CHANGELOG.md")
     if not target.exists():
@@ -338,6 +363,7 @@ def build_release_payload(
         "version": version,
         "minimum_installer_version": meta["minimum_installer_version"],
         "migration_required": migration_required(tag, prev),
+        "reindex_required": reindex_required(tag, prev, meta, version),
         "breaking": is_breaking(version, changelog_path=changelog_path),
         "compose_revision": meta["compose_revision"],
         "requires": meta.get("requires", {}),

@@ -22,7 +22,7 @@ async def load_public_fields(db: AsyncSession, target_type: str) -> list[FieldDe
             FieldDefinition.target_type == target_type,
             FieldDefinition.is_deleted.is_(False),
             FieldDefinition.is_public.is_(True),
-        )
+        ).order_by(FieldDefinition.sort_order, FieldDefinition.name)
     )
     return list(result.scalars().all())
 
@@ -32,17 +32,25 @@ def filter_public_metadata(
     fields: Iterable[FieldDefinition],
     target_subtype: str | None = None,
 ) -> dict[str, Any]:
-    """Return only configured public fields, including public children of groups."""
+    """Return only configured public fields, including public children of groups.
+
+    Keys keep the order of ``fields`` (schema order from `load_public_fields`). The
+    projection must not depend on the process: the API (preview) and the worker (index,
+    OAI) build the same record, and exporters that take the first value of a group
+    would otherwise differ between the two.
+    """
     source = metadata or {}
     applicable = [
         field for field in fields
         if field.target_subtype is None or field.target_subtype == target_subtype
     ]
     top_level = [field for field in applicable if field.parent_id is None]
-    children_by_parent: dict[object, set[str]] = {}
+    children_by_parent: dict[object, list[str]] = {}
     for field in applicable:
         if field.parent_id is not None:
-            children_by_parent.setdefault(field.parent_id, set()).add(field.name)
+            names = children_by_parent.setdefault(field.parent_id, [])
+            if field.name not in names:
+                names.append(field.name)
 
     projected: dict[str, Any] = {}
     for field in top_level:
@@ -52,7 +60,7 @@ def filter_public_metadata(
         if field.field_type != "group":
             projected[field.name] = value
             continue
-        child_names = children_by_parent.get(field.id, set())
+        child_names = children_by_parent.get(field.id, [])
         if not child_names or not isinstance(value, list):
             continue
         entries = [

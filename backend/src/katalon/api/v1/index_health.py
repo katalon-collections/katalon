@@ -22,7 +22,9 @@ from katalon.core.models import (
     Procedure,
     StorageLocation,
 )
-from katalon.integrations.elasticsearch import count_by_type
+from katalon.integrations.elasticsearch import count_by_type, count_stale_export_contexts
+from katalon.integrations.metadata_format import EXPORT_CONTEXT_VERSION
+from katalon.services.export_context_service import EXPORT_CONTEXT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,9 @@ class TypeHealth(BaseModel):
 
 class IndexHealthResponse(BaseModel):
     types: dict[str, TypeHealth]
+    # Index documents whose export context predates this Katalon version. OAI and
+    # exports rebuild them from the database (slower) until a full reindex.
+    stale_export_contexts: int = 0
 
 
 @router.get(
@@ -68,7 +73,8 @@ async def get_index_health(db: DBDep) -> IndexHealthResponse:
         db_count = (await db.execute(count_query)).scalar_one()
         es_count = await count_by_type(record_type)
         types[record_type] = TypeHealth(db=db_count, es=es_count, delta=db_count - es_count)
-    return IndexHealthResponse(types=types)
+    stale = await count_stale_export_contexts(EXPORT_CONTEXT_VERSION, EXPORT_CONTEXT_TYPES)
+    return IndexHealthResponse(types=types, stale_export_contexts=stale)
 
 
 @router.post(

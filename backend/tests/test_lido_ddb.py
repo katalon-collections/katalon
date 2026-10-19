@@ -253,8 +253,17 @@ def test_record_metadata_date_uses_created_at_when_never_updated() -> None:
     ctx = ExportRecordContext(record=ExportRecordSummary(
         id="x", record_type="object", title="T", created_at="2026-01-01T00:00:00"))
     el = ET.fromstring(_render(ctx, _minimal())).find(".//lido:recordMetadataDate", NS)
-    assert el.text == "2026-01-01T00:00:00"
+    assert el.text == "2026-01-01T00:00:00Z"
     assert el.attrib[f"{L}type"].endswith("lido00470")
+
+
+def test_record_metadata_date_matches_oai_datestamp_format() -> None:
+    from katalon.integrations.metadata_format import utc_timestamp
+
+    # Stored naive UTC with microseconds, as written by the ORM.
+    assert utc_timestamp("2026-10-13T08:34:32.570737") == "2026-10-13T08:34:32Z"
+    assert utc_timestamp("2026-10-13T10:34:32+02:00") == "2026-10-13T08:34:32Z"
+    assert utc_timestamp("") is None
 
 
 # ---------------------------------------------------------------------------

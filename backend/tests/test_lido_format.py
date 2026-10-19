@@ -851,7 +851,7 @@ def test_lido_emits_ddb_record_metadata_defaults() -> None:
     metadata_date = record_wrap.find("lido:recordInfoSet/lido:recordMetadataDate", ns)
     assert metadata_date is not None
     # The record's own change date, not the export time (stable across harvests).
-    assert metadata_date.text == "2026-03-01T09:30:00"
+    assert metadata_date.text == "2026-03-01T09:30:00Z"
     assert metadata_date.attrib[f"{{{LIDO_NS}}}type"] == "http://terminology.lido-schema.org/lido00471"
 
 

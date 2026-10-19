@@ -148,7 +148,8 @@ class ExportMappingSetDetail(ExportMappingSetRead):
 
 
 class MappingPreviewRequest(BaseModel):
-    record_id: uuid.UUID
+    # Record UUID or inventory number (idno) of a record of the mapping set's type.
+    record_id: str = Field(min_length=1, max_length=128)
 
 
 class MappingPreviewResult(BaseModel):

@@ -29,6 +29,7 @@ from katalon.integrations.metadata_format import (
     ExportRelation,
     MappingSpec,
     SourceKind,
+    utc_timestamp,
 )
 from katalon.services.metadata_mapping_service import extract_values
 
@@ -715,12 +716,29 @@ def _id_fields(rule: MappingSpec, config: dict[str, Any], key: str) -> list[dict
 
 
 def _authority_ids(values: dict[str, Any], id_fields: list[dict[str, Any]]) -> list[tuple[str, str | None]]:
-    """(uri, source) pairs from authority/url fields of a related record, deduplicated."""
+    """(uri, source) pairs from authority/url fields of a related record, deduplicated.
+
+    ``field`` may address a sub-field of a group (``normdaten.ag_gnd``). A group mapped
+    as a whole contributes every sub-value, not just the first one: each is an
+    identifier of the same record, and its source comes from the URI where recognisable.
+    """
     result: list[tuple[str, str | None]] = []
     seen: set[str] = set()
     for entry in id_fields:
-        raw = values.get(str(entry["field"]))
-        for leaf in raw if isinstance(raw, list) else [raw]:
+        field_name = str(entry["field"])
+        group_name, _, child = field_name.partition(".")
+        raw = values.get(group_name if child else field_name)
+        leaves: list[Any] = []
+        for value in raw if isinstance(raw, list) else [raw]:
+            if child:
+                sub = value.get(child) if isinstance(value, dict) else None
+                leaves.extend(sub if isinstance(sub, list) else [sub])
+            elif isinstance(value, dict) and not (_KNOWN_VALUE_KEYS & value.keys()):
+                for sub in value.values():
+                    leaves.extend(sub if isinstance(sub, list) else [sub])
+            else:
+                leaves.append(value)
+        for leaf in leaves:
             item = _item_from_value(leaf)
             if item is None:
                 continue
@@ -1033,10 +1051,10 @@ def build_lido_element(
     record_info = _sub(record_wrap, "lido:recordInfoSet")
     _sub(record_info, "lido:recordInfoLink", record_info_link)
     if ctx.record.updated_at:
-        _sub(record_info, "lido:recordMetadataDate", ctx.record.updated_at,
+        _sub(record_info, "lido:recordMetadataDate", utc_timestamp(ctx.record.updated_at),
              lido__type=LIDO_TERMS["record_modified"])
     elif ctx.record.created_at:
-        _sub(record_info, "lido:recordMetadataDate", ctx.record.created_at,
+        _sub(record_info, "lido:recordMetadataDate", utc_timestamp(ctx.record.created_at),
              lido__type=LIDO_TERMS["record_created"])
 
     resource_wrap = _sub(administrative, "lido:resourceWrap")

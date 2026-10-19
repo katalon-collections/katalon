@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from typing import Any
@@ -30,6 +31,7 @@ from katalon.core.models import (
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.integrations.licenses import license_label
 from katalon.integrations.metadata_format import (
+    EXPORT_CONTEXT_VERSION,
     ExportMediaItem,
     ExportRecordContext,
     ExportRecordSummary,
@@ -37,6 +39,8 @@ from katalon.integrations.metadata_format import (
 )
 from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
 from katalon.services.search_service import _extract_title
+
+logger = logging.getLogger(__name__)
 
 _MODEL_MAP: dict[str, type[Any]] = {
     "object": Object,
@@ -46,6 +50,9 @@ _MODEL_MAP: dict[str, type[Any]] = {
     "collection": Collection,
 }
 
+# Record types that get an export context (index copy, OAI, exports).
+EXPORT_CONTEXT_TYPES: frozenset[str] = frozenset(_MODEL_MAP)
+
 # Internal types strictly excluded from public export contexts
 _EXCLUDED_RELATION_TARGET_TYPES: set[str] = {"storage_location", "procedure"}
 
@@ -54,7 +61,7 @@ _EXCLUDED_RELATION_TARGET_TYPES: set[str] = {"storage_location", "procedure"}
 # A collection with 30,000 member postcards otherwise produced a 46 MB document
 # (every member with all its public field values). Above this count the index
 # copy omits inbound relations and exporters rebuild the full context from the
-# database for that one record (see expand_omitted_contexts).
+# database for that one record (see refresh_index_contexts).
 INDEX_MAX_INBOUND_RELATIONS = 200
 
 
@@ -455,14 +462,46 @@ async def build_export_context_from_db(
     )
 
 
-async def expand_omitted_contexts(db: AsyncSession, hits: list[dict[str, Any]]) -> None:
-    """Replace index copies that left out inbound relations with the full
-    context from the database, in place. Only records above
-    INDEX_MAX_INBOUND_RELATIONS are affected (e.g. large collections)."""
+async def resolve_record_id(db: AsyncSession, record_type: str, ref: str) -> uuid.UUID:
+    """Record id from a UUID or an inventory number (idno, unique per record type)."""
+    ref = ref.strip()
+    try:
+        return uuid.UUID(ref)
+    except ValueError:
+        pass
+    model = _MODEL_MAP.get(record_type)
+    if model is None:
+        raise ValueError(f"Nicht unterstützter Datensatztyp: {record_type}")
+    query = select(model.id).where(model.idno == ref)
+    if hasattr(model, "deleted_at"):
+        query = query.where(model.deleted_at.is_(None))
+    record_id = (await db.execute(query)).scalar_one_or_none()
+    if record_id is None:
+        raise ValueError(f"Kein Datensatz mit Inventarnummer '{ref}' gefunden.")
+    return uuid.UUID(str(record_id))
+
+
+def index_context_is_stale(export_context: Any) -> bool:
+    """True if an index copy must be rebuilt from the database before exporting it.
+
+    That is the case when inbound relations were left out for size, and when the copy
+    was written by an older Katalon (``schema_version`` below EXPORT_CONTEXT_VERSION):
+    exporters would otherwise emit incomplete records until the next full reindex.
+    """
+    if not isinstance(export_context, dict):
+        return False
+    if export_context.get("inbound_relations_omitted"):
+        return True
+    return int(export_context.get("schema_version") or 0) < EXPORT_CONTEXT_VERSION
+
+
+async def refresh_index_contexts(db: AsyncSession, hits: list[dict[str, Any]]) -> None:
+    """Replace stale index copies of the export context with the full context from
+    the database, in place (see index_context_is_stale)."""
     for hit in hits:
         source = hit.get("_source") or {}
         ec = source.get("export_context")
-        if not isinstance(ec, dict) or not ec.get("inbound_relations_omitted"):
+        if not index_context_is_stale(ec):
             continue
         record = ec.get("record") or {}
         try:
@@ -470,5 +509,6 @@ async def expand_omitted_contexts(db: AsyncSession, hits: list[dict[str, Any]]) 
                 db, str(record.get("record_type")), uuid.UUID(str(record.get("id")))
             )
         except ValueError:
+            logger.warning("Export context of %s could not be rebuilt", record.get("id"), exc_info=True)
             continue
         source["export_context"] = full.to_dict()

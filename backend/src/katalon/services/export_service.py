@@ -142,7 +142,7 @@ async def stream_xml(
     db: AsyncSession, record_type: str, format_key: str, visibility_user: User | None
 ) -> AsyncIterator[str]:
     from katalon.integrations.elasticsearch import iter_hits_by_type
-    from katalon.services.export_context_service import expand_omitted_contexts
+    from katalon.services.export_context_service import refresh_index_contexts
 
     metadata_format = await get_format(format_key)
     if metadata_format is None:
@@ -156,7 +156,7 @@ async def stream_xml(
     yield header
     skipped: list[str] = []
     async for hit in iter_hits_by_type(record_type, public_only=visibility_user is None):
-        await expand_omitted_contexts(db, [hit])
+        await refresh_index_contexts(db, [hit])
         ctx = ExportRecordContext.from_hit(hit)
         missing = metadata_format.required_field_errors(ctx, record_mappings)
         if missing:

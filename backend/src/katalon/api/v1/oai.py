@@ -18,7 +18,7 @@ from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.services import metadata_format_service, oai_state_service, oaipmh_service
-from katalon.services.export_context_service import expand_omitted_contexts
+from katalon.services.export_context_service import refresh_index_contexts
 from katalon.services.metadata_mapping_service import (
     get_mapping_index,
     mapped_format_keys,
@@ -270,7 +270,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 db, set_def, set_spec, from_, until, prefix, record_types, token_data
             )
             mapping_index = await get_mapping_index(db, prefix)
-            await expand_omitted_contexts(db, hits)
+            await refresh_index_contexts(db, hits)
             xml = oaipmh_service.list_records(
                 hits, resumption.complete_list_size, offset, set_spec, from_, until, prefix, base_url,
                 available[prefix], mapping_index, deleted=deleted, resumption=resumption,
@@ -322,7 +322,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 db, set_def, set_spec, from_, until, prefix, record_types, token_data
             )
             mapping_index = await get_mapping_index(db, prefix)
-            await expand_omitted_contexts(db, hits)
+            await refresh_index_contexts(db, hits)
             xml = oaipmh_service.list_identifiers(
                 hits, resumption.complete_list_size, offset, set_spec, from_, until, prefix, base_url,
                 available[prefix], mapping_index, deleted=deleted, resumption=resumption,
@@ -373,7 +373,7 @@ async def oai_endpoint(request: Request, db: DBDep) -> Response:
                 xml = oaipmh_service._error(root, "idDoesNotExist", f"No record: {identifier}")
             else:
                 mapping_index = await get_mapping_index(db, prefix)
-                await expand_omitted_contexts(db, hits[:1])
+                await refresh_index_contexts(db, hits[:1])
                 xml = oaipmh_service.get_record(
                     hits[0], base_url, identifier, prefix, available[prefix], mapping_index
                 )

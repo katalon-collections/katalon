@@ -208,6 +208,28 @@ def test_build_release_payload_structure(tmp_path):
     assert payload["deprecated_env_vars"] == []
     assert "breaking" in payload
     assert "migration_required" in payload
+    assert "reindex_required" in payload
+
+
+def test_reindex_required_follows_export_context_version(monkeypatch):
+    versions = {"v1.43.1": 0, "v1.43.2": 2, "v1.43.3": 2}
+    monkeypatch.setattr(grm, "export_context_version", lambda ref: versions[ref])
+
+    assert grm.reindex_required("v1.43.2", "v1.43.1", {}, "1.43.2") is True
+    assert grm.reindex_required("v1.43.3", "v1.43.2", {}, "1.43.3") is False
+    forced = {"releases": {"1.43.3": {"reindex_required": True}}}
+    assert grm.reindex_required("v1.43.3", "v1.43.2", forced, "1.43.3") is True
+
+
+def test_export_context_version_reads_constant_at_ref(monkeypatch):
+    sources = {
+        "v1.43.1:" + grm.EXPORT_CONTEXT_FILE: "HTML_TAG_RE = ...\n",
+        "v1.43.2:" + grm.EXPORT_CONTEXT_FILE: "x = 1\nEXPORT_CONTEXT_VERSION = 2\n",
+    }
+    monkeypatch.setattr(grm, "run", lambda *args, check=True: sources.get(args[2], ""))
+
+    assert grm.export_context_version("v1.43.2") == 2
+    assert grm.export_context_version("v1.43.1") == 0  # before the constant existed
 
 
 def test_cli_execution_with_meta(tmp_path):

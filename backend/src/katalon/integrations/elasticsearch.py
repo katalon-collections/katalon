@@ -147,6 +147,8 @@ INDEX_SETTINGS: dict[str, Any] = {
             "status": {"type": "keyword"},
             "metadata": {"type": "object", "enabled": False},
             "export_context": {"type": "object", "enabled": False},
+            # export_context.schema_version, queryable (stale copies after an update)
+            "export_context_version": {"type": "integer"},
             "search_text": {"type": "text", "analyzer": "katalon_default"},
             "created_at": {"type": "date"},
             "updated_at": {"type": "date"},
@@ -370,6 +372,25 @@ async def index_document(doc_id: str, body: dict[str, Any]) -> None:
 async def count_by_type(record_type: str) -> int:
     es = get_es()
     query = {"query": {"term": {"record_type": record_type}}}
+    try:
+        resp = await es.count(index=INDEX_NAME, body=query)
+    except NotFoundError:
+        return 0
+    return int(resp["count"])
+
+
+async def count_stale_export_contexts(current_version: int, record_types: Iterable[str]) -> int:
+    """Documents of exportable types whose export_context was written by an older
+    Katalon (or is missing)."""
+    es = get_es()
+    query = {
+        "query": {
+            "bool": {
+                "filter": [{"terms": {"record_type": sorted(record_types)}}],
+                "must_not": [{"range": {"export_context_version": {"gte": current_version}}}],
+            }
+        }
+    }
     try:
         resp = await es.count(index=INDEX_NAME, body=query)
     except NotFoundError:

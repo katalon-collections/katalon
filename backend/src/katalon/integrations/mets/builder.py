@@ -3,19 +3,17 @@
 
 from __future__ import annotations
 
-import html
-import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
 
 from katalon.integrations.metadata_format import (
-    HTML_TAG_RE,
     CompiledMappingSet,
     ExportRecordContext,
     MappingSpec,
     SourceKind,
     append_path,
+    plain_text,
 )
 from katalon.services.metadata_mapping_service import extract_values
 
@@ -56,7 +54,7 @@ def _clean_text(val: Any) -> str:
         return ""
     if (val := _extract_display_value(val)) is None:
         return ""
-    return html.unescape(re.sub(r"\s+", " ", HTML_TAG_RE.sub(" ", str(val))).strip())
+    return plain_text(str(val))
 
 
 def _rule_values(ctx: ExportRecordContext, rule: MappingSpec) -> list[str]:

@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.43.1"
+    "version": "1.43.2"
   },
   "paths": {
     "/v1/admin/config": {
@@ -24872,6 +24872,11 @@
             },
             "type": "object",
             "title": "Types"
+          },
+          "stale_export_contexts": {
+            "type": "integer",
+            "title": "Stale Export Contexts",
+            "default": 0
           }
         },
         "type": "object",
@@ -25115,7 +25120,8 @@
         "properties": {
           "record_id": {
             "type": "string",
-            "format": "uuid",
+            "maxLength": 128,
+            "minLength": 1,
             "title": "Record Id"
           }
         },

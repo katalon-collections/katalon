@@ -394,6 +394,7 @@ def _build_doc(
                 doc["media_height"] = media_info["media_height"]
     if export_context is not None:
         doc["export_context"] = export_context
+        doc["export_context_version"] = export_context.get("schema_version")
     # Build facet_all_* fields for ALL public metadata fields (not just those
     # marked is_facet), so toggling a facet never requires a full reindex:
     # which fields may be aggregated is enforced at query time against the
@@ -828,18 +829,22 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
             record_type, record.id, db, inherited_config
         )
     export_context: dict[str, Any] | None = None
-    if db is not None:
-        try:
-            from katalon.services.export_context_service import (
-                INDEX_MAX_INBOUND_RELATIONS,
-                build_export_context_from_db,
-            )
+    from katalon.services.export_context_service import (
+        EXPORT_CONTEXT_TYPES,
+        INDEX_MAX_INBOUND_RELATIONS,
+        build_export_context_from_db,
+    )
 
+    if db is not None and record_type in EXPORT_CONTEXT_TYPES:
+        try:
             ctx = await build_export_context_from_db(
                 db, record_type, record.id, max_inbound=INDEX_MAX_INBOUND_RELATIONS
             )
             export_context = ctx.to_dict()
         except Exception:
+            logger.warning(
+                "Export context for %s %s not built", record_type, record.id, exc_info=True
+            )
             export_context = None
 
     doc = _build_doc(

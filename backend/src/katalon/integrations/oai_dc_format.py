@@ -16,6 +16,7 @@ from katalon.integrations.metadata_format import (
     MetadataFormat,
     SourceKind,
     ValidatorDependency,
+    plain_text,
 )
 from katalon.services.metadata_mapping_service import extract_values
 
@@ -79,6 +80,7 @@ def _rule_values(ctx: ExportRecordContext, rule: Any) -> list[str]:
             if val:
                 values.append(str(val))
 
+    values = [text for v in values if (text := plain_text(v))]
     if prefix := rule.settings.get("prefix"):
         values = [f"{prefix}{v}" for v in values]
     return values

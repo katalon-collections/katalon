@@ -69,7 +69,7 @@ async def test_index_copy_omits_large_inbound_and_exports_expand_it(
         assert len(under_cap.relations) == 5
 
         hits = [{"_id": collection_id, "_source": {"export_context": capped.to_dict()}}]
-        await ecs.expand_omitted_contexts(db, hits)
+        await ecs.refresh_index_contexts(db, hits)
         expanded = hits[0]["_source"]["export_context"]
         assert expanded["inbound_relations_omitted"] == 0
         assert len(expanded["relations"]) == 5

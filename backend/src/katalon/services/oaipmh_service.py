@@ -17,6 +17,7 @@ from katalon.integrations.metadata_format import (
     CompiledMappingSet,
     ExportRecordContext,
     MetadataFormat,
+    utc_timestamp,
 )
 from katalon.services.metadata_mapping_service import MappingIndex
 from katalon.services.oai_state_service import DeletedRecord
@@ -102,9 +103,7 @@ def _error(el: ET.Element, code: str, message: str) -> str:
 
 
 def _datestamp(ts: str | None) -> str:
-    if not ts:
-        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return ts[:19].replace(" ", "T") + "Z"
+    return utc_timestamp(ts) or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # ---------------------------------------------------------------------------

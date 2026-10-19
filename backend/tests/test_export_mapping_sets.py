@@ -458,7 +458,16 @@ async def test_preview_endpoint_renders_xml_and_diagnostics() -> None:
             assert data["diagnostics"] == []
         call_args = metadata_mapping_service.preview_mapping_set.await_args.args
         assert call_args[1] == set_id
-        assert call_args[2] == record_id
+        assert call_args[2] == str(record_id)
+
+        # An inventory number is passed through and resolved by the service.
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                f"/v1/export-mapping-sets/{set_id}/preview",
+                json={"record_id": "os_ub_0031153"},
+            )
+            assert res.status_code == 200
+        assert metadata_mapping_service.preview_mapping_set.await_args.args[2] == "os_ub_0031153"
     finally:
         metadata_mapping_service.preview_mapping_set = orig_preview
         app.dependency_overrides.pop(get_current_user, None)
