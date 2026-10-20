@@ -21,7 +21,7 @@ const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] a
 export { FIELD_TYPE_LABELS } from './schemaConstants'
 
 // Field types allowed as sub-fields of a group (no recursion)
-const SUB_FIELD_TYPES = ['text', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority'] as const
+const SUB_FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority', 'url', 'geo'] as const
 type SubFieldType = typeof SUB_FIELD_TYPES[number]
 
 type SubFieldFormState = {

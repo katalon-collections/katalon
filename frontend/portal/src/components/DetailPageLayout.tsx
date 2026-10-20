@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Fragment, type ReactNode, Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -37,10 +37,12 @@ export function facetHref(
   return `/search?type=${encodeURIComponent(recordType)}&${query}`
 }
 
-export function MetaRow({ label, value, href, items }: {
+export function MetaRow({ label, value, href, items, children }: {
   label: ReactNode
   value?: string
   href?: string
+  /** Extra content shown inside the row below the value (e.g. a map). */
+  children?: ReactNode
   /** Renders each value as its own click-to-filter pill instead of plain text. */
   items?: { text: string; href: string }[]
 }) {
@@ -61,6 +63,7 @@ export function MetaRow({ label, value, href, items }: {
       <span className="key">{label}</span>
       <span className="val">
         {href ? <a href={href} target="_blank" rel="noreferrer">{value}</a> : value}
+        {children}
       </span>
     </div>
   )
@@ -135,24 +138,43 @@ function GeoNamesMaps({ value }: { value: unknown }) {
     const { lat, lng } = coordinates as Record<string, unknown>
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)
       || Math.abs(lat) > 90 || Math.abs(lng) > 180) return []
-    return [{ label: typeof authority.label === 'string' ? authority.label : authority.external_id, lat, lng }]
+    return [{ label: String(typeof authority.label === 'string' ? authority.label : authority.external_id), lat, lng }]
   })
 
-  return maps.map(({ label, lat, lng }, index) => {
-    const bbox = `${lng - 0.05},${lat - 0.03},${lng + 0.05},${lat + 0.03}`
-    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+  return maps.map((map, index) => <OsmEmbed key={`${map.label}-${index}`} {...map} />)
+}
+
+function OsmEmbed({ label, lat, lng }: { label: string; lat: number; lng: number }) {
+  const bbox = `${lng - 0.05},${lat - 0.03},${lng + 0.05},${lat + 0.03}`
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+  return (
+    <details style={{ margin: '-6px 0 14px' }}>
+      <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--fg-2)' }}>OpenStreetMap</summary>
+      <iframe
+        src={src}
+        title={`OpenStreetMap: ${label}`}
+        width="100%"
+        height="240"
+        style={{ border: '1px solid var(--border)', borderRadius: 6, display: 'block', marginTop: 6 }}
+        loading="lazy"
+      />
+    </details>
+  )
+}
+
+const GeoMap = lazy(() => import('./GeoMap'))
+
+/** Map per geo field value {lat, lon, accuracy_m?}; invalid values are skipped. */
+function GeoMaps({ value, label }: { value: unknown; label: string }) {
+  const entries = Array.isArray(value) ? value : [value]
+  return entries.map((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) return null
+    const { lat, lon, accuracy_m: accuracy } = entry as Record<string, unknown>
+    if (typeof lat !== 'number' || typeof lon !== 'number' || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null
     return (
-      <details key={`${label}-${index}`} style={{ margin: '-6px 0 14px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--fg-2)' }}>OpenStreetMap</summary>
-        <iframe
-          src={src}
-          title={`OpenStreetMap: ${label}`}
-          width="100%"
-          height="240"
-          style={{ border: '1px solid var(--border)', borderRadius: 6, display: 'block', marginTop: 6 }}
-          loading="lazy"
-        />
-      </details>
+      <Suspense key={index} fallback={null}>
+        <GeoMap lat={lat} lon={lon} accuracy={typeof accuracy === 'number' ? accuracy : undefined} label={label} />
+      </Suspense>
     )
   })
 }
@@ -187,6 +209,7 @@ function GroupChildValue({ group, child, value, locale, recordType, vocabularyLa
     const kind = facetKinds?.[recordType]?.[facetField.name]
     return <>{items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, facetField, item.raw, kind, item.id)} style={{ marginRight: 4 }}>{item.display}</Link>)}</>
   }
+  if (child.field_type === 'richtext' && typeof value === 'string') return richText(value)
   const entries = child.field_type === 'url' || child.field_type === 'authority' || child.field_type === 'pid'
     ? (Array.isArray(value) ? value : [value])
     : [value]
@@ -307,6 +330,7 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
         </div>
       )}
       {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
+      {field.field_type === 'geo' && <GeoMaps value={value} label={fieldLabel(field, locale)} />}
     </div>
   )
 }
@@ -342,7 +366,9 @@ function SidebarField({ field, value, locale, recordType, aiProvenance, resolveR
         ? pidUrl(value)
         : undefined
   return rendered ? <>
-    <MetaRow label={label} value={rendered} href={href} />
+    <MetaRow label={label} value={rendered} href={href}>
+      {field.field_type === 'geo' && <GeoMaps value={value} label={fieldLabel(field, locale)} />}
+    </MetaRow>
     {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
   </> : null
 }

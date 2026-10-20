@@ -8,6 +8,7 @@ from katalon.integrations.metadata_format import (
     ExportMediaItem,
     ExportRecordContext,
     ExportRecordSummary,
+    ExportRelation,
     MappingSpec,
     SourceKind,
 )
@@ -54,9 +55,9 @@ def test_mets_mods_capabilities_and_targets() -> None:
     fmt = MetsModsFormat()
     caps = fmt.capabilities()
 
-    assert len(caps.targets) == 20
+    assert len(caps.targets) == 24
     assert len(CORE_MODS_TARGETS) == 8
-    assert len(OPTIONAL_MODS_TARGETS) == 12
+    assert len(OPTIONAL_MODS_TARGETS) == 16
     assert ALL_MODS_TARGETS == CORE_MODS_TARGETS | OPTIONAL_MODS_TARGETS
 
     targets_by_key = {t.key: t for t in caps.targets}
@@ -373,3 +374,161 @@ def test_mets_mods_multiple_notes_with_subkeys() -> None:
     assert '<mods:note type="ownership">Schenkung aus Privatbesitz 1920</mods:note>' in xml_str
 
 
+
+
+def _dfg_context() -> ExportRecordContext:
+    return ExportRecordContext(
+        record=ExportRecordSummary(
+            id="5f0c8a52-0d39-4c4d-9c1e-000000000001",
+            idno="pk_0001",
+            record_type="object",
+            title="Gruß aus Osnabrück",
+            canonical_url="https://example.org/object/pk_0001",
+        ),
+        fields={
+            "title": "Gruß aus Osnabrück",
+            "dates": ["1905/", "1910"],
+            "approx": "1897~",
+            "freetext": "um 1900",
+            "place": "Osnabrück",
+        },
+        relations=[
+            ExportRelation(
+                id="rel-1",
+                relation_type="creator",
+                target_type="entity",
+                target_id="e1",
+                target_label="Verlag Müller",
+                target_subtype="unternehmen",
+                target_values={"gnd": "https://d-nb.info/gnd/1234567-8"},
+            ),
+            ExportRelation(
+                id="rel-2",
+                relation_type="series",
+                target_type="occurrence",
+                target_id="o1",
+                target_label="Serie A",
+            ),
+        ],
+        media=[
+            ExportMediaItem(
+                id="m1", filename="front.jpg", mime_type="image/tiff", url="https://example.org/m1",
+                iiif_base="https://example.org/iiif/3/m1", is_primary=True,
+                license_uri="http://creativecommons.org/licenses/by-sa/4.0/",
+            ),
+            ExportMediaItem(
+                id="m2", filename="back.jpg", mime_type="image/tiff", url="https://example.org/m2",
+                iiif_base="https://example.org/iiif/3/m2",
+                license_uri="http://creativecommons.org/licenses/by-nc/4.0/",
+            ),
+            ExportMediaItem(
+                id="m3", filename="intern.jpg", mime_type="image/jpeg", url="https://example.org/m3",
+                is_public=False,
+            ),
+        ],
+    )
+
+
+def _render_dfg(rules: list[MappingSpec], config: dict | None = None) -> ET.Element:
+    cms = CompiledMappingSet(
+        format_key="mets_mods",
+        record_type="object",
+        institution_config=config or {},
+        rules=[
+            MappingSpec(source_config={"field_name": "title"}, target_key="mods:titleInfo/mods:title"),
+            *rules,
+        ],
+    )
+    return ET.fromstring(ET.tostring(MetsModsFormat().render(_dfg_context(), cms), encoding="unicode"))
+
+
+NS = {"mets": "http://www.loc.gov/METS/", "mods": "http://www.loc.gov/mods/v3",
+      "dv": "http://dfg-viewer.de/", "xlink": "http://www.w3.org/1999/xlink"}
+XL = "{http://www.w3.org/1999/xlink}"
+
+
+def test_mets_dfg_structure_files_and_links() -> None:
+    root = _render_dfg([], {"mets_logical_type": "illustration"})
+
+    logical = root.find("mets:structMap[@TYPE='LOGICAL']/mets:div", NS)
+    assert logical is not None and logical.get("TYPE") == "illustration"
+    # Only public media; IIIF images get a full and a thumbnail version.
+    default = root.findall("mets:fileSec/mets:fileGrp[@USE='DEFAULT']/mets:file", NS)
+    thumbs = root.findall("mets:fileSec/mets:fileGrp[@USE='THUMBS']/mets:file", NS)
+    assert [f.get("ID") for f in default] == ["FILE_0001", "FILE_0002"]
+    assert len(thumbs) == 2
+    assert default[0].find("mets:FLocat", NS).get(f"{XL}href") == (
+        "https://example.org/iiif/3/m1/full/max/0/default.jpg"
+    )
+    pages = root.findall("mets:structMap[@TYPE='PHYSICAL']/mets:div[@TYPE='physSequence']/mets:div", NS)
+    assert [(p.get("ID"), p.get("TYPE"), p.get("ORDER")) for p in pages] == [
+        ("PHYS_0001", "page", "1"), ("PHYS_0002", "page", "2"),
+    ]
+    assert [f.get("FILEID") for f in pages[0]] == ["FILE_0001", "FILE_0001_THUMBS"]
+    links = [(s.get(f"{XL}from"), s.get(f"{XL}to")) for s in root.findall("mets:structLink/mets:smLink", NS)]
+    assert links == [("LOG_0001", "PHYS_0000"), ("LOG_0001", "PHYS_0001"), ("LOG_0001", "PHYS_0002")]
+    assert root.findtext(".//dv:links/dv:presentation", namespaces=NS) == "https://example.org/object/pk_0001"
+
+
+def test_mets_name_with_type_authority_and_relator() -> None:
+    root = _render_dfg(
+        [MappingSpec(
+            source_kind=SourceKind.RELATION,
+            source_config={"relation_type": "creator"},
+            target_key="mods:name/mods:namePart",
+            settings={"role": "Verlag", "role_code": "pbl"},
+        )],
+        {"actor_types": {"unternehmen": "corporation"}, "actor_id_fields": [{"field": "gnd", "source": "gnd"}]},
+    )
+    name = root.find(".//mods:name", NS)
+    assert name.get("type") == "corporate"
+    assert name.get("valueURI") == "https://d-nb.info/gnd/1234567-8"
+    assert name.findtext("mods:displayForm", namespaces=NS) == "Verlag Müller"
+    code = name.find("mods:role/mods:roleTerm[@type='code']", NS)
+    assert code.text == "pbl" and code.get("authority") == "marcrelator"
+    assert code.get("valueURI") == "http://id.loc.gov/vocabulary/relators/pbl"
+    assert name.findtext("mods:role/mods:roleTerm[@type='text']", namespaces=NS) == "Verlag"
+
+
+def test_mets_edtf_dates_become_iso_with_display_date() -> None:
+    def origin(field: str) -> ET.Element:
+        root = _render_dfg([
+            MappingSpec(source_config={"field_name": field}, target_key="mods:originInfo/mods:dateCreated"),
+            MappingSpec(source_config={"field_name": "place"},
+                        target_key="mods:originInfo/mods:place/mods:placeTerm"),
+        ])
+        origins = root.findall(".//mods:originInfo", NS)
+        assert len(origins) == 1  # dates and place share one originInfo
+        return origins[0]
+
+    open_range = origin("dates")  # first value only: "1905/"
+    created = open_range.findall("mods:dateCreated", NS)
+    assert [(d.get("point"), d.get("keyDate"), d.text) for d in created] == [("start", "yes", "1905")]
+    assert open_range.findtext("mods:displayDate", namespaces=NS) == "nach 1905"
+    assert open_range.find("mods:place/mods:placeTerm[@type='text']", NS).text == "Osnabrück"
+
+    approx = origin("approx").find("mods:dateCreated", NS)
+    assert (approx.text, approx.get("qualifier"), approx.get("encoding")) == ("1897", "approximate", "iso8601")
+
+    free = origin("freetext")
+    assert free.find("mods:dateCreated", NS) is None
+    assert free.findtext("mods:displayDate", namespaces=NS) == "um 1900"
+
+
+def test_mets_record_identifier_related_item_and_license_limit() -> None:
+    root = _render_dfg([
+        MappingSpec(source_kind=SourceKind.RECORD, source_config={"property": "idno"},
+                    target_key="mods:recordInfo/mods:recordIdentifier", settings={"source": "demo"}),
+        MappingSpec(source_kind=SourceKind.RELATION, source_config={"relation_type": "series"},
+                    target_key="mods:relatedItem/mods:titleInfo/mods:title", settings={"type": "series"}),
+        MappingSpec(source_kind=SourceKind.MEDIA, source_config={"property": "license_uri"},
+                    target_key="mods:accessCondition", settings={"limit": 1}),
+    ])
+    ident = root.find(".//mods:recordInfo/mods:recordIdentifier", NS)
+    assert (ident.text, ident.get("source")) == ("pk_0001", "demo")
+    related = root.find(".//mods:relatedItem", NS)
+    assert related.get("type") == "series"
+    assert related.findtext("mods:titleInfo/mods:title", namespaces=NS) == "Serie A"
+    licences = root.findall(".//mods:mods/mods:accessCondition", NS)
+    assert [a.text for a in licences] == ["http://creativecommons.org/licenses/by-sa/4.0/"]
+    assert root.findtext(".//dv:license", namespaces=NS) == "http://creativecommons.org/licenses/by-sa/4.0/"

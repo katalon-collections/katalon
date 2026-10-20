@@ -257,7 +257,7 @@ async def test_configured_field_types_are_validated_without_rejecting_legacy_met
         "Feld 'amount' muss eine Zahl enthalten.",
         "Feld 'published' muss einen Boolean enthalten.",
         "Feld 'keywords' muss Text enthalten.",
-        "Feld 'coordinates' muss Text enthalten.",
+        "Feld 'coordinates': Koordinaten müssen ein Objekt {lat, lon} sein.",
         "Feld 'subject': Vokabularwert muss ein Objekt {id, label} sein.",
     ]
 
@@ -293,9 +293,25 @@ async def test_group_subfields_use_the_same_type_validation() -> None:
         "Feld 'details.amount' (Eintrag 1): muss eine Zahl enthalten.",
         "Feld 'details.published' (Eintrag 1): muss einen Boolean enthalten.",
         "Feld 'details.keywords' (Eintrag 1): muss Text enthalten.",
-        "Feld 'details.coordinates' (Eintrag 1): muss Text enthalten.",
+        "Feld 'details.coordinates' (Eintrag 1): Koordinaten müssen ein Objekt {lat, lon} sein.",
         "Feld 'details.subject' (Eintrag 1): Vokabularwert muss ein Objekt {id, label} sein.",
     ]
+
+
+@pytest.mark.asyncio
+async def test_group_url_subfield_validates_http_url() -> None:
+    group = make_field("links", field_type="group")
+    errors = await validate_metadata(
+        mock_db(group, sub_fields=[make_field("target", field_type="url")]),
+        "object",
+        {
+            "links": [
+                {"target": {"value": "ftp://x", "label": "x"}},
+                {"target": {"value": "https://a.de"}},
+            ]
+        },
+    )
+    assert len(errors) == 1 and "Eintrag 1" in errors[0]
 
 
 # ---------------------------------------------------------------------------
@@ -673,3 +689,22 @@ async def test_validate_metadata_accepts_valid_numbers_and_empty_strings() -> No
         {"required_count": ""},
     )
     assert errors == ["Feld 'required_count' ist erforderlich."]
+
+
+@pytest.mark.asyncio
+async def test_geo_field_validates_wgs84_point() -> None:
+    field = make_field("find_spot", field_type="geo")
+    assert (
+        await validate_metadata(
+            mock_db(field), "object", {"find_spot": {"lat": 52.5, "lon": 13.4, "accuracy_m": 50}}
+        )
+        == []
+    )
+    for bad in (
+        {"lat": 91, "lon": 0},
+        {"lat": 0, "lon": -181},
+        {"lat": "x", "lon": 1},
+        {"lat": 1, "lon": 1, "accuracy_m": -1},
+        "52.5, 13.4",
+    ):
+        assert await validate_metadata(mock_db(field), "object", {"find_spot": bad}), bad

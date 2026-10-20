@@ -124,6 +124,8 @@ def parse_csv_terms(
 
     for i, row in enumerate(reader, start=2):
         row_values = {_norm(k): _norm(v) for k, v in row.items() if k}
+        if not any(row_values.values()):
+            continue
         term = ""
         parent_term = None
         uri = None

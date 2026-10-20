@@ -11,7 +11,7 @@ from typing import Any, Literal
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 
 from katalon.config import settings
@@ -240,8 +240,7 @@ class PortalConfigRead(BaseModel):
     header_show_title: bool = True
     hero_hide_title: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortalConfigUpdate(BaseModel):

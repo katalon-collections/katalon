@@ -143,6 +143,7 @@ async def test_reorder_working_set_items() -> None:
 @pytest.fixture
 def override_deps():
     session = AsyncMock()
+    session.execute = AsyncMock(return_value=MagicMock())
     session.add = MagicMock()
     session.commit = AsyncMock()
     session.refresh = AsyncMock()

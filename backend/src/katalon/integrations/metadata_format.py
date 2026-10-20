@@ -158,7 +158,7 @@ class ExportMediaItem(BaseModel):
 # gains, loses or reshapes data an exporter reads (new media keys, field order, ...).
 # Index copies with an older version are rebuilt from the database at export time
 # (export_context_service.refresh_index_contexts) until the next full reindex.
-EXPORT_CONTEXT_VERSION = 2
+EXPORT_CONTEXT_VERSION = 3  # 3: richtext values as plain text
 
 
 class ExportRecordContext(BaseModel):

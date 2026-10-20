@@ -1261,3 +1261,16 @@ async def get_theme() -> JSONResponse:
     result = await theme.get_theme()
     result.headers["Cache-Control"] = _CONFIG_CACHE
     return result
+
+
+@router.get("/theme.css", summary="Theme tokens and stylesheet as CSS, linked render-blocking")
+async def get_theme_css(db: DBDep) -> Response:
+    config = (
+        await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+    ).scalar_one_or_none()
+    css = theme.theme_css(
+        theme.load_theme(),
+        config.color_tokens if config else None,
+        config.accent_color if config else None,
+    )
+    return Response(css, media_type="text/css", headers={"Cache-Control": _CONFIG_CACHE})

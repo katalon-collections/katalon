@@ -41,6 +41,13 @@ def test_parse_csv_terms_with_mapping_and_parent() -> None:
     assert terms[1].parent_term == "foto"
 
 
+def test_parse_csv_terms_skips_blank_rows() -> None:
+    content = b"ID;Deutsch\r\nA;Eins\r\n;\r\n"
+    terms, errors = parse_csv_terms(content, {"ID": "term", "Deutsch": "label:de"})
+    assert [t.term for t in terms] == ["A"]
+    assert errors == []
+
+
 def test_parse_csv_terms_requires_term_or_label() -> None:
     content = b"col_a\nOhne Mapping\n"
     mapping = {"col_a": "external_id"}

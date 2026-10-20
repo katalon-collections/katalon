@@ -286,16 +286,10 @@ function AppInner() {
   }
   useEffect(() => {
     loadAndApplyTheme()
-    // Apply portal config color_tokens on top of the base theme
+    // color_tokens/accent_color come with the theme from /portal/v1/theme.css.
     api.portal.config().then(c => {
       setSupportedLocales(c.supported_languages ?? ['de', 'en'])
       setTerminology(c.terminology)
-      const tokens = c.color_tokens ?? {}
-      const root = document.documentElement
-      for (const [k, v] of Object.entries(tokens)) {
-        if (v) root.style.setProperty(k, v as string)
-      }
-      if (c.accent_color) root.style.setProperty('--accent', c.accent_color)
     }).catch(() => {})
   }, [])
   return (

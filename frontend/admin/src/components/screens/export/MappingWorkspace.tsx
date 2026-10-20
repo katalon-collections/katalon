@@ -530,7 +530,14 @@ export function MappingWorkspace({ recordType, profile, onBack }: MappingWorkspa
     if (!isLido) return []
     const configured = draftSet?.institution_config?.lido_events
     if (Array.isArray(configured) && configured.length > 0) {
-      return configured as LidoEventConfig[]
+      // label is optional in YAML/API configs (the exporter only needs id/type).
+      return (configured as Partial<LidoEventConfig>[]).map(ev => {
+        const fallback = ev.type || ev.id || ''
+        return {
+          ...ev,
+          label: { de: ev.label?.de || ev.label?.en || fallback, en: ev.label?.en || ev.label?.de || fallback },
+        } as LidoEventConfig
+      })
     }
     return DEFAULT_LIDO_EVENTS
   }, [isLido, draftSet?.institution_config])

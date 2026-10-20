@@ -85,7 +85,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
   const [result, setResult] = useState<BatchResponse | null>(null)
 
   const batchableFields = useMemo(
-    () => fields.filter(f => f.field_type !== 'group' && f.field_type !== 'pid' && f.field_type !== 'url' && f.field_type !== 'authority'),
+    () => fields.filter(f => f.field_type !== 'group' && f.field_type !== 'pid' && f.field_type !== 'url' && f.field_type !== 'geo' && f.field_type !== 'authority'),
     [fields]
   )
 
@@ -169,7 +169,6 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
       return Number.isNaN(n) ? null : n
     }
     if (ft === 'date') return dateValue || null
-    if (ft === 'geo') return fieldValue
     if (ft === 'vocab' || ft === 'vocab_free') {
       if (selectedTerm) return { term_id: selectedTerm.id, label: selectedTerm.label }
       return fieldValue
@@ -329,7 +328,7 @@ export function BatchEditModal({ recordType, fields, selection, onClose, onSucce
                     {selectedField.field_type === 'date' && (
                       <input className="fld" type="date" value={dateValue} onChange={e => setDateValue(e.target.value)} />
                     )}
-                    {(selectedField.field_type === 'text' || selectedField.field_type === 'richtext' || selectedField.field_type === 'geo') && !(
+                    {(selectedField.field_type === 'text' || selectedField.field_type === 'richtext') && !(
                       selectedField.is_repeatable && (selectedField.field_type === 'text' || selectedField.field_type === 'richtext') && opType === 'set_field'
                     ) && (
                       <input className="fld" type="text" value={fieldValue} onChange={e => setFieldValue(e.target.value)} />

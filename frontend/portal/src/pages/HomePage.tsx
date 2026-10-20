@@ -129,9 +129,6 @@ export function HomePage() {
     api.portal.config()
       .then(c => {
         setConfig(c)
-        if (c.accent_color) {
-          document.documentElement.style.setProperty('--accent', c.accent_color)
-        }
         return c
       })
       .catch(() => DEFAULT_CONFIG)

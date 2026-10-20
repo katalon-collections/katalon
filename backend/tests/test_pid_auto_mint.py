@@ -28,6 +28,7 @@ async def test_publish_mints_missing_pids(monkeypatch: pytest.MonkeyPatch) -> No
 
     record = make_record()
     db = AsyncMock()
+    db.add = MagicMock()
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = record
     db.execute = AsyncMock(return_value=result_mock)
@@ -50,6 +51,7 @@ async def test_publish_blocked_when_mint_fails(monkeypatch: pytest.MonkeyPatch) 
 
     record = make_record()
     db = AsyncMock()
+    db.add = MagicMock()
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = record
     db.execute = AsyncMock(return_value=result_mock)

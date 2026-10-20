@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi, exportApi } from '../../api/client'
 import type { MediaFile, ActivePresence, LockInfo, ExportFormatInfo } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
+import { GeoInput, type GeoEntry } from '../GeoInput'
 import type { AiProvenance, AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
 import { Alert, AlertCircle, Bookmark, Calendar, ChevD, ChevR, ListTree, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye, Download } from '../ui/Icons'
@@ -2761,6 +2762,23 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             disabled={disabled}
           />
         )
+      case 'richtext':
+        return <RichTextEditor value={(val as string) ?? ''} onChange={v => onChange(v)} placeholder={getLabel(sf, sf.name)} disabled={disabled} />
+      case 'geo':
+        return <GeoInput value={val as GeoEntry | undefined} onChange={onChange} disabled={disabled} />
+      case 'url': {
+        const entry = (val as PidEntry | undefined) ?? { value: '', label: '' }
+        return (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input className="fld mono" type="url" value={entry.value} style={{ flex: 2 }}
+              onChange={e => onChange({ ...entry, value: e.target.value })}
+              placeholder="https://…" disabled={disabled} />
+            <input className="fld" value={entry.label} style={{ flex: 1 }}
+              onChange={e => onChange({ ...entry, label: e.target.value })}
+              placeholder={t('url.linkLabel')} disabled={disabled} />
+          </div>
+        )
+      }
       default:
         return <input className="fld" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
     }
@@ -3461,7 +3479,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     const sourceLabel = sourceField ? getLabel(fields.find(f => f.name === sourceField), sourceField) : undefined
     return (
       <div key={r.id}>
-        <div style={{ display: 'grid', gridTemplateColumns: schemaBound ? '1fr 1fr' : '1fr 1fr auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: schemaBound ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr) auto', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
           <span style={{ color: 'var(--fg-2)' }} title={r.relation_type}>
             {!isFrom && <span style={{ color: 'var(--accent)', marginRight: 4 }}>←</span>}
             {relTypeLabel}
@@ -4472,12 +4490,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       ) : f.field_type === 'group' ? (
                         <div>
                           {((val as Record<string, unknown>[] | undefined) ?? []).map((instance, i) => (
-                            <div key={i} style={{ border: '1px solid var(--border-s)', borderRadius: 6, padding: '10px 12px', marginBottom: 8, position: 'relative', background: 'var(--panel)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-                                <button className="btn sm ico gh dn" onClick={() => removeGroupInstance(f.name, i)} disabled={justCreated}><X size={12} /></button>
-                              </div>
+                            <div key={i} className="group-instance">
+                              <button className="btn sm ico gh dn group-instance-remove" onClick={() => removeGroupInstance(f.name, i)} disabled={justCreated} title={t('remove')} aria-label={t('remove')}><X size={12} /></button>
+                              <div className="group-instance-grid">
                               {(f.children ?? []).map(sf => (
-                                <div key={sf.id} className="field">
+                                <div key={sf.id} className={`group-subfield${sf.field_type === 'richtext' ? ' wide' : ''}`}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                                     <div className="lbl" style={{ marginBottom: 0, flex: 1 }}>
                                       {getLabel(sf, sf.name)}
@@ -4502,6 +4519,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                   {renderSubFieldInput(sf, instance[sf.name], v => updateGroupSubField(f.name, i, sf.name, v), justCreated)}
                                 </div>
                               ))}
+                              </div>
                               {(() => {
                                 const activeSubFieldNames = new Set((f.children ?? []).map(sf => sf.name))
                                 const legacyKeys = Object.entries(instance || {}).filter(
@@ -4609,6 +4627,29 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         </div>
                           )
                         })()
+                      ) : f.field_type === 'geo' ? (
+                        repeatable ? (
+                          <>
+                            {((val as GeoEntry[] | undefined) ?? []).map((entry, i) => (
+                              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                <div style={{ flex: 1 }}>
+                                  <GeoInput value={entry} disabled={justCreated}
+                                    onChange={v => {
+                                      const cur = [...((val as GeoEntry[] | undefined) ?? [])]
+                                      cur[i] = v as GeoEntry
+                                      setField(f.name, cur)
+                                    }} />
+                                </div>
+                                <button className="btn sm ico gh" onClick={() => setField(f.name, ((val as GeoEntry[]) ?? []).filter((_, j) => j !== i))} disabled={justCreated}><X size={12} /></button>
+                              </div>
+                            ))}
+                            <button className="btn sm gh" onClick={() => setField(f.name, [...((val as GeoEntry[] | undefined) ?? []), undefined])} disabled={justCreated}>
+                              <Plus size={12} /> {t('geo.add')}
+                            </button>
+                          </>
+                        ) : (
+                          <GeoInput value={val as GeoEntry | undefined} onChange={v => setField(f.name, v)} disabled={justCreated} />
+                        )
                       ) : f.field_type === 'url' ? (
                         repeatable ? (
                           <>
@@ -4750,7 +4791,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     <div className="lbl">{t('legacy.heading')}</div>
                     {legacyEntries.map(([name, value]) => (
                       <div key={name} className="fg-2" style={{ alignItems: 'center', marginTop: 6 }}>
-                        <code style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}: {JSON.stringify(value)}</code>
+                        <code style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{name}: {JSON.stringify(value)}</code>
                         <button type="button" className="btn sm gh dn" onClick={() => {
                           setValues(current => {
                             const next = { ...current }
@@ -4988,7 +5029,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {procedureRels.map(r => {
                           const targetId = r.from_id === savedId ? r.to_id : r.from_id
                           return (
-                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                               <a
                                 href={`#procedures-form/${targetId}`}
                                 onClick={e => handleRecordLinkClick(e, 'procedure', targetId)}
@@ -5074,7 +5115,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         {objectRels.map(r => {
                           const targetId = r.from_id === savedId ? r.to_id : r.from_id
                           return (
-                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
+                            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-s)', fontSize: 12 }}>
                               <a
                                 href={`#form/${targetId}`}
                                 onClick={e => handleRecordLinkClick(e, 'object', targetId)}

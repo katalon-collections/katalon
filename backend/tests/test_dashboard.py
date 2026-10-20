@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Karl Krägelin
 
 """Unit tests for dashboard service and schemas."""
+
 from __future__ import annotations
 
 import uuid
@@ -101,3 +102,31 @@ async def test_get_dashboard_summary_mock() -> None:
     assert isinstance(summary, DashboardSummary)
     assert summary.recents == []
     assert summary.my_locks == []
+
+
+async def test_audit_queries_only_cover_record_types() -> None:
+    """Config events (export_mapping_set, sparql, ...) have no record form to link to."""
+    audit_queries: list[str] = []
+
+    class _Result:
+        def scalars(self):
+            return SimpleNamespace(all=lambda: [])
+
+        def scalar_one(self):
+            return 0
+
+        def all(self):
+            return []
+
+    class _Session:
+        async def execute(self, stmt):
+            if "audit_log" in str(stmt):
+                audit_queries.append(str(stmt))
+            return _Result()
+
+    user = SimpleNamespace(
+        id=uuid.uuid4(), email="a@example.org", role="admin", features=["audit_log"]
+    )
+    await get_dashboard_summary(_Session(), user)  # type: ignore[arg-type]
+    assert len(audit_queries) == 2
+    assert all("audit_log.record_type IN" in q for q in audit_queries)

@@ -221,6 +221,7 @@ async def test_patch_media_rights(override_auth) -> None:
     obj = MagicMock(updated_at=old_stamp)
     session = AsyncMock()
     session.execute = AsyncMock(return_value=_mock_result(media_file))
+    session.add = MagicMock()
     session.get = AsyncMock(return_value=obj)
     reindex = AsyncMock()
 
@@ -757,6 +758,7 @@ async def test_delete_media_moves_object_datestamp(override_auth) -> None:
     obj = MagicMock(updated_at=old_stamp)
     session = AsyncMock()
     session.execute = AsyncMock(return_value=_mock_result(media_file))
+    session.add = MagicMock()
     session.get = AsyncMock(return_value=obj)
     reindex = AsyncMock()
 

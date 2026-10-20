@@ -129,7 +129,7 @@ svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .fld:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-50); }
 .fld::placeholder { color: var(--fg-5); }
 textarea.fld { height: auto; padding: 8px 10px; line-height: 1.5; resize: vertical; min-height: 80px; }
-.richtext-editor.fld { height: auto; line-height: 1.5; overflow-y: auto; }
+.richtext-editor.fld { height: auto; line-height: 1.5; overflow-y: auto; overflow-wrap: anywhere; }
 .richtext-editor p { margin: 0 0 .6em; }
 .richtext-editor p:last-child { margin-bottom: 0; }
 .richtext-editor ul, .richtext-editor ol { margin: 0 0 .6em; padding-left: 1.4em; }
@@ -141,6 +141,11 @@ textarea.fld { height: auto; padding: 8px 10px; line-height: 1.5; resize: vertic
 .help { font-size: 11.5px; color: var(--fg-3); margin-top: 5px; }
 .help.err { color: #b91c1c; }
 .field { margin-bottom: 14px; }
+.group-instance { position: relative; border: 1px solid var(--border-s); border-radius: 6px; padding: 8px 36px 8px 10px; margin-bottom: 6px; background: var(--panel); }
+.group-instance-remove { position: absolute; top: 6px; right: 6px; }
+.group-instance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px 12px; }
+.group-subfield { min-width: 0; }
+.group-subfield.wide { grid-column: 1 / -1; }
 
 /* Status badge */
 .st { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1; letter-spacing: .005em; white-space: nowrap; }
@@ -294,8 +299,10 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .form-checkbox { display: flex; align-items: center; gap: 8px; }
 .upload-control { color: var(--accent); cursor: pointer; font-size: 12px; }
 .form-single { max-width: 680px; padding: 20px 24px; }
-.form-grid { display: grid; grid-template-columns: 1fr 340px; gap: 18px; padding: 18px 24px 80px; align-items: start; }
+.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; padding: 18px 24px 80px; align-items: start; }
 .form-side { display: flex; flex-direction: column; }
+/* Long unbreakable content (titles, URLs) must not widen the form beyond the viewport (iPhone). */
+.form-grid > *, .form-single > * { min-width: 0; }
 .media-card { order: 0; }
 .relations-card { order: 1; }
 .versions-card { order: 2; }
@@ -304,10 +311,10 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .storage-card { order: 5; }
 .procedure-card { order: 6; }
 @media (max-width: 1180px) {
-  .form-grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
 }
-.fg-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.fg-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.fg-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.fg-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 
 /* Inline relation creation (#277) */
 .relation-picker { position: relative; display: flex; flex-direction: column; gap: 7px; }

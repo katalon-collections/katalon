@@ -195,3 +195,19 @@ def test_object_manifest_uses_current_public_iiif_url() -> None:
     assert (canvas["width"], canvas["height"]) == (1200, 800)
     assert body["id"] == "https://new.example/iiif/3/img.jpg/full/max/0/default.jpg"
     assert body["service"][0]["id"] == "https://new.example/iiif/3/img.jpg"
+
+
+def test_build_object_manifest_uses_core_label_field() -> None:
+    from unittest.mock import MagicMock
+
+    obj = MagicMock()
+    obj.idno = "OBJ-043"
+    obj.metadata_ = {"label": "La Chanson du Cœur"}
+
+    manifest = build_object_manifest(
+        "http://test/manifest",
+        [("img.jpg", None, None)],
+        obj=obj,
+    )
+
+    assert manifest["label"] == {"none": ["La Chanson du Cœur"]}

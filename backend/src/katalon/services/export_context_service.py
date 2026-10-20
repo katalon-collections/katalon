@@ -30,6 +30,7 @@ from katalon.core.models import (
 )
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.integrations.licenses import license_label
+from katalon.integrations.markdown_text import markdown_to_plain_text
 from katalon.integrations.metadata_format import (
     EXPORT_CONTEXT_VERSION,
     ExportMediaItem,
@@ -109,6 +110,50 @@ async def collect_via_relation_types(
         if isinstance(via, dict) and via.get("relation_type"):
             types.add(str(via["relation_type"]))
     return types
+
+
+def _richtext_as_plain_text(
+    fields: dict[str, Any], field_defs: Sequence[FieldDefinition]
+) -> dict[str, Any]:
+    """Return ``fields`` with richtext values (Markdown) as plain text for export formats."""
+    by_id = {fd.id: fd for fd in field_defs}
+    top: set[str] = set()
+    grouped: dict[str, set[str]] = {}
+    for fd in field_defs:
+        if fd.field_type != "richtext":
+            continue
+        parent = by_id.get(fd.parent_id) if fd.parent_id is not None else None
+        if parent is None:
+            top.add(fd.name)
+        else:
+            grouped.setdefault(parent.name, set()).add(fd.name)
+    if not top and not grouped:
+        return fields
+
+    def plain(value: Any) -> Any:
+        if isinstance(value, str):
+            return markdown_to_plain_text(value)
+        if isinstance(value, list):
+            return [plain(item) for item in value]
+        if isinstance(value, dict):  # translatable {"de": ..., "en": ...}
+            return {key: plain(item) for key, item in value.items()}
+        return value
+
+    result = dict(fields)
+    for name in top & result.keys():
+        result[name] = plain(result[name])
+    for group, children in grouped.items():
+        entries = result.get(group)
+        if isinstance(entries, dict):
+            entries = [entries]
+        if not isinstance(entries, list):
+            continue
+        result[group] = [
+            {key: plain(val) if key in children else val for key, val in entry.items()}
+            if isinstance(entry, dict) else entry
+            for entry in entries
+        ]
+    return result
 
 
 async def _enrich_vocab_values(
@@ -354,6 +399,7 @@ async def build_export_context_from_db(
     public_fields = await load_public_fields(db, record_type)
     fields = filter_public_metadata(raw_md, public_fields, subtype)
     fields = await _enrich_vocab_values(db, fields, public_fields)
+    fields = _richtext_as_plain_text(fields, public_fields)
 
     # 3. Public relations only (excluding storage_location & procedure; excluding deleted/non-public targets)
     outbound = (

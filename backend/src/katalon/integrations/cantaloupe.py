@@ -137,7 +137,7 @@ def build_object_manifest(
         meta = metadata if metadata is not None else (obj.metadata_ if isinstance(obj.metadata_, dict) else {})
 
         # label — required by IIIF spec
-        raw_title = meta.get("title") or meta.get("name") or getattr(obj, "idno", None) or str(getattr(obj, "id", ""))
+        raw_title = meta.get("label") or meta.get("title") or meta.get("name") or getattr(obj, "idno", None) or str(getattr(obj, "id", ""))
         title_str = raw_title[0].get("value", str(raw_title)) if isinstance(raw_title, list) and raw_title else str(raw_title)
         manifest["label"] = {"none": [title_str]}
 

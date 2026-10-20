@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import uuid
 from copy import deepcopy
@@ -119,7 +120,7 @@ def _parse_localized_number(value: object) -> tuple[bool, int | float | None]:
             for p in parts[1:]:
                 if len(p) != 3 or not p.isdigit():
                     return False, None
-            dec = s[last_comma + 1:]
+            dec = s[last_comma + 1 :]
             if not dec.isdigit():
                 return False, None
             try:
@@ -134,7 +135,7 @@ def _parse_localized_number(value: object) -> tuple[bool, int | float | None]:
             for p in parts[1:]:
                 if len(p) != 3 or not p.isdigit():
                     return False, None
-            dec = s[last_dot + 1:]
+            dec = s[last_dot + 1 :]
             if not dec.isdigit():
                 return False, None
             try:
@@ -279,6 +280,29 @@ def _validate_url_value(value: object, field_name: str) -> str | None:
     return None
 
 
+def _validate_geo_value(value: object, field_name: str) -> str | None:
+    """Validate a WGS84 point {"lat", "lon"[, "accuracy_m"]} in decimal degrees. Returns error or None."""
+    if not isinstance(value, dict):
+        return f"Feld '{field_name}': Koordinaten müssen ein Objekt {{lat, lon}} sein."
+
+    def number(key: str) -> float | None:
+        v = value.get(key)
+        if isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v):
+            return None
+        return float(v)
+
+    lat, lon = number("lat"), number("lon")
+    if lat is None or lon is None or abs(lat) > 90 or abs(lon) > 180:
+        return (
+            f"Feld '{field_name}': Breite (lat) muss in −90…90 und Länge (lon) in −180…180 liegen."
+        )
+    if value.get("accuracy_m") is not None:
+        accuracy = number("accuracy_m")
+        if accuracy is None or accuracy < 0:
+            return f"Feld '{field_name}': Genauigkeit (accuracy_m) muss eine Zahl ≥ 0 sein."
+    return None
+
+
 def protect_pid_fields(
     fields: list[FieldDefinition],
     metadata: dict[str, Any],
@@ -310,7 +334,7 @@ def _validate_relation_structure(value: object, field_name: str) -> str | None:
         return f"Feld '{field_name}': Relation-Eintrag muss eine 'id' enthalten."
     try:
         uuid.UUID(str(entry_id))
-    except (ValueError, AttributeError):
+    except ValueError, AttributeError:
         return f"Feld '{field_name}': '{entry_id}' ist keine gültige UUID."
     if not value.get("label"):
         return f"Feld '{field_name}': Relation-Eintrag muss ein 'label' enthalten."
@@ -366,7 +390,10 @@ def _is_reference_in_existing(
             for instance in parent_val:
                 if isinstance(instance, dict):
                     sub_val = instance.get(parts[1])
-                    if isinstance(sub_val, dict) and str(sub_val.get("id", "")).lower() == target_id_str:
+                    if (
+                        isinstance(sub_val, dict)
+                        and str(sub_val.get("id", "")).lower() == target_id_str
+                    ):
                         return True
                     if isinstance(sub_val, list) and any(
                         isinstance(item, dict) and str(item.get("id", "")).lower() == target_id_str
@@ -397,7 +424,7 @@ async def _validate_relation_target(
         return None
     try:
         record_uuid = uuid.UUID(str(value["id"]))
-    except (ValueError, KeyError):
+    except ValueError, KeyError:
         return None
 
     if existing and _is_reference_in_existing(existing, field_name, record_uuid):
@@ -422,7 +449,7 @@ async def _validate_vocab_value(
     try:
         term_id = uuid.UUID(str(value.get("id")))
         vocab_id = uuid.UUID(str(settings["vocabulary_id"]))
-    except (KeyError, ValueError, TypeError):
+    except KeyError, ValueError, TypeError:
         return f"Feld '{field_name}': Vokabularwert enthält keine gültige Term-ID."
 
     # If this term reference was already present on the record, keep it even if
@@ -533,6 +560,12 @@ async def validate_metadata(
                             errors.append(
                                 target_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
                             )
+                    if sv is not None and sf.field_type == "url":
+                        url_err = _validate_url_value(sv, field_path)
+                        if url_err:
+                            errors.append(
+                                url_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
+                            )
                     if sv is not None and sf.field_type == "authority":
                         authority_err = _validate_authority_value(sv, sf.settings, field_path)
                         if authority_err:
@@ -550,8 +583,12 @@ async def validate_metadata(
                         errors.append(f"{indexed_prefix}: muss einen Boolean enthalten.")
                     if sv is not None and sf.field_type == "vocab_free" and not isinstance(sv, str):
                         errors.append(f"{indexed_prefix}: muss Text enthalten.")
-                    if sv is not None and sf.field_type == "geo" and not isinstance(sv, str):
-                        errors.append(f"{indexed_prefix}: muss Text enthalten.")
+                    if sv is not None and sf.field_type == "geo":
+                        geo_err = _validate_geo_value(sv, field_path)
+                        if geo_err:
+                            errors.append(
+                                geo_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
+                            )
                     if sv is not None and sf.field_type == "vocab":
                         vocab_err = await _validate_vocab_value(
                             db, sv, field_path, sf.settings, existing=existing
@@ -666,8 +703,12 @@ async def validate_metadata(
                         errors.append(f"Feld '{field.name}' muss eine Zahl enthalten.")
                 elif field.field_type == "boolean" and not isinstance(item, bool):
                     errors.append(f"Feld '{field.name}' muss einen Boolean enthalten.")
-                elif field.field_type in {"vocab_free", "geo"} and not isinstance(item, str):
+                elif field.field_type == "vocab_free" and not isinstance(item, str):
                     errors.append(f"Feld '{field.name}' muss Text enthalten.")
+                elif field.field_type == "geo":
+                    geo_err = _validate_geo_value(item, field.name)
+                    if geo_err:
+                        errors.append(geo_err)
                 elif field.field_type == "vocab":
                     vocab_err = await _validate_vocab_value(
                         db, item, field.name, field.settings, existing=existing
@@ -729,9 +770,7 @@ async def prepare_metadata(
             if field.is_repeatable:
                 if isinstance(val, list):
                     prepared[field.name] = [
-                        _coerce_number(item)
-                        for item in val
-                        if item is not None and item != ""
+                        _coerce_number(item) for item in val if item is not None and item != ""
                     ]
             else:
                 prepared[field.name] = _coerce_number(val)
@@ -1110,7 +1149,7 @@ async def count_repeatable_collapse_loss(db: AsyncSession, field: FieldDefinitio
 
 # field_type pairs whose values are all plain strings — freely interchangeable,
 # a change within this group can never make an existing value invalid.
-_INTERCHANGEABLE_SCALAR_TYPES = {"text", "richtext", "vocab_free", "geo"}
+_INTERCHANGEABLE_SCALAR_TYPES = {"text", "richtext", "vocab_free"}
 
 
 async def count_field_type_change_risk(

@@ -63,6 +63,14 @@ export function urlHref(value: unknown): string | undefined {
   return url
 }
 
+/** Formats a geo value {lat, lon, accuracy_m?} as "52.500000, 13.400000 (±50 m)", or undefined. */
+function formatGeo(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const { lat, lon, accuracy_m: accuracy } = value as Record<string, unknown>
+  if (typeof lat !== 'number' || typeof lon !== 'number') return undefined
+  return `${lat}, ${lon}${typeof accuracy === 'number' ? ` (±${accuracy} m)` : ''}`
+}
+
 /** Converts a single EDTF-lite qualified date ("1900~", "1900?", "1900~?") to display text. */
 function formatQualifiedDate(value: string): string {
   const formatBce = (date: string) => {
@@ -108,6 +116,11 @@ export function renderFieldValue(
       const parts = value.filter((v): v is string => typeof v === 'string' && v !== '').map(formatDateValue)
       return parts.length > 0 ? parts.join(', ') : null
     }
+  }
+
+  if (fieldType === 'geo') {
+    const parts = (Array.isArray(value) ? value : [value]).map(formatGeo).filter((p): p is string => p !== undefined)
+    return parts.length > 0 ? parts.join('; ') : null
   }
 
   // Authority entry {source, external_id, label} / translatable field {lang: text}

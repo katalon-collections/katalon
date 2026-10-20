@@ -19,7 +19,7 @@ from katalon.integrations.metadata_format import (
 )
 from katalon.integrations.mets.builder import METS_NS, MODS_NS, build_mets_element
 
-# 20 Top-Level Elements in MODS (Library of Congress specification)
+# MODS targets (top-level elements of the Library of Congress specification and common sub-elements)
 CORE_MODS_TARGETS = {
     "mods:titleInfo/mods:title",
     "mods:name/mods:namePart",
@@ -44,6 +44,10 @@ OPTIONAL_MODS_TARGETS = {
     "mods:part/mods:detail/mods:number",
     "mods:extension",
     "mods:recordInfo/mods:recordIdentifier",
+    "mods:originInfo/mods:publisher",
+    "mods:originInfo/mods:place/mods:placeTerm",
+    "mods:subject/mods:geographic",
+    "mods:physicalDescription/mods:form",
 }
 
 ALL_MODS_TARGETS = CORE_MODS_TARGETS | OPTIONAL_MODS_TARGETS
@@ -287,6 +291,54 @@ class MetsModsFormat(MetadataFormat):
                 "Extension",
                 "Benutzerdefinierte XML- oder Zusatzdaten",
                 "Custom extension data",
+                False,
+                {SourceKind.FIELD, SourceKind.CONSTANT},
+                {"text"},
+                "many",
+            ),
+            (
+                "mods:originInfo/mods:publisher",
+                "dates",
+                "Verlag",
+                "Publisher",
+                "Name des Verlags (Text); Personen und Körperschaften mit Rolle besser über mods:name",
+                "Publisher name (text); people and organisations with a role go better into mods:name",
+                False,
+                {SourceKind.FIELD, SourceKind.RELATION, SourceKind.CONSTANT},
+                {"text", "relation"},
+                "many",
+            ),
+            (
+                "mods:originInfo/mods:place/mods:placeTerm",
+                "dates",
+                "Entstehungs- / Verlagsort",
+                "Place of Origin",
+                "Ort der Entstehung oder Veröffentlichung, je Ort ein mods:place",
+                "Place of creation or publication, one mods:place per place",
+                False,
+                {SourceKind.FIELD, SourceKind.RELATION, SourceKind.CONSTANT},
+                {"text", "relation"},
+                "many",
+            ),
+            (
+                "mods:subject/mods:geographic",
+                "classification",
+                "Geografisches Schlagwort",
+                "Geographic Subject",
+                "Dargestellter oder behandelter Ort",
+                "Place depicted or treated",
+                False,
+                {SourceKind.FIELD, SourceKind.RELATION, SourceKind.CONSTANT},
+                {"text", "relation"},
+                "many",
+            ),
+            (
+                "mods:physicalDescription/mods:form",
+                "description",
+                "Form / Material",
+                "Form / Material",
+                "Physische Form oder Trägermaterial",
+                "Physical form or carrier material",
                 False,
                 {SourceKind.FIELD, SourceKind.CONSTANT},
                 {"text"},

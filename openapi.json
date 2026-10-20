@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.43.2"
+    "version": "1.44.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -19979,6 +19979,25 @@
         ],
         "summary": "Get Theme",
         "operationId": "portal_get_theme_get_portal_v1_theme",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/theme.css": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Theme tokens and stylesheet as CSS, linked render-blocking",
+        "operationId": "portal_get_theme_css_get_portal_v1_theme.css",
         "responses": {
           "200": {
             "description": "Successful Response",

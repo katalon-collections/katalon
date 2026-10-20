@@ -4,6 +4,22 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.44.0]
+
+- **Kompaktere Containerfelder:** Die Unterfelder eines Eintrags stehen im Formular in einem
+  Raster nebeneinander, etwa Länge und Breite in einer Zeile.
+- **Koordinaten mit Kartenpicker:** Das Feld `geo` speichert geprüfte Koordinaten mit optionaler
+  Genauigkeit. Der Fundort lässt sich im Admin per Kartenklick setzen und wird im Portal auf
+  einer Karte mit Genauigkeitskreis gezeigt.
+- **Links in Containerfeldern:** Unterfelder von Containerfeldern können eine URL mit Linktitel
+  enthalten.
+- **Richtext in Unterfeldern:** Unterfelder von Containerfeldern können formatierten Text
+  enthalten. Er wird im Formular mit dem Richtext-Editor bearbeitet und im Portal formatiert
+  angezeigt; Exporte geben ihn als reinen Text aus.
+- **METS/MODS für den DFG-Viewer:** Der METS/MODS-Export folgt dem DFG-Viewer-Profil mit
+  Seitenstruktur, Bildverweisen über IIIF und Link zur öffentlichen Seite. Personen,
+  Datumsangaben, Verlag, Orte und Gattung werden ausführlicher abgebildet.
+
 ## [1.43.0]
 
 - **Gewählte Filter im Blick:** Die Portalsuche zeigt aktive Filter direkt unter der

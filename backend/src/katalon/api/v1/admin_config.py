@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 
 from katalon.core.dependencies import DBDep, require_role
@@ -67,8 +67,7 @@ class AdminConfigRead(BaseModel):
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminConfigUpdate(BaseModel):

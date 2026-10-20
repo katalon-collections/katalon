@@ -13,7 +13,6 @@ export async function loadAndApplyTheme(): Promise<ThemeManifest | null> {
     applyTheme(theme)
     return theme
   } catch {
-    applyTheme(null)
     return null
   }
 }

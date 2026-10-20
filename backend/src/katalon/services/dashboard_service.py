@@ -17,7 +17,7 @@ from katalon.core.models import (
     Procedure,
     User,
 )
-from katalon.core.schemas import LockRead
+from katalon.core.schemas import RECORD_TYPES, LockRead
 from katalon.core.visibility import readable_record_types
 from katalon.services import working_set_service
 from katalon.services.audit_service import resolve_record_labels
@@ -81,7 +81,7 @@ async def get_dashboard_summary(
     # 1. Recents: recent AuditLog entries for current_user
     recent_query = (
         select(AuditLog)
-        .where(AuditLog.user_id == current_user.id)
+        .where(AuditLog.user_id == current_user.id, AuditLog.record_type.in_(RECORD_TYPES))
         .order_by(AuditLog.created_at.desc())
         .limit(30)
     )
@@ -205,6 +205,7 @@ async def get_dashboard_summary(
         team_query = (
             select(AuditLog, User.email)
             .outerjoin(User, AuditLog.user_id == User.id)
+            .where(AuditLog.record_type.in_(RECORD_TYPES))
             .order_by(AuditLog.created_at.desc())
             .limit(10)
         )

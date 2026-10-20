@@ -27,6 +27,15 @@
     "mintHint": "Datensatz zuerst speichern, dann PID vergeben.",
     "systemManaged": "vom System vergeben"
   },
+  "geo": {
+    "lat": "Breite (lat)",
+    "lon": "Länge (lon)",
+    "accuracy": "Genauigkeit (m)",
+    "showMap": "Karte",
+    "hideMap": "Karte ausblenden",
+    "invalid": "Ungültige Koordinaten. Dezimalgrad: Breite −90…90, Länge −180…180, Genauigkeit ≥ 0.",
+    "add": "Koordinaten hinzufügen"
+  },
   "url": {
     "linkLabel": "Linktitel (optional)",
     "add": "URL hinzufügen"

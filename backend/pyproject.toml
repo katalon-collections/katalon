@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.43.2"
+version = "1.44.0"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.14"
@@ -112,6 +112,11 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Deprecations inside third-party packages, not fixable here; drop once upstream updates.
+filterwarnings = [
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi",
+    "ignore:ConjunctiveGraph is deprecated:DeprecationWarning:rdflib",
+]
 markers = [
     "backup_drill: automated pg_dump/psql restore drill (katalon issue #382); excluded from the default integration run, see .github/workflows/backup-drill.yml",
 ]

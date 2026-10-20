@@ -575,3 +575,5 @@ input, select, textarea { font-family: inherit; }
 /* Group fields on detail pages: one line per entry */
 .group-entry + .group-entry { margin-top: 4px; }
 .group-key { color: var(--fg-3, #6b7280); }
+.group-entry .prose { margin-top: 2px; }
+.group-entry .prose p:last-child { margin-bottom: 0; }

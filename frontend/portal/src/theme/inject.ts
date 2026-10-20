@@ -2,23 +2,10 @@
 // Copyright (c) 2026 Karl Krägelin
 
 import type { ThemeManifest } from './defaults'
-import { DEFAULT_TOKENS } from './defaults'
 
+/** Tokens and the theme stylesheet come render-blocking from
+ *  /portal/v1/theme.css (linked in index.html); this adds the rest. */
 export function applyTheme(theme: ThemeManifest | null): void {
-  const root = document.documentElement
-  const tokens = { ...DEFAULT_TOKENS, ...(theme?.tokens ?? {}) }
-
-  for (const [k, v] of Object.entries(tokens)) {
-    root.style.setProperty(k, v)
-  }
-
-  if (theme?.fonts?.body) {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = theme.fonts.body
-    document.head.appendChild(link)
-  }
-
   const script = themeScriptSrc(theme)
   if (script && !document.querySelector(`script[data-theme-script]`)) {
     // Same-origin file from the theme directory only (CSP script-src 'self').
