@@ -1,6 +1,6 @@
 [project]
 name = "katalon"
-version = "1.44.0"
+version = "1.44.1"
 description = "Katalon – Metadata Management System for GLAM collections"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.14"

@@ -6,7 +6,7 @@ settings:
 
 overrides:
   js-yaml: 4.3.2
-  markdown-it: 14.3.2
+  markdown-it: 14.3.3
   source-map-js: 1.2.2
 
 importers:
@@ -70,7 +70,7 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^5.2.0
-        version: 5.2.0(supports-color@7.2.0)(vite@7.3.6)
+        version: 5.2.0(supports-color@7.2.0)(vite@7.3.7)
       dependency-cruiser:
         specifier: ^18.2.0
         version: 18.2.0
@@ -87,8 +87,8 @@ importers:
         specifier: ^8.66.0
         version: 8.66.0(eslint@9.39.5(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       vite:
-        specifier: ^7.3.6
-        version: 7.3.6
+        specifier: ^7.3.7
+        version: 7.3.7
 
 packages:
 
@@ -1281,8 +1281,8 @@ packages:
   markdown-it-task-lists@2.1.1:
     resolution: {integrity: sha512-TxFAc76Jnhb2OUu+n3yz9RMu4CwGfaT788br6HhEDlvWfdeJcLUsxk1Hgw2yJio0OXsxv7pyIPmvECY7bMbluA==}
 
-  markdown-it@14.3.2:
-    resolution: {integrity: sha512-sHHjZ5fJKlgrG4qns2YwVcdNep35h5fERrfkD2YNsb9UFk0UIHarbiTaHKVMlPuWAoiilyK8Fv/jAm11slsY7Q==}
+  markdown-it@14.3.3:
+    resolution: {integrity: sha512-L//tDAkjTjJCU6pBUSBTgs3Kg4InVaZuUZog/b6V12UKhcDQ7S78877ibbCanRExwPuYP1CZD7Gd2dxSy1GXRg==}
     hasBin: true
 
   mdurl@2.1.0:
@@ -1626,8 +1626,8 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  vite@7.3.6:
-    resolution: {integrity: sha512-4XP60spRGjSZFf1qYH+dJIkK2znL3zQfl9KkOV9MkkRR/3Dls0dxaBsQPTloEc5BLXWPL9vsOxopxyKoMmDueg==}
+  vite@7.3.7:
+    resolution: {integrity: sha512-AHEzTORMbi7/7aXp7w7KZ5+DCUdSeLsJz0grY8xHpc9DHdYb0vQu6DqJfm2tOw3gDExNgPgnJTXxM6syYFHaCA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -2416,7 +2416,7 @@ snapshots:
       '@typescript-eslint/types': 8.66.0
       eslint-visitor-keys: 5.0.1
 
-  '@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@7.3.6)':
+  '@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@7.3.7)':
     dependencies:
       '@babel/core': 7.29.7(supports-color@7.2.0)
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.7(supports-color@7.2.0))
@@ -2424,7 +2424,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-rc.3
       '@types/babel__core': 7.20.5
       react-refresh: 0.18.0
-      vite: 7.3.6
+      vite: 7.3.7
     transitivePeerDependencies:
       - supports-color
 
@@ -2828,7 +2828,7 @@ snapshots:
 
   markdown-it-task-lists@2.1.1: {}
 
-  markdown-it@14.3.2:
+  markdown-it@14.3.3:
     dependencies:
       argparse: 2.0.1
       entities: 4.5.0
@@ -2961,7 +2961,7 @@ snapshots:
   prosemirror-markdown@1.13.6:
     dependencies:
       '@types/markdown-it': 14.2.0
-      markdown-it: 14.3.2
+      markdown-it: 14.3.3
       prosemirror-model: 1.25.11
 
   prosemirror-model@1.25.11:
@@ -3157,7 +3157,7 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.30.5(@tiptap/pm@3.30.5)
       '@types/markdown-it': 13.0.9
-      markdown-it: 14.3.2
+      markdown-it: 14.3.3
       markdown-it-task-lists: 2.1.1
       prosemirror-markdown: 1.13.6
 
@@ -3223,7 +3223,7 @@ snapshots:
     dependencies:
       react: 18.3.1
 
-  vite@7.3.6:
+  vite@7.3.7:
     dependencies:
       esbuild: 0.28.2
       fdir: 6.5.0(picomatch@4.0.5)
