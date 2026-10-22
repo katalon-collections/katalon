@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import importlib
+import logging
+from collections.abc import Callable
+from functools import partial
 
 from katalon.integrations.aat_adapter import AATAdapter
 from katalon.integrations.authority import AuthorityHit, AuthoritySource
@@ -14,17 +17,19 @@ from katalon.integrations.tgn_adapter import TGNAdapter
 from katalon.integrations.viaf_adapter import VIAFAdapter
 from katalon.integrations.wikidata_adapter import WikidataAdapter
 
-# Built-in adapters always available (can be overridden by DB config)
-_BUILTIN: dict[str, AuthoritySource] = {
-    "gnd":         GNDAdapter(),
-    "gnd-person":  GNDAdapter(filter_type="type:Person", source_id="gnd-person"),
-    "gnd-subject": GNDAdapter(filter_type="type:SubjectHeading", source_id="gnd-subject"),
-    "geonames":    GeonamesAdapter(),
-    "viaf":        VIAFAdapter(),
-    "wikidata":    WikidataAdapter(),
-    "tgn":         TGNAdapter(),
-    "iconclass":   ICONCLASSAdapter(),
-    "aat":         AATAdapter(),
+logger = logging.getLogger(__name__)
+
+# Factories keep DB overrides local to each lookup.
+_BUILTIN: dict[str, Callable[[], AuthoritySource]] = {
+    "gnd":         GNDAdapter,
+    "gnd-person":  partial(GNDAdapter, filter_type="type:Person", source_id="gnd-person"),
+    "gnd-subject": partial(GNDAdapter, filter_type="type:SubjectHeading", source_id="gnd-subject"),
+    "geonames":    GeonamesAdapter,
+    "viaf":        VIAFAdapter,
+    "wikidata":    WikidataAdapter,
+    "tgn":         TGNAdapter,
+    "iconclass":   ICONCLASSAdapter,
+    "aat":         AATAdapter,
 }
 
 _LABELS: dict[str, str] = {
@@ -48,18 +53,12 @@ def default_adapter_class(source_id: str) -> str | None:
     adapter = _BUILTIN.get(source_id)
     if adapter is None:
         return None
-    cls = type(adapter)
+    cls = type(adapter())
     return f"{cls.__module__}.{cls.__qualname__}"
-
-# Cache: source_id → adapter (populated lazily from DB)
-_cache: dict[str, AuthoritySource] | None = None
 
 
 async def _load_registry() -> dict[str, AuthoritySource]:
     """Load enabled adapters from authority_sources table, fall back to builtins."""
-    global _cache
-    if _cache is not None:
-        return _cache
     try:
         from sqlalchemy import select
 
@@ -71,13 +70,13 @@ async def _load_registry() -> dict[str, AuthoritySource]:
             db_sources = result.scalars().all()
 
         # Start with all builtins, then apply DB overrides (including disabling)
-        registry: dict[str, AuthoritySource] = dict(_BUILTIN)
+        registry = {key: factory() for key, factory in _BUILTIN.items()}
         for src in db_sources:
             if not src.is_enabled:
                 registry.pop(src.id, None)
                 continue
             if src.id in _BUILTIN:
-                adapter = _BUILTIN[src.id]
+                adapter = registry[src.id]
                 for key, val in (src.config or {}).items():
                     if hasattr(adapter, key):
                         setattr(adapter, key, val)
@@ -93,16 +92,11 @@ async def _load_registry() -> dict[str, AuthoritySource]:
                         cfg["source_id"] = src.id
                     registry[src.id] = cls(**cfg)
                 except Exception:
-                    pass
-        _cache = registry
+                    logger.warning("Failed to load authority adapter %r", src.id, exc_info=True)
+        return registry
     except Exception:
-        _cache = dict(_BUILTIN)
-    return _cache
-
-
-def invalidate_cache() -> None:
-    global _cache
-    _cache = None
+        logger.warning("Failed to load authority sources from DB, using builtins only", exc_info=True)
+        return {key: factory() for key, factory in _BUILTIN.items()}
 
 
 def list_sources() -> list[str]:

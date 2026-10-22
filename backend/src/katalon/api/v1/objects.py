@@ -50,7 +50,10 @@ from katalon.services.idno_service import (
 )
 from katalon.services.lock_service import enforce_not_locked
 from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.public_metadata_service import project_public_record
+from katalon.services.public_metadata_service import (
+    load_public_fields,
+    project_public_record,
+)
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -323,6 +326,32 @@ async def get_object(
             db, ObjectRead.model_validate(obj), "object", obj.object_type
         )
     return obj
+
+
+async def list_objects_by_ids(
+    object_ids: list[uuid.UUID], db: DBDep, current_user: OptionalCurrentUser
+) -> list[Object | ObjectRead]:
+    """Visible objects among `object_ids`, in request order without duplicates.
+
+    Unknown, deleted or hidden IDs are skipped instead of failing the whole batch, like
+    the single reads the portal lists replaced with it.
+    """
+    unique_ids = list(dict.fromkeys(object_ids))
+    visibility_user = await _visibility_user(db, current_user)
+    query = apply_public_visibility(
+        select(Object).where(Object.id.in_(unique_ids)), Object, visibility_user
+    )
+    found = {obj.id: obj for obj in (await db.execute(query)).scalars().all()}
+    objs = [found[object_id] for object_id in unique_ids if object_id in found]
+    if visibility_user is not None:
+        return list(objs)
+    fields = await load_public_fields(db, "object")
+    return [
+        await project_public_record(
+            db, ObjectRead.model_validate(obj), "object", obj.object_type, fields
+        )
+        for obj in objs
+    ]
 
 
 @router.put(

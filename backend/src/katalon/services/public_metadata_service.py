@@ -79,9 +79,14 @@ async def project_public_record[T: BaseModel](
     record: T,
     target_type: str,
     target_subtype: str | None = None,
+    fields: list[FieldDefinition] | None = None,
 ) -> T:
-    """Return a response-model copy with internal metadata removed."""
-    fields = await load_public_fields(db, target_type)
+    """Return a response-model copy with internal metadata removed.
+
+    Batch callers pass `fields` (from `load_public_fields`) to load them once.
+    """
+    if fields is None:
+        fields = await load_public_fields(db, target_type)
     metadata = filter_public_metadata(
         getattr(record, "metadata_", None), fields, target_subtype
     )

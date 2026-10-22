@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '../i18n'
+import { encodeAdvancedQuery } from '../utils/advancedSearch'
 import { SearchPage } from './SearchPage'
 
 vi.mock('../hooks/useSubtypePlaceholders', () => ({ useSubtypePlaceholder: () => () => '' }))
@@ -21,7 +22,9 @@ vi.mock('../api/client', () => ({
       date: { kind: 'date', label: { de: 'Datum' }, granularity: 'decade' },
       flag: { kind: 'boolean', label: { de: 'Markiert' } },
     } },
-  }) } },
+  }) },
+  // Never resolves: lets the tests look at the loading state of an advanced search.
+  search: { advanced: () => new Promise(() => {}) } },
 }))
 
 function Location() {
@@ -152,3 +155,26 @@ describe('SearchPage filters and pagination', () => {
     expect(screen.queryByRole('spinbutton', { name: 'Seite' })).toBeNull()
   })
 })
+
+describe('SearchPage advanced search over relations', () => {
+  afterEach(() => { cleanup(); vi.useRealTimers() })
+
+  it('says that a relation search is running and why it may take longer', async () => {
+    act(() => setLocale('de'))
+    vi.useFakeTimers()
+    const aq = encodeAdvancedQuery({
+      version: 1, record_type: 'object', group: { mode: 'all', clauses: [{
+        kind: 'relation_type', relation_type: 'wurde_abgesendet', direction: 'outgoing', target_type: 'place',
+        group: { mode: 'all', clauses: [{ kind: 'field', field: 'label', operator: 'contains', value: 'Georgsmarienhütte' }] },
+      }] },
+    })
+    render(<MemoryRouter initialEntries={[`/search?aq=${aq}`]}><SearchPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    expect(screen.getByRole('status').textContent).toContain('Suche über Verknüpfungen läuft…')
+    expect(screen.queryByText(/kann das einen Moment dauern/)).toBeNull()
+    await act(async () => { vi.advanceTimersByTime(1600) })
+    expect(screen.getByText(/kann das einen Moment dauern/)).toBeTruthy()
+  })
+})
+

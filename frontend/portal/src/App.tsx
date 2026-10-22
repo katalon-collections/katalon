@@ -73,6 +73,7 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
   const siteTitle = resolveLangText(config.site_title, locale, 'Katalon')
   const logoRef = useRef<HTMLAnchorElement>(null)
   const headerRef = useRef<HTMLElement>(null)
+  const scheduleFitRef = useRef<(() => void) | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -85,7 +86,17 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
 
     let frame = 0
     let active = true
+    const narrow = window.matchMedia('(max-width: 768px)')
     const fit = () => {
+      fitLogo()
+      // Measured without the compact class: does everything fit side by side?
+      header.classList.remove('is-compact')
+      const nav = header.querySelector('nav')
+      const overflows = header.scrollWidth > header.clientWidth + 1
+        || (nav !== null && nav.scrollWidth > nav.clientWidth + 1)
+      header.classList.toggle('is-compact', narrow.matches || overflows)
+    }
+    const fitLogo = () => {
       logo.style.removeProperty('font-size')
       if (getComputedStyle(logo).display === 'none') return
       const originalSize = parseFloat(getComputedStyle(logo).fontSize)
@@ -110,14 +121,22 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
     const observer = new ResizeObserver(scheduleFit)
     observer.observe(header)
     observer.observe(logo)
-    scheduleFit()
+    narrow.addEventListener('change', scheduleFit)
+    scheduleFitRef.current = scheduleFit
+    fit()  // before the first paint: no flash of the full header on phones
     document.fonts.ready.then(scheduleFit)
     return () => {
       active = false
       observer.disconnect()
+      narrow.removeEventListener('change', scheduleFit)
+      scheduleFitRef.current = null
       cancelAnimationFrame(frame)
     }
   }, [siteTitle])
+
+  // Header-Seiten, Sprache, Login oder die Startseite (ohne Suchfeld) ändern den
+  // Platzbedarf, ohne dass sich die Header-Größe ändert.
+  useLayoutEffect(() => { scheduleFitRef.current?.() })
 
   useEffect(() => {
     api.pages.list().then(ps => setHeaderPages(ps.filter(p => p.placement === 'header'))).catch(() => {})
@@ -259,9 +278,8 @@ function Header({ user, onLogout }: { user: PortalUser | null; onLogout: () => v
       </div>
       <Link className="advanced-search-link" to="/advanced-search" aria-label={t('advanced.link')} title={t('advanced.link')}>
         <svg className="advanced-search-link__icon" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-          <line x1="3" y1="5" x2="17" y2="5" /><circle cx="13" cy="5" r="2" fill="var(--header-bg, #0b1a33)" />
-          <line x1="3" y1="10" x2="17" y2="10" /><circle cx="7" cy="10" r="2" fill="var(--header-bg, #0b1a33)" />
-          <line x1="3" y1="15" x2="17" y2="15" /><circle cx="14" cy="15" r="2" fill="var(--header-bg, #0b1a33)" />
+          <circle cx="8.5" cy="8.5" r="5.5" /><line x1="12.6" y1="12.6" x2="17" y2="17" />
+          <line x1="8.5" y1="6" x2="8.5" y2="11" /><line x1="6" y1="8.5" x2="11" y2="8.5" />
         </svg>
         <span className="advanced-search-link__text">{t('advanced.link')}</span>
       </Link>

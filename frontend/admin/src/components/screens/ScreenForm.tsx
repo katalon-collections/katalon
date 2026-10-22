@@ -1040,7 +1040,7 @@ function VocabInput({ vocabId, value, onChange, disabled, autoFocus, onCancel }:
             }
           }}
           autoFocus={autoFocus}
-          placeholder={vocabId ? 'Tippen zum Suchen…' : 'Kein Vokabular zugewiesen'}
+          placeholder={vocabId ? t('vocabPicker.searchPlaceholder') : t('vocabPicker.noVocabulary')}
           disabled={disabled || !vocabId}
         />
         <button
@@ -1263,7 +1263,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
             }
           }}
           autoFocus={autoFocus}
-          placeholder={placeholder ?? (vocabId ? 'Tippen zum Suchen oder frei eingeben…' : 'Freitext eingeben')}
+          placeholder={placeholder ?? (vocabId ? t('vocabPicker.searchOrEnterPlaceholder') : t('vocabPicker.freeTextPlaceholder'))}
           disabled={disabled}
         />
         <button
@@ -1904,6 +1904,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : null
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
+  const subtypeInputId = useId()
   const showIdno  = true
   const showMedia = recordType === 'object' && !quickCreate
   const showGeo   = recordType === 'place'
@@ -2004,6 +2005,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [relTypeTerms, setRelTypeTerms] = useState<VocabularyTerm[]>([])
   const [relTypeVocabId, setRelTypeVocabId] = useState<string | undefined>()
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
+  const [subtypesLoaded, setSubtypesLoaded] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [savedId, setSavedId] = useState<string | null>(currentId)
@@ -2174,6 +2176,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setSavedId(currentId)
     setIdno('')
     setSubtype(initialSubtype ?? '')
+    setSubtypesLoaded(false)
     setLat('')
     setLon('')
     setStartDate('')
@@ -2195,12 +2198,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     // Load available subtypes before resolving a new form's schema, so the
     // default and fixed subtype use the same schema key from the first load.
     const subtypeListP = subtypeKey
-      ? subtypes.list(recordType).catch(() => [] as RecordSubtype[])
+      ? subtypes.list(recordType)
       : Promise.resolve([] as RecordSubtype[])
-    subtypeListP.then(items => {
-      setAvailableSubtypes(items)
-      if (isNew) setSubtype(current => current || initialSubtype || items.find(item => item.is_default)?.name || '')
-    })
 
     if (showParentCollection) {
       collections.list({ page_size: 100 }).then(res => {
@@ -2225,8 +2224,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
     const loadRecP = isNew ? Promise.resolve(null) : (api.get as (id: string) => Promise<AnyRecord>)(recordId!)
 
-    loadRecP
-      .then(async rec => {
+    Promise.all([loadRecP, subtypeListP])
+      .then(async ([rec, items]) => {
+        setAvailableSubtypes(items)
+        setSubtypesLoaded(true)
         let recSubtype: string | undefined = isNew ? initialSubtype : undefined
         if (rec) {
           setStatus((rec as { status?: string }).status as Status)
@@ -2264,8 +2265,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           }
           setTitle(extractTitle(m, (rec as { idno?: string | null }).idno ?? rec.id))
         } else if (subtypeKey) {
-          const items = await subtypeListP
-          recSubtype = initialSubtype || items.find(item => item.is_default)?.name || undefined
+          recSubtype = initialSubtype || items.find(item => item.is_default)?.name || (items.length === 1 ? items[0].name : undefined)
+          setSubtype(recSubtype ?? '')
         }
         // Load manual lock info after record data
         if (rec && !isNew) {
@@ -2815,7 +2816,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     // A fixed relation subtype is structural in quick-create, so drafts must not bypass it.
     const validConfiguredSubtype = availableSubtypes.some(item => item.name === subtype)
     if (quickCreate && lockSubtype && !validConfiguredSubtype) {
-      errors.__subtype = 'Der konfigurierte Subtyp ist ungültig.'
+      errors.__subtype = t('subtypeInvalid')
+    } else if (isNew && availableSubtypes.length > 0 && !validConfiguredSubtype) {
+      errors.__subtype = t('subtypeRequired')
     }
     for (const f of fields) {
       if (f.name === 'idno') continue
@@ -3805,7 +3808,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
             {quickCreate ? 'Abbrechen' : justCreated ? 'Zur Liste' : 'Verwerfen'}
           </button>
           {!justCreated && (
-            <button className="btn pri" onClick={handleSave} disabled={saving}>
+            <button className="btn pri" onClick={handleSave} disabled={saving || !subtypesLoaded}>
               {saving ? 'Speichert…' : quickCreate ? 'Entwurf anlegen und verknüpfen' : 'Speichern'}
             </button>
           )}
@@ -4006,15 +4009,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {subtypeKey && availableSubtypes.length > 0 && (
                   <div className="field">
-                    <div className="lbl">{recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} {recordType !== 'object' && <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span>}</div>
+                    <label className="lbl" htmlFor={subtypeInputId}>{t(`subtypeLabel.${recordType}`)} {isNew ? <span aria-hidden="true">*</span> : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('subtypeOptional')})</span>}</label>
                     <select
                       className="fld"
+                      id={subtypeInputId}
+                      required={isNew}
+                      aria-invalid={Boolean(fieldErrors.__subtype)}
                       value={subtype}
                       onChange={e => { setSubtype(e.target.value); setIsDirty(true); clearFieldFeedback('__subtype') }}
                       disabled={justCreated || lockSubtype}
                       style={getFeedbackStyle('__subtype')}
                     >
-                      <option value="">– {recordType === 'procedure' ? 'Vorgangstyp' : recordType === 'entity' ? 'Entitätstyp' : recordType === 'place' ? 'Orts-Typ' : recordType === 'object' ? 'Objekt-Typ' : recordType === 'collection' ? 'Sammlungstyp' : 'Occurrence-Typ'} wählen –</option>
+                      <option value="" disabled={isNew}>{t('subtypeChoose', { type: t(`subtypeLabel.${recordType}`) })}</option>
+                      {!isNew && subtype && !availableSubtypes.some(s => s.name === subtype) && <option value={subtype}>{subtype}</option>}
                       {availableSubtypes.map(s => (
                         <option key={s.id} value={s.name}>{getLabel(s, s.name)}</option>
                       ))}
@@ -4986,9 +4993,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           </div>
                         ) : (
                           <>
-                            <div style={{ fontSize: 12 }}>Hierher ziehen oder</div>
+                            <div style={{ fontSize: 12 }}>{t('mediaDropHint')}</div>
                             <label className="upload-control">
-                              &nbsp;auswählen
+                              &nbsp;{t('mediaSelect')}
                               <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} accept="image/jpeg,image/png,image/tiff,image/webp,application/pdf,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,model/gltf-binary,.glb" onChange={onFileChange} />
                             </label>
                           </>
@@ -4998,7 +5005,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       </>
                     ) : (
                       <div style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }}>
-                        Objekt zuerst speichern, dann Bilder hochladen.
+                        {t('mediaSaveFirst')}
                       </div>
                     )}
                   </div>

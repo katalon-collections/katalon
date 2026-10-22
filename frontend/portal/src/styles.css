@@ -342,6 +342,8 @@ input, select, textarea { font-family: inherit; }
   min-height: 40px; border: 1px solid var(--border, #e4e6eb); border-radius: 6px;
   background: var(--panel, #fff); color: var(--fg, #181a1f); padding: 7px 10px;
 }
+.advanced-list-value { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.advanced-list-value .advanced-values { margin-top: 0; }
 .advanced-group {
   margin: 0; padding: 16px; border: 1px solid var(--border, #e4e6eb);
   border-radius: 10px; background: var(--panel, #fff);
@@ -362,6 +364,7 @@ input, select, textarea { font-family: inherit; }
 .advanced-depth-1, .advanced-depth-2 { background: var(--bg, #f4f5f7); }
 .advanced-actions { display: flex; align-items: center; gap: 18px; margin-top: 20px; }
 .advanced-submit { min-height: 44px; border: 0; border-radius: 6px; padding: 0 18px; background: var(--accent, #1e3a8a); color: #fff; font-weight: 600; }
+.search-loading__hint { margin-top: 6px; font-size: 13px; }
 .advanced-error { padding: 12px 14px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #991b1b; }
 .advanced-actions + .advanced-error, .advanced-error + .advanced-actions { margin-top: 14px; }
 .advanced-summary { margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--accent-100, #dde3f5); border-radius: 6px; background: var(--accent-50, #eef2fb); font-size: 13px; }
@@ -454,6 +457,59 @@ input, select, textarea { font-family: inherit; }
 }
 .suggest-footer:hover { background: var(--accent-50, #eef2fb); }
 
+/* Kompakter Header: Suche, erweiterte Suche, Sprache und Konto wandern ins
+   Menü. App.tsx setzt .is-compact auf schmalen Bildschirmen und immer dann,
+   wenn Logo, Navigation und Aktionen nebeneinander nicht passen (lange
+   Menüpunkte, Header-Seiten, Theme-Schriften) — sonst überlappen sie. */
+.site-header.is-compact nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.site-header.is-compact nav::-webkit-scrollbar { display: none; }
+.site-header.is-compact .menu-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; flex-shrink: 0; }
+.site-header.is-compact .header-actions {
+  display: none;
+}
+.site-header.is-compact .header-actions.is-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--header-bg, #0b1a33);
+  padding: 12px 16px 16px;
+  box-shadow: 0 12px 20px rgba(0,0,0,.25);
+  z-index: 50;
+}
+.site-header.is-compact .header-actions.is-open .search-wrap { width: 100%; margin: 0; position: static; }
+.site-header.is-compact .header-actions.is-open .search-bar { width: 100%; }
+.site-header.is-compact .header-actions.is-open .advanced-search-link { min-height: 44px; }
+.site-header.is-compact .header-actions.is-open .advanced-search-link__text { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; }
+.site-header.is-compact .header-actions.is-open .lang-switcher { width: fit-content; height: 40px; min-height: 0; padding: 0 10px; }
+.site-header.is-compact .header-actions.is-open .header-actions__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.site-header.is-compact .header-actions.is-open .portal-account { min-height: 44px; display: flex; align-items: center; }
+
+/* Sortierauswahl: einheitlich statt browserspezifisch gerendert */
+.sort-select { position: relative; display: inline-flex; }
+.sort-select select {
+  appearance: none; -webkit-appearance: none;
+  min-height: 34px; padding: 6px 30px 6px 10px;
+  border: 1px solid var(--border, #e4e6eb); border-radius: 6px;
+  background: var(--panel, #fff); color: var(--fg, #181a1f);
+  font-size: 13px; line-height: 1.2; cursor: pointer;
+}
+.sort-select select:hover { border-color: var(--fg-4, #8a90a0); }
+.sort-select select:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 1px; }
+.sort-select::after {
+  content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px;
+  border-right: 1.5px solid var(--fg-3, #5a6173); border-bottom: 1.5px solid var(--fg-3, #5a6173);
+  transform: translateY(-70%) rotate(45deg); pointer-events: none;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .relation-filter__chip, .active-filter { min-height: 44px; }
@@ -468,35 +524,6 @@ input, select, textarea { font-family: inherit; }
   .site-header nav { margin-left: 0; gap: 2px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
   .site-header nav::-webkit-scrollbar { display: none; }
   .site-header nav a { font-size: 12.5px; padding: 4px 6px; white-space: nowrap; }
-  .site-header .menu-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; flex-shrink: 0; }
-  .site-header .header-actions {
-    display: none;
-  }
-  .site-header .header-actions.is-open {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--header-bg, #0b1a33);
-    padding: 12px 16px 16px;
-    box-shadow: 0 12px 20px rgba(0,0,0,.25);
-    z-index: 50;
-  }
-  .site-header .header-actions.is-open .search-wrap { width: 100%; margin: 0; position: static; }
-  .site-header .header-actions.is-open .search-bar { width: 100%; }
-  .site-header .header-actions.is-open .advanced-search-link { min-height: 44px; }
-  .site-header .header-actions.is-open .advanced-search-link__text { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; }
-  .site-header .header-actions.is-open .lang-switcher { width: fit-content; height: 40px; min-height: 0; padding: 0 10px; }
-  .site-header .header-actions.is-open .header-actions__bottom {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .site-header .header-actions.is-open .portal-account { min-height: 44px; display: flex; align-items: center; }
   .container { padding-left: 16px; padding-right: 16px; }
   .page { padding: 24px 0 48px; }
   .hero { padding: 40px 0 36px; }

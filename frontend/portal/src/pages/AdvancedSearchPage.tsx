@@ -4,7 +4,8 @@
 import type { ReactNode } from 'react'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type PortalFieldDefinition } from '../api/client'
+import { api, type AdvancedRelationType, type PortalFieldDefinition } from '../api/client'
+import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { typeLabel, useI18n } from '../i18n'
 import {
   decodeAdvancedQuery,
@@ -13,6 +14,7 @@ import {
   type AdvancedFieldClause,
   type AdvancedGroup,
   type AdvancedQuery,
+  type AdvancedRelationTypeClause,
 } from '../utils/advancedSearch'
 
 const RECORD_TYPES = ['object', 'entity', 'place', 'occurrence'] as const
@@ -27,12 +29,14 @@ const OPERATORS: Record<string, Array<[string, string]>> = {
   number: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['lt', 'advanced.op.lt'], ['lte', 'advanced.op.lte'], ['gt', 'advanced.op.gt'], ['gte', 'advanced.op.gte'], ['between', 'advanced.op.between'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
   date: [['before', 'advanced.op.before'], ['on', 'advanced.op.on'], ['after', 'advanced.op.after'], ['between', 'advanced.op.between'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
   boolean: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
-  vocab: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
-  vocab_free: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
-  authority: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
-  pid: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
-  url: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  vocab: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['in', 'advanced.op.in'], ['not_in', 'advanced.op.notIn'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  vocab_free: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['in', 'advanced.op.in'], ['not_in', 'advanced.op.notIn'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  authority: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['in', 'advanced.op.in'], ['not_in', 'advanced.op.notIn'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  pid: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['in', 'advanced.op.in'], ['not_in', 'advanced.op.notIn'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
+  url: [['eq', 'advanced.op.eq'], ['neq', 'advanced.op.neq'], ['in', 'advanced.op.in'], ['not_in', 'advanced.op.notIn'], ['exists', 'advanced.op.exists'], ['not_exists', 'advanced.op.notExists']],
 }
+
+const LIST_OPERATORS = new Set(['in', 'not_in'])
 
 function blankClause(): AdvancedFieldClause {
   return { kind: 'field', field: '', operator: 'contains', value: '' }
@@ -56,18 +60,28 @@ async function summarizeGroup(
   group: AdvancedGroup,
   locale: string,
   t: (key: string, params?: Record<string, string>) => string,
+  relationLabel: (code: string, isFrom?: boolean) => string,
 ): Promise<ReactNode> {
   const fields = await api.portal.schema(targetType).catch(() => [])
   const parts = await Promise.all(group.clauses.map(async clause => {
+    if (clause.kind === 'relation_type') {
+      const nested = await summarizeGroup(clause.target_type, clause.group, locale, t, relationLabel)
+      const label = relationLabel(clause.relation_type, clause.direction === 'outgoing')
+      return <>{label} → {typeLabel(clause.target_type)} ({nested})</>
+    }
     const field = fields.find(item => item.name === clause.field)
     if (!field) return clause.field
     if (clause.kind === 'relation') {
       const nestedTarget = String(field.settings.target_type ?? '')
-      const nested = await summarizeGroup(nestedTarget, clause.group, locale, t)
+      const nested = await summarizeGroup(nestedTarget, clause.group, locale, t, relationLabel)
       return <>{fieldLabel(field, locale)} → {typeLabel(nestedTarget)} ({nested})</>
     }
     if (clause.operator === 'exists') return <>{fieldLabel(field, locale)} <em>{t('advanced.exists')}</em></>
     if (clause.operator === 'not_exists') return <>{fieldLabel(field, locale)} <em>{t('advanced.notExists')}</em></>
+    if (LIST_OPERATORS.has(clause.operator) && Array.isArray(clause.value)) {
+      const values = await Promise.all(clause.value.map(v => valueLabel(field, targetType, v, locale, t)))
+      return <>{fieldLabel(field, locale)} <em>{operatorLabel(field.field_type, clause.operator, t)}</em> {values.map((v, i) => <span key={i}>{i > 0 ? ` ${t('advanced.or')} ` : ''}&quot;{v}&quot;</span>)}</>
+    }
     const value = await valueLabel(field, targetType, clause.value, locale, t)
     return <>{fieldLabel(field, locale)} <em>{operatorLabel(field.field_type, clause.operator, t)}</em> &quot;{value}&quot;</>
   }))
@@ -100,17 +114,29 @@ async function valueLabel(
   return String(value)
 }
 
+function relationTypeClauses(group: AdvancedGroup): AdvancedRelationTypeClause[] {
+  return group.clauses.flatMap(clause =>
+    clause.kind === 'relation_type' ? [clause, ...relationTypeClauses(clause.group)]
+      : clause.kind === 'relation' ? relationTypeClauses(clause.group)
+        : [])
+}
+
 export function QuerySummary({ query }: { query: AdvancedQuery }) {
   const { locale, t } = useI18n()
+  const relationLabel = useRelationTypeLabels(locale)
   const [summary, setSummary] = useState<ReactNode>(null)
   const key = JSON.stringify(query)
+  // Relation type labels load asynchronously; recompute the summary once they are there.
+  const labelKey = relationTypeClauses(query.group)
+    .map(clause => relationLabel(clause.relation_type, clause.direction === 'outgoing'))
+    .join('|')
 
   useEffect(() => {
     let cancelled = false
-    summarizeGroup(query.record_type, query.group, locale, t).then(text => { if (!cancelled) setSummary(text) })
+    summarizeGroup(query.record_type, query.group, locale, t, relationLabel).then(text => { if (!cancelled) setSummary(text) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, locale])
+  }, [key, locale, labelKey])
 
   return <p className="advanced-query-summary">{summary}</p>
 }
@@ -137,6 +163,70 @@ function ValueEditor({ clause, field, targetType, onChange }: {
   if (clause.operator === 'exists' || clause.operator === 'not_exists') return null
   const termLabel = (term: (typeof terms)[number]) =>
     term.label[locale] ?? term.label.de ?? term.label.en ?? term.term
+  if (LIST_OPERATORS.has(clause.operator)) {
+    const values = Array.isArray(clause.value) ? clause.value.map(String) : []
+    const labelFor = (value: string) => {
+      const term = terms.find(item => item.id === value)
+      return term ? termLabel(term) : value
+    }
+    const add = (value: string) => {
+      const trimmed = value.trim()
+      if (trimmed && !values.includes(trimmed)) onChange({ ...clause, value: [...values, trimmed] })
+    }
+    return (
+      <div className="advanced-list-value">
+        {field.field_type === 'vocab' ? (
+          <select
+            className="advanced-value"
+            aria-label={t('advanced.addValue')}
+            value=""
+            onChange={event => add(event.target.value)}
+          >
+            <option value="">{t('advanced.addValue')}</option>
+            {terms.filter(term => !values.includes(term.id)).map(term => (
+              <option key={term.id} value={term.id}>{termLabel(term)}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              className="advanced-value"
+              aria-label={t('advanced.addValue')}
+              list={field.field_type === 'vocab_free' ? listId : undefined}
+              placeholder={t('advanced.addValue')}
+              onKeyDown={event => {
+                if (event.key !== 'Enter') return
+                event.preventDefault()
+                add(event.currentTarget.value)
+                event.currentTarget.value = ''
+              }}
+              onBlur={event => { add(event.currentTarget.value); event.currentTarget.value = '' }}
+            />
+            {field.field_type === 'vocab_free' && (
+              <datalist id={listId}>
+                {terms.map(term => <option key={term.id} value={termLabel(term)} />)}
+              </datalist>
+            )}
+          </>
+        )}
+        {values.length > 0 && (
+          <div className="active-filters advanced-values">
+            {values.map(value => (
+              <button
+                type="button"
+                key={value}
+                className="active-filter"
+                aria-label={`${t('advanced.removeValue')}: ${labelFor(value)}`}
+                onClick={() => onChange({ ...clause, value: values.filter(item => item !== value) })}
+              >
+                <span>{labelFor(value)}</span><span aria-hidden="true">×</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
   if (field.field_type === 'vocab') {
     return (
       <select
@@ -221,7 +311,9 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
   onChange: (group: AdvancedGroup) => void
 }) {
   const { locale, t } = useI18n()
+  const relationLabel = useRelationTypeLabels(locale)
   const [fields, setFields] = useState<PortalFieldDefinition[]>([])
+  const [relationTypes, setRelationTypes] = useState<AdvancedRelationType[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -231,8 +323,28 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
     return () => { cancelled = true }
   }, [targetType])
 
+  useEffect(() => {
+    // Same limit as relation fields: at most two relation steps.
+    if (depth >= 2) { setRelationTypes([]); return }
+    let cancelled = false
+    api.search.advancedRelationTypes(targetType)
+      .then(result => { if (!cancelled) setRelationTypes(result) })
+      .catch(() => { if (!cancelled) setRelationTypes([]) })
+    return () => { cancelled = true }
+  }, [targetType, depth])
+
+  const relationTypeLabel = (item: { relation_type: string; direction: string; target_type: string }) =>
+    `${relationLabel(item.relation_type, item.direction === 'outgoing')} → ${typeLabel(item.target_type)}`
+  const relationOptions = relationTypes
+    .map((item, index) => ({ index, label: relationTypeLabel(item) }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale))
+  const relationTypeIndex = (clause: AdvancedRelationTypeClause) => relationTypes.findIndex(item =>
+    item.relation_type === clause.relation_type && item.direction === clause.direction
+    && item.target_type === clause.target_type)
+
   const available = useMemo(
-    () => fields.filter(field => field.is_searchable && !field.parent_id
+    // The advanced index covers public fields only; staff also receive internal ones.
+    () => fields.filter(field => field.is_searchable && field.is_public !== false && !field.parent_id
       && SUPPORTED_TYPES.has(field.field_type)
       && (depth < 2 || field.field_type !== 'relation')),
     [fields, depth],
@@ -247,6 +359,17 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
   }
 
   function selectField(index: number, name: string) {
+    if (name.startsWith('rel:')) {
+      const item = relationTypes[Number(name.slice(4))]
+      if (item) {
+        replace(index, {
+          kind: 'relation_type', relation_type: item.relation_type,
+          direction: item.direction, target_type: item.target_type,
+          group: { mode: 'all', clauses: [blankClause()] },
+        })
+        return
+      }
+    }
     const field = available.find(item => item.name === name)
     if (!field) {
       replace(index, blankClause())
@@ -282,24 +405,40 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
 
       <div className="advanced-rules">
         {group.clauses.map((clause, index) => {
-          const field = available.find(item => item.name === clause.field)
-          const relationTarget = field?.field_type === 'relation'
-            ? String(field.settings.target_type ?? '')
-            : ''
+          const field = clause.kind === 'relation_type'
+            ? undefined
+            : available.find(item => item.name === clause.field)
+          const relationTarget = clause.kind === 'relation_type'
+            ? clause.target_type
+            : field?.field_type === 'relation'
+              ? String(field.settings.target_type ?? '')
+              : ''
+          const selected = clause.kind === 'relation_type'
+            ? (relationTypeIndex(clause) >= 0 ? `rel:${relationTypeIndex(clause)}` : '')
+            : clause.field
           return (
             <div className="advanced-rule" key={`${index}-${clause.kind}`}>
               <div className="advanced-rule-row">
                 <select
                   aria-label={t('advanced.field')}
-                  value={clause.field}
+                  value={selected}
                   onChange={event => selectField(index, event.target.value)}
                 >
                   <option value="">{t('advanced.chooseField')}</option>
-                  {available.map(item => (
-                    <option key={item.name} value={item.name}>
-                      {fieldLabel(item, locale)}{item.field_type === 'relation' ? ` → ${typeLabel(String(item.settings.target_type ?? ''))}` : ''}
-                    </option>
-                  ))}
+                  <optgroup label={t('advanced.groupFields')}>
+                    {available.map(item => (
+                      <option key={item.name} value={item.name}>
+                        {fieldLabel(item, locale)}{item.field_type === 'relation' ? ` → ${typeLabel(String(item.settings.target_type ?? ''))}` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {relationOptions.length > 0 && (
+                    <optgroup label={t('advanced.groupRelations')}>
+                      {relationOptions.map(option => (
+                        <option key={option.index} value={`rel:${option.index}`}>{option.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
 
                 {clause.kind === 'field' && field && field.field_type !== 'relation' && (
@@ -307,7 +446,7 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
                     <select
                       aria-label={t('advanced.operator')}
                       value={clause.operator}
-                      onChange={event => replace(index, { ...clause, operator: event.target.value, value: event.target.value === 'between' ? ['', ''] : field.field_type === 'boolean' ? true : '' })}
+                      onChange={event => replace(index, { ...clause, operator: event.target.value, value: event.target.value === 'between' ? ['', ''] : LIST_OPERATORS.has(event.target.value) ? [] : field.field_type === 'boolean' ? true : '' })}
                     >
                       {(OPERATORS[field.field_type] ?? []).map(([value, label]) => (
                         <option key={value} value={value}>{t(label)}</option>
@@ -327,7 +466,7 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
                 </button>
               </div>
 
-              {clause.kind === 'relation' && relationTarget && (
+              {(clause.kind === 'relation' || clause.kind === 'relation_type') && relationTarget && (
                 <div className="advanced-relation-target">
                   <div className="advanced-relation-label">
                     {t('advanced.relatedTarget', { type: typeLabel(relationTarget) })}
@@ -359,12 +498,14 @@ function RuleGroupEditor({ targetType, group, depth, onChange }: {
 function groupIsComplete(group: AdvancedGroup): boolean {
   if (group.clauses.length === 0) return false
   return group.clauses.every(clause => {
+    if (clause.kind === 'relation_type') return groupIsComplete(clause.group)
     if (!clause.field) return false
     if (clause.kind === 'relation') return groupIsComplete(clause.group)
     if (clause.operator === 'exists' || clause.operator === 'not_exists') return true
     if (clause.operator === 'between') {
       return Array.isArray(clause.value) && clause.value.length === 2 && clause.value.every(Boolean)
     }
+    if (Array.isArray(clause.value)) return clause.value.length > 0
     return clause.value !== '' && clause.value != null
   })
 }

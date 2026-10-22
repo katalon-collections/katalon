@@ -64,9 +64,26 @@ _MODELS: dict[
 }
 
 
+# Konfiguration und anonyme Datensatz-Projektionen lädt das Portal bei jedem
+# Seitenaufruf bzw. jeder Zurück-Navigation erneut. Eine kurze TTL nimmt genau
+# die Requests aus der Kette, die Crawler-Traffic vervielfacht, ohne dass
+# Redaktionsänderungen spürbar verzögert sichtbar werden.
+_PUBLIC_CACHE = "public, max-age=60"
+
+
 def _staff_user(user: User | None) -> User | None:
     """Keep future public accounts on the anonymous portal projection."""
     return user if user and user.role in _PORTAL_STAFF_ROLES else None
+
+
+def _cache_for_viewer(response: Response, staff_user: User | None) -> None:
+    """Anonymous projections are briefly cacheable; the staff projection contains
+    non-public fields and must never land in a shared cache."""
+    if staff_user is None:
+        response.headers["Cache-Control"] = _PUBLIC_CACHE
+        response.headers["Vary"] = "Authorization"
+    else:
+        response.headers["Cache-Control"] = "private, no-store"
 
 
 async def _collection_visibility_user(db: DBDep, user: User | None) -> User | None:
@@ -328,6 +345,12 @@ class PortalMediaRead(BaseModel):
         return links
 
 
+class PortalObjectSummary(PortalObjectRead):
+    """Object teaser for portal lists: the record plus its preview file."""
+
+    primary_media: PortalMediaRead | None = None
+
+
 class PortalRelationRead(BaseModel):
     id: uuid.UUID
     from_type: str
@@ -347,6 +370,8 @@ class PortalFieldDefinitionRead(BaseModel):
     is_repeatable: bool
     is_searchable: bool
     is_facet: bool
+    # Staff see non-public fields too; only public ones are searchable in the portal index.
+    is_public: bool | None = None
     parent_id: uuid.UUID | None
     settings: dict[str, Any]
     show_in_detail: bool
@@ -457,11 +482,45 @@ async def list_objects(
     )
 
 
+# Teaser-Listen (Startseite, verknüpfte Objekte, Sammlungsmitglieder) holen damit alle
+# Objekte samt Vorschaubild in einem Request statt in zwei Requests je Objekt.
+_SUMMARY_BATCH_MAX = 100
+
+
+@router.get("/objects/summaries", response_model=list[PortalObjectSummary])
+async def list_object_summaries(
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    response: Response,
+    ids: list[uuid.UUID] = Query(..., min_length=1, max_length=_SUMMARY_BATCH_MAX),
+) -> list[PortalObjectSummary]:
+    staff_user = _staff_user(current_user)
+    records = await objects.list_objects_by_ids(ids, db, staff_user)
+    public_media = await media._visibility_user(db, staff_user) is None
+    previews = await media.primary_media_by_object(
+        [record.id for record in records], db, public_only=public_media
+    )
+    _cache_for_viewer(response, staff_user)
+    return [
+        PortalObjectSummary.model_validate(record).model_copy(
+            update={
+                "primary_media": PortalMediaRead.model_validate(
+                    {**previews[record.id], "object_id": record.id}
+                )
+                if record.id in previews
+                else None
+            }
+        )
+        for record in records
+    ]
+
+
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
 async def get_object(
     object_id: uuid.UUID,
     db: DBDep,
     current_user: OptionalCurrentUser,
+    response: Response,
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
@@ -471,7 +530,9 @@ async def get_object(
     )
     if rdf is not None:
         return rdf
-    return await objects.get_object(object_id, db, _staff_user(current_user))
+    record: Object | ObjectRead = await objects.get_object(object_id, db, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
+    return record
 
 
 @router.get("/objects/{object_id}/export", summary="Export a single object record as JSON-LD or Turtle RDF")
@@ -497,6 +558,7 @@ async def get_entity(
     entity_id: uuid.UUID,
     db: DBDep,
     current_user: OptionalCurrentUser,
+    response: Response,
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
@@ -506,7 +568,9 @@ async def get_entity(
     )
     if rdf is not None:
         return rdf
-    return await entities.get_entity(entity_id, db, _staff_user(current_user))
+    record: Entity | EntityRead = await entities.get_entity(entity_id, db, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
+    return record
 
 
 @router.get("/entities/{entity_id}/export", summary="Export a single entity record as JSON-LD or Turtle RDF")
@@ -532,6 +596,7 @@ async def get_place(
     place_id: uuid.UUID,
     db: DBDep,
     current_user: OptionalCurrentUser,
+    response: Response,
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
@@ -541,7 +606,9 @@ async def get_place(
     )
     if rdf is not None:
         return rdf
-    return await places.get_place(place_id, db, _staff_user(current_user))
+    record: Place | PlaceRead = await places.get_place(place_id, db, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
+    return record
 
 
 @router.get("/places/{place_id}/export", summary="Export a single place record as JSON-LD or Turtle RDF")
@@ -567,6 +634,7 @@ async def get_occurrence(
     occurrence_id: uuid.UUID,
     db: DBDep,
     current_user: OptionalCurrentUser,
+    response: Response,
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
@@ -576,7 +644,9 @@ async def get_occurrence(
     )
     if rdf is not None:
         return rdf
-    return await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
+    record: Occurrence | OccurrenceRead = await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
+    return record
 
 
 @router.get(
@@ -683,6 +753,7 @@ async def get_collection(
     collection_id: uuid.UUID,
     db: DBDep,
     current_user: OptionalCurrentUser,
+    response: Response,
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
@@ -703,6 +774,7 @@ async def get_collection(
     col = result.scalar_one_or_none()
     if not col:
         raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
+    _cache_for_viewer(response, staff_user)
 
     metadata = col.metadata_ or {}
     if visibility_user is None:
@@ -822,9 +894,10 @@ async def export_collection(
 
 @router.get("/objects/{object_id}/media", response_model=list[PortalMediaRead])
 async def list_media(
-    object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+    object_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser, response: Response
 ) -> list[dict[str, Any]]:
     items = await media.list_media(object_id, db, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
     return [{**item, "object_id": object_id} for item in items]
 
 
@@ -858,9 +931,15 @@ async def download_portal_media_file(
 
 @router.get("/objects/{object_id}/iiif/manifest")
 async def iiif_manifest(
-    object_id: uuid.UUID, db: DBDep, request: Request, current_user: OptionalCurrentUser
+    object_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+    response: Response,
 ) -> dict[str, Any]:
-    return await objects.iiif_manifest(object_id, db, request, _staff_user(current_user))
+    manifest = await objects.iiif_manifest(object_id, db, request, _staff_user(current_user))
+    _cache_for_viewer(response, _staff_user(current_user))
+    return manifest
 
 
 def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
@@ -880,6 +959,7 @@ def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
 @router.get("/relations", response_model=list[PortalRelationRead])
 async def list_relations(
     db: DBDep,
+    response: Response,
     from_type: str | None = None,
     from_id: uuid.UUID | None = None,
     to_type: str | None = None,
@@ -918,6 +998,7 @@ async def list_relations(
     query = query.limit(limit)
     relations = (await db.execute(query)).scalars().all()
     labels = await relation_service.resolve_relation_labels(db, relations, public_only=True)
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return [
         PortalRelationRead(
             id=rel.id,
@@ -963,7 +1044,7 @@ async def search(
         for key in request.query_params.keys()
         if key.startswith("meta_")
     }
-    rel_filters: dict[str, list[str]] = {
+    rel_filters: dict[str, list[str] | str] = {
         key: values
         for key, values in {
             "related_entities": rel_entity,
@@ -1019,6 +1100,28 @@ async def search(
     return SearchResponse(**result)
 
 
+class PortalAdvancedRelationType(BaseModel):
+    relation_type: str
+    direction: Literal["outgoing", "incoming"]
+    target_type: str
+    count: int
+
+
+@router.get(
+    "/search/advanced/relation-types",
+    response_model=list[PortalAdvancedRelationType],
+    summary="Relation types usable as advanced search conditions for a record type",
+)
+async def advanced_relation_types(
+    response: Response,
+    record_type: Literal["object", "entity", "place", "occurrence"] = Query(...),
+) -> list[dict[str, Any]]:
+    from katalon.integrations.elasticsearch import advanced_relation_types as load
+
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
+    return await load(record_type)
+
+
 @router.post("/search/advanced", response_model=SearchResponse)
 @limiter.limit(lambda: settings.rate_limit_public_search)
 async def advanced_search(
@@ -1035,7 +1138,7 @@ async def advanced_search(
         advanced_filter = await resolve_query(db, data.query)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    allowed_relation_filters = {
+    allowed_relation_filters: dict[str, list[str] | str] = {
         key: value
         for key, value in data.relation_filters.items()
         if key
@@ -1100,12 +1203,7 @@ async def list_fields(
     staff_user = _staff_user(current_user)
     if staff_user is None:
         query = query.where(FieldDefinition.is_public.is_(True))
-        # Anonymous projection only — the staff variant additionally contains
-        # non-public fields and must never land in a shared cache.
-        response.headers["Cache-Control"] = _CONFIG_CACHE
-        response.headers["Vary"] = "Authorization"
-    else:
-        response.headers["Cache-Control"] = "private, no-store"
+    _cache_for_viewer(response, staff_user)
     result = await db.execute(query.order_by(FieldDefinition.sort_order))
     return list(result.scalars().all())
 
@@ -1118,6 +1216,7 @@ async def list_search_field_terms(
     target_type: str,
     field_name: str,
     db: DBDep,
+    response: Response,
     term_ids: list[uuid.UUID] = Query(default=[]),
 ) -> list[VocabularyTerm]:
     if target_type not in _PUBLIC_TYPES:
@@ -1142,6 +1241,7 @@ async def list_search_field_terms(
     if term_ids:
         query = query.where(VocabularyTerm.id.in_(term_ids))
     terms = await db.execute(query.order_by(VocabularyTerm.term))
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return list(terms.scalars().all())
 
 
@@ -1157,12 +1257,13 @@ async def list_record_subtypes_public(
     result = await db.execute(
         query.order_by(RecordSubtype.primary_type, RecordSubtype.sort_order, RecordSubtype.name)
     )
-    response.headers["Cache-Control"] = _CONFIG_CACHE
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return list(result.scalars().all())
 
 
 @router.get("/vocabularies", response_model=list[PortalVocabularyRead])
-async def list_vocabularies(db: DBDep) -> list[Vocabulary]:
+async def list_vocabularies(db: DBDep, response: Response) -> list[Vocabulary]:
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     result = await db.execute(select(Vocabulary).where(Vocabulary.name == "relation_types"))
     return list(result.scalars().all())
 
@@ -1179,10 +1280,11 @@ async def get_vocabulary(vocab_id: uuid.UUID, db: DBDep) -> Vocabulary:
     "/vocabularies/{vocab_id}/terms",
     response_model=list[PortalVocabularyTermRead],
 )
-async def list_terms(vocab_id: uuid.UUID, db: DBDep) -> list[VocabularyTerm]:
+async def list_terms(vocab_id: uuid.UUID, db: DBDep, response: Response) -> list[VocabularyTerm]:
     vocab = await db.get(Vocabulary, vocab_id)
     if vocab is None or vocab.name != "relation_types":
         raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     result = await db.execute(
         select(VocabularyTerm)
         .where(VocabularyTerm.vocabulary_id == vocab_id)
@@ -1205,19 +1307,12 @@ async def get_term(vocab_id: uuid.UUID, term_id: uuid.UUID, db: DBDep) -> Vocabu
     return term
 
 
-# Diese Antworten lädt das Portal bei jedem Seitenaufruf erneut und sie ändern
-# sich praktisch nie. Eine kurze TTL nimmt genau die Requests aus der Kette,
-# die Crawler-Traffic vervielfacht, ohne dass Redaktionsänderungen spürbar
-# verzögert sichtbar werden.
-_CONFIG_CACHE = "public, max-age=60"
-
-
 @router.get("/portal/config", response_model=portal.PortalConfigRead)
 async def get_portal_config(db: DBDep, response: Response) -> portal.PortalConfigRead:
     config = await portal.get_portal_config(db)
     if config.logo_url == "/v1/portal/logo/file":
         config.logo_url = "/portal/v1/portal/logo/file"
-    response.headers["Cache-Control"] = _CONFIG_CACHE
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return config
 
 
@@ -1228,7 +1323,7 @@ async def serve_logo() -> FileResponse:
 
 @router.get("/pages", response_model=list[pages.PageRead])
 async def list_pages(db: DBDep, response: Response) -> list[StaticPage]:
-    response.headers["Cache-Control"] = _CONFIG_CACHE
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return await pages.list_pages(db)
 
 
@@ -1244,7 +1339,7 @@ async def serve_page_asset(asset_id: uuid.UUID, filename: str, db: DBDep) -> Res
 
 @router.get("/banners/active/portal", response_model=list[banners.BannerRead])
 async def active_portal_banners(db: DBDep, response: Response) -> list[Banner]:
-    response.headers["Cache-Control"] = _CONFIG_CACHE
+    response.headers["Cache-Control"] = _PUBLIC_CACHE
     return await banners.active_portal_banners(db)
 
 
@@ -1259,7 +1354,7 @@ async def get_footer_asset(name: str) -> FileResponse:
 @router.get("/theme")
 async def get_theme() -> JSONResponse:
     result = await theme.get_theme()
-    result.headers["Cache-Control"] = _CONFIG_CACHE
+    result.headers["Cache-Control"] = _PUBLIC_CACHE
     return result
 
 
@@ -1273,4 +1368,4 @@ async def get_theme_css(db: DBDep) -> Response:
         config.color_tokens if config else None,
         config.accent_color if config else None,
     )
-    return Response(css, media_type="text/css", headers={"Cache-Control": _CONFIG_CACHE})
+    return Response(css, media_type="text/css", headers={"Cache-Control": _PUBLIC_CACHE})

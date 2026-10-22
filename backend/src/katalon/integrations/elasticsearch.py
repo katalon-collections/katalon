@@ -175,6 +175,8 @@ INDEX_SETTINGS: dict[str, Any] = {
                     "target_type": {"type": "keyword"},
                     "target_id": {"type": "keyword"},
                     "relation_type": {"type": "keyword"},
+                    # Free relations (relations table): seen from this record.
+                    "direction": {"type": "keyword"},
                 },
             },
         },
@@ -739,6 +741,121 @@ async def search_documents(
     result = await _run(reversed_body)
     result["hits"]["hits"] = list(reversed(result["hits"]["hits"]))
     return result
+
+
+ADVANCED_RECORD_TYPES = ("object", "entity", "place", "occurrence")
+
+
+async def advanced_relation_types(record_type: str) -> list[dict[str, Any]]:
+    """Free relation types usable for one record type: type, direction, other side, count.
+
+    Only outgoing relations are indexed. Outgoing types come from the record type's
+    own documents; incoming ones from other documents' outgoing relations to it.
+    """
+    es = get_es()
+    free_outgoing = {"exists": {"field": "adv_relations.direction"}}
+    result = await es.search(
+        index=INDEX_NAME,
+        body={
+            "size": 0,
+            "query": {"bool": {"filter": [
+                {"terms": {"record_type": list(ADVANCED_RECORD_TYPES)}},
+                {"terms": {"status": list(PUBLIC_STATUSES)}},
+            ]}},
+            "aggs": {
+                "outgoing": {
+                    "filter": {"term": {"record_type": record_type}},
+                    "aggs": {"rels": {"nested": {"path": "adv_relations"}, "aggs": {"free": {
+                        "filter": free_outgoing,
+                        "aggs": {"types": {
+                            "multi_terms": {
+                                "terms": [
+                                    {"field": "adv_relations.relation_type"},
+                                    {"field": "adv_relations.target_type"},
+                                ],
+                                "size": 500,
+                            },
+                            "aggs": {"records": {"reverse_nested": {}}},
+                        }},
+                    }}}},
+                },
+                "incoming": {
+                    "terms": {"field": "record_type", "size": len(ADVANCED_RECORD_TYPES)},
+                    "aggs": {"rels": {"nested": {"path": "adv_relations"}, "aggs": {"to_me": {
+                        "filter": {"bool": {"filter": [
+                            free_outgoing,
+                            {"term": {"adv_relations.target_type": record_type}},
+                        ]}},
+                        "aggs": {"types": {
+                            "terms": {"field": "adv_relations.relation_type", "size": 500},
+                            "aggs": {"records": {"reverse_nested": {}}},
+                        }},
+                    }}}},
+                },
+            },
+        },
+    )
+    aggs = cast(dict[str, Any], result.body).get("aggregations", {})
+    options = [
+        {
+            "relation_type": bucket["key"][0],
+            "direction": "outgoing",
+            "target_type": bucket["key"][1],
+            "count": bucket["records"]["doc_count"],
+        }
+        for bucket in aggs.get("outgoing", {}).get("rels", {}).get("free", {})
+        .get("types", {}).get("buckets", [])
+    ]
+    for source in aggs.get("incoming", {}).get("buckets", []):
+        for bucket in source["rels"]["to_me"]["types"]["buckets"]:
+            options.append({
+                "relation_type": bucket["key"],
+                "direction": "incoming",
+                "target_type": source["key"],
+                "count": bucket["records"]["doc_count"],
+            })
+    return options
+
+
+async def outgoing_relation_target_ids(
+    source_type: str,
+    source_filter: dict[str, Any],
+    relation_type: str,
+    target_type: str,
+    *,
+    limit: int = 10000,
+) -> tuple[list[str], bool]:
+    """IDs that public `source_type` records matching `source_filter` point to.
+
+    Resolves the incoming direction of a free relation without indexing it on the
+    target (see search_service: outgoing only). Returns whether `limit` was exceeded.
+    """
+    es = get_es()
+    result = await es.search(
+        index=INDEX_NAME,
+        body={
+            "size": 0,
+            "query": {"bool": {"filter": [
+                {"term": {"record_type": source_type}},
+                {"terms": {"status": list(PUBLIC_STATUSES)}},
+                source_filter,
+            ]}},
+            "aggs": {"rels": {"nested": {"path": "adv_relations"}, "aggs": {"match": {
+                "filter": {"bool": {"filter": [
+                    {"exists": {"field": "adv_relations.direction"}},
+                    {"term": {"adv_relations.relation_type": relation_type}},
+                    {"term": {"adv_relations.target_type": target_type}},
+                ]}},
+                "aggs": {"ids": {"terms": {"field": "adv_relations.target_id", "size": limit + 1}}},
+            }}}},
+        },
+    )
+    buckets = (
+        cast(dict[str, Any], result.body).get("aggregations", {}).get("rels", {})
+        .get("match", {}).get("ids", {}).get("buckets", [])
+    )
+    ids = [str(bucket["key"]) for bucket in buckets]
+    return ids[:limit], len(ids) > limit
 
 
 async def search_ids_by_filter(

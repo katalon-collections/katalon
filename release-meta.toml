@@ -41,3 +41,20 @@ note = "Umbenannt in INITIAL_ADMIN_PASSWORD (optional). Die Zeile kann aus der .
 
 # Revision 3: Cantaloupe-Derivat-Cache auf Platte (cantaloupe-cache-init, ./cantaloupe-cache)
 # statt tmpfs; braucht das Compose-Template ab katalon-cli 0.3.0.
+
+# 1.45.0: optionale Stellschrauben für Prozesse (Image-Defaults greifen ohne Eintrag).
+[[releases."1.45.0".env_vars]]
+key = "WEB_CONCURRENCY"
+description = "Anzahl API-Prozesse (Default 2; kleine Server 1, mehr CPU/RAM z. B. 4)"
+
+[[releases."1.45.0".env_vars]]
+key = "DATABASE_POOL_SIZE"
+description = "DB-Verbindungen pro API-Prozess (Default 5); Summe aller Prozesse unter max_connections halten"
+
+[[releases."1.45.0".env_vars]]
+key = "DATABASE_MAX_OVERFLOW"
+description = "Zusätzliche DB-Verbindungen pro API-Prozess bei Lastspitzen (Default 5)"
+
+[[releases."1.45.0".env_vars]]
+key = "CELERY_CONCURRENCY"
+description = "Threads des Celery-Workers (leer = Anzahl CPU-Kerne); kleiner wählen, damit das Portal beim Reindex flüssig bleibt"

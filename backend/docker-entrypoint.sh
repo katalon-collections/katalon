@@ -21,5 +21,11 @@ done
 echo "Running database migrations..."
 alembic -c migrations/alembic.ini upgrade head
 
+# Seed once in this process; worker lifespans must not race on first-run rows.
+if [ "$1" = "uvicorn" ]; then
+    python -m katalon.management.bootstrap
+    export KATALON_BOOTSTRAPPED=1
+fi
+
 echo "Starting application..."
 exec "$@"

@@ -714,3 +714,80 @@ async def test_search_hides_internal_records_for_authenticated_user_without_read
     assert response.total == 0
     assert captured["full_visibility_types"] == ()
     assert captured["status"] == "internal"
+
+
+def test_index_doc_keeps_free_relations_next_to_relation_fields() -> None:
+    """Free relations (rel_data) and relation fields both feed the advanced search."""
+    obj = Object(
+        id=uuid.uuid4(), idno="OBJ-1", status="public", collection_status="active",
+        metadata_={"photographer": {"id": "e-1", "relation_type": "created_by"}},
+    )
+    fields = [SimpleNamespace(
+        name="photographer", field_type="relation", is_searchable=True, is_public=True,
+        is_facet=False, settings={"target_type": "entity"},
+    )]
+    free = {"source_field": "", "relation_type": "wurde_abgesendet", "direction": "outgoing",
+            "target_type": "place", "target_id": "p-1"}
+
+    doc = search_service._build_doc(
+        "object", obj, rel_data={"adv_relations": [free]}, field_definitions=fields,
+    )
+
+    assert doc["adv_relations"] == [free, {
+        "source_field": "photographer", "target_type": "entity",
+        "target_id": "e-1", "relation_type": "created_by",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_relation_titles_index_only_outgoing_free_relations(monkeypatch) -> None:
+    """A record can be the target of tens of thousands of relations; ES caps nested
+    entries per document, so only the record's own outgoing relations are indexed."""
+    from katalon.core.models import Entity, Place, Relation
+
+    obj_id, place_id, person_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    relations = [
+        Relation(id=uuid.uuid4(), from_type="object", from_id=obj_id, to_type="place",
+                 to_id=place_id, relation_type="wurde_abgesendet"),
+        Relation(id=uuid.uuid4(), from_type="entity", from_id=person_id, to_type="object",
+                 to_id=obj_id, relation_type="sammelte"),
+    ]
+    place = Place(id=place_id, status="public", metadata_={"label": "Georgsmarienhütte"})
+    person = Entity(id=person_id, status="public", metadata_={"label": "Anna"})
+
+    class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self.rows
+
+    class DB:
+        info: dict = {}
+
+        async def execute(self, statement):
+            sql = str(statement)
+            if "FROM relations" in sql:
+                return Result(relations)
+            if "FROM places" in sql:
+                return Result([place])
+            if "FROM entities" in sql:
+                return Result([person])
+            return Result([])
+
+    async def all_public(db, record_type):
+        return [SimpleNamespace(name="label", parent_id=None, target_subtype=None,
+                                field_type="text", id=uuid.uuid4())]
+
+    monkeypatch.setattr(search_service, "_cached_public_fields", all_public)
+
+    out = await search_service._load_relation_titles("object", obj_id, DB())
+
+    assert out["adv_relations"] == [{
+        "source_field": "", "relation_type": "wurde_abgesendet", "direction": "outgoing",
+        "target_type": "place", "target_id": str(place_id),
+    }]
+    assert out["related_entities"] == ["Anna"]

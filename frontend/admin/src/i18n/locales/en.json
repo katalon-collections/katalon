@@ -34,7 +34,7 @@
     "globalSearch": "Global search",
     "globalSearchPlaceholder": "Search everything…",
     "noResults": "No results for \"{{query}}\"",
-    "help": "Help for this screen",
+    "help": "Help for this page",
     "account": "Account settings",
     "logout": "Log out",
     "user": "User"
@@ -81,7 +81,7 @@
   },
   "unsavedChangesModal": {
     "title": "Unsaved Changes",
-    "prompt": "You have unsaved changes in this record. Are you sure you want to leave this page and discard all unsaved changes?",
+    "prompt": "You have unsaved changes. Leave this page and discard those changes?",
     "stay": "Keep Editing",
     "discard": "Discard Changes"
   }

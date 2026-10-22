@@ -23,7 +23,7 @@
     "confirmPassword": "Neues Passwort wiederholen",
     "newPasswordSubmit": "Neues Passwort speichern",
     "passwordMismatch": "Die Passwörter stimmen nicht überein.",
-    "passwordResetComplete": "Das Passwort wurde geändert. Bitte melde dich an.",
+    "passwordResetComplete": "Das Passwort wurde geändert. Bitte melden Sie sich an.",
     "backToLogin": "Zurück zur Anmeldung"
   },
   "appShell": {
@@ -33,8 +33,8 @@
     "openNav": "Navigation öffnen",
     "globalSearch": "Global suchen",
     "globalSearchPlaceholder": "Global suchen…",
-    "noResults": "Keine Treffer für „{{query}}\"",
-    "help": "Hilfe zu diesem Screen",
+    "noResults": "Keine Treffer für „{{query}}“",
+    "help": "Hilfe zu dieser Seite",
     "account": "Kontoeinstellungen",
     "logout": "Abmelden",
     "user": "Benutzer"
@@ -81,7 +81,7 @@
   },
   "unsavedChangesModal": {
     "title": "Ungespeicherte Änderungen",
-    "prompt": "Du hast ungespeicherte Änderungen an diesem Datensatz vorgenommen. Möchtest du die Seite wirklich verlassen und alle ungespeicherten Änderungen verwerfen?",
+    "prompt": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite verlassen und diese Änderungen verwerfen?",
     "stay": "Weiter bearbeiten",
     "discard": "Änderungen verwerfen"
   }

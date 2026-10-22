@@ -44,7 +44,7 @@
     },
     "sessions": {
       "title": "Sitzungen",
-      "intro": "Meldet dich auf allen anderen Geräten und Browsern ab. Diese Sitzung bleibt angemeldet.",
+      "intro": "Meldet Sie auf allen anderen Geräten und Browsern ab. Diese Sitzung bleibt angemeldet.",
       "submit": "Auf allen anderen Geräten abmelden",
       "success": "Alle anderen Sitzungen wurden abgemeldet."
     },
@@ -125,7 +125,7 @@
     "contentDE": "Text Deutsch",
     "contentEN": "Text Englisch",
     "limitLabel": "Maximale Anzahl",
-    "curatedHint": "Zeigt die unter „Portal & Institution\" gepflegten Highlight-Objekte.",
+    "curatedHint": "Zeigt die unter „Portal & Institution“ gepflegten Highlight-Objekte.",
     "collectionsModeLabel": "Auswahl",
     "collectionsModeTop": "Oberste Sammlungen",
     "collectionsModeAll": "Alle Sammlungen",
@@ -150,7 +150,7 @@
   "terminologie": {
     "nav": "Terminologie",
     "title": "Terminologie",
-    "description": "Fachbegriffe für Kerntypen pro Installation anpassen (z. B. „Werk\" statt „Objekt\"). Wirkt nur auf die Anzeige im Portal – interne Bezeichnungen, API-Routen und Berechtigungen bleiben unverändert.",
+    "description": "Fachbegriffe für Kerntypen pro Installation anpassen (z. B. „Werk“ statt „Objekt“). Wirkt nur auf die Anzeige im Portal – interne Bezeichnungen, API-Routen und Berechtigungen bleiben unverändert.",
     "singularDE": "Singular Deutsch",
     "singularEN": "Singular Englisch",
     "pluralDE": "Plural Deutsch",

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Any, cast
 
 from sqlalchemy import and_, func, or_, select
@@ -295,7 +296,7 @@ async def sync_schema_relations(
 
 async def resolve_relation_labels(
     db: AsyncSession,
-    relations: list[Relation],
+    relations: Sequence[Relation],
     *,
     public_only: bool = False,
 ) -> dict[tuple[str, uuid.UUID], str | None]:

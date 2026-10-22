@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type MediaFile, type PortalFieldDefinition } from '../api/client'
-import { thumbnailUrl } from '../utils/thumbnails'
+import { api, type ObjectSummary, type CollectionSummary, type PortalConfig, type HomepageBlock, type PortalFieldDefinition } from '../api/client'
+import { loadObjectTeasers } from '../utils/thumbnails'
 import { recordTitle, resolveLangText } from '../utils/renderFieldValue'
 import { renderMarkdown } from '../utils/markdown'
 import { recordSubtitle } from '../utils/objectSubtitle'
@@ -147,11 +147,8 @@ export function HomePage() {
         }
 
         const curatedIds = curatedBlock ? (c.featured_object_ids ?? []).slice(0, curatedBlock.limit ?? 100) : []
-        const curatedItems: ObjectSummary[] = []
-        await Promise.all(
-          curatedIds.map(id => api.objects.get(id).then(o => curatedItems.push(o)).catch(() => {}))
-        )
-        setCurated(curatedItems)
+        const curatedTeasers = await loadObjectTeasers(curatedIds)
+        setCurated(curatedTeasers.objects)
 
         let recentItems: ObjectSummary[] = []
         if (objectsBlock) {
@@ -187,22 +184,8 @@ export function HomePage() {
           })
         )
 
-        // Load thumbnails for all visible objects
-        const thumbMap: Record<string, string> = {}
-        await Promise.all(
-          [...curatedItems, ...recentItems].map(obj =>
-            api.objects.media(obj.id)
-              .then(media => {
-                const ready = media.filter((m: MediaFile) => m.status === 'ready')
-                const primary = ready.find((m: MediaFile) => m.is_primary) ?? ready[0]
-                if (primary) {
-                  thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
-                }
-              })
-              .catch(() => {})
-          )
-        )
-        setThumbnails(thumbMap)
+        const recentTeasers = await loadObjectTeasers(recentItems.map(o => o.id))
+        setThumbnails({ ...curatedTeasers.thumbnails, ...recentTeasers.thumbnails })
         setLoading(false)
       })
   }, [])

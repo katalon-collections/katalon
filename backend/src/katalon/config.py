@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "postgresql+asyncpg://katalon:katalon@localhost:5432/katalon"
+    database_pool_size: int = Field(default=10, ge=1)
+    database_max_overflow: int = Field(default=20, ge=0)
+    # Threads of the Celery worker; unset keeps Celery's default (number of CPUs).
+    celery_concurrency: int | None = Field(default=None, ge=1)
     redis_url: str = "redis://localhost:6379/0"
     elasticsearch_url: str = "http://localhost:9200"
     cantaloupe_url: str = "http://localhost:8182"
@@ -153,6 +157,12 @@ class Settings(BaseSettings):
     robots_disallow_paths: Annotated[list[str], NoDecode] = ["/v1/"]
     llms_txt_enabled: bool = True
     llms_txt_extra_notes: str = ""
+
+    @field_validator("celery_concurrency", mode="before")
+    @classmethod
+    def _empty_celery_concurrency(cls, v: object) -> object:
+        # Compose passes an unset variable as an empty string.
+        return None if isinstance(v, str) and not v.strip() else v
 
     @field_validator("cors_origin_regex", mode="before")
     @classmethod

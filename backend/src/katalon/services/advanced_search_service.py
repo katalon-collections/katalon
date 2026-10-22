@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from katalon.core.models import FieldDefinition
-from katalon.integrations.elasticsearch import search_ids_by_filter
+from katalon.integrations.elasticsearch import outgoing_relation_target_ids, search_ids_by_filter
 from katalon.services.search_service import date_bounds
 
 PUBLIC_TYPES = ("object", "entity", "place", "occurrence")
 MAX_RELATION_DEPTH = 2
 INTERMEDIATE_RESULT_LIMIT = 10000
+MAX_LIST_VALUES = 50
+LIST_FIELD_TYPES = {"vocab", "vocab_free", "authority", "pid", "url"}
 
 
 class AdvancedFieldClause(BaseModel):
@@ -30,8 +32,18 @@ class AdvancedRelationClause(BaseModel):
     group: AdvancedGroup
 
 
+class AdvancedRelationTypeClause(BaseModel):
+    """A free relation (relations table) of one type, with conditions on its target."""
+
+    kind: Literal["relation_type"] = "relation_type"
+    relation_type: str = Field(min_length=1, max_length=128)
+    direction: Literal["outgoing", "incoming"] = "outgoing"
+    target_type: Literal["object", "entity", "place", "occurrence"]
+    group: AdvancedGroup
+
+
 AdvancedClause = Annotated[
-    AdvancedFieldClause | AdvancedRelationClause,
+    AdvancedFieldClause | AdvancedRelationClause | AdvancedRelationTypeClause,
     Field(discriminator="kind"),
 ]
 
@@ -48,6 +60,7 @@ class AdvancedQuery(BaseModel):
 
 
 AdvancedRelationClause.model_rebuild()
+AdvancedRelationTypeClause.model_rebuild()
 AdvancedGroup.model_rebuild()
 
 
@@ -138,7 +151,16 @@ def _field_filter(field: FieldDefinition, clause: AdvancedFieldClause) -> dict[s
         query = _nested_field(field.name, value_query)
         return _negate(query) if operator in {"not_contains", "neq"} else query
 
-    if field_type in {"vocab", "vocab_free", "authority", "pid", "url"}:
+    if field_type in LIST_FIELD_TYPES and operator in {"in", "not_in"}:
+        values = clause.value if isinstance(clause.value, list) else None
+        if not values or len(values) > MAX_LIST_VALUES or not all(
+            isinstance(value, str) and value.strip() for value in values
+        ):
+            raise ValueError(f"'Ist eines von' braucht 1 bis {MAX_LIST_VALUES} Werte.")
+        query = _nested_field(field.name, {"terms": {"adv_fields.keyword_value": values}})
+        return _negate(query) if operator == "not_in" else query
+
+    if field_type in LIST_FIELD_TYPES:
         if operator not in {"eq", "neq"}:
             raise ValueError(f"Operator '{operator}' passt nicht zu Auswahlfeldern.")
         if not isinstance(clause.value, str) or not clause.value.strip():
@@ -207,6 +229,9 @@ async def _resolve_group(
     fields = await _fields_for_type(db, record_type)
     resolved: list[dict[str, Any]] = []
     for clause in group.clauses:
+        if isinstance(clause, AdvancedRelationTypeClause):
+            resolved.append(await _relation_type_filter(db, record_type, clause, relation_depth))
+            continue
         field = fields.get(clause.field)
         if field is None:
             raise ValueError(f"Öffentliches Suchfeld '{clause.field}' existiert für {record_type} nicht.")
@@ -217,17 +242,10 @@ async def _resolve_group(
             continue
         if field.field_type != "relation":
             raise ValueError(f"Feld '{field.name}' ist kein Relationsfeld.")
-        if relation_depth >= MAX_RELATION_DEPTH:
-            raise ValueError("Die erweiterte Suche erlaubt höchstens zwei Relationsschritte.")
         target_type = str((field.settings or {}).get("target_type", ""))
         if target_type not in PUBLIC_TYPES:
             raise ValueError(f"Relationsfeld '{field.name}' hat keinen öffentlichen Zieltyp.")
-        target_filter = await _resolve_group(db, target_type, clause.group, relation_depth + 1)
-        target_ids, truncated = await search_ids_by_filter(
-            target_type, target_filter, limit=INTERMEDIATE_RESULT_LIMIT
-        )
-        if truncated:
-            raise ValueError("Zwischenergebnis zu groß. Bitte die Relationsbedingung weiter einschränken.")
+        target_ids = await _target_ids(db, target_type, clause.group, relation_depth)
         if not target_ids:
             resolved.append({"match_none": {}})
             continue
@@ -245,6 +263,52 @@ async def _resolve_group(
             }
         })
     return _group_filter(group.mode, resolved)
+
+
+async def _target_ids(
+    db: Any, target_type: str, group: AdvancedGroup, relation_depth: int
+) -> list[str]:
+    if relation_depth >= MAX_RELATION_DEPTH:
+        raise ValueError("Die erweiterte Suche erlaubt höchstens zwei Relationsschritte.")
+    target_filter = await _resolve_group(db, target_type, group, relation_depth + 1)
+    target_ids, truncated = await search_ids_by_filter(
+        target_type, target_filter, limit=INTERMEDIATE_RESULT_LIMIT
+    )
+    if truncated:
+        raise ValueError("Zwischenergebnis zu groß. Bitte die Relationsbedingung weiter einschränken.")
+    return target_ids
+
+
+async def _relation_type_filter(
+    db: Any, record_type: str, clause: AdvancedRelationTypeClause, relation_depth: int
+) -> dict[str, Any]:
+    if clause.direction == "incoming":
+        # Only outgoing relations are indexed: find the matching sources and collect
+        # the records of this type that their outgoing relations point to.
+        if relation_depth >= MAX_RELATION_DEPTH:
+            raise ValueError("Die erweiterte Suche erlaubt höchstens zwei Relationsschritte.")
+        source_filter = await _resolve_group(db, clause.target_type, clause.group, relation_depth + 1)
+        ids, truncated = await outgoing_relation_target_ids(
+            clause.target_type, source_filter, clause.relation_type, record_type,
+            limit=INTERMEDIATE_RESULT_LIMIT,
+        )
+        if truncated:
+            raise ValueError("Zwischenergebnis zu groß. Bitte die Relationsbedingung weiter einschränken.")
+        return {"ids": {"values": ids}} if ids else {"match_none": {}}
+    target_ids = await _target_ids(db, clause.target_type, clause.group, relation_depth)
+    if not target_ids:
+        return {"match_none": {}}
+    return {
+        "nested": {
+            "path": "adv_relations",
+            "query": {"bool": {"filter": [
+                {"term": {"adv_relations.relation_type": clause.relation_type}},
+                {"term": {"adv_relations.direction": "outgoing"}},
+                {"term": {"adv_relations.target_type": clause.target_type}},
+                {"terms": {"adv_relations.target_id": target_ids}},
+            ]}},
+        }
+    }
 
 
 async def resolve_query(db: Any, query: AdvancedQuery) -> dict[str, Any]:

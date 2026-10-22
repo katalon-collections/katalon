@@ -7,7 +7,7 @@
     "pickerAriaLabel": "Datum auswählen"
   },
   "numberInput": {
-    "placeholder": "Geben Sie eine Zahl ein…"
+    "placeholder": "Zahl eingeben…"
   },
   "vocabPicker": {
     "searchTab": "Suche",
@@ -17,14 +17,18 @@
     "collapse": "Einklappen",
     "loading": "Laden…",
     "empty": "Keine Begriffe vorhanden",
-    "deletedTerm": "Term gelöscht"
+    "deletedTerm": "Term gelöscht",
+    "searchPlaceholder": "Suchen…",
+    "noVocabulary": "Kein Vokabular zugewiesen",
+    "searchOrEnterPlaceholder": "Suchen oder frei eingeben…",
+    "freeTextPlaceholder": "Freitext eingeben…"
   },
   "pid": {
     "mintUrn": "URN reservieren",
-    "mintUrnPending": "Registriert…",
+    "mintUrnPending": "Wird reserviert…",
     "mintArk": "ARK vergeben",
-    "mintArkPending": "Vergebt…",
-    "mintHint": "Datensatz zuerst speichern, dann PID vergeben.",
+    "mintArkPending": "Wird vergeben…",
+    "mintHint": "Bitte speichern Sie den Datensatz, bevor Sie einen PID vergeben.",
     "systemManaged": "vom System vergeben"
   },
   "geo": {
@@ -73,7 +77,7 @@
     "publicWithoutPublicMembers": "Diese Sammlung ist öffentlich, hat aber aktuell keine öffentlich sichtbaren Mitglieder oder Untersammlungen. Im Portal wirkt sie leer."
   },
   "locks": {
-    "youLocked": "Diese Aufzeichnung ist von Ihnen exklusiv gesperrt. Grund: {{reason}}",
+    "youLocked": "Dieser Datensatz ist von Ihnen exklusiv gesperrt. Grund: {{reason}}",
     "lockedBy": "Exklusiv gesperrt von {{name}}. Grund: {{reason}}",
     "expiresAt": "Läuft ab: {{date}}",
     "noReason": "Kein Grund angegeben"
@@ -94,8 +98,8 @@
     "generated": "KI-generiert",
     "generate": "KI-Vorschlag",
     "regenerate": "Neu generieren",
-    "running": "KI läuft…",
-    "saveFirst": "Datensatz zuerst speichern, dann KI-Vorschlag erzeugen.",
+    "running": "Vorschlag wird erstellt…",
+    "saveFirst": "Bitte speichern Sie den Datensatz, bevor Sie einen KI-Vorschlag erstellen.",
     "proposalTitle": "KI-Vorschlag für {{label}}",
     "currentValue": "Aktueller Wert",
     "suggestion": "KI-Vorschlag",
@@ -104,7 +108,7 @@
   },
   "unsavedChangesModal": {
     "title": "Ungespeicherte Änderungen",
-    "prompt": "Du hast ungespeicherte Änderungen an diesem Datensatz vorgenommen. Möchtest du die Seite wirklich verlassen und alle ungespeicherten Änderungen verwerfen?",
+    "prompt": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite verlassen und diese Änderungen verwerfen?",
     "stay": "Weiter bearbeiten",
     "discard": "Änderungen verwerfen"
   },
@@ -120,5 +124,21 @@
   "mediaRightsHolderPlaceholder": "Rechteinhaber",
   "mediaRightsHolderUriPlaceholder": "Rechteinhaber-URI",
   "mediaCreditLinePlaceholder": "Freigabehinweis / Credit Line",
-  "mediaCreditLineHelp": "Hinweis zur Veröffentlichung, z. B. „Veröffentlichung genehmigt von …“. Erscheint im Portal und im LIDO-Export (rightsResource/creditLine)."
+  "mediaCreditLineHelp": "Hinweis zur Veröffentlichung, z. B. „Veröffentlichung genehmigt von …“. Erscheint im Portal und im LIDO-Export (rightsResource/creditLine).",
+  "mediaSaveFirst": "Bitte speichern Sie das Objekt, bevor Sie Medien hochladen können.",
+  "mediaDropHint": "Medien hierher ziehen oder",
+  "mediaSelect": "Dateien auswählen",
+  "subtypeLabel": {
+    "object": "Objekt-Typ",
+    "entity": "Entitätstyp",
+    "place": "Orts-Typ",
+    "occurrence": "Occurrence-Typ",
+    "procedure": "Vorgangstyp",
+    "collection": "Sammlungstyp",
+    "storage_location": "Lagerort-Typ"
+  },
+  "subtypeChoose": "– {{type}} wählen –",
+  "subtypeRequired": "Bitte einen Subtyp auswählen.",
+  "subtypeInvalid": "Der konfigurierte Subtyp ist ungültig.",
+  "subtypeOptional": "optional"
 }

@@ -470,11 +470,17 @@ class JsonLdFormat(MetadataFormat):
         elif isinstance(hit, dict):
             src = hit.get("_source", {}) or {}
             for adv_rel in src.get("adv_relations", []):
-                relations.append({
+                relation = {
                     "target_type": adv_rel.get("target_type"),
                     "target_id": adv_rel.get("target_id"),
                     "relation_type": adv_rel.get("relation_type"),
-                })
+                }
+                # Free relations carry their direction (relation fields are always outgoing).
+                if adv_rel.get("direction"):
+                    relation["direction"] = (
+                        "inbound" if adv_rel["direction"] == "incoming" else "outbound"
+                    )
+                relations.append(relation)
 
         doc = build_jsonld_doc(
             record_type=record_type,

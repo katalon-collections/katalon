@@ -4,8 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, fetchRecord, type EntitySummary, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
-import { thumbnailUrl } from '../utils/thumbnails'
+import { api, fetchRecord, type EntitySummary, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { loadObjectTeasers } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { RelationsList } from '../components/RelationsList'
@@ -50,21 +50,9 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
           .filter(r => r.from_type === 'object' || r.to_type === 'object')
           .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
         const uniqueObjIds = [...new Set(objIds)]
-        const objs = await Promise.all(uniqueObjIds.map(oid => api.objects.get(oid).catch(() => null)))
-        const validObjs = objs.filter((o): o is ObjectSummary => o !== null)
-        setLinkedObjects(validObjs)
-
-        const thumbMap: Record<string, string> = {}
-        await Promise.all(validObjs.map(obj =>
-          api.objects.media(obj.id)
-            .then((media: MediaFile[]) => {
-              const ready = media.filter(mf => mf.status === 'ready')
-              const primary = ready.find(mf => mf.is_primary) ?? ready[0]
-              if (primary) thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
-            })
-            .catch(() => {})
-        ))
-        setThumbnails(thumbMap)
+        const teasers = await loadObjectTeasers(uniqueObjIds)
+        setLinkedObjects(teasers.objects)
+        setThumbnails(teasers.thumbnails)
 
         const nonObjRels = rels.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
         const pairs = nonObjRels.map(rel => {

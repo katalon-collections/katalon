@@ -33,18 +33,19 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - ES_JAVA_OPTS=-Xms${ES_HEAP_SIZE:-1g} -Xmx${ES_HEAP_SIZE:-1g}
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: ${ES_MEMORY_LIMIT:-2g}
 
   cantaloupe:
     restart: always
     deploy:
       resources:
         limits:
-          memory: 512m
+          # Heap-Maximum (CANTALOUPE_HEAP_MAX, Default 1g) plus native Bildpuffer.
+          memory: ${CANTALOUPE_MEMORY_LIMIT:-1536m}
 
   api:
     restart: always
@@ -70,7 +71,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: ${API_MEMORY_LIMIT:-1g}
 
   worker:
     restart: always
@@ -80,6 +81,7 @@ services:
       CANTALOUPE_URL: ${CANTALOUPE_URL}
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL}
       MEDIA_ROOT: /var/lib/katalon/media
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-}
     deploy:
       resources:
         limits:

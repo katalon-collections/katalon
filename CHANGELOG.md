@@ -4,6 +4,17 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.45.0]
+
+- **Erweiterte Suche über Verknüpfungen:** Neben den Feldern lassen sich auch Verknüpfungen
+  als Suchbedingung nutzen, etwa „Absendeort → Ort, Name enthält Georgsmarienhütte“ oder
+  „abgebildete Person → …“. Die Auswahl zeigt nur Verknüpfungen, die es im Bestand gibt.
+- **„Ist eines von“ in der erweiterten Suche:** Bei Auswahlfeldern lassen sich mehrere Werte
+  angeben, etwa „Material ist eines von Karton oder Leder“.
+- **Schnellere Portalseiten:** Personen-, Orts-, Sammlungs- und Startseiten laden verknüpfte
+  Objekte samt Vorschaubild gebündelt; das Portal antwortet mit mehreren API-Prozessen auch
+  unter paralleler Last zügig.
+
 ## [1.44.0]
 
 - **Kompaktere Containerfelder:** Die Unterfelder eines Eintrags stehen im Formular in einem

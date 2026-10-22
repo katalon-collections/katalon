@@ -1,7 +1,7 @@
 {
   "reuploadNotice": "Die hochgeladene Datei hat sich geändert. Bitte erneut hochladen.",
-  "loading": "Lade hoch…",
-  "dropOrClick": "Datei hier ablegen oder zum Auswählen klicken",
+  "loading": "Wird hochgeladen…",
+  "dropOrClick": "Datei hier ablegen oder auswählen",
   "fileTypeHint": "Unterstützt CSV, TSV, XLSX und XML (LIDO, EAD, METS, DC, IIIF)",
   "folderDropNotSupported": "Ordner können nicht per Drag & Drop abgelegt werden. Bitte über den Dateidialog auswählen.",
   "loadProfileButton": "Mapping-Profil laden (Datei)",

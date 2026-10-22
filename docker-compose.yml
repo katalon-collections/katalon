@@ -26,7 +26,12 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - bootstrap.memory_lock=${ES_MEMORY_LOCK:-false}
       - ES_JAVA_OPTS=-Xms${ES_HEAP_SIZE:-512m} -Xmx${ES_HEAP_SIZE:-512m}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -38,7 +43,7 @@ services:
   # Legt das Cache-Verzeichnis an und übergibt es dem Cantaloupe-User (UID aus
   # dem Image, nicht fest verdrahtet). Ändert nur Einträge mit falschem Eigentümer.
   cantaloupe-cache-init:
-    image: islandora/cantaloupe:main
+    image: islandora/cantaloupe:7.0.22
     user: "0:0"
     entrypoint: [ "sh", "-c", "mkdir -p /data/cache && find /data ! -user cantaloupe -exec chown cantaloupe:cantaloupe {} +" ]
     volumes:
@@ -46,7 +51,7 @@ services:
     restart: "no"
 
   cantaloupe:
-    image: islandora/cantaloupe:main
+    image: islandora/cantaloupe:7.0.22
     volumes:
       - ${MEDIA_ROOT:-/srv/katalon/media}:/var/lib/cantaloupe/images:ro
       # Derivat-Cache auf Platte (benanntes Volume oder CANTALOUPE_CACHE_DIR=/pfad),
@@ -62,8 +67,11 @@ services:
       cantaloupe-cache-init:
         condition: service_completed_successfully
     environment:
-      - CANTALOUPE_HEAP_MIN=${CANTALOUPE_HEAP_MIN:-128m}
-      - CANTALOUPE_HEAP_MAX=${CANTALOUPE_HEAP_MAX:-256m}
+      # Gemessen (2026-10, 16 parallele Bildanfragen inkl. full/max): ~0,6 GB Heap
+      # belegt. Das Image-Default (3G/5G) reserviert unnötig RAM, 256m Maximum
+      # reicht unter Last nicht.
+      - CANTALOUPE_HEAP_MIN=${CANTALOUPE_HEAP_MIN:-256m}
+      - CANTALOUPE_HEAP_MAX=${CANTALOUPE_HEAP_MAX:-1g}
       - CANTALOUPE_SOURCE_STATIC=FilesystemSource
       - CANTALOUPE_FILESYSTEMSOURCE_LOOKUP_STRATEGY=BasicLookupStrategy
       - CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX=/var/lib/cantaloupe/images/
@@ -79,6 +87,10 @@ services:
       # nginx setzt Cache-Control für /iiif/ ohnehin nach Sichtbarkeit (X-Media-Visibility).
       - CANTALOUPE_CACHE_CLIENT_PUBLIC=false
       - CANTALOUPE_CACHE_CLIENT_PRIVATE=true
+      # Das Image setzt "debug": jede Anfrage und jeder Healthcheck schreibt
+      # mehrere Zeilen. Zugriffe protokolliert nginx bereits.
+      - CANTALOUPE_LOG_APPLICATION_LEVEL=${CANTALOUPE_LOG_LEVEL:-info}
+      - CANTALOUPE_LOG_ACCESS_CONSOLEAPPENDER_ENABLED=false
     healthcheck:
       # Prüft nicht nur, dass der Server antwortet (immer 200), sondern auch,
       # dass der Cantaloupe-Prozess tatsächlich in seinen Cache schreiben
@@ -109,6 +121,9 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.backend
     environment:
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-5}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
@@ -167,6 +182,7 @@ services:
       CANTALOUPE_URL: ${CANTALOUPE_URL:-http://cantaloupe:8182}
       CANTALOUPE_PUBLIC_URL: ${CANTALOUPE_PUBLIC_URL:-http://localhost}
       MEDIA_ROOT: /var/lib/katalon/media
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-}
       SECRET_KEY: ${SECRET_KEY}
       KATALON_SECRETS_KEY: ${KATALON_SECRETS_KEY}
       KATALON_BASE_URL: ${KATALON_BASE_URL:-}

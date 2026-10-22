@@ -13,8 +13,8 @@ from katalon.config import settings
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=settings.database_pool_size,
+    max_overflow=settings.database_max_overflow,
     pool_pre_ping=True,
 )
 

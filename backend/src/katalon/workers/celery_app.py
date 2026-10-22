@@ -28,6 +28,7 @@ celery_app.conf.result_serializer = "json"
 celery_app.conf.accept_content = ["json"]
 celery_app.conf.task_track_started = True
 celery_app.conf.task_acks_late = True
+celery_app.conf.worker_concurrency = settings.celery_concurrency
 
 # Layer 3 (#214): reconciliation safety net — daily count check, weekly ID-diff
 celery_app.conf.beat_schedule = {

@@ -28,6 +28,13 @@ from katalon.integrations.elasticsearch import search_documents
 
 logger = logging.getLogger(__name__)
 
+# Record types a free relation may point to for the advanced search (its public types).
+ADVANCED_RELATION_TARGETS = ("object", "entity", "place", "occurrence")
+# Elasticsearch rejects a document with more than 10,000 nested entries (all nested
+# fields together); stay well below so one outlier never fails a whole reindex.
+MAX_ADVANCED_RELATIONS = 5000
+
+
 def _is_leap_year(year: int) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
@@ -432,7 +439,8 @@ def _build_doc(
         if advanced_fields:
             doc["adv_fields"] = advanced_fields
         if advanced_relations:
-            doc["adv_relations"] = advanced_relations
+            # Relation fields come on top of the free relations from rel_data.
+            doc["adv_relations"] = [*doc.get("adv_relations", []), *advanced_relations]
     return doc
 
 
@@ -571,6 +579,8 @@ async def _load_relation_titles(
         "object": Object,
     }
     out: dict[str, Any] = {name: [] for name in related_fields.values()}
+    # Free relations for the advanced search (relation type + public target).
+    out["adv_relations"] = []
     specs = relation_specs or []
     for spec in specs:
         out[spec.agg_field] = []
@@ -595,7 +605,11 @@ async def _load_relation_titles(
 
     ids_by_type: dict[str, set[Any]] = {}
     for _rel, other_type, other_id, _direction in links:
-        wanted = other_type in related_fields or any(s.extra.get("target_type") == other_type for s in specs)
+        wanted = (
+            other_type in related_fields
+            or other_type in ADVANCED_RELATION_TARGETS
+            or any(s.extra.get("target_type") == other_type for s in specs)
+        )
         if wanted and other_type in models:
             ids_by_type.setdefault(other_type, set()).add(other_id)
 
@@ -624,6 +638,17 @@ async def _load_relation_titles(
         title, subtype = target
         if other_type in related_fields:
             out[related_fields[other_type]].append(title)
+        # Outgoing only: a record can be the target of tens of thousands of relations
+        # (ES caps nested documents per record at 10,000). The advanced search
+        # resolves the incoming direction from the sources' outgoing entries.
+        if other_type in ADVANCED_RELATION_TARGETS and direction == "outgoing":
+            out["adv_relations"].append({
+                "source_field": "",
+                "relation_type": rel.relation_type,
+                "direction": direction,
+                "target_type": other_type,
+                "target_id": str(other_id),
+            })
         for spec in specs:
             cfg = spec.extra
             if cfg.get("target_type") != other_type:
@@ -639,6 +664,12 @@ async def _load_relation_titles(
             if value not in out[spec.agg_field]:
                 out[spec.agg_field].append(value)
                 out[spec.filter_field].append(str(other_id))
+    if len(out["adv_relations"]) > MAX_ADVANCED_RELATIONS:
+        logger.warning(
+            "%s %s has %d outgoing relations; the advanced search indexes the first %d",
+            record_type, record_id, len(out["adv_relations"]), MAX_ADVANCED_RELATIONS,
+        )
+        out["adv_relations"] = out["adv_relations"][:MAX_ADVANCED_RELATIONS]
     return out
 
 

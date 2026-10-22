@@ -12,7 +12,7 @@ import { useFieldLabels } from '../hooks/useFieldLabels'
 import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { t, typeLabel, useI18n } from '../i18n'
-import { decodeAdvancedQuery } from '../utils/advancedSearch'
+import { decodeAdvancedQuery, usesRelations } from '../utils/advancedSearch'
 import { dateBucketLabel, facetKind, resolveLabel, splitRelationBucket } from '../utils/facets'
 import { QuerySummary } from './AdvancedSearchPage'
 
@@ -206,6 +206,7 @@ export function SearchPage() {
   const subtypeFilt = params.getAll('subtype')
   const encodedAdvancedQuery = params.get('aq') ?? ''
   const advancedQuery = decodeAdvancedQuery(encodedAdvancedQuery)
+  const relationSearch = advancedQuery ? usesRelations(advancedQuery.group) : false
   const effectiveType = advancedQuery?.record_type ?? typeFilt
   const page = parseInt(params.get('page') ?? '1', 10)
   const sort = params.get('sort') ?? ''
@@ -213,6 +214,8 @@ export function SearchPage() {
   const [data, setData] = useState<SearchResponse | null>(null)
   const [allItems, setAllItems] = useState<SearchResponse['items']>([])
   const [loading, setLoading] = useState(false)
+  // Searches over relations resolve their targets first; after a moment, say why it takes longer.
+  const [slowSearch, setSlowSearch] = useState(false)
   const [error, setError] = useState('')
   const [jumpPage, setJumpPage] = useState('')
   const [jumpError, setJumpError] = useState('')
@@ -390,6 +393,12 @@ export function SearchPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [filterKey, JSON.stringify(facetConfig), page, infinite])
+
+  useEffect(() => {
+    if (!loading || !relationSearch) return
+    const timer = window.setTimeout(() => setSlowSearch(true), 1500)
+    return () => { window.clearTimeout(timer); setSlowSearch(false) }
+  }, [loading, relationSearch])
 
   async function loadMore() {
     if (!infinite || loadingMoreRef.current) return
@@ -598,13 +607,15 @@ export function SearchPage() {
             </button>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--fg-3)' }}>
               <span className="sort-label-text">{t('search.sortLabel')}</span>
-              <select value={sort} onChange={e => setFilter('sort', e.target.value)}>
-                <option value="">{t('search.sortRelevance')}</option>
-                <option value="idno_asc">{t('search.sortIdno')}</option>
-                <option value="title_asc">{t('search.sortTitle')}</option>
-                <option value="newest">{t('search.sortNewest')}</option>
-                <option value="oldest">{t('search.sortOldest')}</option>
-              </select>
+              <span className="sort-select">
+                <select value={sort} onChange={e => setFilter('sort', e.target.value)}>
+                  <option value="">{t('search.sortRelevance')}</option>
+                  <option value="idno_asc">{t('search.sortIdno')}</option>
+                  <option value="title_asc">{t('search.sortTitle')}</option>
+                  <option value="newest">{t('search.sortNewest')}</option>
+                  <option value="oldest">{t('search.sortOldest')}</option>
+                </select>
+              </span>
             </label>
           </div>
         </div>
@@ -747,7 +758,12 @@ export function SearchPage() {
 
         <div className="result-list">
           {error && <div className="advanced-error" role="alert">{error}</div>}
-          {loading && <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('common.loading')}</div>}
+          {loading && (
+            <div className="search-loading" role="status" style={{ padding: 24, color: 'var(--fg-3)' }}>
+              {relationSearch ? t('advanced.loadingRelations') : t('common.loading')}
+              {slowSearch && <div className="search-loading__hint">{t('advanced.loadingRelationsHint')}</div>}
+            </div>
+          )}
           {!loading && allItems.length === 0 && (
             <div style={{ padding: 24, color: 'var(--fg-3)' }}>{t('search.noResultsShort')}</div>
           )}

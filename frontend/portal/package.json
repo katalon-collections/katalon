@@ -1,6 +1,6 @@
 {
   "name": "katalon-portal",
-  "version": "1.44.1",
+  "version": "1.45.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -10,7 +10,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check:arch": "depcruise src --config .dependency-cruiser.cjs"
+    "check:arch": "depcruise src --config .dependency-cruiser.cjs",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

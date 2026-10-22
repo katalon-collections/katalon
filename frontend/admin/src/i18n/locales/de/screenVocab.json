@@ -104,7 +104,7 @@
   },
   "importButton": "Importieren",
   "importDialog": {
-    "title": "Terme in „{{name}}\" importieren",
+    "title": "Terme in „{{name}}“ importieren",
     "targetVocab": "Zielvokabular",
     "selectVocab": "Vokabular auswählen",
     "relationNotice": "Relationstypen sind flach. Ohne ID-Spalte wird die ID automatisch aus dem Label abgeleitet.",

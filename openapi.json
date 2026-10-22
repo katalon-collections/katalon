@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.44.1"
+    "version": "1.45.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -17884,6 +17884,58 @@
         }
       }
     },
+    "/portal/v1/objects/summaries": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "List Object Summaries",
+        "operationId": "portal_list_object_summaries_get_portal_v1_objects_summaries",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "title": "Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortalObjectSummary"
+                  },
+                  "title": "Response Portal List Object Summaries Get Portal V1 Objects Summaries"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portal/v1/objects/{object_id}": {
       "get": {
         "tags": [
@@ -19373,6 +19425,58 @@
         }
       }
     },
+    "/portal/v1/search/advanced/relation-types": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Relation types usable as advanced search conditions for a record type",
+        "operationId": "portal_advanced_relation_types_get_portal_v1_search_advanced_relation_types",
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence"
+              ],
+              "type": "string",
+              "title": "Record Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortalAdvancedRelationType"
+                  },
+                  "title": "Response Portal Advanced Relation Types Get Portal V1 Search Advanced Relation Types"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portal/v1/search/advanced": {
       "post": {
         "tags": [
@@ -20766,13 +20870,17 @@
                 },
                 {
                   "$ref": "#/components/schemas/AdvancedRelationClause"
+                },
+                {
+                  "$ref": "#/components/schemas/AdvancedRelationTypeClause"
                 }
               ],
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
                   "field": "#/components/schemas/AdvancedFieldClause",
-                  "relation": "#/components/schemas/AdvancedRelationClause"
+                  "relation": "#/components/schemas/AdvancedRelationClause",
+                  "relation_type": "#/components/schemas/AdvancedRelationTypeClause"
                 }
               }
             },
@@ -20839,6 +20947,52 @@
           "group"
         ],
         "title": "AdvancedRelationClause"
+      },
+      "AdvancedRelationTypeClause": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "relation_type",
+            "title": "Kind",
+            "default": "relation_type"
+          },
+          "relation_type": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Relation Type"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "outgoing",
+              "incoming"
+            ],
+            "title": "Direction",
+            "default": "outgoing"
+          },
+          "target_type": {
+            "type": "string",
+            "enum": [
+              "object",
+              "entity",
+              "place",
+              "occurrence"
+            ],
+            "title": "Target Type"
+          },
+          "group": {
+            "$ref": "#/components/schemas/AdvancedGroup"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation_type",
+          "target_type",
+          "group"
+        ],
+        "title": "AdvancedRelationTypeClause",
+        "description": "A free relation (relations table) of one type, with conditions on its target."
       },
       "AdvancedSearchRequest": {
         "properties": {
@@ -26427,6 +26581,38 @@
         ],
         "title": "PlaceRead"
       },
+      "PortalAdvancedRelationType": {
+        "properties": {
+          "relation_type": {
+            "type": "string",
+            "title": "Relation Type"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "outgoing",
+              "incoming"
+            ],
+            "title": "Direction"
+          },
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation_type",
+          "direction",
+          "target_type",
+          "count"
+        ],
+        "title": "PortalAdvancedRelationType"
+      },
       "PortalCollectionDetail": {
         "properties": {
           "id": {
@@ -27446,6 +27632,17 @@
             "type": "boolean",
             "title": "Is Facet"
           },
+          "is_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Public"
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -27728,6 +27925,101 @@
           "_links"
         ],
         "title": "PortalObjectRead"
+      },
+      "PortalObjectSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "idno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idno"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "metadata_": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "ai_provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ai Provenance",
+            "default": {}
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Type"
+          },
+          "collection_status": {
+            "type": "string",
+            "title": "Collection Status"
+          },
+          "primary_media": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortalMediaRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "_links": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Links",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "idno",
+          "status",
+          "metadata_",
+          "created_at",
+          "updated_at",
+          "object_type",
+          "collection_status",
+          "_links"
+        ],
+        "title": "PortalObjectSummary",
+        "description": "Object teaser for portal lists: the record plus its preview file."
       },
       "PortalOccurrenceRead": {
         "properties": {

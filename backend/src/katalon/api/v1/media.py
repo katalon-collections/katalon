@@ -129,6 +129,26 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
     return [_serialize(f) for f in result.scalars().all()]
 
 
+async def primary_media_by_object(
+    object_ids: list[uuid.UUID], db: DBDep, *, public_only: bool
+) -> dict[uuid.UUID, dict[str, Any]]:
+    """Preview file per object as portal teasers show it: the ready primary file, otherwise
+    the oldest ready one. One query for all objects; visibility of the objects themselves
+    is the caller's job."""
+    query = select(MediaFile).where(
+        MediaFile.object_id.in_(object_ids),
+        MediaFile.deleted_at.is_(None),
+        MediaFile.status == "ready",
+    )
+    if public_only:
+        query = query.where(MediaFile.is_public.is_(True))
+    result = await db.execute(query.order_by(MediaFile.is_primary.desc(), MediaFile.created_at))
+    primary: dict[uuid.UUID, dict[str, Any]] = {}
+    for f in result.scalars().all():
+        primary.setdefault(f.object_id, _serialize(f))
+    return primary
+
+
 @router.post(
     "",
     status_code=201,

@@ -77,7 +77,6 @@ async def update_source(source_id: str, body: SourceUpdate, db: DBDep) -> Source
         db.add(row)
     row.is_enabled = body.is_enabled
     await db.commit()
-    authority_service.invalidate_cache()
     return SourceOut(id=row.id, label=row.label, is_enabled=row.is_enabled)
 
 

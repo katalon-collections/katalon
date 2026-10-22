@@ -16,14 +16,6 @@ def _hit(**kwargs) -> AuthorityHit:
     return AuthorityHit(**{**defaults, **kwargs})
 
 
-@pytest.fixture(autouse=True)
-def reset_cache():
-    """Ensure the authority_service cache is clean before and after each test."""
-    authority_service.invalidate_cache()
-    yield
-    authority_service.invalidate_cache()
-
-
 # ── list_sources ─────────────────────────────────────────────────────────────
 
 
@@ -39,9 +31,9 @@ def test_list_sources_returns_nine_entries() -> None:
 
 
 def test_gnd_variants_configured_with_source_id_and_filters() -> None:
-    p = authority_service._BUILTIN["gnd-person"]
-    s = authority_service._BUILTIN["gnd-subject"]
-    g = authority_service._BUILTIN["gnd"]
+    p = authority_service._BUILTIN["gnd-person"]()
+    s = authority_service._BUILTIN["gnd-subject"]()
+    g = authority_service._BUILTIN["gnd"]()
     assert getattr(p, "source_id", None) == "gnd-person"
     assert getattr(p, "filter_type", None) == "type:Person"
     assert getattr(s, "source_id", None) == "gnd-subject"
@@ -54,18 +46,18 @@ def test_gnd_variants_configured_with_source_id_and_filters() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_unknown_source_returns_none() -> None:
-    authority_service._cache = {"gnd": authority_service._BUILTIN["gnd"]}
+async def test_search_unknown_source_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={}))
     result = await authority_service.search("nonexistent_source", "test")
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_search_delegates_to_adapter() -> None:
+async def test_search_delegates_to_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
     expected = [_hit(external_id="42", label="Treffer")]
     mock_adapter = AsyncMock()
     mock_adapter.search = AsyncMock(return_value=expected)
-    authority_service._cache = {"mock": mock_adapter}
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={"mock": mock_adapter}))
 
     result = await authority_service.search("mock", "suchbegriff", limit=5)
 
@@ -74,10 +66,10 @@ async def test_search_delegates_to_adapter() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_default_limit_is_ten() -> None:
+async def test_search_default_limit_is_ten(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_adapter = AsyncMock()
     mock_adapter.search = AsyncMock(return_value=[])
-    authority_service._cache = {"mock": mock_adapter}
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={"mock": mock_adapter}))
 
     await authority_service.search("mock", "test")
 
@@ -88,18 +80,18 @@ async def test_search_default_limit_is_ten() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_unknown_source_returns_none() -> None:
-    authority_service._cache = {"gnd": authority_service._BUILTIN["gnd"]}
+async def test_fetch_unknown_source_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={}))
     result = await authority_service.fetch("nonexistent_source", "123")
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_fetch_delegates_to_adapter() -> None:
+async def test_fetch_delegates_to_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
     expected = _hit(external_id="42", label="Gefundenes Objekt")
     mock_adapter = AsyncMock()
     mock_adapter.fetch = AsyncMock(return_value=expected)
-    authority_service._cache = {"mock": mock_adapter}
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={"mock": mock_adapter}))
 
     result = await authority_service.fetch("mock", "42")
 
@@ -108,29 +100,13 @@ async def test_fetch_delegates_to_adapter() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_adapter_returns_none_propagated() -> None:
+async def test_fetch_adapter_returns_none_propagated(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_adapter = AsyncMock()
     mock_adapter.fetch = AsyncMock(return_value=None)
-    authority_service._cache = {"mock": mock_adapter}
+    monkeypatch.setattr(authority_service, "_load_registry", AsyncMock(return_value={"mock": mock_adapter}))
 
     result = await authority_service.fetch("mock", "missing-id")
     assert result is None
-
-
-# ── cache ─────────────────────────────────────────────────────────────────────
-
-
-def test_invalidate_cache_resets_to_none() -> None:
-    authority_service._cache = {"gnd": authority_service._BUILTIN["gnd"]}
-    authority_service.invalidate_cache()
-    assert authority_service._cache is None
-
-
-@pytest.mark.asyncio
-async def test_list_enabled_sources_uses_cache() -> None:
-    authority_service._cache = {"gnd": authority_service._BUILTIN["gnd"], "viaf": authority_service._BUILTIN["viaf"]}
-    enabled = await authority_service.list_enabled_sources()
-    assert set(enabled) == {"gnd", "viaf"}
 
 
 # ── default_label / default_adapter_class ──────────────────────────────────────
@@ -213,3 +189,38 @@ async def test_load_registry_keeps_enabled_db_source() -> None:
     with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
         registry = await authority_service._load_registry()
     assert "gnd" in registry
+
+
+@pytest.mark.asyncio
+async def test_registry_observes_committed_toggle_without_local_invalidation() -> None:
+    rows = [_FakeDBRow(id="gnd", is_enabled=True)]
+    with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
+        assert "gnd" in await authority_service.list_enabled_sources()
+        rows[0].is_enabled = False
+        assert "gnd" not in await authority_service.list_enabled_sources()
+        assert await authority_service.search("gnd", "test") is None
+        assert await authority_service.fetch("gnd", "123") is None
+        rows[0].is_enabled = True
+        assert "gnd" in await authority_service.list_enabled_sources()
+
+
+@pytest.mark.asyncio
+async def test_removed_config_restores_defaults_without_mutating_earlier_adapter() -> None:
+    rows = [_FakeDBRow(id="gnd-person", is_enabled=True, config={"filter_type": "custom"})]
+    with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
+        configured = (await authority_service._load_registry())["gnd-person"]
+        rows[0].config = {}
+        restored = (await authority_service._load_registry())["gnd-person"]
+    assert getattr(configured, "filter_type") == "custom"
+    assert getattr(restored, "filter_type") == "type:Person"
+    assert restored.source_id == "gnd-person"
+    assert configured is not restored
+
+
+@pytest.mark.asyncio
+async def test_database_failure_does_not_cache_fallback_after_recovery() -> None:
+    with patch("katalon.core.isolated_session.isolated_session", side_effect=RuntimeError("offline")):
+        assert "gnd" in await authority_service.list_enabled_sources()
+    rows = [_FakeDBRow(id="gnd", is_enabled=False)]
+    with patch("katalon.core.isolated_session.isolated_session", _fake_session_local(rows)):
+        assert "gnd" not in await authority_service.list_enabled_sources()

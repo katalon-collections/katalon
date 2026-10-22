@@ -17,14 +17,18 @@
     "collapse": "Collapse",
     "loading": "Loading…",
     "empty": "No terms available",
-    "deletedTerm": "Term deleted"
+    "deletedTerm": "Term deleted",
+    "searchPlaceholder": "Search…",
+    "noVocabulary": "No vocabulary assigned",
+    "searchOrEnterPlaceholder": "Search or enter free text…",
+    "freeTextPlaceholder": "Enter free text…"
   },
   "pid": {
     "mintUrn": "Reserve URN",
-    "mintUrnPending": "Registering…",
+    "mintUrnPending": "Reserving…",
     "mintArk": "Assign ARK",
     "mintArkPending": "Assigning…",
-    "mintHint": "Save the record first, then assign the PID.",
+    "mintHint": "Please save the record before assigning a PID.",
     "systemManaged": "assigned by the system"
   },
   "geo": {
@@ -94,8 +98,8 @@
     "generated": "AI-generated",
     "generate": "AI suggestion",
     "regenerate": "Regenerate",
-    "running": "AI is running…",
-    "saveFirst": "Save the record first, then generate an AI suggestion.",
+    "running": "Generating suggestion…",
+    "saveFirst": "Please save the record before generating an AI suggestion.",
     "proposalTitle": "AI suggestion for {{label}}",
     "currentValue": "Current value",
     "suggestion": "AI suggestion",
@@ -104,7 +108,7 @@
   },
   "unsavedChangesModal": {
     "title": "Unsaved changes",
-    "prompt": "You have unsaved changes in this record. Are you sure you want to leave this page and discard all unsaved changes?",
+    "prompt": "You have unsaved changes. Leave this page and discard those changes?",
     "stay": "Keep editing",
     "discard": "Discard changes"
   },
@@ -120,5 +124,21 @@
   "mediaRightsHolderPlaceholder": "Rights holder",
   "mediaRightsHolderUriPlaceholder": "Rights holder URI",
   "mediaCreditLinePlaceholder": "Permission note / credit line",
-  "mediaCreditLineHelp": "Note on publication, e.g. \"Published with permission of …\". Shown in the portal and in the LIDO export (rightsResource/creditLine)."
+  "mediaCreditLineHelp": "Note on publication, e.g. \"Published with permission of …\". Shown in the portal and in the LIDO export (rightsResource/creditLine).",
+  "mediaSaveFirst": "Please save the object before uploading media.",
+  "mediaDropHint": "Drag media here or",
+  "mediaSelect": "Select files",
+  "subtypeLabel": {
+    "object": "Object type",
+    "entity": "Entity type",
+    "place": "Place type",
+    "occurrence": "Occurrence type",
+    "procedure": "Procedure type",
+    "collection": "Collection type",
+    "storage_location": "Storage location type"
+  },
+  "subtypeChoose": "– Select {{type}} –",
+  "subtypeRequired": "Please select a subtype.",
+  "subtypeInvalid": "The configured subtype is invalid.",
+  "subtypeOptional": "optional"
 }

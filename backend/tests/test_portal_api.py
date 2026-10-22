@@ -15,6 +15,7 @@ from katalon.core.dependencies import try_get_current_user
 from katalon.core.models import (
     Entity,
     FieldDefinition,
+    MediaFile,
     Object,
     Occurrence,
     Place,
@@ -305,6 +306,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
         is_repeatable=True,
         is_searchable=True,
         is_facet=False,
+        is_public=True,
         sort_order=1,
     )
     session = AsyncMock()
@@ -331,6 +333,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
             "is_repeatable": True,
             "is_searchable": True,
             "is_facet": False,
+            "is_public": True,
             "parent_id": None,
             "settings": {"hint": "visible"},
             "show_in_detail": True,
@@ -1268,3 +1271,215 @@ async def test_portal_schema_cache_header_depends_on_the_viewer() -> None:
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(try_get_current_user, None)
+
+
+def _portal_object(idno: str) -> Object:
+    return Object(
+        id=uuid.uuid4(),
+        idno=idno,
+        status="public",
+        collection_status="active",
+        metadata_={"label": idno, "internal_note": "intern"},
+        ai_provenance={},
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        version=1,
+    )
+
+
+def _ready_image(object_id: uuid.UUID, filename: str, *, is_primary: bool) -> MediaFile:
+    return MediaFile(
+        id=uuid.uuid4(),
+        object_id=object_id,
+        filename=filename,
+        mime_type="image/jpeg",
+        storage_key=f"ab/{filename}",
+        status="ready",
+        is_primary=is_primary,
+        is_public=True,
+        created_at=datetime.now(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_portal_object_summaries_batch_objects_and_previews() -> None:
+    """One request replaces an object read plus a media read per teaser."""
+    first, second = _portal_object("OBJ-1"), _portal_object("OBJ-2")
+    hidden_id = uuid.uuid4()
+    public_field = FieldDefinition(
+        id=uuid.uuid4(),
+        target_type="object",
+        name="label",
+        label={},
+        field_type="text",
+        is_public=True,
+    )
+    statements: list[str] = []
+    session = AsyncMock()
+
+    async def execute(statement):
+        statements.append(str(statement))
+        if len(statements) == 1:
+            # Visibility filter drops the hidden ID; DB order differs from the request.
+            return _result(items=[first, second])
+        if len(statements) == 2:
+            return _result(items=[public_field])
+        # Ordered by is_primary DESC: the first row per object wins.
+        return _result(
+            items=[
+                _ready_image(second.id, "b-primary.jpg", is_primary=True),
+                _ready_image(second.id, "b-other.jpg", is_primary=False),
+            ]
+        )
+
+    session.execute.side_effect = execute
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/portal/v1/objects/summaries",
+                params=[("ids", str(second.id)), ("ids", str(hidden_id)), ("ids", str(first.id)),
+                        ("ids", str(second.id))],
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [item["idno"] for item in data] == ["OBJ-2", "OBJ-1"]
+    assert data[0]["metadata_"] == {"label": "OBJ-2"}
+    assert data[0]["primary_media"]["filename"] == "b-primary.jpg"
+    assert data[0]["primary_media"]["iiif_identifier"] == "ab%2Fb-primary.jpg"
+    assert data[1]["primary_media"] is None
+    assert len(statements) == 3
+    assert "objects.status IN" in statements[0]
+    assert "media_files.is_public IS true" in statements[2]
+    assert "media_files.status = " in statements[2]
+    assert response.headers["cache-control"] == "public, max-age=60"
+
+
+@pytest.mark.asyncio
+async def test_portal_object_summaries_limit_batch_size() -> None:
+    ids = [("ids", str(uuid.uuid4())) for _ in range(101)]
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        too_many = await client.get("/portal/v1/objects/summaries", params=ids)
+        empty = await client.get("/portal/v1/objects/summaries")
+    assert too_many.status_code == 422
+    assert empty.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_portal_record_cache_header_depends_on_the_viewer() -> None:
+    """Back navigation reuses anonymous record reads; staff projections stay private."""
+    record = _portal_object("OBJ-1")
+    record_result = MagicMock()
+    record_result.scalar_one_or_none.return_value = record
+    session = AsyncMock()
+    session.execute.side_effect = [record_result, _result(items=[]), record_result]
+    staff_user = User(id=uuid.uuid4(), email="s@example.org", role="editor", is_active=True)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            anon = await client.get(f"/portal/v1/objects/{record.id}")
+            assert anon.headers["cache-control"] == "public, max-age=60"
+            assert "Authorization" in {value.strip() for value in anon.headers["vary"].split(",")}
+
+            app.dependency_overrides[try_get_current_user] = lambda: staff_user
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(
+                    "katalon.api.v1.objects.has_record_permission", AsyncMock(return_value=True)
+                )
+                staff = await client.get(f"/portal/v1/objects/{record.id}")
+            assert staff.status_code == 200
+            assert staff.headers["cache-control"] == "private, no-store"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_portal_record_errors_are_not_cacheable() -> None:
+    session = AsyncMock()
+    missing = MagicMock()
+    missing.scalar_one_or_none.return_value = None
+    session.execute.return_value = missing
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/objects/{uuid.uuid4()}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 404
+    assert "cache-control" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_portal_advanced_relation_types_lists_free_relations(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeES:
+        async def search(self, index, body):
+            captured["body"] = body
+            return MagicMock(body={"aggregations": {
+                "outgoing": {"rels": {"free": {"types": {"buckets": [
+                    {"key": ["wurde_abgesendet", "place"], "records": {"doc_count": 11399}},
+                ]}}}},
+                "incoming": {"buckets": [{"key": "entity", "rels": {"to_me": {"types": {"buckets": [
+                    {"key": "sammelte", "records": {"doc_count": 12}},
+                ]}}}}]},
+            }})
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/portal/v1/search/advanced/relation-types", params={"record_type": "object"})
+        rejected = await client.get("/portal/v1/search/advanced/relation-types", params={"record_type": "procedure"})
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"relation_type": "wurde_abgesendet", "direction": "outgoing", "target_type": "place", "count": 11399},
+        {"relation_type": "sammelte", "direction": "incoming", "target_type": "entity", "count": 12},
+    ]
+    assert response.headers["cache-control"] == "public, max-age=60"
+    filters = captured["body"]["query"]["bool"]["filter"]
+    assert any("status" in f.get("terms", {}) for f in filters)
+    assert captured["body"]["aggs"]["outgoing"]["filter"] == {"term": {"record_type": "object"}}
+    assert rejected.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_portal_schema_marks_internal_fields_for_staff() -> None:
+    internal = FieldDefinition(
+        id=uuid.uuid4(), target_type="object", name="internal_note", label={"de": "Intern"},
+        field_type="text", is_public=False, is_searchable=True, is_repeatable=False, is_facet=False,
+        settings={}, show_in_detail=False, detail_slot="main", detail_role="none",
+    )
+    session = AsyncMock()
+    session.execute.return_value = _result(items=[internal])
+    staff_user = User(id=uuid.uuid4(), email="s@example.org", role="editor", is_active=True)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[try_get_current_user] = lambda: staff_user
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/portal/v1/schema/object")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(try_get_current_user, None)
+
+    assert response.json()[0]["is_public"] is False

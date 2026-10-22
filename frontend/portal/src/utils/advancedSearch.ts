@@ -14,17 +14,33 @@ export type AdvancedRelationClause = {
   group: AdvancedGroup
 }
 
-export type AdvancedClause = AdvancedFieldClause | AdvancedRelationClause
+/** A free relation (not a relation field) of one type, with conditions on its target. */
+export type AdvancedRelationTypeClause = {
+  kind: 'relation_type'
+  relation_type: string
+  direction: 'outgoing' | 'incoming'
+  target_type: AdvancedRecordType
+  group: AdvancedGroup
+}
+
+export type AdvancedClause = AdvancedFieldClause | AdvancedRelationClause | AdvancedRelationTypeClause
 
 export type AdvancedGroup = {
   mode: 'all' | 'any'
   clauses: AdvancedClause[]
 }
 
+export type AdvancedRecordType = 'object' | 'entity' | 'place' | 'occurrence'
+
 export type AdvancedQuery = {
   version: 1
-  record_type: 'object' | 'entity' | 'place' | 'occurrence'
+  record_type: AdvancedRecordType
   group: AdvancedGroup
+}
+
+/** True when a condition follows relations; such searches resolve targets first and take longer. */
+export function usesRelations(group: AdvancedGroup): boolean {
+  return group.clauses.some(clause => clause.kind !== 'field')
 }
 
 export function encodeAdvancedQuery(query: AdvancedQuery): string {

@@ -132,6 +132,14 @@ export interface ObjectSummary {
   created_at: string; updated_at: string
 }
 
+/** Teaser of `/objects/summaries`: the object plus its preview file (if any). */
+export interface ObjectTeaser extends ObjectSummary {
+  primary_media: MediaFile | null
+}
+
+/** Batch size the API accepts per `/objects/summaries` request. */
+const SUMMARY_BATCH_MAX = 100
+
 export interface EntitySummary {
   id: string; entity_type: string; status: string
   metadata_: Record<string, unknown>
@@ -331,6 +339,8 @@ export interface PortalFieldDefinition {
   is_repeatable: boolean
   is_searchable: boolean
   is_facet: boolean
+  /** False only in the staff projection; the portal index holds public fields only. */
+  is_public?: boolean | null
   parent_id: string | null
   settings: Record<string, unknown>
   show_in_detail: boolean
@@ -379,6 +389,16 @@ export const api = {
     },
     get: (id: string) => get<ObjectSummary>(`${PORTAL_API}/objects/${id}`),
     media: (id: string) => get<MediaFile[]>(`${PORTAL_API}/objects/${id}/media`),
+    /** Visible objects with preview file in request order; hidden IDs are skipped. */
+    summaries: async (ids: string[]): Promise<ObjectTeaser[]> => {
+      const unique = [...new Set(ids)]
+      const chunks: string[][] = []
+      for (let i = 0; i < unique.length; i += SUMMARY_BATCH_MAX) chunks.push(unique.slice(i, i + SUMMARY_BATCH_MAX))
+      const pages = await Promise.all(chunks.map(chunk =>
+        get<ObjectTeaser[]>(`${PORTAL_API}/objects/summaries?${new URLSearchParams(chunk.map(id => ['ids', id]))}`),
+      ))
+      return pages.flat()
+    },
   },
   entities: {
     get: (id: string) => get<EntitySummary>(`${PORTAL_API}/entities/${id}`),
@@ -403,11 +423,10 @@ export const api = {
   relations: {
     forRecord: (type: string, id: string, includeSubcollections: boolean = false) => {
       const sub = includeSubcollections ? '&include_subcollections=true' : ''
-      return get<Relation[]>(`${PORTAL_API}/relations?from_type=${type}&from_id=${id}&limit=50${sub}`)
-        .then(async fromRels => {
-          const toRels = await get<Relation[]>(`${PORTAL_API}/relations?to_type=${type}&to_id=${id}&limit=50${sub}`)
-          return [...fromRels, ...toRels]
-        })
+      return Promise.all([
+        get<Relation[]>(`${PORTAL_API}/relations?from_type=${type}&from_id=${id}&limit=50${sub}`),
+        get<Relation[]>(`${PORTAL_API}/relations?to_type=${type}&to_id=${id}&limit=50${sub}`),
+      ]).then(([fromRels, toRels]) => [...fromRels, ...toRels])
     },
   },
   portal: {
@@ -441,7 +460,17 @@ export const api = {
       return get<SearchResponse>(`${PORTAL_API}/search?${qs}`)
     },
     advanced: (body: unknown) => post<SearchResponse>(`${PORTAL_API}/search/advanced`, body),
+    /** Free relation types that public records of this type use (advanced search conditions). */
+    advancedRelationTypes: (recordType: string) =>
+      get<AdvancedRelationType[]>(`${PORTAL_API}/search/advanced/relation-types?record_type=${encodeURIComponent(recordType)}`),
   },
+}
+
+export interface AdvancedRelationType {
+  relation_type: string
+  direction: 'outgoing' | 'incoming'
+  target_type: 'object' | 'entity' | 'place' | 'occurrence'
+  count: number
 }
 
 export interface BannerItem {

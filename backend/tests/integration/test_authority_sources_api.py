@@ -75,3 +75,34 @@ async def test_update_source_rejects_truly_unknown_source(
         json={"is_enabled": True},
     )
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_committed_toggle_reaches_subsequent_registry_lookup(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    from katalon.services import authority_service
+
+    listed = await async_client.get("/v1/authorities/", headers=auth_headers)
+    assert listed.status_code == 200, listed.text
+    was_enabled = next(row["is_enabled"] for row in listed.json() if row["id"] == "gnd")
+
+    try:
+        enabled = await async_client.patch(
+            "/v1/authorities/gnd", headers=auth_headers, json={"is_enabled": True}
+        )
+        assert enabled.status_code == 200, enabled.text
+        assert "gnd" in await authority_service.list_enabled_sources()
+
+        disabled = await async_client.patch(
+            "/v1/authorities/gnd", headers=auth_headers, json={"is_enabled": False}
+        )
+        assert disabled.status_code == 200, disabled.text
+        assert "gnd" not in await authority_service.list_enabled_sources()
+        assert await authority_service.search("gnd", "test") is None
+    finally:
+        restored = await async_client.patch(
+            "/v1/authorities/gnd", headers=auth_headers, json={"is_enabled": was_enabled}
+        )
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["is_enabled"] is was_enabled

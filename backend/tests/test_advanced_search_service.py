@@ -13,6 +13,7 @@ from katalon.services.advanced_search_service import (
     AdvancedGroup,
     AdvancedQuery,
     AdvancedRelationClause,
+    AdvancedRelationTypeClause,
 )
 
 
@@ -205,3 +206,144 @@ async def test_resolve_query_rejects_third_relation_hop(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="höchstens zwei Relationsschritte"):
         await advanced_search_service.resolve_query(_DB(fields), query)
+
+
+@pytest.mark.asyncio
+async def test_relation_type_clause_filters_free_relations_by_type_and_direction(monkeypatch) -> None:
+    fields = {"place": [SimpleNamespace(
+        name="label", field_type="text", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+    calls: list[str] = []
+
+    async def fake_search_ids(record_type: str, advanced_filter: dict, *, limit: int):
+        calls.append(record_type)
+        return (["place-1", "place-2"], False)
+
+    monkeypatch.setattr(advanced_search_service, "search_ids_by_filter", fake_search_ids)
+    query = AdvancedQuery(
+        record_type="object",
+        group=AdvancedGroup(clauses=[AdvancedRelationTypeClause(
+            relation_type="wurde_abgesendet", direction="outgoing", target_type="place",
+            group=AdvancedGroup(clauses=[
+                AdvancedFieldClause(field="label", operator="contains", value="Georgsmarienhütte"),
+            ]),
+        )]),
+    )
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    assert calls == ["place"]
+    assert resolved == {"bool": {"filter": [{"nested": {
+        "path": "adv_relations",
+        "query": {"bool": {"filter": [
+            {"term": {"adv_relations.relation_type": "wurde_abgesendet"}},
+            {"term": {"adv_relations.direction": "outgoing"}},
+            {"term": {"adv_relations.target_type": "place"}},
+            {"terms": {"adv_relations.target_id": ["place-1", "place-2"]}},
+        ]}},
+    }}]}}
+
+
+@pytest.mark.asyncio
+async def test_relation_type_clause_without_targets_matches_nothing(monkeypatch) -> None:
+    fields = {"place": [SimpleNamespace(
+        name="label", field_type="text", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+
+    async def no_ids(*args, **kwargs):
+        return ([], False)
+
+    monkeypatch.setattr(advanced_search_service, "search_ids_by_filter", no_ids)
+    query = AdvancedQuery(record_type="object", group=AdvancedGroup(clauses=[AdvancedRelationTypeClause(
+        relation_type="x", target_type="place",
+        group=AdvancedGroup(clauses=[AdvancedFieldClause(field="label", operator="eq", value="y")]),
+    )]))
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    assert resolved == {"bool": {"filter": [{"match_none": {}}]}}
+
+
+@pytest.mark.asyncio
+async def test_in_operator_matches_any_of_the_values() -> None:
+    fields = {"object": [SimpleNamespace(
+        name="material", field_type="vocab", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+    query = AdvancedQuery(record_type="object", group=AdvancedGroup(clauses=[
+        AdvancedFieldClause(field="material", operator="in", value=["karton-id", "leder-id"]),
+        AdvancedFieldClause(field="material", operator="not_in", value=["seide-id"]),
+    ]))
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    included, excluded = resolved["bool"]["filter"]
+    assert included["nested"]["query"]["bool"]["filter"][1] == {
+        "terms": {"adv_fields.keyword_value": ["karton-id", "leder-id"]}
+    }
+    assert excluded["bool"]["must_not"][0]["nested"]["query"]["bool"]["filter"][1] == {
+        "terms": {"adv_fields.keyword_value": ["seide-id"]}
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [[], "karton-id", ["ok", ""], [f"v{i}" for i in range(51)]])
+async def test_in_operator_rejects_invalid_lists(value) -> None:
+    fields = {"object": [SimpleNamespace(
+        name="material", field_type="vocab", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+    query = AdvancedQuery(record_type="object", group=AdvancedGroup(clauses=[
+        AdvancedFieldClause(field="material", operator="in", value=value),
+    ]))
+
+    with pytest.raises(ValueError, match="Ist eines von"):
+        await advanced_search_service.resolve_query(_DB(fields), query)
+
+
+@pytest.mark.asyncio
+async def test_incoming_relation_type_is_resolved_from_the_sources(monkeypatch) -> None:
+    """Persons depicted on postcards sent from X: the postcards point to the persons."""
+    fields = {"object": [SimpleNamespace(
+        name="label", field_type="text", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+    calls: list[tuple] = []
+
+    async def fake_targets(source_type, source_filter, relation_type, target_type, *, limit):
+        calls.append((source_type, relation_type, target_type))
+        return (["person-1", "person-2"], False)
+
+    monkeypatch.setattr(advanced_search_service, "outgoing_relation_target_ids", fake_targets)
+    query = AdvancedQuery(record_type="entity", group=AdvancedGroup(clauses=[AdvancedRelationTypeClause(
+        relation_type="ist_abgebildet", direction="incoming", target_type="object",
+        group=AdvancedGroup(clauses=[AdvancedFieldClause(field="label", operator="contains", value="Gruß")]),
+    )]))
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+
+    assert calls == [("object", "ist_abgebildet", "entity")]
+    assert resolved == {"bool": {"filter": [{"ids": {"values": ["person-1", "person-2"]}}]}}
+
+
+@pytest.mark.asyncio
+async def test_incoming_relation_type_rejects_too_large_intermediate_sets(monkeypatch) -> None:
+    fields = {"object": [SimpleNamespace(
+        name="label", field_type="text", is_public=True,
+        is_searchable=True, parent_id=None, settings={},
+    )]}
+
+    async def too_many(*args, **kwargs):
+        return (["x"], True)
+
+    monkeypatch.setattr(advanced_search_service, "outgoing_relation_target_ids", too_many)
+    query = AdvancedQuery(record_type="entity", group=AdvancedGroup(clauses=[AdvancedRelationTypeClause(
+        relation_type="ist_abgebildet", direction="incoming", target_type="object",
+        group=AdvancedGroup(clauses=[AdvancedFieldClause(field="label", operator="contains", value="a")]),
+    )]))
+
+    with pytest.raises(ValueError, match="Zwischenergebnis zu groß"):
+        await advanced_search_service.resolve_query(_DB(fields), query)
+

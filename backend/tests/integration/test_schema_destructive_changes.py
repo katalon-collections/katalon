@@ -289,8 +289,9 @@ async def test_get_field_usage_counts_active_records(async_client, auth_headers)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("trashed", [False, True], ids=["active", "trashed"])
 async def test_deleting_field_with_purge_data_removes_existing_record_metadata(
-    async_client, auth_headers
+    async_client, auth_headers, trashed: bool
 ) -> None:
     field_name = f"custom_field_{uuid.uuid4().hex[:8]}"
     create_field = await async_client.post(
@@ -317,6 +318,10 @@ async def test_deleting_field_with_purge_data_removes_existing_record_metadata(
     assert created_object.status_code == 201, created_object.text
     object_id = created_object.json()["id"]
 
+    if trashed:
+        trash = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+        assert trash.status_code == 204, trash.text
+
     delete_field = await async_client.delete(
         f"/v1/schema/{field_id}?purge_data=true", headers=auth_headers
     )
@@ -325,14 +330,19 @@ async def test_deleting_field_with_purge_data_removes_existing_record_metadata(
     active_fields = await async_client.get("/v1/schema/object", headers=auth_headers)
     assert field_name not in {f["name"] for f in active_fields.json()}
 
+    if trashed:
+        restore = await async_client.post(f"/v1/objects/{object_id}/restore", headers=auth_headers)
+        assert restore.status_code == 200, restore.text
+
     persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
     assert persisted.status_code == 200
     assert field_name not in persisted.json()["metadata_"]
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("trashed", [False, True], ids=["active", "trashed"])
 async def test_deleting_subfield_with_purge_data_removes_nested_values(
-    async_client, auth_headers
+    async_client, auth_headers, trashed: bool
 ) -> None:
     group_name = f"group_{uuid.uuid4().hex[:8]}"
     create_group = await async_client.post(
@@ -378,10 +388,18 @@ async def test_deleting_subfield_with_purge_data_removes_nested_values(
     assert created_object.status_code == 201, created_object.text
     object_id = created_object.json()["id"]
 
+    if trashed:
+        trash = await async_client.delete(f"/v1/objects/{object_id}", headers=auth_headers)
+        assert trash.status_code == 204, trash.text
+
     delete_sub = await async_client.delete(
         f"/v1/schema/{sub_id}?purge_data=true", headers=auth_headers
     )
     assert delete_sub.status_code == 204
+
+    if trashed:
+        restore = await async_client.post(f"/v1/objects/{object_id}/restore", headers=auth_headers)
+        assert restore.status_code == 200, restore.text
 
     persisted = await async_client.get(f"/v1/objects/{object_id}", headers=auth_headers)
     assert persisted.status_code == 200

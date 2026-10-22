@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Karl Krägelin
 
 import logging
+import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -573,8 +574,8 @@ def _check_media_root_writable() -> None:
         )
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def initialize_application() -> None:
+    """Initialize shared defaults before spawning API workers."""
     _check_production_secrets()
     _check_media_root_writable()
     await _ensure_admin()
@@ -591,7 +592,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from katalon.integrations.elasticsearch import ensure_index
         await ensure_index()
     except Exception:
-        pass  # ES may not be available in all environments
+        logger.warning("Elasticsearch initialization failed", exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _check_production_secrets()
+    _check_media_root_writable()
+    if os.environ.get("KATALON_BOOTSTRAPPED") != "1":
+        await initialize_application()
     yield
     from katalon.integrations.elasticsearch import close_es
 

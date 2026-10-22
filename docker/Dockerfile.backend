@@ -31,5 +31,9 @@ EXPOSE 8000
 # is safe because the api service publishes no host port — it is reachable only
 # from the compose network, i.e. only through nginx. Override if that changes.
 ENV FORWARDED_ALLOW_IPS="*"
+# Two processes use multiple cores; cap each process's database connection budget.
+ENV WEB_CONCURRENCY=2 DATABASE_POOL_SIZE=5 DATABASE_MAX_OVERFLOW=5
+# Rate-limit counters must be shared by all API processes.
+ENV RATE_LIMIT_STORAGE_URI="redis://redis:6379/0"
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["uvicorn", "katalon.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

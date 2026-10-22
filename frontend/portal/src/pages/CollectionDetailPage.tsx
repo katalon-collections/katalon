@@ -7,12 +7,11 @@ import { Helmet } from 'react-helmet-async'
 import {
   api,
   type CollectionDetail,
-  type MediaFile,
   type ObjectSummary,
   type PortalUser,
   type Relation,
 } from '../api/client'
-import { thumbnailUrl } from '../utils/thumbnails'
+import { loadObjectTeasers } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
@@ -79,27 +78,9 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
           const uniqueIds = [...new Set(memberObjIds)].slice(0, 48)
 
           if (uniqueIds.length > 0) {
-            const fetched = await Promise.all(uniqueIds.map(oid => api.objects.get(oid).catch(() => null)))
-            const valid = fetched.filter((o): o is ObjectSummary => o !== null)
-            setObjects(valid)
-
-            // Fetch thumbnails
-            const thumbMap: Record<string, string> = {}
-            await Promise.all(
-              valid.map(obj =>
-                api.objects
-                  .media(obj.id)
-                  .then((m: MediaFile[]) => {
-                    const ready = m.filter(mf => mf.status === 'ready')
-                    const primary = ready.find(mf => mf.is_primary) ?? ready[0]
-                    if (primary) {
-                      thumbMap[obj.id] = thumbnailUrl(obj.id, primary.id, primary.iiif_identifier)
-                    }
-                  })
-                  .catch(() => {})
-              )
-            )
-            setThumbnails(thumbMap)
+            const teasers = await loadObjectTeasers(uniqueIds)
+            setObjects(teasers.objects)
+            setThumbnails(teasers.thumbnails)
           } else {
             setObjects([])
           }

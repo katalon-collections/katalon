@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import type { VocabTerm } from '../api/client'
+import { resolveLabel } from '../utils/facets'
 
 // Module-level cache: one API round-trip per browser session
 let _promise: Promise<Record<string, VocabTerm>> | null = null
@@ -39,10 +40,13 @@ export function useRelationTypeLabels(lang = 'de') {
     loadRelationTypeLabels().then(setTermMap)
   }, [])
 
-  return (code: string, isFrom = true): string => {
-    const term = termMap[code]
-    if (!term) return code
-    const labelObj = isFrom ? term.label : (term.inverse_label ?? term.label)
-    return labelObj[lang] ?? labelObj['en'] ?? code
-  }
+  return (code: string, isFrom = true): string => relationTypeLabel(termMap[code], code, isFrom, lang)
+}
+
+/** Label of a relation type in `lang`, falling back to the other languages (a vocabulary
+ *  maintained in German only must not show raw codes in the English portal), then `code`. */
+export function relationTypeLabel(term: VocabTerm | undefined, code: string, isFrom: boolean, lang: string): string {
+  if (!term) return code
+  const inverse = isFrom ? '' : resolveLabel(term.inverse_label, lang)
+  return inverse || resolveLabel(term.label, lang, code)
 }

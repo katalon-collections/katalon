@@ -129,3 +129,37 @@ def test_no_nginx_block_drops_inherited_security_headers(name: str) -> None:
     every such block must repeat the server-level headers (CSP, HSTS, ...)."""
     root = _nginx_blocks((REPO_ROOT / "docker" / name).read_text())
     assert _dropped_headers(root, [], []) == []
+
+
+def test_celery_concurrency_is_configurable() -> None:
+    from katalon.config import Settings
+    from katalon.workers.celery_app import celery_app, settings
+
+    assert celery_app.conf.worker_concurrency == settings.celery_concurrency
+    assert Settings(celery_concurrency="3").celery_concurrency == 3
+    # Compose hands an unset variable over as an empty string: Celery default.
+    assert Settings(celery_concurrency="").celery_concurrency is None
+    assert "CELERY_CONCURRENCY" in _compose()["services"]["worker"]["environment"]
+
+
+def test_cantaloupe_image_is_pinned_and_quiet() -> None:
+    """`:main` moves under existing installations; the image's own log level is debug."""
+    services = _compose()["services"]
+    for name in ("cantaloupe", "cantaloupe-cache-init"):
+        image = services[name]["image"]
+        assert image.startswith("islandora/cantaloupe:") and not image.endswith(":main"), name
+    assert services["cantaloupe"]["image"] == services["cantaloupe-cache-init"]["image"]
+    env = services["cantaloupe"]["environment"]
+    assert "CANTALOUPE_LOG_APPLICATION_LEVEL=${CANTALOUPE_LOG_LEVEL:-info}" in env
+    assert "CANTALOUPE_LOG_ACCESS_CONSOLEAPPENDER_ENABLED=false" in env
+    chart = yaml.safe_load((REPO_ROOT / "charts/katalon/values.yaml").read_text())
+    assert chart["cantaloupe"]["image"] == services["cantaloupe"]["image"]
+
+
+def test_cantaloupe_memory_limit_leaves_room_for_heap() -> None:
+    env = _compose()["services"]["cantaloupe"]["environment"]
+    assert "CANTALOUPE_HEAP_MAX=${CANTALOUPE_HEAP_MAX:-1g}" in env
+    # The prod override uses Compose's !reset tag, which safe_load rejects.
+    prod = (REPO_ROOT / "docker-compose.prod.yml").read_text()
+    cantaloupe = prod.split("\n  cantaloupe:\n", 1)[1].split("\n  api:\n", 1)[0]
+    assert "memory: ${CANTALOUPE_MEMORY_LIMIT:-1536m}" in cantaloupe
