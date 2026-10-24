@@ -578,7 +578,10 @@ async def test_portal_config_update_returns_resolved_facets() -> None:
                         "_system": ["record_type"],
                         "object": ["inherited_entity_name"],
                     },
-                    "facet_sort": "alpha",
+                    "facet_sort": "count",
+                    "facet_sort_overrides": {
+                        "object": {"material": "alpha"},
+                    },
                     "facet_initial_count": 15,
                 },
             )
@@ -588,7 +591,10 @@ async def test_portal_config_update_returns_resolved_facets() -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["facet_sort"] == "alpha"
+    assert body["facet_sort"] == "count"
+    assert body["facet_sort_overrides"] == {"object": {"material": "alpha"}}
+    assert body["facet_kinds"]["object"]["material"]["sort"] == "alpha"
+    assert body["facet_kinds"]["object"]["inherited_entity_name"]["sort"] == "count"
     assert body["facet_initial_count"] == 15
     assert "material" in body["facet_fields"]["object"]
     assert "inherited_entity_name" in body["facet_fields"]["object"]

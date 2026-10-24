@@ -78,6 +78,7 @@ type FieldFormState = {
   relation_type_vocab: string
   fixed_relation_type: string
   inherited_fields: string[]
+  show_place_map: boolean
   default_value: unknown
   is_locked: boolean
   ai_enabled: boolean
@@ -91,7 +92,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', facet_granularity: '', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', facet_granularity: '', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], show_place_map: false, default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -124,6 +125,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     relation_type_vocab: (f.settings?.relation_type_vocab as string) ?? '',
     fixed_relation_type: (f.settings?.fixed_relation_type as string) ?? '',
     inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
+    show_place_map: Boolean(f.settings?.show_place_map),
     default_value: f.settings?.default_value ?? '',
     is_locked: Boolean(f.settings?.is_locked),
     ai_enabled: Boolean((f.settings?.ai_config as Record<string, unknown> | undefined)?.enabled),
@@ -711,6 +713,19 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   <option value="">{t('fieldDetail.fixedRelationTypeAll')}</option>
                   {relationTypeTerms.map(term => <option key={term.id} value={term.term}>{getLabel(term, term.term)}</option>)}
                 </select>
+              </div>
+            )}
+            {form.relation_target_type === 'place' && (
+              <div className="field">
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.show_place_map}
+                    onChange={e => set('show_place_map', e.target.checked)}
+                  />
+                  {t('fieldDetail.showPlaceMap')}
+                </label>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.showPlaceMapHint')}</div>
               </div>
             )}
             {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
@@ -1751,6 +1766,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           relation_type_vocab: form.relation_type_vocab,
           ...(form.relation_type_vocab && form.fixed_relation_type ? { fixed_relation_type: form.fixed_relation_type } : {}),
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
+          ...(form.relation_target_type === 'place' && form.show_place_map ? { show_place_map: true } : {}),
         } : {}),
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
         ...(form.is_repeatable && form.max_count.trim() ? { max_count: parseInt(form.max_count, 10) } : {}),

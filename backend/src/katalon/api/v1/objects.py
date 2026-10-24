@@ -51,6 +51,7 @@ from katalon.services.idno_service import (
 from katalon.services.lock_service import enforce_not_locked
 from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import (
+    load_hidden_relation_targets,
     load_public_fields,
     project_public_record,
 )
@@ -346,9 +347,10 @@ async def list_objects_by_ids(
     if visibility_user is not None:
         return list(objs)
     fields = await load_public_fields(db, "object")
+    hidden = await load_hidden_relation_targets(db, [obj.metadata_ for obj in objs], fields)
     return [
         await project_public_record(
-            db, ObjectRead.model_validate(obj), "object", obj.object_type, fields
+            db, ObjectRead.model_validate(obj), "object", obj.object_type, fields, hidden
         )
         for obj in objs
     ]
@@ -660,7 +662,10 @@ async def iiif_manifest(
 ) -> dict[str, Any]:
     from katalon.config import settings
     from katalon.integrations.cantaloupe import build_object_manifest
-    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+    from katalon.services.public_metadata_service import (
+        filter_public_metadata_checked,
+        load_public_fields,
+    )
 
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
@@ -703,7 +708,9 @@ async def iiif_manifest(
     field_defs = field_result.scalars().all()
     if visibility_user is None:
         public_fields = await load_public_fields(db, "object")
-        public_metadata = filter_public_metadata(obj.metadata_, public_fields, obj.object_type)
+        public_metadata = await filter_public_metadata_checked(
+            db, obj.metadata_, public_fields, obj.object_type
+        )
     else:
         public_metadata = obj.metadata_ if isinstance(obj.metadata_, dict) else {}
 

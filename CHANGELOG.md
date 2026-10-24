@@ -4,6 +4,22 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.46.0]
+
+- **Karte bei Orts-Beziehungsfeldern im Portal:** Beziehungsfelder, die auf Orte verweisen
+  (z. B. Herstellungsort oder Fundort), können auf der Objekt-Detailseite im Portal direkt
+  eine interaktive Karte mit den Koordinaten der verknüpften Orte einblenden. Auch ausgewählte
+  Felder des Ortsdatensatzes lassen sich direkt beim Beziehungsfeld mit anzeigen.
+- **Ortsnamensuche auf der Karte im Admin:** Beim Erfassen von Ortsdatensätzen kann im
+  Kartenfeld direkt nach Ortsnamen gesucht werden, um Koordinaten per Klick zu übernehmen.
+- **Alphabetische Sortierung pro Facette:** Für Text-, Auswahl-, Vokabular- und
+  Verknüpfungsfacetten lässt sich in den Portal-Einstellungen pro Facette festlegen, ob die
+  Filterwerte nach Trefferanzahl oder alphabetisch (A–Z) sortiert werden.
+- **Beziehungsfelder als Suchfilter:** Ein Klick auf einen Namen in einem Beziehungsfeld
+  (z. B. Künstler/in oder Verlag) führt im Portal zur Suche nach allen Datensätzen mit
+  diesem Wert, wie bei Vokabularbegriffen; der verknüpfte Datensatz bleibt über einen
+  eigenen Link erreichbar.
+
 ## [1.45.0]
 
 - **Erweiterte Suche über Verknüpfungen:** Neben den Feldern lassen sich auch Verknüpfungen

@@ -18,6 +18,7 @@ import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { occurrenceTypeLabel, useI18n } from '../i18n'
+import { withoutFieldRelations } from '../utils/relations'
 
 export function OccurrenceDetailPage({ user }: { user: PortalUser | null }) {
   const { id } = useParams<{ id: string }>()
@@ -88,7 +89,8 @@ export function OccurrenceDetailPage({ user }: { user: PortalUser | null }) {
   const description = renderFieldValue(m.description, locale) ?? ''
 
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'title' && f.name !== 'name')
-  const nonObjectRelations = relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
+  const nonObjectRelations = withoutFieldRelations(relations, occurrence.id, fieldDefs)
+    .filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 
   return (
     <div className="container page">

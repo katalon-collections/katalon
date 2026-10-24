@@ -24,7 +24,7 @@ from katalon.core.models import (
     Vocabulary,
     VocabularyTerm,
 )
-from katalon.integrations.elasticsearch import search_documents
+from katalon.integrations.elasticsearch import RELATED_FACET_NAMES, search_documents
 
 logger = logging.getLogger(__name__)
 
@@ -466,7 +466,10 @@ async def _load_linked_data(
         Procedure,
         Relation,
     )
-    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+    from katalon.services.public_metadata_service import (
+        filter_public_metadata_checked,
+        load_public_fields,
+    )
 
     _MODEL_MAP: dict[str, Any] = {
         "object": Object,
@@ -501,7 +504,7 @@ async def _load_linked_data(
             continue
         public_fields = await load_public_fields(db, rel.to_type)
         subtype = getattr(linked_rec, f"{rel.to_type}_type", None)
-        md = filter_public_metadata(linked_rec.metadata_ or {}, public_fields, subtype)
+        md = await filter_public_metadata_checked(db, linked_rec.metadata_ or {}, public_fields, subtype)
         inherited = {f: md[f] for f in fields if f in md}
         if not inherited:
             continue
@@ -796,7 +799,10 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     from sqlalchemy import select
 
     from katalon.core.models import FieldDefinition
-    from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+    from katalon.services.public_metadata_service import (
+        filter_public_metadata_checked,
+        load_public_fields,
+    )
 
     rel_data: dict[str, Any] | None = None
     media_info: dict[str, Any] | None = None
@@ -816,7 +822,8 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
     if db is not None:
         public_fields = await load_public_fields(db, record_type)
         public_metadata = normalize_url_values(
-            filter_public_metadata(
+            await filter_public_metadata_checked(
+                db,
                 getattr(record, "metadata_", None),
                 public_fields,
                 getattr(record, f"{record_type}_type", None),
@@ -984,6 +991,7 @@ async def search(
     subtitle_fields: dict[str, list[str]] | None = None,
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
+    facet_sorts: dict[str, str] | None = None,
     sort: str | None = None,
     full_visibility_types: tuple[str, ...] | None = None,
     facet_specs: dict[str, tuple[str, str, str]] | None = None,
@@ -1005,6 +1013,7 @@ async def search(
         record_types=record_types,
         advanced_filter=advanced_filter,
         facet_sort=facet_sort,
+        facet_sorts=facet_sorts,
         sort=sort,
         full_visibility_types=full_visibility_types,
         facet_specs=facet_specs,
@@ -1039,10 +1048,30 @@ async def search(
             if lower is not None and upper is not None:
                 numeric_facets[agg_key[8:]] = {"min": lower, "max": upper}
             continue
-        buckets = agg_val.get("filtered", {}).get("values", {}).get("buckets")
+        filtered = agg_val.get("filtered", {})
+        buckets = filtered.get("values", {}).get("buckets")
         if buckets is None:
             buckets = agg_val.get("buckets", [])
-        facets[agg_key] = [{"value": b["key"], "count": b["doc_count"]} for b in buckets]
+        # Selected relation targets beyond the top buckets (see search_documents).
+        known = {b["key"] for b in buckets}
+        extra = [b for b in filtered.get("selected", {}).get("buckets", []) if b["key"] not in known]
+        bucket_items = [{"value": b["key"], "count": b["doc_count"]} for b in [*buckets, *extra]]
+        field_name = (
+            agg_key[5:]
+            if agg_key.startswith("meta_")
+            else agg_key
+            if agg_key in RELATED_FACET_NAMES
+            else None
+        )
+        if field_name is not None:
+            kind = (facet_specs or {}).get(field_name, ("", "", "terms"))[2]
+            effective_sort = (facet_sorts or {}).get(field_name, facet_sort)
+            if effective_sort == "alpha" and kind in ("terms", "inherited", "related", "relation"):
+                if kind == "relation":
+                    bucket_items.sort(key=lambda b: str(b["value"]).split("|", 1)[-1].casefold())
+                else:
+                    bucket_items.sort(key=lambda b: str(b["value"]).casefold())
+        facets[agg_key] = bucket_items
 
     return {
         "total": total,

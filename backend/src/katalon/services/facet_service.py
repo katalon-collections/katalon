@@ -31,6 +31,7 @@ from katalon.integrations.elasticsearch import RELATED_FACET_NAMES
 GROUP_SEPARATOR = "__"
 RELATION_FACET_PREFIX = "relfacet_"
 DATE_GRANULARITIES = ("decade", "century", "year")
+SORTABLE_FACET_KINDS = ("terms", "inherited", "related", "relation")
 RELATION_TARGET_TYPES = ("entity", "place", "occurrence", "collection", "object")
 RELATION_DIRECTIONS = ("outgoing", "incoming", "both")
 _KEY_RE = re.compile(r"^[a-z0-9_]{1,48}$")
@@ -45,6 +46,7 @@ class FacetSpec:
     label: dict[str, str] | None = None
     granularity: str | None = None
     vocabulary_id: str | None = None
+    sort: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def public(self) -> dict[str, Any]:
@@ -54,6 +56,8 @@ class FacetSpec:
             out["label"] = self.label
         if self.granularity:
             out["granularity"] = self.granularity
+        if self.sort:
+            out["sort"] = self.sort
         return out
 
 
@@ -182,6 +186,10 @@ async def portal_facets(
     """All active facets per type, ordered (dict order) as the portal shows them."""
     saved = (getattr(config, "facet_fields", None) or {}) if config is not None else {}
     order = (getattr(config, "facet_order", None) or {}) if config is not None else {}
+    sort_overrides = (
+        (getattr(config, "facet_sort_overrides", None) or {}) if config is not None else {}
+    )
+    default_sort = (getattr(config, "facet_sort", None) or "count") if config is not None else "count"
     relation = relation_facet_specs(getattr(config, "relation_facets", None) if config else None)
     fields = await field_facet_specs(db, target_types)
     out: dict[str, dict[str, FacetSpec]] = {}
@@ -192,6 +200,11 @@ async def portal_facets(
             if special is not None:
                 specs[name] = special
         specs.update(relation.get(target_type, {}))
+        type_sorts = sort_overrides.get(target_type) or {}
+        for name, spec in specs.items():
+            if spec.kind in SORTABLE_FACET_KINDS:
+                override = type_sorts.get(name)
+                spec.sort = override if override in ("count", "alpha") else default_sort
         ordered = apply_order(list(specs), order.get(target_type))
         out[target_type] = {name: specs[name] for name in ordered}
     return out

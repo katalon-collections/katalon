@@ -206,6 +206,8 @@ export interface Relation {
   relation_type: string
   from_label: string | null
   to_label: string | null
+  /** Schema relation field ("field" or "group.child") this relation is derived from. */
+  source_field?: string | null
 }
 
 export interface StaticPageSummary {
@@ -251,6 +253,7 @@ export interface PortalConfig {
   meta_row_layout: 'stacked' | 'inline'
   meta_label_uppercase: boolean
   facet_sort: 'count' | 'alpha'
+  facet_sort_overrides?: Record<string, Record<string, 'count' | 'alpha'>>
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
@@ -294,6 +297,7 @@ export interface FacetKind {
   kind: 'terms' | 'numeric' | 'boolean' | 'date' | 'tree' | 'inherited' | 'related' | 'relation'
   label?: Record<string, string>
   granularity?: 'decade' | 'century' | 'year'
+  sort?: 'count' | 'alpha'
 }
 
 export interface TreeFacetNode {

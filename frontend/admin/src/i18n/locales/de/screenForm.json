@@ -37,7 +37,10 @@
     "accuracy": "Genauigkeit (m)",
     "showMap": "Karte",
     "hideMap": "Karte ausblenden",
+    "searchPlaceholder": "Ort auf Karte suchen (z. B. Berlin)…",
+    "noResults": "Keine Treffer gefunden.",
     "invalid": "Ungültige Koordinaten. Dezimalgrad: Breite −90…90, Länge −180…180, Genauigkeit ≥ 0.",
+    "invalidCoords": "Ungültige Koordinaten. Dezimalgrad: Breite −90…90, Länge −180…180.",
     "add": "Koordinaten hinzufügen"
   },
   "url": {

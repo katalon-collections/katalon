@@ -9,9 +9,9 @@ import type { FieldDefinition } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
-import { RelationFieldRow } from './RelationFieldRow'
+import { RelationFieldRow, type RelationEntry } from './RelationFieldRow'
 import { api, type FacetKind, type VocabTerm } from '../api/client'
-import { dateBucketOf } from '../utils/facets'
+import { dateBucketOf, matchRelationFacet, relationFacetHref, type RelationFacetConfig } from '../utils/facets'
 
 /** Search-page link for one facet value of a field marked `is_facet`, scoped to the
  *  record's own type. Numeric fields use the range filter (exact value as both bounds);
@@ -35,6 +35,22 @@ export function facetHref(
     ? `range_${field.name}_from=${encoded}&range_${field.name}_to=${encoded}`
     : `meta_${field.name}=${encoded}`
   return `/search?type=${encodeURIComponent(recordType)}&${query}`
+}
+
+/** Pre-filtered search for one relation field entry: the field's own relation facet, else a
+ *  relation facet of the record type covering the entry's relation type. */
+export function relationFilterHref(
+  recordType: string,
+  field: Pick<FieldDefinition, 'name' | 'field_type' | 'is_facet' | 'settings'>,
+  entry: RelationEntry,
+  kind: FacetKind | undefined,
+  relationFacets: Record<string, RelationFacetConfig[]> | undefined,
+): string | undefined {
+  if (field.is_facet && kind?.kind === 'relation') return facetHref(recordType, field, entry.id, kind)
+  const targetType = field.settings?.target_type as string | undefined
+  if (!targetType || !entry.relation_type) return undefined
+  const facet = matchRelationFacet(relationFacets?.[recordType], targetType, entry.relation_type, 'outgoing')
+  return facet ? relationFacetHref(recordType, facet, entry.id) : undefined
 }
 
 export function MetaRow({ label, value, href, items, children }: {
@@ -277,7 +293,7 @@ export function richText(value: string): ReactNode {
 
 /** A field placed in the main column: labeled block, markdown for richtext fields. */
 function MainField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels, groupChildren }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string>; groupChildren: FieldDefinition[] }) {
-  const facetKinds = usePortalConfig().facet_kinds
+  const { facet_kinds: facetKinds, relation_facets: relationFacets } = usePortalConfig()
   if (field.field_type === 'group') {
     const lines = groupEntryLines(field, groupChildren, value, locale, recordType, vocabularyLabels)
     if (lines.length === 0) return null
@@ -291,7 +307,18 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
     )
   }
   if (field.field_type === 'relation') {
-    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
+    return (
+      <RelationFieldRow
+        label={fieldLabel(field, locale)}
+        value={value}
+        targetType={field.settings?.target_type as string | undefined}
+        inheritedFields={(field.settings?.inherited_fields as string[] | undefined) ?? []}
+        showPlaceMap={Boolean(field.settings?.show_place_map)}
+        locale={locale}
+        resolveRelationType={resolveRelationType}
+        filterHref={entry => relationFilterHref(recordType, field, entry, facetKinds?.[recordType]?.[field.name], relationFacets)}
+      />
+    )
   }
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type, vocabularyLabels)
@@ -337,7 +364,7 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
 
 /** A field placed in the sidebar: compact key/value row. */
 function SidebarField({ field, value, locale, recordType, aiProvenance, resolveRelationType, vocabularyLabels, groupChildren }: { field: FieldDefinition; value: unknown; locale: string; recordType: string; aiProvenance?: { model: string; at: string }; resolveRelationType: (code: string) => string; vocabularyLabels: ReadonlyMap<string, string>; groupChildren: FieldDefinition[] }) {
-  const facetKinds = usePortalConfig().facet_kinds
+  const { facet_kinds: facetKinds, relation_facets: relationFacets } = usePortalConfig()
   if (field.field_type === 'group') {
     const lines = groupEntryLines(field, groupChildren, value, locale, recordType, vocabularyLabels)
     if (lines.length === 0) return null
@@ -349,7 +376,18 @@ function SidebarField({ field, value, locale, recordType, aiProvenance, resolveR
     )
   }
   if (field.field_type === 'relation') {
-    return <RelationFieldRow label={fieldLabel(field, locale)} value={value} targetType={field.settings?.target_type as string | undefined} resolveRelationType={resolveRelationType} />
+    return (
+      <RelationFieldRow
+        label={fieldLabel(field, locale)}
+        value={value}
+        targetType={field.settings?.target_type as string | undefined}
+        inheritedFields={(field.settings?.inherited_fields as string[] | undefined) ?? []}
+        showPlaceMap={Boolean(field.settings?.show_place_map)}
+        locale={locale}
+        resolveRelationType={resolveRelationType}
+        filterHref={entry => relationFilterHref(recordType, field, entry, facetKinds?.[recordType]?.[field.name], relationFacets)}
+      />
+    )
   }
   const label = <>{fieldLabel(field, locale)}{aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}</>
   if (field.is_facet) {

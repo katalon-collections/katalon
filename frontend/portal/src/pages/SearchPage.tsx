@@ -8,6 +8,7 @@ import { thumbnailSrcSet, thumbnailUrl } from '../utils/thumbnails'
 import { LazyImage } from '../components/LazyImage'
 import { TreeFacetPanel } from '../components/TreeFacetPanel'
 import { saveLastSearch, saveSearchContext } from '../hooks/useBackToSearch'
+import { usePortalConfig } from '../hooks/usePortalConfig'
 import { useFieldLabels } from '../hooks/useFieldLabels'
 import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
@@ -268,6 +269,8 @@ export function SearchPage() {
       ])
   )].sort().join(',')
   const fieldLabels = useFieldLabels(facetTypesKey, locale)
+  // Types with their own header entry (collections have their own page instead of search)
+  const navTypes = (usePortalConfig().browse_enabled_types ?? []).filter(type => type !== 'collection')
 
   // Load configurable facet + result-subtitle fields from portal config
   useEffect(() => {
@@ -517,7 +520,8 @@ export function SearchPage() {
   const addFilter = (key: string, value: string, label: string) => {
     activeFilters.push({ keys: [key], value, label })
   }
-  if (!advancedQuery && systemFacets.includes('record_type') && typeFilt) {
+  // A type chosen through its header entry is shown there already; no chip for it.
+  if (!advancedQuery && systemFacets.includes('record_type') && typeFilt && !navTypes.includes(typeFilt)) {
     addFilter('type', typeFilt, `${t('search.typeFacet')}: ${typeLabel(typeFilt)}`)
   }
   if (systemFacets.includes('status')) statusFilt.forEach(value => addFilter('status', value, `${t('search.statusFacet')}: ${typeLabel(value)}`))

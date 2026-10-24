@@ -17,6 +17,7 @@ import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
+import { withoutFieldRelations } from '../utils/relations'
 
 function StaticMap({ lat, lon, name }: { lat: number; lon: number; name: string }) {
   const bbox = `${lon - 0.05},${lat - 0.03},${lon + 0.05},${lat + 0.03}`
@@ -111,7 +112,8 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
   const description = renderFieldValue(m.description, locale) ?? ''
 
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'title' && f.name !== 'name')
-  const nonObjectRelations = relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
+  const nonObjectRelations = withoutFieldRelations(relations, place.id, fieldDefs)
+    .filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 
   return (
     <div className="container page">

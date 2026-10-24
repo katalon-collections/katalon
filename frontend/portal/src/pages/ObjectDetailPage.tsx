@@ -19,6 +19,7 @@ import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
+import { withoutFieldRelations } from '../utils/relations'
 
 function ViewerFallback({ objectId, mediaFiles, title }: { objectId: string; mediaFiles: MediaFile[]; title: string }) {
   if (mediaFiles.length === 1) {
@@ -109,6 +110,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   }
 
   const m = obj.metadata_ as Record<string, unknown>
+  const listedRelations = withoutFieldRelations(relations, obj.id, fieldDefs)
   const title = recordTitle(m, locale, obj.idno ?? obj.id)
   const readyMedia = mediaFiles.filter(f => f.status === 'ready')
   const primaryMedia = readyMedia.find(f => f.is_primary) ?? readyMedia[0]
@@ -211,10 +213,10 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
             {(m.keywords as string[]).map((kw, i) => <span key={i} className="tag">{kw}</span>)}
           </div>
         )}
-        relations={relations.length > 0 && (
+        relations={listedRelations.length > 0 && (
           <RelationsList
             recordType="object"
-            relations={relations}
+            relations={listedRelations}
             currentId={obj.id}
             resolveLabel={resolveRelationType}
             titles={relationTitles}

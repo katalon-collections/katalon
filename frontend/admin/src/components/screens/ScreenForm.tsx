@@ -4073,10 +4073,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 {showGeo && (
                   <div className="field">
                     <div className="lbl">Koordinaten</div>
-                    <div className="fg-2">
-                      <input className="fld mono" value={lat} onChange={e => { setLat(e.target.value); setIsDirty(true) }} placeholder="Breite (lat)" disabled={justCreated} />
-                      <input className="fld mono" value={lon} onChange={e => { setLon(e.target.value); setIsDirty(true) }} placeholder="Länge (lon)" disabled={justCreated} />
-                    </div>
+                    <GeoInput
+                      showAccuracy={false}
+                      value={lat !== '' && lon !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? { lat: Number(lat), lon: Number(lon) } : undefined}
+                      onChange={v => {
+                        setLat(v ? String(v.lat) : '')
+                        setLon(v ? String(v.lon) : '')
+                        setIsDirty(true)
+                      }}
+                      disabled={justCreated}
+                    />
                   </div>
                 )}
 

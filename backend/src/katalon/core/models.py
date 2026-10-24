@@ -788,9 +788,11 @@ class PortalConfig(Base):
     meta_row_layout: Mapped[str] = mapped_column(String(16), default="stacked", server_default="stacked")
     # Render metadata/relation labels in uppercase on detail pages
     meta_label_uppercase: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    # Global facet display settings (#321). Per-field override via
-    # FieldDefinition.settings can be added later if actually needed.
+    # Global facet display settings (#321) and per-type/per-facet sort overrides.
     facet_sort: Mapped[str] = mapped_column(String(16), default="count", server_default="count")
+    facet_sort_overrides: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict[str, Any]
+    )
     facet_initial_count: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
     # Show the public IIIF manifest link/button on the object detail page (#-).
     show_iiif_manifest_link: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

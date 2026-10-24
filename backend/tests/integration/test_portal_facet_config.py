@@ -121,6 +121,7 @@ async def test_relation_facets_are_listed_ordered_and_trigger_reindex(
     assert body["facet_kinds"]["object"]["relfacet_komponist"] == {
         "kind": "relation",
         "label": {"de": "Komponist_in"},
+        "sort": "count",
     }
     assert reindex_requests == ["object"]
 

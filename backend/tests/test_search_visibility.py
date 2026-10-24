@@ -791,3 +791,28 @@ async def test_relation_titles_index_only_outgoing_free_relations(monkeypatch) -
         "target_type": "place", "target_id": str(place_id),
     }]
     assert out["related_entities"] == ["Anna"]
+
+
+@pytest.mark.asyncio
+async def test_search_documents_relation_facet_always_returns_selected_targets(monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeES:
+        async def search(self, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"body": {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}})()
+
+    monkeypatch.setattr(elasticsearch, "get_es", lambda: FakeES())
+    target = "0aed32f1-8885-5de3-8652-3735cfd49685"
+
+    await elasticsearch.search_documents(
+        None, "object", "public", 0, 20,
+        facet_fields=["relfacet_maler"],
+        extra_filters={"relfacet_maler": [target]},
+        facet_specs={"relfacet_maler": ("facet_relfacet_maler_id", "facet_relfacet_maler", "relation")},
+    )
+
+    aggs = captured["body"]["aggs"]["meta_relfacet_maler"]["aggs"]["filtered"]["aggs"]
+    selected = aggs["selected"]["terms"]
+    assert selected["field"] == "facet_relfacet_maler"
+    assert selected["include"] == "(" + target.replace("-", "\\-") + ")\\|.*"

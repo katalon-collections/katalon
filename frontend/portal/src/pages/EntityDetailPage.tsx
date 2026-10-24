@@ -18,6 +18,7 @@ import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { entityTypeLabel, useI18n } from '../i18n'
+import { withoutFieldRelations } from '../utils/relations'
 
 export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   const { id } = useParams<{ id: string }>()
@@ -88,7 +89,8 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   const description = renderFieldValue(m.description, locale) ?? ''
 
   const detailFieldDefs = fieldDefs.filter(f => f.name !== 'name' && f.name !== 'title')
-  const nonObjectRelations = relations.filter(r => r.from_type !== 'object' && r.to_type !== 'object')
+  const nonObjectRelations = withoutFieldRelations(relations, entity.id, fieldDefs)
+    .filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 
   return (
     <div className="container page">

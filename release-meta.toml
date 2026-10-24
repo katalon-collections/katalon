@@ -58,3 +58,7 @@ description = "Zusätzliche DB-Verbindungen pro API-Prozess bei Lastspitzen (Def
 [[releases."1.45.0".env_vars]]
 key = "CELERY_CONCURRENCY"
 description = "Threads des Celery-Workers (leer = Anzahl CPU-Kerne); kleiner wählen, damit das Portal beim Reindex flüssig bleibt"
+
+# 1.46.0: Suchindex enthält Namen nicht öffentlicher Beziehungsfeld-Ziele nicht mehr.
+[releases."1.46.0"]
+reindex_required = true

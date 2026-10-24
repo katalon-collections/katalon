@@ -176,6 +176,8 @@
     "fixedRelationTypeAll": "– All types of this vocabulary –",
     "inheritedFields": "Fields of target record to display",
     "inheritedFieldsHint": "(optional – e.g. country for place relation)",
+    "showPlaceMap": "Show map of linked place on the detail page",
+    "showPlaceMapHint": "Displays a map below the place name in the portal when the place has coordinates.",
     "save": "Save",
     "saving": "Saving…",
     "delete": "Delete Field",

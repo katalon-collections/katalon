@@ -54,6 +54,7 @@ export default {
   'notice.defaultTitle': 'Notice',
   'notice.accept': 'I understand',
   'relations.moreWithValue': 'more',
+  'relations.openRecord': 'record',
   'relations.searchByRole': '{type} with {role}',
   'search.removeFilter': 'Remove filter',
   'search.filterTerms': 'Filter terms',

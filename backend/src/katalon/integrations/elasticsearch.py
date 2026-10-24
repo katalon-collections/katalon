@@ -7,6 +7,7 @@ import asyncio
 import itertools
 import json
 import logging
+import re
 import uuid
 import weakref
 from collections.abc import AsyncIterator, Iterable, Iterator
@@ -481,6 +482,7 @@ async def search_documents(
     record_types: tuple[str, ...] | None = None,
     advanced_filter: dict[str, Any] | None = None,
     facet_sort: str = "count",
+    facet_sorts: dict[str, str] | None = None,
     sort: str | None = None,
     full_visibility_types: tuple[str, ...] | None = None,
     facet_specs: dict[str, tuple[str, str, str]] | None = None,
@@ -589,8 +591,6 @@ async def search_documents(
 
     es_query: dict[str, Any] = {"bool": {"must": must, "filter": filters}}
 
-    facet_order = {"_key": "asc"} if facet_sort == "alpha" else {"_count": "desc"}
-
     def _self_excluding_agg(
         terms_field: str, exclude_key: str, agg_size: int, order: dict[str, str]
     ) -> dict[str, Any]:
@@ -628,8 +628,12 @@ async def search_documents(
     # Fetch generously beyond the portal's initially visible count so "show
     # more" can reveal further values without a second round-trip.
     for field in facet_fields or []:
+        field_sort = (facet_sorts or {}).get(field, facet_sort)
+        field_order = {"_key": "asc"} if field_sort == "alpha" else {"_count": "desc"}
         if field in RELATED_FACET_NAMES:
-            aggs[field] = _self_excluding_agg(field, field, 30, {"_count": "desc"})
+            aggs[field] = _self_excluding_agg(
+                field, field, 100 if field_sort == "alpha" else 30, field_order
+            )
             continue
         kind = specs[field][2] if field in specs else "terms"
         if kind == "tree":
@@ -638,10 +642,28 @@ async def search_documents(
             # Chronological, and enough buckets for every year of a few centuries.
             aggs[f"meta_{field}"] = _self_excluding_agg(specs[field][1], field, 500, {"_key": "asc"})
             continue
-        if kind == "relation":
-            aggs[f"meta_{field}"] = _self_excluding_agg(specs[field][1], field, 100, facet_order)
+        if kind == "boolean":
+            aggs[f"meta_{field}"] = _self_excluding_agg(
+                _facet_doc_field(field), field, 10, {"_count": "desc"}
+            )
             continue
-        aggs[f"meta_{field}"] = _self_excluding_agg(_facet_doc_field(field), field, 100, facet_order)
+        if kind == "relation":
+            # Buckets are "<uuid>|<title>", so _key order would sort by UUID;
+            # search_service sorts by title when field_sort == "alpha".
+            agg = _self_excluding_agg(
+                specs[field][1], field, 500 if field_sort == "alpha" else 100, {"_count": "desc"}
+            )
+            selected = [str(v) for v in (extra_filters or {}).get(field) or []]
+            if selected:
+                # A selected target outside the top buckets would come back without its
+                # title (the active filter would show the bare id).
+                pattern = "(" + "|".join(re.escape(v) for v in selected) + ")\\|.*"
+                agg["aggs"]["filtered"]["aggs"]["selected"] = {
+                    "terms": {"field": specs[field][1], "size": len(selected), "include": pattern}
+                }
+            aggs[f"meta_{field}"] = agg
+            continue
+        aggs[f"meta_{field}"] = _self_excluding_agg(_facet_doc_field(field), field, 100, field_order)
         numeric_aggregation_filters = [
             value for name, value in numeric_facet_filters.items() if name != field
         ]

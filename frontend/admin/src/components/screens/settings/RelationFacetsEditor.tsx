@@ -27,10 +27,12 @@ function suggestKey(label: string): string {
 /** List + dialog for the relation facets of one record type. Relation types
  *  come from the "relation_types" vocabulary, filtered by source and target
  *  type (applies_from / applies_to). */
-export function RelationFacetsEditor({ recordType, value, onChange }: {
+export function RelationFacetsEditor({ recordType, value, onChange, sortByKey, onSortChange }: {
   recordType: string
   value: RelationFacet[]
   onChange: (next: RelationFacet[]) => void
+  sortByKey?: Record<string, 'count' | 'alpha'>
+  onSortChange?: (facetName: string, sort: 'count' | 'alpha') => void
 }) {
   const { t, i18n } = useTranslation('facetSettings')
   const { t: tSettings } = useTranslation('screenSettings')
@@ -73,6 +75,18 @@ export function RelationFacetsEditor({ recordType, value, onChange }: {
             </div>
           </div>
           <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>relfacet_{facet.key}</span>
+          {onSortChange && (
+            <select
+              className="fld"
+              aria-label={t('order.sortAria', { name: labelOf(facet.label, lang, facet.key) })}
+              value={sortByKey?.[`relfacet_${facet.key}`] ?? 'count'}
+              onChange={e => onSortChange(`relfacet_${facet.key}`, e.target.value as 'count' | 'alpha')}
+              style={{ width: 'auto', height: 26, padding: '0 8px', fontSize: 12 }}
+            >
+              <option value="count">{t('order.sort.count')}</option>
+              <option value="alpha">{t('order.sort.alpha')}</option>
+            </select>
+          )}
           <button type="button" className="btn sm" onClick={() => setEditing({ index, draft: { ...facet } })}>{t('relations.edit')}</button>
           <button type="button" className="btn sm gh" onClick={() => onChange(value.filter((_, i) => i !== index))}>{t('relations.remove')}</button>
         </div>

@@ -21,22 +21,6 @@ function typePath(type: string, id: string): string {
   return `/${TYPE_PATHS[type] ?? `${type}s`}/${id}`
 }
 
-function extractText(val: unknown): string | null {
-  if (val == null) return null
-  if (typeof val === 'string') return val || null
-  if (typeof val === 'number' || typeof val === 'boolean') return String(val)
-  if (Array.isArray(val)) {
-    const first = val[0]
-    if (first == null) return null
-    if (typeof first === 'string') return first || null
-    if (typeof first === 'object') {
-      const v = (first as Record<string, unknown>).value
-      return typeof v === 'string' ? v || null : null
-    }
-  }
-  return null
-}
-
 interface Props {
   relations: Relation[]
   currentId: string
@@ -45,13 +29,13 @@ interface Props {
   titles?: Record<string, string>
   /** Optional: pre-loaded metadata keyed by "<type>/<id>" */
   metadata?: Record<string, Record<string, unknown>>
-  /** Optional: current record's field definitions (used to find inherited_fields config) */
+  /** Optional: current record's field definitions */
   fieldDefs?: FieldDefinition[]
   /** Current record type: enables "more with this …" links via relation facets. */
   recordType?: string
 }
 
-export function RelationsList({ relations, currentId, resolveLabel, titles = {}, metadata = {}, fieldDefs = [], recordType }: Props) {
+export function RelationsList({ relations, currentId, resolveLabel, titles = {}, recordType }: Props) {
   const navigate = useNavigate()
   const { t } = useI18n()
   const portalConfig = usePortalConfig()
@@ -74,11 +58,6 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
           const targetLabel = resolvedLabel ?? titles[titleKey] ?? t('common.recordUnavailable')
           const path = typePath(targetType, targetId)
           const facet = matchRelationFacet(ownFacets, targetType, r.relation_type, isFrom ? 'outgoing' : 'incoming')
-
-          const inheritedFieldNames = fieldDefs
-            .filter(f => f.field_type === 'relation' && (f.settings?.target_type as string) === targetType)
-            .flatMap(f => (f.settings?.inherited_fields as string[]) ?? [])
-          const meta = metadata[titleKey]
 
           return (
             <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -107,19 +86,6 @@ export function RelationsList({ relations, currentId, resolveLabel, titles = {},
                   )}
                 </span>
               </div>
-              {meta && inheritedFieldNames.length > 0 && (
-                <div style={{ paddingLeft: 'calc(9.5rem + 12px)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {inheritedFieldNames.map(fname => {
-                    const text = extractText(meta[fname])
-                    if (!text) return null
-                    return (
-                      <span key={fname} style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                        {fname}: {text}
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
             </div>
           )
         })}

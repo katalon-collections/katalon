@@ -48,3 +48,89 @@ def test_values_from_several_group_instances_are_merged_and_sorted() -> None:
 def test_apply_order_puts_configured_names_first() -> None:
     assert apply_order(["a", "b", "c", "d"], ["c", "x", "a"]) == ["c", "a", "b", "d"]
     assert apply_order(["a", "b"], None) == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_search_service_sorts_facets_per_field_override(monkeypatch) -> None:
+    from katalon.services import search_service
+
+    captured_aggs: dict = {}
+
+    class FakeES:
+        async def search(self, index, body):
+            captured_aggs.update(body["aggs"])
+            from unittest.mock import MagicMock
+
+            return MagicMock(
+                body={
+                    "hits": {"total": {"value": 2}, "hits": []},
+                    "aggregations": {
+                        "meta_material": {
+                            "filtered": {
+                                "values": {
+                                    "buckets": [
+                                        {"key": "Zink", "doc_count": 10},
+                                        {"key": "aluminium", "doc_count": 2},
+                                        {"key": "Bronze", "doc_count": 5},
+                                    ]
+                                }
+                            }
+                        },
+                        "meta_relfacet_artist": {
+                            "filtered": {
+                                "values": {
+                                    "buckets": [
+                                        {"key": "zzzz-id|Berta", "doc_count": 9},
+                                        {"key": "aaaa-id|Zoe", "doc_count": 4},
+                                        {"key": "mmmm-id|Anna", "doc_count": 1},
+                                    ]
+                                }
+                            }
+                        },
+                        "related_places": {
+                            "filtered": {
+                                "values": {
+                                    "buckets": [
+                                        {"key": "Zürich", "doc_count": 8},
+                                        {"key": "Berlin", "doc_count": 3},
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                }
+            )
+
+    monkeypatch.setattr("katalon.integrations.elasticsearch.get_es", lambda: FakeES())
+
+    result = await search_service.search(
+        facet_fields=["material", "relfacet_artist", "related_places"],
+        facet_sort="count",
+        facet_sorts={"material": "alpha", "relfacet_artist": "alpha", "related_places": "count"},
+        facet_specs={
+            "material": ("facet_all_material", "facet_all_material", "terms"),
+            "relfacet_artist": ("facet_relid_artist", "facet_rel_artist", "relation"),
+        },
+    )
+
+    assert (
+        captured_aggs["meta_material"]["aggs"]["filtered"]["aggs"]["values"]["terms"]["order"]
+        == {"_key": "asc"}
+    )
+    assert (
+        captured_aggs["related_places"]["aggs"]["filtered"]["aggs"]["values"]["terms"]["order"]
+        == {"_count": "desc"}
+    )
+    assert [b["value"] for b in result["facets"]["meta_material"]] == [
+        "aluminium",
+        "Bronze",
+        "Zink",
+    ]
+    # Relation facet buckets ("<id>|<title>") are sorted by title, not UUID prefix.
+    assert [b["value"] for b in result["facets"]["meta_relfacet_artist"]] == [
+        "mmmm-id|Anna",
+        "zzzz-id|Berta",
+        "aaaa-id|Zoe",
+    ]
+    assert [b["value"] for b in result["facets"]["related_places"]] == ["Zürich", "Berlin"]
+

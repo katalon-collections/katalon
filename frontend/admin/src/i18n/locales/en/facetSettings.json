@@ -6,6 +6,11 @@
     "moveUp": "Move {{name}} up",
     "moveDown": "Move {{name}} down",
     "dragHandle": "Move {{name}}",
+    "sortAria": "Sort order for {{name}}",
+    "sort": {
+      "count": "By count",
+      "alpha": "Alphabetical (A–Z)"
+    },
     "kind": {
       "field": "Field",
       "date": "Date",

@@ -176,6 +176,8 @@
     "fixedRelationTypeAll": "– Alle Typen dieses Vokabulars –",
     "inheritedFields": "Felder des Zieldatensatzes mit anzeigen",
     "inheritedFieldsHint": "(optional – z.B. Land bei Ortsverknüpfung)",
+    "showPlaceMap": "Karte des verknüpften Ortes auf der Detailseite anzeigen",
+    "showPlaceMapHint": "Zeigt im Portal unter dem Ortsnamen eine Karte an, sofern der Ort Koordinaten hat.",
     "save": "Speichern",
     "saving": "Speichert…",
     "delete": "Feld löschen",

@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { PortalFieldDefinition } from '../api/client'
+import { api, type PortalFieldDefinition } from '../api/client'
 
 vi.mock('../hooks/usePortalConfig', () => ({ usePortalConfig: () => ({ facet_kinds: {} }) }))
 vi.mock('../hooks/useRelationTypeLabels', () => ({ useRelationTypeLabels: () => (code: string) => code }))
+vi.mock('./GeoMap', () => ({
+  default: ({ lat, lon, label }: { lat: number; lon: number; label: string }) => (
+    <div data-testid="geo-map" aria-label={label}>{`${lat},${lon}`}</div>
+  ),
+}))
 
 const { DetailPageLayout, GroupMetaRow } = await import('./DetailPageLayout')
 
@@ -71,5 +76,47 @@ describe('group fields on detail pages', () => {
       </MemoryRouter>,
     )
     expect(container.innerHTML).toBe('')
+  })
+
+  it('renders a map under place relation fields with show_place_map only when the place has coordinates', async () => {
+    const getPlaceSpy = vi.spyOn(api.places, 'get').mockImplementation(async (id: string) => ({
+      id,
+      status: 'public',
+      lat: id === 'p-berlin' ? 52.52 : null,
+      lon: id === 'p-berlin' ? 13.405 : null,
+      metadata_: {},
+      ai_provenance: {},
+      created_at: '',
+      updated_at: '',
+    }))
+    const placeRelField = def('r1', 'Fundort', 'relation', {
+      is_repeatable: true,
+      settings: { target_type: 'place', show_place_map: true },
+    })
+    render(
+      <MemoryRouter>
+        <DetailPageLayout
+          fieldDefs={[placeRelField]}
+          metadata={{
+            Fundort: [
+              { id: 'p-berlin', label: 'Berlin', relation_type: 'found_at' },
+              { id: 'p-atlantis', label: 'Atlantis', relation_type: 'found_at' },
+            ],
+          }}
+          locale="de"
+          recordType="object"
+          sidebarPosition="right"
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: 'Berlin' }).getAttribute('href')).toBe('/places/p-berlin')
+    expect(screen.getByRole('link', { name: 'Atlantis' }).getAttribute('href')).toBe('/places/p-atlantis')
+    await waitFor(() => {
+      const maps = screen.getAllByTestId('geo-map')
+      expect(maps).toHaveLength(1)
+      expect(maps[0].getAttribute('aria-label')).toBe('Berlin')
+      expect(maps[0].textContent).toBe('52.52,13.405')
+    })
+    getPlaceSpy.mockRestore()
   })
 })

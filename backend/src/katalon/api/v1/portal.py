@@ -54,6 +54,7 @@ _DEFAULTS = {
     "meta_row_layout": "stacked",
     "meta_label_uppercase": False,
     "facet_sort": "count",
+    "facet_sort_overrides": {},
     "facet_initial_count": 10,
     "homepage_blocks": [],
     "terminology": {},
@@ -226,6 +227,9 @@ class PortalConfigRead(BaseModel):
     meta_label_uppercase: bool = False
     supported_languages: list[str] = ["de", "en"]
     facet_sort: Literal["count", "alpha"] = "count"
+    facet_sort_overrides: dict[FacetRecordType, dict[str, Literal["count", "alpha"]]] = Field(
+        default_factory=dict
+    )
     facet_initial_count: int = 10
     homepage_blocks: list[HomepageBlock] = Field(default_factory=list)
     terminology: dict[TerminologyRecordType, TerminologyEntry] = Field(default_factory=dict)
@@ -261,6 +265,7 @@ class PortalConfigUpdate(BaseModel):
     meta_row_layout: Literal["stacked", "inline"] | None = None
     meta_label_uppercase: bool | None = None
     facet_sort: Literal["count", "alpha"] | None = None
+    facet_sort_overrides: dict[FacetRecordType, dict[str, Literal["count", "alpha"]]] | None = None
     facet_initial_count: int | None = Field(default=None, ge=1, le=100)
     homepage_blocks: list[HomepageBlock] | None = None
     terminology: dict[TerminologyRecordType, TerminologyEntry] | None = None

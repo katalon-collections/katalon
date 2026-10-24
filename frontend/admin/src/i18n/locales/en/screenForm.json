@@ -37,7 +37,10 @@
     "accuracy": "Accuracy (m)",
     "showMap": "Map",
     "hideMap": "Hide map",
+    "searchPlaceholder": "Search place on map (e.g. Berlin)…",
+    "noResults": "No results found.",
     "invalid": "Invalid coordinates. Decimal degrees: latitude −90…90, longitude −180…180, accuracy ≥ 0.",
+    "invalidCoords": "Invalid coordinates. Decimal degrees: latitude −90…90, longitude −180…180.",
     "add": "Add coordinates"
   },
   "url": {

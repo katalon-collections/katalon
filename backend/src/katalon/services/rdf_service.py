@@ -34,6 +34,11 @@ if TYPE_CHECKING:
 
     from katalon.core.models import User
 from katalon.integrations.jsonld_format import build_jsonld_doc
+from katalon.services.public_metadata_service import (
+    filter_public_metadata_checked,
+    load_public_fields,
+    visible_record_ids,
+)
 from katalon.services.relation_service import resolve_relation_labels
 from katalon.services.search_service import _extract_title
 
@@ -136,13 +141,22 @@ async def serialize_record_to_jsonld(
     record: Any,
     base_url: str = "",
     mappings: dict[str, list[str]] | None = None,
+    public: bool = True,
 ) -> dict[str, Any]:
-    """Serialize an ORM record into a complete JSON-LD CIDOC-CRM/LRMoo document."""
+    """Serialize an ORM record into a complete JSON-LD CIDOC-CRM/LRMoo document.
+
+    `public` (the default: portal without read permission, triplestore sync) uses the
+    public metadata projection and only relations to public portal records.
+    """
     record_id = record.id
     _, subtype_col = RECORD_MODEL_MAP[record_type]
     subtype = getattr(record, subtype_col, None)
     idno = getattr(record, "idno", None)
     md = record.metadata_ or {}
+    if public:
+        md = await filter_public_metadata_checked(
+            db, md, await load_public_fields(db, record_type), subtype
+        )
 
     subtype_label = None
     if subtype:
@@ -175,7 +189,23 @@ async def serialize_record_to_jsonld(
         .order_by(Relation.created_at)
     )
     rel_rows = list((await db.execute(rel_stmt)).scalars().all())
-    labels = await resolve_relation_labels(db, rel_rows)
+    if public:
+        other_ids: dict[str, set[uuid.UUID]] = {}
+        for r in rel_rows:
+            is_outgoing = r.from_type == record_type and r.from_id == record_id
+            other_ids.setdefault(r.to_type if is_outgoing else r.from_type, set()).add(
+                r.to_id if is_outgoing else r.from_id
+            )
+        visible = await visible_record_ids(db, other_ids)
+        rel_rows = [
+            r for r in rel_rows
+            if (
+                (r.to_type, r.to_id)
+                if r.from_type == record_type and r.from_id == record_id
+                else (r.from_type, r.from_id)
+            ) in visible
+        ]
+    labels = await resolve_relation_labels(db, rel_rows, public_only=public)
 
     target_ids_by_type: dict[str, set[uuid.UUID]] = {}
     for r in rel_rows:
@@ -273,8 +303,9 @@ async def export_single_record(
     record_id: uuid.UUID,
     format: str = "jsonld",
     base_url: str = "",
+    public: bool = True,
 ) -> tuple[str, str, str]:
-    """Export single record as JSON-LD or Turtle RDF.
+    """Export single record as JSON-LD or Turtle RDF (public view unless `public=False`).
 
     Returns (payload, media_type, filename).
     """
@@ -289,7 +320,7 @@ async def export_single_record(
     if not record:
         raise ValueError(f"{record_type.capitalize()} nicht gefunden")
 
-    doc = await serialize_record_to_jsonld(db, record_type, record, base_url=base_url)
+    doc = await serialize_record_to_jsonld(db, record_type, record, base_url=base_url, public=public)
 
     norm_format = (format or "jsonld").lower().strip()
     if norm_format in ("ttl", "turtle"):
@@ -356,7 +387,8 @@ async def handle_single_record_export(
     raw_request_base = str(request.base_url) if request else ""
     base_url = get_canonical_base_url(raw_request_base)
     content, media_type, filename = await export_single_record(
-        db, norm_type, record_id, format=format_choice, base_url=base_url
+        db, norm_type, record_id, format=format_choice, base_url=base_url,
+        public=visibility_user is None,
     )
     return Response(
         content=content,

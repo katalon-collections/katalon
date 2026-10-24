@@ -54,6 +54,7 @@ export default {
   'notice.defaultTitle': 'Hinweis',
   'notice.accept': 'Verstanden',
   'relations.moreWithValue': 'weitere',
+  'relations.openRecord': 'Datensatz',
   'relations.searchByRole': '{type} mit {role}',
   'search.removeFilter': 'Filter entfernen',
   'search.filterTerms': 'Begriffe filtern',

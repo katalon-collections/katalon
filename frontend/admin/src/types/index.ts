@@ -508,6 +508,7 @@ export interface PortalConfigRead {
   detail_sidebar_position: 'left' | 'right'
   meta_row_layout: 'stacked' | 'inline'
   facet_sort: 'count' | 'alpha'
+  facet_sort_overrides?: Record<string, Record<string, 'count' | 'alpha'>>
   facet_initial_count: number
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
@@ -519,7 +520,7 @@ export interface PortalConfigRead {
   notice?: NoticeConfig
   header_show_title?: boolean
   hero_hide_title?: boolean
-  facet_kinds?: Record<string, Record<string, { kind: string; label?: Record<string, string>; granularity?: string }>>
+  facet_kinds?: Record<string, Record<string, { kind: string; label?: Record<string, string>; granularity?: string; sort?: 'count' | 'alpha' }>>
 }
 
 /** Portal facet over linked records restricted to relation types (e.g. "Komponist_in"). */

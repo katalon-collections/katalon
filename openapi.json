@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.45.0"
+    "version": "1.46.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -27040,6 +27040,30 @@
             "title": "Facet Sort",
             "default": "count"
           },
+          "facet_sort_overrides": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "count",
+                  "alpha"
+                ]
+              },
+              "type": "object"
+            },
+            "propertyNames": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence",
+                "collection",
+                "procedure"
+              ]
+            },
+            "type": "object",
+            "title": "Facet Sort Overrides"
+          },
           "facet_initial_count": {
             "type": "integer",
             "title": "Facet Initial Count",
@@ -27359,6 +27383,37 @@
               }
             ],
             "title": "Facet Sort"
+          },
+          "facet_sort_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "string",
+                    "enum": [
+                      "count",
+                      "alpha"
+                    ]
+                  },
+                  "type": "object"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "object",
+                    "entity",
+                    "place",
+                    "occurrence",
+                    "collection",
+                    "procedure"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facet Sort Overrides"
           },
           "facet_initial_count": {
             "anyOf": [
@@ -28280,6 +28335,17 @@
               }
             ],
             "title": "To Label"
+          },
+          "source_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Field"
           }
         },
         "type": "object",

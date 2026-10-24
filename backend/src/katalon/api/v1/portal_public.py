@@ -121,6 +121,7 @@ class _FacetContext(BaseModel):
     specs: dict[str, tuple[str, str, str]]
     tree_aggs: dict[str, tuple[str, str, list[str]]]
     trees: dict[str, dict[str, Any]]
+    sorts: dict[str, str] = {}
 
 
 async def _facet_context(
@@ -153,6 +154,7 @@ async def _facet_context(
         for name, spec in merged.items()
         if spec.kind not in ("related", "inherited")
     }
+    sorts = {name: spec.sort for name, spec in merged.items() if spec.sort}
     tree_aggs: dict[str, tuple[str, str, list[str]]] = {}
     trees: dict[str, dict[str, Any]] = {}
     for name in names or []:
@@ -174,7 +176,7 @@ async def _facet_context(
         for parent in [None, *[p for p in expand.get(name, []) if p in terms]]:
             key = f"tree_{name}__{parent or 'root'}"
             tree_aggs[key] = (name, spec.filter_field, children.get(parent, []))
-    return _FacetContext(names=names, specs=specs, tree_aggs=tree_aggs, trees=trees)
+    return _FacetContext(names=names, specs=specs, tree_aggs=tree_aggs, trees=trees, sorts=sorts)
 
 
 def _tree_facets(
@@ -360,6 +362,8 @@ class PortalRelationRead(BaseModel):
     relation_type: str
     from_label: str | None = None
     to_label: str | None = None
+    # Schema relation field ("field" or "group.child") the relation is derived from.
+    source_field: str | None = None
 
 
 class PortalFieldDefinitionRead(BaseModel):
@@ -727,12 +731,14 @@ async def list_collections(
         metadata = col.metadata_ or {}
         if visibility_user is None:
             from katalon.services.public_metadata_service import (
-                filter_public_metadata,
+                filter_public_metadata_checked,
                 load_public_fields,
             )
 
             pub_fields = await load_public_fields(db, "collection")
-            metadata = filter_public_metadata(metadata, pub_fields, col.collection_type)
+            metadata = await filter_public_metadata_checked(
+                db, metadata, pub_fields, col.collection_type
+            )
         response_items.append(
             PortalCollectionRead(
                 id=col.id,
@@ -779,12 +785,14 @@ async def get_collection(
     metadata = col.metadata_ or {}
     if visibility_user is None:
         from katalon.services.public_metadata_service import (
-            filter_public_metadata,
+            filter_public_metadata_checked,
             load_public_fields,
         )
 
         pub_fields = await load_public_fields(db, "collection")
-        metadata = filter_public_metadata(metadata, pub_fields, col.collection_type)
+        metadata = await filter_public_metadata_checked(
+            db, metadata, pub_fields, col.collection_type
+        )
 
     from katalon.services.search_service import _extract_title
 
@@ -956,6 +964,13 @@ def _public_endpoint_clause(type_column: Any, id_column: Any) -> Any:
     return or_(*clauses)
 
 
+def _relation_source_field(rel: Relation) -> str | None:
+    if not rel.is_schema_derived:
+        return None
+    source = (rel.metadata_ or {}).get("source_field")
+    return source if isinstance(source, str) and source else None
+
+
 @router.get("/relations", response_model=list[PortalRelationRead])
 async def list_relations(
     db: DBDep,
@@ -1009,6 +1024,7 @@ async def list_relations(
             relation_type=rel.relation_type,
             from_label=labels.get((rel.from_type, rel.from_id)),
             to_label=labels.get((rel.to_type, rel.to_id)),
+            source_field=_relation_source_field(rel),
         )
         for rel in relations
     ]
@@ -1092,6 +1108,7 @@ async def search(
         rel_filters=rel_filters or None,
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
+        facet_sorts=facet_context.sorts or None,
         sort=sort,
         facet_specs=facet_context.specs,
         tree_aggs=facet_context.tree_aggs,
@@ -1181,6 +1198,7 @@ async def advanced_search(
         subtitle_fields=(portal_config.subtitle_fields if portal_config else None) or None,
         advanced_filter=advanced_filter,
         facet_sort=(portal_config.facet_sort if portal_config else None) or "count",
+        facet_sorts=facet_context.sorts or None,
         sort=data.sort,
         facet_specs=facet_context.specs,
         tree_aggs=facet_context.tree_aggs,

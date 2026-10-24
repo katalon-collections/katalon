@@ -38,7 +38,11 @@ from katalon.integrations.metadata_format import (
     ExportRecordSummary,
     ExportRelation,
 )
-from katalon.services.public_metadata_service import filter_public_metadata, load_public_fields
+from katalon.services.public_metadata_service import (
+    filter_public_metadata,
+    load_hidden_relation_targets,
+    load_public_fields,
+)
 from katalon.services.search_service import _extract_title
 
 logger = logging.getLogger(__name__)
@@ -221,7 +225,8 @@ async def _enrich_vocab_values(
 
 async def _load_public_targets(
     db: AsyncSession, ids_by_type: dict[str, set[uuid.UUID]]
-) -> tuple[dict[tuple[str, uuid.UUID], Any], dict[str, list[FieldDefinition]]]:
+) -> tuple[dict[tuple[str, uuid.UUID], Any], dict[str, list[FieldDefinition]], set[str]]:
+    """Public relation targets, their public fields, and hidden ids in their relation fields."""
     targets: dict[tuple[str, uuid.UUID], Any] = {}
     public_fields_by_type: dict[str, list[FieldDefinition]] = {}
     for other_type, ids in ids_by_type.items():
@@ -239,7 +244,14 @@ async def _load_public_targets(
                     continue
                 targets[(other_type, other_rec.id)] = other_rec
         public_fields_by_type[other_type] = await load_public_fields(db, other_type)
-    return targets, public_fields_by_type
+    hidden: set[str] = set()
+    for other_type, fields in public_fields_by_type.items():
+        hidden |= await load_hidden_relation_targets(
+            db,
+            [getattr(rec, "metadata_", None) for (t, _), rec in targets.items() if t == other_type],
+            fields,
+        )
+    return targets, public_fields_by_type, hidden
 
 
 def _export_relation(
@@ -249,6 +261,7 @@ def _export_relation(
     other_id: uuid.UUID,
     other_rec: Any,
     public_fields: Sequence[FieldDefinition],
+    hidden_targets: set[str],
 ) -> ExportRelation:
     other_subtype = _record_subtype(other_rec, other_type)
     title = _record_title(other_rec)
@@ -263,7 +276,7 @@ def _export_relation(
         target_subtype=str(other_subtype) if other_subtype else None,
         metadata=dict(rel.metadata_ or {}),
         target_values=filter_public_metadata(
-            getattr(other_rec, "metadata_", None) or {}, public_fields, other_subtype
+            getattr(other_rec, "metadata_", None) or {}, public_fields, other_subtype, hidden_targets
         ),
     )
 
@@ -300,7 +313,7 @@ async def _attach_second_level(
     for _owner, _row, _direction, other_type, other_id in pending:
         if other_type in _MODEL_MAP and other_type not in _EXCLUDED_RELATION_TARGET_TYPES:
             ids_by_type.setdefault(other_type, set()).add(other_id)
-    targets, public_fields_by_type = await _load_public_targets(db, ids_by_type)
+    targets, public_fields_by_type, hidden_targets = await _load_public_targets(db, ids_by_type)
     by_owner: dict[tuple[str, uuid.UUID], list[ExportRelation]] = {}
     for owner, row, direction, other_type, other_id in pending:
         other_rec = targets.get((other_type, other_id))
@@ -308,7 +321,8 @@ async def _attach_second_level(
             continue
         by_owner.setdefault(owner, []).append(
             _export_relation(
-                row, direction, other_type, other_id, other_rec, public_fields_by_type[other_type]
+                row, direction, other_type, other_id, other_rec, public_fields_by_type[other_type],
+                hidden_targets,
             )
         )
     for rel in relations:
@@ -397,7 +411,8 @@ async def build_export_context_from_db(
 
     # 2. Public fields only (internal fields excluded); vocab values carry term URIs
     public_fields = await load_public_fields(db, record_type)
-    fields = filter_public_metadata(raw_md, public_fields, subtype)
+    hidden_field_targets = await load_hidden_relation_targets(db, [raw_md], public_fields)
+    fields = filter_public_metadata(raw_md, public_fields, subtype, hidden_field_targets)
     fields = await _enrich_vocab_values(db, fields, public_fields)
     fields = _richtext_as_plain_text(fields, public_fields)
 
@@ -427,7 +442,7 @@ async def build_export_context_from_db(
     for _rel, other_type, other_id, _direction in pending:
         if other_type in _MODEL_MAP and other_type not in _EXCLUDED_RELATION_TARGET_TYPES:
             ids_by_type.setdefault(other_type, set()).add(other_id)
-    targets, public_fields_by_type = await _load_public_targets(db, ids_by_type)
+    targets, public_fields_by_type, hidden_targets = await _load_public_targets(db, ids_by_type)
 
     relations: list[ExportRelation] = []
     for rel, other_type, other_id, direction in pending:
@@ -436,7 +451,8 @@ async def build_export_context_from_db(
             continue
         relations.append(
             _export_relation(
-                rel, direction, other_type, other_id, other_rec, public_fields_by_type[other_type]
+                rel, direction, other_type, other_id, other_rec, public_fields_by_type[other_type],
+                hidden_targets,
             )
         )
     if via_relation_types is None:

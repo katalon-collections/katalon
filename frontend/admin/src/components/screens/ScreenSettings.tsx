@@ -900,7 +900,6 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   const [systemFacets, setSystemFacets] = useState<string[]>(
     () => config.facet_fields?._system ?? ['record_type', 'subtype']
   )
-  const [facetSort, setFacetSort] = useState<'count' | 'alpha'>(config.facet_sort ?? 'count')
   const [facetInitialCount, setFacetInitialCount] = useState(config.facet_initial_count ?? 10)
   const [facetFields, setFacetFields] = useState<Record<string, string[]>>(
     () => {
@@ -916,6 +915,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   )
   const [relationFacets, setRelationFacets] = useState<Record<string, RelationFacet[]>>(() => config.relation_facets ?? {})
   const [facetOrder, setFacetOrder] = useState<Record<string, string[]>>(() => config.facet_order ?? {})
+  const [facetSortOverrides, setFacetSortOverrides] = useState<Record<string, Record<string, 'count' | 'alpha'>>>(() => config.facet_sort_overrides ?? {})
   const { t: tFacets, i18n } = useTranslation('facetSettings')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -1056,7 +1056,16 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         body: JSON.stringify({
           facet_fields: inheritedToSave,
           subtitle_fields: subtitleToSave,
-          facet_sort: facetSort,
+          facet_sort: 'count',
+          facet_sort_overrides: Object.fromEntries(
+            RECORD_TYPES.map(({ key }) => {
+              const activeNames = new Set(orderItemsFor(key).map(item => item.name))
+              const entries = [...activeNames]
+                .filter(name => getFacetSort(key, name) === 'alpha')
+                .map(name => [name, 'alpha' as const])
+              return [key, Object.fromEntries(entries)]
+            })
+          ),
           facet_initial_count: facetInitialCount,
           relation_facets: Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, relationFacets[key] ?? []])),
           facet_order: Object.fromEntries(RECORD_TYPES.map(({ key }) => [key, orderItemsFor(key).map(item => item.name)])),
@@ -1067,6 +1076,40 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) { setError((e as Error).message) }
     finally { setSaving(false) }
+  }
+
+  function isSortableField(type: string, name: string, def?: FieldDefinition): boolean {
+    if (RELATED_FACET_NAMES.includes(name) || name.startsWith('inherited_')) return true
+    if (!def) return false
+    if (def.field_type === 'number' || def.field_type === 'boolean' || def.field_type === 'date') return false
+    if (config.facet_kinds?.[type]?.[name]?.kind === 'tree') return false
+    return true
+  }
+
+  function getFacetSort(type: string, name: string): 'count' | 'alpha' {
+    return facetSortOverrides[type]?.[name] ?? (config.facet_sort === 'alpha' ? 'alpha' : 'count')
+  }
+
+  function setFacetSortFor(type: string, name: string, sort: 'count' | 'alpha') {
+    setFacetSortOverrides(prev => ({
+      ...prev,
+      [type]: { ...(prev[type] ?? {}), [name]: sort },
+    }))
+  }
+
+  function renderSortSelect(type: string, name: string, label: string) {
+    return (
+      <select
+        className="fld"
+        aria-label={tFacets('order.sortAria', { name: label })}
+        value={getFacetSort(type, name)}
+        onChange={e => setFacetSortFor(type, name, e.target.value as 'count' | 'alpha')}
+        style={{ width: 'auto', height: 26, padding: '0 8px', fontSize: 12 }}
+      >
+        <option value="count">{tFacets('order.sort.count')}</option>
+        <option value="alpha">{tFacets('order.sort.alpha')}</option>
+      </select>
+    )
   }
 
   function orderItemsFor(type: string): FacetOrderItem[] {
@@ -1096,7 +1139,12 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       return { name, label, kind }
     })
     for (const facet of relationFacets[type] ?? []) {
-      items.push({ name: `relfacet_${facet.key}`, label: facet.label?.[lang] || facet.label?.de || facet.key, kind: 'relation' })
+      const name = `relfacet_${facet.key}`
+      items.push({
+        name,
+        label: facet.label?.[lang] || facet.label?.de || facet.key,
+        kind: 'relation',
+      })
     }
     const ordered = applyOrder(items.map(item => item.name), facetOrder[type])
     return ordered.map(name => items.find(item => item.name === name)!)
@@ -1140,13 +1188,6 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="bd" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-            Sortierung der Facettenwerte
-            <select className="fld" value={facetSort} onChange={e => setFacetSort(e.target.value as 'count' | 'alpha')}>
-              <option value="count">Nach Trefferanzahl</option>
-              <option value="alpha">Alphabetisch</option>
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
             Anfangs sichtbare Werte
             <input
               className="fld mono"
@@ -1161,186 +1202,218 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border-s)' }}>
-        {RECORD_TYPES.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setActiveType(key)}
-            style={{
-              padding: '7px 14px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer',
-              borderBottom: activeType === key ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeType === key ? 'var(--accent)' : 'var(--fg-2)',
-              fontWeight: activeType === key ? 600 : 400,
-              marginBottom: -1,
-            }}
-          >
-            {label}
-            {(facetFields[key]?.length ?? 0) > 0 && (
-              <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--accent)', color: '#fff', borderRadius: 10, padding: '1px 5px' }}>
-                {facetFields[key].length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Facetten pro Datensatztyp</h4>
+      <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-s)', background: 'var(--bg-2, rgba(0,0,0,0.02))', padding: '0 8px', flexWrap: 'wrap' }}>
+          {RECORD_TYPES.map(({ key, label }) => {
+            const count = (facetFields[key]?.length ?? 0) + (relationFacets[key]?.length ?? 0)
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveType(key)}
+                style={{
+                  padding: '10px 14px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer',
+                  borderBottom: activeType === key ? '2px solid var(--accent)' : '2px solid transparent',
+                  color: activeType === key ? 'var(--accent)' : 'var(--fg-2)',
+                  fontWeight: activeType === key ? 600 : 400,
+                  marginBottom: -1,
+                }}
+              >
+                {label}
+                {count > 0 && (
+                  <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--accent)', color: '#fff', borderRadius: 10, padding: '1px 5px' }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
 
-      {loadingFields ? (
-        <div className="empty">Lade Felder…</div>
-      ) : (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="bd">
-            {fields.length === 0 && inheritedFacetFields.length === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>Keine Felder für diesen Typ definiert.</div>
-            )}
-            {fields.map(f => (
-              <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  className="ck"
-                  checked={selected.includes(f.name)}
-                  onChange={() => toggle(activeType, f.name)}
-                />
-                <span style={{ flex: 1 }}>{f.label?.de || f.label?.en || f.name}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
-              </label>
-            ))}
-            {subfields.map(sub => (
-              <label key={sub.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  className="ck"
-                  checked={selected.includes(sub.name)}
-                  onChange={() => toggle(activeType, sub.name)}
-                />
-                <span style={{ flex: 1 }}>
-                  {tFacets('subfield', {
-                    group: sub.group.label?.de || sub.group.label?.en || sub.group.name,
-                    field: sub.child.label?.de || sub.child.label?.en || sub.child.name,
-                  })}
-                </span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{sub.name}</span>
-              </label>
-            ))}
-            {inheritedFacetFields.length > 0 && (
-              <>
-                <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
-                  Felder verknüpfter Datensätze
-                </div>
-                {inheritedFacetFields.map(f => (
-                  <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-                    <input
-                      type="checkbox"
-                      className="ck"
-                      checked={selected.includes(f.name)}
-                      onChange={() => toggle(activeType, f.name)}
-                    />
-                    <span style={{ flex: 1 }}>{f.label}</span>
+        <div className="bd">
+          {loadingFields ? (
+            <div className="empty">Lade Felder…</div>
+          ) : (
+            <div>
+              {fields.length === 0 && inheritedFacetFields.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>Keine Felder für diesen Typ definiert.</div>
+              )}
+              {fields.map(f => {
+                const label = f.label?.de || f.label?.en || f.name
+                const isChecked = selected.includes(f.name)
+                return (
+                  <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        className="ck"
+                        checked={isChecked}
+                        onChange={() => toggle(activeType, f.name)}
+                      />
+                      <span style={{ flex: 1 }}>{label}</span>
+                    </label>
+                    {isChecked && isSortableField(activeType, f.name, f) && renderSortSelect(activeType, f.name, label)}
                     <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
-                  </label>
-                ))}
-              </>
-            )}
-            <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
-              Verknüpfte Datensätze (automatische Relations-Facetten)
-            </div>
-            {RELATED_FACET_DEFS.map(f => (
-              <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  className="ck"
-                  checked={selected.includes(f.name)}
-                  onChange={() => toggle(activeType, f.name)}
-                />
-                <span style={{ flex: 1 }}>{f.label}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>{tFacets('relations.title')}</h4>
-      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{tFacets('relations.hint')}</p>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="bd">
-          <RelationFacetsEditor
-            recordType={activeType}
-            value={relationFacets[activeType] ?? []}
-            onChange={next => setRelationFacets(prev => ({ ...prev, [activeType]: next }))}
-          />
-        </div>
-      </div>
-
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>{tFacets('order.title')}</h4>
-      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{tFacets('order.hint')}</p>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="bd">
-          <FacetOrderList
-            items={orderItemsFor(activeType)}
-            onChange={names => setFacetOrder(prev => ({ ...prev, [activeType]: names }))}
-          />
-        </div>
-      </div>
-
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '20px 0 6px' }}>Ergebnis-Untertitel</h4>
-      <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-        Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · Datierung“).
-        Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.
-      </p>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="bd">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-            <input
-              type="checkbox"
-              className="ck"
-              checked={subtitleSelected.includes('record_type')}
-              onChange={() => toggleSubtitle(activeType, 'record_type')}
-            />
-            <span style={{ flex: 1 }}>Typ</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>record_type</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-            <input
-              type="checkbox"
-              className="ck"
-              checked={subtitleSelected.includes('status')}
-              onChange={() => toggleSubtitle(activeType, 'status')}
-            />
-            <span style={{ flex: 1 }}>Status</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>status</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-            <input
-              type="checkbox"
-              className="ck"
-              checked={subtitleSelected.includes('idno')}
-              onChange={() => toggleSubtitle(activeType, 'idno')}
-            />
-            <span style={{ flex: 1 }}>ID-Nummer</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>idno</span>
-          </label>
-          {(() => {
-            const options = [
-              ...fields.filter(f => selected.includes(f.name)).map(f => ({ name: f.name, label: f.label?.de || f.label?.en || f.name })),
-              ...inheritedFacetFields.filter(f => selected.includes(f.name)),
-            ]
-            return options.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>
-                Keine weiteren Felder – aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
+                  </div>
+                )
+              })}
+              {subfields.map(sub => {
+                const label = tFacets('subfield', {
+                  group: sub.group.label?.de || sub.group.label?.en || sub.group.name,
+                  field: sub.child.label?.de || sub.child.label?.en || sub.child.name,
+                })
+                const isChecked = selected.includes(sub.name)
+                return (
+                  <div key={sub.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        className="ck"
+                        checked={isChecked}
+                        onChange={() => toggle(activeType, sub.name)}
+                      />
+                      <span style={{ flex: 1 }}>{label}</span>
+                    </label>
+                    {isChecked && isSortableField(activeType, sub.name, sub.child) && renderSortSelect(activeType, sub.name, label)}
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{sub.name}</span>
+                  </div>
+                )
+              })}
+              {inheritedFacetFields.length > 0 && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
+                    Felder verknüpfter Datensätze
+                  </div>
+                  {inheritedFacetFields.map(f => {
+                    const isChecked = selected.includes(f.name)
+                    return (
+                      <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                          <input
+                            type="checkbox"
+                            className="ck"
+                            checked={isChecked}
+                            onChange={() => toggle(activeType, f.name)}
+                          />
+                          <span style={{ flex: 1 }}>{f.label}</span>
+                        </label>
+                        {isChecked && renderSortSelect(activeType, f.name, f.label)}
+                        <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+              <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
+                Verknüpfte Datensätze (automatische Relations-Facetten)
               </div>
-            ) : options.map(f => (
-              <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  className="ck"
-                  checked={subtitleSelected.includes(f.name)}
-                  onChange={() => toggleSubtitle(activeType, f.name)}
-                />
-                <span style={{ flex: 1 }}>{f.label}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
-              </label>
-            ))
-          })()}
+              {RELATED_FACET_DEFS.map(f => {
+                const isChecked = selected.includes(f.name)
+                return (
+                  <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        className="ck"
+                        checked={isChecked}
+                        onChange={() => toggle(activeType, f.name)}
+                      />
+                      <span style={{ flex: 1 }}>{f.label}</span>
+                    </label>
+                    {isChecked && renderSortSelect(activeType, f.name, f.label)}
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid var(--border-s)', marginTop: 20, paddingTop: 16 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{tFacets('order.title')}</h4>
+            <p style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 10 }}>{tFacets('order.hint')}</p>
+            <FacetOrderList
+              items={orderItemsFor(activeType)}
+              onChange={names => setFacetOrder(prev => ({ ...prev, [activeType]: names }))}
+            />
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-s)', marginTop: 20, paddingTop: 16 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{tFacets('relations.title')}</h4>
+            <p style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 10 }}>{tFacets('relations.hint')}</p>
+            <RelationFacetsEditor
+              recordType={activeType}
+              value={relationFacets[activeType] ?? []}
+              onChange={next => setRelationFacets(prev => ({ ...prev, [activeType]: next }))}
+              sortByKey={Object.fromEntries(
+                (relationFacets[activeType] ?? []).map(facet => [
+                  `relfacet_${facet.key}`,
+                  getFacetSort(activeType, `relfacet_${facet.key}`),
+                ])
+              )}
+              onSortChange={(facetName, sort) => setFacetSortFor(activeType, facetName, sort)}
+            />
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-s)', marginTop: 20, paddingTop: 16 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>Ergebnis-Untertitel</h4>
+            <p style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 10 }}>
+              Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · Datierung“).
+              Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                className="ck"
+                checked={subtitleSelected.includes('record_type')}
+                onChange={() => toggleSubtitle(activeType, 'record_type')}
+              />
+              <span style={{ flex: 1 }}>Typ</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>record_type</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                className="ck"
+                checked={subtitleSelected.includes('status')}
+                onChange={() => toggleSubtitle(activeType, 'status')}
+              />
+              <span style={{ flex: 1 }}>Status</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>status</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                className="ck"
+                checked={subtitleSelected.includes('idno')}
+                onChange={() => toggleSubtitle(activeType, 'idno')}
+              />
+              <span style={{ flex: 1 }}>ID-Nummer</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>idno</span>
+            </label>
+            {(() => {
+              const options = [
+                ...fields.filter(f => selected.includes(f.name)).map(f => ({ name: f.name, label: f.label?.de || f.label?.en || f.name })),
+                ...inheritedFacetFields.filter(f => selected.includes(f.name)),
+              ]
+              return options.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>
+                  Keine weiteren Felder – aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
+                </div>
+              ) : options.map(f => (
+                <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    className="ck"
+                    checked={subtitleSelected.includes(f.name)}
+                    onChange={() => toggleSubtitle(activeType, f.name)}
+                  />
+                  <span style={{ flex: 1 }}>{f.label}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
+                </label>
+              ))
+            })()}
+          </div>
         </div>
       </div>
 
