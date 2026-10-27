@@ -140,6 +140,14 @@ def apply_transforms(value: str, transforms: list[dict[str, Any]]) -> list[str]:
     return values
 
 
+def _dedupe_key(item: Any) -> Any:
+    if isinstance(item, str):
+        return item.strip()
+    if isinstance(item, dict):
+        return str(item.get("value", "")).strip()
+    return item
+
+
 def _combine_row_values(row: dict[str, Any], transform: dict[str, Any]) -> str:
     sources = transform.get("sources", [])
     values = [_row_values(row, source)[0] if _row_values(row, source) else "" for source in sources]
@@ -219,7 +227,7 @@ def apply_mapping(
             if container_target:
                 group_name, child_name = container_target
                 container_parts = [part for raw in raws for part in (apply_transforms(raw, transforms) if transforms else [raw])]
-                containers.setdefault(group_name, {})[child_name] = container_parts
+                containers.setdefault(group_name, {}).setdefault(child_name, []).extend(container_parts)
                 continue
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
@@ -232,10 +240,16 @@ def apply_mapping(
 
             # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
-                if field_type == "url":
-                    record[field_name] = [{"value": part, "label": ""} for part in parts]
-                else:
-                    record[field_name] = parts
+                items: list[Any] = (
+                    [{"value": part, "label": ""} for part in parts] if field_type == "url" else parts
+                )
+                # Several columns may feed one repeatable field (Genre1..3): append, skip repeats.
+                existing = record.setdefault(field_name, [])
+                seen = {_dedupe_key(item) for item in existing}
+                for item in items:
+                    if _dedupe_key(item) not in seen:
+                        seen.add(_dedupe_key(item))
+                        existing.append(item)
                 continue
 
             # For non-repeatable fields, store single plain value (form reads string/number/bool)
@@ -476,14 +490,16 @@ def dry_run(
             if fname in mapped_fields and not rec.get(fname):
                 errors.append({"row": row_num, "message": f"Pflichtfeld '{fname}' ist leer"})
 
-        # Track empty values for non-required mapped fields
+        # Track empty values for non-required mapped fields; a field fed by several
+        # columns counts as empty only when all of them are empty in this row.
+        selectors_by_field: dict[str, list[str]] = {}
         for selector, val in mapping.items():
             field_name = val.get("target", "") if isinstance(val, dict) else val
-            if field_name == "__idno__":
+            if field_name == "__idno__" or field_name in required_fields:
                 continue
-            if field_name in required_fields:
-                continue
-            if not _row_values(rows[i], selector):
+            selectors_by_field.setdefault(field_name, []).append(selector)
+        for field_name, selectors in selectors_by_field.items():
+            if not any(_row_values(rows[i], selector) for selector in selectors):
                 empty_field_counts[field_name] = empty_field_counts.get(field_name, 0) + 1
 
     # Aggregate empty-field warnings: only show if >10% of rows are empty

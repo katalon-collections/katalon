@@ -89,6 +89,7 @@ def import_records_task(
     from katalon.services.schema_service import prepare_metadata, validate_metadata
     from katalon.services.search_service import index_record
     from katalon.services.subtype_service import ensure_subtype_exists
+    from katalon.services.vocabulary_reference_service import ensure_field_vocabulary
 
     # NullPool avoids binding connections to a previous event loop across Celery task invocations
     AsyncSessionLocal, _engine = make_session()
@@ -286,6 +287,7 @@ def import_records_task(
                     name = (f.get("name") or "").strip()
                     if not name:
                         continue
+                    vocab_name = (f.get("label_de") or "").strip() or name
                     existing_fd = (
                         await session.execute(
                             select(FieldDefinition).where(
@@ -299,23 +301,24 @@ def import_records_task(
                             existing_fd.is_deleted = False
                             existing_fd.field_type = f.get("field_type", "text")
                             existing_fd.is_repeatable = bool(f.get("is_repeatable", False))
+                        await ensure_field_vocabulary(session, existing_fd, vocab_name)
                         continue
                     label: dict[str, str] = {}
                     if f.get("label_de"):
                         label["de"] = f["label_de"].strip()
                     if f.get("label_en"):
                         label["en"] = f["label_en"].strip()
-                    session.add(
-                        FieldDefinition(
-                            target_type=record_type,
-                            name=name,
-                            label=label,
-                            field_type=f.get("field_type", "text"),
-                            is_required=False,
-                            is_repeatable=bool(f.get("is_repeatable", False)),
-                            sort_order=0,
-                        )
+                    new_fd = FieldDefinition(
+                        target_type=record_type,
+                        name=name,
+                        label=label,
+                        field_type=f.get("field_type", "text"),
+                        is_required=False,
+                        is_repeatable=bool(f.get("is_repeatable", False)),
+                        sort_order=0,
                     )
+                    await ensure_field_vocabulary(session, new_fd, vocab_name)
+                    session.add(new_fd)
                 await session.flush()
 
             # Load field_defs once for type conversion in apply_mapping

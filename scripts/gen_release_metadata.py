@@ -4,7 +4,7 @@
 """Generiert katalon-release.json für ein Release-Tag (katalon-cli Issue #286).
 
 Version + migration_required/breaking werden automatisch ermittelt,
-compose_revision/minimum_installer_version/requires kommen aus release-meta.toml
+compose_revision/minimum_installer_version/images/requires kommen aus release-meta.toml
 (manuell gepflegt, s. Kommentar dort).
 
 Zusätzlich werden Metadaten zu Umgebungsvariablen (env_vars und deprecated_env_vars)
@@ -366,6 +366,7 @@ def build_release_payload(
         "reindex_required": reindex_required(tag, prev, meta, version),
         "breaking": is_breaking(version, changelog_path=changelog_path),
         "compose_revision": meta["compose_revision"],
+        "images": meta.get("images", {}),
         "requires": meta.get("requires", {}),
         "env_vars": env_vars,
         "deprecated_env_vars": deprecated_env_vars,

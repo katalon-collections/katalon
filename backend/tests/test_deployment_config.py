@@ -81,7 +81,7 @@ def test_record_uri_location_keeps_security_headers() -> None:
     it would serve the portal shell without CSP/HSTS & co."""
     for name in ("docker/nginx.conf", "docker/nginx.dev.conf"):
         conf = (REPO_ROOT / name).read_text()
-        start = conf.index('add_header Vary "Accept" always;')
+        start = conf.index('add_header Vary "Accept, User-Agent" always;')
         block = conf[start: conf.index("\n    }\n", start)]
         assert "add_header Content-Security-Policy" in block
         assert 'add_header X-Frame-Options "SAMEORIGIN" always;' in block

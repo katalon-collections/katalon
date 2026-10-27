@@ -285,13 +285,6 @@ class PortalConfigUpdate(BaseModel):
         return _validate_relation_facets(value)
 
 
-def resolve_lang_text(value: dict[str, str] | None, preferred: str = "de") -> str:
-    """Pick one string out of a {"de": ..., "en": ...} field for non-i18n-aware consumers."""
-    if not value:
-        return ""
-    return value.get(preferred) or next(iter(value.values()), "")
-
-
 async def _get_or_create(db: DBDep) -> PortalConfig:
     result = await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
     config = result.scalar_one_or_none()

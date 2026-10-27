@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, ClassVar, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy import and_, exists, func, or_, select
 
@@ -46,6 +46,7 @@ from katalon.core.models import (
 )
 from katalon.core.schemas import EntityRead, ObjectRead, OccurrenceRead, PlaceRead
 from katalon.core.visibility import PUBLIC_STATUSES, readable_record_types
+from katalon.integrations.jsonld_format import PLURAL_TYPE_MAP
 from katalon.services import relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 
@@ -537,6 +538,21 @@ async def get_object(
     record: Object | ObjectRead = await objects.get_object(object_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
     return record
+
+
+@router.get("/seo/{plural_type}/{record_id}", response_class=HTMLResponse, include_in_schema=False)
+async def seo_page(
+    plural_type: Literal["objects", "entities", "places", "occurrences", "collections"],
+    record_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+) -> HTMLResponse:
+    """Meta-tag HTML for crawlers without JS (nginx routes bots here, see `$seo_bot`)."""
+    from katalon.services.seo_service import render_record_seo
+
+    record_type = next(t for t, plural in PLURAL_TYPE_MAP.items() if plural == plural_type)
+    page = await render_record_seo(db, record_type, record_id, str(request.base_url))
+    return HTMLResponse(page, headers={"Cache-Control": _PUBLIC_CACHE})
 
 
 @router.get("/objects/{object_id}/export", summary="Export a single object record as JSON-LD or Turtle RDF")

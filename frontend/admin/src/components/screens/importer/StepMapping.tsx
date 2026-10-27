@@ -312,31 +312,37 @@ export function StepMapping({
                           delete next[col]
                         } else {
                           next[col] = { target, transforms: mapping[col]?.transforms }
-                          for (const [otherCol, otherEntry] of Object.entries(next)) {
-                            if (otherCol !== col && otherEntry.target === target) delete next[otherCol]
+                          // Repeatable targets keep their other columns (Genre1..3); others are exclusive.
+                          const [groupName, childName] = target.split('.')
+                          const targetField = fields.find(f => f.name === (childName ? groupName : target))
+                          if (!targetField?.is_repeatable) {
+                            for (const [otherCol, otherEntry] of Object.entries(next)) {
+                              if (otherCol !== col && otherEntry.target === target) delete next[otherCol]
+                            }
                           }
                         }
                         onMappingChange(next)
                       }}
                     >
-                      <option value="">– ignorieren –</option>
+                      <option value="">{t('mappingIgnore')}</option>
                       <optgroup label={RECORD_TYPES.find(t => t.id === recordType)?.label ?? 'Felder'}>
                         {fields.map(f => {
-                          const isMappedByOther = Object.entries(mapping).some(
+                          // Repeatable targets may be fed by several columns (e.g. Genre1..3).
+                          const isMappedByOther = !f.is_repeatable && Object.entries(mapping).some(
                             ([otherCol, otherEntry]) => otherCol !== col && otherEntry.target === f.name
                           )
                           const isPending = pendingFields.some(p => p.name === f.name)
                           if (f.field_type === 'group') {
                             return (f.children ?? []).map(child => {
                               const target = `${f.name}.${child.name}`
-                              const used = Object.entries(mapping).some(([otherCol, entry]) => otherCol !== col && entry.target === target)
+                              const used = !f.is_repeatable && Object.entries(mapping).some(([otherCol, entry]) => otherCol !== col && entry.target === target)
                               return <option key={child.id} value={target} disabled={used}>
-                                {getLabel(f, f.name)} → {getLabel(child, child.name)}{child.is_required ? ' *' : ''}{used ? ' (bereits zugewiesen)' : ''}
+                                {getLabel(f, f.name)} → {getLabel(child, child.name)}{child.is_required ? ' *' : ''}{used ? ` ${t('mappingAlreadyAssigned')}` : ''}
                               </option>
                             })
                           }
                           return <option key={f.id} value={f.name} disabled={isMappedByOther}>
-                            {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isPending ? ' (neu)' : ''}{isMappedByOther ? ' (bereits zugewiesen)' : ''}
+                            {getLabel(f, f.name)}{f.is_required ? ' *' : ''}{isPending ? ` ${t('mappingNewField')}` : ''}{isMappedByOther ? ` ${t('mappingAlreadyAssigned')}` : ''}
                           </option>
                         })}
                       </optgroup>

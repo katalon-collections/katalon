@@ -11,9 +11,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
 
-from katalon.api.v1.portal import resolve_lang_text
 from katalon.config import settings
 from katalon.core.dependencies import DBDep
+from katalon.core.lang_text import resolve_lang_text
 from katalon.core.limiter import limiter
 from katalon.core.models import OAISet, PortalConfig
 from katalon.core.visibility import PUBLIC_STATUSES

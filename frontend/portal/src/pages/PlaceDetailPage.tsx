@@ -123,6 +123,7 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
         <meta property="og:title" content={title} />
         {description && <meta property="og:description" content={description} />}
         <meta property="og:url" content={window.location.href} />
+        <link rel="canonical" href={`${window.location.origin}${window.location.pathname}`} />
         <meta property="og:type" content="article" />
       </Helmet>
       <div className="bc">

@@ -708,6 +708,12 @@ export const preservationApi = {
 export const vocabularies = {
   list:       () => req<Vocabulary[]>('/v1/vocabularies'),
   create:     (data: Omit<Vocabulary, 'id'>) => req<Vocabulary>('/v1/vocabularies', { method: 'POST', body: JSON.stringify(data) }),
+  resetSummary: (vocabId: string) =>
+    req<{ term_count: number; referencing_fields: number; is_system: boolean }>(`/v1/vocabularies/${vocabId}/reset-summary`),
+  clearTerms: (vocabId: string) =>
+    req<{ deleted_terms: number; deleted_vocabulary: boolean; deactivated_fields: number }>(`/v1/vocabularies/${vocabId}/terms`, { method: 'DELETE' }),
+  deleteVocabulary: (vocabId: string, opts?: { force?: boolean }) =>
+    req<{ deleted_terms: number; deleted_vocabulary: boolean; deactivated_fields: number }>(`/v1/vocabularies/${vocabId}${opts?.force ? '?force=true' : ''}`, { method: 'DELETE' }),
   listTerms:  (vocabId: string, filter?: { from_type?: string; to_type?: string }) => {
     const params = new URLSearchParams()
     if (filter?.from_type) params.set('from_type', filter.from_type)

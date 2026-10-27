@@ -45,7 +45,7 @@ from katalon.core.visibility import PUBLIC_STATUSES, ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
 from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
-from katalon.services.media_service import touch_object
+from katalon.services.media_service import primary_media_files_by_object, touch_object
 from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
@@ -132,21 +132,9 @@ async def list_media(object_id: uuid.UUID, db: DBDep, current_user: OptionalCurr
 async def primary_media_by_object(
     object_ids: list[uuid.UUID], db: DBDep, *, public_only: bool
 ) -> dict[uuid.UUID, dict[str, Any]]:
-    """Preview file per object as portal teasers show it: the ready primary file, otherwise
-    the oldest ready one. One query for all objects; visibility of the objects themselves
-    is the caller's job."""
-    query = select(MediaFile).where(
-        MediaFile.object_id.in_(object_ids),
-        MediaFile.deleted_at.is_(None),
-        MediaFile.status == "ready",
-    )
-    if public_only:
-        query = query.where(MediaFile.is_public.is_(True))
-    result = await db.execute(query.order_by(MediaFile.is_primary.desc(), MediaFile.created_at))
-    primary: dict[uuid.UUID, dict[str, Any]] = {}
-    for f in result.scalars().all():
-        primary.setdefault(f.object_id, _serialize(f))
-    return primary
+    """Serialized preview file per object (see ``primary_media_files_by_object``)."""
+    files = await primary_media_files_by_object(db, object_ids, public_only=public_only)
+    return {object_id: _serialize(f) for object_id, f in files.items()}
 
 
 @router.post(

@@ -21,9 +21,14 @@ from katalon.core.schemas import (
 from katalon.services import skos_import_service, vocabulary_import_service
 from katalon.services.schema_service import prepare_metadata, validate_metadata
 from katalon.services.vocabulary_reference_service import (
+    SYSTEM_VOCABULARY_NAMES,
+    clear_vocabulary_terms,
     count_direct_children,
     count_references,
+    count_vocabulary_terms,
+    delete_vocabulary_and_terms,
     get_term_subtree_ids,
+    referencing_schema_fields,
     remap_references,
     remove_references,
     reparent_children,
@@ -154,6 +159,112 @@ async def create_vocabulary(data: VocabularyCreate, db: DBDep) -> Vocabulary:
     db.add(vocab)
     await db.commit()
     return vocab
+
+
+class VocabularyResetSummary(BaseModel):
+    term_count: int
+    referencing_fields: int
+    is_system: bool
+
+
+class VocabularyResetResult(BaseModel):
+    deleted_terms: int
+    deleted_vocabulary: bool
+    deactivated_fields: int = 0
+
+
+@router.get(
+    "/{vocab_id}/reset-summary",
+    response_model=VocabularyResetSummary,
+    dependencies=[require_role("admin")],
+    summary="Count terms and referencing schema fields for a vocabulary reset or deletion",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Vocabulary not found"},
+    },
+)
+async def vocabulary_reset_summary(vocab_id: uuid.UUID, db: DBDep) -> VocabularyResetSummary:
+    vocab = await db.get(Vocabulary, vocab_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    term_count = await count_vocabulary_terms(db, vocab_id)
+    ref_fields = await referencing_schema_fields(db, vocab_id)
+    return VocabularyResetSummary(
+        term_count=term_count,
+        referencing_fields=len(ref_fields),
+        is_system=vocab.name in SYSTEM_VOCABULARY_NAMES,
+    )
+
+
+@router.delete(
+    "/{vocab_id}/terms",
+    response_model=VocabularyResetResult,
+    dependencies=[require_role("admin")],
+    summary="Delete all terms of a vocabulary while keeping the vocabulary itself",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Vocabulary not found"},
+    },
+)
+async def reset_vocabulary_terms(vocab_id: uuid.UUID, db: DBDep) -> VocabularyResetResult:
+    vocab = await db.get(Vocabulary, vocab_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    deleted_terms = await clear_vocabulary_terms(db, vocab_id)
+    await db.commit()
+    return VocabularyResetResult(
+        deleted_terms=deleted_terms,
+        deleted_vocabulary=False,
+        deactivated_fields=0,
+    )
+
+
+@router.delete(
+    "/{vocab_id}",
+    response_model=VocabularyResetResult,
+    dependencies=[require_role("admin")],
+    summary="Delete an entire vocabulary and all its terms",
+    responses={
+        403: {"description": "Insufficient permissions"},
+        404: {"description": "Vocabulary not found"},
+        409: {
+            "description": "System vocabulary cannot be deleted, or active schema fields still reference it"
+        },
+    },
+)
+async def delete_vocabulary(
+    vocab_id: uuid.UUID,
+    db: DBDep,
+    force: bool = Query(
+        False, description="Also soft-delete active schema fields referencing this vocabulary."
+    ),
+) -> VocabularyResetResult:
+    vocab = await db.get(Vocabulary, vocab_id)
+    if not vocab:
+        raise HTTPException(status_code=404, detail="Vokabular nicht gefunden")
+    if vocab.name in SYSTEM_VOCABULARY_NAMES:
+        raise HTTPException(
+            status_code=409,
+            detail="Systemvokabulare (media_types, relation_types) können nicht komplett gelöscht werden.",
+        )
+    ref_fields = await referencing_schema_fields(db, vocab_id)
+    if ref_fields and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"{len(ref_fields)} aktive Felddefinitionen verweisen noch auf dieses Vokabular.",
+                "related_count": len(ref_fields),
+            },
+        )
+    deleted_terms, deactivated_fields = await delete_vocabulary_and_terms(
+        db, vocab, force=force
+    )
+    await db.commit()
+    return VocabularyResetResult(
+        deleted_terms=deleted_terms,
+        deleted_vocabulary=True,
+        deactivated_fields=deactivated_fields,
+    )
 
 
 # ---------------------------------------------------------------------------

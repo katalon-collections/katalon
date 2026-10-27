@@ -4,6 +4,24 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.47.0]
+
+- **Mehrere Spalten in ein Feld importieren:** Im Importer können mehrere Spalten (etwa
+  Genre1, Genre2, Genre3) demselben wiederholbaren Feld zugeordnet werden; ihre Werte werden
+  zusammengeführt, doppelte Werte einer Zeile entfallen. Bisher blieb nur die letzte Spalte
+  übrig. Auch die Hinweise im Zuordnungsschritt sind jetzt zweisprachig.
+  Neu im Import angelegte Vokabularfelder erhalten automatisch ein passendes Vokabular, die
+  Werte der Spalten werden als Begriffe angelegt.
+- **Vokabulare leeren oder löschen:** Im Gefahrenbereich der Einstellungen lassen sich alle
+  Begriffe eines Vokabulars oder das gesamte Vokabular entfernen, mit Bestätigung durch
+  Eingabe des Namens.
+- **Vorschau-Informationen für Suchmaschinen und Link-Vorschauen:** Verlinkte Datensätze
+  zeigen in Messengern, sozialen Netzwerken und bei Suchmaschinen Titel, Beschreibung und
+  Vorschaubild; dazu gibt es eine Sitemap.
+- **Update-Informationen für Installationen:** Ein Release legt jetzt fest, welche Versionen
+  von Datenbank, Suchindex, Bildserver und Webserver eine Installation verwendet; die
+  Installations-CLI (ab 0.4.0) übernimmt sie beim Update.
+
 ## [1.46.0]
 
 - **Karte bei Orts-Beziehungsfeldern im Portal:** Beziehungsfelder, die auf Orte verweisen

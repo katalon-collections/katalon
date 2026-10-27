@@ -8,11 +8,121 @@ from collections.abc import Iterator
 from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import FieldDefinition, VocabularyTerm
+from katalon.core.models import FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.services.relation_service import _RECORD_MODELS
+
+SYSTEM_VOCABULARY_NAMES: frozenset[str] = frozenset({"media_types", "relation_types"})
+
+
+async def referencing_schema_fields(
+    db: AsyncSession, vocabulary_id: uuid.UUID
+) -> list[FieldDefinition]:
+    """Return active record schema fields referencing ``vocabulary_id``."""
+    vocab_id_str = str(vocabulary_id)
+    fields = list(
+        (
+            await db.execute(
+                select(FieldDefinition).where(
+                    FieldDefinition.is_deleted.is_(False),
+                    FieldDefinition.field_type.in_(("vocab", "vocab_free", "relation")),
+                )
+            )
+        ).scalars()
+    )
+    return [
+        f
+        for f in fields
+        if (
+            f.field_type in ("vocab", "vocab_free")
+            and str((f.settings or {}).get("vocabulary_id")) == vocab_id_str
+        )
+        or (
+            f.field_type == "relation"
+            and str((f.settings or {}).get("relation_type_vocab")) == vocab_id_str
+        )
+    ]
+
+
+async def ensure_field_vocabulary(db: AsyncSession, field: FieldDefinition, vocab_name: str) -> None:
+    """Bind a vocab field without vocabulary to the vocabulary ``vocab_name`` (created if
+    missing). Without a binding the field rejects every imported value."""
+    if field.field_type != "vocab" or (field.settings or {}).get("vocabulary_id"):
+        return
+    vocab = (await db.execute(select(Vocabulary).where(Vocabulary.name == vocab_name))).scalar_one_or_none()
+    if vocab is None:
+        vocab = Vocabulary(name=vocab_name)
+        db.add(vocab)
+        await db.flush()
+    field.settings = {**(field.settings or {}), "vocabulary_id": str(vocab.id)}
+
+
+async def count_vocabulary_terms(db: AsyncSession, vocabulary_id: uuid.UUID) -> int:
+    """Count all terms belonging to ``vocabulary_id``."""
+    result = await db.execute(
+        select(func.count()).where(VocabularyTerm.vocabulary_id == vocabulary_id)
+    )
+    return result.scalar_one()
+
+
+async def clear_vocabulary_terms(db: AsyncSession, vocabulary_id: uuid.UUID) -> int:
+    """Delete all terms of ``vocabulary_id`` while keeping the vocabulary row itself."""
+    term_count = await count_vocabulary_terms(db, vocabulary_id)
+    if term_count > 0:
+        await request_reindex_for_vocabulary(db, vocabulary_id)
+        await db.execute(
+            delete(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocabulary_id)
+        )
+    return term_count
+
+
+async def delete_vocabulary_and_terms(
+    db: AsyncSession, vocab: Vocabulary, *, force: bool = False
+) -> tuple[int, int]:
+    """Delete ``vocab`` and all its terms, optionally soft-deleting referencing schema fields.
+
+    Returns ``(deleted_terms, deactivated_fields)``.
+    """
+    from katalon.workers.enqueue import after_commit
+    from katalon.workers.reindex_state import request_bulk_reindex
+
+    ref_fields = await referencing_schema_fields(db, vocab.id)
+    deactivated_fields = 0
+    affected_types: set[str] = set()
+    if ref_fields and force:
+        for field in ref_fields:
+            field.is_deleted = True
+            deactivated_fields += 1
+            if field.target_type in _RECORD_MODELS:
+                affected_types.add(field.target_type)
+
+    # Also soft-delete any custom vocabulary_term fields scoped to this vocabulary
+    await db.execute(
+        update(FieldDefinition)
+        .where(
+            FieldDefinition.target_type == "vocabulary_term",
+            FieldDefinition.target_subtype == str(vocab.id),
+            FieldDefinition.is_deleted.is_(False),
+        )
+        .values(is_deleted=True)
+    )
+
+    term_count = await count_vocabulary_terms(db, vocab.id)
+    for record_type, fields in (await _vocab_fields(db, vocab.id)).items():
+        if fields:
+            affected_types.add(record_type)
+
+    await db.execute(
+        delete(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab.id)
+    )
+    await db.delete(vocab)
+
+    for record_type in affected_types:
+        after_commit(db, request_bulk_reindex, record_type)
+
+    return term_count, deactivated_fields
 
 
 async def count_direct_children(db: AsyncSession, parent_id: uuid.UUID) -> int:

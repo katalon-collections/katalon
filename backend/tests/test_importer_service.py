@@ -355,3 +355,29 @@ def test_apply_mapping_url_subfields_use_url_object_shape() -> None:
     assert records == [
         {"links": [{"link": {"value": "https://a.org", "label": ""}, "note": "A"}, {"note": "B"}]}
     ]
+
+
+def test_apply_mapping_multiple_columns_into_repeatable_field() -> None:
+    field = SimpleNamespace(id=object(), name="genre", field_type="vocab", is_repeatable=True, parent_id=None)
+    rows = [{"G1": "Action", "G2": " Simulation", "G3": " Action"}, {"G1": "", "G2": " Arcade", "G3": ""}]
+    mapping = {"G1": "genre", "G2": "genre", "G3": "genre"}
+    result, _ = apply_mapping(rows, mapping, {"genre": field})
+    assert result[0]["genre"] == ["Action", "Simulation"]
+    assert result[1]["genre"] == ["Arcade"]
+
+
+def test_apply_mapping_multiple_columns_into_group_child() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="name", field_type="group", parent_id=None)
+    child = SimpleNamespace(id=object(), name="vorname", field_type="text", parent_id=group_id)
+    fields = {"name": group, "name.vorname": child}
+    result, _ = apply_mapping([{"A": "Anna", "B": "Bert"}], {"A": "name.vorname", "B": "name.vorname"}, fields)
+    assert result[0]["name"] == [{"vorname": "Anna"}, {"vorname": "Bert"}]
+
+
+def test_dry_run_empty_stat_counts_rows_not_columns() -> None:
+    rows = [{"T": "x", "G1": "A", "G2": "", "G3": ""}] * 3 + [{"T": "x", "G1": "", "G2": "", "G3": ""}] * 7
+    mapping = {"T": "title", "G1": "genre", "G2": "genre", "G3": "genre"}
+    result = dry_run(rows, mapping)
+    message = next(w["message"] for w in result["warnings"] if "genre" in w["message"])
+    assert "in 7 von 10 Zeilen (70%) leer" in message

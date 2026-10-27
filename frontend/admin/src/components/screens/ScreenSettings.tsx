@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { req, BASE, apiKeys, users, schema, subtypes, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
+import { req, BASE, apiKeys, users, schema, subtypes, vocabularies, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
-import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, RelationFacet, TerminologyEntry } from '../../types'
+import type { ApiKey, ApiKeyCreated, FieldDefinition, HomepageBlock, PortalConfigRead, RecordSubtype, RelationFacet, TerminologyEntry, Vocabulary } from '../../types'
 import { FacetOrderList, type FacetOrderItem } from './settings/FacetOrderList'
 import { RelationFacetsEditor } from './settings/RelationFacetsEditor'
 import { SectionFooterNotice } from './settings/SectionFooterNotice'
@@ -787,6 +787,7 @@ function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, on
 // ---------------------------------------------------------------------------
 
 function SectionDangerZone() {
+  const { t } = useTranslation('screenSettings')
   const [activeType, setActiveType] = useState<(typeof RECORD_TYPES)[number]['key']>('object')
   const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
   const [activeSubtype, setActiveSubtype] = useState('')
@@ -798,6 +799,19 @@ function SectionDangerZone() {
   const active = RECORD_TYPES.find(type => type.key === activeType)!
   const selectedSubtype = subtypesList.find(subtype => subtype.name === activeSubtype)
   const expectedConfirmation = (selectedSubtype?.label?.de || active.label).toUpperCase()
+
+  // Vocabulary reset / delete state
+  const [vocabsList, setVocabsList] = useState<Vocabulary[]>([])
+  const [activeVocabId, setActiveVocabId] = useState('')
+  const [vocabScope, setVocabScope] = useState<'terms' | 'vocabulary'>('terms')
+  const [vocabSummary, setVocabSummary] = useState<{ term_count: number; referencing_fields: number; is_system: boolean } | null>(null)
+  const [vocabConfirmation, setVocabConfirmation] = useState('')
+  const [resettingVocab, setResettingVocab] = useState(false)
+  const [vocabError, setVocabError] = useState<string | null>(null)
+  const [vocabSuccess, setVocabSuccess] = useState<string | null>(null)
+
+  const selectedVocab = vocabsList.find(v => v.id === activeVocabId)
+  const expectedVocabConfirmation = (selectedVocab?.name ?? '').toUpperCase()
 
   useEffect(() => {
     setActiveSubtype('')
@@ -811,6 +825,33 @@ function SectionDangerZone() {
       .catch((e: Error) => setError(e.message))
   }, [activeType, activeSubtype])
 
+  useEffect(() => {
+    vocabularies.list()
+      .then(list => {
+        setVocabsList(list)
+        if (list.length > 0) setActiveVocabId(list[0].id)
+      })
+      .catch((e: Error) => setVocabError(e.message))
+  }, [])
+
+  useEffect(() => {
+    if (!activeVocabId) {
+      setVocabSummary(null)
+      return
+    }
+    setVocabSummary(null)
+    setVocabConfirmation('')
+    setVocabError(null)
+    vocabularies.resetSummary(activeVocabId)
+      .then(result => {
+        setVocabSummary(result)
+        if (result.is_system) {
+          setVocabScope('terms')
+        }
+      })
+      .catch((e: Error) => setVocabError(e.message))
+  }, [activeVocabId])
+
   async function handleReset() {
     if (confirmation !== expectedConfirmation) return
     setResetting(true); setError(null); setSuccess(null)
@@ -822,10 +863,53 @@ function SectionDangerZone() {
     finally { setResetting(false) }
   }
 
+  async function handleVocabAction() {
+    if (!selectedVocab || vocabConfirmation !== expectedVocabConfirmation) return
+    setResettingVocab(true)
+    setVocabError(null)
+    setVocabSuccess(null)
+    const targetName = selectedVocab.name
+    try {
+      if (vocabScope === 'terms') {
+        const result = await vocabularies.clearTerms(selectedVocab.id)
+        setVocabSummary(prev => prev ? { ...prev, term_count: 0 } : null)
+        setVocabConfirmation('')
+        setVocabSuccess(t('dangerZone.vocabSuccessTerms', { count: result.deleted_terms }))
+      } else {
+        const result = await vocabularies.deleteVocabulary(selectedVocab.id, { force: true })
+        const remaining = vocabsList.filter(v => v.id !== selectedVocab.id)
+        setVocabsList(remaining)
+        setActiveVocabId(remaining[0]?.id ?? '')
+        setVocabConfirmation('')
+        setVocabSuccess(
+          result.deactivated_fields > 0
+            ? t('dangerZone.vocabSuccessFullWithFields', {
+                name: targetName,
+                count: result.deleted_terms,
+                fields: result.deactivated_fields,
+              })
+            : t('dangerZone.vocabSuccessFull', { name: targetName, count: result.deleted_terms })
+        )
+      }
+    } catch (e) {
+      setVocabError((e as Error).message)
+    } finally {
+      setResettingVocab(false)
+    }
+  }
+
+  const vocabActionDisabled =
+    resettingVocab ||
+    !selectedVocab ||
+    vocabSummary === null ||
+    vocabConfirmation !== expectedVocabConfirmation ||
+    (vocabScope === 'terms' && vocabSummary.term_count === 0) ||
+    (vocabScope === 'vocabulary' && vocabSummary.is_system)
+
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="card" style={{ borderColor: '#fca5a5' }}>
-        <div className="hd" style={{ color: '#b91c1c' }}>Gefahrenbereich</div>
+        <div className="hd" style={{ color: '#b91c1c' }}>Gefahrenbereich – {t('dangerZone.schemaTitle')}</div>
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
             Blendet Felddefinitionen aus, löscht aber keine Datensätze oder Metadaten. Für eine spätere Bearbeitung das Feld im Schema-Editor mit demselben technischen Namen wieder anlegen; die gespeicherten Werte werden dann wieder angezeigt. Das Systemfeld <code>label</code> bleibt erhalten.
@@ -855,6 +939,89 @@ function SectionDangerZone() {
           <button className="btn dn" onClick={handleReset} disabled={resetting || summary === 0 || confirmation !== expectedConfirmation}>
             {resetting ? 'Setze zurück…' : `${selectedSubtype ? `${selectedSubtype.label?.de || selectedSubtype.name}-Subschema` : `${active.label}-Schema`} zurücksetzen`}
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ borderColor: '#fca5a5' }}>
+        <div className="hd" style={{ color: '#b91c1c' }}>{t('dangerZone.vocabTitle')}</div>
+        <div className="bd">
+          <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
+            {t('dangerZone.vocabDescription')}
+          </p>
+          {vocabsList.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t('dangerZone.vocabEmpty')}</p>
+          ) : (
+            <>
+              <div className="field">
+                <div className="lbl">{t('dangerZone.vocabLabel')}</div>
+                <select
+                  className="fld"
+                  value={activeVocabId}
+                  onChange={e => {
+                    setActiveVocabId(e.target.value)
+                    setVocabSuccess(null)
+                  }}
+                >
+                  {vocabsList.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <div className="lbl">{t('dangerZone.vocabScopeLabel')}</div>
+                <select
+                  className="fld"
+                  value={vocabScope}
+                  onChange={e => {
+                    setVocabScope(e.target.value as 'terms' | 'vocabulary')
+                    setVocabConfirmation('')
+                    setVocabSuccess(null)
+                  }}
+                >
+                  <option value="terms">{t('dangerZone.vocabScopeTerms')}</option>
+                  <option value="vocabulary" disabled={vocabSummary?.is_system === true}>
+                    {vocabSummary?.is_system ? t('dangerZone.vocabScopeFullSystemDisabled') : t('dangerZone.vocabScopeFull')}
+                  </option>
+                </select>
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 16 }}>
+                {vocabSummary === null ? (
+                  <div>{t('dangerZone.vocabChecking')}</div>
+                ) : vocabScope === 'terms' ? (
+                  <div>{t('dangerZone.vocabSummaryTerms', { count: vocabSummary.term_count })}</div>
+                ) : (
+                  <>
+                    <div>{t('dangerZone.vocabSummaryFull', { name: selectedVocab?.name ?? '', count: vocabSummary.term_count })}</div>
+                    {vocabSummary.referencing_fields > 0 && (
+                      <div style={{ color: '#b91c1c', marginTop: 4 }}>
+                        {t('dangerZone.vocabReferencingFieldsWarning', { count: vocabSummary.referencing_fields })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="field">
+                <div className="lbl">
+                  {t('dangerZone.confirmPrompt')} <code>{expectedVocabConfirmation}</code> {t('dangerZone.confirmPromptSuffix')}
+                </div>
+                <input
+                  className="fld"
+                  value={vocabConfirmation}
+                  onChange={e => setVocabConfirmation(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              {vocabError && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{vocabError}</div>}
+              {vocabSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{vocabSuccess}</div>}
+              <button className="btn dn" onClick={handleVocabAction} disabled={vocabActionDisabled}>
+                {resettingVocab
+                  ? t('dangerZone.vocabDeleting')
+                  : vocabScope === 'terms'
+                    ? t('dangerZone.vocabDeleteTermsBtn', { name: selectedVocab?.name ?? '' })
+                    : t('dangerZone.vocabDeleteFullBtn', { name: selectedVocab?.name ?? '' })}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -2441,6 +2608,7 @@ const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string; 
   { id: 'papierkorb', label: 'Papierkorb', adminOnly: true },
   { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
   { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
+  { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true, i18nKey: 'screenSettings:dangerZone.nav' },
 ]
 
 const SECTION_IDS = NAV.map(n => n.id)

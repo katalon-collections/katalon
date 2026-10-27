@@ -192,6 +192,7 @@ def test_build_release_payload_structure(tmp_path):
     meta = {
         "compose_revision": 2,
         "minimum_installer_version": "0.1.0",
+        "images": {"postgres": "postgis/postgis:16-3.4"},
         "requires": {"postgres": ">=16"},
     }
     payload = grm.build_release_payload(
@@ -203,6 +204,7 @@ def test_build_release_payload_structure(tmp_path):
     assert payload["version"] == "1.30.0"
     assert payload["minimum_installer_version"] == "0.1.0"
     assert payload["compose_revision"] == 2
+    assert payload["images"] == {"postgres": "postgis/postgis:16-3.4"}
     assert payload["requires"] == {"postgres": ">=16"}
     assert payload["env_vars"] == []
     assert payload["deprecated_env_vars"] == []
@@ -282,3 +284,61 @@ note = "replaced"
     assert data["env_vars"][0]["default"] == "foo"
     assert len(data["deprecated_env_vars"]) == 1
     assert data["deprecated_env_vars"][0]["key"] == "CLI_OLD_VAR"
+
+
+# Compose-Service bzw. Helm-Schlüssel je Image-Rolle aus release-meta.toml [images].
+COMPOSE_SERVICES = {
+    "postgres": ["db", "backup"],
+    "redis": ["redis"],
+    "elasticsearch": ["elasticsearch"],
+    "cantaloupe": ["cantaloupe", "cantaloupe-cache-init"],
+    "nginx": ["nginx"],
+}
+HELM_KEYS = ["postgres", "redis", "elasticsearch", "cantaloupe"]
+
+
+def _release_meta() -> dict:
+    import tomllib
+
+    return tomllib.loads((REPO_ROOT / "release-meta.toml").read_text(encoding="utf-8"))
+
+
+def test_release_images_match_compose_and_helm():
+    """docker-compose.yml und Helm-Chart nutzen die Images, die das Release an katalon-cli gibt."""
+    import yaml
+
+    images = _release_meta()["images"]
+    services = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text())["services"]
+    for role, names in COMPOSE_SERVICES.items():
+        for name in names:
+            assert services[name]["image"] == images[role], f"docker-compose.yml {name}"
+    values = yaml.safe_load((REPO_ROOT / "charts/katalon/values.yaml").read_text())
+    for key in HELM_KEYS:
+        assert values[key]["image"] == images[key], f"charts/katalon/values.yaml {key}"
+
+
+def _version_tuple(text: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in text.split("."))
+
+
+def _satisfies(version: tuple[int, ...], spec: str) -> bool:
+    import operator
+    import re
+
+    ops = {">=": operator.ge, "<=": operator.le, ">": operator.gt, "<": operator.lt, "==": operator.eq}
+    for clause in spec.split(","):
+        op, ref = re.fullmatch(r"\s*(>=|<=|==|>|<)\s*([\d.]+)\s*", clause).groups()
+        bound = _version_tuple(ref)
+        if not ops[op](version[: len(bound)], bound):
+            return False
+    return True
+
+
+def test_release_images_satisfy_requires():
+    import re
+
+    meta = _release_meta()
+    for role, spec in meta["requires"].items():
+        tag = meta["images"][role].rsplit(":", 1)[1]
+        version = _version_tuple(re.match(r"[\d.]+", tag).group(0).rstrip("."))
+        assert _satisfies(version, spec), f"{role} {tag} erfüllt {spec} nicht"

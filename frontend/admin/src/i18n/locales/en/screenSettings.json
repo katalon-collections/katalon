@@ -167,5 +167,29 @@
     "metaRowHint": "Applies uniformly to all detail pages.",
     "metaLabelUppercase": "Field labels in uppercase",
     "metaLabelUppercaseHint": "Affects metadata and relations on all detail pages."
+  },
+  "dangerZone": {
+    "nav": "Danger zone",
+    "schemaTitle": "Reset schema",
+    "vocabTitle": "Reset / delete vocabulary",
+    "vocabDescription": "Either removes all terms of a vocabulary (keeping the vocabulary shell and linked schema fields) or permanently deletes the entire vocabulary. System vocabularies (media_types, relation_types) can be emptied, but cannot be deleted as a whole.",
+    "vocabLabel": "Vocabulary",
+    "vocabScopeLabel": "Scope",
+    "vocabScopeTerms": "Delete all terms only (keep vocabulary)",
+    "vocabScopeFull": "Delete entire vocabulary",
+    "vocabScopeFullSystemDisabled": "Delete entire vocabulary (system vocabulary – not allowed)",
+    "vocabChecking": "Checking vocabulary…",
+    "vocabSummaryTerms": "{{count}} terms will be deleted. The vocabulary itself will be kept.",
+    "vocabSummaryFull": "Vocabulary \"{{name}}\" and {{count}} terms will be permanently deleted.",
+    "vocabReferencingFieldsWarning": "Note: {{count}} active field definitions reference this vocabulary and will also be hidden when deleting the entire vocabulary.",
+    "confirmPrompt": "Type",
+    "confirmPromptSuffix": "to confirm",
+    "vocabDeleting": "Deleting…",
+    "vocabDeleteTermsBtn": "Delete all terms in \"{{name}}\"",
+    "vocabDeleteFullBtn": "Delete vocabulary \"{{name}}\" completely",
+    "vocabSuccessTerms": "{{count}} terms were deleted.",
+    "vocabSuccessFull": "Vocabulary \"{{name}}\" ({{count}} terms) was deleted.",
+    "vocabSuccessFullWithFields": "Vocabulary \"{{name}}\" ({{count}} terms) was deleted; {{fields}} linked field definitions were hidden.",
+    "vocabEmpty": "No vocabularies available."
   }
 }

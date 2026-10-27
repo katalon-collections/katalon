@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.46.0"
+    "version": "1.47.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -4676,9 +4676,191 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "vocabularies"
+        ],
+        "summary": "Delete an entire vocabulary and all its terms",
+        "operationId": "vocabularies_delete_vocabulary_delete_v1_vocabularies__vocab_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vocab_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vocab Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also soft-delete active schema fields referencing this vocabulary.",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "Also soft-delete active schema fields referencing this vocabulary."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyResetResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Vocabulary not found"
+          },
+          "409": {
+            "description": "System vocabulary cannot be deleted, or active schema fields still reference it"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vocabularies/{vocab_id}/reset-summary": {
+      "get": {
+        "tags": [
+          "vocabularies"
+        ],
+        "summary": "Count terms and referencing schema fields for a vocabulary reset or deletion",
+        "operationId": "vocabularies_vocabulary_reset_summary_get_v1_vocabularies__vocab_id__reset_summary",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vocab_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vocab Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyResetSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Vocabulary not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/vocabularies/{vocab_id}/terms": {
+      "delete": {
+        "tags": [
+          "vocabularies"
+        ],
+        "summary": "Delete all terms of a vocabulary while keeping the vocabulary itself",
+        "operationId": "vocabularies_reset_vocabulary_terms_delete_v1_vocabularies__vocab_id__terms",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vocab_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vocab Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyResetResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Vocabulary not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "vocabularies"
@@ -20135,6 +20317,49 @@
         }
       }
     },
+    "/sitemap.xml": {
+      "get": {
+        "tags": [
+          "crawlers"
+        ],
+        "summary": "sitemap.xml of all public records",
+        "description": "Single urlset up to 50,000 records, otherwise an index pointing to `?page=N`.",
+        "operationId": "crawlers_sitemap_xml_get_sitemap.xml",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/llms.txt": {
       "get": {
         "tags": [
@@ -30879,6 +31104,52 @@
           "_links"
         ],
         "title": "VocabularyRead"
+      },
+      "VocabularyResetResult": {
+        "properties": {
+          "deleted_terms": {
+            "type": "integer",
+            "title": "Deleted Terms"
+          },
+          "deleted_vocabulary": {
+            "type": "boolean",
+            "title": "Deleted Vocabulary"
+          },
+          "deactivated_fields": {
+            "type": "integer",
+            "title": "Deactivated Fields",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted_terms",
+          "deleted_vocabulary"
+        ],
+        "title": "VocabularyResetResult"
+      },
+      "VocabularyResetSummary": {
+        "properties": {
+          "term_count": {
+            "type": "integer",
+            "title": "Term Count"
+          },
+          "referencing_fields": {
+            "type": "integer",
+            "title": "Referencing Fields"
+          },
+          "is_system": {
+            "type": "boolean",
+            "title": "Is System"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term_count",
+          "referencing_fields",
+          "is_system"
+        ],
+        "title": "VocabularyResetSummary"
       },
       "VocabularyTermCreate": {
         "properties": {

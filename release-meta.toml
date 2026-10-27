@@ -7,7 +7,16 @@
 # minimum_installer_version   – hochzählen, wenn dieses Release ein Feature der
 #                                katalon-cli voraussetzt, das ältere CLI-Versionen
 #                                nicht haben (z.B. neues Compose-Template-Feld).
-# requires                    – Fremdservice-Versionsanforderungen, ändert sich selten.
+# images                      – Images der Fremdservices, die katalon-cli für dieses
+#                                Release in compose.yaml schreibt (Repository:Tag). Das
+#                                Release bestimmt sie, nicht die CLI. docker-compose.yml und
+#                                charts/katalon/values.yaml müssen dieselben Images nutzen
+#                                (backend/tests/test_release_metadata.py prüft das).
+#                                Ein Major-Wechsel von postgres oder elasticsearch braucht
+#                                einen eigenen Upgrade-Weg; katalon-cli bricht dort ab.
+# requires                    – Versionen, mit denen Katalon technisch läuft (z. B. bei
+#                                eigenem Image per compose.override.yaml). Die Images
+#                                unter [images] müssen sie erfüllen.
 #
 # env_vars                    – Neu hinzugekommene Umgebungsvariablen für dieses Release.
 #                               Werden von katalon-cli beim Update ausgewertet und ggf.
@@ -29,11 +38,21 @@
 #                               oder versionsspezifisch ([[releases."1.31.0".deprecated_env_vars]]).
 
 compose_revision = 3
-minimum_installer_version = "0.3.0"
+# 0.4.0: katalon-cli übernimmt [images] aus dem Release; ältere CLIs schreiben ihre
+# eingebauten Images (Stand 1.46.0) und würden geänderte Images still ignorieren.
+minimum_installer_version = "0.4.0"
+
+[images]
+postgres = "postgis/postgis:16-3.4"
+redis = "redis:7-alpine"
+elasticsearch = "docker.elastic.co/elasticsearch/elasticsearch:8.13.4"
+cantaloupe = "islandora/cantaloupe:7.0.22"
+nginx = "nginx:alpine"
+caddy = "caddy:2-alpine"
 
 [requires]
-postgres = ">=16"
-elasticsearch = ">=8.15,<9"
+postgres = ">=16,<17"
+elasticsearch = ">=8.13,<9"
 
 [[releases."1.40.3".deprecated_env_vars]]
 key = "DEFAULT_ADMIN_PASSWORD"

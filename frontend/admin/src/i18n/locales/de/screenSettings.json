@@ -167,5 +167,29 @@
     "metaRowHint": "Gilt einheitlich für alle Detailseiten.",
     "metaLabelUppercase": "Feldbezeichnungen in Großbuchstaben",
     "metaLabelUppercaseHint": "Betrifft Metadaten und Verknüpfungen auf allen Detailseiten."
+  },
+  "dangerZone": {
+    "nav": "Gefahrenbereich",
+    "schemaTitle": "Schema zurücksetzen",
+    "vocabTitle": "Vokabular zurücksetzen / löschen",
+    "vocabDescription": "Entfernt entweder alle Terme eines Vokabulars (die Vokabular-Hülle und verknüpfte Schema-Felder bleiben bestehen) oder löscht das gesamte Vokabular endgültig. Systemvokabulare (media_types, relation_types) können geleert, aber nicht als Ganzes gelöscht werden.",
+    "vocabLabel": "Vokabular",
+    "vocabScopeLabel": "Geltungsbereich",
+    "vocabScopeTerms": "Nur alle Terme löschen (Vokabular behalten)",
+    "vocabScopeFull": "Gesamtes Vokabular löschen",
+    "vocabScopeFullSystemDisabled": "Gesamtes Vokabular löschen (Systemvokabular – nicht möglich)",
+    "vocabChecking": "Prüfe Vokabular…",
+    "vocabSummaryTerms": "{{count}} Terme werden gelöscht. Das Vokabular selbst bleibt erhalten.",
+    "vocabSummaryFull": "Das Vokabular „{{name}}“ und {{count}} enthaltene Terme werden endgültig gelöscht.",
+    "vocabReferencingFieldsWarning": "Hinweis: {{count}} aktive Felddefinitionen verweisen auf dieses Vokabular und werden beim Komplettlöschen ebenfalls ausgeblendet.",
+    "confirmPrompt": "Zur Bestätigung",
+    "confirmPromptSuffix": "eingeben",
+    "vocabDeleting": "Lösche…",
+    "vocabDeleteTermsBtn": "Alle Terme in „{{name}}“ löschen",
+    "vocabDeleteFullBtn": "Vokabular „{{name}}“ komplett löschen",
+    "vocabSuccessTerms": "{{count}} Terme wurden gelöscht.",
+    "vocabSuccessFull": "Vokabular „{{name}}“ ({{count}} Terme) wurde gelöscht.",
+    "vocabSuccessFullWithFields": "Vokabular „{{name}}“ ({{count}} Terme) wurde gelöscht; {{fields}} verknüpfte Felddefinitionen wurden ausgeblendet.",
+    "vocabEmpty": "Keine Vokabulare vorhanden."
   }
 }
