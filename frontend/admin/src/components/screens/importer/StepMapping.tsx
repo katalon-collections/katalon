@@ -9,7 +9,7 @@ import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
 import { SaveMappingModal } from '../../importer/SaveMappingModal'
 import { LoadMappingModal } from '../../importer/LoadMappingModal'
-import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult } from './types'
+import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult, type VocabMode } from './types'
 
 interface Props {
   uploaded: UploadResult
@@ -29,6 +29,8 @@ interface Props {
   onIdnoStrategyChange: (strategy: string, column: string | null) => void
   pendingFields: PendingField[]
   onPendingFieldsChange: (fields: PendingField[]) => void
+  vocabModes: Record<string, VocabMode>
+  onVocabModeChange: (field: string, mode: VocabMode) => void
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
   mappedCount: number
@@ -48,7 +50,7 @@ export function StepMapping({
   subtype, savedMappingId, savedMappingName, onSavedMappingLoaded, onMappingSaved,
   mediaSelector, onMediaSelectorChange,
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
-  pendingFields, onPendingFieldsChange,
+  pendingFields, onPendingFieldsChange, vocabModes, onVocabModeChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
   dryRunning, onDryRun, onBack, onProfileExport, profileWarnings, xmlSelectors,
 }: Props) {
@@ -125,6 +127,12 @@ export function StepMapping({
     const segs = full.split('@')[0].split('/')
     return segs.length > 1 ? segs.slice(0, -1).join('/') : ''
   }
+
+  // Strict vocab fields (existing vocabulary) that receive at least one column
+  const mappedTargets = new Set(Object.values(mapping).map(m => m.target))
+  const vocabFields = fields.filter(
+    f => f.field_type === 'vocab' && f.settings?.vocabulary_id && mappedTargets.has(f.name),
+  )
 
   return (
     <>
@@ -272,6 +280,28 @@ export function StepMapping({
         <b style={{ color: 'var(--fg-3)' }}>{ignoredCount}</b> ignoriert
       </div>
 
+      {vocabFields.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="hd">{t('vocabMode.title')}</div>
+          <div className="bd" style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('vocabMode.help')}</div>
+            {vocabFields.map(f => (
+              <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ minWidth: 160 }}>{getLabel(f, f.name)}</span>
+                <select
+                  className="fld" style={{ height: 28, fontSize: 12, width: 280 }}
+                  value={vocabModes[f.name] ?? 'extend'}
+                  onChange={e => onVocabModeChange(f.name, e.target.value as VocabMode)}
+                >
+                  <option value="extend">{t('vocabMode.extend')}</option>
+                  <option value="match_only">{t('vocabMode.matchOnly')}</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Mapping table */}
       <div className="tw">
         <table className="tbl">
@@ -331,7 +361,7 @@ export function StepMapping({
                           const isMappedByOther = !f.is_repeatable && Object.entries(mapping).some(
                             ([otherCol, otherEntry]) => otherCol !== col && otherEntry.target === f.name
                           )
-                          const isPending = pendingFields.some(p => p.name === f.name)
+                          const isPending = f.id.startsWith('__pending__')
                           if (f.field_type === 'group') {
                             return (f.children ?? []).map(child => {
                               const target = `${f.name}.${child.name}`

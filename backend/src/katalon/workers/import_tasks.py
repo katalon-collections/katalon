@@ -43,6 +43,7 @@ def import_records_task(
     subtype: str | None = None,
     fields_to_create: list[dict[str, Any]] | None = None,
     media_selector: str | None = None,
+    vocab_modes: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
 
@@ -57,6 +58,8 @@ def import_records_task(
                          while retaining unmapped legacy metadata
         auto_publish: if True, attempt to publish each record after creation
         user_id: UUID of the user who triggered the import
+        vocab_modes: {field_name -> "extend" | "match_only"}; "match_only" drops values
+                     without a matching vocabulary term instead of creating one
     """
     from fastapi import HTTPException
     from sqlalchemy import select
@@ -80,7 +83,7 @@ def import_records_task(
     )
     from katalon.services.audit_service import diff_fields, log_change
     from katalon.services.idno_service import consume_next_idno
-    from katalon.services.importer_service import apply_mapping
+    from katalon.services.importer_service import apply_mapping, normalize_term_key
     from katalon.services.lock_service import enforce_not_locked
     from katalon.services.media_batch_import_service import media_references_for_rows
     from katalon.services.presence_service import enforce_not_blocked
@@ -168,10 +171,11 @@ def import_records_task(
     ) -> list[dict[str, Any]]:
         """Replace plain string values in vocab fields with {id, label} dicts.
 
-        Looks up existing terms case-insensitively, creates missing ones, and
-        caches per-vocabulary to avoid redundant DB queries.
+        Looks up existing terms by normalized key (NFKC, whitespace, casefold) and caches
+        per vocabulary. Missing terms are created ("extend", default) or the value is
+        dropped and reported ("match_only"), per field via ``vocab_modes``.
         """
-        # Find all vocab fields that have a vocabulary_id configured
+        # Find all strict vocab fields that have a vocabulary_id configured
         vocab_fields: dict[str, uuid.UUID] = {}
         for fname, fd in field_defs.items():
             if fd.field_type == "vocab":
@@ -185,29 +189,37 @@ def import_records_task(
         if not vocab_fields:
             return records
 
-        # Per-vocabulary term cache: vocab_id -> {lower_term -> {id, label}}
+        modes = vocab_modes or {}
+        dropped: dict[str, dict[str, int]] = {}
+
+        # Per-vocabulary term cache: vocab_id -> {normalized_term -> {id, label}}
         term_cache: dict[uuid.UUID, dict[str, dict[str, Any]]] = {}
 
-        async def get_term(vocab_id: uuid.UUID, term_str: str) -> dict[str, Any] | None:
+        async def get_term(fname: str, vocab_id: uuid.UUID, term_str: str) -> dict[str, Any] | None:
             if vocab_id not in term_cache:
                 res = await session.execute(
                     select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id)
                 )
                 term_cache[vocab_id] = {
-                    t.term.strip().lower(): {"id": str(t.id), "label": t.term}
+                    normalize_term_key(t.term): {"id": str(t.id), "label": t.term}
                     for t in res.scalars().all()
                 }
-            key = term_str.strip().lower()
+            key = normalize_term_key(term_str)
             if key in term_cache[vocab_id]:
                 return term_cache[vocab_id][key]
+            if modes.get(fname) == "match_only":
+                counts = dropped.setdefault(fname, {})
+                counts[term_str.strip()] = counts.get(term_str.strip(), 0) + 1
+                return None
             # Term does not exist — check the vocabulary exists before creating
             vocab_res = await session.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
             if vocab_res.scalar_one_or_none() is None:
                 return None
+            clean = " ".join(term_str.split())
             new_term = VocabularyTerm(
                 vocabulary_id=vocab_id,
-                term=term_str.strip(),
-                label={"de": term_str.strip()},
+                term=clean,
+                label={"de": clean},
             )
             session.add(new_term)
             await session.flush()
@@ -224,7 +236,7 @@ def import_records_task(
                     resolved = []
                     for item in val:
                         if isinstance(item, str) and item.strip():
-                            entry = await get_term(vocab_id, item)
+                            entry = await get_term(fname, vocab_id, item)
                             if entry:
                                 resolved.append(entry)
                     if resolved:
@@ -232,11 +244,25 @@ def import_records_task(
                     else:
                         record.pop(fname, None)
                 elif isinstance(val, str) and val.strip():
-                    entry = await get_term(vocab_id, val)
+                    entry = await get_term(fname, vocab_id, val)
                     if entry:
                         record[fname] = entry
                     else:
                         record.pop(fname, None)
+
+        for fname, counts in dropped.items():
+            label = (field_defs[fname].label or {}).get("de") or fname
+            sample = ", ".join(sorted(counts)[:10])
+            more = f" (+{len(counts) - 10} weitere)" if len(counts) > 10 else ""
+            warnings.append(
+                {
+                    "row": None,
+                    "warning": (
+                        f"Feld '{label}': {sum(counts.values())} Werte ohne passenden Term "
+                        f"verworfen: {sample}{more}"
+                    ),
+                }
+            )
 
         return records
 
@@ -310,6 +336,7 @@ def import_records_task(
                         label["en"] = f["label_en"].strip()
                     new_fd = FieldDefinition(
                         target_type=record_type,
+                        target_subtype=subtype,
                         name=name,
                         label=label,
                         field_type=f.get("field_type", "text"),
@@ -329,6 +356,12 @@ def import_records_task(
                 )
             )
             field_defs = {f.name: f for f in fd_result.scalars().all()}
+
+            # Bestehende vocab-Felder ohne Vokabular binden, sonst scheitert jede Zeile mit Wert
+            for target in set(_mapping_targets):
+                fd = field_defs.get(target)
+                if fd and fd.field_type == "vocab":
+                    await ensure_field_vocabulary(session, fd, (fd.label or {}).get("de") or fd.name)
 
             records, idnos = apply_mapping(rows, mapping, field_defs)
 

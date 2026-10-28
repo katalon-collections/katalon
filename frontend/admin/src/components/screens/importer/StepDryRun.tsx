@@ -110,7 +110,9 @@ export function StepDryRun({
         <div style={{ marginBottom: 12 }}>
           {dryResult.vocab_warnings.map((w, i) => (
             <div key={i} style={{ fontSize: 12, background: w.high_cardinality ? '#fff7ed' : '#f0fdf4', border: `1px solid ${w.high_cardinality ? '#fed7aa' : '#bbf7d0'}`, borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
-              {w.high_cardinality
+              {w.mode === 'match_only'
+                ? t('dryRun.vocabMatchOnly', { label: w.label, uniqueCount: w.unique_count, newCount: w.new_count })
+                : w.high_cardinality
                 ? t('dryRun.vocabHighCardinality', { label: w.label, uniqueCount: w.unique_count, newCount: w.new_count })
                 : t('dryRun.vocabNewTerms', { label: w.label, uniqueCount: w.unique_count, newCount: w.new_count })
               }

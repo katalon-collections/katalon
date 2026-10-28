@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from jinja2.sandbox import SandboxedEnvironment
@@ -33,6 +34,20 @@ def _is_number(val: str) -> bool:
 
 def _is_boolean(val: str) -> bool:
     return val.strip().lower() in {"true", "false", "1", "0", "ja", "nein", "yes", "no"}
+
+
+def _parse_geo(val: str) -> dict[str, float] | None:
+    """Parse "lat, lon" (also ';' or whitespace separated, decimal comma not supported) into a WGS84 point."""
+    parts = re.split(r"\s*[,;]\s*|\s+", val.strip())
+    if len(parts) != 2:
+        return None
+    try:
+        lat, lon = float(parts[0]), float(parts[1])
+    except ValueError:
+        return None
+    if abs(lat) > 90 or abs(lon) > 180:
+        return None
+    return {"lat": lat, "lon": lon}
 
 
 def _row_values(row: dict[str, Any], selector: str) -> list[str]:
@@ -218,7 +233,7 @@ def apply_mapping(
                 continue
 
             # Special handling for idno
-            if field_name == "__idno__":
+            if field_name in ("__idno__", "idno"):
                 row_idno = raws[0]
                 continue
 
@@ -240,9 +255,11 @@ def apply_mapping(
 
             # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
-                items: list[Any] = (
-                    [{"value": part, "label": ""} for part in parts] if field_type == "url" else parts
-                )
+                items: list[Any] = parts
+                if field_type == "url":
+                    items = [{"value": part, "label": ""} for part in parts]
+                elif field_type == "geo":
+                    items = [g for g in map(_parse_geo, parts) if g]
                 # Several columns may feed one repeatable field (Genre1..3): append, skip repeats.
                 existing = record.setdefault(field_name, [])
                 seen = {_dedupe_key(item) for item in existing}
@@ -265,6 +282,10 @@ def apply_mapping(
                 record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
             elif field_type == "url":
                 record[field_name] = {"value": single, "label": ""}
+            elif field_type == "geo":
+                geo = _parse_geo(single)
+                if geo:
+                    record[field_name] = geo
             else:
                 record[field_name] = single
         for group_name, group_values in containers.items():
@@ -330,6 +351,9 @@ def _validate_types(
                 elif fd.field_type == "url":
                     if not raw.lower().startswith(("http://", "https://")):
                         issue = f"'{raw[:30]}' ist keine vollständige http(s)-URL"
+                elif fd.field_type == "geo":
+                    if not _parse_geo(raw):
+                        issue = f"'{raw[:30]}' ist keine Koordinate (Format: Breite, Länge, z. B. 52.52, 13.405)"
 
                 if issue:
                     counts[fname] = counts.get(fname, 0) + 1
@@ -377,6 +401,11 @@ def _collect_vocab_values(
                         counts[p] = counts.get(p, 0) + 1
         result[field_name] = counts
     return result
+
+
+def normalize_term_key(value: str) -> str:
+    """Vergleichsschlüssel für Vokabelterme: NFKC, Whitespace zusammengezogen, casefold."""
+    return " ".join(unicodedata.normalize("NFKC", value).split()).casefold()
 
 
 CLUSTER_SIMILARITY_THRESHOLD = 0.82
@@ -470,7 +499,7 @@ def dry_run(
                     errors.append({"row": index + 2, "message": f"Container '{group_name}': Subfelder haben unterschiedlich viele Wiederholungen"})
 
     # Check for idno mapping
-    has_idno_mapping = "__idno__" in mapped_fields
+    has_idno_mapping = bool({"__idno__", "idno"} & mapped_fields)
     if has_idno_mapping:
         empty_idnos = sum(1 for i, idno in enumerate(idnos) if not idno)
         if empty_idnos > 0:

@@ -26,6 +26,7 @@
     "errorPagination": "{{page}} / {{totalPages}} ({{count}} different errors)",
     "vocabHighCardinality": "⚠ Field \"{{label}}\": {{uniqueCount}} different values, {{newCount}} new. Should this column really be used as a vocabulary?",
     "vocabNewTerms": "Field \"{{label}}\": {{newCount}} new vocabulary terms will be created ({{uniqueCount}} unique values).",
+    "vocabMatchOnly": "Field \"{{label}}\": existing terms only. {{newCount}} of {{uniqueCount}} unique values have no matching term and will be dropped.",
     "spellingVariants": "Possible spelling variants",
     "merge": "Merge",
     "noErrors": "No errors. {{count}} records can be imported.",
@@ -41,6 +42,12 @@
   "exportProfileButton": "Export profile",
   "exportProfileTooltip": "Download as JSON file to disk",
   "activeTemplate": "Template: {{name}}",
+  "vocabMode": {
+    "title": "Vocabulary fields",
+    "help": "How should values be handled that are not in the vocabulary yet? Case and whitespace are ignored when matching (\"Berlin\" = \"berlin\").",
+    "extend": "Extend vocabulary (create new terms)",
+    "matchOnly": "Only use existing terms"
+  },
   "mappingIgnore": "– ignore –",
   "mappingAlreadyAssigned": "(already assigned)",
   "mappingNewField": "(new)",
@@ -71,5 +78,8 @@
   "actionsCol": "Actions",
   "applyTemplateButton": "Load",
   "deleteTemplate": "Delete template",
-  "close": "Close"
+  "close": "Close",
+  "newImport": "New import",
+  "newImportConfirm": "Discard the current import? Mapping and fields to be created will be lost.",
+  "newImportDiscard": "Discard"
 }

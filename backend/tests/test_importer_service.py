@@ -83,6 +83,18 @@ def test_apply_mapping_with_split_transform_repeatable() -> None:
     assert records[0]["languages"] == ["Deutsch", "Englisch", "Französisch"]
 
 
+def test_apply_mapping_geo_field() -> None:
+    geo = SimpleNamespace(field_type="geo", is_repeatable=False)
+    records, _ = apply_mapping(
+        [{"pos": "52.52, 13.405"}, {"pos": "kaputt"}, {"pos": "91, 0"}],
+        {"pos": {"target": "fundort"}},
+        {"fundort": geo},
+    )
+    assert records[0]["fundort"] == {"lat": 52.52, "lon": 13.405}
+    assert "fundort" not in records[1]
+    assert "fundort" not in records[2]
+
+
 def test_apply_mapping_to_container_subfields() -> None:
     group_id = object()
     group = SimpleNamespace(id=group_id, name="name", field_type="group", parent_id=None)

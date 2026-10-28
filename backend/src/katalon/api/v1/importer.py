@@ -88,6 +88,8 @@ class MappingRequest(BaseModel):
     # Fields the user will create on-the-fly. In dry-run these are merged as
     # transient (unpersisted) field defs so clustering/type-validation see them.
     fields_to_create: list[dict[str, Any]] = Field(default_factory=list[Any])
+    # Per strict vocab field: "extend" creates missing terms (default), "match_only" drops them.
+    vocab_modes: dict[str, Literal["extend", "match_only"]] = Field(default_factory=dict)
 
 
 class ImportRequest(MappingRequest):
@@ -489,21 +491,25 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
         if not vocab_id:
             continue
         from katalon.core.models import VocabularyTerm
+        from katalon.services.importer_service import normalize_term_key
         existing_terms_result = await db.execute(
             select(VocabularyTerm.term).where(
                 VocabularyTerm.vocabulary_id == uuid.UUID(str(vocab_id)),
-                VocabularyTerm.term.in_(unique_values),
             )
         )
-        existing_set = {row[0] for row in existing_terms_result.all()}
-        new_count = len([v for v in unique_values if v not in existing_set])
+        existing_keys = {normalize_term_key(row[0]) for row in existing_terms_result.all()}
+        new_keys = {
+            normalize_term_key(v) for v in unique_values if normalize_term_key(v) not in existing_keys
+        }
+        mode = body.vocab_modes.get(field_name, "extend")
         label_text = (fd.label or {}).get("de") or field_name
         vocab_warnings.append({
             "field": field_name,
             "label": label_text,
-            "unique_count": len(unique_values),
-            "new_count": new_count,
-            "high_cardinality": new_count > 100,
+            "unique_count": len({normalize_term_key(v) for v in unique_values}),
+            "new_count": len(new_keys),
+            "mode": mode,
+            "high_cardinality": mode == "extend" and len(new_keys) > 100,
         })
 
     dry_result["vocab_warnings"] = vocab_warnings
@@ -577,6 +583,7 @@ async def run_import(body: ImportRequest, db: DBDep, current_user: User = requir
         subtype=subtype,
         fields_to_create=body.fields_to_create,
         media_selector=media_selector,
+        vocab_modes=body.vocab_modes,
     )
     _get_redis().setex(f"import_task:{task_id}", IMPORT_TASK_TTL_SECONDS, "1")
     return {"status": "queued", "task_id": task_id}

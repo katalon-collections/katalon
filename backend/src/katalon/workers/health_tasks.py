@@ -6,6 +6,8 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+from celery.signals import worker_ready
+
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -36,3 +38,11 @@ def heartbeat() -> None:
 
     client = redis_lib.from_url(settings.redis_url)
     client.set(HEARTBEAT_KEY, datetime.now(UTC).isoformat(), ex=HEARTBEAT_TTL_SECONDS)
+
+
+@worker_ready.connect
+def _heartbeat_on_worker_ready(**_: object) -> None:
+    # Beat's first tick can be up to 2 minutes away. Without this the API's
+    # /health (its compose healthcheck) stays 503 on a fresh Redis, so the
+    # api container is marked unhealthy and dependent services never start.
+    heartbeat()

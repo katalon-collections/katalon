@@ -149,7 +149,7 @@ def reset_admin(email: str | None, password: str | None) -> None:
 @click.option(
     "--role",
     required=True,
-    type=click.Choice(["admin", "superuser", "editor", "cataloger", "viewer"]),
+    type=click.Choice(["admin", "editor", "cataloger", "viewer"]),
     help="Role for the new user.",
 )
 def create_user(email: str, password: str, role: str) -> None:

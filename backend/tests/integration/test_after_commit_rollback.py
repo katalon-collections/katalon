@@ -526,9 +526,7 @@ async def test_procedure_hard_delete_relation_cleanup_rollback_leaves_zero_clean
 
 
 @pytest.mark.asyncio
-async def test_celery_native_task_always_eager_with_after_commit(
-    app: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_celery_native_task_always_eager_with_after_commit(app: Any) -> None:
     """Verifies that Celery's native task_always_eager mode works seamlessly with
     after_commit / run_after_commit_hooks: eager task is NOT called on rollback,
     and IS called synchronously on commit."""
@@ -543,22 +541,26 @@ async def test_celery_native_task_always_eager_with_after_commit(
 
     _eager_task: Any = celery_app.task(name="test.eager_verification_task")(_raw_eager_task)
 
-    monkeypatch.setattr(celery_app.conf, "task_always_eager", True)
-    monkeypatch.setattr(celery_app.conf, "task_eager_propagates", True)
+    # conf.update + restore instead of monkeypatch: pytest>=9.2 cannot undo setattr on
+    # Celery's Settings view and leaves eager mode on for all following tests.
+    previous = {k: getattr(celery_app.conf, k) for k in ("task_always_eager", "task_eager_propagates")}
+    celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
+    try:
+        rec_id = str(uuid.uuid4())
 
-    rec_id = str(uuid.uuid4())
+        # 1. Rollback case: task should not execute
+        with pytest.raises(ValueError, match="Rollback test"):
+            async for db in get_db():
+                after_commit(db, _eager_task, "object", rec_id)
+                raise ValueError("Rollback test")
 
-    # 1. Rollback case: task should not execute
-    with pytest.raises(ValueError, match="Rollback test"):
+        assert task_executions == []
+
+        # 2. Commit case: task should execute eagerly during run_after_commit_hooks
         async for db in get_db():
             after_commit(db, _eager_task, "object", rec_id)
-            raise ValueError("Rollback test")
 
-    assert task_executions == []
-
-    # 2. Commit case: task should execute eagerly during run_after_commit_hooks
-    async for db in get_db():
-        after_commit(db, _eager_task, "object", rec_id)
-
-    assert len(task_executions) == 1
-    assert task_executions[0] == {"record_type": "object", "record_id": rec_id}
+        assert len(task_executions) == 1
+        assert task_executions[0] == {"record_type": "object", "record_id": rec_id}
+    finally:
+        celery_app.conf.update(**previous)

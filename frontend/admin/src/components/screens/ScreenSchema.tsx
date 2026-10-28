@@ -420,7 +420,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         {showSubtype && (
           <div className="field">
             <div className="lbl">{t('fieldDetail.subtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.subtypeHint')}</span></div>
-            <select className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)} disabled={!isNew}>
+            <select className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)}>
               <option value="">{t('fieldDetail.subtypeAll')}</option>
               {availableSubtypes.map(s => (
                 <option key={s.id} value={s.name}>{s.label.de || s.name}</option>

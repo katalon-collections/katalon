@@ -11,6 +11,7 @@ import { StepMedia } from './importer/StepMedia'
 import { StepResult } from './importer/StepResult'
 import { StepUpload } from './importer/StepUpload'
 import { StepXmlRecordSelector } from './importer/StepXmlRecordSelector'
+import { ConfirmModal } from '../ui/ConfirmModal'
 import { VocabularyImport } from './VocabularyImport'
 
 function StepBar({ step, isXml }: { step: number; isXml: boolean }) {
@@ -64,6 +65,14 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
   const resultStep    = isXml ? 4 : 3
 
   function reset() { dispatch({ type: 'RESET' }) }
+
+  const [confirmReset, setConfirmReset] = useState(false)
+  // Step 0 without a file holds nothing to lose; elsewhere ask first.
+  const canReset = state.step > 0 || !!state.uploaded
+  function requestReset() {
+    if (state.step === 0) reset()
+    else setConfirmReset(true)
+  }
 
   function selectTab(tab: ImporterTab, focusHeading = false) {
     setFocusMediaHeading(focusHeading)
@@ -127,7 +136,22 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
             </div>
           )}
 
-          <StepBar step={state.step} isXml={isXml} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <StepBar step={state.step} isXml={isXml} />
+            {canReset && state.step < resultStep && (
+              <button className="btn gh sm" onClick={requestReset}>{t('newImport')}</button>
+            )}
+          </div>
+          {confirmReset && (
+            <ConfirmModal
+              message={t('newImportConfirm')}
+              confirmLabel={t('newImportDiscard')}
+              cancelLabel={t('cancel')}
+              danger
+              onConfirm={() => { reset(); setConfirmReset(false) }}
+              onCancel={() => setConfirmReset(false)}
+            />
+          )}
 
           <div style={{ marginTop: 24 }}>
             {/* Step 0: Upload (all formats) */}
@@ -176,6 +200,10 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 pendingFields={state.pendingFields}
                 onPendingFieldsChange={(pending) =>
                   dispatch({ type: 'PENDING_FIELDS_CHANGED', payload: pending })
+                }
+                vocabModes={state.vocabModes}
+                onVocabModeChange={(field, mode) =>
+                  dispatch({ type: 'VOCAB_MODE_CHANGED', payload: { field, mode } })
                 }
                 missingRequired={missingRequired}
                 idnoMissing={idnoMissing}

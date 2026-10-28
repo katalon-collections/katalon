@@ -5,6 +5,7 @@ import React, { useEffect, useReducer, useRef } from 'react'
 import { importer, schema, subtypes as subtypesApi } from '../../../api/client'
 import type { ImportMapping, MappingEntry, UploadResult, XmlElementLevel } from '../../../api/client'
 import type { FieldDefinition, RecordSubtype } from '../../../types'
+import type { PendingField } from './types'
 import {
   IMPORTER_STATE_KEY,
   type ImporterAction,
@@ -56,6 +57,9 @@ function normalizedSimilarity(a: string, b: string): number {
   if (maxLen === 0) return 1
   return 1 - levenshteinDistance(a, b) / maxLen
 }
+
+// Spaltenköpfe, die automatisch als ID-Nummer-Spalte vorgeschlagen werden
+const IDNO_COLUMN_ALIASES = ['id', 'idno', 'id-nr', 'id-nr.', 'id_nr', 'id-nummer', 'id nummer']
 
 function suggestTargetForColumn(col: string, fields: FieldDefinition[]): string | null {
   const lowerCol = col.trim().toLowerCase()
@@ -125,6 +129,23 @@ function loadPersistedState(): PersistedImporterState | null {
   return null
 }
 
+// Pending fields become virtual select options; skip duplicates and names the server already knows.
+function withPending(base: FieldDefinition[], pending: PendingField[], recordType: string): FieldDefinition[] {
+  const taken = new Set(base.map(f => f.name))
+  return base.concat(dedupePending(pending).filter(p => !taken.has(p.name)).map((p): FieldDefinition => ({
+    id: `__pending__${p.name}`, target_type: recordType, name: p.name,
+    label: { de: p.label_de, en: p.label_en },
+    field_type: p.field_type as FieldDefinition['field_type'],
+    is_required: false, is_repeatable: p.is_repeatable, is_translatable: false, sort_order: 9999,
+    settings: {}, target_subtype: null,
+    show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
+  })))
+}
+
+function dedupePending(list: PendingField[]): PendingField[] {
+  return [...new Map(list.map(p => [p.name, p])).values()]
+}
+
 // ── Initial state ─────────────────────────────────────────────────────────────
 
 function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
@@ -150,7 +171,8 @@ function buildInitialState(persisted: PersistedImporterState | null): ImporterSt
     idnoColumn:     persisted?.idnoColumn    ?? null,
     upsertStrategy: persisted?.upsertStrategy ?? 'skip',
     autoPublish:    persisted?.autoPublish   ?? false,
-    pendingFields:  persisted?.pendingFields ?? [],
+    pendingFields:  dedupePending(persisted?.pendingFields ?? []),
+    vocabModes:     persisted?.vocabModes    ?? {},
     dryResult:      persisted?.dryResult     ?? null,
     dryRunning:     false,
     taskId:         persisted?.taskId        ?? null,
@@ -243,7 +265,10 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
       return { ...state, ...action.payload }
 
     case 'PENDING_FIELDS_CHANGED':
-      return { ...state, pendingFields: action.payload }
+      return { ...state, pendingFields: dedupePending(action.payload) }
+
+    case 'VOCAB_MODE_CHANGED':
+      return { ...state, vocabModes: { ...state.vocabModes, [action.payload.field]: action.payload.mode } }
 
     case 'DRY_RUN_STARTED':
       return { ...state, dryRunning: true }
@@ -262,7 +287,7 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
 
     case 'PROFILE_APPLIED': {
       const { mapping, mediaSelector, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
-      return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields, upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
+      return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields: dedupePending(pendingFields), upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
     }
     case 'SAVED_MAPPING_APPLIED': {
       const { mapping, mediaSelector, mappingId, savedMappingName, subtype } = action.payload
@@ -338,44 +363,27 @@ export function useImporterState(): ImporterStateAndHandlers {
       upsertStrategy: state.upsertStrategy, autoPublish: state.autoPublish,
       uploaded: state.uploaded ? { ...state.uploaded, upload_id: '' } : null,
       dryResult: state.dryResult, taskId: state.taskId,
-      pendingFields: state.pendingFields,
+      pendingFields: state.pendingFields, vocabModes: state.vocabModes,
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(toSave))
   }, [
     state.step, state.recordType, state.subtype, state.mapping, state.mappingId, state.savedMappingName,
     state.mediaSelector, state.idnoStrategy, state.idnoColumn, state.upsertStrategy, state.autoPublish,
-    state.uploaded, state.dryResult, state.taskId, state.pendingFields,
+    state.uploaded, state.dryResult, state.taskId, state.pendingFields, state.vocabModes,
   ])
 
   // Load fields + subtypes
   useEffect(() => {
     schema.list(state.recordType, state.subtype ?? undefined).then(fs => {
-      const virtuals = state.pendingFields.map((p): FieldDefinition => ({
-        id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
-        label: { de: p.label_de, en: p.label_en },
-        field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false, is_repeatable: p.is_repeatable, is_translatable: false, sort_order: 9999,
-        settings: {}, target_subtype: null,
-        show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
-      }))
-      setFields(fs.concat(virtuals))
+      // 'idno' wird über die Karte "ID-Nummer" zugewiesen, nicht als normales Mapping-Ziel
+      setFields(withPending(fs.filter(f => f.name !== 'idno'), state.pendingFields, state.recordType))
     }).catch(() => setFields([]))
     subtypesApi.list(state.recordType).then(setAvailableSubtypes).catch(() => setAvailableSubtypes([]))
   }, [state.recordType, state.subtype])
 
   // Re-merge pending fields when they change
   useEffect(() => {
-    setFields(prev => {
-      const base = prev.filter(f => !f.id.startsWith('__pending__'))
-      return base.concat(state.pendingFields.map((p): FieldDefinition => ({
-        id: `__pending__${p.name}`, target_type: state.recordType, name: p.name,
-        label: { de: p.label_de, en: p.label_en },
-        field_type: p.field_type as FieldDefinition['field_type'],
-        is_required: false, is_repeatable: p.is_repeatable, is_translatable: false, sort_order: 9999,
-        settings: {}, target_subtype: null,
-        show_in_detail: false, show_in_list: false, is_facet: false, is_searchable: false,
-      })))
-    })
+    setFields(prev => withPending(prev.filter(f => !f.id.startsWith('__pending__')), state.pendingFields, state.recordType))
   }, [state.pendingFields, state.recordType])
 
   // Poll task status
@@ -435,8 +443,12 @@ export function useImporterState(): ImporterStateAndHandlers {
         const target = suggestTargetForColumn(col, fields)
         if (target) autoMap[col] = { target }
       }
+      // ID-Nummer läuft nur über die Karte "ID-Nummer", nicht über das Mapping
+      const idnoCol = (result.headers ?? []).find(h => IDNO_COLUMN_ALIASES.includes(h.trim().toLowerCase()))
+      if (idnoCol) delete autoMap[idnoCol]
       dispatch({ type: 'UPLOADED', payload: result })
       dispatch({ type: 'MAPPING_CHANGED', payload: autoMap })
+      if (idnoCol) dispatch({ type: 'IDNO_STRATEGY_CHANGED', payload: { strategy: 'column', column: idnoCol } })
     } catch (e) {
       dispatch({ type: 'UPLOAD_ERROR', payload: (e as Error).message })
     }
@@ -476,7 +488,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId, state.vocabModes)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -520,6 +532,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         fields_to_create: pendingFieldsPayload(),
         media_selector: state.mediaSelector,
         mapping_id: state.mappingId,
+        vocab_modes: state.vocabModes,
       })
       dispatch({ type: 'IMPORT_STARTED', payload: task_id })
     } catch (e) {

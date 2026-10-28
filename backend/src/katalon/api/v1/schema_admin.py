@@ -618,6 +618,36 @@ async def _apply_field_update(
             name=data.name,
             exclude_id=field.id,
         )
+    moved_children: list[FieldDefinition] = []
+    if data.target_subtype != field.target_subtype and not field.parent_id:
+        # Values stay in record metadata under the field name; a move would hide them
+        # from records of the old subtype, so only unused fields (and groups) may move.
+        from katalon.services.schema_service import count_field_usage
+
+        moved_children = list(
+            (
+                await db.execute(
+                    select(FieldDefinition).where(
+                        FieldDefinition.parent_id == field.id,
+                        FieldDefinition.is_deleted.is_(False),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        used = await count_field_usage(db, field)
+        for child in moved_children:
+            used += await count_field_usage(db, child)
+        if used:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Das Feld wird in {used} Datensätzen verwendet und kann nicht in einen "
+                    "anderen Subtyp verschoben werden. Feld stattdessen duplizieren "
+                    "(im Ziel-Subtyp) und das ursprüngliche Feld löschen."
+                ),
+            )
     old_is_public = field.is_public
     old_settings = field.settings or {}
     old_is_translatable = field.is_translatable
@@ -625,6 +655,8 @@ async def _apply_field_update(
     old_field_type = field.field_type
     for k, v in data.model_dump().items():
         setattr(field, k, v)
+    for child in moved_children:
+        child.target_subtype = data.target_subtype
     try:
         await db.flush()
     except IntegrityError as exc:

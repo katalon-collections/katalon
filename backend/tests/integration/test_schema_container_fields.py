@@ -6,6 +6,8 @@
 Regression tests for MissingGreenlet errors caused by lazy-loading the
 `children` relationship outside an async SQLAlchemy context.
 """
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -642,3 +644,75 @@ async def test_duplicate_field_names_rejected(
     finally:
         await async_client.delete(f"/v1/schema/{field_a_id}", headers=auth_headers)
 
+
+
+async def _create_procedure_field(
+    client: AsyncClient, headers: dict, name: str, field_type: str = "text", **extra
+) -> dict:
+    r = await client.post(
+        "/v1/schema",
+        headers=headers,
+        json={
+            "target_type": "procedure", "target_subtype": "conservation", "name": name,
+            "label": {"de": name}, "field_type": field_type, "is_required": False,
+            "is_repeatable": field_type == "group", "settings": {}, **extra,
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _as_payload(field: dict, **changes) -> dict:
+    keys = ("target_type", "target_subtype", "name", "label", "field_type", "is_required",
+            "is_repeatable", "settings", "parent_id")
+    return {**{k: field[k] for k in keys}, **changes}
+
+
+@pytest.mark.asyncio
+async def test_move_unused_group_to_other_subtype_moves_children(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    group = await _create_procedure_field(async_client, auth_headers, "move_group", "group")
+    child = await _create_procedure_field(
+        async_client, auth_headers, "move_group_child", parent_id=group["id"]
+    )
+
+    r = await async_client.put(
+        f"/v1/schema/{group['id']}",
+        headers=auth_headers,
+        json=_as_payload(group, target_subtype="acquisition"),
+    )
+    assert r.status_code == 200, r.text
+
+    fields = (await async_client.get(
+        "/v1/schema/procedure?subtype=acquisition", headers=auth_headers
+    )).json()
+    moved = next(f for f in fields if f["id"] == group["id"])
+    assert [c["id"] for c in moved["children"]] == [child["id"]]
+    assert moved["children"][0]["target_subtype"] == "acquisition"
+
+
+@pytest.mark.asyncio
+async def test_move_used_field_to_other_subtype_rejected(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    field = await _create_procedure_field(async_client, auth_headers, "move_used_field")
+    created = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PROC-{uuid.uuid4().hex[:12]}",
+            "procedure_type": "conservation",
+            "status": "draft",
+            "metadata_": {"move_used_field": "x"},
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    r = await async_client.put(
+        f"/v1/schema/{field['id']}",
+        headers=auth_headers,
+        json=_as_payload(field, target_subtype="acquisition"),
+    )
+    assert r.status_code == 409, r.text
+    assert "duplizieren" in r.json()["detail"]

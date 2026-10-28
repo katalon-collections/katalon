@@ -4,6 +4,18 @@ Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Vers
 Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
 Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 
+## [1.48.0]
+
+- **Vokabulare beim Import erweitern oder nur abgleichen:** Für Vokabularfelder mit
+  bestehendem Vokabular wählt man im Importer, ob unbekannte Werte neue Begriffe anlegen
+  („Vokabular erweitern“) oder ob nur vorhandene Begriffe übernommen werden. Beim Abgleich
+  spielen Groß-/Kleinschreibung und überzählige Leerzeichen keine Rolle („Berlin“ = „berlin“);
+  der Probelauf zeigt vorab, wie viele Werte neu sind oder verworfen werden.
+- **Mehr Feldtypen beim Anlegen neuer Felder im Import:** Beim Anlegen eines Feldes aus einer
+  Quellspalte stehen nun auch URL, Rich-Text, freies Vokabular und Geo zur Auswahl.
+- **Ungenutzte Felder in einen anderen Subtyp verschieben:** Felder und Gruppen, in denen noch
+  kein Datensatz Werte hat, lassen sich im Schema einem anderen Subtyp zuordnen.
+
 ## [1.47.0]
 
 - **Mehrere Spalten in ein Feld importieren:** Im Importer können mehrere Spalten (etwa

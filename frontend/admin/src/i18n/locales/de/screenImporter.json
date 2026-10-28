@@ -26,6 +26,7 @@
     "errorPagination": "{{page}} / {{totalPages}} ({{count}} verschiedene Fehler)",
     "vocabHighCardinality": "⚠ Feld „{{label}}“: {{uniqueCount}} verschiedene Werte, davon {{newCount}} neu. Soll diese Spalte wirklich als Vokabular verwendet werden?",
     "vocabNewTerms": "Feld „{{label}}“: {{newCount}} neue Vokabular-Terms werden angelegt ({{uniqueCount}} eindeutige Werte).",
+    "vocabMatchOnly": "Feld „{{label}}“: nur vorhandene Terme. {{newCount}} von {{uniqueCount}} eindeutigen Werten haben keinen passenden Term und werden verworfen.",
     "spellingVariants": "Mögliche Schreibweisen-Varianten",
     "merge": "Zusammenführen",
     "noErrors": "Keine Fehler. {{count}} Datensätze können importiert werden.",
@@ -41,6 +42,12 @@
   "exportProfileButton": "Profil exportieren",
   "exportProfileTooltip": "Als JSON-Datei auf Festplatte herunterladen",
   "activeTemplate": "Vorlage: {{name}}",
+  "vocabMode": {
+    "title": "Vokabular-Felder",
+    "help": "Wie sollen Werte behandelt werden, die im Vokabular noch nicht vorkommen? Groß-/Kleinschreibung und Leerzeichen werden beim Abgleich ignoriert („Berlin“ = „berlin“).",
+    "extend": "Vokabular erweitern (neue Terme anlegen)",
+    "matchOnly": "Nur vorhandene Terme übernehmen"
+  },
   "mappingIgnore": "– ignorieren –",
   "mappingAlreadyAssigned": "(bereits zugewiesen)",
   "mappingNewField": "(neu)",
@@ -71,5 +78,8 @@
   "actionsCol": "Aktionen",
   "applyTemplateButton": "Laden",
   "deleteTemplate": "Vorlage löschen",
-  "close": "Schließen"
+  "close": "Schließen",
+  "newImport": "Neuer Import",
+  "newImportConfirm": "Aktuellen Import verwerfen? Mapping und neu anzulegende Felder gehen verloren.",
+  "newImportDiscard": "Verwerfen"
 }

@@ -29,6 +29,8 @@ export interface ProfileApplyResult {
   missingFieldNames: string[]
 }
 
+export type VocabMode = 'extend' | 'match_only'
+
 export interface PendingField {
   csvColumn: string
   name: string
@@ -64,6 +66,8 @@ export interface ImporterState {
   upsertStrategy: string
   autoPublish: boolean
   pendingFields: PendingField[]
+  /** Strict vocab field name → how unknown values are handled (default 'extend') */
+  vocabModes: Record<string, VocabMode>
   // Dry run
   dryResult: DryRunResult | null
   dryRunning: boolean
@@ -89,6 +93,7 @@ export type ImporterAction =
   | { type: 'IDNO_STRATEGY_CHANGED'; payload: { strategy: string; column: string | null } }
   | { type: 'OPTIONS_CHANGED'; payload: Partial<Pick<ImporterState, 'upsertStrategy' | 'autoPublish'>> }
   | { type: 'PENDING_FIELDS_CHANGED'; payload: PendingField[] }
+  | { type: 'VOCAB_MODE_CHANGED'; payload: { field: string; mode: VocabMode } }
   | { type: 'DRY_RUN_STARTED' }
   | { type: 'DRY_RUN_OK'; payload: DryRunResult }
   | { type: 'IMPORT_STARTED'; payload: string }
@@ -117,7 +122,7 @@ export type ImporterAction =
 export type PersistedImporterState = Pick<
   ImporterState,
   'step' | 'recordType' | 'subtype' | 'mapping' | 'mappingId' | 'savedMappingName' | 'idnoStrategy' | 'idnoColumn'
-  | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields'
+  | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields' | 'vocabModes'
 >
 export const RECORD_TYPES = [
   { id: 'object',     label: 'Objects' },
@@ -139,6 +144,10 @@ export const FIELD_TYPE_OPTIONS = [
   { id: 'boolean',  label: 'Boolean' },
   { id: 'vocab',    label: 'Vocabulary' },
   { id: 'relation', label: 'Relation' },
+  { id: 'url',      label: 'URL' },
+  { id: 'richtext', label: 'Rich text' },
+  { id: 'vocab_free', label: 'Free vocabulary' },
+  { id: 'geo',      label: 'Geo (lat, lon)' },
 ] as const
 
 // Steps 0=Upload, 1=Mapping (CSV/Excel) or XmlRecordSelector (XML), 2=Mapping (XML only), 3=DryRun, 4=Import

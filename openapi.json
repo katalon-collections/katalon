@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.47.0"
+    "version": "1.48.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -25201,6 +25201,17 @@
             "type": "array",
             "title": "Fields To Create"
           },
+          "vocab_modes": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "extend",
+                "match_only"
+              ]
+            },
+            "type": "object",
+            "title": "Vocab Modes"
+          },
           "idno_strategy": {
             "type": "string",
             "title": "Idno Strategy",
@@ -25609,6 +25620,17 @@
             },
             "type": "array",
             "title": "Fields To Create"
+          },
+          "vocab_modes": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "extend",
+                "match_only"
+              ]
+            },
+            "type": "object",
+            "title": "Vocab Modes"
           }
         },
         "type": "object",

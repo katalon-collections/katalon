@@ -1099,7 +1099,7 @@ export interface DryRunResult {
     empty: number
     conflicts: { filename: string; rows: number[] }[]
   } | null
-  vocab_warnings?: { field: string; label: string; unique_count: number; new_count: number; high_cardinality: boolean }[]
+  vocab_warnings?: { field: string; label: string; unique_count: number; new_count: number; mode?: 'extend' | 'match_only'; high_cardinality: boolean }[]
   vocab_clusters?: {
     field: string
     label: string
@@ -1172,10 +1172,10 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null }) }),
-  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null }) }),
+  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null, vocabModes?: Record<string, 'extend' | 'match_only'>): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null, vocab_modes: vocabModes ?? {} }) }),
+  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null; vocab_modes?: Record<string, 'extend' | 'match_only'> }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null, vocab_modes: opts?.vocab_modes ?? {} }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   cancelTask: (taskId: string): Promise<{ cancelled: boolean }> =>
