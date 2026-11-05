@@ -46,5 +46,31 @@
     "errorKey": "Schlüssel fehlt, ist ungültig oder schon vergeben.",
     "errorTypes": "Mindestens eine Beziehungsart wählen."
   },
-  "subfield": "{{group}} › {{field}}"
+  "subfield": "{{group}} › {{field}}",
+  "intro": "Lege globale Standardfacetten und zusätzliche Filter pro Datensatztyp fest.",
+  "systemFacets": "Standardfacetten",
+  "system": {
+    "record_type": "Typ",
+    "status": "Status",
+    "subtype": "Subtyp",
+    "idno": "ID-Nummer"
+  },
+  "display": "Anzeige",
+  "initialCount": "Anfangs sichtbare Werte",
+  "perType": "Facetten pro Datensatztyp",
+  "loadingFields": "Lade Felder…",
+  "noFields": "Keine Felder für diesen Typ definiert.",
+  "inheritedFields": "Felder verknüpfter Datensätze",
+  "subtitle": {
+    "title": "Ergebnis-Untertitel",
+    "description": "Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · Datierung“). Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.",
+    "empty": "Keine weiteren Felder – aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können."
+  },
+  "related": {
+    "entities": "Personen/Organisationen",
+    "places": "Orte",
+    "occurrences": "Werke/Ereignisse (Occurrences)",
+    "collections": "Sammlungen"
+  },
+  "relatedFacets": "Verknüpfte Datensätze (automatische Relations-Facetten)"
 }

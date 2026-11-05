@@ -272,6 +272,25 @@ def test_dry_run_no_errors() -> None:
     assert result["errors"] == []
 
 
+def test_dry_run_idno_card_satisfies_required_idno() -> None:
+    idno_field = SimpleNamespace(id=object(), name="idno", field_type="text", parent_id=None, is_required=True)
+    result = dry_run([{"ID": "x_1"}], {"ID": {"target": "__idno__"}}, {"idno": idno_field})
+    assert not any("Pflichtfelder nicht gemappt" in w["message"] for w in result["warnings"])
+
+
+def test_dry_run_idno_card_checks_the_id_column_not_metadata() -> None:
+    idno_field = SimpleNamespace(id=object(), name="idno", field_type="text", parent_id=None, is_required=True, is_repeatable=False)
+    label_field = SimpleNamespace(id=object(), name="label", field_type="text", parent_id=None, is_required=False, is_repeatable=False)
+    mapping = {"ID": {"target": "__idno__"}, "Titel": {"target": "label"}}
+    result = dry_run(
+        [{"ID": "x_1", "Titel": "a"}, {"ID": "", "Titel": "b"}],
+        mapping,
+        {"idno": idno_field, "label": label_field},
+    )
+    assert [e["message"] for e in result["errors"]] == ["Pflichtfeld 'idno' ist leer"]
+    assert result["errors"][0]["row"] == 3
+
+
 def test_dry_run_empty_mapping() -> None:
     rows = [{"title": "Foto 1"}]
     mapping: dict = {}

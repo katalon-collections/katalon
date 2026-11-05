@@ -227,6 +227,49 @@ async def get_field_definitions(
     return list(result.scalars().all())
 
 
+async def find_counter_direction_relation_fields(
+    db: AsyncSession,
+    *,
+    owner_type: str,
+    owner_subtype: str | None,
+    target_type: str,
+    target_subtype: str | None,
+    exclude_field_id: uuid.UUID | None = None,
+) -> list[FieldDefinition]:
+    """Relation fields that already model the opposite direction of a planned field.
+
+    A planned field on ``owner_type``/``owner_subtype`` points to
+    ``target_type``/``target_subtype`` (X -> Y). A counter-direction field B lives on
+    Y and points to X. A NULL subtype means "all subtypes" and matches any value on
+    either side. Group sub-fields count; soft-deleted fields and ``exclude_field_id``
+    do not.
+    """
+    result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.field_type == "relation",
+            FieldDefinition.is_deleted.is_(False),
+            FieldDefinition.target_type == target_type,
+        )
+    )
+    candidates = []
+    for field in result.scalars().all():
+        if exclude_field_id is not None and field.id == exclude_field_id:
+            continue
+        settings = field.settings or {}
+        if settings.get("target_type") != owner_type:
+            continue
+        if not _subtypes_overlap(field.target_subtype, target_subtype):
+            continue
+        if not _subtypes_overlap(settings.get("target_subtype") or None, owner_subtype):
+            continue
+        candidates.append(field)
+    return candidates
+
+
+def _subtypes_overlap(a: str | None, b: str | None) -> bool:
+    return a is None or b is None or a == b
+
+
 async def get_sub_field_definitions(
     db: AsyncSession, parent_id: uuid.UUID
 ) -> list[FieldDefinition]:

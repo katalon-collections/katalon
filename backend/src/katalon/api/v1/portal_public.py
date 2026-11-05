@@ -378,6 +378,8 @@ class PortalFieldDefinitionRead(BaseModel):
     # Staff see non-public fields too; only public ones are searchable in the portal index.
     is_public: bool | None = None
     parent_id: uuid.UUID | None
+    # None = field applies to every subtype of the type.
+    target_subtype: str | None = None
     settings: dict[str, Any]
     show_in_detail: bool
     detail_slot: str

@@ -15,7 +15,7 @@ import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
+import { DetailPageLayout, MetaRow, fieldsForSubtype, withoutTitleFields } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
@@ -127,7 +127,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   const ogImage = primaryImage ? thumbnailUrl(obj.id, primaryImage.id, primaryImage.iiif_identifier) : ''
 
   // Keywords get their own tag-pill rendering below; keep them out of the generic field loop.
-  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'keywords' && f.name !== 'title' && f.name !== 'name')
+  const detailFieldDefs = withoutTitleFields(fieldsForSubtype(fieldDefs, obj.object_type), ['keywords'])
 
   const placeholderUrl = subtypePlaceholder(obj.object_type) || portalConfig.placeholder_image_url
 

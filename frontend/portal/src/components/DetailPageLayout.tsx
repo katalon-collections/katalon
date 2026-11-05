@@ -11,6 +11,7 @@ import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow, type RelationEntry } from './RelationFieldRow'
 import { api, type FacetKind, type VocabTerm } from '../api/client'
+import { useI18n } from '../i18n'
 import { dateBucketOf, matchRelationFacet, relationFacetHref, type RelationFacetConfig } from '../utils/facets'
 
 /** Search-page link for one facet value of a field marked `is_facet`, scoped to the
@@ -195,6 +196,19 @@ function GeoMaps({ value, label }: { value: unknown; label: string }) {
   })
 }
 
+/** Keeps fields without a subtype and those of the record's own subtype, so equally named
+ *  fields of other subtypes (e.g. a relation on one subtype, a group on another) never mix. */
+export function fieldsForSubtype(fieldDefs: FieldDefinition[], subtype: string | null | undefined): FieldDefinition[] {
+  return fieldDefs.filter(f => !f.target_subtype || f.target_subtype === subtype)
+}
+
+/** Drops top-level fields the page already shows elsewhere (title/name in the H1, plus `hidden`).
+ *  Group sub-fields keep their own names, so only top-level fields are filtered. */
+export function withoutTitleFields(fieldDefs: FieldDefinition[], hidden: string[] = []): FieldDefinition[] {
+  const skip = new Set(['title', 'name', ...hidden])
+  return fieldDefs.filter(f => f.parent_id || !skip.has(f.name))
+}
+
 function fieldLabel(f: FieldDefinition, locale: string): string {
   return f.label?.[locale] ?? f.label?.de ?? f.label?.en ?? f.name
 }
@@ -203,12 +217,13 @@ function fieldLabel(f: FieldDefinition, locale: string): string {
  *  Only reaches the portal for fields that also passed public-metadata filtering
  *  (see backend public_metadata_service.filter_public_ai_provenance). */
 function AiDisclosureNote({ model, at, locale }: { model: string; at: string; locale: string }) {
+  const { t } = useI18n()
   return (
     <span
-      title={`KI-generiert (${model}) · ${new Date(at).toLocaleDateString(locale)}`}
+      title={t('ai.generatedTooltip', { model, date: new Date(at).toLocaleDateString(locale) })}
       style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--fg-3)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', marginLeft: 6, cursor: 'help' }}
     >
-      KI
+      {t('ai.badge')}
     </span>
   )
 }
@@ -264,7 +279,7 @@ function groupEntryLines(group: FieldDefinition, children: FieldDefinition[], va
           <Fragment key={child.name}>
             {i > 0 && <span className="group-sep" aria-hidden="true"> · </span>}
             {children.length > 1 && <span className="group-key">{fieldLabel(child, locale)}: </span>}
-            {node}
+            {group.settings?.emphasize_first_child === true && child === children[0] ? <strong>{node}</strong> : node}
           </Fragment>
         ))}
       </div>,

@@ -44,6 +44,7 @@ def import_records_task(
     fields_to_create: list[dict[str, Any]] | None = None,
     media_selector: str | None = None,
     vocab_modes: dict[str, str] | None = None,
+    relation_options: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Import records from CSV/Excel with validation, audit logging, and ES indexing.
 
@@ -60,11 +61,12 @@ def import_records_task(
         user_id: UUID of the user who triggered the import
         vocab_modes: {field_name -> "extend" | "match_only"}; "match_only" drops values
                      without a matching vocabulary term instead of creating one
+        relation_options: {field_name -> {"lookup": "idno" | "label", "on_missing": "error" |
+                          "create"}} for plain-text values in relation fields
     """
     from fastapi import HTTPException
     from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import insert
-    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.exc import StaleDataError
 
     from katalon.core.dependencies import has_feature_permission, has_record_permission
@@ -78,12 +80,11 @@ def import_records_task(
         Occurrence,
         Place,
         User,
-        Vocabulary,
-        VocabularyTerm,
     )
     from katalon.services.audit_service import diff_fields, log_change
     from katalon.services.idno_service import consume_next_idno
-    from katalon.services.importer_service import apply_mapping, normalize_term_key
+    from katalon.services.import_resolution import resolve_relations, resolve_vocab_terms
+    from katalon.services.importer_service import apply_mapping
     from katalon.services.lock_service import enforce_not_locked
     from katalon.services.media_batch_import_service import media_references_for_rows
     from katalon.services.presence_service import enforce_not_blocked
@@ -163,108 +164,6 @@ def import_records_task(
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     publish_fail_reasons: list[str] = []  # first few unique reasons
-
-    async def _resolve_vocab_terms(
-        session: AsyncSession,
-        field_defs: dict[str, Any],
-        records: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        """Replace plain string values in vocab fields with {id, label} dicts.
-
-        Looks up existing terms by normalized key (NFKC, whitespace, casefold) and caches
-        per vocabulary. Missing terms are created ("extend", default) or the value is
-        dropped and reported ("match_only"), per field via ``vocab_modes``.
-        """
-        # Find all strict vocab fields that have a vocabulary_id configured
-        vocab_fields: dict[str, uuid.UUID] = {}
-        for fname, fd in field_defs.items():
-            if fd.field_type == "vocab":
-                vid = (fd.settings or {}).get("vocabulary_id")
-                if vid:
-                    try:
-                        vocab_fields[fname] = uuid.UUID(str(vid))
-                    except ValueError:
-                        pass
-
-        if not vocab_fields:
-            return records
-
-        modes = vocab_modes or {}
-        dropped: dict[str, dict[str, int]] = {}
-
-        # Per-vocabulary term cache: vocab_id -> {normalized_term -> {id, label}}
-        term_cache: dict[uuid.UUID, dict[str, dict[str, Any]]] = {}
-
-        async def get_term(fname: str, vocab_id: uuid.UUID, term_str: str) -> dict[str, Any] | None:
-            if vocab_id not in term_cache:
-                res = await session.execute(
-                    select(VocabularyTerm).where(VocabularyTerm.vocabulary_id == vocab_id)
-                )
-                term_cache[vocab_id] = {
-                    normalize_term_key(t.term): {"id": str(t.id), "label": t.term}
-                    for t in res.scalars().all()
-                }
-            key = normalize_term_key(term_str)
-            if key in term_cache[vocab_id]:
-                return term_cache[vocab_id][key]
-            if modes.get(fname) == "match_only":
-                counts = dropped.setdefault(fname, {})
-                counts[term_str.strip()] = counts.get(term_str.strip(), 0) + 1
-                return None
-            # Term does not exist — check the vocabulary exists before creating
-            vocab_res = await session.execute(select(Vocabulary).where(Vocabulary.id == vocab_id))
-            if vocab_res.scalar_one_or_none() is None:
-                return None
-            clean = " ".join(term_str.split())
-            new_term = VocabularyTerm(
-                vocabulary_id=vocab_id,
-                term=clean,
-                label={"de": clean},
-            )
-            session.add(new_term)
-            await session.flush()
-            entry = {"id": str(new_term.id), "label": new_term.term}
-            term_cache[vocab_id][key] = entry
-            return entry
-
-        for record in records:
-            for fname, vocab_id in vocab_fields.items():
-                val = record.get(fname)
-                if val is None:
-                    continue
-                if isinstance(val, list):
-                    resolved = []
-                    for item in val:
-                        if isinstance(item, str) and item.strip():
-                            entry = await get_term(fname, vocab_id, item)
-                            if entry:
-                                resolved.append(entry)
-                    if resolved:
-                        record[fname] = resolved
-                    else:
-                        record.pop(fname, None)
-                elif isinstance(val, str) and val.strip():
-                    entry = await get_term(fname, vocab_id, val)
-                    if entry:
-                        record[fname] = entry
-                    else:
-                        record.pop(fname, None)
-
-        for fname, counts in dropped.items():
-            label = (field_defs[fname].label or {}).get("de") or fname
-            sample = ", ".join(sorted(counts)[:10])
-            more = f" (+{len(counts) - 10} weitere)" if len(counts) > 10 else ""
-            warnings.append(
-                {
-                    "row": None,
-                    "warning": (
-                        f"Feld '{label}': {sum(counts.values())} Werte ohne passenden Term "
-                        f"verworfen: {sample}{more}"
-                    ),
-                }
-            )
-
-        return records
 
     async def _import() -> dict[str, Any]:
         nonlocal created, updated, skipped, published, publish_failed, index_failed
@@ -391,7 +290,27 @@ def import_records_task(
                 media_references_created += len(inserted_ids)
 
             # Resolve vocab field values: string → {id, label} by looking up/creating terms
-            records = await _resolve_vocab_terms(session, field_defs, records)
+            vocab_report = await resolve_vocab_terms(session, field_defs, records, vocab_modes)
+            relation_report = await resolve_relations(
+                session, field_defs, records, relation_options, user_id=user_uuid
+            )
+            warnings.extend(
+                {"row": None, "warning": text}
+                for text in (*vocab_report.warnings, *relation_report.warnings)
+            )
+            resolution_errors = {
+                index: messages
+                for report in (vocab_report, relation_report)
+                for index, messages in report.row_errors.items()
+            }
+            for target_type, target in relation_report.created_records:
+                try:
+                    await index_record(target_type, target, session)
+                except Exception as e:
+                    index_failed += 1
+                    warnings.append(
+                        {"row": None, "warning": f"ES-Indexierung fehlgeschlagen: {e}"}
+                    )
 
             # PID fields are system-managed: CSV values are dropped (PIDs are
             # minted via the UI or automatically on publish, never imported).
@@ -437,6 +356,10 @@ def import_records_task(
                 if i % 10 == 0 and _is_cancelled():
                     warnings.append({"row": None, "warning": "Import wurde abgebrochen."})
                     break
+
+                if i in resolution_errors:
+                    errors.append({"row": row_num, "error": "; ".join(resolution_errors[i])})
+                    continue
 
                 # Determine idno
                 row_idno = idnos[i] if i < len(idnos) else None

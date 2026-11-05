@@ -1,8 +1,55 @@
 # Changelog
 
-Diese Übersicht zeigt neu eingeführte Funktionen von Katalon Collections, Version für
-Version. Bugfixes, Regressionen, interne Refactorings, CI-/Test-Infrastruktur und reine
-Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
+Diese Übersicht zeigt neue Funktionen und, ab Version 1.49.0, auch Fehlerbehebungen von
+Katalon Collections, Version für Version. Interne Refactorings, CI-/Test-Infrastruktur und
+reine Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
+Frühere Versionen listen nur neue Funktionen.
+
+## [1.49.0]
+
+### Neu
+
+- **Beziehungen im Import aus Text anlegen:** Spalten mit Namen oder ID-Nummern werden mit
+  vorhandenen Datensätzen verknüpft, etwa Entwickler-Firmen oder das zugehörige Werk. Man
+  wählt, ob über ID-Nummer oder Titel gesucht wird und ob fehlende Ziele als Fehler gemeldet
+  oder als Entwurf angelegt werden. Der Probelauf zeigt vorab, was passieren würde.
+- **Vokabularwerte über Beschriftungen finden:** Beim Import treffen Werte nun auch
+  vorhandene Begriffe über ihre Beschriftung in jeder Sprache; es entstehen keine Duplikate
+  mehr.
+- **Zeichenkodierung beim CSV-Import prüfen und umstellen:** Der Importer zeigt die erkannte
+  Kodierung der Datei (UTF-8 oder Windows-1252 aus älteren Excel-Versionen) und lässt sie
+  ändern; der Probelauf warnt bei fehlerhaften Umlauten.
+- **Unterfelder von Feldgruppen umsortieren und hervorheben:** Die Reihenfolge der Unterfelder
+  lässt sich im Schema ändern. Im Portal kann der erste Wert jedes Eintrags fett erscheinen,
+  zum Beispiel ein Titel.
+- **Hinweis auf doppelt modellierte Beziehungen:** Der Schema-Editor warnt, wenn dieselbe
+  Beziehung schon als Feld in Gegenrichtung existiert.
+
+### Behoben
+
+- **Doppelte Beziehungen bei gleichnamigen Feldern:** Wenn Felder mit demselben Namen an
+  verschiedenen Subtypen existieren (etwa „Expression“ an Werk und Manifestation), wurde
+  dieselbe Beziehung mehrfach gespeichert. Das passiert nicht mehr. Bestehende Dubletten
+  bereinigt der Betreiber mit `katalon-manage resync-schema-relations` (vorher `--dry-run`,
+  Datensicherung empfohlen).
+- **Datensätze fehlten in der Suche:** Enthielt ein Gruppenfeld Text, wo früher eine Zahl
+  stand (etwa „640 KB“), konnte der Datensatz aus dem Suchindex fallen. Nach dem Update einen
+  vollständigen Reindex ausführen, damit das neue Index-Mapping gilt.
+- **Portal zeigte Namen in Gruppenfeldern nicht:** In Gruppen mit einem Unterfeld „Name“ oder
+  „Titel“ (etwa beteiligte Personen) erschien nur der Rest, etwa „Autor“ statt „David Braben ·
+  Autor“.
+- **Portal vermischte gleichnamige Felder verschiedener Subtypen:** Die Detailseite zeigt nur
+  noch Felder ohne Subtyp und die des eigenen Subtyps.
+- **Import: falsche Warnung zur ID-Nummer und kaputte Umlaute:** Die Warnung „Pflichtfelder
+  nicht gemappt: idno“ erschien trotz zugeordneter ID-Spalte. CSV-Dateien in Windows-1252
+  verloren ihre Umlaute und werden jetzt richtig gelesen.
+- **SPARQL: gespeicherte Abfragen:** „Für alle Kuratoren teilen“ wirkt jetzt. Nicht geteilte
+  Abfragen sehen und ändern nur ihre Autorinnen und Autoren.
+- **Audit-Log:** KI-Vorschläge, KI-Übersetzungen und SPARQL-Abfragen erscheinen mit
+  verständlicher Beschriftung, Modell und Tokenverbrauch.
+- **„Über Katalon“:** Quellcode und Lizenz verlinken auf das öffentliche Repository.
+- **Zweisprachigkeit:** Der Einstellungsscreen, der Dialog des KI-Schema-Assistenten und das
+  KI-Kennzeichen im Portal liegen auf Deutsch und Englisch vor.
 
 ## [1.48.0]
 

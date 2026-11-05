@@ -880,7 +880,7 @@ def _backup_age_hours() -> float | None:
 
     Returns ``None`` unless an operator has optionally mounted the backup
     volume read-only into the api container — not the default topology, see
-    docs/04_produktion.md#monitoring for the recommended host-side check
+    docs/02_produktion.md#monitoring for the recommended host-side check
     that needs no compose change at all.
     """
     marker = Path("/backups/.last_success")
@@ -909,7 +909,7 @@ async def health(response: Response) -> dict[str, object]:
     Returns 503 if any entry in ``checks`` is not "ok" so load balancers can
     fail over. ``queue_backlog`` and ``backup_age_hours`` are informational
     only and never affect the status code — see
-    docs/04_produktion.md#monitoring for suggested alerting thresholds.
+    docs/02_produktion.md#monitoring for suggested alerting thresholds.
     """
     from sqlalchemy import text
 

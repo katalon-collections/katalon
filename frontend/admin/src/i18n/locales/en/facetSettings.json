@@ -46,5 +46,31 @@
     "errorKey": "Key is missing, invalid or already in use.",
     "errorTypes": "Select at least one relation type."
   },
-  "subfield": "{{group}} › {{field}}"
+  "subfield": "{{group}} › {{field}}",
+  "intro": "Set global default facets and additional filters per record type.",
+  "systemFacets": "Default facets",
+  "system": {
+    "record_type": "Type",
+    "status": "Status",
+    "subtype": "Subtype",
+    "idno": "ID number"
+  },
+  "display": "Display",
+  "initialCount": "Initially visible values",
+  "perType": "Facets per record type",
+  "loadingFields": "Loading fields…",
+  "noFields": "No fields defined for this type.",
+  "inheritedFields": "Fields of linked records",
+  "subtitle": {
+    "title": "Result subtitle",
+    "description": "Choose what the portal result list shows below the title (e.g. “Object · Dating”). Only fields that are also enabled as filters above are available here.",
+    "empty": "No further fields – enable additional fields as filters above to select them here."
+  },
+  "related": {
+    "entities": "People/organisations",
+    "places": "Places",
+    "occurrences": "Works/events (occurrences)",
+    "collections": "Collections"
+  },
+  "relatedFacets": "Linked records (automatic relation facets)"
 }

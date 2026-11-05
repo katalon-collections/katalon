@@ -45,7 +45,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
     state, needsReupload, dispatch, fields, availableSubtypes,
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
-    handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
+    handleFile, handleEncodingChange, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
     handleProfileLoaded, handleProfileExport,
     handleSavedMappingLoaded, handleMappingSaved,
   } = useImporterState()
@@ -204,6 +204,11 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 vocabModes={state.vocabModes}
                 onVocabModeChange={(field, mode) =>
                   dispatch({ type: 'VOCAB_MODE_CHANGED', payload: { field, mode } })
+                }
+                onEncodingChange={handleEncodingChange ?? undefined}
+                relationOptions={state.relationOptions}
+                onRelationOptionChange={(field, option) =>
+                  dispatch({ type: 'RELATION_OPTION_CHANGED', payload: { field, option } })
                 }
                 missingRequired={missingRequired}
                 idnoMissing={idnoMissing}

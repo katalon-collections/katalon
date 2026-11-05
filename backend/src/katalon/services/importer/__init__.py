@@ -35,13 +35,17 @@ def parse_excel(content: bytes) -> tuple[list[str], list[dict[str, str]]]:
     return _parse_with_headers(ExcelFormat(), content)
 
 
-def parse_file(filename: str, content: bytes) -> tuple[list[str], list[dict[str, str]], SourceFormat]:
-    """Parse content using the format registry.
+def parse_file(
+    filename: str, content: bytes, encoding: str | None = None
+) -> tuple[list[str], list[dict[str, str]], SourceFormat]:
+    """Parse content using the format registry. ``encoding`` only applies to CSV/TSV.
 
     Returns:
         (headers, rows, format) tuple.
     """
     fmt = get_format_for(filename, content)
+    if encoding and isinstance(fmt, CsvFormat):
+        fmt = CsvFormat(encoding)
     headers, rows = _parse_with_headers(fmt, content)
     return headers, rows, fmt
 

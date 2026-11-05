@@ -14,7 +14,7 @@ vi.mock('./GeoMap', () => ({
   ),
 }))
 
-const { DetailPageLayout, GroupMetaRow } = await import('./DetailPageLayout')
+const { DetailPageLayout, GroupMetaRow, fieldsForSubtype, withoutTitleFields } = await import('./DetailPageLayout')
 
 function def(id: string, name: string, field_type: string, extra: Partial<PortalFieldDefinition> = {}): PortalFieldDefinition {
   return {
@@ -67,6 +67,61 @@ describe('group fields on detail pages', () => {
     expect(lines).toContain('VIAF')
     expect(screen.getByRole('link', { name: 'GND' }).getAttribute('href')).toBe('https://d-nb.info/gnd/118540238')
     expect(screen.getByRole('link', { name: 'Musik' }).getAttribute('href')).toBe('/search?type=entity&meta_Normdaten__Schlagwort=Musik')
+  })
+
+  it('withoutTitleFields drops top-level title/name but keeps group sub-fields of that name', () => {
+    const defs = [
+      def('t', 'title', 'text'),
+      def('n', 'name', 'text'),
+      def('k', 'keywords', 'text'),
+      def('g', 'beteiligte_personen', 'group'),
+      def('gn', 'name', 'text', { parent_id: 'g' }),
+      def('gt', 'title', 'text', { parent_id: 'g' }),
+    ]
+    expect(withoutTitleFields(defs).map(f => f.id)).toEqual(['k', 'g', 'gn', 'gt'])
+    expect(withoutTitleFields(defs, ['keywords']).map(f => f.id)).toEqual(['g', 'gn', 'gt'])
+    const { container } = render(
+      <MemoryRouter>
+        <DetailPageLayout fieldDefs={withoutTitleFields(defs)} metadata={{ beteiligte_personen: [{ name: 'David Braben' }] }} locale="de" recordType="occurrence" sidebarPosition="right" />
+      </MemoryRouter>,
+    )
+    expect(container.textContent).toContain('David Braben')
+  })
+
+  it('fieldsForSubtype keeps generic fields and the record subtype, drops other subtypes', () => {
+    const defs = [
+      def('a', 'alle', 'text'),
+      def('w', 'expression', 'relation', { target_subtype: 'work' }),
+      def('m', 'expression', 'group', { target_subtype: 'manifestation' }),
+    ]
+    expect(fieldsForSubtype(defs, 'work').map(f => f.id)).toEqual(['a', 'w'])
+    expect(fieldsForSubtype(defs, 'manifestation').map(f => f.id)).toEqual(['a', 'm'])
+    expect(fieldsForSubtype(defs, null).map(f => f.id)).toEqual(['a'])
+  })
+
+  it('emphasizes the first sub-field of a group when the group setting is on', () => {
+    const defs = [
+      def('g', 'Fan', 'group', { settings: { emphasize_first_child: true } }),
+      def('t', 'Titel', 'text', { parent_id: 'g' }),
+      def('d', 'Beschreibung', 'text', { parent_id: 'g' }),
+    ]
+    const { container } = render(
+      <MemoryRouter>
+        <DetailPageLayout fieldDefs={defs} metadata={{ Fan: [{ Titel: 'Scummbar', Beschreibung: 'Fanseite' }, { Beschreibung: 'ohne Titel' }] }} locale="de" recordType="occurrence" sidebarPosition="right" />
+      </MemoryRouter>,
+    )
+    const bold = [...container.querySelectorAll('.group-entry strong')].map(el => el.textContent)
+    expect(bold).toEqual(['Scummbar'])
+  })
+
+  it('does not emphasize anything without the group setting', () => {
+    const defs = [def('g', 'Fan', 'group'), def('t', 'Titel', 'text', { parent_id: 'g' }), def('d', 'Beschreibung', 'text', { parent_id: 'g' })]
+    const { container } = render(
+      <MemoryRouter>
+        <DetailPageLayout fieldDefs={defs} metadata={{ Fan: [{ Titel: 'Scummbar', Beschreibung: 'Fanseite' }] }} locale="de" recordType="occurrence" sidebarPosition="right" />
+      </MemoryRouter>,
+    )
+    expect(container.querySelector('.group-entry strong')).toBeNull()
   })
 
   it('GroupMetaRow renders nothing without values', () => {

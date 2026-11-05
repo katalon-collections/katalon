@@ -99,6 +99,8 @@
   },
   "ai": {
     "generated": "KI-generiert",
+    "generatedTooltip": "KI-generiert ({{model}}) am {{date}}",
+    "warning": "KI-Hinweis für {{label}}: {{warning}}",
     "generate": "KI-Vorschlag",
     "regenerate": "Neu generieren",
     "running": "Vorschlag wird erstellt…",

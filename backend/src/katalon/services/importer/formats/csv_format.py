@@ -19,8 +19,33 @@ def _detect_delimiter(content: str) -> str:
         return ","
 
 
+ENCODINGS = ("utf-8", "windows-1252", "iso-8859-1")
+_PYTHON_CODECS = {"utf-8": "utf-8-sig", "windows-1252": "cp1252", "iso-8859-1": "latin-1"}
+
+
+def detect_encoding(content: bytes) -> str:
+    """UTF-8 (with or without BOM) if the bytes are valid, else Windows-1252, else ISO-8859-1."""
+    for name in ENCODINGS:
+        try:
+            content.decode(_PYTHON_CODECS[name])
+        except UnicodeDecodeError:
+            continue
+        return name
+    return "iso-8859-1"
+
+
+def _decode(content: bytes, encoding: str | None = None) -> str:
+    """Decode with the chosen encoding, or the detected one. A forced encoding the bytes do
+    not fit keeps working: undecodable bytes become U+FFFD, which the dry run reports."""
+    name = encoding if encoding in ENCODINGS else detect_encoding(content)
+    return content.decode(_PYTHON_CODECS[name], errors="replace")
+
+
 class CsvFormat(SourceFormat):
-    """CSV file format handler."""
+    """CSV file format handler. ``encoding`` forces one of ``ENCODINGS`` instead of detecting."""
+
+    def __init__(self, encoding: str | None = None) -> None:
+        self.encoding = encoding
 
     def sniff(self, content: bytes, filename: str) -> bool:
         """Match .csv or .tsv files."""
@@ -29,7 +54,7 @@ class CsvFormat(SourceFormat):
 
     def parse(self, content: bytes) -> Iterator[SourceRecord]:
         """Parse CSV and yield rows as dicts."""
-        text = content.decode("utf-8-sig", errors="replace")
+        text = _decode(content, self.encoding)
         delimiter = _detect_delimiter(text)
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         for row in reader:
@@ -38,7 +63,7 @@ class CsvFormat(SourceFormat):
 
     def list_selectors(self, content: bytes) -> list[Selector]:
         """List headers as selectors."""
-        text = content.decode("utf-8-sig", errors="replace")
+        text = _decode(content, self.encoding)
         delimiter = _detect_delimiter(text)
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         if not reader.fieldnames:

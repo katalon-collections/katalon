@@ -298,6 +298,23 @@ class SchemaAiAssistResponse(BaseModel):
     usage: dict[str, int]
 
 
+class RelationCounterpartRequest(BaseModel):
+    target_type: str
+    target_subtype: str | None = None
+    relation_target_type: str
+    relation_target_subtype: str | None = None
+    exclude_field_id: uuid.UUID | None = None
+
+
+class RelationCounterpart(BaseModel):
+    id: uuid.UUID
+    name: str
+    label: dict[str, str]
+    target_subtype: str | None
+    relation_target_subtype: str | None
+    parent_name: str | None = None
+
+
 class SchemaResetSummary(BaseModel):
     deletable_fields: int
 
@@ -1153,6 +1170,61 @@ async def duplicate_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead
     _enqueue_reindex(db, field.target_type)
     children_read = [_fd_read(c) for c in cloned_children] if field.field_type == "group" else []
     return _fd_read(new_field, children_read)
+
+
+@router.post(
+    "/relation-counterparts",
+    response_model=list[RelationCounterpart],
+    dependencies=[require_role("admin")],
+    summary="Find relation fields that model the opposite direction of a planned relation field",
+    description=(
+        "Heuristic hint for the schema editor: a field X -> Y is suspicious when a relation field "
+        "Y -> X already exists. A NULL subtype matches every subtype. Nothing is blocked."
+    ),
+    responses={
+        403: {"description": "Insufficient permissions"},
+        422: {"description": "Invalid target type"},
+    },
+)
+async def relation_counterparts(
+    data: RelationCounterpartRequest, db: DBDep
+) -> list[RelationCounterpart]:
+    from katalon.services.schema_service import find_counter_direction_relation_fields
+
+    _validate_schema_target_type(data.target_type)
+    _validate_schema_target_type(data.relation_target_type)
+    fields = await find_counter_direction_relation_fields(
+        db,
+        owner_type=data.target_type,
+        owner_subtype=data.target_subtype,
+        target_type=data.relation_target_type,
+        target_subtype=data.relation_target_subtype,
+        exclude_field_id=data.exclude_field_id,
+    )
+    parent_ids = {f.parent_id for f in fields if f.parent_id}
+    parents = (
+        {
+            p.id: p.name
+            for p in (
+                await db.execute(select(FieldDefinition).where(FieldDefinition.id.in_(parent_ids)))
+            )
+            .scalars()
+            .all()
+        }
+        if parent_ids
+        else {}
+    )
+    return [
+        RelationCounterpart(
+            id=f.id,
+            name=f.name,
+            label=f.label or {},
+            target_subtype=f.target_subtype,
+            relation_target_subtype=(f.settings or {}).get("target_subtype") or None,
+            parent_name=parents.get(f.parent_id) if f.parent_id else None,
+        )
+        for f in fields
+    ]
 
 
 @router.post(

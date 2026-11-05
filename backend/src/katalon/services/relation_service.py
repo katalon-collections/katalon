@@ -154,25 +154,57 @@ async def procedure_object_ids(db: AsyncSession, procedure_id: uuid.UUID) -> lis
     return ids
 
 
+class _ResolveSubtype:
+    """Marker: read the subtype from the record itself."""
+
+
+_RESOLVE_SUBTYPE = _ResolveSubtype()
+
+
+def _applies_to_subtype(subtype: str | None) -> Any:
+    """A field applies to every subtype (NULL) or to exactly the record's own."""
+    if subtype is None:
+        return FieldDefinition.target_subtype.is_(None)
+    return or_(FieldDefinition.target_subtype.is_(None), FieldDefinition.target_subtype == subtype)
+
+
+async def _record_subtype(db: AsyncSession, record_type: str, record_id: uuid.UUID) -> str | None:
+    model = _RECORD_MODELS.get(record_type)
+    record = await db.get(model, record_id) if model is not None else None
+    value = getattr(record, f"{record_type}_type", None)
+    return value if isinstance(value, str) and value else None
+
+
 async def sync_schema_relations(
     db: AsyncSession,
     record_type: str,
     record_id: uuid.UUID,
     metadata_: dict[str, Any],
+    subtype: str | _ResolveSubtype | None = _RESOLVE_SUBTYPE,
 ) -> None:
     """Mirror schema relation fields into the relations table.
 
     Deletes existing schema-derived relations for this record and recreates
     them based on current metadata_.  Idempotent — safe to call after every
     create/update.
+
+    Only fields without a subtype or with the record's own subtype count, so equally
+    named fields of different subtypes do not create the same relation twice. The
+    subtype is read from the record unless the caller passes it. A record with no
+    subtype only gets fields without one.
     """
-    # 1. Load field definitions for this type
+    if isinstance(subtype, _ResolveSubtype):
+        subtype = await _record_subtype(db, record_type, record_id)
+    applies = _applies_to_subtype(subtype)
+
+    # 1. Load field definitions for this type and subtype
     result = await db.execute(
         select(FieldDefinition).where(
             FieldDefinition.target_type == record_type,
             FieldDefinition.field_type == "relation",
             FieldDefinition.parent_id.is_(None),
             FieldDefinition.is_deleted.is_(False),
+            applies,
         )
     )
     rel_fields = list(result.scalars().all())
@@ -182,6 +214,7 @@ async def sync_schema_relations(
             FieldDefinition.field_type == "group",
             FieldDefinition.parent_id.is_(None),
             FieldDefinition.is_deleted.is_(False),
+            applies,
         )
     )
     group_fields = list(group_result.scalars().all())
@@ -192,6 +225,7 @@ async def sync_schema_relations(
                 FieldDefinition.parent_id == group.id,
                 FieldDefinition.field_type == "relation",
                 FieldDefinition.is_deleted.is_(False),
+                applies,
             )
         )
         group_relation_fields.extend((group, child) for child in children.scalars().all())
@@ -226,6 +260,8 @@ async def sync_schema_relations(
         )
     )
     manual_keys = {(t, i, r) for t, i, r in existing_manual.all()}
+    # One row per target, relation type and source field, however often a field repeats.
+    created: set[tuple[str, uuid.UUID, str, str]] = set()
 
     for field in rel_fields:
         raw = metadata_.get(field.name)
@@ -249,8 +285,11 @@ async def sync_schema_relations(
             relation_type = str(entry.get("relation_type", ""))
             if (target_type, to_id, relation_type) in manual_keys:
                 continue
+            if (target_type, to_id, relation_type, field.name) in created:
+                continue
             if await validate_relation_endpoint(db, target_type, to_id) is not None:
                 continue
+            created.add((target_type, to_id, relation_type, field.name))
             db.add(
                 Relation(
                     from_type=record_type,
@@ -277,8 +316,12 @@ async def sync_schema_relations(
             relation_type = str(entry.get("relation_type", ""))
             if (target_type, to_id, relation_type) in manual_keys:
                 continue
+            source_field = f"{group.name}.{field.name}"
+            if (target_type, to_id, relation_type, source_field) in created:
+                continue
             if await validate_relation_endpoint(db, target_type, to_id) is not None:
                 continue
+            created.add((target_type, to_id, relation_type, source_field))
             db.add(
                 Relation(
                     from_type=record_type,
@@ -287,7 +330,7 @@ async def sync_schema_relations(
                     to_id=to_id,
                     relation_type=relation_type,
                     metadata_={
-                        "source_field": f"{group.name}.{field.name}",
+                        "source_field": source_field,
                         "is_schema_relation": True,
                     },
                     is_schema_derived=True,

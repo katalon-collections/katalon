@@ -16,7 +16,9 @@
     "relation_update": "Relation geändert",
     "relation_delete": "Relation gelöscht",
     "ai_schema_assist": "KI-Schema-Assistent verwendet",
-    "ai_translate": "KI-Übersetzung erstellt"
+    "ai_translate": "KI-Übersetzung erstellt",
+    "ai_complete": "KI-Vorschlag erstellt",
+    "nl2sparql_generated": "KI-SPARQL-Abfrage erstellt"
   },
   "loading": "Lade…",
   "empty": "Keine Einträge.",
@@ -35,8 +37,10 @@
     "place": "Ort",
     "occurrence": "Occurrence",
     "procedure": "Vorgang",
-    "collection": "Sammlung"
+    "collection": "Sammlung",
+    "storage_location": "Lagerort"
   },
   "extraFile": "Datei: {{filename}}",
-  "extraRelationType": "Beziehungstyp: {{relationType}}"
+  "extraRelationType": "Beziehungstyp: {{relationType}}",
+  "schemaFallback": "Schema"
 }

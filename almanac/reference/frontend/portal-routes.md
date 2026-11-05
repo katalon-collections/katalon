@@ -1,0 +1,77 @@
+---
+title: "Portal Routes"
+summary: "Reference for public portal browser routes, page components, and backend API resources."
+topics: [reference, frontend, routing, portal]
+sources:
+  - id: portal-app
+    type: file
+    path: frontend/portal/src/App.tsx
+  - id: portal-client
+    type: file
+    path: frontend/portal/src/api/client.ts
+  - id: portal-styles
+    type: file
+    path: frontend/portal/src/styles.css
+---
+
+Portal routes are browser routes rendered through React Router. `App` wraps `AppInner` in `HelmetProvider` and `BrowserRouter`, and `AppInner` mounts a fixed set of public routes below the shared banner, header, and footer [@portal-app]. The portal API client uses `VITE_API_URL` as an optional host prefix and sends anonymous reads or an existing staff JWT to `/portal/v1` [@portal-client].
+
+## Browser Routes
+
+| Path | Component | Main API resources |
+|---|---|---|
+| `/` | `HomePage` | Portal config and page-specific resources |
+| `/search` | `SearchPage` | `/portal/v1/search` |
+| `/advanced-search` | `AdvancedSearchPage` | `/portal/v1/schema/:type`, field-scoped vocabulary terms; results use `/portal/v1/search/advanced` |
+| `/login` | `LoginPage` | `/v1/auth/token` |
+| `/collections` | `CollectionsPage` | `/portal/v1/collections` |
+| `/collections/:id` | `CollectionDetailPage` | `/portal/v1/collections/:id`, `/portal/v1/collections/:id/export`, `/portal/v1/relations`, object search filtered by collection |
+| `/objects/:id` | `ObjectDetailPage` inside `ErrorBoundary` | `/portal/v1/objects/:id`, `/portal/v1/objects/:id/media`, `/portal/v1/relations` |
+| `/entities/:id` | `EntityDetailPage` | `/portal/v1/entities/:id`, `/portal/v1/relations` |
+| `/places/:id` | `PlaceDetailPage` | `/portal/v1/places/:id`, `/portal/v1/relations` |
+| `/occurrences/:id` | `OccurrenceDetailPage` | `/portal/v1/occurrences/:id`, `/portal/v1/relations` |
+| `/page/:slug` | `StaticPageView` | `/portal/v1/pages/:slug` |
+
+The route table is declared directly in `AppInner`; there is no generated route registry or nested route file for the portal [@portal-app]. Portal layout, theming, and React Router ownership are covered by [Portal Routing And Theming](../../architecture/frontend/portal-routing-and-theming).
+
+## Header Navigation
+
+The header logo links to `/`. Its title reduces its font size when it would wrap and may use two lines at a readable minimum; the text is never shortened [@portal-app] [@portal-styles]. The configured browse navigation can show Objects, Collections, Entities, Places, and Occurrences. Object, Entity, Place, and Occurrence links use `/search?q=&type=<type>`; Collections use the dedicated `/collections` browse route [@portal-app].
+
+The header search is global. On submit it navigates to `/search?q=<term>` without inheriting a type from the current page. The adjacent advanced-search link opens `/advanced-search`, where users choose a result type explicitly [@portal-app].
+
+The header offers `Anmelden` when no valid local token is present and `Abmelden` after staff login. The login form reuses an existing Katalon user account. It visibly reserves a disabled registration action for the future public-account workflow, but creates no public account yet [@portal-app] [@portal-client].
+
+## Autocomplete Paths
+
+Header autocomplete calls `/portal/v1/search` with `q` and `page_size=5`. Suggestions link to detail paths based on `record_type`: `entity` maps to `/entities/:id`, `place` to `/places/:id`, `occurrence` to `/occurrences/:id`, and every other type falls back to `/objects/:id` [@portal-app].
+
+## API Client Endpoints
+
+| Client member | Endpoint shape |
+|---|---|
+| `objects.list` | `/portal/v1/objects?...` |
+| `objects.get` | `/portal/v1/objects/:id` |
+| `objects.media` | `/portal/v1/objects/:id/media` |
+| `collections.list` | `/portal/v1/collections?...` |
+| `collections.get` | `/portal/v1/collections/:id` |
+| `entities.get` | `/portal/v1/entities/:id` |
+| `places.get` | `/portal/v1/places/:id` |
+| `occurrences.get` | `/portal/v1/occurrences/:id` |
+| `relations.forRecord` | `/portal/v1/relations?from_type=...` and `/portal/v1/relations?to_type=...` |
+| `portal.config` | `/portal/v1/portal/config` |
+| `portal.schema` | `/portal/v1/schema/:type` |
+| `pages.list` | `/portal/v1/pages` |
+| `pages.get` | `/portal/v1/pages/:slug` |
+| `pages.assets` | `/portal/v1/pages/assets/:id/:filename` |
+| `vocabularies.list` | `/portal/v1/vocabularies` |
+| `vocabularies.terms` | `/portal/v1/vocabularies/:id/terms` |
+| `search.query` | `/portal/v1/search?...` |
+| `search.advanced` | `POST /portal/v1/search/advanced` |
+| `banners.activePortal` | `/portal/v1/banners/active/portal` |
+
+`relations.forRecord` performs two API reads, one where the current record is `from_*` and one where it is `to_*`, then concatenates the relation lists [@portal-client]. Search behavior and facet query parameters are described in [Portal Search And Facets](../../architecture/workflows/portal-search-and-facets).
+
+## Footer Routes
+
+The footer loads static page summaries from `api.pages.list()` and creates one `/page/<slug>` link for each returned page. It also links the API documentation at `/api/docs` [@portal-app].

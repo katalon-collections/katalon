@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.48.0"
+    "version": "1.49.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -3646,6 +3646,56 @@
             }
           }
         }
+      }
+    },
+    "/v1/schema/relation-counterparts": {
+      "post": {
+        "tags": [
+          "schema"
+        ],
+        "summary": "Find relation fields that model the opposite direction of a planned relation field",
+        "description": "Heuristic hint for the schema editor: a field X -> Y is suspicious when a relation field Y -> X already exists. A NULL subtype matches every subtype. Nothing is blocked.",
+        "operationId": "schema_relation_counterparts_post_v1_schema_relation_counterparts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationCounterpartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelationCounterpart"
+                  },
+                  "type": "array",
+                  "title": "Response Schema Relation Counterparts Post V1 Schema Relation Counterparts"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Invalid target type"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/v1/schema/import": {
@@ -17649,7 +17699,7 @@
           "sparql"
         ],
         "summary": "List saved SPARQL queries",
-        "description": "List all saved SPARQL queries with optional tag or text search (Admin only).",
+        "description": "List shared and own saved SPARQL queries with optional tag or text search (Admin only).",
         "operationId": "sparql_list_saved_sparql_queries_get_v1_sparql_queries",
         "security": [
           {
@@ -20387,7 +20437,7 @@
           "system"
         ],
         "summary": "Health",
-        "description": "Readiness check: verifies DB, Elasticsearch, Redis, Cantaloupe and\n(if enabled) Oxigraph are reachable, plus Celery Beat/Worker liveness via\na heartbeat key (see workers/health_tasks.py).\n\nReturns 503 if any entry in ``checks`` is not \"ok\" so load balancers can\nfail over. ``queue_backlog`` and ``backup_age_hours`` are informational\nonly and never affect the status code — see\ndocs/04_produktion.md#monitoring for suggested alerting thresholds.",
+        "description": "Readiness check: verifies DB, Elasticsearch, Redis, Cantaloupe and\n(if enabled) Oxigraph are reachable, plus Celery Beat/Worker liveness via\na heartbeat key (see workers/health_tasks.py).\n\nReturns 503 if any entry in ``checks`` is not \"ok\" so load balancers can\nfail over. ``queue_backlog`` and ``backup_age_hours`` are informational\nonly and never affect the status code — see\ndocs/02_produktion.md#monitoring for suggested alerting thresholds.",
         "operationId": "system_health_get_health",
         "responses": {
           "200": {
@@ -22151,6 +22201,18 @@
             },
             "type": "array",
             "title": "File"
+          },
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding",
+            "description": "CSV/TSV only: force 'utf-8', 'windows-1252' or 'iso-8859-1' instead of detecting it."
           }
         },
         "type": "object",
@@ -25212,6 +25274,13 @@
             "type": "object",
             "title": "Vocab Modes"
           },
+          "relation_options": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelationImportOption"
+            },
+            "type": "object",
+            "title": "Relation Options"
+          },
           "idno_strategy": {
             "type": "string",
             "title": "Idno Strategy",
@@ -25631,6 +25700,13 @@
             },
             "type": "object",
             "title": "Vocab Modes"
+          },
+          "relation_options": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelationImportOption"
+            },
+            "type": "object",
+            "title": "Relation Options"
           }
         },
         "type": "object",
@@ -27957,6 +28033,17 @@
             ],
             "title": "Parent Id"
           },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
           "settings": {
             "additionalProperties": true,
             "type": "object",
@@ -29371,6 +29458,120 @@
         ],
         "title": "ReindexTypeStatus"
       },
+      "RelationCounterpart": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Label"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "relation_target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Target Subtype"
+          },
+          "parent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "label",
+          "target_subtype",
+          "relation_target_subtype"
+        ],
+        "title": "RelationCounterpart"
+      },
+      "RelationCounterpartRequest": {
+        "properties": {
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Subtype"
+          },
+          "relation_target_type": {
+            "type": "string",
+            "title": "Relation Target Type"
+          },
+          "relation_target_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Target Subtype"
+          },
+          "exclude_field_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Field Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_type",
+          "relation_target_type"
+        ],
+        "title": "RelationCounterpartRequest"
+      },
       "RelationCreate": {
         "properties": {
           "from_type": {
@@ -29471,6 +29672,31 @@
         ],
         "title": "RelationFacet",
         "description": "A portal facet over linked records restricted to certain relation types,\ne.g. \"Komponist_in\" = entities linked via relation_type ``komponist``."
+      },
+      "RelationImportOption": {
+        "properties": {
+          "lookup": {
+            "type": "string",
+            "enum": [
+              "idno",
+              "label"
+            ],
+            "title": "Lookup",
+            "default": "idno"
+          },
+          "on_missing": {
+            "type": "string",
+            "enum": [
+              "error",
+              "create"
+            ],
+            "title": "On Missing",
+            "default": "error"
+          }
+        },
+        "type": "object",
+        "title": "RelationImportOption",
+        "description": "How plain text in a relation field is turned into a link to an existing record."
       },
       "RelationRead": {
         "properties": {

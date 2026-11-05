@@ -148,7 +148,7 @@ export interface EntitySummary {
 }
 
 export interface PlaceSummary {
-  id: string; status: string
+  id: string; status: string; place_type?: string | null
   lat: number | null; lon: number | null
   metadata_: Record<string, unknown>
   ai_provenance: AiProvenance
@@ -346,6 +346,8 @@ export interface PortalFieldDefinition {
   /** False only in the staff projection; the portal index holds public fields only. */
   is_public?: boolean | null
   parent_id: string | null
+  /** null/absent = applies to every subtype */
+  target_subtype?: string | null
   settings: Record<string, unknown>
   show_in_detail: boolean
   detail_slot: 'main' | 'sidebar'

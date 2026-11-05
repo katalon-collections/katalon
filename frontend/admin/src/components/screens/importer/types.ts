@@ -31,6 +31,13 @@ export interface ProfileApplyResult {
 
 export type VocabMode = 'extend' | 'match_only'
 
+/** How plain text in a relation field finds (or creates) the linked record. */
+export interface RelationOption {
+  lookup: 'idno' | 'label'
+  on_missing: 'error' | 'create'
+}
+export const DEFAULT_RELATION_OPTION: RelationOption = { lookup: 'idno', on_missing: 'error' }
+
 export interface PendingField {
   csvColumn: string
   name: string
@@ -68,6 +75,8 @@ export interface ImporterState {
   pendingFields: PendingField[]
   /** Strict vocab field name → how unknown values are handled (default 'extend') */
   vocabModes: Record<string, VocabMode>
+  /** Relation field name → lookup and missing-target handling (default: by ID no., error) */
+  relationOptions: Record<string, RelationOption>
   // Dry run
   dryResult: DryRunResult | null
   dryRunning: boolean
@@ -94,6 +103,7 @@ export type ImporterAction =
   | { type: 'OPTIONS_CHANGED'; payload: Partial<Pick<ImporterState, 'upsertStrategy' | 'autoPublish'>> }
   | { type: 'PENDING_FIELDS_CHANGED'; payload: PendingField[] }
   | { type: 'VOCAB_MODE_CHANGED'; payload: { field: string; mode: VocabMode } }
+  | { type: 'RELATION_OPTION_CHANGED'; payload: { field: string; option: RelationOption } }
   | { type: 'DRY_RUN_STARTED' }
   | { type: 'DRY_RUN_OK'; payload: DryRunResult }
   | { type: 'IMPORT_STARTED'; payload: string }
@@ -122,7 +132,7 @@ export type ImporterAction =
 export type PersistedImporterState = Pick<
   ImporterState,
   'step' | 'recordType' | 'subtype' | 'mapping' | 'mappingId' | 'savedMappingName' | 'idnoStrategy' | 'idnoColumn'
-  | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields' | 'vocabModes'
+  | 'mediaSelector' | 'upsertStrategy' | 'autoPublish' | 'uploaded' | 'dryResult' | 'taskId' | 'pendingFields' | 'vocabModes' | 'relationOptions'
 >
 export const RECORD_TYPES = [
   { id: 'object',     label: 'Objects' },

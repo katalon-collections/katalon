@@ -1,247 +1,135 @@
 # Katalon Collections
 
-Turn-key Open-Source Metadata Management System (MMS) für den GLAM-Sektor — Galerien, Bibliotheken, Archive, Museen.
+Katalon Collections ist ein Open-Source-System zur Erfassung, Verwaltung und
+Veröffentlichung von Metadaten für Museen, Archive, Bibliotheken und Sammlungen.
+Institutionen installieren und betreiben ihre eigene Instanz.
 
-*Katalon Collections* (kurz "Katalon" im Code und in der Entwicklungsdokumentation) ist eigenständig und nicht mit [katalon.com](https://katalon.com/) (Test-Automatisierung) verbunden.
+Felder, Subtypen, Vokabulare und Formulare werden in der Admin-Oberfläche
+konfiguriert. Ein öffentliches Portal erschließt freigegebene Datensätze über
+Suche, Facetten und Medienansichten. REST-API, OAI-PMH und konfigurierbare
+Export-Mappings ermöglichen die Anbindung anderer Systeme.
 
-Katalon verbindet flexible, dynamische Metadatenschemata mit einer sauberen REST-API, zwei spezialisierten Frontends und einer containerisierten Deployment-Infrastruktur.
+Das Projekt ist unabhängig vom Test-Automatisierungsprodukt
+[katalon.com](https://katalon.com/).
 
-> Both the Admin UI and the public Portal are fully multilingual, shipping with German and English out of the box. Field labels, vocabulary terms, and other collection metadata support any number of languages per install, configured through the UI. Additional UI interface languages can be added via a small locale file, no core code changes required.
+## Funktionen
 
----
+- **Metadaten konfigurieren:** Feldtypen, Gruppen, wiederholbare und
+  mehrsprachige Werte, Pflichtfelder und Subtypen in der Oberfläche verwalten.
+- **Datensätze verknüpfen:** Fachliche Beziehungen als Schemafelder erfassen und
+  durch freie Beziehungen ergänzen; ausgewählte verknüpfte Werte für Suche und
+  Facetten verwenden.
+- **Daten importieren:** CSV, TSV, Excel und XML zuordnen, transformieren und im
+  Probelauf prüfen. Der generische Metadatenimport unterstützt Objects, Entities,
+  Places und Occurrences. Ein separater Medienimport ordnet Dateien zu.
+- **Kontrollierte Begriffe verwenden:** Hierarchische Vokabulare pflegen und
+  Normdaten unter anderem aus GND, GeoNames, VIAF, Wikidata, Getty und ICONCLASS
+  suchen und verknüpfen.
+- **Medien präsentieren:** Bilder über IIIF anzeigen sowie PDFs, Audio, Video und
+  unterstützte 3D-Dateien einbinden. Masterdateien und Bildpyramiden bleiben
+  getrennt; Medien können einzeln von der öffentlichen Anzeige ausgenommen werden.
+- **Metadaten ausgeben:** Feld-Mappings unter anderem für Dublin Core, LIDO und
+  METS/MODS konfigurieren, OAI-PMH bereitstellen und Daten als CSV oder JSON
+  exportieren. Fachliche Export-Mappings werden pro Installation eingerichtet.
+- **Redaktionelle Arbeit unterstützen:** Rollenrechte, Arbeitslisten,
+  Massenbearbeitung, Audit-Log, Snapshots für unterstützte Typen, Versionsprüfung
+  und Bearbeitungssperren nutzen.
+- **Portal gestalten:** Titel, Logo, Farben, Startseite, Footer und
+  Detaildarstellung konfigurieren; eigene Theme-Pakete ohne Frontend-Neubau laden.
+- **Optionale Erweiterungen nutzen:** RDF-Projektion in Oxigraph, lesende
+  SPARQL-Abfragen und KI-gestützte Vorschläge bei entsprechender Konfiguration
+  aktivieren.
 
-## Was ist Katalon?
+Admin und Portal bieten deutsche und englische Oberflächentexte.
+Mehrsprachige Metadaten und Labels können weitere institutionell konfigurierte
+Sprachen verwenden. Zusätzliche UI-Sprachen benötigen passende Übersetzungen.
+Tastaturbedienung, sichtbarer Fokus und zugängliche Formulare gehören zu den
+Designzielen.
 
-Sammlungsverantwortliche stehen vor der Herausforderung, heterogene Bestände mit individuellen Metadatenfeldern zu erfassen, zu verknüpfen und der Öffentlichkeit zugänglich zu machen. Katalon setzt dabei auf *Configuration over Coding*: Schemata werden konfiguriert statt programmiert.
+## Datensatztypen
 
-Katalon baut auf einem modernen Stack:
+| Typ | Zweck |
+|---|---|
+| Object | Sammlungsgut, Dokumente und Digitalisate |
+| Entity | Personen und Körperschaften |
+| Place | Geografische Orte |
+| Occurrence | Werke, Ereignisse und Konzepte |
+| Collection | Sammlungen, Bestände und Archivtektonik |
+| Storage Location | Interne Lagerorte mit Gebäude-/Raum-/Regalhierarchie |
+| Procedure | Vorgänge wie Leihverkehr, Erwerbung und Restaurierung |
 
-- **Dynamische Schemata** — Jedes Feld pro Typ konfigurierbar, wiederholbar, mehrsprachig
-- **Kontrollierte Vokabulare** — Hierarchische Begriffssysteme mit Import aus CSV/JSON
-- **Typisierte Relationen** — Fachlich benannte Formularfelder und freie Zusatzbeziehungen im gemeinsamen Beziehungsgraphen
-- **IIIF als first-class citizen** — Hochauflösender Deep-Zoom für Digitalisate
-- **Volltextsuche**
-- **Facettierte Suche über alle Bestände**
-- **Theme-System** — Public-Portal per Drop-in-Bundle anpassbar (Farben, Logo, Schrift, Layout), kein Rebuild nötig — [Doku](https://katalon-collections.github.io/katalon-docs/administration/portal-themes/)
+Alle sieben Kerntypen besitzen eigene Tabellen, Versionen und konfigurierbare
+Metadaten. Lagerorte und Vorgänge bleiben interne Verwaltungsdaten. Die fünf
+Bestands- und Sammlungstypen können nach Freigabe im Portal erscheinen.
 
-Unique Selling Points:
+## Installation und Betrieb
 
-- Extrem konfortabler Datenimport (WYSIWYG Mapping inkl. Transformationen)
-- Skalierbare Architektur
-- Exporter GUI (Eigenes Datenmodell auf Schema mappen)
-- KI-assistierte Felder
-- Extrem einfache Installtion dank Docker Compose
-
----
-
-## Prinzipien
-
-1. **Datenintegrität und Sicherheit von Metadaten und Medien**
-2. **User Experience: Simplizität und Flexibilität.** Kuratorinnen und Sachbearbeiter konfigurieren Schemata über die Oberfläche, nicht über Config-Dateien oder Code. Die Software passt sich an die Sammlung an und nicht umgekehrt.
-3. **Techstack.** Moderne, etablierte und gut gewartete Technologien. Performance und Angriffsresistenz. Eine Portalansicht kommt direkt mit. Mit überschaubarem Aufwand zu Installieren und Betreiben.
-4. **Kostenlos, einfach anpassbar, Import selbst machbar.** Katalon ist Open Source, keine Lizenzkosten. Institutionen mit kleinem Budget importieren ihre Bestände selbst (Smart Importer, Dry-Run-Vorschau) statt einen Dienstleister zu beauftragen.
-5. **Kein Lock-in.** REST-API mit OpenAPI-Spec, OAI-PMH, ein dokumentiertes, einfaches Datenmodell. Institutionen nehmen ihre Daten jederzeit mit.
-6. **Standardkonformität.** Anschluss an GLAM-Standards (IIIF, Dublin Core, ggf. LIDO/EAD) statt proprietärer Formate. Nutzung von Normdaten.
-7. **Barrierefreiheit.** Das öffentliche Portal ist für alle nutzbar.
-8. **Anpassbar.** Falls doch eine Speziallösung oder ein eigenes Portal genutzt werden soll.
-
----
-
-## Schnellstart
-
-```bash
-# Repository klonen
-git clone https://github.com/katalon-collections/katalon.git
-cd katalon
-./install.sh --up
-```
-
-**Voraussetzungen:** Docker + Docker Compose v2
-
-### Erster Login
-
-Beim ersten Start generiert Katalon automatisch ein sicheres Admin-Passwort. `install.sh` zeigt die Zugangsdaten direkt nach dem Start an und kopiert sie nach `./first-run-credentials.txt`.
-
-Wer den Stack ohne `install.sh` startet (z. B. `docker compose up -d`), findet die Zugangsdaten:
-
-```bash
-# im API-Container (Datei wird beim nächsten API-Neustart gelöscht)
-docker compose exec api cat /var/lib/katalon/first-run-credentials.txt
-
-# oder in den Logs (einmalig beim ersten Start)
-docker compose logs api | grep -A5 "KATALON FIRST RUN"
-```
-
-> **Ohne gesetztes `KATALON_BASE_URL`** (z. B. lokale Entwicklung) wird statt eines generierten Passworts der Wert `INITIAL_ADMIN_PASSWORD` aus der `.env` verwendet (Standard: `admin`). Mit gesetzter `KATALON_BASE_URL` gilt `INITIAL_ADMIN_PASSWORD`, falls gesetzt und kein Standardwert, sonst wird ein Zufallspasswort erzeugt.
-
----
-
-## Architektur
-
-```mermaid
-flowchart TD
-    Client["Browser & API-Clients"] --> Nginx["Nginx Reverse Proxy (TLS)"]
-    Nginx --> Admin["Admin-UI (React/Vite)"]
-    Nginx --> Portal["Public-Portal (React/Vite)"]
-    Admin -->|REST / JSON| API["FastAPI Backend (Python 3.14+)"]
-    Portal -->|REST / JSON| API
-    Portal -->|IIIF Image API 3| Cantaloupe["Cantaloupe (IIIF Server)"]
-    API --> DB[("PostgreSQL 16 + PostGIS + JSONB")]
-    API --> ES[("Elasticsearch 8 (Suche)")]
-    API --> Redis[("Redis (Queue / Locks)")]
-    API --> Cantaloupe
-    API -.-> Oxigraph[("Oxigraph (SPARQL 1.1 Triplestore)")]
-    Redis --> Celery["Celery Worker & Beat"]
-    Celery --> DB
-    Celery --> ES
-```
-
-**Stack:** FastAPI · PostgreSQL 16 + PostGIS · Elasticsearch 8 · Redis · Celery · Cantaloupe (IIIF) · Oxigraph (SPARQL) · React 18 + TypeScript
-
----
-
-## Kernfunktionen
-
-### Sieben Kerntypen (`RECORD_TYPES`)
-
-| Typ | DB-Tabelle | Beschreibung | Beispiele |
-|---|---|---|---|
-| **Object** | `objects` | Physische oder digitale Artefakte | Fotografie, Dokument, Gemälde, Digitalisat |
-| **Entity** | `entities` | Personen oder Organisationen | Fotograf:in, Verlag, Sammler:in, Institution |
-| **Place** | `places` | Geografische Orte (PostGIS-Punktgeometrie) | Stadtbezirk, Gebäude, Fundort, Region |
-| **Occurrence** | `occurrences` | Werke (FRBR), Ereignisse, Konzepte | Musikwerk, Ausstellung, historische Epoche |
-| **Collection** | `collections` | Sammlungen, Bestände, Archivtektonik | Nachlass, Fotosammlung, Teilbestand |
-| **Storage Location** | `storage_locations` | Standort- & Lagerortverwaltung (hierarchisch) | Magazin A → Raum 102 → Regal 4 → Fach B |
-| **Procedure** | `procedures` | Vorgangsverwaltung & Fachprozesse | Leihverkehr, Restaurierung, Erwerbung |
-
-Alle Typen haben **optimistische Sperren** (`version`), Zeitstempel und **frei konfigurierbare Metadatenfelder** — definiert im Admin-UI und dynamisch in der Datenbank gespeichert (JSONB).
-
-### Schema-Engine
-
-Felder pro Typ definierbar mit:
-
-- Feldtyp (Text, Datum, Zahl, Geo, Vokabular, Relation, Boolean)
-- Wiederholbarkeit
-- Pflichtfeld
-- Mehrsprachige Labels
-- Feldspezifische Einstellungen
-
-### Beziehungen und verknüpfte Suche
-
-Fachlich benannte Beziehungen wie „Autor:in“ oder „Aufnahmeort“ werden als
-Relationsfelder im Schema konfiguriert. Sie können einen Zieltyp, ein
-Relationstyp-Vokabular und optional einen festen Relationstyp festlegen.
-Die Beziehungen-Karte zeigt den vollständigen Graphen und erfasst nur weitere,
-freie Beziehungen zu anderen Haupttypen.
-
-Ausgewählte Felder verknüpfter Records können in Elasticsearch eingebettet und
-im Portal als Facetten aktiviert werden. Ein festgelegter Relationstyp begrenzt
-die Suche auf diese fachliche Beziehung; ohne ihn werden alle Beziehungen zum
-gewählten Zieltyp berücksichtigt.
-
-### Vokabulare
-
-Hierarchische kontrollierte Begriffssysteme — importierbar aus CSV, TSV oder JSON. Unterstützt Übersetzungen, Oberbegriffe und externe IDs (z. B. GND).
-
-### Normdaten-Integration
-
-Integrierte Adapter für GND, GeoNames, VIAF, Wikidata, Getty TGN und ICONCLASS. Normdaten-Einträge können direkt in Erfassungsformularen gesucht und verknüpft werden.
-
-### OAI-PMH
-
-Standardschnittstelle für Metadaten-Harvesting mit generischer Export-Mapping-Schicht. OAI-PMH nutzt aktuell `oai_dc`, spaeter koennen weitere Formate wie LIDO oder METS/MODS an dieselbe Infrastruktur angeschlossen werden.
-
-### Theming
-
-Das Public-Portal ist vollständig themebar per **Drop-in Bundle** — kein Rebuild, kein Store:
+Für eine Produktionsinstanz wird die separate
+[katalon-cli](https://github.com/katalon-collections/katalon-cli) verwendet.
+Sie installiert veröffentlichte, versionierte Container-Images und verwaltet
+Updates im Instanzverzeichnis. Voraussetzungen sind Docker mit Compose v2 und
+[uv](https://docs.astral.sh/uv/) für die Installation der CLI.
 
 ```bash
-# Theme ablegen
-cp -r mein-archiv/ /var/lib/katalon/themes/mein-archiv/
-
-# Aktivieren
-echo "PORTAL_THEME=mein-archiv" >> .env
-docker compose restart portal
+uv tool install katalon-cli
+katalon install
 ```
 
-Ein Theme-Bundle besteht aus `theme.json` (CSS-Tokens, Fonts, Logo) + optionalem `custom.css`.
+Die Installation fragt die Instanzkonfiguration ab. Das Portal ist am
+konfigurierten Host erreichbar, die Admin-Oberfläche unter `/admin/` und die
+API-Dokumentation unter `/api/docs`. Erstzugang und weitere Installationsoptionen
+sind in der [Anwenderdokumentation](https://katalon-collections.github.io/katalon-docs/)
+beschrieben.
 
----
+Die Betreiberinstitution verantwortet Zugriffsschutz, Updates, Monitoring,
+Backups und Wiederherstellung ihrer Installation. Katalon ist kein zentral
+betriebener Hostingdienst. Vor dem produktiven Einsatz sollten die eigenen
+Erfassungs-, Veröffentlichungs- und Wiederherstellungsabläufe geprüft werden.
 
-## API
+## Architektur und Integration
 
-OpenAPI-Dokumentation: `http://localhost:8000/api/docs`
+PostgreSQL mit PostGIS ist der Primärspeicher. Elasticsearch hält die
+Suchprojektion, Celery und Redis übernehmen Hintergrundaufgaben, Cantaloupe
+liefert IIIF-Bilder. Admin und Portal sind getrennte React-/TypeScript-Apps vor
+einem Python-/FastAPI-Backend. Oxigraph ist optional.
 
-Wichtige Endpunkte:
+Die authentifizierte API liegt unter `/v1/`, das öffentliche Read-Modell unter
+`/portal/v1/`. Updates versionierter Records benötigen den aktuellen
+`If-Match`-Wert. Integrationen sollten die OpenAPI-Beschreibung der jeweiligen
+Installation verwenden.
 
-| Methode        | Pfad                           | Beschreibung                                               |
-|----------------|--------------------------------|------------------------------------------------------------|
-| POST           | `/v1/auth/token`               | JWT-Login                                                  |
-| GET            | `/v1/objects`                  | Objekte auflisten (Pagination, Filter)                     |
-| POST           | `/v1/objects`                  | Neues Objekt anlegen                                       |
-| GET/PUT/DELETE | `/v1/objects/{id}`             | Objekt lesen/aktualisieren/löschen                         |
-| GET            | `/v1/schema/{target_type}`     | Felddefinitionen abrufen                                   |
-| GET/POST       | `/v1/schema/import`            | Schema aus YAML/JSON importieren                           |
-| GET            | `/v1/vocabularies`             | Vokabulare auflisten                                       |
-| POST           | `/v1/vocabularies/{id}/import` | Vokabular-Terme aus CSV/JSON importieren (Dry-Run/Replace) |
-| GET            | `/v1/search`                   | Volltext- und Facettensuche                                |
-| POST           | `/v1/pids/mint`                | ARK oder DNB-URN über den PID-Feldanbieter vergeben        |
-| GET            | `/v1/authorities/search`       | Normdaten-Suche                                            |
-| GET            | `/oai`                         | OAI-PMH Endpoint                                           |
-| GET            | `/v1/portal/config`            | Portal-Konfiguration                                       |
-| POST           | `/v1/portal/logo`              | Logo hochladen                                             |
-| GET            | `/v1/audit`                    | Audit-Log abrufen                                          |
-
-### Persistente Identifier (PID)
-
-- PID-Felder verwenden ARK oder DNB-URN; sie sind erst in der Schema-Verwaltung auswählbar, wenn ihr Dienst vollständig konfiguriert ist.
-- ARKs brauchen einen registrierten produktiven NAAN und eine dauerhafte `KATALON_BASE_URL`; die Instanz löst sie unter `/ark:/<NAAN>/<Suffix>` auf.
-- Für lokale DNB-URN-Entwicklung kann der Mock-Endpunkt genutzt werden: `DNB_URN_API_URL=http://localhost:8000/v1/dnb-urn-mock`.
-
-## Admin-UI
-
-- **Objekte / Entitäten / Orte / Occurrences** — Tabellenansicht + dynamisches Erfassungsformular
-- **Schemata** — Feldkonfiguration pro Typ, YAML/JSON-Import
-- **Metadaten-Export** — Felddefinitionen auf Exportformate mappen
-- **Vokabular** — Kontrollierte Listen verwalten
-- **Importer** — CSV/Excel-Import-Wizard mit Dry-Run
-- **Statische Seiten** — Portal-Inhaltsseiten
-- **Benutzer** — Rollenbasierte Benutzerverwaltung
-- **Einstellungen** — Portal-Konfiguration, Logo, Farben
-- **Audit-Log** — Vollständige Änderungshistorie
-
----
-
-## Dokumentation
-
-Die Anwenderdokumentation liegt im separaten Docs-Repository:
-
-```text
-https://katalon-collections.github.io/katalon-docs/
-```
-
-Die lokale `docs/`-Ablage enthält nur technische Entwickler- und Betriebsdokumentation.
-
----
+Theme-Pakete bestehen aus einem `theme.json` und den referenzierten lokalen
+Dateien. Sie werden über einen Mount und `PORTAL_THEME` in der
+Backend-Konfiguration eingebunden. Das Backend liefert die Theme-Styleschicht;
+Portal-Einstellungen ergänzen die institutionellen Farben und Inhalte.
+Die [Theme-Anleitung](https://katalon-collections.github.io/katalon-docs/administration/portal-themes/)
+erklärt Einrichtung und Priorität der beiden Ebenen.
 
 ## Entwicklung am Quellcode
 
-Für Beiträge zum Quellcode steht ein Docker-Dev-Stack mit Live-Reload bereit:
+Für Entwicklung und Beiträge kann dieses Repository lokal gebaut werden:
 
 ```bash
+git clone https://github.com/katalon-collections/katalon.git
+cd katalon
 make dev
 ```
 
-Backend und beide Frontends laufen darin mit Live-Reload; die Oberflächen
-sind unter `http://localhost:4000` (Admin) und `http://localhost:4001`
-(Portal) erreichbar, die API-Dokumentation unter
-`http://localhost:8000/api/docs`. Nach dem Start oder nach Änderungen an
-Migrationen: `make migrate`.
+Der Docker-Dev-Stack bietet Live-Reload für Backend und Frontends. Admin läuft
+unter `http://localhost:4000`, Portal unter `http://localhost:4001` und die
+API-Dokumentation unter `http://localhost:8000/api/docs`.
 
-`make up` startet stattdessen den production-like Stack im Hintergrund
-(Zugriff über nginx unter `http://localhost/` bzw. `http://localhost/admin/`)
-— nützlich zum End-to-End-Testen des gebauten Stacks, nicht als täglicher
-Entwicklungsworkflow.
+`make up` startet den produktionsnahen Source-Stack. Dort werden Admin über
+`http://localhost/admin/` und Portal über `http://localhost/` aufgerufen.
+Dieser Entwicklungsweg ist von der Installation über die CLI getrennt.
+
+## Dokumentation und Sicherheitsmeldungen
+
+Die [Anwenderdokumentation](https://katalon-collections.github.io/katalon-docs/)
+erklärt Bedienung und Konfiguration. Die OpenAPI-Dokumentation der Instanz
+beschreibt die verfügbaren API-Endpunkte.
+
+Für Sicherheitsmeldungen gilt [SECURITY.md](SECURITY.md).
 
 ## Lizenz
 

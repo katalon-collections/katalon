@@ -9,7 +9,7 @@ import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
 import { SaveMappingModal } from '../../importer/SaveMappingModal'
 import { LoadMappingModal } from '../../importer/LoadMappingModal'
-import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult, type VocabMode } from './types'
+import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult, type RelationOption, DEFAULT_RELATION_OPTION, type VocabMode } from './types'
 
 interface Props {
   uploaded: UploadResult
@@ -31,6 +31,10 @@ interface Props {
   onPendingFieldsChange: (fields: PendingField[]) => void
   vocabModes: Record<string, VocabMode>
   onVocabModeChange: (field: string, mode: VocabMode) => void
+  /** CSV/TSV only; absent after a page reload because the file is gone */
+  onEncodingChange?: (encoding: string) => void
+  relationOptions: Record<string, RelationOption>
+  onRelationOptionChange: (field: string, option: RelationOption) => void
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
   mappedCount: number
@@ -50,7 +54,7 @@ export function StepMapping({
   subtype, savedMappingId, savedMappingName, onSavedMappingLoaded, onMappingSaved,
   mediaSelector, onMediaSelectorChange,
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
-  pendingFields, onPendingFieldsChange, vocabModes, onVocabModeChange,
+  pendingFields, onPendingFieldsChange, vocabModes, onVocabModeChange, onEncodingChange, relationOptions, onRelationOptionChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
   dryRunning, onDryRun, onBack, onProfileExport, profileWarnings, xmlSelectors,
 }: Props) {
@@ -132,6 +136,11 @@ export function StepMapping({
   const mappedTargets = new Set(Object.values(mapping).map(m => m.target))
   const vocabFields = fields.filter(
     f => f.field_type === 'vocab' && f.settings?.vocabulary_id && mappedTargets.has(f.name),
+  )
+
+  // Top-level relation fields that receive a column: text is resolved to a linked record
+  const relationFields = fields.filter(
+    f => f.field_type === 'relation' && !f.parent_id && mappedTargets.has(f.name),
   )
 
   return (
@@ -280,6 +289,25 @@ export function StepMapping({
         <b style={{ color: 'var(--fg-3)' }}>{ignoredCount}</b> ignoriert
       </div>
 
+      {uploaded.encoding && (
+        <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--fg-2)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <label htmlFor="import-encoding">{t('encoding.label')}</label>
+          <select
+            id="import-encoding" className="fld" style={{ height: 28, fontSize: 12, width: 200 }}
+            value={uploaded.encoding} disabled={!onEncodingChange}
+            onChange={e => onEncodingChange?.(e.target.value)}
+          >
+            <option value="utf-8">UTF-8</option>
+            <option value="windows-1252">Windows-1252</option>
+            <option value="iso-8859-1">ISO-8859-1</option>
+          </select>
+          <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+            {uploaded.encoding === uploaded.encoding_detected ? t('encoding.detected') : t('encoding.changed', { detected: uploaded.encoding_detected })}
+            {' '}{t('encoding.hint')}
+          </span>
+        </div>
+      )}
+
       {vocabFields.length > 0 && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="hd">{t('vocabMode.title')}</div>
@@ -298,6 +326,41 @@ export function StepMapping({
                 </select>
               </label>
             ))}
+          </div>
+        </div>
+      )}
+
+      {relationFields.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="hd">{t('relationMode.title')}</div>
+          <div className="bd" style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>{t('relationMode.help')}</div>
+            {relationFields.map(f => {
+              const option = relationOptions[f.name] ?? DEFAULT_RELATION_OPTION
+              return (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, flexWrap: 'wrap' }}>
+                  <span style={{ minWidth: 160 }}>{getLabel(f, f.name)}</span>
+                  <select
+                    className="fld" style={{ height: 28, fontSize: 12, width: 220 }}
+                    aria-label={t('relationMode.lookupLabel', { name: getLabel(f, f.name) })}
+                    value={option.lookup}
+                    onChange={e => onRelationOptionChange(f.name, { ...option, lookup: e.target.value as RelationOption['lookup'] })}
+                  >
+                    <option value="idno">{t('relationMode.lookupIdno')}</option>
+                    <option value="label">{t('relationMode.lookupLabelOption')}</option>
+                  </select>
+                  <select
+                    className="fld" style={{ height: 28, fontSize: 12, width: 260 }}
+                    aria-label={t('relationMode.missingLabel', { name: getLabel(f, f.name) })}
+                    value={option.on_missing}
+                    onChange={e => onRelationOptionChange(f.name, { ...option, on_missing: e.target.value as RelationOption['on_missing'] })}
+                  >
+                    <option value="error">{t('relationMode.missingError')}</option>
+                    <option value="create">{t('relationMode.missingCreate')}</option>
+                  </select>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -355,6 +418,7 @@ export function StepMapping({
                       }}
                     >
                       <option value="">{t('mappingIgnore')}</option>
+                      {mapped === '__idno__' && <option value="__idno__" disabled>{t('mappingIdnoCard')}</option>}
                       <optgroup label={RECORD_TYPES.find(t => t.id === recordType)?.label ?? 'Felder'}>
                         {fields.map(f => {
                           // Repeatable targets may be fed by several columns (e.g. Genre1..3).

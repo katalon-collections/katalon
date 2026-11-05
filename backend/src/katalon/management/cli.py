@@ -10,6 +10,7 @@ Commands:
     katalon-manage reset-admin
     katalon-manage warm-thumbnails
     katalon-manage lido-report
+    katalon-manage resync-schema-relations
 """
 
 from __future__ import annotations
@@ -227,3 +228,26 @@ def lido_report(mapping_set_id: str, output: str | None) -> None:
         for problem in report.problems:
             for message in problem.messages:
                 writer.writerow([problem.rec_id, problem.record_id, message])
+
+
+@cli.command(name="resync-schema-relations")
+@click.option("--dry-run", is_flag=True, help="Only report duplicate relation rows; write nothing.")
+def resync_schema_relations(dry_run: bool) -> None:
+    """Rebuild the schema-derived relation rows of all records.
+
+    Removes duplicates that older versions created for equally named relation fields of
+    different subtypes. Without --dry-run this changes data: back up first and run it on an
+    instance only with the operator's approval.
+    """
+    from katalon.management.resync_relations import run
+
+    report = run(dry_run)
+    click.echo(
+        f"Doppelte schema-abgeleitete Relationszeilen vorher: {report.extra_rows} überzählig "
+        f"in {report.duplicate_groups} Gruppen."
+    )
+    if dry_run:
+        click.echo(f"Trockenlauf: {report.records} Datensätze würden neu synchronisiert, nichts geschrieben.")
+    else:
+        click.echo(f"{report.resynced} von {report.records} Datensätzen neu synchronisiert.")
+        click.echo(f"Überzählige Zeilen danach: {report.extra_rows_after}.")

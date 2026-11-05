@@ -431,11 +431,11 @@ type AiProposal = {
  *  data-integrity requirement: AI involvement in a field value must be visible
  *  to catalogers, not just logged in the audit trail). */
 function AiDisclosureBadge({ model, at }: { model: string; at: string }) {
-  const { t } = useTranslation('screenForm')
+  const { t, i18n } = useTranslation('screenForm')
   return (
     <span
       className="h"
-      title={`KI-generiert (${model}) am ${new Date(at).toLocaleString('de')}`}
+      title={t('ai.generatedTooltip', { model, date: new Date(at).toLocaleString(i18n.language) })}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6, color: 'var(--accent-ink)' }}
     >
       <Lightning size={11} /> {t('ai.generated')}
@@ -3031,7 +3031,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       })
       setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model })
       if (result.warning) {
-        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+        setError(t('ai.warning', { label: getLabel(field, field.name), warning: result.warning }))
       }
     } catch (e) {
       setError((e as Error).message)
@@ -3080,7 +3080,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         translation: { sourceLanguage, targetLanguage },
       })
       if (result.warning) {
-        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+        setError(t('ai.warning', { label: getLabel(field, field.name), warning: result.warning }))
       }
     } catch (e) {
       setError((e as Error).message)
@@ -3108,7 +3108,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       })
       setAiProposal({ field, currentValue, suggestedValue: result.value, model: result.model, group: { name: group.name, index: groupIndex } })
       if (result.warning) {
-        setError(`KI-Hinweis für ${getLabel(field, field.name)}: ${result.warning}`)
+        setError(t('ai.warning', { label: getLabel(field, field.name), warning: result.warning }))
       }
     } catch (e) {
       setError((e as Error).message)

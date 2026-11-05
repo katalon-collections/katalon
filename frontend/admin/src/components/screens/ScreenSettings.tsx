@@ -25,12 +25,12 @@ interface Props {
 type Section = 'profil' | 'portal' | 'fusszeile' | 'startseite' | 'terminologie' | 'facetten' | 'sprachen' | 'suche' | 'sparql' | 'idno' | 'ki' | 'medien' | 'authorities' | 'sperren' | 'papierkorb' | 'gefahrenbereich' | 'ueber'
 
 const RECORD_TYPES = [
-  { key: 'object',     label: 'Objekte',     labelKey: 'recordTypes.object' },
-  { key: 'entity',     label: 'Entitäten',   labelKey: 'recordTypes.entity' },
-  { key: 'place',      label: 'Orte',        labelKey: 'recordTypes.place' },
-  { key: 'occurrence', label: 'Occurrences', labelKey: 'recordTypes.occurrence' },
-  { key: 'procedure',  label: 'Vorgänge',    labelKey: 'recordTypes.procedure' },
-  { key: 'collection', label: 'Sammlungen',  labelKey: 'recordTypes.collection' },
+  { key: 'object',     labelKey: 'screenSettings:recordTypes.object' },
+  { key: 'entity',     labelKey: 'screenSettings:recordTypes.entity' },
+  { key: 'place',      labelKey: 'screenSettings:recordTypes.place' },
+  { key: 'occurrence', labelKey: 'screenSettings:recordTypes.occurrence' },
+  { key: 'procedure',  labelKey: 'screenSettings:recordTypes.procedure' },
+  { key: 'collection', labelKey: 'screenSettings:recordTypes.collection' },
 ] as const
 
 const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
@@ -335,7 +335,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
     try {
       const fd = new FormData(); fd.append('file', file)
       const res = await authorizedFetch(`${BASE}/v1/portal/logo`, { method: 'POST', body: fd })
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? `Fehler ${res.status}`) }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? t('common.httpError', { status: String(res.status) })) }
       const c: PortalConfigRead = await res.json()
       setLogoUrl(c.logo_url); onSaved(c)
     } catch (e) { setError((e as Error).message) }
@@ -345,42 +345,42 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   function handleLangChange(next: string) { setLang(next); localStorage.setItem('katalon_lang', next) }
 
   const colorFields = [
-    { lbl: 'Akzentfarbe', val: accentColor, set: setAccentColor },
-    { lbl: 'Kopfzeile – Hintergrund', val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
-    { lbl: 'Kopfzeile – Schrift', val: headerFg, set: setHeaderFg, ph: '#ffffff' },
-    { lbl: 'Seitenhintergrund', val: pageBg, set: setPageBg, ph: '#f4f5f7' },
-    { lbl: 'Panel-/Kartenfarbe', val: panelBg, set: setPanelBg, ph: '#ffffff' },
+    { lbl: t('portal.colors.accent'), val: accentColor, set: setAccentColor },
+    { lbl: t('portal.colors.headerBg'), val: headerBg, set: setHeaderBg, ph: '#0b1a33' },
+    { lbl: t('portal.colors.headerFg'), val: headerFg, set: setHeaderFg, ph: '#ffffff' },
+    { lbl: t('portal.colors.pageBg'), val: pageBg, set: setPageBg, ph: '#f4f5f7' },
+    { lbl: t('portal.colors.panelBg'), val: panelBg, set: setPanelBg, ph: '#ffffff' },
   ]
 
   return (
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Institution</div>
+        <div className="hd">{t('portal.institution')}</div>
         <div className="bd">
           <div className="fg-2">
-            <LabelEditor languages={languages} value={siteTitle} labelPrefix="Institutionsname / Seitentitel"
+            <LabelEditor languages={languages} value={siteTitle} labelPrefix={t('portal.siteTitle')}
               onChange={(lng, val) => setSiteTitle(prev => ({ ...prev, [lng]: val }))} />
           </div>
           <div className="fg-2">
-            <LabelEditor languages={languages} value={siteSubtitle} labelPrefix="Untertitel"
+            <LabelEditor languages={languages} value={siteSubtitle} labelPrefix={t('portal.subtitle')}
               onChange={(lng, val) => setSiteSubtitle(prev => ({ ...prev, [lng]: val }))} />
           </div>
           {languages.map(lng => (
-            <div className="field" key={lng}><div className="lbl">Willkommenstext (Hero) {lng.toUpperCase()}</div>
+            <div className="field" key={lng}><div className="lbl">{t('portal.heroText', { lang: lng.toUpperCase() })}</div>
               <textarea className="fld" rows={3} value={heroText[lng] ?? ''}
                 onChange={e => setHeroText(prev => ({ ...prev, [lng]: e.target.value }))}
                 style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
           ))}
           <div className="field">
-            <div className="lbl">Logo <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+            <div className="lbl">{t('portal.logo')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
-              <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>{logoUploading ? 'Lädt hoch…' : 'Logo hochladen'}</button>
-              {logoUrl && <button className="btn sm gh" onClick={() => setLogoUrl('')} title="Logo entfernen">✕</button>}
+              <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>{logoUploading ? t('portal.logoUploading') : t('portal.logoUpload')}</button>
+              {logoUrl && <button className="btn sm gh" onClick={() => setLogoUrl('')} title={t('portal.logoRemove')}>✕</button>}
               <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
             </div>
-            <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="oder URL eingeben" style={{ marginTop: 6, fontSize: 12 }} />
+            <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder={t('portal.logoUrlPlaceholder')} style={{ marginTop: 6, fontSize: 12 }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 8, opacity: logoUrl ? 1 : 0.6 }}>
               <input type="checkbox" className="ck" checked={headerShowTitle} onChange={e => setHeaderShowTitle(e.target.checked)} />
               {tLayout('header.showTitle')}
@@ -392,47 +392,47 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{tLayout('header.hint')}</div>
           </div>
           <div className="field">
-            <div className="lbl">Platzhalter-Bild <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(für Objekte ohne Bild)</span></div>
+            <div className="lbl">{t('portal.placeholderImage')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.placeholderImageHint')}</span></div>
             <input className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
-            {placeholderImageUrl && <img src={placeholderImageUrl} alt="Platzhalter" style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
+            {placeholderImageUrl && <img src={placeholderImageUrl} alt={t('portal.placeholderImage')} style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
           </div>
           <div className="field">
-            <div className="lbl">Highlight-Objekte <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(eine UUID pro Zeile, max. 6)</span></div>
+            <div className="lbl">{t('portal.featured')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.featuredHint')}</span></div>
             <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2'} />
           </div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Öffentliche Navigation</div>
+        <div className="hd">{t('portal.navigation')}</div>
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-            Nur aktivierte Typen erscheinen als eigener Menüpunkt im Portal. Direkte Links bleiben erreichbar.
+            {t('portal.navigationHint')}
           </p>
-          {RECORD_TYPES.filter(({ key }) => key !== 'procedure').map(({ key, label }) => (
+          {RECORD_TYPES.filter(({ key }) => key !== 'procedure').map(({ key, labelKey }) => (
             <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13 }}>
               <input
                 type="checkbox"
                 checked={browseTypes.includes(key)}
                 onChange={e => setBrowseTypes(types => e.target.checked ? [...types, key] : types.filter(type => type !== key))}
               />
-              {label}
+              {t(labelKey)}
             </label>
           ))}
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Detailseiten-Layout</div>
+        <div className="hd">{t('detailLayout.title')}</div>
         <div className="bd">
           <div className="field">
-            <div className="lbl">Seitenspalte (Metadaten)</div>
+            <div className="lbl">{t('detailLayout.sidebar')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className={`btn${detailSidebarPosition === 'right' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('right')}>Rechts</button>
-              <button className={`btn${detailSidebarPosition === 'left' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('left')}>Links</button>
+              <button className={`btn${detailSidebarPosition === 'right' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('right')}>{t('detailLayout.right')}</button>
+              <button className={`btn${detailSidebarPosition === 'left' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('left')}>{t('detailLayout.left')}</button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
-              Gilt einheitlich für alle Detailseiten (Objekte, Entitäten, Orte, Occurrences). Auf kleinen Bildschirmen stehen Medien/Hauptinhalt immer zuerst.
+              {t('detailLayout.sidebarHint')}
             </div>
           </div>
           <div className="field">
@@ -465,17 +465,17 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
                 checked={showIiifManifestLink}
                 onChange={e => setShowIiifManifestLink(e.target.checked)}
               />
-              IIIF-Manifest-Button auf der Objekt-Detailseite anzeigen
+              {t('detailLayout.iiifButton')}
             </label>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
-              Zeigt bei Objekten mit Bildern einen Link auf das IIIF-Manifest sowie eine Kopieren-Aktion an, ohne Icons.
+              {t('detailLayout.iiifButtonHint')}
             </div>
           </div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Design & Farben</div>
+        <div className="hd">{t('portal.design')}</div>
         <div className="bd">
           {colorFields.map(({ lbl, val, set, ph }) => (
             <div className="field" key={lbl}>
@@ -484,7 +484,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
                 <input type="color" value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
                   style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
                 <input className="fld mono" value={val} onChange={e => set(e.target.value)} placeholder={ph ?? ''} style={{ flex: 1 }} />
-                {val && <button className="btn sm gh" onClick={() => set('')} title="Zurücksetzen">✕</button>}
+                {val && <button className="btn sm gh" onClick={() => set('')} title={t('common.reset')}>✕</button>}
               </div>
             </div>
           ))}
@@ -492,9 +492,9 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Oberfläche</div>
+        <div className="hd">{t('portal.portalLanguage')}</div>
         <div className="bd">
-          <div className="field"><div className="lbl">Sprache</div>
+          <div className="field"><div className="lbl">{t('portal.language')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className={`btn${lang === 'de' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('de')}>Deutsch</button>
               <button className={`btn${lang === 'en' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('en')}>English</button>
@@ -505,8 +505,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
 
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
-        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('common.saved')}</span>}
       </div>
     </div>
   )
@@ -733,13 +733,13 @@ function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, on
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('terminologie.description')}</p>
 
-          {TERMINOLOGY_TYPES.map(({ key, label }) => {
+          {TERMINOLOGY_TYPES.map(({ key, labelKey }) => {
             const entry = entryFor(key)
             const hasOverride = Boolean(terminology[key])
             return (
               <div key={key} className="card" style={{ marginBottom: 12, background: 'var(--bg)' }}>
                 <div className="hd" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>{label}</span>
+                  <span>{t(labelKey)}</span>
                   <div className="grow" />
                   <button className="btn sm gh" disabled={!hasOverride} onClick={() => reset(key)}>
                     {t('terminologie.reset')}
@@ -798,7 +798,7 @@ function SectionDangerZone() {
   const [success, setSuccess] = useState<string | null>(null)
   const active = RECORD_TYPES.find(type => type.key === activeType)!
   const selectedSubtype = subtypesList.find(subtype => subtype.name === activeSubtype)
-  const expectedConfirmation = (selectedSubtype?.label?.de || active.label).toUpperCase()
+  const expectedConfirmation = (selectedSubtype?.label?.de || t(active.labelKey)).toUpperCase()
 
   // Vocabulary reset / delete state
   const [vocabsList, setVocabsList] = useState<Vocabulary[]>([])
@@ -858,7 +858,7 @@ function SectionDangerZone() {
     try {
       const result = await schema.reset(activeType, activeSubtype || undefined)
       setSummary(0); setConfirmation('')
-      setSuccess(`${result.deleted_fields} Felddefinitionen wurden ausgeblendet.`)
+      setSuccess(t('dangerZone.schemaSuccess', { count: result.deleted_fields }))
     } catch (e) { setError((e as Error).message) }
     finally { setResetting(false) }
   }
@@ -909,35 +909,39 @@ function SectionDangerZone() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="card" style={{ borderColor: '#fca5a5' }}>
-        <div className="hd" style={{ color: '#b91c1c' }}>Gefahrenbereich – {t('dangerZone.schemaTitle')}</div>
+        <div className="hd" style={{ color: '#b91c1c' }}>{t('dangerZone.nav')} – {t('dangerZone.schemaTitle')}</div>
         <div className="bd">
           <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-            Blendet Felddefinitionen aus, löscht aber keine Datensätze oder Metadaten. Für eine spätere Bearbeitung das Feld im Schema-Editor mit demselben technischen Namen wieder anlegen; die gespeicherten Werte werden dann wieder angezeigt. Das Systemfeld <code>label</code> bleibt erhalten.
+            {t('dangerZone.schemaDescription')} <code>label</code> {t('dangerZone.schemaDescriptionSuffix')}
           </p>
           <div className="field">
-            <div className="lbl">Bestandstyp</div>
+            <div className="lbl">{t('dangerZone.recordType')}</div>
             <select className="fld" value={activeType} onChange={e => setActiveType(e.target.value as typeof activeType)}>
-              {RECORD_TYPES.map(type => <option key={type.key} value={type.key}>{type.label}</option>)}
+              {RECORD_TYPES.map(type => <option key={type.key} value={type.key}>{t(type.labelKey)}</option>)}
             </select>
           </div>
           {subtypesList.length > 0 && <div className="field">
-            <div className="lbl">Geltungsbereich</div>
+            <div className="lbl">{t('dangerZone.vocabScopeLabel')}</div>
             <select className="fld" value={activeSubtype} onChange={e => setActiveSubtype(e.target.value)}>
-              <option value="">Gesamtes {active.label}-Schema</option>
-              {subtypesList.map(subtype => <option key={subtype.id} value={subtype.name}>Nur Subtyp: {subtype.label?.de || subtype.name}</option>)}
+              <option value="">{t('dangerZone.wholeSchema', { type: t(active.labelKey) })}</option>
+              {subtypesList.map(subtype => <option key={subtype.id} value={subtype.name}>{t('dangerZone.onlySubtype', { subtype: subtype.label?.de || subtype.name })}</option>)}
             </select>
           </div>}
           <p style={{ fontSize: 13, marginBottom: 16 }}>
-            {summary === null ? 'Prüfe Felddefinitionen…' : `${summary} Felddefinitionen werden ausgeblendet.`}
+            {summary === null ? t('dangerZone.schemaChecking') : t('dangerZone.schemaSummary', { count: summary })}
           </p>
           <div className="field">
-            <div className="lbl">Zur Bestätigung <code>{expectedConfirmation}</code> eingeben</div>
+            <div className="lbl">{t('dangerZone.confirmPrompt')} <code>{expectedConfirmation}</code> {t('dangerZone.confirmPromptSuffix')}</div>
             <input className="fld" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" />
           </div>
           {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
           {success && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{success}</div>}
           <button className="btn dn" onClick={handleReset} disabled={resetting || summary === 0 || confirmation !== expectedConfirmation}>
-            {resetting ? 'Setze zurück…' : `${selectedSubtype ? `${selectedSubtype.label?.de || selectedSubtype.name}-Subschema` : `${active.label}-Schema`} zurücksetzen`}
+            {resetting
+              ? t('dangerZone.schemaResetting')
+              : selectedSubtype
+                ? t('dangerZone.resetSubschema', { subtype: selectedSubtype.label?.de || selectedSubtype.name })
+                : t('dangerZone.resetSchema', { type: t(active.labelKey) })}
           </button>
         </div>
       </div>
@@ -1036,10 +1040,10 @@ function SectionDangerZone() {
 // rows (not backed by a FieldDefinition). Toggled per type, same storage
 // mechanism as inherited_* facets: portal_config.facet_fields[type].
 const RELATED_FACET_DEFS = [
-  { name: 'related_entities', label: 'Personen/Organisationen' },
-  { name: 'related_places', label: 'Orte' },
-  { name: 'related_occurrences', label: 'Werke/Ereignisse (Occurrences)' },
-  { name: 'related_collections', label: 'Sammlungen' },
+  { name: 'related_entities', labelKey: 'facetSettings:related.entities' },
+  { name: 'related_places', labelKey: 'facetSettings:related.places' },
+  { name: 'related_occurrences', labelKey: 'facetSettings:related.occurrences' },
+  { name: 'related_collections', labelKey: 'facetSettings:related.collections' },
 ] as const
 const RELATED_FACET_NAMES: readonly string[] = RELATED_FACET_DEFS.map(f => f.name)
 const SUBFIELD_SEPARATOR = '__'
@@ -1137,7 +1141,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         const targetType = relation.settings?.target_type as string | undefined
         const inherited = relation.settings?.inherited_fields as string[] | undefined
         if (!targetType || !inherited?.length) return []
-        const targetLabel = RECORD_TYPES.find(t => t.key === targetType)?.label ?? targetType
+        const targetType_ = RECORD_TYPES.find(type => type.key === targetType)
+        const targetLabel = targetType_ ? tFacets(targetType_.labelKey) : targetType
         return inherited.map(name => {
           const targetField = (fieldsByType[targetType] ?? []).find(field => field.name === name)
           const label = targetField?.label?.de || targetField?.label?.en || name
@@ -1279,6 +1284,11 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
     )
   }
 
+  function relatedFacetLabel(name: string): string | undefined {
+    const def = RELATED_FACET_DEFS.find(r => r.name === name)
+    return def ? tFacets(def.labelKey) : undefined
+  }
+
   function orderItemsFor(type: string): FacetOrderItem[] {
     const lang = i18n.language?.slice(0, 2) || 'de'
     const typeFields = fieldsByType[type] ?? []
@@ -1293,7 +1303,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         ? tFacets('subfield', { group: sub.group.label?.[lang] || sub.group.label?.de || sub.group.name, field: sub.child.label?.[lang] || sub.child.label?.de || sub.child.name })
         : field
           ? field.label?.[lang] || field.label?.de || field.label?.en || name
-          : RELATED_FACET_DEFS.find(r => r.name === name)?.label ?? inherited.find(i => i.name === name)?.label ?? name
+          : relatedFacetLabel(name) ?? inherited.find(i => i.name === name)?.label ?? name
       const kind: FacetOrderItem['kind'] = RELATED_FACET_NAMES.includes(name)
         ? 'related'
         : name.startsWith('inherited_')
@@ -1326,16 +1336,16 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
   return (
     <div>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-        Lege globale Standardfacetten und zusätzliche Filter pro Datensatztyp fest.
+        {tFacets('intro')}
       </p>
 
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Standardfacetten</h4>
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>{tFacets('systemFacets')}</h4>
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="bd">
           {[
-            { name: 'record_type', label: 'Typ' },
-            { name: 'status', label: 'Status' },
-            { name: 'subtype', label: 'Subtyp' },
+            { name: 'record_type', label: tFacets('system.record_type') },
+            { name: 'status', label: tFacets('system.status') },
+            { name: 'subtype', label: tFacets('system.subtype') },
           ].map(f => (
             <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
               <input
@@ -1351,11 +1361,11 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         </div>
       </div>
 
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Anzeige</h4>
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>{tFacets('display')}</h4>
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="bd" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-            Anfangs sichtbare Werte
+            {tFacets('initialCount')}
             <input
               className="fld mono"
               type="number"
@@ -1369,10 +1379,10 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
         </div>
       </div>
 
-      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Facetten pro Datensatztyp</h4>
+      <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>{tFacets('perType')}</h4>
       <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-s)', background: 'var(--bg-2, rgba(0,0,0,0.02))', padding: '0 8px', flexWrap: 'wrap' }}>
-          {RECORD_TYPES.map(({ key, label }) => {
+          {RECORD_TYPES.map(({ key, labelKey }) => {
             const count = (facetFields[key]?.length ?? 0) + (relationFacets[key]?.length ?? 0)
             return (
               <button
@@ -1387,7 +1397,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                   marginBottom: -1,
                 }}
               >
-                {label}
+                {tFacets(labelKey)}
                 {count > 0 && (
                   <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--accent)', color: '#fff', borderRadius: 10, padding: '1px 5px' }}>
                     {count}
@@ -1400,11 +1410,11 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
         <div className="bd">
           {loadingFields ? (
-            <div className="empty">Lade Felder…</div>
+            <div className="empty">{tFacets('loadingFields')}</div>
           ) : (
             <div>
               {fields.length === 0 && inheritedFacetFields.length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>Keine Felder für diesen Typ definiert.</div>
+                <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>{tFacets('noFields')}</div>
               )}
               {fields.map(f => {
                 const label = f.label?.de || f.label?.en || f.name
@@ -1450,7 +1460,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
               {inheritedFacetFields.length > 0 && (
                 <>
                   <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
-                    Felder verknüpfter Datensätze
+                    {tFacets('inheritedFields')}
                   </div>
                   {inheritedFacetFields.map(f => {
                     const isChecked = selected.includes(f.name)
@@ -1473,7 +1483,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 </>
               )}
               <div style={{ borderTop: '1px solid var(--border-s)', margin: '10px 0 4px', paddingTop: 10, fontSize: 12, color: 'var(--fg-3)' }}>
-                Verknüpfte Datensätze (automatische Relations-Facetten)
+                {tFacets('relatedFacets')}
               </div>
               {RELATED_FACET_DEFS.map(f => {
                 const isChecked = selected.includes(f.name)
@@ -1486,9 +1496,9 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                         checked={isChecked}
                         onChange={() => toggle(activeType, f.name)}
                       />
-                      <span style={{ flex: 1 }}>{f.label}</span>
+                      <span style={{ flex: 1 }}>{tFacets(f.labelKey)}</span>
                     </label>
-                    {isChecked && renderSortSelect(activeType, f.name, f.label)}
+                    {isChecked && renderSortSelect(activeType, f.name, tFacets(f.labelKey))}
                     <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>{f.name}</span>
                   </div>
                 )
@@ -1523,10 +1533,9 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-s)', marginTop: 20, paddingTop: 16 }}>
-            <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>Ergebnis-Untertitel</h4>
+            <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{tFacets('subtitle.title')}</h4>
             <p style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 10 }}>
-              Wähle, was in der Trefferliste des Portals unter dem Titel angezeigt wird (z. B. „Objekt · Datierung“).
-              Nur Felder, die oben auch als Filter aktiviert sind, stehen hier zur Auswahl.
+              {tFacets('subtitle.description')}
             </p>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
               <input
@@ -1535,7 +1544,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 checked={subtitleSelected.includes('record_type')}
                 onChange={() => toggleSubtitle(activeType, 'record_type')}
               />
-              <span style={{ flex: 1 }}>Typ</span>
+              <span style={{ flex: 1 }}>{tFacets('system.record_type')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>record_type</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
@@ -1545,7 +1554,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 checked={subtitleSelected.includes('status')}
                 onChange={() => toggleSubtitle(activeType, 'status')}
               />
-              <span style={{ flex: 1 }}>Status</span>
+              <span style={{ flex: 1 }}>{tFacets('system.status')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>status</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
@@ -1555,7 +1564,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
                 checked={subtitleSelected.includes('idno')}
                 onChange={() => toggleSubtitle(activeType, 'idno')}
               />
-              <span style={{ flex: 1 }}>ID-Nummer</span>
+              <span style={{ flex: 1 }}>{tFacets('system.idno')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--fg-4)' }}>idno</span>
             </label>
             {(() => {
@@ -1565,7 +1574,7 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
               ]
               return options.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--fg-4)', padding: '6px 0' }}>
-                  Keine weiteren Felder – aktiviere oben zusätzliche Felder als Filter, um sie hier auswählen zu können.
+                  {tFacets('subtitle.empty')}
                 </div>
               ) : options.map(f => (
                 <label key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer', fontSize: 13 }}>
@@ -1586,8 +1595,8 @@ function SectionFacetten({ config, onSaved }: { config: PortalConfigRead, onSave
 
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
-        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? tFacets('screenSettings:common.saving') : tFacets('screenSettings:common.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{tFacets('screenSettings:common.saved')}</span>}
       </div>
     </div>
   )
@@ -1601,11 +1610,12 @@ type IndexHealthEntry = { db: number; es: number; delta: number }
 type IndexHealth = { types: Record<string, IndexHealthEntry> }
 
 function IndexHealthWidget() {
+  const { t } = useTranslation('screenSettings')
   const [health, setHealth] = useState<IndexHealth | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null)
   const [cfg, setCfg] = useState<Pick<AdminConfigRead, 'reconciliation_enabled' | 'reconciliation_threshold' | 'reconciliation_id_diff_enabled'> | null>(null)
   const [cfgSaving, setCfgSaving] = useState(false)
 
@@ -1638,7 +1648,7 @@ function IndexHealthWidget() {
     setCfgSaving(true)
     try {
       await adminConfig.update(patch)
-    } catch (e) { setMsg(`Fehler beim Speichern: ${(e as Error).message}`) }
+    } catch (e) { setMsg({ text: t('search.saveError', { message: (e as Error).message }), error: true }) }
     finally { setCfgSaving(false) }
   }
 
@@ -1646,45 +1656,44 @@ function IndexHealthWidget() {
     setRunning(mode); setMsg(null)
     try {
       await req(`${BASE}/v1/admin/index-health/reconcile?mode=${mode}`, { method: 'POST' })
-      setMsg('Abgleich gestartet – läuft im Hintergrund. Aktualisieren Sie die Seite in Kürze, um das Ergebnis zu sehen.')
+      setMsg({ text: t('search.reconcileStarted'), error: false })
       setTimeout(() => setMsg(null), 8000)
-    } catch (e) { setMsg(`Fehler: ${(e as Error).message}`) }
+    } catch (e) { setMsg({ text: t('search.error', { message: (e as Error).message }), error: true }) }
     finally { setRunning(null) }
   }
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="hd">Index-Status</div>
+      <div className="hd">{t('search.indexStatus')}</div>
       <div className="bd">
         <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-          Vergleich der Datensatzanzahl zwischen Datenbank und Suchindex (#214). Abweichungen werden
-          täglich automatisch geprüft und ab dem konfigurierten Schwellenwert nachindiziert.
+          {t('search.indexStatusDescription')}
         </p>
         {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 10 }}>{error}</div>}
         {msg && (
-          <div style={{ fontSize: 12, color: msg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
-            {msg}
+          <div style={{ fontSize: 12, color: msg.error ? '#dc2626' : '#166534', marginBottom: 10 }}>
+            {msg.text}
           </div>
         )}
-        {loading && <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>Lädt…</p>}
+        {loading && <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t('common.loading')}</p>}
         {!loading && health && (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '4px 8px' }}>Typ</th>
+                <th style={{ padding: '4px 8px' }}>{t('search.type')}</th>
                 <th style={{ padding: '4px 8px', textAlign: 'right' }}>DB</th>
                 <th style={{ padding: '4px 8px', textAlign: 'right' }}>ES</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right' }}>Abweichung</th>
+                <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('search.delta')}</th>
               </tr>
             </thead>
             <tbody>
-              {RECORD_TYPES.map(({ key, label }) => {
+              {RECORD_TYPES.map(({ key, labelKey }) => {
                 const entry = health.types[key]
                 if (!entry) return null
                 const ok = entry.delta === 0
                 return (
                   <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '4px 8px' }}>{label}</td>
+                    <td style={{ padding: '4px 8px' }}>{t(labelKey)}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.db}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.es}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', color: ok ? '#166534' : '#dc2626' }}>
@@ -1697,17 +1706,17 @@ function IndexHealthWidget() {
           </table>
         )}
         <div style={{ display: 'flex', gap: 8, marginBottom: cfg ? 16 : 0 }}>
-          <button className="btn sm gh" onClick={load} disabled={loading}>Aktualisieren</button>
+          <button className="btn sm gh" onClick={load} disabled={loading}>{t('search.refresh')}</button>
           <button className="btn sm gh" onClick={() => handleReconcile('count')} disabled={running !== null}>
-            {running === 'count' ? 'Läuft…' : 'Zählung prüfen'}
+            {running === 'count' ? t('search.running') : t('search.checkCount')}
           </button>
           <button className="btn sm pri" onClick={() => handleReconcile('id_diff')} disabled={running !== null}>
-            {running === 'id_diff' ? 'Läuft…' : 'ID-Diff ausführen'}
+            {running === 'id_diff' ? t('search.running') : t('search.runIdDiff')}
           </button>
         </div>
         {cfg && (
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <div className="lbl" style={{ marginBottom: 8 }}>Automatischer Abgleich (Celery Beat)</div>
+            <div className="lbl" style={{ marginBottom: 8 }}>{t('search.autoReconcile')}</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
               <input
                 type="checkbox"
@@ -1715,7 +1724,7 @@ function IndexHealthWidget() {
                 disabled={cfgSaving}
                 onChange={e => saveCfg({ reconciliation_enabled: e.target.checked })}
               />
-              Tägliche Zählungs-Prüfung aktiv (3 Uhr)
+              {t('search.dailyCount')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
               <input
@@ -1724,10 +1733,10 @@ function IndexHealthWidget() {
                 disabled={cfgSaving}
                 onChange={e => saveCfg({ reconciliation_id_diff_enabled: e.target.checked })}
               />
-              Wöchentlicher ID-Diff aktiv (sonntags, 4 Uhr)
+              {t('search.weeklyIdDiff')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              Schwellenwert für automatischen ID-Diff (Abweichung)
+              {t('search.threshold')}
               <input
                 type="number"
                 min={0}
@@ -1746,8 +1755,9 @@ function IndexHealthWidget() {
 }
 
 function SectionSuche() {
+  const { t } = useTranslation('screenSettings')
   const [reindexing, setReindexing] = useState<string | null>(null)
-  const [reindexMsg, setReindexMsg] = useState<string | null>(null)
+  const [reindexMsg, setReindexMsg] = useState<{ text: string; error: boolean } | null>(null)
   const [confirmReindexType, setConfirmReindexType] = useState<string | 'all' | null>(null)
 
   function handleReindex(type?: string) {
@@ -1762,9 +1772,9 @@ function SectionSuche() {
     try {
       const url = type ? `${BASE}/v1/search/reindex/${type}` : `${BASE}/v1/search/reindex`
       await req(url, { method: 'POST' })
-      setReindexMsg('Reindizierung gestartet – läuft im Hintergrund.')
+      setReindexMsg({ text: t('search.reindexStarted'), error: false })
       setTimeout(() => setReindexMsg(null), 5000)
-    } catch (e) { setReindexMsg(`Fehler: ${(e as Error).message}`) }
+    } catch (e) { setReindexMsg({ text: t('search.error', { message: (e as Error).message }), error: true }) }
     finally { setReindexing(null) }
   }
 
@@ -1772,34 +1782,33 @@ function SectionSuche() {
     <>
     <IndexHealthWidget />
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="hd">Suche &amp; Indexierung</div>
+      <div className="hd">{t('search.title')}</div>
       <div className="bd">
         <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>
-          Nach Schema-Änderungen oder Datenimporten muss der Suchindex manuell aktualisiert werden.
-          Die Reindizierung läuft asynchron im Hintergrund.
+          {t('search.description')}
         </p>
         {reindexMsg && (
-          <div style={{ fontSize: 12, color: reindexMsg.startsWith('Fehler') ? '#dc2626' : '#166534', marginBottom: 10 }}>
-            {reindexMsg}
+          <div style={{ fontSize: 12, color: reindexMsg.error ? '#dc2626' : '#166534', marginBottom: 10 }}>
+            {reindexMsg.text}
           </div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {(['object', 'entity', 'place', 'occurrence'] as const).map(t => (
-            <button key={t} className="btn sm gh" onClick={() => handleReindex(t)} disabled={reindexing !== null}>
-              {reindexing === t ? 'Läuft…' : `${t} reindizieren`}
+          {(['object', 'entity', 'place', 'occurrence'] as const).map(type => (
+            <button key={type} className="btn sm gh" onClick={() => handleReindex(type)} disabled={reindexing !== null}>
+              {reindexing === type ? t('search.running') : t('search.reindexType', { type: t(`recordTypes.${type}`) })}
             </button>
           ))}
           <button className="btn sm pri" onClick={() => handleReindex()} disabled={reindexing !== null} style={{ marginLeft: 8 }}>
-            {reindexing === 'all' ? 'Läuft…' : 'Alles reindizieren'}
+            {reindexing === 'all' ? t('search.running') : t('search.reindexAll')}
           </button>
         </div>
       </div>
     </div>
     {confirmReindexType !== null && (
       <ConfirmModal
-        message={confirmReindexType === 'all' ? 'Alle Datensätze vollständig neu indizieren?' : `Alle ${confirmReindexType}-Datensätze neu indizieren?`}
-        confirmLabel={confirmReindexType === 'all' ? 'Alles reindizieren' : `${confirmReindexType} reindizieren`}
-        cancelLabel="Abbrechen"
+        message={confirmReindexType === 'all' ? t('search.confirmAll') : t('search.confirmType', { type: t(`recordTypes.${confirmReindexType}`) })}
+        confirmLabel={confirmReindexType === 'all' ? t('search.reindexAll') : t('search.reindexType', { type: t(`recordTypes.${confirmReindexType}`) })}
+        cancelLabel={t('cancel')}
         onConfirm={confirmReindex}
         onCancel={() => setConfirmReindexType(null)}
       />
@@ -2015,6 +2024,7 @@ function SectionSparql({
 // ---------------------------------------------------------------------------
 
 function SectionIdnoSchemas() {
+  const { t } = useTranslation('screenSettings')
   const [schemas, setSchemas] = useState<Record<string, string>>({})
   const [patterns, setPatterns] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -2050,41 +2060,40 @@ function SectionIdnoSchemas() {
     setPatterns(prev => ({ ...prev, [type]: value }))
   }
 
-  if (loading) return <div className="empty">Lade…</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
 
   return (
     <div>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-        Pro Primärtyp kann ein ID-Schema mit Platzhaltern definiert werden.
-        Beim Anlegen eines neuen Datensatzes wird die nächste ID automatisch vorgeschlagen.
+        {t('idno.description')}
       </p>
 
-      {RECORD_TYPES.map(({ key, label }) => (
+      {RECORD_TYPES.map(({ key, labelKey }) => (
         <div className="card" key={key} style={{ marginBottom: 16 }}>
-          <div className="hd">{label}</div>
+          <div className="hd">{t(labelKey)}</div>
           <div className="bd">
             <div className="field">
-              <div className="lbl">Schema <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+              <div className="lbl">{t('idno.schema')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
               <input
                 className="fld mono"
                 value={schemas[key] ?? ''}
                 onChange={e => setSchema(key, e.target.value)}
-                placeholder="z.B. ulb_x_{counter:05d}"
+                placeholder={t('idno.schemaPlaceholder')}
               />
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                Platzhalter: {'{counter}'} – laufende Nummer | {'{counter:05d}'} – mit Nullen aufgefüllt | {'{year}'} – aktuelles Jahr | {'{type}'} – Typ-Kürzel (obj/ent/pla/occ/pro)
+                {t('idno.placeholders')}
               </div>
             </div>
             <div className="field">
-              <div className="lbl">Validierungs-Muster (Regex) <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+              <div className="lbl">{t('idno.pattern')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
               <input
                 className="fld mono"
                 value={patterns[key] ?? ''}
                 onChange={e => setPattern(key, e.target.value)}
-                placeholder="z.B. ^ulb_x_\\d{5}$"
+                placeholder={t('idno.patternPlaceholder')}
               />
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                Wenn gesetzt, werden manuell eingegebene IDs gegen dieses Muster geprüft.
+                {t('idno.patternHint')}
               </div>
             </div>
           </div>
@@ -2093,14 +2102,15 @@ function SectionIdnoSchemas() {
 
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
-        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('common.saved')}</span>}
       </div>
     </div>
   )
 }
 
 function SectionAI() {
+  const { t, i18n } = useTranslation('screenSettings')
   const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2181,38 +2191,38 @@ function SectionAI() {
     finally { setSecretBusy(false) }
   }
 
-  if (loading) return <div className="empty">Lade…</div>
-  if (!cfg) return <div className="empty">Keine Konfiguration geladen.</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
+  if (!cfg) return <div className="empty">{t('common.noConfig')}</div>
 
   return (
     <div>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-        Globale KI-Anbindung für feldbezogene Vorschläge. API-Key wird verschlüsselt in Datenbank gespeichert und nie im Klartext zurückgegeben.
+        {t('ai.description')}
       </p>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">LLM-Anbindung</div>
+        <div className="hd">{t('ai.connection')}</div>
         <div className="bd">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 12 }}>
             <input type="checkbox" className="ck" checked={cfg.ai_enabled} onChange={e => set('ai_enabled', e.target.checked)} />
-            KI-Unterstützung aktiv
+            {t('ai.enabled')}
           </label>
           <div className="field">
-            <div className="lbl">Base URL</div>
+            <div className="lbl">{t('ai.baseUrl')}</div>
             <input className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
-            <div className="sub">Ohne <code>/chat/completions</code> am Ende – wird automatisch angehängt. Für OpenRouter z.B. <code>https://openrouter.ai/api/v1</code>.</div>
+            <div className="sub">{t('ai.baseUrlHintBefore')} <code>/chat/completions</code> {t('ai.baseUrlHintMiddle')} <code>https://openrouter.ai/api/v1</code>.</div>
           </div>
           <div className="field">
-            <div className="lbl">Modell</div>
+            <div className="lbl">{t('ai.model')}</div>
             <input className="fld mono" value={cfg.ai_model ?? ''} onChange={e => set('ai_model', e.target.value)} placeholder="gpt-4.1-mini" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button className="btn gh" onClick={checkAi} disabled={checkBusy}>
-              {checkBusy ? 'Prüft…' : 'Verbindung testen'}
+              {checkBusy ? t('common.checking') : t('ai.testConnection')}
             </button>
             {checkResult && (
               <span style={{ fontSize: 12, color: checkResult.ok ? '#166534' : '#b91c1c' }}>
-                {checkResult.ok ? `✓ Antwort: ${checkResult.message}` : `✗ ${checkResult.message}`}
+                {checkResult.ok ? `✓ ${t('ai.response', { message: checkResult.message })}` : `✗ ${checkResult.message}`}
               </span>
             )}
           </div>
@@ -2220,22 +2230,26 @@ function SectionAI() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">API-Key</div>
+        <div className="hd">{t('ai.apiKey')}</div>
         <div className="bd">
           <div style={{ fontSize: 12, color: cfg.ai_secret.has_key ? '#166534' : 'var(--fg-3)', marginBottom: 10 }}>
-            {cfg.ai_secret.has_key ? `Key gesetzt${cfg.ai_secret.updated_at ? ` · aktualisiert ${new Date(cfg.ai_secret.updated_at).toLocaleString()}` : ''}` : 'Noch kein Key gespeichert'}
+            {cfg.ai_secret.has_key
+              ? cfg.ai_secret.updated_at
+                ? t('ai.keySetUpdated', { date: new Date(cfg.ai_secret.updated_at).toLocaleString(i18n.language) })
+                : t('ai.keySet')
+              : t('ai.noKey')}
           </div>
           <div className="field">
-            <div className="lbl">Neuen API-Key setzen / ersetzen</div>
+            <div className="lbl">{t('ai.newKey')}</div>
             <input className="fld mono" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn pri" onClick={saveSecret} disabled={secretBusy || !apiKey.trim()}>
-              {secretBusy ? 'Speichert…' : 'Key speichern'}
+              {secretBusy ? t('common.saving') : t('ai.saveKey')}
             </button>
             {cfg.ai_secret.has_key && (
               <button className="btn dn" onClick={deleteSecret} disabled={secretBusy}>
-                Löschen
+                {t('common.delete')}
               </button>
             )}
           </div>
@@ -2243,28 +2257,28 @@ function SectionAI() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="hd">Token-Limits</div>
+        <div className="hd">{t('ai.tokenLimits')}</div>
         <div className="bd">
           <div className="fg-2">
             <div className="field">
-              <div className="lbl">Max. Input-Tokens pro Request</div>
+              <div className="lbl">{t('ai.maxInput')}</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_max_input_tokens} onChange={e => set('ai_max_input_tokens', Number(e.target.value))} />
             </div>
             <div className="field">
-              <div className="lbl">Max. Output-Tokens pro Request</div>
+              <div className="lbl">{t('ai.maxOutput')}</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_max_output_tokens} onChange={e => set('ai_max_output_tokens', Number(e.target.value))} />
             </div>
           </div>
           <div className="fg-2">
             <div className="field">
-              <div className="lbl">Tageslimit pro Benutzer</div>
+              <div className="lbl">{t('ai.dailyLimit')}</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_daily_user_token_limit} onChange={e => set('ai_daily_user_token_limit', Number(e.target.value))} />
-              <div className="sub">Ihr Verbrauch heute: {cfg.ai_usage.daily_user_tokens.toLocaleString()} Tokens</div>
+              <div className="sub">{t('ai.dailyUsage', { count: cfg.ai_usage.daily_user_tokens.toLocaleString(i18n.language) })}</div>
             </div>
             <div className="field">
-              <div className="lbl">Monatslimit global</div>
+              <div className="lbl">{t('ai.monthlyLimit')}</div>
               <input className="fld mono" type="number" min={1} value={cfg.ai_monthly_global_token_limit} onChange={e => set('ai_monthly_global_token_limit', Number(e.target.value))} />
-              <div className="sub">Globaler Verbrauch diesen Monat: {cfg.ai_usage.monthly_global_tokens.toLocaleString()} Tokens</div>
+              <div className="sub">{t('ai.monthlyUsage', { count: cfg.ai_usage.monthly_global_tokens.toLocaleString(i18n.language) })}</div>
             </div>
           </div>
         </div>
@@ -2272,14 +2286,14 @@ function SectionAI() {
 
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
-        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>Gespeichert.</span>}
+        <button className="btn pri" onClick={handleSave} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
+        {saved && <span style={{ fontSize: 13, color: '#166534', alignSelf: 'center' }}>{t('common.saved')}</span>}
       </div>
       {confirmDeleteSecretOpen && (
         <ConfirmModal
-          message="API-Key wirklich löschen?"
-          confirmLabel="Löschen"
-          cancelLabel="Abbrechen"
+          message={t('ai.deleteKeyConfirm')}
+          confirmLabel={t('common.delete')}
+          cancelLabel={t('cancel')}
           danger
           onConfirm={confirmDeleteSecret}
           onCancel={() => setConfirmDeleteSecretOpen(false)}
@@ -2290,6 +2304,7 @@ function SectionAI() {
 }
 
 function SectionMediaRights() {
+  const { t } = useTranslation('screenSettings')
   const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -2310,14 +2325,14 @@ function SectionMediaRights() {
     finally { setSaving(false) }
   }
 
-  if (!cfg) return <div className="empty">{error ?? 'Lade…'}</div>
+  if (!cfg) return <div className="empty">{error ?? t('common.loading')}</div>
   const holder = cfg.media_default_rights_holder ?? { name: '', uri: '' }
   return <div>
-    <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>Diese Angaben werden beim Upload auf jede neue Mediendatei kopiert. Spätere Änderungen gelten nur für neue Uploads.</p>
-    <div className="field"><div className="lbl">Standardlizenz</div><input className="fld" value={cfg.media_default_license_uri ?? ''} placeholder="Lizenz-URI" onChange={e => setCfg({ ...cfg, media_default_license_uri: e.target.value || null })} /></div>
-    <div className="field"><div className="lbl">Standard-Rechteinhaber</div><input className="fld" value={holder.name} placeholder="Name" onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, name: e.target.value } })} /><input className="fld" style={{ marginTop: 4 }} value={holder.uri ?? ''} placeholder="URI (optional)" onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, uri: e.target.value || undefined } })} /></div>
+    <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('media.description')}</p>
+    <div className="field"><div className="lbl">{t('media.license')}</div><input className="fld" value={cfg.media_default_license_uri ?? ''} placeholder={t('media.licensePlaceholder')} onChange={e => setCfg({ ...cfg, media_default_license_uri: e.target.value || null })} /></div>
+    <div className="field"><div className="lbl">{t('media.rightsHolder')}</div><input className="fld" value={holder.name} placeholder={t('media.name')} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, name: e.target.value } })} /><input className="fld" style={{ marginTop: 4 }} value={holder.uri ?? ''} placeholder={t('media.uriOptional')} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, uri: e.target.value || undefined } })} /></div>
     {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
-    <button className="btn pri" onClick={save} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>{saved && <span style={{ marginLeft: 8, fontSize: 12, color: '#166534' }}>Gespeichert.</span>}
+    <button className="btn pri" onClick={save} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>{saved && <span style={{ marginLeft: 8, fontSize: 12, color: '#166534' }}>{t('common.saved')}</span>}
   </div>
 }
 
@@ -2326,6 +2341,7 @@ function SectionMediaRights() {
 // ---------------------------------------------------------------------------
 
 function SectionAuthoritySources() {
+  const { t } = useTranslation('screenSettings')
   const [sources, setSources] = useState<AuthoritySource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -2354,7 +2370,7 @@ function SectionAuthoritySources() {
     const testRequest = AUTHORITY_TESTS[source.id] ?? { query: 'test', href: '#' }
     try {
       const hits = await authority.search(source.id, testRequest.query, 1)
-      setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: `Erreichbar – ${hits.length} Treffer für Testanfrage.` } }))
+      setTestResults(prev => ({ ...prev, [source.id]: { ok: true, message: t('authorities.reachable', { count: hits.length }) } }))
     } catch (e) {
       setTestResults(prev => ({ ...prev, [source.id]: { ok: false, message: (e as Error).message } }))
     } finally {
@@ -2362,13 +2378,12 @@ function SectionAuthoritySources() {
     }
   }
 
-  if (loading) return <div className="empty">Lade…</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
 
   return (
     <div>
       <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>
-        Normdatenquellen für Authority-Felder und Vokabular-Term-Lookups. Deaktivierte Quellen stehen bei neuen
-        Verknüpfungen nicht mehr zur Auswahl; bereits gespeicherte Verknüpfungen bleiben unverändert erhalten.
+        {t('authorities.description')}
       </p>
       {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       {sources.map(source => {
@@ -2380,18 +2395,18 @@ function SectionAuthoritySources() {
               <span>{source.label}</span>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 400 }}>
                 <input type="checkbox" checked={source.is_enabled} disabled={pending === source.id} onChange={() => toggle(source)} />
-                {source.is_enabled ? 'Aktiviert' : 'Deaktiviert'}
+                {source.is_enabled ? t('authorities.enabled') : t('authorities.disabled')}
               </label>
             </div>
             <div className="bd">
               <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>ID: <span className="mono">{source.id}</span></div>
               <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 8 }}>
-                Testanfrage: <a href={testRequest.href} target="_blank" rel="noreferrer">{testRequest.query}</a>
+                {t('authorities.testQuery')} <a href={testRequest.href} target="_blank" rel="noreferrer">{testRequest.query}</a>
               </div>
               <button className="btn sm gh" onClick={() => test(source)} disabled={!source.is_enabled || testing === source.id}>
-                {testing === source.id ? 'Prüft…' : 'Verbindung testen'}
+                {testing === source.id ? t('common.checking') : t('ai.testConnection')}
               </button>
-              {!source.is_enabled && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--fg-3)' }}>Quelle deaktiviert – keine Anfragen möglich.</span>}
+              {!source.is_enabled && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--fg-3)' }}>{t('authorities.disabledHint')}</span>}
               {source.is_enabled && result && (
                 <span style={{ marginLeft: 8, fontSize: 12, color: result.ok ? '#166534' : '#dc2626' }}>
                   {result.message}
@@ -2417,8 +2432,8 @@ function SectionUeber() {
         </p>
         <p style={{ fontSize: 13, color: 'var(--fg-3)' }}>{t('ueber.copyright')}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, fontSize: 13 }}>
-          <a href="https://github.com/karkraeg/Katalon" target="_blank" rel="noreferrer">{t('ueber.links.repo')}</a>
-          <a href="https://github.com/karkraeg/Katalon/blob/main/LICENSE" target="_blank" rel="noreferrer">{t('ueber.links.license')}</a>
+          <a href="https://github.com/katalon-collections/katalon" target="_blank" rel="noreferrer">{t('ueber.links.repo')}</a>
+          <a href="https://github.com/katalon-collections/katalon/blob/main/LICENSE" target="_blank" rel="noreferrer">{t('ueber.links.license')}</a>
           <a href="https://katalon-collections.github.io/katalon-docs/" target="_blank" rel="noreferrer">{t('ueber.links.docs')}</a>
         </div>
       </div>
@@ -2431,6 +2446,7 @@ function SectionUeber() {
 // ---------------------------------------------------------------------------
 
 function SectionLanguages() {
+  const { t } = useTranslation('screenSettings')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2448,7 +2464,7 @@ function SectionLanguages() {
     const parsed = Array.from(new Set(
       input.split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
     ))
-    if (parsed.length === 0) { setError('Mindestens eine Sprache erforderlich.'); return }
+    if (parsed.length === 0) { setError(t('languages.required')); return }
     setSaving(true); setError(null); setSaved(false)
     try {
       await adminConfig.update({ supported_languages: parsed })
@@ -2458,21 +2474,21 @@ function SectionLanguages() {
     finally { setSaving(false) }
   }
 
-  if (loading) return <div className="empty">Lade…</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
   return (
     <div className="card">
-      <div className="hd">Sprachen für Metadaten</div>
+      <div className="hd">{t('languages.title')}</div>
       <div className="bd">
         <div className="field">
-          <div className="lbl">Unterstützte Sprachen (ISO-639-1-Codes, kommagetrennt)</div>
+          <div className="lbl">{t('languages.label')}</div>
           <input className="fld mono" value={input} onChange={e => setInput(e.target.value)} placeholder="de, en, fr" />
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            Erste Sprache ist die Primärsprache (Fallback). Gilt für Feld-Labels und übersetzbare Feldwerte.
+            {t('languages.hint')}
           </div>
         </div>
         {error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
-        {saved && <div style={{ fontSize: 13, color: '#166534', marginBottom: 8 }}>Gespeichert.</div>}
-        <button className="btn pri" onClick={save} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button>
+        {saved && <div style={{ fontSize: 13, color: '#166534', marginBottom: 8 }}>{t('common.saved')}</div>}
+        <button className="btn pri" onClick={save} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
       </div>
     </div>
   )
@@ -2503,7 +2519,7 @@ function SectionPresenceLock() {
     finally { setSaving(false) }
   }
 
-  if (loading) return <div className="empty">Lade…</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
   return (
     <div className="card">
       <div className="hd">{t('presenceLock.title')}</div>
@@ -2552,7 +2568,7 @@ function SectionAutoPurge() {
     finally { setSaving(false) }
   }
 
-  if (loading) return <div className="empty">Lade…</div>
+  if (loading) return <div className="empty">{t('common.loading')}</div>
   return (
     <div className="card">
       <div className="hd">{t('autoPurge.title')}</div>
@@ -2591,24 +2607,24 @@ function SectionAutoPurge() {
   )
 }
 
-const NAV: { id: Section; label: string; adminOnly?: boolean; feature?: string; i18nKey?: string }[] = [
-  { id: 'profil',   label: 'Profil' },
-  { id: 'ueber',    label: 'Über Katalon' },
-  { id: 'portal',   label: 'Portal & Institution', adminOnly: true },
-  { id: 'fusszeile', label: 'Fußzeile & Hinweis', adminOnly: true, i18nKey: 'portalLayout:nav' },
-  { id: 'startseite', label: 'Startseite', adminOnly: true },
-  { id: 'terminologie', label: 'Terminologie', adminOnly: true },
-  { id: 'facetten', label: 'Facetten', adminOnly: true },
-  { id: 'sprachen', label: 'Sprachen', adminOnly: true },
-  { id: 'idno',     label: 'ID-Schemas', adminOnly: true },
-  { id: 'ki',       label: 'KI', adminOnly: true },
-  { id: 'medien',   label: 'Medienrechte', adminOnly: true },
-  { id: 'authorities', label: 'Normdatenquellen', adminOnly: true },
-  { id: 'sperren',  label: 'Bearbeitungssperre', adminOnly: true },
-  { id: 'papierkorb', label: 'Papierkorb', adminOnly: true },
-  { id: 'suche',    label: 'Suche & Indexierung', adminOnly: true },
-  { id: 'sparql',   label: 'Linked Data & SPARQL', adminOnly: true },
-  { id: 'gefahrenbereich', label: 'Gefahrenbereich', adminOnly: true, i18nKey: 'screenSettings:dangerZone.nav' },
+const NAV: { id: Section; i18nKey: string; adminOnly?: boolean; feature?: string }[] = [
+  { id: 'profil',   i18nKey: 'screenSettings:nav.profil' },
+  { id: 'ueber',    i18nKey: 'screenSettings:nav.ueber' },
+  { id: 'portal',   i18nKey: 'screenSettings:nav.portal', adminOnly: true },
+  { id: 'fusszeile', i18nKey: 'portalLayout:nav', adminOnly: true },
+  { id: 'startseite', i18nKey: 'screenSettings:startseite.nav', adminOnly: true },
+  { id: 'terminologie', i18nKey: 'screenSettings:terminologie.nav', adminOnly: true },
+  { id: 'facetten', i18nKey: 'screenSettings:nav.facetten', adminOnly: true },
+  { id: 'sprachen', i18nKey: 'screenSettings:nav.sprachen', adminOnly: true },
+  { id: 'idno',     i18nKey: 'screenSettings:nav.idno', adminOnly: true },
+  { id: 'ki',       i18nKey: 'screenSettings:nav.ki', adminOnly: true },
+  { id: 'medien',   i18nKey: 'screenSettings:nav.medien', adminOnly: true },
+  { id: 'authorities', i18nKey: 'screenSettings:nav.authorities', adminOnly: true },
+  { id: 'sperren',  i18nKey: 'screenSettings:nav.sperren', adminOnly: true },
+  { id: 'papierkorb', i18nKey: 'screenSettings:nav.papierkorb', adminOnly: true },
+  { id: 'suche',    i18nKey: 'screenSettings:search.title', adminOnly: true },
+  { id: 'sparql',   i18nKey: 'screenSettings:sparql.nav', adminOnly: true },
+  { id: 'gefahrenbereich', i18nKey: 'screenSettings:dangerZone.nav', adminOnly: true },
 ]
 
 const SECTION_IDS = NAV.map(n => n.id)
@@ -2622,7 +2638,7 @@ function initialSection(): Section {
 export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: Props) {
   const [section, setSection] = useState<Section>(initialSection)
   const { t: tNav } = useTranslation()
-  const navLabel = (n: (typeof NAV)[number]) => (n.i18nKey ? tNav(n.i18nKey) : n.label)
+  const navLabel = (n: (typeof NAV)[number]) => tNav(n.i18nKey)
   const [config, setConfig] = useState<PortalConfigRead | null>(null)
   const [sparqlStatus, setSparqlStatus] = useState<SparqlStatus | null>(null)
   const [loading, setLoading] = useState(isAdmin)
@@ -2649,7 +2665,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="ph">
-        <div><h1>Einstellungen</h1><div className="sub">Account und Systemkonfiguration</div></div>
+        <div><h1>{tNav('screenSettings:title')}</h1><div className="sub">{tNav('screenSettings:subtitle')}</div></div>
       </div>
 
       <div className="settings-layout">
@@ -2667,7 +2683,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
 
         {/* Section select (mobile) */}
         <div className="settings-select field">
-          <label className="lbl" htmlFor="settings-section">Bereich</label>
+          <label className="lbl" htmlFor="settings-section">{tNav('screenSettings:sectionLabel')}</label>
           <select
             id="settings-section"
             className="fld"
@@ -2684,7 +2700,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
 
         {/* Content */}
         <div className="settings-content">
-          {loading && <div className="empty">Lade…</div>}
+          {loading && <div className="empty">{tNav('screenSettings:common.loading')}</div>}
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
           {!loading && section === 'ueber' && <SectionUeber />}

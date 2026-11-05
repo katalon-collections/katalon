@@ -123,11 +123,15 @@ INDEX_SETTINGS: dict[str, Any] = {
                 }
             },
             {
-                # group field instances are indexed as nested objects under grp_{fieldname}
+                # Group field instances are kept in the document under grp_{fieldname} but
+                # their sub-fields are not indexed (nothing queries them; the advanced
+                # search uses adv_fields). Dynamic mapping would fix a sub-field's type
+                # by its first value, and one later text value ("640 KB" after a number)
+                # made Elasticsearch reject the whole document.
                 "group_fields": {
                     "match_pattern": "regex",
                     "match": "^grp_.*",
-                    "mapping": {"type": "nested"},
+                    "mapping": {"type": "nested", "dynamic": False},
                 }
             },
         ],
@@ -300,6 +304,55 @@ def _bulk_chunks(
         yield lines, ids
 
 
+_PARSE_ERRORS = ("document_parsing_exception", "mapper_parsing_exception")
+
+
+def _without_group_fields(source_line: bytes) -> bytes | None:
+    """The same document without grp_* keys, or None if it has none."""
+    body = json.loads(source_line)
+    stripped = {key: value for key, value in body.items() if not key.startswith("grp_")}
+    return _ndjson_line(stripped) if len(stripped) < len(body) else None
+
+
+async def _retry_without_group_fields(
+    es: AsyncElasticsearch, target_type: str, lines: list[bytes], failed_ids: set[str]
+) -> set[str]:
+    """Re-send documents rejected because of an old, type-fixed grp_* mapping without
+    their group data. Returns the ids that were indexed this way.
+
+    Only an index built before ``dynamic: false`` can reject a document like that; a full
+    reindex replaces such an index. Until then a record without its group copy beats a
+    lost record.
+    """
+    retry: list[bytes] = []
+    retry_ids: list[str] = []
+    for action, source in zip(lines[::2], lines[1::2], strict=True):
+        doc_id = str(json.loads(action)["index"]["_id"])
+        if doc_id in failed_ids and (stripped := _without_group_fields(source)) is not None:
+            retry += [action, stripped]
+            retry_ids.append(doc_id)
+    if not retry:
+        return set()
+    try:
+        resp = await es.bulk(operations=cast(Any, retry), refresh=False)
+    except Exception:
+        logger.warning("retry without group fields failed for '%s'", target_type, exc_info=True)
+        return set()
+    saved = {
+        str(item["index"]["_id"])
+        for item in resp.get("items", [])
+        if "error" not in item.get("index", {})
+    }
+    for doc_id in sorted(saved):
+        logger.warning(
+            "indexed %s/%s without its group fields: the index mapping rejects them "
+            "(run a full reindex to rebuild the mapping)",
+            target_type,
+            doc_id,
+        )
+    return saved
+
+
 async def bulk_index_documents(
     es: AsyncElasticsearch,
     target_type: str,
@@ -332,19 +385,25 @@ async def bulk_index_documents(
             )
             failed.extend(ids)
             continue
-        chunk_failed = 0
+        chunk_failed: list[str] = []
+        parse_failed: set[str] = set()
         for item in resp.get("items", []):
             info = item.get("index", {})
             if "error" in info:
-                chunk_failed += 1
-                failed.append(str(info.get("_id", "")))
+                chunk_failed.append(str(info.get("_id", "")))
+                if info["error"].get("type") in _PARSE_ERRORS:
+                    parse_failed.add(str(info.get("_id", "")))
                 logger.error(
                     "bulk index item error for %s/%s: %s",
                     target_type,
                     info.get("_id"),
                     info["error"],
                 )
-        indexed += len(ids) - chunk_failed
+        if parse_failed:
+            saved = await _retry_without_group_fields(es, target_type, lines, parse_failed)
+            chunk_failed = [doc_id for doc_id in chunk_failed if doc_id not in saved]
+        failed.extend(chunk_failed)
+        indexed += len(ids) - len(chunk_failed)
     return indexed, failed
 
 
@@ -362,12 +421,32 @@ async def delete_documents(
     return deleted
 
 
+async def _index_tolerating_group_fields(
+    es: AsyncElasticsearch, index: str, doc_id: str, body: dict[str, Any], refresh: bool
+) -> None:
+    """Index one document; if an old grp_* mapping rejects it, store it without the
+    group copies instead of failing the write (and everything that cascades from it)."""
+    try:
+        await es.index(index=index, id=doc_id, body=body, refresh=refresh)
+    except BadRequestError as exc:
+        stripped = {key: value for key, value in body.items() if not key.startswith("grp_")}
+        if getattr(exc, "error", None) not in _PARSE_ERRORS or len(stripped) == len(body):
+            raise
+        logger.warning(
+            "indexing %s without its group fields: the index mapping rejects them "
+            "(run a full reindex to rebuild the mapping): %s",
+            doc_id,
+            exc,
+        )
+        await es.index(index=index, id=doc_id, body=stripped, refresh=refresh)
+
+
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
     es = get_es()
-    await es.index(index=INDEX_NAME, id=doc_id, body=body, refresh=True)
+    await _index_tolerating_group_fields(es, INDEX_NAME, doc_id, body, refresh=True)
     if shadow := await _shadow_index():
         try:
-            await es.index(index=shadow, id=doc_id, body=body, refresh=False)
+            await _index_tolerating_group_fields(es, shadow, doc_id, body, refresh=False)
         except Exception:
             logger.warning("shadow write to %s failed for %s", shadow, doc_id, exc_info=True)
 

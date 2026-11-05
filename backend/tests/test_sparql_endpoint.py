@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -554,6 +555,80 @@ async def test_saved_sparql_queries_crud(admin_user: User) -> None:
 
                 resp_get_after = await client.get(f"/v1/sparql/queries/{query_id}")
                 assert resp_get_after.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_private_saved_sparql_queries_only_visible_to_creator(admin_user: User) -> None:
+    from unittest.mock import MagicMock
+
+    from katalon.core.dependencies import get_db
+    from katalon.core.models import SavedSparqlQuery
+
+    other_admin = User(id=uuid.uuid4(), email="other@example.org", role="admin", is_active=True)
+
+    def make(title: str, *, shared: bool, owner: uuid.UUID | None) -> SavedSparqlQuery:
+        return SavedSparqlQuery(
+            id=uuid.uuid4(),
+            title=title,
+            query="SELECT * WHERE { ?s ?p ?o }",
+            tags=[],
+            is_shared=shared,
+            created_by=owner,
+            created_at=datetime(2026, 1, 1),
+            updated_at=datetime(2026, 1, 1),
+        )
+
+    private = make("Private", shared=False, owner=other_admin.id)
+    shared = make("Shared", shared=True, owner=other_admin.id)
+    legacy = make("Legacy", shared=False, owner=None)
+    storage = {item.id: item for item in (private, shared, legacy)}
+
+    class MockSession:
+        async def commit(self) -> None:
+            pass
+
+        async def refresh(self, item: SavedSparqlQuery) -> None:
+            pass
+
+        async def delete(self, item: SavedSparqlQuery) -> None:
+            storage.pop(item.id, None)
+
+        async def execute(self, stmt: Any) -> Any:
+            mock_res = MagicMock()
+            params = getattr(stmt.compile(), "params", {})
+            ids = [val for val in params.values() if isinstance(val, uuid.UUID)]
+            if ids:
+                mock_res.scalar_one_or_none.return_value = storage.get(ids[0])
+            else:
+                mock_res.scalars.return_value.all.return_value = list(storage.values())
+            return mock_res
+
+    async def override_db():
+        yield MockSession()
+
+    current = {"user": admin_user}
+    app.dependency_overrides[get_current_user] = lambda: current["user"]
+    app.dependency_overrides[get_db] = override_db
+    try:
+        with patch.object(settings, "oxigraph_enabled", True):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                listed = {q["title"] for q in (await client.get("/v1/sparql/queries")).json()}
+                assert listed == {"Shared", "Legacy"}
+
+                url = f"/v1/sparql/queries/{private.id}"
+                assert (await client.get(url)).status_code == 404
+                assert (await client.put(url, json={"title": "Hijacked"})).status_code == 404
+                assert (await client.delete(url)).status_code == 404
+                assert private.title == "Private"
+                assert private.id in storage
+
+                current["user"] = other_admin
+                listed = {q["title"] for q in (await client.get("/v1/sparql/queries")).json()}
+                assert listed == {"Private", "Shared", "Legacy"}
+                assert (await client.get(url)).status_code == 200
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_db, None)

@@ -99,6 +99,8 @@
   },
   "ai": {
     "generated": "AI-generated",
+    "generatedTooltip": "AI-generated ({{model}}) on {{date}}",
+    "warning": "AI notice for {{label}}: {{warning}}",
     "generate": "AI suggestion",
     "regenerate": "Regenerate",
     "running": "Generating suggestion…",

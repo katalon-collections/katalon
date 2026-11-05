@@ -15,7 +15,7 @@ import re
 import uuid
 from typing import Any, Literal, cast
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -31,7 +31,9 @@ from katalon.core.schemas import (
     ImportMappingUpdate,
 )
 from katalon.services import importer_service
+from katalon.services.import_resolution import resolve_relations, resolve_vocab_terms
 from katalon.services.importer import parse_file
+from katalon.services.importer.formats.csv_format import ENCODINGS, CsvFormat, detect_encoding
 from katalon.services.importer.formats.xml_format import XmlFormat
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import has_any_subtypes
@@ -90,6 +92,15 @@ class MappingRequest(BaseModel):
     fields_to_create: list[dict[str, Any]] = Field(default_factory=list[Any])
     # Per strict vocab field: "extend" creates missing terms (default), "match_only" drops them.
     vocab_modes: dict[str, Literal["extend", "match_only"]] = Field(default_factory=dict)
+    # Per relation field: how text values find (or create) the linked record.
+    relation_options: dict[str, RelationImportOption] = Field(default_factory=dict)
+
+
+class RelationImportOption(BaseModel):
+    """How plain text in a relation field is turned into a link to an existing record."""
+
+    lookup: Literal["idno", "label"] = "idno"
+    on_missing: Literal["error", "create"] = "error"
 
 
 class ImportRequest(MappingRequest):
@@ -232,8 +243,16 @@ async def _resolve_mapping(
 )
 async def upload_file(
     files: list[UploadFile] = File(alias="file"),
+    encoding: str | None = Form(
+        default=None,
+        description="CSV/TSV only: force 'utf-8', 'windows-1252' or 'iso-8859-1' instead of detecting it.",
+    ),
     current_user: User = require_feature("import"),
 ) -> dict[str, Any]:
+    if encoding is not None and encoding not in ENCODINGS:
+        raise HTTPException(
+            status_code=422, detail=f"Ungültige Zeichenkodierung: {encoding}. Erlaubt: {', '.join(ENCODINGS)}"
+        )
     if not files:
         raise HTTPException(status_code=422, detail="Keine Datei hochgeladen")
 
@@ -291,7 +310,7 @@ async def upload_file(
         )
 
     try:
-        headers, rows, _ = parse_file(filename, content)
+        headers, rows, fmt = parse_file(filename, content, encoding)
     except (ValueError, NotImplementedError):
         raise HTTPException(status_code=422, detail="Nur CSV, TSV, Excel (.xlsx) und XML werden unterstützt")
 
@@ -299,8 +318,12 @@ async def upload_file(
     upload_id = _store_rows(r, rows)
     suggestions = importer_service.suggest_field_types(headers, rows)
     source_type = "excel" if filename.lower().endswith((".xlsx", ".xls")) else "csv"
+    detected = detect_encoding(content) if isinstance(fmt, CsvFormat) else None
     return {
         "source_type": source_type,
+        # CSV/TSV only: the encoding in effect and the one detected (they differ after an override)
+        "encoding": (encoding or detected) if detected else None,
+        "encoding_detected": detected,
         "upload_id": upload_id,
         "headers": headers,
         "row_count": len(rows),
@@ -449,11 +472,42 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
     # Run full schema validation per row (catches pid/relation/regex/required errors)
     from katalon.services.importer_service import apply_mapping
     all_records, _ = apply_mapping(rows, norm_mapping, field_defs)
-    for i, metadata in enumerate(all_records):
-        row_num = i + 2
-        val_errors = await validate_metadata(db, body.record_type, metadata, subtype)
-        for err in val_errors:
-            dry_result["errors"].append({"row": row_num, "message": err})
+    # Resolve text to vocabulary terms and relation targets exactly like the worker.
+    # Missing terms/targets are created inside a savepoint that is rolled back, so the
+    # preview validates the real result without persisting anything.
+    savepoint = await db.begin_nested()
+    try:
+        vocab_report = await resolve_vocab_terms(db, field_defs, all_records, body.vocab_modes)
+        relation_report = await resolve_relations(
+            db,
+            field_defs,
+            all_records,
+            {name: opt.model_dump() for name, opt in body.relation_options.items()},
+            user_id=current_user.id,
+        )
+        row_errors: dict[int, list[str]] = {}
+        for report in (vocab_report, relation_report):
+            for index, messages in report.row_errors.items():
+                row_errors.setdefault(index, []).extend(messages)
+        for i, metadata in enumerate(all_records):
+            row_num = i + 2
+            for err in row_errors.get(i, []):
+                dry_result["errors"].append({"row": row_num, "message": err})
+            val_errors = await validate_metadata(db, body.record_type, metadata, subtype)
+            for err in val_errors:
+                dry_result["errors"].append({"row": row_num, "message": err})
+    finally:
+        await savepoint.rollback()
+    for text in (*vocab_report.warnings, *relation_report.warnings):
+        dry_result["warnings"].append({"row": None, "message": text})
+    created_targets: dict[str, int] = {}
+    for target_type, _ in relation_report.created_records:
+        created_targets[target_type] = created_targets.get(target_type, 0) + 1
+    for target_type, count in created_targets.items():
+        dry_result["warnings"].append({
+            "row": None,
+            "message": f"{count} verknüpfte Datensätze ({target_type}) würden als Entwurf angelegt.",
+        })
 
     if media_selector:
         from katalon.services.media_batch_import_service import media_references_for_rows
@@ -490,17 +544,9 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
         vocab_id = (fd.settings or {}).get("vocabulary_id")
         if not vocab_id:
             continue
-        from katalon.core.models import VocabularyTerm
         from katalon.services.importer_service import normalize_term_key
-        existing_terms_result = await db.execute(
-            select(VocabularyTerm.term).where(
-                VocabularyTerm.vocabulary_id == uuid.UUID(str(vocab_id)),
-            )
-        )
-        existing_keys = {normalize_term_key(row[0]) for row in existing_terms_result.all()}
-        new_keys = {
-            normalize_term_key(v) for v in unique_values if normalize_term_key(v) not in existing_keys
-        }
+        new_keys = {normalize_term_key(t) for t in vocab_report.new_terms.get(field_name, set())}
+        new_keys |= vocab_report.unmatched.get(field_name, set())
         mode = body.vocab_modes.get(field_name, "extend")
         label_text = (fd.label or {}).get("de") or field_name
         vocab_warnings.append({
@@ -584,6 +630,7 @@ async def run_import(body: ImportRequest, db: DBDep, current_user: User = requir
         fields_to_create=body.fields_to_create,
         media_selector=media_selector,
         vocab_modes=body.vocab_modes,
+        relation_options={name: opt.model_dump() for name, opt in body.relation_options.items()},
     )
     _get_redis().setex(f"import_task:{task_id}", IMPORT_TASK_TTL_SECONDS, "1")
     return {"status": "queued", "task_id": task_id}

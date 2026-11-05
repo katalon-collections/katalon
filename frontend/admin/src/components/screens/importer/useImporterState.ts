@@ -173,6 +173,7 @@ function buildInitialState(persisted: PersistedImporterState | null): ImporterSt
     autoPublish:    persisted?.autoPublish   ?? false,
     pendingFields:  dedupePending(persisted?.pendingFields ?? []),
     vocabModes:     persisted?.vocabModes    ?? {},
+    relationOptions: persisted?.relationOptions ?? {},
     dryResult:      persisted?.dryResult     ?? null,
     dryRunning:     false,
     taskId:         persisted?.taskId        ?? null,
@@ -267,6 +268,9 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
     case 'PENDING_FIELDS_CHANGED':
       return { ...state, pendingFields: dedupePending(action.payload) }
 
+    case 'RELATION_OPTION_CHANGED':
+      return { ...state, relationOptions: { ...state.relationOptions, [action.payload.field]: action.payload.option } }
+
     case 'VOCAB_MODE_CHANGED':
       return { ...state, vocabModes: { ...state.vocabModes, [action.payload.field]: action.payload.mode } }
 
@@ -330,7 +334,9 @@ export interface ImporterStateAndHandlers {
   missingRequired: FieldDefinition[]
   idnoMissing: boolean
   profileWarnings: ProfileApplyResult | null
-  handleFile: (files: File | File[]) => Promise<void>
+  handleFile: (files: File | File[], encoding?: string) => Promise<void>
+  /** Re-reads the last uploaded CSV with another encoding (resets the mapping, headers change). */
+  handleEncodingChange: ((encoding: string) => Promise<void>) | null
   handleXmlRecordXpath: (clarkTag: string) => Promise<void>
   handleDryRun: () => Promise<void>
   applyVocabCluster: (field: string, canonical: string, variants: string[]) => Promise<void>
@@ -344,6 +350,7 @@ export function useImporterState(): ImporterStateAndHandlers {
   const persisted = loadPersistedState()
   const [state, dispatch] = useReducer(importerReducer, persisted, buildInitialState)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastFilesRef = useRef<File | File[] | null>(null)
 
   const [fields, setFields] = React.useState<FieldDefinition[]>([])
   const [availableSubtypes, setAvailableSubtypes] = React.useState<RecordSubtype[]>([])
@@ -364,12 +371,14 @@ export function useImporterState(): ImporterStateAndHandlers {
       uploaded: state.uploaded ? { ...state.uploaded, upload_id: '' } : null,
       dryResult: state.dryResult, taskId: state.taskId,
       pendingFields: state.pendingFields, vocabModes: state.vocabModes,
+      relationOptions: state.relationOptions,
     }
     localStorage.setItem(IMPORTER_STATE_KEY, JSON.stringify(toSave))
   }, [
     state.step, state.recordType, state.subtype, state.mapping, state.mappingId, state.savedMappingName,
     state.mediaSelector, state.idnoStrategy, state.idnoColumn, state.upsertStrategy, state.autoPublish,
     state.uploaded, state.dryResult, state.taskId, state.pendingFields, state.vocabModes,
+    state.relationOptions,
   ])
 
   // Load fields + subtypes
@@ -417,16 +426,19 @@ export function useImporterState(): ImporterStateAndHandlers {
       - (mediaSelectorCountedSeparately ? 1 : 0)
     : 0
   const mappedTargets = new Set(Object.values(state.mapping).map(m => m.target).filter(Boolean))
+  // The idno card maps the ID column to the pseudo target "__idno__".
+  if (mappedTargets.has('__idno__')) mappedTargets.add('idno')
   const missingRequired = fields.filter(f => f.is_required && !mappedTargets.has(f.name))
   const idnoMissing = state.idnoStrategy === 'column' && !state.idnoColumn
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
-  async function handleFile(files: File | File[]) {
+  async function handleFile(files: File | File[], encoding?: string) {
     setProfileWarnings(null)
+    lastFilesRef.current = files
     dispatch({ type: 'UPLOAD_STARTED' })
     try {
-      const raw = await importer.upload(files)
+      const raw = await importer.upload(files, encoding)
       const result = raw as UploadResult & { upload_id?: string; element_levels?: XmlElementLevel[] }
 
       if (result.source_type === 'xml' && result.upload_id) {
@@ -488,7 +500,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId, state.vocabModes)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId, state.vocabModes, state.relationOptions)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -533,6 +545,7 @@ export function useImporterState(): ImporterStateAndHandlers {
         media_selector: state.mediaSelector,
         mapping_id: state.mappingId,
         vocab_modes: state.vocabModes,
+        relation_options: state.relationOptions,
       })
       dispatch({ type: 'IMPORT_STARTED', payload: task_id })
     } catch (e) {
@@ -606,6 +619,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     mappedCount, ignoredCount, missingRequired, idnoMissing,
     profileWarnings,
     handleFile, handleXmlRecordXpath, handleDryRun, applyVocabCluster, handleImport,
+    handleEncodingChange: lastFilesRef.current ? (encoding: string) => handleFile(lastFilesRef.current as File | File[], encoding) : null,
     handleProfileLoaded, handleProfileExport,
     handleSavedMappingLoaded, handleMappingSaved,
   }

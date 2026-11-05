@@ -207,4 +207,6 @@ export default {
   'login.submitting': 'Anmeldung läuft …',
   'login.noAccount': 'Noch kein Konto?',
   'login.register': 'Registrieren (demnächst)',
+  'ai.badge': 'KI',
+  'ai.generatedTooltip': 'KI-generiert ({model}) · {date}',
 }

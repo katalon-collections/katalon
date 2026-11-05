@@ -1,0 +1,317 @@
+topics:
+  - slug: architecture
+    title: Architecture
+    description: System shape, runtime flows, and subsystem boundaries.
+    parents: []
+  - slug: concepts
+    title: Concepts
+    description: Core vocabulary and mental models for this codebase.
+    parents: []
+  - slug: decisions
+    title: Decisions
+    description: Durable architecture and workflow choices with consequences.
+    parents: []
+  - slug: reference
+    title: Reference
+    description: Exact lookup material for commands, routes, configuration, and contracts.
+    parents: []
+  - slug: operations
+    title: Operations
+    description: Deployment, runtime, recovery, and maintenance work.
+    parents: []
+  - slug: development
+    title: Development
+    description: Local workflows and checks for changing Katalon.
+    parents: [operations]
+  - slug: roadmap
+    title: Roadmap
+    description: GitHub roadmap umbrella issues and planning routes.
+    parents: [development]
+  - slug: domain
+    title: Domain
+    description: Katalon's GLAM metadata-management product model.
+    parents: [concepts]
+  - slug: records
+    title: Records
+    description: Object, entity, place, occurrence, and procedure records.
+    parents: [domain]
+  - slug: metadata
+    title: Metadata
+    description: Dynamic fields, JSONB metadata, mappings, and display/search flags.
+    parents: [concepts]
+  - slug: ai
+    title: AI
+    description: Schema-configured AI suggestions and OpenAI-compatible provider calls.
+    parents: [metadata, integrations]
+  - slug: schema
+    title: Schema
+    description: Field definitions, subtypes, form generation, and validation.
+    parents: [metadata]
+  - slug: vocabularies
+    title: Vocabularies
+    description: Controlled terms, relation types, hierarchy, and term metadata.
+    parents: [metadata]
+  - slug: relations
+    title: Relations
+    description: Typed links between record families and their search/display effects.
+    parents: [records, metadata]
+  - slug: occurrences
+    title: Occurrences
+    description: Work, event, exhibition, and concept records in the domain model.
+    parents: [records]
+  - slug: library-standards
+    title: Library Standards
+    description: LRMoo, FRBR, SPECTRUM, OAI-PMH, and preservation standards as Katalon applies them.
+    parents: [domain, export]
+  - slug: spectrum
+    title: SPECTRUM
+    description: Collection-management procedure vocabulary and logistics conventions.
+    parents: [library-standards, records]
+  - slug: authority
+    title: Authority
+    description: External authority adapters and normalized identifiers.
+    parents: [metadata]
+  - slug: integrations
+    title: Integrations
+    description: External systems and adapter boundaries.
+    parents: [architecture]
+  - slug: frontend
+    title: Frontend
+    description: Admin and public portal React applications.
+    parents: [architecture]
+  - slug: admin
+    title: Admin
+    description: Authenticated admin application behavior and navigation.
+    parents: [frontend]
+  - slug: onboarding
+    title: Onboarding
+    description: First-login guidance and restartable setup tours.
+    parents: [admin]
+  - slug: portal
+    title: Portal
+    description: Public portal routing, search, detail pages, and theming.
+    parents: [frontend]
+  - slug: i18n
+    title: I18n
+    description: Configured languages, translated labels and values, and portal locale handling.
+    parents: [frontend, metadata]
+  - slug: routing
+    title: Routing
+    description: Browser, hash, nginx, and compose route contracts.
+    parents: [frontend, operations]
+  - slug: api
+    title: API
+    description: FastAPI application and endpoint surface.
+    parents: [architecture]
+  - slug: backend
+    title: Backend
+    description: Python backend behavior and service boundaries.
+    parents: [architecture]
+  - slug: api-client
+    title: API Client
+    description: Frontend client wrappers around backend endpoints.
+    parents: [frontend, api]
+  - slug: authentication
+    title: Authentication
+    description: Login and token behavior.
+    parents: [security]
+  - slug: security
+    title: Security
+    description: Secret gates, auth, API keys, rate limits, and visibility.
+    parents: [backend, operations]
+  - slug: configuration
+    title: Configuration
+    description: Runtime settings, environment variables, and singleton config rows.
+    parents: [operations]
+  - slug: deployment
+    title: Deployment
+    description: Production and production-like deployment paths.
+    parents: [operations]
+  - slug: docker
+    title: Docker
+    description: Compose files, containers, ports, mounts, and image customizations.
+    parents: [deployment]
+  - slug: kubernetes
+    title: Kubernetes
+    description: Helm-based Kubernetes deployment and operation.
+    parents: [deployment]
+  - slug: installer
+    title: Installer
+    description: The separate katalon-cli installation and update path.
+    parents: [deployment]
+  - slug: database
+    title: Database
+    description: PostgreSQL, PostGIS, migrations, and data-safety concerns.
+    parents: [operations]
+  - slug: data-model
+    title: Data Model
+    description: Persistent record, relation, metadata, and vocabulary structures.
+    parents: [database, records]
+  - slug: persistence
+    title: Persistence
+    description: Stored data shape and migration-backed state.
+    parents: [database]
+  - slug: search
+    title: Search
+    description: Elasticsearch-backed search, facets, visibility, and denormalization.
+    parents: [architecture]
+  - slug: indexing
+    title: Indexing
+    description: Search document construction, reindexing, and reconciliation.
+    parents: [search]
+  - slug: elasticsearch
+    title: Elasticsearch
+    description: Elasticsearch integration and index behavior.
+    parents: [search]
+  - slug: visibility
+    title: Visibility
+    description: Public read and search filtering rules.
+    parents: [search, security]
+  - slug: facets
+    title: Facets
+    description: Search facet configuration and query behavior.
+    parents: [search, portal]
+  - slug: media
+    title: Media
+    description: Uploads, storage, media workers, and public image delivery.
+    parents: [architecture]
+  - slug: storage
+    title: Storage
+    description: Managed media files, derived assets, and external object-storage boundaries.
+    parents: [media]
+  - slug: s3
+    title: S3
+    description: S3-compatible storage integration points.
+    parents: [storage, integrations]
+  - slug: iiif
+    title: IIIF
+    description: Cantaloupe-backed IIIF manifests and viewing.
+    parents: [media]
+  - slug: celery
+    title: Celery
+    description: Worker queues and background processing.
+    parents: [backend, operations]
+  - slug: workers
+    title: Workers
+    description: Background task modules and queue ownership.
+    parents: [celery]
+  - slug: importer
+    title: Importer
+    description: CSV, Excel, XML, dry-run, transform, and reconciliation workflows.
+    parents: [metadata]
+  - slug: xml
+    title: XML
+    description: XML importer behavior and parser hardening.
+    parents: [importer]
+  - slug: reconciliation
+    title: Reconciliation
+    description: Duplicate and drift detection workflows.
+    parents: [importer, indexing]
+  - slug: oai-pmh
+    title: OAI-PMH
+    description: Harvesting endpoint and OAI-DC export behavior.
+    parents: [metadata, api]
+  - slug: export
+    title: Export
+    description: Metadata mapping and external export surfaces.
+    parents: [metadata]
+  - slug: preservation
+    title: Preservation
+    description: BagIt, METS, PREMIS, and long-term availability export work.
+    parents: [export, media, backup]
+  - slug: audit
+    title: Audit
+    description: Audit-log and snapshot behavior.
+    parents: [records]
+  - slug: snapshots
+    title: Snapshots
+    description: Stored record snapshot and restore behavior.
+    parents: [audit]
+  - slug: workflows
+    title: Workflows
+    description: Cross-file runtime and maintenance flows.
+    parents: [architecture]
+  - slug: batch
+    title: Batch
+    description: Bulk record operations and worklist-driven batch workflows.
+    parents: [workflows, admin]
+  - slug: working-sets
+    title: Working Sets
+    description: Ad-hoc internal Arbeitslisten for record review, ordering, annotation, and batch targets.
+    parents: [batch, records]
+  - slug: publishing
+    title: Publishing
+    description: Record publication validation and public exposure.
+    parents: [records]
+  - slug: concurrency
+    title: Concurrency
+    description: Optimistic locking, edit presence, and conflict handling.
+    parents: [records]
+  - slug: testing
+    title: Testing
+    description: Backend, frontend, E2E, and validation coverage.
+    parents: [development]
+  - slug: ci
+    title: CI
+    description: GitHub workflow coverage and gaps.
+    parents: [testing]
+  - slug: backup
+    title: Backup
+    description: Backup, restore, and preservation operations.
+    parents: [operations, database]
+  - slug: safety
+    title: Safety
+    description: Data-loss prevention and escalation rules.
+    parents: [operations]
+  - slug: resilience
+    title: Resilience
+    description: Behavior during partial dependency outages.
+    parents: [operations]
+  - slug: platform
+    title: Platform
+    description: Fixed stack and deployment substrate.
+    parents: [architecture]
+  - slug: rdf
+    title: RDF
+    description: RDF graph and semantic-web extension boundaries.
+    parents: [platform, integrations]
+  - slug: sparql
+    title: SPARQL
+    description: SPARQL query surface and Oxigraph-related extension boundaries.
+    parents: [rdf]
+  - slug: plugins
+    title: Plugins
+    description: Plugin architecture choices and intentionally rejected dynamic extension mechanisms.
+    parents: [platform]
+  - slug: customization
+    title: Customization
+    description: Supported customization points and deployment overrides.
+    parents: [deployment]
+  - slug: theming
+    title: Theming
+    description: Runtime portal appearance configuration.
+    parents: [portal]
+  - slug: startup
+    title: Startup
+    description: Application lifespan bootstrap and readiness behavior.
+    parents: [api, operations]
+  - slug: routers
+    title: Routers
+    description: FastAPI router mount table and endpoint families.
+    parents: [api]
+  - slug: orientation
+    title: Orientation
+    description: Entry points for reading the wiki.
+    parents: [reference]
+  - slug: wiki
+    title: Wiki
+    description: CodeAlmanac wiki maintenance and structure.
+    parents: [reference]
+  - slug: licensing
+    title: Licensing
+    description: Source licensing and AGPL policy.
+    parents: [operations]
+  - slug: branding
+    title: Branding
+    description: Product naming and public-facing naming boundaries.
+    parents: [operations]

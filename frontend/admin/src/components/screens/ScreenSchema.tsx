@@ -4,10 +4,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { adminConfig, authority, getTokenUser, schema, subtypes, vocabularies } from '../../api/client'
-import type { AuthoritySource, SchemaImportResult } from '../../api/client'
+import type { AuthoritySource, RelationCounterpart, SchemaImportResult } from '../../api/client'
+import { RelationCounterpartHint } from './RelationCounterpartHint'
 import type { FieldDefinition, RecordSubtype, Vocabulary, VocabularyTerm } from '../../types'
 import { getLabel } from '../../types'
-import { Alert, Archive, Check, Copy, Edit, Grip, Lightning, Plus, RotateCcw, Trash, X } from '../ui/Icons'
+import { Alert, Archive, Check, ChevD, ChevU, Copy, Edit, Grip, Lightning, Plus, RotateCcw, Trash, X } from '../ui/Icons'
 import { ActionMenu } from '../ui/ActionMenu'
 import { SchemaAiAssist } from './SchemaAiAssist'
 import { ScreenFormSections } from './ScreenFormSections'
@@ -79,6 +80,7 @@ type FieldFormState = {
   fixed_relation_type: string
   inherited_fields: string[]
   show_place_map: boolean
+  emphasize_first_child: boolean
   default_value: unknown
   is_locked: boolean
   ai_enabled: boolean
@@ -92,7 +94,7 @@ type FieldFormState = {
 }
 
 function emptyForm(targetType: string, sortOrder: number, subtype: string): FieldFormState {
-  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', facet_granularity: '', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], show_place_map: false, default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
+  return { target_type: targetType, target_subtype: subtype, name: '', label: {}, help_text: {}, field_type: 'text', is_required: false, is_repeatable: false, is_translatable: false, max_count: '', sort_order: sortOrder, validation_regex: '', authority_source: 'gnd', pid_provider: 'dnb_urn', facet_granularity: '', show_in_detail: true, show_in_list: false, detail_slot: 'sidebar', detail_role: 'none', is_public: true, is_facet: false, is_searchable: true, vocabulary_id: '', relation_target_type: 'entity', relation_target_subtype: '', relation_type_vocab: '', fixed_relation_type: '', inherited_fields: [], show_place_map: false, emphasize_first_child: false, default_value: '', is_locked: false, ai_enabled: false, ai_mode: 'text', ai_prompt: '', ai_include_fields: [], ai_send_existing_value: false, ai_translation_enabled: false }
 }
 
 function fieldToForm(f: FieldDefinition): FieldFormState {
@@ -126,6 +128,7 @@ function fieldToForm(f: FieldDefinition): FieldFormState {
     fixed_relation_type: (f.settings?.fixed_relation_type as string) ?? '',
     inherited_fields: (f.settings?.inherited_fields as string[]) ?? [],
     show_place_map: Boolean(f.settings?.show_place_map),
+    emphasize_first_child: Boolean(f.settings?.emphasize_first_child),
     default_value: f.settings?.default_value ?? '',
     is_locked: Boolean(f.settings?.is_locked),
     ai_enabled: Boolean((f.settings?.ai_config as Record<string, unknown> | undefined)?.enabled),
@@ -291,6 +294,46 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
     }
   }
 
+  const activeSubFields = (form.subFields ?? []).filter(f => !f.is_deleted)
+  const activeSubFieldCount = activeSubFields.length
+  const subFieldIndex = (sf: FieldDefinition) => activeSubFields.findIndex(f => f.id === sf.id)
+
+  async function handleSubFieldMove(sf: FieldDefinition, direction: -1 | 1) {
+    const active = (form.subFields ?? []).filter(f => !f.is_deleted)
+    const from = active.findIndex(f => f.id === sf.id)
+    const to = from + direction
+    if (from === -1 || to < 0 || to >= active.length) return
+    const reordered = [...active]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    try {
+      await Promise.all(reordered.flatMap((f, index) => f.sort_order === index ? [] : [schema.update(f.id, {
+        target_type: f.target_type,
+        target_subtype: f.target_subtype,
+        name: f.name,
+        label: f.label,
+        help_text: f.help_text ?? {},
+        field_type: f.field_type,
+        is_required: f.is_required,
+        is_repeatable: f.is_repeatable,
+        is_translatable: f.is_translatable,
+        is_searchable: f.is_searchable,
+        sort_order: index,
+        settings: f.settings,
+        show_in_detail: f.show_in_detail,
+        show_in_list: f.show_in_list,
+        detail_slot: f.detail_slot,
+        detail_role: f.detail_role,
+        is_public: f.is_public,
+        is_facet: f.is_facet,
+        parent_id: fieldId,
+      })]))
+    } catch (e) {
+      setSubFieldError((e as Error).message)
+    }
+    onSubFieldChange()
+  }
+
   function handleSubFieldDelete(sf: FieldDefinition) {
     if (onRequestDeleteSubfield) {
       onRequestDeleteSubfield(sf)
@@ -327,6 +370,23 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
     if (form.field_type !== 'relation') { setTargetTypeFields([]); return }
     schema.list(form.relation_target_type).then(setTargetTypeFields).catch(() => setTargetTypeFields([]))
   }, [form.field_type, form.relation_target_type])
+
+  // Hint when the same relation already exists in the opposite direction (never blocks saving)
+  const [counterparts, setCounterparts] = useState<RelationCounterpart[]>([])
+  useEffect(() => {
+    if (form.field_type !== 'relation' || !form.relation_target_type) { setCounterparts([]); return }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      schema.relationCounterparts({
+        target_type: form.target_type,
+        target_subtype: form.target_subtype.trim() || null,
+        relation_target_type: form.relation_target_type,
+        relation_target_subtype: form.relation_target_subtype.trim() || null,
+        exclude_field_id: fieldId,
+      }).then(result => { if (!cancelled) setCounterparts(result) }).catch(() => { if (!cancelled) setCounterparts([]) })
+    }, 300)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [form.field_type, form.target_type, form.target_subtype, form.relation_target_type, form.relation_target_subtype, fieldId])
 
   const [relationTypeTerms, setRelationTypeTerms] = useState<VocabularyTerm[]>([])
   useEffect(() => {
@@ -699,6 +759,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                   placeholder={t('fieldDetail.relationTargetSubtypePlaceholder')} />
               </div>
             </div>
+            <RelationCounterpartHint counterparts={counterparts} targetTypeLabel={t(`fieldDetail.relationTargetTypeOptions.${form.relation_target_type}`)} />
             <div className="field">
               <div className="lbl">{t('fieldDetail.relationTypeVocab')} <span className="req">*</span></div>
               <select className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
@@ -750,6 +811,19 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               </div>
             )}
           </>
+        )}
+        {form.field_type === 'group' && (
+          <div className="field">
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.emphasize_first_child}
+                onChange={e => set('emphasize_first_child', e.target.checked)}
+              />
+              {t('fieldDetail.emphasizeFirstChild')}
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.emphasizeFirstChildHint')}</div>
+          </div>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn pri" onClick={onSave} disabled={saving}>
@@ -823,6 +897,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                     <span className="key" style={{ fontSize: 11 }}>{sf.name}</span>
                     <span className="typ">{t(`fieldTypes.${sf.field_type}`)}</span>
                     {sf.is_required && <span className="req-mark">{t('fieldDetail.subFieldRequired')}</span>}
+                    <button className="btn sm ico gh" aria-label={t('fieldDetail.subFieldMoveUp', { name: getLabel(sf, sf.name) })} disabled={subFieldIndex(sf) === 0} onClick={() => handleSubFieldMove(sf, -1)}><ChevU size={12} /></button>
+                    <button className="btn sm ico gh" aria-label={t('fieldDetail.subFieldMoveDown', { name: getLabel(sf, sf.name) })} disabled={subFieldIndex(sf) === activeSubFieldCount - 1} onClick={() => handleSubFieldMove(sf, 1)}><ChevD size={12} /></button>
                     <button className="btn sm ico gh" onClick={() => openEditSubField(sf)}><Edit size={12} /></button>
                     <button className="btn sm ico gh dn" onClick={() => handleSubFieldDelete(sf)}><Trash size={12} /></button>
                   </div>
@@ -1768,6 +1844,7 @@ export function ScreenSchema({ initialPath, onPathChange }: Props = {}) {
           ...(form.inherited_fields.length ? { inherited_fields: form.inherited_fields } : {}),
           ...(form.relation_target_type === 'place' && form.show_place_map ? { show_place_map: true } : {}),
         } : {}),
+        ...(form.field_type === 'group' && form.emphasize_first_child ? { emphasize_first_child: true } : {}),
         ...(['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && form.default_value !== '' ? { default_value: form.default_value } : {}),
         ...(form.is_repeatable && form.max_count.trim() ? { max_count: parseInt(form.max_count, 10) } : {}),
         ...(form.is_locked ? { is_locked: true } : {}),

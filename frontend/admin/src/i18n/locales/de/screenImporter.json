@@ -42,12 +42,29 @@
   "exportProfileButton": "Profil exportieren",
   "exportProfileTooltip": "Als JSON-Datei auf Festplatte herunterladen",
   "activeTemplate": "Vorlage: {{name}}",
+  "encoding": {
+    "label": "Zeichenkodierung",
+    "detected": "automatisch erkannt.",
+    "changed": "von Hand geändert (erkannt: {{detected}}).",
+    "hint": "Ändern liest die Datei neu und setzt die Zuordnung zurück. Passen Umlaute nicht, hier umstellen."
+  },
   "vocabMode": {
     "title": "Vokabular-Felder",
     "help": "Wie sollen Werte behandelt werden, die im Vokabular noch nicht vorkommen? Groß-/Kleinschreibung und Leerzeichen werden beim Abgleich ignoriert („Berlin“ = „berlin“).",
     "extend": "Vokabular erweitern (neue Terme anlegen)",
     "matchOnly": "Nur vorhandene Terme übernehmen"
   },
+  "relationMode": {
+    "title": "Beziehungsfelder",
+    "help": "Texte in diesen Spalten werden mit vorhandenen Datensätzen verknüpft. Ein Label, das auf mehrere Datensätze passt, ist immer ein Fehler.",
+    "lookupLabel": "Zuordnung für \"{{name}}\"",
+    "missingLabel": "Wenn das Ziel fehlt: \"{{name}}\"",
+    "lookupIdno": "Über ID-Nummer zuordnen",
+    "lookupLabelOption": "Über Label zuordnen",
+    "missingError": "Zeile mit Fehler melden",
+    "missingCreate": "Ziel als Entwurf anlegen"
+  },
+  "mappingIdnoCard": "→ ID-Nummer (siehe oben)",
   "mappingIgnore": "– ignorieren –",
   "mappingAlreadyAssigned": "(bereits zugewiesen)",
   "mappingNewField": "(neu)",

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Katalon backup loop: pg_dump (gzip) + media tar, with retention.
 # Runs inside the postgis/postgis:16-3.4 image (same as the DB server, so
-# pg_dump and psql minor versions match). Restore: see docs/04_produktion.md.
+# pg_dump and psql minor versions match). Restore: see docs/02_produktion.md.
 #
 # Env:
 #   BACKUP_ENABLED           true|false (default true) — false = idle, no backups
@@ -33,7 +33,7 @@ run_backup() {
   find "${BACKUP_DIR}" -name 'db_*.sql.gz' -mtime "+${RETENTION_DAYS}" -delete
   find "${BACKUP_DIR}" -name 'media_*.tar.gz' -mtime "+${RETENTION_DAYS}" -delete
 
-  # #396: marker file for backup-age monitoring (see docs/04_produktion.md#monitoring).
+  # #396: marker file for backup-age monitoring (see docs/02_produktion.md#monitoring).
   # Written last, only after a fully successful run — its mtime/content is the
   # "last known-good backup" signal an operator's monitoring polls for.
   date -u +%Y-%m-%dT%H:%M:%SZ > "${BACKUP_DIR}/.last_success.tmp" \

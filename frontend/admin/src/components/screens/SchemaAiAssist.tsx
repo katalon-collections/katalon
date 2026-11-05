@@ -2,12 +2,12 @@
 // Copyright (c) 2026 Karl Krägelin
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { schema, vocabularies } from '../../api/client'
 import type { SchemaAiChatMessage, SchemaAiFieldProposal, SchemaAiProposal, SchemaAiVocabularyProposal } from '../../api/client'
 import type { FieldDefinition } from '../../types'
 import { getLabel } from '../../types'
 import { Lightning } from '../ui/Icons'
-import { FIELD_TYPE_LABELS } from './schemaConstants'
 
 type Props = {
   targetType: string
@@ -45,6 +45,7 @@ function FieldPreview({ field, depth = 0, selected, onToggle }: {
   selected: Set<string>
   onToggle: (name: string) => void
 }) {
+  const { t } = useTranslation('screenSchema')
   const isSelected = selected.has(field.name)
   return (
     <div style={{ marginLeft: depth * 16, padding: '6px 0', borderBottom: depth === 0 ? '1px solid var(--border-s)' : 'none' }}>
@@ -53,15 +54,15 @@ function FieldPreview({ field, depth = 0, selected, onToggle }: {
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggle(field.name)}
-          title={isSelected ? 'Feld vom Vorschlag ausschließen' : 'Feld in den Vorschlag aufnehmen'}
+          title={isSelected ? t('aiAssistDialog.excludeField') : t('aiAssistDialog.includeField')}
           style={{ accentColor: 'var(--accent)', flexShrink: 0 }}
         />
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 5px' }}>NEU</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 5px' }}>{t('aiAssistDialog.newBadge')}</span>
         <strong style={{ fontSize: 13, opacity: isSelected ? 1 : 0.45 }}>{displayLabel(field.label, field.name)}</strong>
         <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>({field.name})</span>
-        <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>{FIELD_TYPE_LABELS[field.field_type] ?? field.field_type}</span>
-        {field.is_required && <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>Pflicht</span>}
-        {field.is_repeatable && <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>Wiederholbar</span>}
+        <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>{t(`fieldTypes.${field.field_type}`, { defaultValue: field.field_type })}</span>
+        {field.is_required && <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>{t('aiAssistDialog.required')}</span>}
+        {field.is_repeatable && <span style={{ fontSize: 11, color: 'var(--fg-3)', opacity: isSelected ? 1 : 0.45 }}>{t('aiAssistDialog.repeatable')}</span>}
       </div>
       {typeof field.settings?.validation_regex === 'string' && field.settings.validation_regex && (
         <div style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: "'IBM Plex Mono',monospace", opacity: isSelected ? 1 : 0.45 }}>{field.settings.validation_regex}</div>
@@ -87,6 +88,7 @@ function ChatText({ content }: { content: string }) {
 }
 
 export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, existingFieldCount, onClose, onApplied }: Props) {
+  const { t } = useTranslation('screenSchema')
   const [messages, setMessages] = useState<SchemaAiChatMessage[]>([])
   const [proposal, setProposal] = useState<SchemaAiProposal | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -198,9 +200,9 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
             applies_to: [],
           })
         }
-        results.push({ name: `Vokabular: ${vocab.name}`, status: 'ok' })
+        results.push({ name: t('aiAssistDialog.vocabularyResult', { name: vocab.name }), status: 'ok' })
       } catch (e) {
-        results.push({ name: `Vokabular: ${vocab.name}`, status: 'error', message: (e as Error).message })
+        results.push({ name: t('aiAssistDialog.vocabularyResult', { name: vocab.name }), status: 'error', message: (e as Error).message })
       }
     }
 
@@ -209,7 +211,7 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
       if (field.field_type === 'group' && field.children?.length) {
         const keptChildren = field.children.filter(child => selected.has(child.name))
         if (keptChildren.length === 0) {
-          results.push({ name: displayLabel(field.label, field.name), status: 'skip', message: 'keine Unterfelder ausgewählt' })
+          results.push({ name: displayLabel(field.label, field.name), status: 'skip', message: t('aiAssistDialog.noSubfieldsSelected') })
           continue
         }
       }
@@ -232,14 +234,14 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ width: 640, maxWidth: '92vw', maxHeight: '86vh', display: 'flex', flexDirection: 'column' }}>
         <div className="hd">
-          <span><Lightning size={13} /> KI-Assistent für Felder</span>
+          <span><Lightning size={13} /> {t('aiAssistTitle')}</span>
           <div className="grow" />
-          <button className="btn sm" onClick={onClose}>Schließen</button>
+          <button className="btn sm" onClick={onClose}>{t('aiAssistDialog.close')}</button>
         </div>
         <div ref={logRef} className="bd" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p style={{ fontSize: 12, color: 'var(--fg-3)', margin: 0 }}>
-            Beschreibe, was erfasst werden soll. Der Assistent schlägt neue Felder für <strong>{targetTypeLabel}{targetSubtype ? ` / ${targetSubtype}` : ''}</strong> vor,
-            fragt bei Bedarf nach, verlinkt passende Quellen und ändert nie bestehende Felder. Einzelne Felder des Vorschlags können vor dem Übernehmen abgewählt werden.
+            {t('aiAssistDialog.introBefore')} <strong>{targetTypeLabel}{targetSubtype ? ` / ${targetSubtype}` : ''}</strong>{' '}
+            {t('aiAssistDialog.introAfter')}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -261,7 +263,7 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
                   border: '2px solid var(--border-s)', borderTopColor: 'var(--fg-3)',
                   borderRadius: '50%', animation: 'spin .7s linear infinite',
                 }} />
-                KI denkt nach…
+                {t('aiAssistDialog.thinking')}
               </div>
             )}
           </div>
@@ -273,17 +275,17 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
               className="fld"
               rows={3}
               style={{ flex: 1, resize: 'vertical' }}
-              placeholder={messages.length === 0 ? "z.B. Ich will historische Postkarten erfassen: Karten haben Absende- und Empfangsort, Datierungen, sind frankiert/unfrankiert und brauchen eine Bildbeschreibung." : undefined}
+              placeholder={messages.length === 0 ? t('aiAssistDialog.placeholder') : undefined}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }}
             />
-            <button className="btn pri" onClick={send} disabled={busy || !input.trim()}>Senden</button>
+            <button className="btn pri" onClick={send} disabled={busy || !input.trim()}>{t('aiAssistDialog.send')}</button>
           </div>
 
           {proposal && (proposal.vocabularies.length > 0 || proposal.fields.length > 0) && (
             <div style={{ border: '1px solid var(--border-s)', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Vorschlag</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{t('aiAssistDialog.proposal')}</div>
               {proposal.vocabularies.map(v => (
                 <VocabPreview key={v.tmp_id} vocab={v} />
               ))}
@@ -294,10 +296,10 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
                   return (
                     <>
                       <button className="btn pri" onClick={apply} disabled={applying}>
-                        {applying ? 'Wird angelegt…' : selectedCount === proposal.fields.length ? 'Übernehmen' : `Übernehmen (${selectedCount} von ${proposal.fields.length})`}
+                        {applying ? t('aiAssistDialog.applying') : selectedCount === proposal.fields.length ? t('aiAssistDialog.apply') : t('aiAssistDialog.applyPartial', { selected: String(selectedCount), total: String(proposal.fields.length) })}
                       </button>
                       {selectedCount < proposal.fields.length && (
-                        <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>Nicht ausgewählte Felder werden übersprungen.</span>
+                        <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('aiAssistDialog.skipHint')}</span>
                       )}
                     </>
                   )
@@ -322,12 +324,13 @@ export function SchemaAiAssist({ targetType, targetTypeLabel, targetSubtype, exi
 }
 
 function VocabPreview({ vocab }: { vocab: SchemaAiVocabularyProposal }) {
+  const { t } = useTranslation('screenSchema')
   return (
     <div style={{ padding: '6px 0', borderBottom: '1px solid var(--border-s)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 5px' }}>NEUES VOKABULAR</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 5px' }}>{t('aiAssistDialog.newVocabularyBadge')}</span>
         <strong style={{ fontSize: 13 }}>{vocab.name}</strong>
-        <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{vocab.terms.length} Terme</span>
+        <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t('aiAssistDialog.termCount', { count: vocab.terms.length })}</span>
       </div>
     </div>
   )

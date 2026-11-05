@@ -19,7 +19,7 @@ class WikidataAdapter(AuthoritySource):
     def _user_agent() -> str:
         if settings.wikidata_user_agent.strip():
             return settings.wikidata_user_agent.strip()
-        base_url = settings.katalon_base_url.strip() or "https://github.com/karkraeg/Katalon"
+        base_url = settings.katalon_base_url.strip() or "https://github.com/katalon-collections/katalon"
         contact = settings.oai_admin_email.strip() or settings.default_admin_email.strip()
         return f"Katalon/1.0 ({base_url}; {contact}) httpx"
 

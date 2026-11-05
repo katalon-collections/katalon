@@ -81,3 +81,8 @@ description = "Threads des Celery-Workers (leer = Anzahl CPU-Kerne); kleiner wä
 # 1.46.0: Suchindex enthält Namen nicht öffentlicher Beziehungsfeld-Ziele nicht mehr.
 [releases."1.46.0"]
 reindex_required = true
+
+# 1.49.0: grp_* ist im Suchindex nested mit dynamic:false (Unterfeld-Typen wurden aus dem
+# ersten Wert geraten und lehnten spätere Texte ab). Gilt erst nach einem Voll-Reindex.
+[releases."1.49.0"]
+reindex_required = true

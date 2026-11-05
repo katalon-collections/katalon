@@ -294,6 +294,7 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
     field = FieldDefinition(
         id=uuid.uuid4(),
         target_type="object",
+        target_subtype="videogame",
         name="material",
         label={"de": "Material"},
         field_type="text",
@@ -335,6 +336,8 @@ async def test_portal_schema_is_narrow_and_excludes_deleted_fields() -> None:
             "is_facet": False,
             "is_public": True,
             "parent_id": None,
+            # The portal filters equally named fields of other subtypes by this.
+            "target_subtype": "videogame",
             "settings": {"hint": "visible"},
             "show_in_detail": True,
             "detail_slot": "sidebar",

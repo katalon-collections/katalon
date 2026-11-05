@@ -1,0 +1,43 @@
+---
+title: "Operations"
+summary: "Reading path for deploying, routing, backing up, and repairing Katalon without losing data."
+topics: [operations, deployment, docker, database, safety]
+sources:
+  - id: agents
+    type: file
+    path: AGENTS.md
+  - id: compose
+    type: file
+    path: docker-compose.yml
+  - id: prod-compose
+    type: file
+    path: docker-compose.prod.yml
+  - id: production-doc
+    type: file
+    path: docs/02_produktion.md
+  - id: public-image-workflow
+    type: file
+    path: .github/workflows/public-container-images.yml
+---
+
+Use this operations hub when the task involves deployment, browser routing, backups, database incidents, or production-like verification. Katalon runs as a Docker Compose application with persistent PostgreSQL and Elasticsearch volumes, media mounts, frontend containers, an API service, workers, and an outer nginx route surface [@compose]. Operator-facing production installs use the separate `katalon-cli`; the source-checkout Compose path here is for local development, production-like verification, and direct maintenance of this repository's deployment assets [@agents]. The Compose production guide covers `docker-compose.prod.yml`, TLS/nginx changes, migrations, first-run credential handling, and post-start health checks for that checkout-owned path [@prod-compose] [@production-doc].
+
+## Start With The Failure Surface
+
+For local browser checks, read [Ports And Routing](../../reference/operations/ports-and-routing) before opening a URL. The normal production-like stack uses `http://localhost/admin/` for Admin and `http://localhost/` for Portal, while direct Admin and Portal container ports are debugging surfaces with different path behavior [@agents].
+
+For operator installation/update behavior, start with [katalon-cli Distribution](../../decisions/operations/katalon-cli-distribution). Public release tags also depend on the public container workflow: image build and Trivy scan, Admin routing smoke test, `katalon-release.json` generation, and GitHub Release asset creation must all pass before `katalon-cli` has installable artifacts [@public-image-workflow]. If that chain fails, [Known Gotchas](../../reference/operations/known-gotchas) separates image-gate failures from Admin base-path smoke-test failures. For direct source-checkout production-like deploys, start with [Production Deployment](production-deployment), then use [Docker Compose Surfaces](../../reference/operations/docker-compose-surfaces) when compose files, service ports, mounts, or overrides are part of the change. If the work touches Admin build paths, nginx routing, or Vite base configuration, run [Admin Deploy Verification](admin-deploy-verification) before treating the deployment as done.
+
+For a Kubernetes deployment instead of Compose, [Kubernetes Helm Chart](kubernetes-helm-chart) covers the starter chart under `charts/katalon/`, its service mapping to `docker-compose.yml`, and known pitfalls (Cantaloupe auth gate, media RWX storage, scaling limits) — it is a bring-your-own-ops proof of concept, not the supported production path.
+
+For secrets and startup gates, read [Environment And Secrets](../../reference/operations/environment-and-secrets). That page is the lookup surface for required environment variables, first-run admin behavior, production secret checks, and the test-only `KATALON_SECRETS_KEY` requirement.
+
+## Protect Durable State
+
+For backups, restore drills, risky changes, or ambiguous `pg_restore` output, use [Backup And Restore](backup-and-restore). PostgreSQL and media are the durable stores that must survive, while Elasticsearch can be rebuilt from stored records [@production-doc].
+
+For database startup, credential, migration, or volume incidents, use [DB Problem Escalation](db-problem-escalation) first. The project rule is strict: inspect logs, understand the root cause, present options, and never delete or recreate database volumes or run `docker compose down -v` without Karl's explicit approval [@agents].
+
+## Gotchas
+
+[Known Gotchas](../../reference/operations/known-gotchas) is the compact preflight list for port confusion, Admin asset base paths, backend command location, the `click-didyoumean` lock pin, pytest secret setup, restore-error interpretation, database volume safety, and code-level rebranding. Use it before broad testing, deployment, or repair work.

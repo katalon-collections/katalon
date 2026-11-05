@@ -26,6 +26,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.config import settings
 from katalon.core.dependencies import (
@@ -35,7 +36,7 @@ from katalon.core.dependencies import (
     require_role,
 )
 from katalon.core.limiter import limiter
-from katalon.core.models import SavedSparqlQuery
+from katalon.core.models import SavedSparqlQuery, User
 from katalon.integrations.oxigraph import (
     OxigraphConnectionError,
     OxigraphQueryError,
@@ -373,6 +374,29 @@ async def sparql_post(
 # ---------------------------------------------------------------------------
 
 
+def _is_visible_to(saved: SavedSparqlQuery, user: User) -> bool:
+    """Shared queries are visible to all admins; private ones only to their creator.
+
+    Queries without a creator (created before ownership was recorded) count as shared.
+    """
+    if saved.is_shared or saved.created_by is None:
+        return True
+    return user.role == "superuser" or saved.created_by == user.id
+
+
+async def _get_visible_saved_query(
+    db: AsyncSession, query_id: uuid.UUID, user: User
+) -> SavedSparqlQuery:
+    result = await db.execute(select(SavedSparqlQuery).where(SavedSparqlQuery.id == query_id))
+    saved = result.scalar_one_or_none()
+    if not saved or not _is_visible_to(saved, user):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Saved SPARQL query not found.",
+        )
+    return saved
+
+
 @router.get(
     "/v1/sparql/queries",
     response_model=list[SavedSparqlQueryRead],
@@ -387,10 +411,11 @@ async def sparql_post(
 )
 async def list_saved_sparql_queries(
     db: DBDep,
+    current_user: CurrentUser,
     tag: Annotated[str | None, Query(description="Filter by tag")] = None,
     q: Annotated[str | None, Query(description="Search in title or description")] = None,
 ) -> list[SavedSparqlQuery]:
-    """List all saved SPARQL queries with optional tag or text search (Admin only)."""
+    """List shared and own saved SPARQL queries with optional tag or text search (Admin only)."""
     if not settings.oxigraph_enabled or not settings.sparql_endpoint_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -398,7 +423,7 @@ async def list_saved_sparql_queries(
         )
     stmt = select(SavedSparqlQuery).order_by(SavedSparqlQuery.updated_at.desc())
     result = await db.execute(stmt)
-    queries = list(result.scalars().all())
+    queries = [item for item in result.scalars().all() if _is_visible_to(item, current_user)]
     if tag:
         queries = [item for item in queries if tag in (item.tags or [])]
     if q:
@@ -471,6 +496,7 @@ async def create_saved_sparql_query(
 async def get_saved_sparql_query(
     query_id: uuid.UUID,
     db: DBDep,
+    current_user: CurrentUser,
 ) -> SavedSparqlQuery:
     """Get a single saved SPARQL query by ID (Admin only)."""
     if not settings.oxigraph_enabled or not settings.sparql_endpoint_enabled:
@@ -478,13 +504,7 @@ async def get_saved_sparql_query(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SPARQL endpoint is disabled.",
         )
-    result = await db.execute(select(SavedSparqlQuery).where(SavedSparqlQuery.id == query_id))
-    saved = result.scalar_one_or_none()
-    if not saved:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Saved SPARQL query not found.",
-        )
+    saved = await _get_visible_saved_query(db, query_id, current_user)
     return saved
 
 
@@ -504,6 +524,7 @@ async def update_saved_sparql_query(
     query_id: uuid.UUID,
     data: SavedSparqlQueryUpdate,
     db: DBDep,
+    current_user: CurrentUser,
 ) -> SavedSparqlQuery:
     """Update a saved SPARQL query (Admin only)."""
     if not settings.oxigraph_enabled or not settings.sparql_endpoint_enabled:
@@ -511,13 +532,7 @@ async def update_saved_sparql_query(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SPARQL endpoint is disabled.",
         )
-    result = await db.execute(select(SavedSparqlQuery).where(SavedSparqlQuery.id == query_id))
-    saved = result.scalar_one_or_none()
-    if not saved:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Saved SPARQL query not found.",
-        )
+    saved = await _get_visible_saved_query(db, query_id, current_user)
 
     if data.query is not None:
         validate_read_only_sparql(data.query)
@@ -551,6 +566,7 @@ async def update_saved_sparql_query(
 async def delete_saved_sparql_query(
     query_id: uuid.UUID,
     db: DBDep,
+    current_user: CurrentUser,
 ) -> None:
     """Delete a saved SPARQL query by ID (Admin only)."""
     if not settings.oxigraph_enabled or not settings.sparql_endpoint_enabled:
@@ -558,13 +574,7 @@ async def delete_saved_sparql_query(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SPARQL endpoint is disabled.",
         )
-    result = await db.execute(select(SavedSparqlQuery).where(SavedSparqlQuery.id == query_id))
-    saved = result.scalar_one_or_none()
-    if not saved:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Saved SPARQL query not found.",
-        )
+    saved = await _get_visible_saved_query(db, query_id, current_user)
     await db.delete(saved)
     await db.commit()
 

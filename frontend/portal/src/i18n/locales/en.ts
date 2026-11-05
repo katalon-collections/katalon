@@ -207,4 +207,6 @@ export default {
   'login.submitting': 'Signing in…',
   'login.noAccount': 'No account yet?',
   'login.register': 'Register (coming soon)',
+  'ai.badge': 'AI',
+  'ai.generatedTooltip': 'AI-generated ({model}) · {date}',
 }

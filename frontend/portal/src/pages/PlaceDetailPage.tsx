@@ -13,7 +13,7 @@ import { RelatedObjects } from '../components/RelatedObjects'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
+import { DetailPageLayout, MetaRow, fieldsForSubtype, withoutTitleFields } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { useI18n } from '../i18n'
@@ -111,7 +111,7 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
   const hasCoords = place.lat != null && place.lon != null
   const description = renderFieldValue(m.description, locale) ?? ''
 
-  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'title' && f.name !== 'name')
+  const detailFieldDefs = withoutTitleFields(fieldsForSubtype(fieldDefs, place.place_type))
   const nonObjectRelations = withoutFieldRelations(relations, place.id, fieldDefs)
     .filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 

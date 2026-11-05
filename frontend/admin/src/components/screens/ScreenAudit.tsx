@@ -44,22 +44,34 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
   relation_update:   <Link size={13} />,
   relation_delete:   <Link size={13} />,
   ai_schema_assist:  <Lightning size={13} />,
+  ai_complete:       <Lightning size={13} />,
+  ai_translate:      <Lightning size={13} />,
+  nl2sparql_generated: <Lightning size={13} />,
 }
 
+const AI_ACTIONS = new Set(['ai_schema_assist', 'ai_complete', 'ai_translate', 'nl2sparql_generated'])
 
 
-type AiSchemaAssistFields = {
+
+type AiAuditFields = {
   target_type?: string
   target_subtype?: string | null
+  prompt?: string
   model?: string
   input_tokens?: number
   output_tokens?: number
 }
 
-function aiSchemaAssistTitle(diff: AiSchemaAssistFields): string {
-  const LABELS: Record<string, string> = { object: 'Objekt', entity: 'Entität', place: 'Ort', occurrence: 'Occurrence', procedure: 'Vorgang' }
-  const typeLabel = (diff.target_type && LABELS[diff.target_type]) || diff.target_type || 'Schema'
+function aiSchemaAssistTitle(t: (k: string, p?: Record<string, string>) => string, diff: AiAuditFields): string {
+  const typeLabel = diff.target_type
+    ? t(`typeLabels.${diff.target_type}`, { defaultValue: diff.target_type })
+    : t('schemaFallback')
   return diff.target_subtype ? `${typeLabel} · ${diff.target_subtype}` : typeLabel
+}
+
+function nl2sparqlTitle(diff: AiAuditFields): string {
+  const prompt = (diff.prompt ?? '').trim()
+  return prompt.length > 80 ? `${prompt.slice(0, 80)}…` : prompt || 'SPARQL'
 }
 
 type ExtraFields = {
@@ -119,6 +131,9 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
     media_add: t('actionLabels.media_add'), media_update: t('actionLabels.media_update'), media_delete: t('actionLabels.media_delete'),
     relation_add: t('actionLabels.relation_add'), relation_update: t('actionLabels.relation_update'), relation_delete: t('actionLabels.relation_delete'),
     ai_schema_assist: t('actionLabels.ai_schema_assist'),
+    ai_complete: t('actionLabels.ai_complete'),
+    ai_translate: t('actionLabels.ai_translate'),
+    nl2sparql_generated: t('actionLabels.nl2sparql_generated'),
   }
   const [filter, setFilter] = useState(initialFilter && ACTIONS.includes(initialFilter) ? initialFilter : 'all')
   const [query, setQuery] = useState('')
@@ -204,7 +219,9 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                   <div className="ti">
                     {ACTION_LABELS[evt.action] ?? evt.action}:{' '}
                     {evt.action === 'ai_schema_assist'
-                      ? <b>{aiSchemaAssistTitle(diff as AiSchemaAssistFields)}</b>
+                      ? <b>{aiSchemaAssistTitle(t, diff as AiAuditFields)}</b>
+                      : evt.action === 'nl2sparql_generated'
+                      ? <b>{nl2sparqlTitle(diff as AiAuditFields)}</b>
                       : evt.action === 'delete'
                         ? <b>{evt.record_label ?? String(evt.record_id).slice(-8)}</b>
                         : <RecordLink type={evt.record_type} id={evt.record_id} label={evt.record_label ?? String(evt.record_id).slice(-8)} />}
@@ -217,9 +234,9 @@ export function ScreenAudit({ initialFilter, onFilterChange }: Props = {}) {
                       </>
                     )}
                   </div>
-                  {evt.action === 'ai_schema_assist' ? (
+                  {AI_ACTIONS.has(evt.action) ? (
                     (() => {
-                      const ai = diff as AiSchemaAssistFields
+                      const ai = diff as AiAuditFields
                       const tokens = (ai.input_tokens ?? 0) + (ai.output_tokens ?? 0)
                       return <div className="sub">{ai.model ?? '–'}{tokens > 0 ? ` · ${tokens} Tokens` : ''}</div>
                     })()

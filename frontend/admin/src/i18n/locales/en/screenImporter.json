@@ -42,12 +42,29 @@
   "exportProfileButton": "Export profile",
   "exportProfileTooltip": "Download as JSON file to disk",
   "activeTemplate": "Template: {{name}}",
+  "encoding": {
+    "label": "Character encoding",
+    "detected": "detected automatically.",
+    "changed": "changed manually (detected: {{detected}}).",
+    "hint": "Changing it re-reads the file and resets the mapping. If umlauts look wrong, switch it here."
+  },
   "vocabMode": {
     "title": "Vocabulary fields",
     "help": "How should values be handled that are not in the vocabulary yet? Case and whitespace are ignored when matching (\"Berlin\" = \"berlin\").",
     "extend": "Extend vocabulary (create new terms)",
     "matchOnly": "Only use existing terms"
   },
+  "relationMode": {
+    "title": "Relation fields",
+    "help": "Text in these columns is linked to existing records. A label that matches several records is always an error.",
+    "lookupLabel": "Match for \"{{name}}\"",
+    "missingLabel": "If the target is missing: \"{{name}}\"",
+    "lookupIdno": "Match by ID number",
+    "lookupLabelOption": "Match by label",
+    "missingError": "Report the row as an error",
+    "missingCreate": "Create the target as a draft"
+  },
+  "mappingIdnoCard": "→ ID number (see above)",
   "mappingIgnore": "– ignore –",
   "mappingAlreadyAssigned": "(already assigned)",
   "mappingNewField": "(new)",

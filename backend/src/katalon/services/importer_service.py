@@ -463,6 +463,10 @@ def dry_run(
         else:
             mapped_fields.add(v)
 
+    # The idno card maps the ID column to the pseudo target "__idno__".
+    if "__idno__" in mapped_fields:
+        mapped_fields.add("idno")
+
     required_fields = (
         {name for name, fd in field_defs.items() if fd.is_required}
         if field_defs
@@ -498,6 +502,23 @@ def dry_run(
                 if len(lengths) > 1 and len(set(lengths)) > 1:
                     errors.append({"row": index + 2, "message": f"Container '{group_name}': Subfelder haben unterschiedlich viele Wiederholungen"})
 
+    # U+FFFD in the parsed rows means bytes were lost while decoding (wrong encoding).
+    replaced = sum(
+        1
+        for row in rows
+        for key, value in row.items()
+        for text in (key, value)
+        if isinstance(text, str) and "\ufffd" in text
+    )
+    if replaced:
+        warnings.append({
+            "row": None,
+            "message": (
+                f"{replaced} Zellen enthalten Ersatzzeichen (\ufffd). Die Datei wurde vermutlich "
+                "in einer anderen Zeichenkodierung gespeichert: Kodierung im Mapping-Schritt prüfen."
+            ),
+        })
+
     # Check for idno mapping
     has_idno_mapping = bool({"__idno__", "idno"} & mapped_fields)
     if has_idno_mapping:
@@ -516,7 +537,9 @@ def dry_run(
             errors.append({"row": row_num, "message": "Keine Felder gemappt – Zeile wird übersprungen"})
             continue
         for fname in required_fields:
-            if fname in mapped_fields and not rec.get(fname):
+            # idno is a record column, not metadata: it comes from the ID-number card.
+            value = idnos[i] if fname == "idno" else rec.get(fname)
+            if fname in mapped_fields and not value:
                 errors.append({"row": row_num, "message": f"Pflichtfeld '{fname}' ist leer"})
 
         # Track empty values for non-required mapped fields; a field fed by several

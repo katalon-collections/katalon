@@ -14,7 +14,7 @@ import { useBackToSearch } from '../hooks/useBackToSearch'
 import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { DetailPageLayout, MetaRow } from '../components/DetailPageLayout'
+import { DetailPageLayout, MetaRow, fieldsForSubtype, withoutTitleFields } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { entityTypeLabel, useI18n } from '../i18n'
@@ -88,7 +88,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   const typeLabel = configuredTypeLabel !== entity.entity_type ? configuredTypeLabel : entityTypeLabel(entity.entity_type)
   const description = renderFieldValue(m.description, locale) ?? ''
 
-  const detailFieldDefs = fieldDefs.filter(f => f.name !== 'name' && f.name !== 'title')
+  const detailFieldDefs = withoutTitleFields(fieldsForSubtype(fieldDefs, entity.entity_type))
   const nonObjectRelations = withoutFieldRelations(relations, entity.id, fieldDefs)
     .filter(r => r.from_type !== 'object' && r.to_type !== 'object')
 

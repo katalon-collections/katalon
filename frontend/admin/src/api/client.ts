@@ -466,6 +466,15 @@ export interface SchemaAiAssistResult {
 }
 
 // Schema
+export interface RelationCounterpart {
+  id: string
+  name: string
+  label: Record<string, string>
+  target_subtype: string | null
+  relation_target_subtype: string | null
+  parent_name: string | null
+}
+
 export const schema = {
   list:   (targetType: string, subtype?: string, opts?: { includeDeleted?: boolean }) => {
     const params = new URLSearchParams()
@@ -475,6 +484,9 @@ export const schema = {
     return req<FieldDefinition[]>(`/v1/schema/${targetType}${qs}`)
   },
   create: (data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>('/v1/schema', { method: 'POST', body: JSON.stringify(data) }),
+  /** Relation fields that already model the opposite direction of a planned relation field (hint only). */
+  relationCounterparts: (data: { target_type: string; target_subtype: string | null; relation_target_type: string; relation_target_subtype: string | null; exclude_field_id: string | null }) =>
+    req<RelationCounterpart[]>('/v1/schema/relation-counterparts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Omit<FieldDefinition, 'id'>) => req<FieldDefinition>(`/v1/schema/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   /** Several fields of one type in one transaction; triggers at most one reindex. */
   bulkUpdate: (targetType: string, items: FieldDefinition[]) => req<FieldDefinition[]>(`/v1/schema/${targetType}/bulk`, { method: 'PUT', body: JSON.stringify(items) }),
@@ -1047,6 +1059,9 @@ export const staticPages = {
 export interface UploadResult {
   source_type?: 'csv' | 'excel' | 'xml'
   upload_id: string
+  /** CSV/TSV only: encoding in effect and the one detected (differ after a manual override) */
+  encoding?: 'utf-8' | 'windows-1252' | 'iso-8859-1' | null
+  encoding_detected?: 'utf-8' | 'windows-1252' | 'iso-8859-1' | null
   headers: string[]
   row_count: number
   preview: Record<string, string>[]
@@ -1164,18 +1179,19 @@ export interface ImportMapping {
 }
 
 export const importer = {
-  upload: async (files: File | File[]): Promise<UploadResult> => {
+  upload: async (files: File | File[], encoding?: string): Promise<UploadResult> => {
     const formData = new FormData()
     for (const f of Array.isArray(files) ? files : [files]) formData.append('file', f)
+    if (encoding) formData.append('encoding', encoding)
     const res = await authorizedFetch('/v1/importer/upload', { method: 'POST', body: formData })
     if (res.status === 401) { setToken(null); _onUnauthorized?.(); throw new Error('Sitzung abgelaufen.') }
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null, vocabModes?: Record<string, 'extend' | 'match_only'>): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null, vocab_modes: vocabModes ?? {} }) }),
-  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null; vocab_modes?: Record<string, 'extend' | 'match_only'> }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null, vocab_modes: opts?.vocab_modes ?? {} }) }),
+  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null, vocabModes?: Record<string, 'extend' | 'match_only'>, relationOptions?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }>): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null, vocab_modes: vocabModes ?? {}, relation_options: relationOptions ?? {} }) }),
+  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null; vocab_modes?: Record<string, 'extend' | 'match_only'>; relation_options?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }> }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null, vocab_modes: opts?.vocab_modes ?? {}, relation_options: opts?.relation_options ?? {} }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   cancelTask: (taskId: string): Promise<{ cancelled: boolean }> =>
