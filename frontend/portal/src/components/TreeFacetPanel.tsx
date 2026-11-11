@@ -17,7 +17,8 @@ export function TreeFacetPanel({ label, tree, active, expanded, onToggleExpand, 
   active: string[]
   expanded: string[]
   onToggleExpand: (id: string) => void
-  onSelect: (id: string) => void
+  /** ``expand`` is true when picking the node should also open its children. */
+  onSelect: (id: string, expand?: boolean) => void
 }) {
   const { t, locale } = useI18n()
   const roots = tree?.nodes.root ?? []
@@ -54,7 +55,7 @@ function TreeLevel({ nodes, tree, active, expanded, onToggleExpand, onSelect, de
   active: string[]
   expanded: string[]
   onToggleExpand: (id: string) => void
-  onSelect: (id: string) => void
+  onSelect: (id: string, expand?: boolean) => void
   depth: number
 }) {
   const { t, locale } = useI18n()
@@ -92,7 +93,9 @@ function TreeLevel({ nodes, tree, active, expanded, onToggleExpand, onSelect, de
                   aria-label={t(isOpen ? 'search.collapse' : 'search.expand', { name })}
                   onClick={() => onToggleExpand(node.id)}
                 >
-                  {isOpen ? '▾' : '▸'}
+                  <span className="tree-facet-chevron" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                  </span>
                 </button>
               ) : <span className="tree-facet-toggle" aria-hidden="true" />}
               <button
@@ -100,7 +103,7 @@ function TreeLevel({ nodes, tree, active, expanded, onToggleExpand, onSelect, de
                 className="facet-item"
                 aria-pressed={active.includes(node.id)}
                 style={{ fontWeight: active.includes(node.id) ? 600 : undefined }}
-                onClick={() => onSelect(node.id)}
+                onClick={() => onSelect(node.id, node.has_children && !isOpen && !active.includes(node.id))}
               >
                 <span>{name}</span>
                 <span className="ct">{node.count}</span>

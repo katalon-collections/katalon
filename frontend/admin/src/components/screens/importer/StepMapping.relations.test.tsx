@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 import { expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '../../../i18n'
 import type { FieldDefinition } from '../../../types'
 import { StepMapping } from './StepMapping'
@@ -49,4 +49,17 @@ it('labels the ID column as assigned via the ID number card instead of ignored',
 it('shows no relation card without a mapped relation field', () => {
   renderMapping({ mapping: { ID: { target: '__idno__' } } })
   expect(screen.queryByText('Beziehungsfelder')).toBeNull()
+})
+
+it('loads a mapping profile file in the mapping step (XML never returns to upload)', async () => {
+  const onProfileLoaded = vi.fn()
+  renderMapping({ onProfileLoaded })
+  const input = screen.getByLabelText('Mapping-Profil laden (Datei)') as HTMLInputElement
+  const profile = { version: 1, record_type: 'occurrence', mapping: { ID: { target: '__idno__' } } }
+  fireEvent.change(input, { target: { files: [new File([JSON.stringify(profile)], 'p.json')] } })
+  await waitFor(() => expect(onProfileLoaded).toHaveBeenCalledWith(profile))
+
+  fireEvent.change(input, { target: { files: [new File(['{"version":2}'], 'bad.json')] } })
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Ungültiges Profilformat.')
+  expect(onProfileLoaded).toHaveBeenCalledTimes(1)
 })

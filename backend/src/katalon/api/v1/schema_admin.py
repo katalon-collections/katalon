@@ -19,6 +19,7 @@ from katalon.core.dependencies import CurrentUser, DBDep, require_role
 from katalon.core.models import AuthoritySource, FieldDefinition, Vocabulary, VocabularyTerm
 from katalon.core.schemas import FieldDefinitionCreate, FieldDefinitionRead
 from katalon.services import authority_service
+from katalon.services.attachment_service import ATTACHMENT_RECORD_TYPES
 from katalon.services.pid_service import PID_PROVIDERS, available_pid_providers
 from katalon.services.schema_ai_service import schema_chat
 from katalon.services.subtype_service import ensure_subtype_exists
@@ -149,6 +150,12 @@ async def _validate_field_settings(
         raise HTTPException(
             status_code=422,
             detail="Dieser Feldtyp ist für Vokabularterme nicht erlaubt.",
+        )
+
+    if data.field_type == "file" and data.target_type not in ATTACHMENT_RECORD_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Der Feldtyp 'Datei' ist nur für Objekte, Personen, Orte, Werke und Vorgänge erlaubt.",
         )
 
     if data.field_type == "group" and not data.is_repeatable:
@@ -1227,6 +1234,77 @@ async def relation_counterparts(
     ]
 
 
+async def _resolve_named_vocabularies(
+    db: DBDep, settings: dict[str, Any], *, create: bool
+) -> dict[str, Any]:
+    """Replace vocabulary names in field settings by ids so schema files are portable.
+
+    ``vocabulary: <name>`` becomes ``vocabulary_id`` (a missing term vocabulary is created);
+    a ``relation_type_vocab`` that is not an id is looked up as a relation vocabulary by name.
+    """
+    out = dict(settings)
+    name = out.pop("vocabulary", None)
+    if name:
+        vocab = (
+            await db.execute(select(Vocabulary).where(Vocabulary.name == str(name)))
+        ).scalar_one_or_none()
+        if vocab is None and create:
+            vocab = Vocabulary(name=str(name), kind="term")
+            db.add(vocab)
+            await db.flush()
+        if vocab is not None:
+            out["vocabulary_id"] = str(vocab.id)
+    ref = out.get("relation_type_vocab")
+    if ref:
+        try:
+            uuid.UUID(str(ref))
+        except ValueError:
+            vocab = (
+                await db.execute(
+                    select(Vocabulary).where(Vocabulary.name == str(ref), Vocabulary.kind == "relation")
+                )
+            ).scalar_one_or_none()
+            if vocab is None:
+                raise HTTPException(
+                    status_code=422, detail=f"Relationstyp-Vokabular '{ref}' existiert nicht."
+                ) from None
+            out["relation_type_vocab"] = str(vocab.id)
+    return out
+
+
+async def _ensure_relation_types(db: DBDep, entries: list[Any]) -> None:
+    """Create relation types listed in a schema file (into the ``relation_types`` vocabulary)."""
+    vocab = (
+        await db.execute(select(Vocabulary).where(Vocabulary.name == "relation_types"))
+    ).scalar_one_or_none()
+    if vocab is None:
+        raise HTTPException(status_code=422, detail="Vokabular 'relation_types' fehlt.")
+    for entry in entries:
+        if not isinstance(entry, dict) or not str(entry.get("term") or "").strip():
+            raise HTTPException(status_code=422, detail="relation_types: 'term' fehlt.")
+        term = str(entry["term"]).strip()
+        exists = (
+            await db.execute(
+                select(VocabularyTerm.id).where(
+                    VocabularyTerm.vocabulary_id == vocab.id, VocabularyTerm.term == term
+                )
+            )
+        ).first()
+        if exists:
+            continue
+        db.add(
+            VocabularyTerm(
+                vocabulary_id=vocab.id,
+                term=term,
+                label=entry.get("label") or {},
+                inverse_label=entry.get("inverse_label") or {},
+                applies_from=entry.get("applies_from") or [],
+                applies_to=entry.get("applies_to") or [],
+            )
+        )
+    await db.flush()
+
+
 @router.post(
     "/import",
     response_model=ImportResult,
@@ -1246,13 +1324,25 @@ async def import_schema(
 ) -> ImportResult:
     """Import field definitions from a YAML or JSON file.
 
-    Expected format:
-      target_type: object
-      fields:
-        - name: title
-          label: {de: Titel, en: Title}
-          field_type: text
-          is_required: true
+    One record type per document (``target_type`` + ``fields``) or several in ``schemas``:
+
+      relation_types:                  # optional; created in the relation_types vocabulary
+        - {term: found_at, label: {de: Fundort}, applies_from: [object], applies_to: [place]}
+      schemas:
+        - target_type: object
+          fields:
+            - name: material
+              field_type: vocab
+              settings: {vocabulary: material}          # by name, created if missing
+            - name: masse
+              field_type: group
+              is_repeatable: true
+              children:                                  # sub-fields of a group
+                - {name: wert, field_type: number}
+            - name: fundort
+              field_type: relation
+              settings: {target_type: place, relation_type_vocab: relation_types,
+                         fixed_relation_type: found_at}
     """
     content = await file.read()
     try:
@@ -1264,82 +1354,121 @@ async def import_schema(
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Datei konnte nicht geparst werden: {exc}")
 
-    if not isinstance(data, dict) or "target_type" not in data or "fields" not in data:
+    if isinstance(data, dict) and isinstance(data.get("schemas"), list):
+        documents = data["schemas"]
+    elif isinstance(data, dict) and "target_type" in data and "fields" in data:
+        documents = [data]
+    else:
         raise HTTPException(
             status_code=422,
-            detail="Ungültiges Format. Erwartet: {target_type, fields: [...]}",
+            detail="Ungültiges Format. Erwartet: {target_type, fields: [...]} oder {schemas: [...]}",
         )
+    # A dry run still creates vocabularies/relation types (fields validate against them) but
+    # inside a savepoint that is rolled back at the end.
+    savepoint = await db.begin_nested() if dry_run else None
+    if isinstance(data.get("relation_types"), list):
+        await _ensure_relation_types(db, data["relation_types"])
 
-    target_type: str = data["target_type"]
-    _validate_schema_target_type(target_type)
-    raw_fields: list[Any] = data.get("fields", [])
-
-    if not isinstance(raw_fields, list):
-        raise HTTPException(status_code=422, detail="'fields' muss eine Liste sein")
-
-    # Load existing fields (by target_type + name) for upsert logic
-    existing_result = await db.execute(
-        select(FieldDefinition).where(FieldDefinition.target_type == target_type)
-    )
-    existing_map: dict[tuple[str | None, str], FieldDefinition] = {
-        (f.target_subtype, f.name): f for f in existing_result.scalars().all()
-    }
-
-    created = 0
-    updated = 0
-    skipped = 0
+    created = updated = skipped = 0
     errors: list[str] = []
     result_fields: list[FieldDefinition] = []
 
-    for idx, raw in enumerate(raw_fields):
-        if not isinstance(raw, dict):
-            errors.append(f"Feld #{idx}: kein Objekt")
-            continue
-        name = raw.get("name", "").strip()
-        if not name:
-            errors.append(f"Feld #{idx}: 'name' fehlt oder leer")
-            continue
+    for document in documents:
+        if not isinstance(document, dict) or "target_type" not in document:
+            raise HTTPException(status_code=422, detail="Jedes Schema braucht 'target_type'.")
+        target_type: str = document["target_type"]
+        _validate_schema_target_type(target_type)
+        raw_fields: list[Any] = document.get("fields", [])
+        if not isinstance(raw_fields, list):
+            raise HTTPException(status_code=422, detail="'fields' muss eine Liste sein")
 
-        field_data = FieldDefinitionCreate(
-            target_type=target_type,
-            target_subtype=raw.get("target_subtype"),
-            name=name,
-            label=raw.get("label", {}),
-            help_text=raw.get("help_text", {}),
-            field_type=raw.get("field_type", "text"),
-            is_required=raw.get("is_required", False),
-            is_repeatable=raw.get("is_repeatable", False),
-            sort_order=raw.get("sort_order", idx),
-            settings=raw.get("settings", {}),
+        # Load existing fields (by target_type + name) for upsert logic
+        existing_result = await db.execute(
+            select(FieldDefinition).where(FieldDefinition.target_type == target_type)
         )
-        await _ensure_schema_subtype_exists(db, target_type, field_data.target_subtype)
-        await _validate_field_settings(db, field_data)
+        all_existing = list(existing_result.scalars().all())
+        existing_map: dict[tuple[str | None, str], FieldDefinition] = {
+            (f.target_subtype, f.name): f for f in all_existing if f.parent_id is None
+        }
+        child_map: dict[tuple[uuid.UUID, str], FieldDefinition] = {
+            (f.parent_id, f.name): f for f in all_existing if f.parent_id is not None
+        }
 
-        key = (field_data.target_subtype, name)
-        if key in existing_map:
-            existing = existing_map[key]
-            if not overwrite:
-                skipped += 1
+        async def upsert(
+            raw: Any,
+            idx: int,
+            parent: FieldDefinition | None,
+            target_type: str = target_type,
+            existing_map: dict[tuple[str | None, str], FieldDefinition] = existing_map,
+            child_map: dict[tuple[uuid.UUID, str], FieldDefinition] = child_map,
+        ) -> FieldDefinition | None:
+            nonlocal created, updated, skipped
+            if not isinstance(raw, dict):
+                errors.append(f"Feld #{idx}: kein Objekt")
+                return None
+            name = str(raw.get("name", "")).strip()
+            if not name:
+                errors.append(f"Feld #{idx}: 'name' fehlt oder leer")
+                return None
+
+            field_data = FieldDefinitionCreate(
+                target_type=target_type,
+                target_subtype=raw.get("target_subtype"),
+                name=name,
+                label=raw.get("label", {}),
+                help_text=raw.get("help_text", {}),
+                field_type=raw.get("field_type", "text"),
+                is_required=raw.get("is_required", False),
+                is_repeatable=raw.get("is_repeatable", False),
+                sort_order=raw.get("sort_order", idx),
+                settings=await _resolve_named_vocabularies(
+                    db, raw.get("settings", {}), create=True
+                ),
+                parent_id=parent.id if parent is not None else None,
+            )
+            await _ensure_schema_subtype_exists(db, target_type, field_data.target_subtype)
+            await _validate_field_settings(db, field_data)
+
+            existing = (
+                child_map.get((parent.id, name)) if parent is not None
+                else existing_map.get((field_data.target_subtype, name))
+            )
+            if existing is not None:
+                if not overwrite:
+                    skipped += 1
+                    result_fields.append(existing)
+                    return existing
+                if not dry_run:
+                    for k, v in field_data.model_dump().items():
+                        setattr(existing, k, v)
+                    existing.is_deleted = False
+                updated += 1
                 result_fields.append(existing)
-                continue
-            if not dry_run:
-                for k, v in field_data.model_dump().items():
-                    setattr(existing, k, v)
-                existing.is_deleted = False
-            updated += 1
-            result_fields.append(existing)
-        else:
-            field = FieldDefinition(**field_data.model_dump())
+                return existing
+            # Explicit id/is_deleted: a dry run never flushes, yet the result is serialised.
+            field = FieldDefinition(**field_data.model_dump(), id=uuid.uuid4(), is_deleted=False)
             if not dry_run:
                 db.add(field)
                 await db.flush()
             created += 1
             result_fields.append(field)
+            return field
 
-    if not dry_run and (created > 0 or updated > 0):
-        await db.flush()
-        _enqueue_reindex(db, target_type)
+        for idx, raw in enumerate(raw_fields):
+            field = await upsert(raw, idx, None)
+            children = raw.get("children") if isinstance(raw, dict) else None
+            if field is not None and children:
+                if field.field_type != "group":
+                    errors.append(f"Feld '{field.name}': 'children' nur bei field_type group")
+                    continue
+                for child_idx, child in enumerate(children):
+                    await upsert(child, child_idx, field)
+        if not dry_run:
+            await db.flush()
+            _enqueue_reindex(db, target_type)
 
+    if savepoint is not None:
+        await savepoint.rollback()
     return ImportResult(
         created=created,
         updated=updated,

@@ -40,6 +40,8 @@ Format-specific code stops at the `SourceFormat` interface. Each handler impleme
 
 The importer API accepts mappings as `selector -> MappingEntry`, where a selector is a CSV or Excel column header or an XML Clark-notation path [@importer-api]. `apply_mapping()` normalizes both simple mappings and transform-bearing mappings, reads values by selector from parsed rows, applies transforms, handles `__idno__`, and coerces values according to field definitions when available [@importer-service]. `dry_run()` uses the same mapping shape to compute required-field warnings, type warnings, schema validation input, vocabulary statistics, and preview rows [@importer-service].
 
+Place imports can build a hierarchy: a `MappingEntry` on the place title may carry `path_separator`, and the worker splits `Land>Region>Ort` at it, creates missing ancestor places and links the parent chain (`place_path_import`, `import_tasks`). Without a separator nothing is split; see `.agents/knowledge/decisions/orts-hierarchie.md`.
+
 This decision is paired with [XML Importer Scope](xml-importer-scope). XML adds an element-selection step before mapping, but after selectors are produced it joins the same selector-based pipeline as CSV and Excel [@importer-api].
 
 ## Consequences

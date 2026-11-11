@@ -143,6 +143,8 @@ describe('group fields on detail pages', () => {
       ai_provenance: {},
       created_at: '',
       updated_at: '',
+      ancestors: [],
+      children: [],
     }))
     const placeRelField = def('r1', 'Fundort', 'relation', {
       is_repeatable: true,

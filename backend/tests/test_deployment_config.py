@@ -113,9 +113,20 @@ def _nginx_blocks(text: str) -> dict:
     return root
 
 
+# Attachment and media file routes: the API sets CSP (per content type; PDF needs the
+# browser viewer) and nosniff itself, see tests/test_attachments.py. The page CSP
+# with object-src 'none' must not be added on top.
+_API_OWNED_HEADERS = {
+    "v1/(attachments/": {"content-security-policy", "x-content-type-options"},
+}
+
+
 def _dropped_headers(node: dict, inherited: list[str], found: list[str]) -> list[str]:
     if node["headers"] and inherited:
-        missing = sorted(set(inherited) - set(node["headers"]))
+        exempt = {
+            h for marker, hs in _API_OWNED_HEADERS.items() if marker in node["name"] for h in hs
+        }
+        missing = sorted(set(inherited) - set(node["headers"]) - exempt)
         if missing:
             found.append(f"line {node['line']} {node['name'][:50]}: {', '.join(missing)}")
     for child in node["children"]:

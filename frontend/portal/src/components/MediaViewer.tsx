@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import type { MediaFile } from '../api/client'
 import { BASE, PORTAL_API } from '../api/client'
+import { useI18n } from '../i18n'
 import { thumbnailUrl } from '../utils/thumbnails'
 
 interface Props {
@@ -57,61 +58,23 @@ function ModelViewer({ src, alt }: { src: string; alt: string }) {
 }
 
 /**
- * The media file endpoint serves with `Content-Disposition: attachment`,
- * which makes a direct <iframe src> trigger a download instead of inline
- * rendering. Fetch the blob and play it back from an object URL (mirrors the
- * admin MediaLightbox approach) so the browser's PDF viewer renders inline.
+ * The file endpoint answers inline (no Content-Disposition: attachment), so the
+ * iframe renders the PDF directly. The link below it is the fallback for
+ * browsers that cannot show PDFs inline.
  */
 function PdfViewer({ src, title }: { src: string; title: string }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    let objectUrl: string | null = null
-    setUrl(null)
-    setFailed(false)
-    fetch(src)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.blob()
-      })
-      .then(blob => {
-        if (cancelled) return
-        objectUrl = URL.createObjectURL(blob)
-        setUrl(objectUrl)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [src])
-
-  if (failed) {
-    return (
-      <div style={{ padding: 16, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}>
-        <a href={src} target="_blank" rel="noreferrer" style={{ color: '#e2e8f0' }}>
-          PDF öffnen ({title})
-        </a>
-      </div>
-    )
-  }
-  if (!url) {
-    return (
-      <div style={{ width: '100%', height: '78vh', borderRadius: 10, background: 'var(--viewer-bg, #0f172a)', display: 'grid', placeItems: 'center', color: '#94a3b8', fontSize: 14 }}>
-        PDF wird geladen…
-      </div>
-    )
-  }
+  const { t } = useI18n()
   return (
-    <iframe
-      src={url}
-      title={title}
-      style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}
-    />
+    <div>
+      <iframe
+        src={src}
+        title={title}
+        style={{ width: '100%', height: '78vh', border: 0, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}
+      />
+      <a href={src} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, color: 'var(--accent)' }}>
+        {t('media.openPdf', { name: title })}
+      </a>
+    </div>
   )
 }
 
@@ -120,6 +83,7 @@ function PdfViewer({ src, title }: { src: string; title: string }) {
  * Images stay on the IIIF path in ObjectDetailPage.
  */
 export function MediaViewer({ objectId, media }: Props) {
+  const { t } = useI18n()
   const src = fileUrl(objectId, media)
 
   switch (media.category) {
@@ -141,7 +105,7 @@ export function MediaViewer({ objectId, media }: Props) {
       return (
         <div style={{ padding: 16, borderRadius: 10, background: 'var(--viewer-bg, #0f172a)' }}>
           <a href={src} target="_blank" rel="noreferrer" style={{ color: '#e2e8f0' }}>
-            Datei öffnen ({media.filename})
+            {t('media.openFile', { name: media.filename })}
           </a>
         </div>
       )
@@ -177,6 +141,32 @@ export function RightsStatement({ media, label }: { media: MediaFile; label: str
         {credit_line && <div style={{ marginTop: 4 }}>{credit_line}</div>}
       </div>
     </details>
+  )
+}
+
+/**
+ * Download links for an object's public media files (original file as
+ * attachment). Shown only when the portal enables media downloads.
+ */
+export function MediaDownloads({ media, label }: { media: MediaFile[]; label: string }) {
+  if (media.length === 0) return null
+  return (
+    <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-3)' }}>
+      <div style={{ fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {media.map(m => {
+          const ext = m.filename.includes('.') ? m.filename.split('.').pop()!.toUpperCase() : ''
+          return (
+            <li key={m.id} style={{ overflowWrap: 'anywhere' }}>
+              <a href={`${BASE}${PORTAL_API}/media/${m.id}/download`} download={m.filename} style={{ color: 'var(--accent)' }}>
+                ⬇ {m.filename}
+              </a>
+              {ext && <span> · {ext}</span>}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 

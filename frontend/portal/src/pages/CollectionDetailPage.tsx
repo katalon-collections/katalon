@@ -18,7 +18,7 @@ import { useSubtypeLabel } from '../hooks/useSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { facetItems, markdownToPlainText, recordTitle, renderFieldValue } from '../utils/renderFieldValue'
-import { facetHref, MetaRow, richText, GroupMetaRow } from '../components/DetailPageLayout'
+import { facetHref, MetaRow, richText, GroupMetaRow, UsageStats } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { RelationsList } from '../components/RelationsList'
@@ -340,6 +340,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
                     if (!rendered) return null
                     return <MetaRow key={f.name} label={label} value={rendered} />
                   })}
+                <UsageStats recordType="collection" recordId={col.id} />
               </div>
 
               {relations.length > 0 && (

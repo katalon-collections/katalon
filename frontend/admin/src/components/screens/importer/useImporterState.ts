@@ -148,7 +148,7 @@ function dedupePending(list: PendingField[]): PendingField[] {
 
 // ── Initial state ─────────────────────────────────────────────────────────────
 
-function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
+export function buildInitialState(persisted: PersistedImporterState | null): ImporterState {
   const hasUploadId = !!persisted?.uploaded?.upload_id
   const needsReupload = !!persisted?.uploaded && !hasUploadId && (persisted?.step ?? 0) > 0
   return {
@@ -192,7 +192,12 @@ function removeIdnoFromMapping(m: Record<string, MappingEntry>): Record<string, 
   return next
 }
 
-function importerReducer(state: ImporterState, action: ImporterAction): ImporterState {
+/** Column a loaded mapping assigns to the ID number, so the ID card shows it. */
+export function idnoColumnOf(m: Record<string, MappingEntry>): string | null {
+  return Object.entries(m).find(([, v]) => v.target === '__idno__')?.[0] ?? null
+}
+
+export function importerReducer(state: ImporterState, action: ImporterAction): ImporterState {
   switch (action.type) {
     case 'SET_RECORD_TYPE':
       return { ...buildInitialState(null), recordType: action.payload }
@@ -291,13 +296,15 @@ function importerReducer(state: ImporterState, action: ImporterAction): Importer
 
     case 'PROFILE_APPLIED': {
       const { mapping, mediaSelector, pendingFields, upsertStrategy, autoPublish, idnoStrategy } = action.payload
-      return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields: dedupePending(pendingFields), upsertStrategy, autoPublish, idnoStrategy, step: state.sourceType === 'xml' ? 2 : 1 }
+      return { ...state, mapping, mediaSelector: state.recordType === 'object' ? mediaSelector : null, pendingFields: dedupePending(pendingFields), upsertStrategy, autoPublish, idnoStrategy, idnoColumn: idnoColumnOf(mapping), step: state.sourceType === 'xml' ? 2 : 1 }
     }
     case 'SAVED_MAPPING_APPLIED': {
       const { mapping, mediaSelector, mappingId, savedMappingName, subtype } = action.payload
+      const idnoColumn = idnoColumnOf(mapping)
       return {
         ...state,
         mapping,
+        ...(idnoColumn ? { idnoStrategy: 'column', idnoColumn } : {}),
         mediaSelector: state.recordType === 'object' ? mediaSelector : null,
         mappingId,
         savedMappingName,

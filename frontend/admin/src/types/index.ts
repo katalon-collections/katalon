@@ -40,6 +40,7 @@ export interface Place {
   id: string
   idno: string | null
   place_type: string | null
+  parent_id?: string | null
   status: Status
   lat: number | null
   lon: number | null
@@ -121,7 +122,7 @@ export interface FieldDefinition {
   name: string
   label: Record<string, string>
   help_text?: Record<string, string>
-  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'url' | 'authority' | 'group'
+  field_type: 'text' | 'date' | 'number' | 'geo' | 'vocab' | 'vocab_free' | 'relation' | 'boolean' | 'richtext' | 'pid' | 'url' | 'authority' | 'file' | 'group'
   is_required: boolean
   is_repeatable: boolean
   is_translatable: boolean
@@ -513,6 +514,10 @@ export interface PortalConfigRead {
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
   show_iiif_manifest_link: boolean
+  show_usage_stats?: boolean
+  media_download_enabled?: boolean
+  /** Read-only: global admin switch for usage counting. */
+  usage_stats_enabled?: boolean
   meta_label_uppercase: boolean
   facet_order?: Record<string, string[]>
   relation_facets?: Record<string, RelationFacet[]>

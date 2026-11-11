@@ -3,6 +3,7 @@
 
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { attachmentFiles } from './attachments'
 
 /** Picks one string out of a {"de": ..., "en": ...} field, falling back to whatever
  *  language is set before giving up and using `fallback`. */
@@ -109,6 +110,12 @@ export function renderFieldValue(
   vocabularyLabels?: ReadonlyMap<string, string>,
 ): string | null {
   if (value == null) return null
+
+  // File entries {id, filename, mime_type, size}: show names, never the generic first-string fallback (the id).
+  if (fieldType === 'file') {
+    const names = attachmentFiles(value).map(file => file.filename)
+    return names.length > 0 ? names.join(', ') : null
+  }
 
   if (fieldType === 'date') {
     if (typeof value === 'string') return value ? formatDateValue(value) : null

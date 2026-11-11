@@ -68,7 +68,7 @@ async def can_publish(
         subtype = getattr(rec, "collection_type", None)
 
     val_errors = await validate_metadata(
-        db, record_type, metadata, subtype, existing=metadata
+        db, record_type, metadata, subtype, existing=metadata, record_id=rec.id
     )
     errors.extend(val_errors)
 

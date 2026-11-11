@@ -26,7 +26,7 @@ Use [OAI And Export Mappings](oai-and-export-mappings) for OAI-PMH, OAI-DC seria
 
 ## Async And Media Workflows
 
-Read [Media And IIIF](media-and-iiif) for object media uploads, worker processing, Cantaloupe image delivery, manifests, portal IIIF viewing, and batch media import.
+Read [Media And IIIF](media-and-iiif) for object media uploads, worker processing, Cantaloupe image delivery, manifests, portal IIIF viewing, and batch media import. Read [Usage Statistics](usage-statistics) for anonymous view/download counters, portal media downloads, and their switches.
 
 Read [Importer Pipeline](importer-pipeline) for CSV, Excel, XML, dry-run validation, transform mapping, vocabulary reconciliation, Celery-backed record creation, and importer cancellation.
 

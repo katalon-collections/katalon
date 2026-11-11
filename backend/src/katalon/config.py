@@ -47,6 +47,8 @@ class Settings(BaseSettings):
 
     media_root: str = "/var/lib/katalon/media"
     max_upload_size_mb: int = 100
+    # Dateianhänge am Feldtyp "file" (Phase 1 Upload, siehe services/attachment_service.py).
+    attachment_max_upload_mb: int = 200
 
     # Medien-Speicherbackend (strikt opt-in; Default local = unverändertes Verhalten).
     # S3Storage zielt auf alle S3-kompatiblen Implementierungen (Ceph RADOSGW,

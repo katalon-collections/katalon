@@ -151,6 +151,9 @@ def build_object_manifest(
         if field_defs:
             metadata_entries = []
             for fd in field_defs:
+                # File values are attachment references (id, filename), not manifest text.
+                if fd.field_type == "file":
+                    continue
                 raw = meta.get(fd.name)
                 if not raw:
                     continue

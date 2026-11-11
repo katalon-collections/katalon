@@ -38,9 +38,9 @@
 #                               oder versionsspezifisch ([[releases."1.31.0".deprecated_env_vars]]).
 
 compose_revision = 3
-# 0.4.0: katalon-cli übernimmt [images] aus dem Release; ältere CLIs schreiben ihre
-# eingebauten Images (Stand 1.46.0) und würden geänderte Images still ignorieren.
-minimum_installer_version = "0.4.0"
+# 0.5.0: nginx-Template ohne Seiten-CSP auf Anhang- und Mediendateien (sonst blockiert der
+# Browser den PDF-Viewer) und ATTACHMENT_MAX_UPLOAD_MB in compose.yaml.
+minimum_installer_version = "0.5.0"
 
 [images]
 postgres = "postgis/postgis:16-3.4"
@@ -86,3 +86,9 @@ reindex_required = true
 # ersten Wert geraten und lehnten spätere Texte ab). Gilt erst nach einem Voll-Reindex.
 [releases."1.49.0"]
 reindex_required = true
+
+# 1.50.0: Feldtyp "Datei"; eigene Größengrenze für Anhänge.
+[[releases."1.50.0".env_vars]]
+key = "ATTACHMENT_MAX_UPLOAD_MB"
+description = "Maximale Größe eines Dateianhangs (Feldtyp Datei) in MB (Default 200); nginx muss mindestens so große Uploads annehmen"
+default = "200"

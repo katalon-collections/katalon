@@ -293,3 +293,30 @@ async def test_upsert_prepares_metadata_preserves_legacy_and_syncs_relations(
             )
         )
         await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_idno_within_one_batch_is_skipped(
+    app, auth_headers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from katalon.database import AsyncSessionLocal
+    from katalon.workers.import_tasks import import_records_task
+
+    _patch_no_broker(monkeypatch)
+    idno = f"DUP-{uuid.uuid4().hex}"
+    rows = [{"id": idno, "title": "A"}, {"id": idno, "title": "B"}]
+
+    result = await asyncio.to_thread(
+        import_records_task.run,
+        "place",
+        rows,
+        {"id": "__idno__", "title": "label"},
+        idno_strategy="column",
+        user_id=await _admin_user_id(),
+    )
+
+    assert (result["created"], result["skipped"]) == (1, 1)
+    async with AsyncSessionLocal() as session:
+        from katalon.core.models import Place
+
+        assert len((await session.execute(select(Place).where(Place.idno == idno))).scalars().all()) == 1

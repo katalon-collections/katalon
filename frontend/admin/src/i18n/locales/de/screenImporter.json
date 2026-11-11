@@ -98,5 +98,7 @@
   "close": "Schließen",
   "newImport": "Neuer Import",
   "newImportConfirm": "Aktuellen Import verwerfen? Mapping und neu anzulegende Felder gehen verloren.",
-  "newImportDiscard": "Verwerfen"
+  "newImportDiscard": "Verwerfen",
+  "mappingPathSeparator": "Pfad-Trenner (optional)",
+  "mappingPathSeparatorHint": "Zerlegt „Land>Region>Ort“ in eine Ortshierarchie. Fehlende Ebenen werden als eigene Orte angelegt. Leer lassen: Der Wert bleibt ein einzelner Name."
 }

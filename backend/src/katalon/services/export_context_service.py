@@ -243,7 +243,10 @@ async def _load_public_targets(
                 if other_status is not None and other_status not in PUBLIC_STATUSES:
                     continue
                 targets[(other_type, other_rec.id)] = other_rec
-        public_fields_by_type[other_type] = await load_public_fields(db, other_type)
+        # `file` values (attachment ids, filenames) stay out of exports and the index.
+        public_fields_by_type[other_type] = [
+            f for f in await load_public_fields(db, other_type) if f.field_type != "file"
+        ]
     hidden: set[str] = set()
     for other_type, fields in public_fields_by_type.items():
         hidden |= await load_hidden_relation_targets(
@@ -410,7 +413,10 @@ async def build_export_context_from_db(
     )
 
     # 2. Public fields only (internal fields excluded); vocab values carry term URIs
-    public_fields = await load_public_fields(db, record_type)
+    # `file` values stay out of exports and the index.
+    public_fields = [
+        f for f in await load_public_fields(db, record_type) if f.field_type != "file"
+    ]
     hidden_field_targets = await load_hidden_relation_targets(db, [raw_md], public_fields)
     fields = filter_public_metadata(raw_md, public_fields, subtype, hidden_field_targets)
     fields = await _enrich_vocab_values(db, fields, public_fields)

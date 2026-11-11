@@ -385,7 +385,78 @@ def test_html_in_fields_is_sanitized_cleanly() -> None:
     assert "<p>" not in xml_str
     assert "</p>" not in xml_str
     assert "<script>" not in xml_str
-    assert "Erster Absatz Zweiter Absatz" in xml_str
+    assert "Erster Absatz\n\nZweiter Absatz &amp; Sonderzeichen" in xml_str
+
+
+def test_description_keeps_paragraphs_but_titles_stay_on_one_line() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="p-001", idno="P-001", record_type="object", title="Titel", status="public"
+        ),
+        fields={
+            "title": "Zwei\nZeilen  im Titel",
+            "description": "Erster Absatz.\n\n\n\nZweiter   Absatz.\r\nZeile  drei.",
+        },
+        relations=[],
+        media=[],
+    )
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+            MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Objekt"}, target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"),
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "description"}, target_key="lido:objectIdentificationWrap/lido:objectDescriptionWrap/lido:objectDescriptionSet/lido:descriptiveNoteValue"),
+        ],
+    )
+    root = LidoFormat().render(ctx, cms)
+    # The builder names elements with a literal "lido:" prefix.
+    title = next(e.text for e in root.iter("lido:appellationValue"))
+    description = next(e.text for e in root.iter("lido:descriptiveNoteValue"))
+    assert title == "Zwei Zeilen im Titel"
+    assert description == "Erster Absatz.\n\nZweiter Absatz.\nZeile drei."
+
+
+def test_measurements_from_a_group_keep_type_and_unit_per_entry() -> None:
+    ctx = ExportRecordContext(
+        record=ExportRecordSummary(
+            id="m-001", idno="M-001", record_type="object", title="Gefäß", status="public"
+        ),
+        fields={
+            "title": "Gefäß",
+            "masse": [
+                {"typ": "Länge", "wert": 195, "einheit": "mm"},
+                {"typ": "Randdurchmesser", "wert": 147.5, "einheit": "mm"},
+                {"wert": 12, "einheit": "cm"},
+            ],
+        },
+        relations=[],
+        media=[],
+    )
+    cms = CompiledMappingSet(
+        format_key="lido",
+        record_type="object",
+        rules=[
+            MappingSpec(source_kind=SourceKind.FIELD, source_config={"field_name": "title"}, target_key="lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"),
+            MappingSpec(source_kind=SourceKind.CONSTANT, source_config={"value": "Objekt"}, target_key="lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"),
+            MappingSpec(
+                source_kind=SourceKind.FIELD,
+                source_config={"field_name": "masse.wert"},
+                target_key="lido:objectIdentificationWrap/lido:objectMeasurementsWrap/lido:objectMeasurementsSet/lido:objectMeasurements/lido:measurementsSet",
+                settings={"measurement_type_field": "masse.typ", "unit_field": "masse.einheit"},
+            ),
+        ],
+    )
+    root = LidoFormat().render(ctx, cms)
+    sets = [
+        tuple(
+            next(e.text for e in ms.iter(f"lido:{tag}"))
+            for tag in ("measurementType", "measurementUnit", "measurementValue")
+        )
+        for ms in root.iter("lido:measurementsSet")
+    ]
+    assert sets == [("Länge", "mm", "195"), ("Randdurchmesser", "mm", "147.5"), ("Maß", "cm", "12")]
+    assert validate_lido_xml(ET.tostring(root, encoding="unicode")) == []
 
 
 # ---------------------------------------------------------------------------

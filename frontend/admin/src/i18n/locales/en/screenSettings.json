@@ -173,7 +173,12 @@
     "left": "Left",
     "sidebarHint": "Applies to all detail pages (objects, entities, places, occurrences). On small screens, media/main content always come first.",
     "iiifButton": "Show IIIF manifest button on the object detail page",
-    "iiifButtonHint": "For objects with images, shows a link to the IIIF manifest and a copy action, without icons."
+    "iiifButtonHint": "For objects with images, shows a link to the IIIF manifest and a copy action, without icons.",
+    "mediaDownload": "Allow media file downloads",
+    "mediaDownloadHint": "Shows a “Downloads” list with the public media files in original quality on the object detail page. When off, anonymous visitors cannot download.",
+    "usageStats": "Show views and downloads on detail pages",
+    "usageStatsHint": "Shows in the sidebar how often a record was viewed and its files downloaded. Downloads only appear when downloads are allowed.",
+    "usageStatsOffHint": "Usage statistics are switched off below. Without counting, nothing is shown in the portal."
   },
   "dangerZone": {
     "nav": "Danger zone",
@@ -352,5 +357,10 @@
   },
   "title": "Settings",
   "subtitle": "Account and system configuration",
-  "sectionLabel": "Section"
+  "sectionLabel": "Section",
+  "usageStats": {
+    "title": "Usage statistics",
+    "description": "Counts anonymously how often public records are viewed in the portal and their files downloaded. Only daily counters per record are stored, no IP addresses, cookies or session data. Signed-in staff and search engines are not counted.",
+    "enabledLabel": "Collect usage statistics"
+  }
 }

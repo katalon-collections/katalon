@@ -10,7 +10,9 @@ import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
 import { RelationFieldRow, type RelationEntry } from './RelationFieldRow'
-import { api, type FacetKind, type VocabTerm } from '../api/client'
+import { AttachmentList } from './AttachmentField'
+import { attachmentFiles } from '../utils/attachments'
+import { api, recordView, type FacetKind, type UsageCounts, type VocabTerm } from '../api/client'
 import { useI18n } from '../i18n'
 import { dateBucketOf, matchRelationFacet, relationFacetHref, type RelationFacetConfig } from '../utils/facets'
 
@@ -241,6 +243,7 @@ function GroupChildValue({ group, child, value, locale, recordType, vocabularyLa
     return <>{items.map((item, i) => <Link key={i} className="tag tag-link" to={facetHref(recordType, facetField, item.raw, kind, item.id)} style={{ marginRight: 4 }}>{item.display}</Link>)}</>
   }
   if (child.field_type === 'richtext' && typeof value === 'string') return richText(value)
+  if (child.field_type === 'file') return <AttachmentList files={attachmentFiles(value)} />
   const entries = child.field_type === 'url' || child.field_type === 'authority' || child.field_type === 'pid'
     ? (Array.isArray(value) ? value : [value])
     : [value]
@@ -335,6 +338,18 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
       />
     )
   }
+  if (field.field_type === 'file') {
+    const files = attachmentFiles(value)
+    if (files.length === 0) return null
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
+          {fieldLabel(field, locale)}
+        </div>
+        <AttachmentList files={files} />
+      </div>
+    )
+  }
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type, vocabularyLabels)
     if (items.length === 0) return null
@@ -404,6 +419,16 @@ function SidebarField({ field, value, locale, recordType, aiProvenance, resolveR
       />
     )
   }
+  if (field.field_type === 'file') {
+    const files = attachmentFiles(value)
+    if (files.length === 0) return null
+    return (
+      <div className="meta-row">
+        <span className="key">{fieldLabel(field, locale)}</span>
+        <div className="val"><AttachmentList files={files} /></div>
+      </div>
+    )
+  }
   const label = <>{fieldLabel(field, locale)}{aiProvenance && <AiDisclosureNote {...aiProvenance} locale={locale} />}</>
   if (field.is_facet) {
     const items = facetItems(value, locale, field.field_type, vocabularyLabels)
@@ -426,6 +451,33 @@ function SidebarField({ field, value, locale, recordType, aiProvenance, resolveR
   </> : null
 }
 
+/**
+ * Counts the detail page view once per record and shows the counts as sidebar
+ * rows when the portal displays them. Renders nothing otherwise or on error —
+ * the page never depends on the statistics.
+ */
+export function UsageStats({ recordType, recordId }: { recordType: string; recordId: string }) {
+  const { t, locale } = useI18n()
+  const [counts, setCounts] = useState<UsageCounts | null>(null)
+
+  useEffect(() => {
+    let active = true
+    setCounts(null)
+    void recordView(recordType, recordId).then(result => { if (active) setCounts(result) })
+    return () => { active = false }
+  }, [recordType, recordId])
+
+  if (!counts) return null
+  return (
+    <>
+      <MetaRow label={t('usage.views')} value={counts.views.toLocaleString(locale)} />
+      {counts.downloads !== null && (
+        <MetaRow label={t('usage.downloads')} value={counts.downloads.toLocaleString(locale)} />
+      )}
+    </>
+  )
+}
+
 interface DetailPageLayoutProps {
   /** Media/viewer area (IIIF viewer, map, image grid, or null) — rendered above the description. */
   media?: ReactNode
@@ -445,6 +497,8 @@ interface DetailPageLayoutProps {
   /** Extra content rendered in the sidebar, after generic sidebar fields (e.g. type label, coordinates). */
   sidebarExtra?: ReactNode
   relations?: ReactNode
+  /** Record id: counts the page view and shows view/download counts when the portal enables them. */
+  recordId?: string
 }
 
 /**
@@ -453,7 +507,7 @@ interface DetailPageLayoutProps {
  * admins control layout instead of it being hardcoded per record type.
  */
 export function DetailPageLayout({
-  media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, metaRowLayout, mainExtra, sidebarBefore, sidebarExtra, relations,
+  media, fieldDefs, metadata, aiProvenance, locale, recordType, sidebarPosition, metaRowLayout, mainExtra, sidebarBefore, sidebarExtra, relations, recordId,
 }: DetailPageLayoutProps) {
   const { meta_label_uppercase } = usePortalConfig()
   const vocabularyLabels = useVocabularyLabels(recordType, fieldDefs, metadata, locale)
@@ -497,6 +551,7 @@ export function DetailPageLayout({
     <aside className={`detail-meta${metaRowLayout === 'inline' ? ' detail-meta--inline' : ''}`}>
       {sidebarBefore}
       {sidebarFields.map(f => <SidebarField key={f.name} field={f} value={metadata[f.name]} locale={locale} recordType={recordType} aiProvenance={aiProvenance?.[f.name]} resolveRelationType={resolveRelationType} vocabularyLabels={vocabularyLabels} groupChildren={groupChildren.get(f.id) ?? []} />)}
+      {recordId && <UsageStats recordType={recordType} recordId={recordId} />}
       {sidebarExtra}
     </aside>
   )

@@ -42,6 +42,17 @@ describe('TreeFacetPanel', () => {
     expect(screen.getByText('Tiere')).toBeTruthy()
   })
 
+  it('opens the children when a node with children is picked', () => {
+    const onSelect = vi.fn()
+    render(
+      <TreeFacetPanel label="Schlagwort" tree={tree} active={[]} expanded={[]} onToggleExpand={() => {}} onSelect={onSelect} />,
+    )
+    fireEvent.click(screen.getByText('Natur'))
+    expect(onSelect).toHaveBeenLastCalledWith('natur', true)
+    fireEvent.click(screen.getByText('Musik'))
+    expect(onSelect).toHaveBeenLastCalledWith('musik', false)
+  })
+
   it('shows the breadcrumb of an active node and clears it', () => {
     const onSelect = vi.fn()
     render(

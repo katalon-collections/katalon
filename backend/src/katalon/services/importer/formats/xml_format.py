@@ -77,12 +77,17 @@ class XmlFormat(SourceFormat):
     # XML-specific: not part of SourceFormat ABC
     # ------------------------------------------------------------------
 
-    def list_element_levels(self, content: bytes, max_depth: int = 5) -> list[dict[str, Any]]:
+    def list_element_levels(self, content: bytes, max_depth: int | None = None) -> list[dict[str, Any]]:
         """Return distinct element tags at each depth level.
 
         Used by the frontend to let the user choose which element = one record.
-        Returns list of {depth, tags: [{label, clark_tag}]}.
+        Returns list of {depth, tags: [{label, clark_tag}]}. Defaults to the
+        parser's depth limit: record elements can sit deep (LIDO ``lido:place``
+        is at depth 6, 7 inside a multi-file batch), and ``parse`` finds them
+        at any depth anyway.
         """
+        if max_depth is None:
+            max_depth = self.max_depth
         root = self._parse_root(content)
         levels: dict[int, dict[str, str]] = {}  # depth -> {clark_tag: label}
         for elem in root.iter():

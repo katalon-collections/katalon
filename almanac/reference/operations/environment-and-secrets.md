@@ -3,6 +3,9 @@ title: "Environment And Secrets"
 summary: "Reference for Katalon environment variables, startup secret gates, first-run credentials, and test-only secret requirements."
 topics: [reference, operations, configuration, security, testing]
 sources:
+  - id: attachment-service
+    type: file
+    path: backend/src/katalon/services/attachment_service.py
   - id: env-example
     type: file
     path: .env.example
@@ -97,6 +100,7 @@ On first startup with no existing admin or superuser and a usable `KATALON_BASE_
 | `S3_FORCE_PATH_STYLE` | `true` | Path-style addressing on the backend (boto3) side — works without any DNS wildcard. Note: Cantaloupe 5.0.x S3Source has no path-style option and always uses virtual-hosted addressing, so `<bucket>.<endpoint-host>` must resolve for IIIF reads (wildcard DNS, or the dev MinIO network alias) [@media-storage] |
 | `S3_VERIFY_TLS`, `S3_CA_BUNDLE` | `true`, empty | TLS verification for the backend S3 client; set a CA bundle path for on-prem Ceph with internal/self-signed CAs [@config] |
 | `MAX_UPLOAD_SIZE_MB` | `100` in settings, `200` in Compose and example env | Upload size limit [@config] [@compose] [@env-example] |
+| `ATTACHMENT_MAX_UPLOAD_MB` | `200` in settings, Compose, example env and Helm chart | Upload limit for `file`-field attachments, separate from media. Streaming aborts with 413 above it; the outer nginx `client_max_body_size` (500 MB in the main configs) must be at least this value [@config] [@compose] [@env-example] [@attachment-service] |
 | `OAI_ADMIN_EMAIL` | `admin@katalon.dev` | OAI-PMH Identify `adminEmail`; empty falls back to `DEFAULT_ADMIN_EMAIL` (`Settings.oai_contact_email`), the API logs a startup warning while the placeholder is in effect [@config] |
 | `OAI_BASE_URL` | empty | Public OAI-PMH `baseURL`; empty derives it from the request (`Host` + `X-Forwarded-Proto` via uvicorn `--proxy-headers`) [@config] |
 | `GEONAMES_USERNAME` | `demo` | GeoNames webservice account name, passed through to the Compose API service [@config] [@compose] [@env-example] |

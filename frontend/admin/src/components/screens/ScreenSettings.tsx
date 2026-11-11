@@ -290,6 +290,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
   const [metaRowLayout, setMetaRowLayout] = useState(config.meta_row_layout ?? 'stacked')
   const [metaLabelUppercase, setMetaLabelUppercase] = useState(config.meta_label_uppercase ?? false)
   const [showIiifManifestLink, setShowIiifManifestLink] = useState(config.show_iiif_manifest_link ?? true)
+  const [showUsageStats, setShowUsageStats] = useState(config.show_usage_stats ?? false)
+  const [mediaDownloadEnabled, setMediaDownloadEnabled] = useState(config.media_download_enabled ?? false)
   const [headerShowTitle, setHeaderShowTitle] = useState(config.header_show_title ?? true)
   const [heroHideTitle, setHeroHideTitle] = useState(config.hero_hide_title ?? false)
   const { t: tLayout } = useTranslation('portalLayout')
@@ -318,6 +320,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
           header_show_title: headerShowTitle,
           hero_hide_title: heroHideTitle,
           show_iiif_manifest_link: showIiifManifestLink,
+          show_usage_stats: showUsageStats,
+          media_download_enabled: mediaDownloadEnabled,
           color_tokens: Object.fromEntries(
             [['--header-bg', headerBg], ['--header-fg', headerFg], ['--bg', pageBg], ['--panel', panelBg]]
               .filter(([, v]) => v.trim())
@@ -469,6 +473,32 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             </label>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
               {t('detailLayout.iiifButtonHint')}
+            </div>
+          </div>
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={mediaDownloadEnabled}
+                onChange={e => setMediaDownloadEnabled(e.target.checked)}
+              />
+              {t('detailLayout.mediaDownload')}
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              {t('detailLayout.mediaDownloadHint')}
+            </div>
+          </div>
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={showUsageStats}
+                onChange={e => setShowUsageStats(e.target.checked)}
+              />
+              {t('detailLayout.usageStats')}
+            </label>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+              {t(config.usage_stats_enabled === false ? 'detailLayout.usageStatsOffHint' : 'detailLayout.usageStatsHint')}
             </div>
           </div>
         </div>
@@ -2607,6 +2637,47 @@ function SectionAutoPurge() {
   )
 }
 
+function SectionUsageStats() {
+  const { t } = useTranslation('screenSettings')
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminConfig.get()
+      .then(cfg => setEnabled(cfg.usage_stats_enabled))
+      .catch((e: Error) => setError(e.message))
+  }, [])
+
+  async function save(value: boolean) {
+    setSaving(true); setError(null)
+    try {
+      setEnabled((await adminConfig.update({ usage_stats_enabled: value })).usage_stats_enabled)
+    } catch (e) { setError((e as Error).message) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="hd">{t('usageStats.title')}</div>
+      <div className="bd">
+        <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 12 }}>{t('usageStats.description')}</p>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={enabled ?? false}
+            disabled={saving || enabled === null}
+            onChange={e => { void save(e.target.checked) }}
+            style={{ marginTop: 3 }}
+          />
+          <span>{t('usageStats.enabledLabel')}</span>
+        </label>
+        {error && <div style={{ fontSize: 13, color: '#dc2626', marginTop: 10 }}>{error}</div>}
+      </div>
+    </div>
+  )
+}
+
 const NAV: { id: Section; i18nKey: string; adminOnly?: boolean; feature?: string }[] = [
   { id: 'profil',   i18nKey: 'screenSettings:nav.profil' },
   { id: 'ueber',    i18nKey: 'screenSettings:nav.ueber' },
@@ -2704,7 +2775,7 @@ export function ScreenSettings({ isAdmin, features, onStartTour, onNavigate }: P
           {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
           {!loading && section === 'profil' && <SectionProfil onStartTour={isAdmin ? onStartTour : undefined} />}
           {!loading && section === 'ueber' && <SectionUeber />}
-          {!loading && isAdmin && config && section === 'portal' && <SectionPortal config={config} onSaved={setConfig} />}
+          {!loading && isAdmin && config && section === 'portal' && <><SectionPortal config={config} onSaved={setConfig} /><SectionUsageStats /></>}
           {!loading && isAdmin && config && section === 'fusszeile' && <SectionFooterNotice config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'startseite' && <SectionStartseite config={config} onSaved={setConfig} />}
           {!loading && isAdmin && config && section === 'terminologie' && <SectionTerminologie config={config} onSaved={setConfig} />}

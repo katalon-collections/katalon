@@ -3,6 +3,12 @@ title: "Persistence Model"
 summary: "Katalon stores fixed record shells in PostgreSQL tables and keeps configurable metadata, settings, audit records, and snapshots in JSONB-backed structures."
 topics: [architecture, persistence, metadata, audit, search]
 sources:
+  - id: migration
+    type: file
+    path: backend/migrations/versions/0088_attachments.py
+  - id: file-field-attachments-concept
+    type: file
+    path: almanac/concepts/metadata/file-field-attachments.md
   - id: models
     type: file
     path: backend/src/katalon/core/models.py
@@ -42,6 +48,8 @@ PostgreSQL indexes are tuned around that split. The ORM defines GIN indexes on m
 Relations are generic rows with `from_type`, `from_id`, `to_type`, `to_id`, `relation_type`, JSONB metadata, and indexes for both directions [@models]. Media files belong to objects through a foreign key and store the original filename, MIME type, relative managed `storage_key`, optional relative `iiif_storage_key`, IIIF manifest JSON, status, primary-image flag, and rights fields [@models]. Absolute filesystem paths are resolved from the keys under `MEDIA_ROOT` at the local-storage boundary [@media-storage].
 
 `MediaImportReference` stores a pending link from an object to a source filename before the file itself is uploaded. It keeps the original filename and a normalized basename used for matching. The table has indexes on `object_id` and `normalized_filename`, a uniqueness constraint across both columns, and an object foreign key with cascade deletion [@models] [@media-reference-migration]. These technical references remain outside the object's configurable `metadata` JSONB. A successful batch upload consumes its matching reference; a failed upload leaves it available for retry.
+
+Files of `file` schema fields use a separate `Attachment` table (`attachments`) with record type and id, filename, checked MIME type, size, storage key and uploader. It has no foreign key, no field name and no path; record metadata holds the attachment id and a copy of name, type and size. Migration `0088` creates it [@models] [@migration] [@file-field-attachments-concept].
 
 Several product settings are singleton-like records. `PortalConfig` and `AdminConfig` use a string primary key defaulting to `default`, and both store structured settings in ordinary columns and JSONB fields [@models]. `AppSecret` stores encrypted values by key, while `AuthoritySource` stores adapter class names and adapter config in JSONB [@models].
 

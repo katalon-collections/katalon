@@ -190,6 +190,7 @@ export function ScreenImporter({ initialTab, onTabChange }: Props = {}) {
                 savedMappingName={state.savedMappingName}
                 onSavedMappingLoaded={handleSavedMappingLoaded}
                 onMappingSaved={handleMappingSaved}
+                onProfileLoaded={handleProfileLoaded}
                 mediaSelector={state.mediaSelector}
                 onMediaSelectorChange={selector => dispatch({ type: 'MEDIA_SELECTOR_CHANGED', payload: selector })}
                 idnoStrategy={state.idnoStrategy}

@@ -11,7 +11,8 @@ from collections.abc import Iterable
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, Text, cast, false, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONPATH
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import Collection, Entity, FieldDefinition, Object, Occurrence, Place
@@ -196,6 +197,46 @@ def filter_public_metadata(
     return projected
 
 
+def public_attachment_ids(
+    projected_metadata: dict[str, Any] | None, field_defs: Iterable[FieldDefinition]
+) -> set[str]:
+    """Attachment ids in `file` field values (top-level or group subfield) of a projected record.
+
+    Pass the public field definitions that apply to the record's subtype, the same set
+    `filter_public_metadata` projected from. Ids outside those fields are never returned.
+    """
+    source = projected_metadata or {}
+    fields = list(field_defs)
+    children_by_parent: dict[object, list[FieldDefinition]] = {}
+    for field in fields:
+        if field.parent_id is not None:
+            children_by_parent.setdefault(field.parent_id, []).append(field)
+
+    ids: set[str] = set()
+
+    def collect(value: Any) -> None:
+        for entry in value if isinstance(value, list) else [value]:
+            if isinstance(entry, dict) and entry.get("id"):
+                ids.add(str(entry["id"]))
+
+    for field in fields:
+        if field.parent_id is not None:
+            continue
+        value = source.get(field.name)
+        if value is None:
+            continue
+        if field.field_type == "file":
+            collect(value)
+        elif field.field_type == "group" and isinstance(value, list):
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                for child in children_by_parent.get(field.id, []):
+                    if child.field_type == "file" and child.name in item:
+                        collect(item[child.name])
+    return ids
+
+
 async def filter_public_metadata_checked(
     db: AsyncSession,
     metadata: dict[str, Any] | None,
@@ -261,3 +302,41 @@ def filter_public_ai_provenance(
             if isinstance(entry, dict) and parts[2] in entry:
                 filtered[path] = info
     return filtered
+
+
+def _jsonpath_key(name: str) -> str:
+    """Quote a field name as a JSON path member (names come from the schema, not from users)."""
+    return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+async def metadata_text_clause(
+    db: AsyncSession, model: Any, record_type: str, q: str, visibility_user: Any | None
+) -> ColumnElement[bool]:
+    """Free-text match over record metadata as the caller may see it.
+
+    A caller with read permission searches the whole metadata. Anyone else only
+    searches public top-level fields and public subfields of public groups, so a
+    hit never reveals text from internal fields. `file` values are never searched.
+    """
+    if visibility_user is not None:
+        return cast(model.metadata_, Text).icontains(q, autoescape=True)
+    fields = await load_public_fields(db, record_type)
+    children: dict[uuid.UUID, list[FieldDefinition]] = {}
+    for field in fields:
+        if field.parent_id is not None:
+            children.setdefault(field.parent_id, []).append(field)
+    parts: list[ColumnElement[bool]] = []
+    for field in fields:
+        if field.parent_id is not None or field.field_type == "file":
+            continue
+        if field.field_type == "group":
+            for child in children.get(field.id, []):
+                if child.field_type == "file":
+                    continue
+                path = f"$.{_jsonpath_key(field.name)}[*].{_jsonpath_key(child.name)}"
+                values = func.jsonb_path_query_array(model.metadata_, cast(path, JSONPATH))
+                parts.append(cast(values, Text).icontains(q, autoescape=True))
+        else:
+            parts.append(cast(model.metadata_[field.name], Text).icontains(q, autoescape=True))
+    return or_(*parts) if parts else false()
+

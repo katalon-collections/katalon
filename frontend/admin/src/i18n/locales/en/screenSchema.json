@@ -86,6 +86,7 @@
     "geo": "Geodata",
     "pid": "PID",
     "authority": "Authority",
+    "file": "File",
     "group": "Container (Group)",
     "url": "URL (with link title)"
   },

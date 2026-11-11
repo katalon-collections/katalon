@@ -41,6 +41,11 @@ def page_asset_storage_key(asset_id: uuid.UUID, filename: str) -> str:
     return f"pages/{asset_id.hex[:2]}/{asset_id}--{safe_filename(filename)}"
 
 
+def attachment_storage_key(attachment_id: uuid.UUID, filename: str) -> str:
+    """Build the relative storage key for a file attached through a `file` field."""
+    return f"attachments/{attachment_id.hex[:2]}/{attachment_id}--{safe_filename(filename)}"
+
+
 def storage_path(key: str) -> Path:
     """Resolve a media key under MEDIA_ROOT without allowing path traversal."""
     root = Path(config.settings.media_root).resolve()
@@ -272,6 +277,34 @@ class S3Storage:
         except self.client.exceptions.ClientError:
             return False
         return True
+
+    def size(self, key: str) -> int:
+        """Object size in bytes. Raises FileNotFoundError when missing."""
+        try:
+            response = self.client.head_object(Bucket=self._bucket, Key=key)
+        except self.client.exceptions.ClientError as exc:
+            raise FileNotFoundError(key) from exc
+        return int(response["ContentLength"])
+
+    async def stream_range(self, key: str, start: int, end: int) -> AsyncIterator[bytes]:
+        """Yield bytes start..end (inclusive) of the object. Raises FileNotFoundError when missing."""
+        try:
+            body = await asyncio.to_thread(
+                self.client.get_object,
+                Bucket=self._bucket,
+                Key=key,
+                Range=f"bytes={start}-{end}",
+            )
+        except self.client.exceptions.NoSuchKey:
+            raise FileNotFoundError(key) from None
+        stream = body["Body"]
+        try:
+            while chunk := await asyncio.to_thread(stream.read, 65536):
+                yield chunk
+        finally:
+            close = getattr(stream, "close", None)
+            if close is not None:
+                await asyncio.to_thread(close)
 
 
 def get_storage() -> StorageBackend:

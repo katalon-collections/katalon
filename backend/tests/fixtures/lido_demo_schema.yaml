@@ -1,0 +1,67 @@
+# Schema für die LIDO-Demo (Lehrsammlung UFG). Import: Admin > Schema > Importieren (Datei wählen),
+# vorher "Vorschau"/Probelauf möglich. Legt Vokabulare (material, objekttyp, fachgebiet) und den
+# Relationstyp found_at an, falls sie fehlen. Idempotent: bestehende Felder werden übersprungen.
+relation_types:
+  - term: found_at
+    label: {de: Fundort, en: Find spot}
+    inverse_label: {de: Fundort von, en: Find spot of}
+    applies_from: [object]
+    applies_to: [place]
+
+schemas:
+  - target_type: object
+    fields:
+      - name: objekttyp
+        label: {de: Objekttyp, en: Object type}
+        field_type: vocab
+        settings: {vocabulary: objekttyp}
+      - name: fachgebiet
+        label: {de: Fachgebiet, en: Subject area}
+        field_type: vocab
+        is_repeatable: true
+        settings: {vocabulary: fachgebiet}
+      - name: material
+        label: {de: Material, en: Material}
+        field_type: vocab
+        is_repeatable: true
+        settings: {vocabulary: material}
+      - name: beschreibung
+        label: {de: Beschreibung, en: Description}
+        field_type: richtext
+      - name: datierung
+        label: {de: Datierung, en: Dating}
+        field_type: text
+      - name: masse
+        label: {de: Maße, en: Measurements}
+        field_type: group
+        is_repeatable: true
+        children:
+          - {name: typ, label: {de: Maßtyp, en: Type}, field_type: text}
+          - {name: wert, label: {de: Wert, en: Value}, field_type: number}
+          - {name: einheit, label: {de: Einheit, en: Unit}, field_type: text}
+      - name: fundort
+        label: {de: Fundort, en: Find spot}
+        field_type: relation
+        is_repeatable: true
+        settings:
+          target_type: place
+          relation_type_vocab: relation_types
+          fixed_relation_type: found_at
+      - name: rechte_uri
+        label: {de: Rechte (URI), en: Rights (URI)}
+        field_type: url
+
+  - target_type: place
+    fields:
+      - name: geonames
+        label: {de: Geonames, en: Geonames}
+        field_type: url
+
+  - target_type: collection
+    fields:
+      - {name: fachbereich, label: {de: Fachbereich, en: Department}, field_type: text}
+      - {name: leitung, label: {de: Sammlungsleitung, en: Head of collection}, field_type: text}
+      - {name: beauftragte, label: {de: Sammlungsbeauftragte, en: Collection officer}, field_type: text}
+      - {name: homepage, label: {de: Homepage, en: Homepage}, field_type: url}
+      - {name: geschichte, label: {de: Geschichte, en: History}, field_type: richtext}
+      - {name: bestaende, label: {de: Bestände, en: Holdings}, field_type: richtext}

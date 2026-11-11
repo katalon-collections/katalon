@@ -510,6 +510,29 @@ async def _validate_vocab_value(
     return None
 
 
+def _validate_file_values(value: Any, *, repeatable: bool, label: str) -> list[str]:
+    """Structural check of `file` values: {"id": <uuid>, ...} (or a list of them when repeatable)."""
+    if repeatable:
+        if not isinstance(value, list):
+            return [f"{label} muss eine Liste sein (wiederholbar)."]
+        items = value
+    else:
+        if isinstance(value, list):
+            return [f"{label} darf keine Liste sein (nicht wiederholbar)."]
+        items = [value]
+    errors: list[str] = []
+    for item in items:
+        file_id = item.get("id") if isinstance(item, dict) else None
+        if not isinstance(file_id, str):
+            errors.append(f"{label}: Dateiwert muss ein Objekt mit einer Datei-ID sein.")
+            continue
+        try:
+            uuid.UUID(file_id)
+        except ValueError:
+            errors.append(f"{label}: ungültige Datei-ID.")
+    return errors
+
+
 async def validate_metadata(
     db: AsyncSession,
     record_type: str,
@@ -518,8 +541,15 @@ async def validate_metadata(
     *,
     existing: dict[str, Any] | None = None,
     skip_required: bool = False,
+    record_id: uuid.UUID | None = None,
 ) -> list[str]:
-    """Return list of validation error messages (empty = valid)."""
+    """Return list of validation error messages (empty = valid).
+
+    `record_id` is the record being updated. Without it (create, import, dry run)
+    any `file` reference is rejected. Valid references are normalized in place.
+    """
+    from katalon.services.attachment_service import check_and_normalize_attachment_refs
+
     fields = await get_field_definitions(db, record_type, target_subtype)
     errors: list[str] = []
 
@@ -609,6 +639,12 @@ async def validate_metadata(
                             errors.append(
                                 url_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
                             )
+                    if sv is not None and sv != "" and sf.field_type == "file":
+                        errors.extend(
+                            _validate_file_values(
+                                sv, repeatable=sf.is_repeatable, label=indexed_prefix
+                            )
+                        )
                     if sv is not None and sf.field_type == "authority":
                         authority_err = _validate_authority_value(sv, sf.settings, field_path)
                         if authority_err:
@@ -640,6 +676,12 @@ async def validate_metadata(
                             errors.append(
                                 vocab_err.replace(f"Feld '{field_path}'", indexed_prefix, 1)
                             )
+            continue
+
+        if field.field_type == "file":
+            errors.extend(
+                _validate_file_values(value, repeatable=field.is_repeatable, label=f"Feld '{field.name}'")
+            )
             continue
 
         if field.field_type == "pid":
@@ -780,6 +822,9 @@ async def validate_metadata(
                             f"Feld '{field.name}': entspricht nicht dem erwarteten Format."
                         )
 
+    errors.extend(
+        await check_and_normalize_attachment_refs(db, record_type, record_id, metadata, fields)
+    )
     return errors
 
 

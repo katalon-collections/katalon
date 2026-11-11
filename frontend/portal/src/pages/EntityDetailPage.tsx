@@ -131,6 +131,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="entity"
+        recordId={entity.id}
         aiProvenance={entity.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}

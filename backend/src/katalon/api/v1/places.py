@@ -7,8 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from sqlalchemy import Text, func, select
-from sqlalchemy import cast as sql_cast
+from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.config import settings
@@ -37,8 +36,14 @@ from katalon.services.idno_service import (
     validate_idno_pattern,
 )
 from katalon.services.lock_service import enforce_not_locked
+from katalon.services.place_service import (
+    count_direct_children,
+    find_cycle_or_missing_parent,
+    get_place_subtree_ids,
+    reparent_children,
+)
 from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.public_metadata_service import project_public_record
+from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -71,10 +76,16 @@ async def list_places(
     place_type: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    parent_id: uuid.UUID | None = None,
+    root: bool = False,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
     query = select(Place)
+    if parent_id is not None:
+        query = query.where(Place.parent_id == parent_id)
+    elif root:
+        query = query.where(Place.parent_id.is_(None))
     if place_type:
         query = query.where(Place.place_type == place_type)
     if status:
@@ -84,7 +95,7 @@ async def list_places(
     if q:
         query = query.where(
             Place.idno.icontains(q, autoescape=True)
-            | sql_cast(Place.metadata_, Text).icontains(q, autoescape=True)
+            | await metadata_text_clause(db, Place, "place", q, visibility_user)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = apply_sort(
@@ -156,9 +167,13 @@ async def create_place(
         existing = await db.execute(select(Place).where(Place.idno == idno))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
+    parent_error = await find_cycle_or_missing_parent(db, None, data.parent_id)
+    if parent_error:
+        raise HTTPException(status_code=422, detail=parent_error)
     place = Place(
         idno=idno,
         place_type=place_type,
+        parent_id=data.parent_id,
         status=data.status,
         metadata_=metadata,
         ai_provenance=data.ai_provenance,
@@ -322,17 +337,23 @@ async def update_place(
         place_type,
         existing=place.metadata_,
         skip_required=data.status == "draft",
+        record_id=place_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
+    parent_error = await find_cycle_or_missing_parent(db, place_id, data.parent_id)
+    if parent_error:
+        raise HTTPException(status_code=422, detail=parent_error)
     old = {
         "idno": place.idno,
         "place_type": place.place_type,
+        "parent_id": str(place.parent_id) if place.parent_id else None,
         "status": place.status,
         "metadata": place.metadata_,
     }
     place.idno = idno
     place.place_type = place_type
+    place.parent_id = data.parent_id
     place.status = data.status
     place.metadata_ = metadata
     place.ai_provenance = data.ai_provenance
@@ -344,7 +365,14 @@ async def update_place(
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, metadata)
     place_diff = diff_fields(
-        old, {"idno": idno, "place_type": place_type, "status": data.status, "metadata": metadata}
+        old,
+        {
+            "idno": idno,
+            "place_type": place_type,
+            "parent_id": str(data.parent_id) if data.parent_id else None,
+            "status": data.status,
+            "metadata": metadata,
+        },
     )
     if place_diff:
         await log_change(
@@ -407,36 +435,67 @@ async def delete_place(
     db: DBDep,
     current_user: User = require_record_permission("place", "delete"),
     force: bool = Query(False),
+    cascade: bool = Query(False, description="Delete this place and its whole subtree."),
+    reparent: bool = Query(
+        False, description="Move direct children up to this place's parent before deleting."
+    ),
 ) -> None:
     result = await db.execute(select(Place).where(Place.id == place_id))
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    if cascade and reparent:
+        raise HTTPException(
+            status_code=400, detail="cascade und reparent schließen sich gegenseitig aus."
+        )
 
-    related_count = await count_relations(db, "place", place_id)
+    child_count = await count_direct_children(db, place_id)
+    if child_count > 0 and not cascade and not reparent:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": f"Dieser Ort hat {child_count} untergeordnete Orte.",
+                "child_count": child_count,
+            },
+        )
+
+    target_ids = [place_id]
+    if cascade and child_count > 0:
+        target_ids = await get_place_subtree_ids(db, place_id)
+    elif reparent and child_count > 0:
+        await reparent_children(db, place_id, place.parent_id)
+
+    related_count = sum([await count_relations(db, "place", tid) for tid in target_ids])
     if related_count > 0 and not force:
         raise HTTPException(
             status_code=409,
             detail={
-                "detail": f"Dieser Datensatz ist mit {related_count} anderen Datensätzen verknüpft.",
+                "detail": f"{len(target_ids)} betroffene Orte sind mit insgesamt "
+                f"{related_count} anderen Datensätzen verknüpft.",
                 "related_count": related_count,
             },
         )
 
-    place.deleted_at = datetime.now(UTC).replace(tzinfo=None)
-    await log_change(
-        db,
-        record_type="place",
-        record_id=place.id,
-        user_id=current_user.id,
-        action="delete",
-        changed_fields=delete_label_fields(place.idno, place.metadata_),
+    targets = (
+        (await db.execute(select(Place).where(Place.id.in_(target_ids)))).scalars().all()
     )
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for rec in targets:
+        rec.deleted_at = now
+        await log_change(
+            db,
+            record_type="place",
+            record_id=rec.id,
+            user_id=current_user.id,
+            action="delete",
+            changed_fields=delete_label_fields(rec.idno, rec.metadata_),
+        )
     await flush_record(db, place)
-    try:
-        await search_service.remove_record(place.id, db, record_type="place")
-    except Exception:
-        logger.warning("ES index/remove failed", exc_info=True)
+    for rec in targets:
+        try:
+            await search_service.remove_record(rec.id, db, record_type="place")
+        except Exception:
+            logger.warning("ES index/remove failed", exc_info=True)
 
 
 @router.post(

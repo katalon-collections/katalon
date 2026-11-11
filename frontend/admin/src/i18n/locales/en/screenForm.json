@@ -145,5 +145,16 @@
   "subtypeChoose": "– Select {{type}} –",
   "subtypeRequired": "Please select a subtype.",
   "subtypeInvalid": "The configured subtype is invalid.",
-  "subtypeOptional": "optional"
+  "subtypeOptional": "optional",
+  "placeParentLabel": "Parent place",
+  "placeParentPlaceholder": "Search places …",
+  "placeParentEmpty": "No places found",
+  "placeParentClear": "Remove parent place",
+  "vocabTermOpen": "Open term in vocabulary",
+  "usage": {
+    "views_one": "{{total}} portal view (last 30 days: {{recent}})",
+    "views_other": "{{total}} portal views (last 30 days: {{recent}})",
+    "downloads_one": "{{total}} download (last 30 days: {{recent}})",
+    "downloads_other": "{{total}} downloads (last 30 days: {{recent}})"
+  }
 }

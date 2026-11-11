@@ -3,6 +3,12 @@ title: "Known Gotchas"
 summary: "Operational traps that should be checked before testing, deploying, or repairing the Katalon stack."
 topics: [reference, operations, testing, deployment]
 sources:
+  - id: cli
+    type: file
+    path: backend/src/katalon/management/cli.py
+  - id: file-field-attachments-concept
+    type: file
+    path: almanac/concepts/metadata/file-field-attachments.md
   - id: agents
     type: file
     path: AGENTS.md
@@ -142,6 +148,8 @@ When a public release tag exists but `katalon-cli` cannot pull the corresponding
 Object media uploads hit the backend's `settings.max_upload_size_mb` check while the file is streamed, before Katalon creates the `MediaFile` row or queues IIIF work [@media-api]. The source setting defaults to 100 MB, the main Compose stack sets `MAX_UPLOAD_SIZE_MB` to 200 MB when the operator does not override it, and the outer nginx allows 500 MB request bodies; the direct Admin nginx config has its own 200 MB body limit and is a debugging surface, not the normal production-like browser path [@config] [@compose] [@nginx] [@admin-nginx] [@agents].
 
 For large TIFF failures, check the effective `MAX_UPLOAD_SIZE_MB` in the API container and the path used to reach the upload endpoint before raising proxy limits. The importer has a separate `IMPORTER_MAX_UPLOAD_SIZE_MB` setting and should not be used as evidence for object media upload limits [@config] [@media-api].
+
+`file`-field attachments have their own limit, `ATTACHMENT_MAX_UPLOAD_MB` (default 200). A 413 on a file field is not a media limit and is not fixed by `MAX_UPLOAD_SIZE_MB`. Attachments are not removed when a file is taken out of its field; that happens only when `katalon-manage attachments-gc` runs, and the command must be scheduled by the operator [@config] [@cli] [@file-field-attachments-concept].
 
 ## Admin Asset Base Path
 

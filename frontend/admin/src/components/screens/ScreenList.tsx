@@ -368,8 +368,9 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   }
 
   async function handleChildDelete(id: string, action: 'cascade' | 'reparent') {
+    const hierarchyApi = recordType === 'place' ? places : collections
     try {
-      await collections.deleteHierarchy(id, { [action]: true })
+      await hierarchyApi.deleteHierarchy(id, { [action]: true })
       removeLocally(id)
       load()
       setChildDeleteTarget(null)
@@ -380,7 +381,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           message: t('deleteConfirmWithConflicts', { message: e.message }),
           onConfirm: async () => {
             try {
-              await collections.deleteHierarchy(id, { [action]: true, force: true })
+              await hierarchyApi.deleteHierarchy(id, { [action]: true, force: true })
               removeLocally(id)
               load()
             } catch (e2) {

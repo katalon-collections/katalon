@@ -44,11 +44,21 @@ PUBLIC_V1_ENDPOINTS = {
     # status=="ready" checks, not by a missing credential requirement.
     ("get", "/v1/media/{media_id}/file"),
     ("get", "/v1/media/{media_id}/download"),
+    # Signed-link stream (attachments.py stream_router, mounted without the auth
+    # dependency): the HMAC link is the credential, verified per request with
+    # expiry, and the user is re-checked for active status and read permission.
+    ("get", "/v1/attachments/{attachment_id}/stream"),
+    # Signed-link media stream (media.py stream_router, mounted without the auth
+    # dependency): same contract as the attachment stream above, scope "media".
+    ("get", "/v1/objects/{object_id}/media/{media_id}/stream"),
 }
 
 # Portal search takes a complex filter payload and is a read, not a write;
 # it is the one legitimate POST in the public portal API.
 PORTAL_READ_VIA_POST = {"/portal/v1/search/advanced"}
+# Anonymous page-view beacon: increments a day counter only (no record data,
+# rate-limited, see the usage statistics decision). Anything else stays read-only.
+PORTAL_COUNTER_WRITES = {("post", "/portal/v1/usage/{plural_type}/{record_id}/view")}
 _SAFE_METHODS = {"get", "head"}
 
 
@@ -81,7 +91,9 @@ def test_portal_router_exposes_no_write_endpoints() -> None:
     writes = [
         f"{method.upper()} {path}"
         for method, path, operation in _operations(schema["paths"], "/portal/v1/")
-        if method not in _SAFE_METHODS and path not in PORTAL_READ_VIA_POST
+        if method not in _SAFE_METHODS
+        and path not in PORTAL_READ_VIA_POST
+        and (method, path) not in PORTAL_COUNTER_WRITES
     ]
     assert writes == [], (
         f"These public portal routes are not GET/HEAD: {writes}. The unauthenticated "

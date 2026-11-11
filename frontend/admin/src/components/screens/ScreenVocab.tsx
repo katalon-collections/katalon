@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { ConflictError, schema, vocabularies } from '../../api/client'
@@ -592,6 +592,9 @@ interface ScreenVocabProps {
 
 export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
   const { t } = useTranslation('screenVocab')
+  // Route "vocab/<name or id>[/<term id>]": a term id opens that term for editing once.
+  const [vocabRef, termRef] = (initialVocab ?? '').split('/')
+  const pendingTermId = useRef<string | null>(termRef || null)
   const requiredBadge = t('requiredBadge')
   const uriLabel = t('uri')
   const uriPlaceholder = t('uriPlaceholder')
@@ -657,13 +660,13 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
       .then(data => {
         setVocabs(data)
         if (data.length > 0 && !activeVocab) {
-          const target = initialVocab ? data.find(v => v.name === initialVocab) : null
+          const target = vocabRef ? data.find(v => v.name === vocabRef || v.id === vocabRef) : null
           setActiveVocab(target ? target.id : data[0].id)
         }
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [activeVocab, initialVocab])
+  }, [activeVocab, vocabRef])
 
   useEffect(() => { loadVocabs() }, [])
 
@@ -677,6 +680,14 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
   }, [activeVocab])
 
   useEffect(() => { loadTerms() }, [loadTerms])
+  useEffect(() => {
+    const wanted = pendingTermId.current
+    const term = wanted ? terms.find(item => item.id === wanted) : null
+    if (!term) return
+    pendingTermId.current = null
+    setSelectedTermId(term.id)
+    startEditTerm(term)
+  }, [terms])
   useEffect(() => {
     if (!activeVocab) {
       setTermFields([])

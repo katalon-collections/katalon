@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import type { FacetKind } from '../api/client'
+import type { FacetKind, RelationFacetConfig, TreeFacet } from '../api/client'
+
+export type { RelationFacetConfig }
 
 export function resolveLabel(label: Record<string, string> | undefined | null, locale: string, fallback = ''): string {
   if (!label) return fallback
@@ -44,14 +46,6 @@ export function facetKind(
   return undefined
 }
 
-export interface RelationFacetConfig {
-  key: string
-  label: Record<string, string>
-  target_type: string
-  relation_types: string[]
-  target_subtypes?: string[]
-  direction?: 'outgoing' | 'incoming' | 'both'
-}
 
 /** The relation facet of `facets` that covers a relation of this type to a
  *  record of `targetType`, seen from the facet's own record. Facets restricted
@@ -84,4 +78,30 @@ export function dateBucketOf(value: string, granularity: string | undefined): st
   if (granularity === 'century') return String(Math.floor(year / 100) * 100)
   if (granularity === 'decade') return String(Math.floor(year / 10) * 10)
   return String(year)
+}
+
+/** Parent of every node the tree facet knows: its loaded levels and the paths of active values. */
+export function treeParents(tree: TreeFacet | undefined): Map<string, string> {
+  const parents = new Map<string, string>()
+  for (const [parent, nodes] of Object.entries(tree?.nodes ?? {})) {
+    if (parent !== 'root') nodes.forEach(node => parents.set(node.id, parent))
+  }
+  for (const chain of Object.values(tree?.paths ?? {})) {
+    chain.forEach((step, index) => { if (index > 0) parents.set(step.id, chain[index - 1].id) })
+  }
+  return parents
+}
+
+/** Active values after picking ``id`` in a tree facet. A node includes everything below it, so
+ *  picking a child replaces its selected ancestor and picking an ancestor replaces its selected
+ *  descendants; nodes of other branches stay (OR). Picking an active node clears it. */
+export function pickTreeNode(active: string[], id: string, parents: Map<string, string>): string[] {
+  if (active.includes(id)) return active.filter(value => value !== id)
+  const ancestorsOf = (node: string): string[] => {
+    const out: string[] = []
+    for (let current = parents.get(node); current && !out.includes(current); current = parents.get(current)) out.push(current)
+    return out
+  }
+  const ancestors = ancestorsOf(id)
+  return [...active.filter(value => !ancestors.includes(value) && !ancestorsOf(value).includes(id)), id]
 }

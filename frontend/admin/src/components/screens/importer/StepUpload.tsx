@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import type { ImportMapping, UploadResult } from '../../../api/client'
 import { Upload } from '../../ui/Icons'
 import { LoadMappingModal } from '../../importer/LoadMappingModal'
+import { headerLabel } from './headerLabel'
+import { readProfileFile } from './profileUtils'
 import type { ImportProfile } from './types'
 
 interface Props {
@@ -48,22 +50,16 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
     else if (fs.length > 1) onFile(fs)
   }
 
-  function handleProfileFile(file: File) {
+  async function handleProfileFile(file: File) {
     setProfileErr(null)
-    const reader = new FileReader()
-    reader.onload = e => {
-      try {
-        const parsed = JSON.parse(e.target?.result as string)
-        if (parsed.version !== 1 || typeof parsed.mapping !== 'object') {
-          setProfileErr(t('invalidProfileFormat'))
-          return
-        }
-        onProfileLoaded?.(parsed as ImportProfile)
-      } catch {
-        setProfileErr(t('profileReadFailed'))
-      }
+    let profile: ImportProfile
+    try {
+      profile = await readProfileFile(file)
+    } catch (err) {
+      setProfileErr(t((err as Error).message))
+      return
     }
-    reader.readAsText(file)
+    onProfileLoaded?.(profile)
   }
 
   return (
@@ -146,21 +142,22 @@ export function StepUpload({ uploaded, uploading, uploadErr, needsReupload, onFi
         />
       )}
 
-      {uploaded && (
+      {/* After a reload the remembered preview belongs to a file that is gone: hide it. */}
+      {uploaded && !needsReupload && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="hd">
             {t('previewSummary', { rows: uploaded.row_count, columns: uploaded.headers.length })}
           </div>
           <div className="bd" style={{ overflow: 'auto' }}>
-            <table className="tbl" style={{ fontSize: 12 }}>
+            <table className="tbl" style={{ fontSize: 12, tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
               <thead>
-                <tr>{uploaded.headers.map(h => <th key={h}>{h}</th>)}</tr>
+                <tr>{uploaded.headers.map(h => <th key={h} title={h} style={{ minWidth: 160, maxWidth: 280 }}>{headerLabel(h)}</th>)}</tr>
               </thead>
               <tbody>
                 {uploaded.preview.map((row, i) => (
                   <tr key={i}>
                     {uploaded.headers.map(h => (
-                      <td key={h} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <td key={h} style={{ minWidth: 160, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row[h] ?? '–'}
                       </td>
                     ))}

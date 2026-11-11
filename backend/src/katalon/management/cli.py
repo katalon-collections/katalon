@@ -11,6 +11,7 @@ Commands:
     katalon-manage warm-thumbnails
     katalon-manage lido-report
     katalon-manage resync-schema-relations
+    katalon-manage attachments-gc --older-than 7d [--dry-run]
 """
 
 from __future__ import annotations
@@ -251,3 +252,44 @@ def resync_schema_relations(dry_run: bool) -> None:
     else:
         click.echo(f"{report.resynced} von {report.records} Datensätzen neu synchronisiert.")
         click.echo(f"Überzählige Zeilen danach: {report.extra_rows_after}.")
+
+
+@cli.command(name="attachments-gc")
+@click.option(
+    "--older-than",
+    default="7d",
+    show_default=True,
+    help="Only consider attachments created before this age: '<n>d', '<n>h' or '0' (no age limit).",
+)
+@click.option("--dry-run", is_flag=True, help="Count what would be deleted; delete nothing.")
+def attachments_gc(older_than: str, dry_run: bool) -> None:
+    """Delete unreferenced `file` attachments (rows and stored files).
+
+    An attachment is kept while its id appears in the current metadata of its record
+    (trashed records included) or in one of that record's snapshots. Attachments whose
+    record no longer exists are deleted. Run `--older-than 0` only after removing a file
+    from its field and deleting any snapshot that still contains it.
+    """
+    import asyncio
+
+    from katalon.database import AsyncSessionLocal
+    from katalon.services.attachment_service import gc_attachments, parse_older_than
+
+    try:
+        age = parse_older_than(older_than)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--older-than") from exc
+
+    async def _run() -> dict[str, int]:
+        async with AsyncSessionLocal() as db:
+            return await gc_attachments(db, older_than=age, dry_run=dry_run)
+
+    report = asyncio.run(_run())
+    click.echo(
+        f"Anhänge älter als {older_than}: {report['candidates']}; "
+        f"referenziert: {report['referenced']}; verwaist: {report['orphaned']}."
+    )
+    if dry_run:
+        click.echo(f"Trockenlauf: {report['deleted']} würden gelöscht, nichts geschrieben.")
+    else:
+        click.echo(f"Gelöscht: {report['deleted']}; Speicherfehler (Zeile bleibt): {report['failed']}.")

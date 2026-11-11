@@ -842,3 +842,49 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   .ex-proto-root * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+
+/* File field ("Datei", attachments) */
+.file-field { display: grid; gap: 8px; min-width: 0; }
+.file-field-hint { font-size: 12px; color: var(--fg-3); padding: 12px 14px; border: 1px dashed var(--border-s); border-radius: 8px; background: var(--panel-2); }
+.file-field-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.file-field-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 6px 4px 10px; border: 1px solid var(--border-s); border-radius: 6px; background: var(--panel); font-size: 13px; min-width: 0; }
+.file-field-icon { flex-shrink: 0; color: var(--fg-3); }
+.file-field-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-field-size { flex-shrink: 0; color: var(--fg-3); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.file-field-missing { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; color: #92400e; font-size: 12px; }
+.file-field-progress { width: 120px; height: 6px; flex-shrink: 0; accent-color: var(--accent); }
+.file-field-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.file-field-error .file-field-icon { color: #dc2626; }
+.file-field-error .file-field-name { white-space: normal; overflow-wrap: anywhere; }
+.dz.file-field-dropzone { padding: 20px 16px; display: grid; justify-items: center; gap: 6px; font-size: 12px; }
+.file-field-drop-text { color: var(--fg-3); }
+.file-field-limit { color: var(--fg-4); font-size: 11px; }
+
+.attachment-lightbox { width: min(1100px, calc(100vw - 32px)); height: min(860px, calc(100vh - 32px)); max-width: none; max-height: none; padding: 0; border: 1px solid var(--border-s); border-radius: 10px; background: #0f172a; color: #e2e8f0; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+.attachment-lightbox[open] { display: flex; flex-direction: column; }
+.attachment-lightbox::backdrop { background: rgba(2,6,23,.85); }
+.attachment-lightbox-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.attachment-lightbox-title { margin: 0; flex: 1; min-width: 0; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-lightbox-counter { flex-shrink: 0; font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.attachment-lightbox .btn.gh { color: #e2e8f0; }
+.attachment-lightbox .btn.gh:hover { background: rgba(255,255,255,.1); color: #fff; }
+.attachment-lightbox-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px 56px; }
+.attachment-lightbox-media { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.attachment-lightbox-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.attachment-lightbox-audio { width: min(560px, 100%); }
+.attachment-lightbox-message { margin: 0; font-size: 13px; color: #94a3b8; }
+.attachment-lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.attachment-lightbox-nav.prev { left: 12px; }
+.attachment-lightbox-nav.next { right: 12px; }
+.attachment-lightbox-foot { padding: 8px 16px; border-top: 1px solid rgba(255,255,255,.1); font-size: 13px; }
+.attachment-lightbox-foot a { color: #93c5fd; }
+
+@media (max-width: 600px) {
+  .attachment-lightbox { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
+  .attachment-lightbox-stage { padding: 8px 8px 48px; }
+  .attachment-lightbox-nav { top: auto; bottom: 8px; transform: none; }
+  .attachment-lightbox-nav.prev { left: 8px; }
+  .attachment-lightbox-nav.next { right: 8px; }
+  .attachment-lightbox .btn { min-height: 44px; min-width: 44px; }
+  .file-field .btn { min-height: 44px; }
+}

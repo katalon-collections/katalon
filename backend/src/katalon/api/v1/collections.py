@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from sqlalchemy import Text, cast, exists, func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -49,7 +49,7 @@ from katalon.services.idno_service import (
 )
 from katalon.services.lock_service import enforce_not_locked
 from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.public_metadata_service import project_public_record
+from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -171,7 +171,7 @@ async def list_collections(
     if q:
         query = query.where(
             Collection.idno.icontains(q, autoescape=True)
-            | cast(Collection.metadata_, Text).icontains(q, autoescape=True)
+            | await metadata_text_clause(db, Collection, "collection", q, visibility_user)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = apply_sort(

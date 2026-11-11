@@ -8,6 +8,7 @@ from typing import Any
 from geoalchemy2 import Geometry, WKBElement, WKTElement
 from geoalchemy2.shape import to_shape
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -94,6 +95,12 @@ class Place(Base):
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     place_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     geom: Mapped[WKBElement | WKTElement | None] = mapped_column(Geometry("POINT", srid=4326))
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("places.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
@@ -732,6 +739,30 @@ class PageAsset(Base):
     page: Mapped[StaticPage] = relationship(back_populates="assets")
 
 
+class Attachment(Base):
+    """File stored through a `file` schema field (not a media file).
+
+    The row carries no field name or path: where a file sits is read from the
+    record's current metadata, so moving a group entry needs no update here.
+    """
+
+    __tablename__ = "attachments"
+    __table_args__ = (Index("ix_attachments_record", "record_type", "record_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    # object/entity/place/occurrence/procedure; no FK because the target table is polymorphic
+    record_type: Mapped[str] = mapped_column(String(32))
+    record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    filename: Mapped[str] = mapped_column(String(512))
+    mime_type: Mapped[str] = mapped_column(String(128))
+    size: Mapped[int] = mapped_column(BigInteger)
+    storage_key: Mapped[str] = mapped_column(String(1024))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 # ---------------------------------------------------------------------------
 # Portal configuration (singleton row, key="default")
 # ---------------------------------------------------------------------------
@@ -796,6 +827,10 @@ class PortalConfig(Base):
     facet_initial_count: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
     # Show the public IIIF manifest link/button on the object detail page (#-).
     show_iiif_manifest_link: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Show view/download counts on public detail pages (needs admin_config.usage_stats_enabled).
+    show_usage_stats: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Offer public media files for download on object detail pages.
+    media_download_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
@@ -969,6 +1004,8 @@ class AdminConfig(Base):
     # #414 follow-up: nightly hard-delete of soft-deleted records past the retention window.
     auto_purge_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     purge_retention_days: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
+    # Global switch for anonymous view/download counting (record_usage_daily).
+    usage_stats_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
@@ -978,6 +1015,22 @@ class AppSecret(Base):
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     encrypted_value: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class RecordUsageDaily(Base):
+    """Anonymous per-day view/download counters of public records.
+
+    No IP, cookie or session is stored; one row per record and day. Polymorphic
+    (no FK), so purge removes the rows explicitly (workers/purge_tasks.py).
+    """
+
+    __tablename__ = "record_usage_daily"
+
+    record_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    views: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    downloads: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class AIUsageEvent(Base):

@@ -15,14 +15,15 @@ import { ScreenFormSections } from './ScreenFormSections'
 import { LabelEditor } from '../ui/LabelEditor'
 import { useSupportedLanguages } from '../../hooks/useSupportedLanguages'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { FILE_FIELD_TARGET_TYPES } from './schemaConstants'
 
 type DestructiveReconfigWarning = { kind: 'translatable' | 'repeatable' | 'fieldType'; count: number; newFieldType?: string }
-const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'url', 'authority', 'group'] as const
+const FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'geo', 'pid', 'url', 'authority', 'file', 'group'] as const
 const VOCABULARY_TERM_FIELD_TYPES = ['text', 'number', 'boolean', 'authority'] as const
 export { FIELD_TYPE_LABELS } from './schemaConstants'
 
 // Field types allowed as sub-fields of a group (no recursion)
-const SUB_FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority', 'url', 'geo'] as const
+const SUB_FIELD_TYPES = ['text', 'richtext', 'date', 'number', 'boolean', 'vocab', 'vocab_free', 'relation', 'authority', 'url', 'geo', 'file'] as const
 type SubFieldType = typeof SUB_FIELD_TYPES[number]
 
 type SubFieldFormState = {
@@ -411,6 +412,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
   const isIdno = !isNew && form.name === 'idno'
   const fieldTypes = (isVocabularyTerm ? VOCABULARY_TERM_FIELD_TYPES : FIELD_TYPES)
     .filter(type => type !== 'pid' || pidProviders.length > 0 || form.field_type === 'pid')
+    .filter(type => type !== 'file' || FILE_FIELD_TARGET_TYPES.includes(form.target_type) || form.field_type === 'file')
   const aiEligible = !isVocabularyTerm && ['text', 'richtext', 'vocab_free', 'date', 'number', 'boolean'].includes(form.field_type)
   useEffect(() => {
     if (!isNew || form.field_type !== 'authority') return
@@ -861,6 +863,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 {subFieldEditing === sf.id ? (
                   <SubFieldFormPanel
                     sf={subFieldForm!}
+                    targetType={form.target_type}
                     allVocabs={allVocabs}
                     availableFields={availableFields}
                     authoritySources={authoritySources}
@@ -911,6 +914,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               <div style={{ marginTop: 8 }}>
                 <SubFieldFormPanel
                   sf={subFieldForm!}
+                  targetType={form.target_type}
                   allVocabs={allVocabs}
                   availableFields={availableFields}
                   authoritySources={authoritySources}
@@ -944,6 +948,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
 
 interface SubFieldFormPanelProps {
   sf: SubFieldFormState
+  /** target type of the parent group; decides whether the "file" sub-field type is offered */
+  targetType: string
   allVocabs: Vocabulary[]
   availableFields: FieldDefinition[]
   authoritySources: AuthoritySource[]
@@ -956,7 +962,7 @@ interface SubFieldFormPanelProps {
   onCancel: () => void
 }
 
-function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
+function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
   const { t } = useTranslation('screenSchema')
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
   const languages = useSupportedLanguages()
@@ -1000,7 +1006,8 @@ function SubFieldFormPanel({ sf, allVocabs, availableFields, authoritySources, n
         <div className="field">
           <div className="lbl">{t('subFieldForm.fieldType')}</div>
           <select className="fld" value={sf.field_type} onChange={e => set('field_type', e.target.value as SubFieldType)}>
-            {SUB_FIELD_TYPES.map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
+            {SUB_FIELD_TYPES.filter(k => k !== 'file' || FILE_FIELD_TARGET_TYPES.includes(targetType) || sf.field_type === 'file')
+              .map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
           </select>
         </div>
       </div>

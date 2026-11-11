@@ -3,6 +3,15 @@ title: "Router Surface"
 summary: "Lookup map for Katalon's authenticated `/v1` routers, anonymous portal read model, public paths, dev-only mock routes, and the OAI-PMH prefix exception."
 topics: [reference, api, routers]
 sources:
+  - id: attachments-api
+    type: file
+    path: backend/src/katalon/api/v1/attachments.py
+  - id: media-api
+    type: file
+    path: backend/src/katalon/api/v1/media.py
+  - id: main
+    type: file
+    path: backend/src/katalon/main.py
   - id: app
     type: file
     path: backend/src/katalon/main.py
@@ -67,6 +76,13 @@ These routers are included with `prefix="/v1"` in `main.py` and a `get_current_u
 | `/v1/relations` | `relations.py` | Generic relations [@api-dir]. |
 | `/v1/objects/{object_id}/media` | `media.py` main router | Object media files [@api-dir]. |
 | `/v1/media` | `media.py` batch router | Batch media import surface [@app] [@api-dir]. |
+| `/v1/attachments/{record_type}/{record_id}` | `attachments.py` | Upload of a `file`-field attachment (multipart `file`, `update` permission); writes the row only [@attachments-api]. |
+| `/v1/attachments/limits` | `attachments.py` | Configured upload limit (`max_upload_mb` from `ATTACHMENT_MAX_UPLOAD_MB`) for the admin file field hint and pre-check; any logged-in user [@attachments-api]. |
+| `/v1/attachments/{attachment_id}/file` | `attachments.py` | Admin file delivery, `read` permission on the owning type [@attachments-api]. |
+| `/v1/attachments/{attachment_id}/link` | `attachments.py` | Returns a 300-second signed stream path for `<video>`/`<audio>` [@attachments-api]. |
+| `/v1/attachments/{attachment_id}/stream` | `attachments.py` stream router | Streams with the signed link only; mounted without the bearer dependency [@attachments-api] [@main]. |
+| `/v1/objects/{object_id}/media/{media_id}/link` | `media.py` main router | Returns a 300-second signed stream path for admin PDF, video and audio [@media-api]. |
+| `/v1/objects/{object_id}/media/{media_id}/stream` | `media.py` stream router | Streams with the media signed link only; mounted without the bearer dependency [@media-api] [@main]. |
 | `/v1/theme` | `theme.py` | Portal theme manifest [@api-dir]. |
 | `/v1/portal` | `portal.py` | Public portal configuration and logo files [@api-dir]. |
 | `/v1/pages` | `pages.py` | Static portal pages [@api-dir]. |
@@ -84,7 +100,7 @@ Objects, entities, places, occurrences, collections, and storage locations also 
 
 ## `/portal/v1` Read Model
 
-`portal_public.py` is mounted separately at `/portal/v1` with no global authentication dependency. It serves only read paths the React Portal needs: Objects, Entities, Places, Occurrences, their visible relations and object media, quick and advanced portal search, public searchable field definitions, field-scoped vocabulary terms, relation-type vocabulary terms, portal configuration and logo, published pages, active portal banners, and theme data [@app] [@portal-public]. An anonymous request retains the public projection. A valid staff JWT (`superuser`, `admin`, `editor`, `cataloger`, or `viewer`) enables internal records where its backend read permission allows them, all schema fields, and unfiltered inventory search; unrecognised future roles retain anonymous visibility. Advanced search uses `POST /portal/v1/search/advanced`; the body is a validated query description, not a stored or executable Elasticsearch query. `/portal/v1/schema/{type}/fields/{field}/terms` exposes the minimal term projection only when that field is public, searchable, and vocabulary-backed [@portal-public].
+`portal_public.py` is mounted separately at `/portal/v1` with no global authentication dependency. It serves only read paths the React Portal needs: Objects, Entities, Places, Occurrences, their visible relations and object media, the files of public `file` fields (`GET /portal/v1/attachments/{attachment_id}/file`, checked per request against the public projection), quick and advanced portal search, public searchable field definitions, field-scoped vocabulary terms, relation-type vocabulary terms, portal configuration and logo, published pages, active portal banners, and theme data [@app] [@portal-public]. An anonymous request retains the public projection. A valid staff JWT (`superuser`, `admin`, `editor`, `cataloger`, or `viewer`) enables internal records where its backend read permission allows them, all schema fields, and unfiltered inventory search; unrecognised future roles retain anonymous visibility. Advanced search uses `POST /portal/v1/search/advanced`; the body is a validated query description, not a stored or executable Elasticsearch query. `/portal/v1/schema/{type}/fields/{field}/terms` exposes the minimal term projection only when that field is public, searchable, and vocabulary-backed [@portal-public].
 
 Procedures have no `/portal/v1` route. Relation results require both endpoints to be visible inventory records, so a relation to a Procedure is not exposed [@portal-public]. Portal response models are explicit projections rather than shared ORM/API schemas; they omit internal fields such as record versions and search vectors, and relation projections omit relation metadata [@portal-public].
 

@@ -63,6 +63,7 @@ class AdminConfigRead(BaseModel):
     presence_lock_mode: str
     auto_purge_enabled: bool
     purge_retention_days: int
+    usage_stats_enabled: bool
     pid_providers: list[str]
     ai_secret: SecretStatus
     ai_usage: AIUsageRead
@@ -89,6 +90,7 @@ class AdminConfigUpdate(BaseModel):
     presence_lock_mode: str | None = None
     auto_purge_enabled: bool | None = None
     purge_retention_days: int | None = Field(default=None, ge=1)
+    usage_stats_enabled: bool | None = None
 
     @field_validator("presence_lock_mode")
     @classmethod
@@ -161,6 +163,7 @@ async def _to_read(db: DBDep, config: AdminConfig, user_id: uuid.UUID) -> AdminC
         presence_lock_mode=config.presence_lock_mode,
         auto_purge_enabled=config.auto_purge_enabled,
         purge_retention_days=config.purge_retention_days,
+        usage_stats_enabled=config.usage_stats_enabled,
         pid_providers=list(available_pid_providers()),
         ai_secret=SecretStatus(
             has_key=secret_obj is not None,
@@ -244,6 +247,8 @@ async def update_admin_config(
         config.auto_purge_enabled = data.auto_purge_enabled
     if data.purge_retention_days is not None:
         config.purge_retention_days = data.purge_retention_days
+    if data.usage_stats_enabled is not None:
+        config.usage_stats_enabled = data.usage_stats_enabled
     await db.flush()
     return await _to_read(db, config, current_user.id)
 

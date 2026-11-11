@@ -27,6 +27,26 @@ export function buildProfile(
   return { version: 1, ...options, mapping, field_definitions }
 }
 
+/** Read an exported profile file; rejects with an i18n key from `stepUpload`. */
+export async function readProfileFile(file: File): Promise<ImportProfile> {
+  let parsed: Partial<ImportProfile> | null
+  try {
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(file)
+    })
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('profileReadFailed')
+  }
+  if (!parsed || parsed.version !== 1 || typeof parsed.mapping !== 'object') {
+    throw new Error('invalidProfileFormat')
+  }
+  return parsed as ImportProfile
+}
+
 export function downloadProfile(profile: ImportProfile): void {
   const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)

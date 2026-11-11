@@ -5,9 +5,11 @@ import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } f
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi, exportApi } from '../../api/client'
-import type { MediaFile, ActivePresence, LockInfo, ExportFormatInfo } from '../../api/client'
+import type { MediaFile, ActivePresence, LockInfo, ExportFormatInfo, AttachmentRecordType, AttachmentRef } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import { GeoInput, type GeoEntry } from '../GeoInput'
+import { FileField } from '../FileField'
+import { PlaceParentPicker } from './PlaceParentPicker'
 import type { AiProvenance, AnyRecord, AuditEntry, FieldDefinition, FormSection, FormVariant, KatalonCollection, ProcedureStatus, RecordSubtype, RecordType, Relation, SearchResult, Snapshot, Status, VocabularyTerm, VocabularyTermNode, WorkingSet } from '../../types'
 import { getLabel } from '../../types'
 import { Alert, AlertCircle, Bookmark, Calendar, ChevD, ChevR, ListTree, Plus, Upload, X, Trash, Lightning, File, Music, Video, FileText, Box, Eye, Download } from '../ui/Icons'
@@ -18,6 +20,7 @@ import { MediaLightbox } from '../MediaLightbox'
 import { HelpPopover } from '../ui/HelpPopover'
 import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { RecordUsageLine } from '../RecordUsageLine'
 import { resolveActiveVariant } from '../../lib/formVariants'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
@@ -618,7 +621,7 @@ const NEW_TYPE_LABELS: Record<RecordType, string> = {
 }
 
 const TYPE_ROUTES: Record<string, string> = {
-  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form', collection: 'collections-form', storage_location: 'storage-locations',
+  object: 'form', entity: 'entities-form', place: 'places-form', occurrence: 'occurrences-form', procedure: 'procedures-form', collection: 'collections-form', storage_location: 'storage-locations', vocab: 'vocab',
 }
 
 function navigateToRecord(type: string, id: string) {
@@ -1912,6 +1915,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const showSnapshotsForRecord = recordType !== 'procedure'
   const showCollectionStatus = recordType === 'object'
   const showParentCollection = recordType === 'collection'
+  const showParentPlace = recordType === 'place'
   const [parentId, setParentId] = useState<string | null>(initialParentId ?? null)
   const [availableParents, setAvailableParents] = useState<Array<{ id: string; title: string }>>([])
   const [availableCollections, setAvailableCollections] = useState<Array<{ id: string; title: string }>>([])
@@ -2253,8 +2257,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           if (showCollectionStatus) {
             setCollectionStatus((rec as { collection_status?: string | null }).collection_status ?? 'active')
           }
-          if (showParentCollection) {
-            setParentId((rec as KatalonCollection).parent_id ?? null)
+          if (showParentCollection || showParentPlace) {
+            setParentId((rec as { parent_id?: string | null }).parent_id ?? null)
           }
           if (showProcedureFields) {
             const p = rec as { start_date?: string | null; end_date?: string | null; due_date?: string | null; reference_number?: string | null }
@@ -2550,6 +2554,24 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     )
   }
 
+  /** Vocabulary chip text; for users who manage vocabularies it links to the term (e.g. to add a URI). */
+  function renderVocabTermLabel(field: FieldDefinition, entry: VocabEntry): React.ReactNode {
+    const vocabId = field.settings?.vocabulary_id as string | undefined
+    if (!vocabId || !features.includes('vocab_terms') || quickCreate) return entry.label
+    return (
+      <a
+        href={`#vocab/${vocabId}/${entry.id}`}
+        onClick={e => handleRecordLinkClick(e, 'vocab', `${vocabId}/${entry.id}`)}
+        title={t('vocabTermOpen')}
+        style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
+        onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+        onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+      >
+        {entry.label}
+      </a>
+    )
+  }
+
   function closeDiscardModal() {
     setShowDiscardModal(false)
     setPendingRecordNav(null)
@@ -2765,6 +2787,17 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         )
       case 'richtext':
         return <RichTextEditor value={(val as string) ?? ''} onChange={v => onChange(v)} placeholder={getLabel(sf, sf.name)} disabled={disabled} />
+      case 'file':
+        return (
+          <FileField
+            recordType={recordType as AttachmentRecordType}
+            recordId={savedId}
+            repeatable={sf.is_repeatable}
+            value={val as AttachmentRef | AttachmentRef[] | undefined}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        )
       case 'geo':
         return <GeoInput value={val as GeoEntry | undefined} onChange={onChange} disabled={disabled} />
       case 'url': {
@@ -3144,7 +3177,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       if (showIdno)   payload.idno = idno || null
       if (subtypeKey) payload[subtypeKey] = subtype
       if (showCollectionStatus) payload.collection_status = collectionStatus
-      if (showParentCollection) payload.parent_id = parentId || null
+      if (showParentCollection || showParentPlace) payload.parent_id = parentId || null
       if (showGeo) {
         payload.lat = lat ? parseFloat(lat) : null
         payload.lon = lon ? parseFloat(lon) : null
@@ -3555,6 +3588,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     <div className={quickCreate ? 'quick-create-form' : undefined} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className={`record-toolbar${quickCreate ? ' quick-create-toolbar' : ''}`}>
         {!quickCreate && <div className="record-title">{title}</div>}
+        {!quickCreate && !isNew && recordId && <RecordUsageLine recordType={recordType} recordId={recordId} />}
         <div className="record-actions">
           {!quickCreate && <div className="record-status" role="group" aria-label="Status" data-tour="record-status">
             {statusOptions.map(s => (
@@ -4070,6 +4104,19 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   </div>
                 )}
 
+                {showParentPlace && (
+                  <div className="field">
+                    <div className="lbl">{t('placeParentLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('subtypeOptional')})</span></div>
+                    <PlaceParentPicker
+                      value={parentId}
+                      excludeId={currentId}
+                      disabled={justCreated}
+                      renderSelected={(id, title) => renderRecordLink('place', id, title)}
+                      onChange={id => { setParentId(id); setIsDirty(true) }}
+                    />
+                  </div>
+                )}
+
                 {showGeo && (
                   <div className="field">
                     <div className="lbl">Koordinaten</div>
@@ -4198,7 +4245,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                     padding: '3px 8px', borderRadius: 4,
                                     background: 'var(--accent-50)', color: 'var(--accent-ink)', fontSize: 13,
                                   }}>
-                                    {entry.label}
+                                    {renderVocabTermLabel(f, entry)}
                                     <button
                                       type="button"
                                       className="btn sm ico gh"
@@ -4640,6 +4687,15 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         </div>
                           )
                         })()
+                      ) : f.field_type === 'file' ? (
+                        <FileField
+                          recordType={recordType as AttachmentRecordType}
+                          recordId={savedId}
+                          repeatable={repeatable}
+                          value={val as AttachmentRef | AttachmentRef[] | undefined}
+                          onChange={v => setField(f.name, v)}
+                          disabled={justCreated}
+                        />
                       ) : f.field_type === 'geo' ? (
                         repeatable ? (
                           <>

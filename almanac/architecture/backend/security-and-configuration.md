@@ -3,6 +3,12 @@ title: "Security And Configuration"
 summary: "Katalon's backend combines environment-driven settings, production secret checks, JWT login, hashed API keys, role capabilities, encrypted application secrets, and request rate limits."
 topics: [architecture, security, configuration, api]
 sources:
+  - id: public-metadata
+    type: file
+    path: backend/src/katalon/services/public_metadata_service.py
+  - id: export-service
+    type: file
+    path: backend/src/katalon/services/export_service.py
   - id: config
     type: file
     path: backend/src/katalon/config.py
@@ -103,6 +109,8 @@ The user endpoints enforce admin-only access for listing, creating, reading arbi
 Configuration routers are still authenticated even when selected reads are not admin-only. Schema field reads and published static-page reads can be used by logged-in editorial users, while schema resets/imports and field mutations require `admin`; vocabulary mutations require `admin`; and static-page draft listing plus page create/update/delete use `require_admin()` [@app] [@schema-api] [@vocab-api] [@pages-api].
 
 The fixed editorial roles `editor`, `cataloger`, and `viewer` have a persistent permission matrix for `read`, `create`, `update`, and `delete` across objects, entities, places, occurrences, and procedures. Admin and superuser retain unrestricted access. The backend enforces configured write rights and limits internal, non-published records to roles with read access; public portal visibility remains governed by publication status rather than the matrix [@dependencies] [@users] [@models].
+
+Callers without `read` permission on a type (anonymous portal visitors and logged-in users lacking that permission) only ever see the public projection, and they only search it: the `q` filter of the record lists and the portal collection list matches public top-level fields and public subfields of public groups via `metadata_text_clause`, never internal fields or `file` values [@public-metadata]. CSV/JSON dumps follow the same rule and return nothing for procedures and storage locations [@export-service].
 
 ## Stored Secrets And Rate Limits
 

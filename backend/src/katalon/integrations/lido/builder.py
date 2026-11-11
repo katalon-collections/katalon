@@ -124,15 +124,29 @@ _KEEP_EMPTY = {f"{{{LIDO_NS}}}recordSource", "lido:recordSource"}
 # ---------------------------------------------------------------------------
 
 
-def _clean_text(val: Any) -> str:
-    """Plain, trimmed text: tags become spaces, entities are decoded, NBSP/newlines collapse."""
+_BLOCK_END_RE = re.compile(r"</(?:p|div|li)\s*>|<br\s*/?>", re.IGNORECASE)
+
+
+def _clean_text(val: Any, *, multiline: bool = False) -> str:
+    """Plain, trimmed text: tags become spaces, entities are decoded, NBSP/newlines collapse.
+
+    ``multiline`` keeps line breaks (at most one blank line) for running text such as
+    descriptions; HTML paragraphs and ``<br>`` become line breaks.
+    """
     if val is None:
         return ""
     if isinstance(val, dict | list) and (val := _display_value(val)) is None:
         return ""
-    text = html.unescape(str(val))
+    text = str(val)
+    if multiline:
+        text = _BLOCK_END_RE.sub("\n\n", text)
+    text = html.unescape(text)
     text = HTML_TAG_RE.sub(" ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    if not multiline:
+        return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^\S\n]+", " ", text.replace("\r\n", "\n").replace("\r", "\n"))
+    text = re.sub(r" ?\n ?", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _display_value(val: Any) -> Any:
@@ -173,7 +187,7 @@ def _item_from_value(value: Any) -> _Item | None:
     if value is None or value == "":
         return None
     if not isinstance(value, dict):
-        text = _clean_text(value)
+        text = _clean_text(value, multiline=True)
         if not text:
             return None
         parsed = parse_authority_url(text) if text.startswith("http") else None
@@ -190,7 +204,7 @@ def _item_from_value(value: Any) -> _Item | None:
         if not label.get("de") and label.get("en"):
             lang = lang or "en"
     else:
-        text = _clean_text(value)
+        text = _clean_text(value, multiline=True)
     source = normalize_source(value.get("source")) or None
     if source in _ENGLISH_SOURCES and not lang:
         # Authority values picked from Getty carry the English preferred label.
@@ -291,6 +305,40 @@ def _rule_items(ctx: ExportRecordContext, rule: MappingSpec) -> list[_Item]:
     return result
 
 
+def _grouped_measurements(
+    ctx: ExportRecordContext, rule: MappingSpec
+) -> list[tuple[str, str, str, str]] | None:
+    """Measurements read entry by entry from a group (type, shown number, value, unit).
+
+    A measurement rule on a group sub-field (``masse.wert``) may name the sibling sub-fields
+    holding the type and the unit (``measurement_type_field``, ``unit_field``); each group entry
+    then yields one measurement with its own type. ``None`` when the rule does not use that.
+    """
+    group, _, child = (rule.field_name or "").partition(".")
+    settings = rule.settings
+
+    def sibling(key: str) -> str:
+        name = str(settings.get(key) or "").strip()
+        return name.rpartition(".")[2] if name else ""
+
+    type_child, unit_child = sibling("measurement_type_field"), sibling("unit_field")
+    if not child or not (type_child or unit_child):
+        return None
+    entries = ctx.fields.get(group)
+    out: list[tuple[str, str, str, str]] = []
+    for entry in entries if isinstance(entries, list) else [entries]:
+        if not isinstance(entry, dict):
+            continue
+        value = _clean_text(entry.get(child))
+        unit = _clean_text(entry.get(unit_child)) if unit_child else ""
+        parsed = parse_measurement(f"{value} {unit}".strip(), settings.get("unit"))
+        if parsed is None:
+            continue
+        type_ = _clean_text(entry.get(type_child)) if type_child else ""
+        out.append((type_ or _clean_text(settings.get("measurement_type")), *parsed))
+    return out
+
+
 def _rule_values(ctx: ExportRecordContext, rule: MappingSpec) -> list[str]:
     return [item.text for item in _rule_items(ctx, rule)]
 
@@ -304,7 +352,8 @@ def _sub(parent: ET.Element, tag: str, text: Any = None, **attrs: Any) -> ET.Ele
     }
     el = ET.SubElement(parent, tag, clean_attrs)
     if text is not None:
-        el.text = _clean_text(text) or None
+        # Only running text keeps its paragraphs; titles, terms and the like stay on one line.
+        el.text = _clean_text(text, multiline=tag == "lido:descriptiveNoteValue") or None
     return el
 
 
@@ -970,7 +1019,13 @@ def build_lido_element(
     measurements_wrap = _sub(identification, "lido:objectMeasurementsWrap")
     display_values = [item.text for _rule, item in target_items(MEASUREMENTS_DISPLAY_TARGET)]
     structured: list[tuple[str, str, str, str]] = []  # (type, shown number, value, unit)
+    for rule in rules_by_target.get(MEASUREMENTS_SET_TARGET, []):
+        grouped = _grouped_measurements(ctx, rule)
+        if grouped is not None:
+            structured.extend(grouped)
     for rule, item in target_items(MEASUREMENTS_SET_TARGET):
+        if _grouped_measurements(ctx, rule) is not None:
+            continue
         parsed = parse_measurement(item.text, rule.settings.get("unit"))
         if parsed is None:
             display_values.append(item.text)

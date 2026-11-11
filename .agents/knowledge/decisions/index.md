@@ -32,6 +32,7 @@
 * [Standortverwaltung](standortverwaltung.md) - StorageLocation als sechster Primärtyp mit Hierarchie, Zuweisung über generische Relation (normal_location/current_location) statt direkter FK, SPECTRUM-Bewegungshistorie ohne Zusatztabelle
 * [Dev-HTTPS mit Custom Hostname](dev-https-custom-hostname.md) - mkcert/Caddy als opt-in Host-Prozess vor Dev-Compose-Ports, Vite `server.allowedHosts` als notwendige Ergänzung (#168)
 * [Hierarchische Suche und Filterung](hierarchische-suche-und-filterung.md) - Transitive Unterbaumauflösung für Sammlungen und Standorte via CTE-Query-Expansion statt ES-Denormalisierung; Vokabulare zurückgestellt (#362, #366, #367)
+* [Orts-Hierarchie](orts-hierarchie.md) - places.parent_id, Unterbaumabfrage per CTE, Pfad-Import mit explizitem Trenner legt Zwischenebenen an
 * [Facetten-Materialisierung als facet_all_*](facet-all-materialisierung.md) - alle Public-Felder als facet_all_* im Index, is_facet steuert nur noch Queryzeit-Whitelist im Portal-Search; Facetten-Toggles ohne Reindex, Sicherheitsmodell "Non-Public nie im Index" bleibt
 * [SPARQL Query Builder](sparql-query-builder.md) - Integrierter SPARQL Query Builder in der Admin-UI mit direkter SPARQL-Ausführung gegen Oxigraph, NL2SPARQL via LLM und persistierten gespeicherten Abfragen
 * [S3-Speicherbackend](s3-storage-backend.md) - optionales S3-Backend hinter StorageBackend-Protokoll (Default local unverändert), Cantaloupe S3Source, RADOSGW-Portabilität via boto3-Overrides, kein Migrationsskript, MinIO nur Dev (#121)
@@ -52,6 +53,7 @@
 * [Facetten-Katalog](facetten-katalog.md) - Relations-, Datums- und Baumfacetten über `facet_service`, `is_facet` getrennt von `show_in_detail`, Sortierung pro Facette, `selected`-Buckets
 * [Öffentliche Projektion von Relationsfeldern](oeffentliche-projektion-relationsfelder.md) - Ziel-Labels erben Sichtbarkeit, fail closed ohne `hidden_targets`, RDF mit öffentlicher Sicht, `source_field` gegen Doppelanzeige
 * [Portal-HTTP-Caching und Sammel-Requests](portal-http-caching-und-sammel-requests.md) - `public, max-age=60` + `Vary: Authorization` für anonyme Reads, `objects/summaries` statt zwei Requests je Teaser
+* [Nutzungsstatistik als Tageszähler und Beacon](nutzungsstatistik-tageszaehler-und-beacon.md) - anonyme Tageszähler ohne Personenbezug; Aufrufe per Portal-Beacon statt Detail-GET, Downloads nur am schaltbaren Attachment-Endpoint.
 * [Cantaloupe-Derivat-Cache und Vorschaubilder](cantaloupe-derivat-cache-und-vorschaubilder.md) - Cache auf Platte, Vorschaubilder vorab rendern, direkte IIIF-URLs
 * [Portal-Gestaltung als Kernkonfiguration](portal-gestaltung-als-kernkonfiguration.md) - Footer, Nutzungshinweis, Logo, Theme-Skript in PortalConfig statt Theme-Workarounds
 * [SEO-Meta-Tags per Bot-Weiche statt SSR](seo-bot-weiche-statt-ssr.md) - nginx leitet Crawler per User-Agent auf einen Backend-Renderer (Meta-Tags, schema.org, Sitemap) statt SSR/Prerender (#440)
@@ -68,3 +70,4 @@
 
 * [Manuelle exklusive Sperre](manual-exclusive-lock.md) - persistente Reservierung, eigene Freigabe und Admin-Force-Unlock; getrennt von Presence und If-Match
 * [Import-Auflösung in einem Pfad](import-aufloesung-gemeinsamer-pfad.md) - Vokabular und Relationen aus Text, Dry-run rollt per Savepoint zurück
+* [Feldtyp Datei mit eigener Anhang-Tabelle](feldtyp-datei-anhaenge.md) - Anhänge als Feldtyp `file` in eigener Tabelle `attachments`, Referenzprüfung beim Speichern, Portal per öffentlicher Projektion, Sichtbarkeit pro Feld, GC-Befehl mit 7 Tagen

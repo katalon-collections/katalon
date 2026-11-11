@@ -74,6 +74,7 @@ async def _validate_procedure(
         procedure_type,
         existing=existing,
         skip_required=data.status == "draft",
+        record_id=procedure_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)
@@ -501,6 +502,10 @@ async def delete_procedure(
             k: v for k, v in {"idno": proc.idno, "title": proc.reference_number}.items() if v
         },
     )
+    from katalon.services.attachment_service import purge_record_attachments
+
+    # Procedures have no trash: deleting is final, so their attachments go too.
+    await purge_record_attachments(db, "procedure", procedure_id)
     await db.delete(proc)
     await flush_record(db, proc)
     try:

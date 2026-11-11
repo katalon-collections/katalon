@@ -87,6 +87,11 @@ def import_records_task(
     from katalon.services.importer_service import apply_mapping
     from katalon.services.lock_service import enforce_not_locked
     from katalon.services.media_batch_import_service import media_references_for_rows
+    from katalon.services.place_path_import import (
+        ensure_ancestors,
+        place_path_separator,
+        split_path,
+    )
     from katalon.services.presence_service import enforce_not_blocked
     from katalon.services.publish_service import publish_record
     from katalon.services.relation_service import sync_schema_relations
@@ -347,13 +352,34 @@ def import_records_task(
 
             total = len(records)
 
-            for i, metadata in enumerate(records):
+            # Place paths ("Land>Region>Ort"): the label keeps its last segment, the rest
+            # becomes the parent chain. Shallow paths first so a parent row exists before
+            # its children and implicit levels are only created for levels without a row.
+            path_sep = place_path_separator(mapping) if record_type == "place" else None
+            paths: dict[int, list[str]] = {}
+            if path_sep:
+                for idx, meta in enumerate(records):
+                    label_value = meta.get("label")
+                    if not isinstance(label_value, str):
+                        continue
+                    try:
+                        segments = split_path(label_value, path_sep)
+                    except ValueError as exc:
+                        resolution_errors[idx] = [str(exc)]
+                        continue
+                    paths[idx] = segments
+                    meta["label"] = segments[-1]
+            order = sorted(range(total), key=lambda idx: len(paths.get(idx, ())))
+            ancestor_cache: dict[tuple[uuid.UUID | None, str], uuid.UUID] = {}
+
+            for pos, i in enumerate(order):
+                metadata = records[i]
                 row_num = i + 1
                 self.update_state(
                     state="STARTED",
-                    meta={"current": i + 1, "total": total, "stage": "importing"},
+                    meta={"current": pos + 1, "total": total, "stage": "importing"},
                 )
-                if i % 10 == 0 and _is_cancelled():
+                if pos % 10 == 0 and _is_cancelled():
                     warnings.append({"row": None, "warning": "Import wurde abgebrochen."})
                     break
 
@@ -368,6 +394,35 @@ def import_records_task(
                     idno = row_idno
                 elif idno_strategy == "auto" and idno_schema:
                     idno = await consume_next_idno(session, record_type, idno_schema)
+
+                parent_id: uuid.UUID | None = None
+                if i in paths:
+                    new_ancestors: list[Place] = []
+                    parent_id = await ensure_ancestors(
+                        session, paths[i][:-1], path_sep or "", ancestor_cache, new_ancestors
+                    )
+                    for ancestor in new_ancestors:
+                        created += 1
+                        await log_change(
+                            session,
+                            record_type=record_type,
+                            record_id=ancestor.id,
+                            user_id=user_uuid,
+                            action="create",
+                            changed_fields={"source": "import", "row": row_num},
+                        )
+                        if auto_publish:
+                            await publish_record(
+                                session, record_type, str(ancestor.id), user_id
+                            )
+                    if not idno:
+                        idno = (path_sep or "").join(paths[i])
+                        if idno not in existing_by_idno:
+                            known = (
+                                await session.execute(select(Place).where(Place.idno == idno))
+                            ).scalar_one_or_none()
+                            if known is not None:
+                                existing_by_idno[idno] = known
 
                 # Handle upsert
                 existing = existing_by_idno.get(idno) if idno else None
@@ -402,7 +457,12 @@ def import_records_task(
                                 can_edit_locked=can_edit_locked,
                             )
                             val_errors = await validate_metadata(
-                                session, record_type, final_metadata, subtype, skip_required=True
+                                session,
+                                record_type,
+                                final_metadata,
+                                subtype,
+                                skip_required=True,
+                                record_id=existing.id,
                             )
                             if val_errors:
                                 errors.append({"row": row_num, "error": "; ".join(val_errors)})
@@ -411,6 +471,8 @@ def import_records_task(
                             old_fields = {"metadata": old_meta}
                             new_fields = {"metadata": final_metadata}
                             existing.metadata_ = final_metadata
+                            if parent_id is not None and hasattr(existing, "parent_id"):
+                                existing.parent_id = parent_id
                             if upsert_strategy == "replace" and subtype_field:
                                 old_fields[subtype_field] = getattr(existing, subtype_field)
                                 new_fields[subtype_field] = subtype
@@ -494,10 +556,15 @@ def import_records_task(
                     kwargs["idno"] = idno
                 if subtype_field:
                     kwargs[subtype_field] = subtype
+                if parent_id is not None:
+                    kwargs["parent_id"] = parent_id
 
                 rec = model(**kwargs)
                 session.add(rec)
                 await session.flush()
+                if idno:
+                    # later rows of the same batch with this idno hit the upsert path
+                    existing_by_idno[idno] = rec
                 await sync_schema_relations(session, record_type, rec.id, metadata)
                 created += 1
                 await store_media_references(rec.id, media_references[i])

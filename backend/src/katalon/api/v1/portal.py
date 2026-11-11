@@ -59,6 +59,8 @@ _DEFAULTS = {
     "homepage_blocks": [],
     "terminology": {},
     "show_iiif_manifest_link": True,
+    "show_usage_stats": False,
+    "media_download_enabled": False,
     "facet_order": {},
     "relation_facets": {},
     "footer": {},
@@ -234,6 +236,10 @@ class PortalConfigRead(BaseModel):
     homepage_blocks: list[HomepageBlock] = Field(default_factory=list)
     terminology: dict[TerminologyRecordType, TerminologyEntry] = Field(default_factory=dict)
     show_iiif_manifest_link: bool = True
+    show_usage_stats: bool = False
+    media_download_enabled: bool = False
+    # Read-only mirror of admin_config.usage_stats_enabled (global switch).
+    usage_stats_enabled: bool = True
     facet_order: dict[str, list[str]] = Field(default_factory=dict)
     relation_facets: dict[FacetRecordType, list[RelationFacet]] = Field(default_factory=dict)
     # Derived, read-only: kind (terms/numeric/boolean/date/tree/related/
@@ -270,6 +276,8 @@ class PortalConfigUpdate(BaseModel):
     homepage_blocks: list[HomepageBlock] | None = None
     terminology: dict[TerminologyRecordType, TerminologyEntry] | None = None
     show_iiif_manifest_link: bool | None = None
+    show_usage_stats: bool | None = None
+    media_download_enabled: bool | None = None
     facet_order: dict[FacetRecordType, list[str]] | None = None
     relation_facets: dict[FacetRecordType, list[RelationFacet]] | None = None
     footer: FooterConfig | None = None
@@ -336,6 +344,7 @@ async def get_portal_config(db: DBDep) -> PortalConfigRead:
         if lang_config and lang_config.supported_languages
         else ["de", "en"]
     )
+    result.usage_stats_enabled = lang_config.usage_stats_enabled if lang_config else True
     return result
 
 

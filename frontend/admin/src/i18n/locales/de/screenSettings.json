@@ -173,7 +173,12 @@
     "left": "Links",
     "sidebarHint": "Gilt einheitlich für alle Detailseiten (Objekte, Entitäten, Orte, Occurrences). Auf kleinen Bildschirmen stehen Medien/Hauptinhalt immer zuerst.",
     "iiifButton": "IIIF-Manifest-Button auf der Objekt-Detailseite anzeigen",
-    "iiifButtonHint": "Zeigt bei Objekten mit Bildern einen Link auf das IIIF-Manifest sowie eine Kopieren-Aktion an, ohne Icons."
+    "iiifButtonHint": "Zeigt bei Objekten mit Bildern einen Link auf das IIIF-Manifest sowie eine Kopieren-Aktion an, ohne Icons.",
+    "mediaDownload": "Download von Mediendateien erlauben",
+    "mediaDownloadHint": "Zeigt auf der Objekt-Detailseite eine Liste „Downloads“ mit den öffentlichen Mediendateien in Originalqualität. Ausgeschaltet ist der Download für anonyme Besucher gesperrt.",
+    "usageStats": "Aufrufe und Downloads auf Detailseiten anzeigen",
+    "usageStatsHint": "Zeigt in der Seitenleiste, wie oft ein Datensatz aufgerufen und seine Dateien heruntergeladen wurden. Downloads erscheinen nur, wenn der Download erlaubt ist.",
+    "usageStatsOffHint": "Die Nutzungsstatistik ist unten ausgeschaltet. Ohne Erfassung wird im Portal nichts angezeigt."
   },
   "dangerZone": {
     "nav": "Gefahrenbereich",
@@ -352,5 +357,10 @@
   },
   "title": "Einstellungen",
   "subtitle": "Account und Systemkonfiguration",
-  "sectionLabel": "Bereich"
+  "sectionLabel": "Bereich",
+  "usageStats": {
+    "title": "Nutzungsstatistik",
+    "description": "Zählt anonym, wie oft öffentliche Datensätze im Portal aufgerufen und ihre Dateien heruntergeladen werden. Gespeichert werden nur Tageszähler pro Datensatz, keine IP-Adressen, Cookies oder Sitzungsdaten. Angemeldete Mitarbeitende und Suchmaschinen werden nicht gezählt.",
+    "enabledLabel": "Nutzungsstatistik erfassen"
+  }
 }

@@ -5,16 +5,19 @@
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import parse_qs
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from katalon.api.v1.media import _serialize
 from katalon.core.dependencies import get_current_user, try_get_current_user
+from katalon.core.media_storage import storage_key, storage_path
 from katalon.core.media_validation import PIL_MIME_BY_FORMAT
 from katalon.core.models import MediaFile, Object, User
 from katalon.database import get_db
 from katalon.main import app
+from katalon.services.attachment_service import build_attachment_link, build_signed_query
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -779,3 +782,155 @@ async def test_delete_media_moves_object_datestamp(override_auth) -> None:
         reindex.assert_awaited_once()
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+# ---------------------------------------------------------------------------
+# File delivery headers and signed media links
+# ---------------------------------------------------------------------------
+
+PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+MP4_BYTES = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00isommp42" + b"\x00" * 64
+CSP_SANDBOX = "default-src 'none'; sandbox"
+CSP_PDF = "default-src 'none'; object-src 'self'; frame-ancestors 'self'"
+
+
+@pytest.fixture
+def media_root(tmp_path, monkeypatch):
+    monkeypatch.setattr("katalon.config.settings.media_root", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
+def media_user() -> User:
+    return User(id=uuid.uuid4(), email="media@example.com", role="admin", hashed_password="x", is_active=True)
+
+
+@pytest.fixture
+def signed_in(media_user):
+    app.dependency_overrides[get_current_user] = lambda: media_user
+    app.dependency_overrides[try_get_current_user] = lambda: media_user
+    yield media_user
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(try_get_current_user, None)
+
+
+def _stored_media(media_root, *, obj_id: uuid.UUID, mime_type: str, data: bytes, filename: str) -> MediaFile:
+    media_id = uuid.uuid4()
+    key = storage_key(media_id, filename)
+    path = storage_path(key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return MediaFile(
+        id=media_id,
+        object_id=obj_id,
+        filename=filename,
+        mime_type=mime_type,
+        storage_key=key,
+        status="ready",
+        is_public=True,
+        is_primary=True,
+        created_at=datetime.now(),
+    )
+
+
+def _use_media_session(*results, user: User | None = None) -> None:
+    """Session whose execute() returns the given results in order (object, then media)."""
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[_mock_result(value) for value in results])
+    session.get = AsyncMock(return_value=user)
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+
+
+@pytest.mark.asyncio
+async def test_media_video_file_is_nosniff_and_sandboxed(signed_in, media_root) -> None:
+    obj = Object(id=uuid.uuid4(), idno="OBJ-V", status="published", metadata_={})
+    media = _stored_media(media_root, obj_id=obj.id, mime_type="video/mp4", data=MP4_BYTES, filename="film.mp4")
+    _use_media_session(obj, media)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(f"/v1/objects/{obj.id}/media/{media.id}/file")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 200
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == CSP_SANDBOX
+
+
+@pytest.mark.asyncio
+async def test_media_pdf_file_gets_pdf_csp(signed_in, media_root) -> None:
+    obj = Object(id=uuid.uuid4(), idno="OBJ-P", status="published", metadata_={})
+    media = _stored_media(media_root, obj_id=obj.id, mime_type="application/pdf", data=PDF_BYTES, filename="brief.pdf")
+    _use_media_session(obj, media)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(f"/v1/objects/{obj.id}/media/{media.id}/file")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 200
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == CSP_PDF
+    assert r.headers["content-disposition"].startswith("inline")
+
+
+@pytest.mark.asyncio
+async def test_media_link_then_stream_without_bearer(signed_in, media_user, media_root) -> None:
+    obj = Object(id=uuid.uuid4(), idno="OBJ-L", status="published", metadata_={})
+    media = _stored_media(media_root, obj_id=obj.id, mime_type="video/mp4", data=MP4_BYTES, filename="film.mp4")
+    _use_media_session(obj, media)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            link = await client.get(f"/v1/objects/{obj.id}/media/{media.id}/link")
+            assert link.status_code == 200
+            url = link.json()["url"]
+            assert url.startswith(f"/v1/objects/{obj.id}/media/{media.id}/stream?")
+
+            # No bearer and no auth overrides: the signed link is the only credential.
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(try_get_current_user, None)
+            _use_media_session(obj, media, user=media_user)
+            r = await client.get(url)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 200
+    assert r.content == MP4_BYTES
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == CSP_SANDBOX
+
+
+@pytest.mark.asyncio
+async def test_media_stream_rejects_tampered_signature(media_user, media_root) -> None:
+    obj_id = uuid.uuid4()
+    media = _stored_media(media_root, obj_id=obj_id, mime_type="video/mp4", data=MP4_BYTES, filename="film.mp4")
+    query = build_signed_query(media.id, media_user.id, scope="media")
+    tampered = f"/v1/objects/{obj_id}/media/{media.id}/stream?" + query.replace(
+        parse_qs(query)["sig"][0], "0" * 64
+    )
+    _use_media_session(Object(id=obj_id, status="published"), media)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(tampered)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_media_stream_rejects_attachment_scoped_signature(media_user, media_root) -> None:
+    obj_id = uuid.uuid4()
+    media = _stored_media(media_root, obj_id=obj_id, mime_type="video/mp4", data=MP4_BYTES, filename="film.mp4")
+    # Same user, same resource id, but issued for attachments: must not open the media file.
+    attachment_url = build_attachment_link(media.id, media_user.id)
+    media_url = attachment_url.replace(
+        f"/v1/attachments/{media.id}/stream", f"/v1/objects/{obj_id}/media/{media.id}/stream"
+    )
+    _use_media_session(Object(id=obj_id, status="published"), media)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(media_url)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 403

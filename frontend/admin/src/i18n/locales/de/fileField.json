@@ -1,0 +1,30 @@
+{
+  "saveFirst": "Zum Hochladen von Dateien den Datensatz zuerst speichern.",
+  "select": "Datei auswählen",
+  "dropHint": "oder hierher ziehen",
+  "hint": "PDF, Bild, Audio, Video · max. {{max}} MB",
+  "hintNoMax": "PDF, Bild, Audio, Video",
+  "addMore": "Weitere Datei",
+  "view": "Ansehen",
+  "remove": "Entfernen",
+  "cancelUpload": "Abbrechen",
+  "dismiss": "Meldung schließen",
+  "uploadPercent": "{{percent}} %",
+  "missing": "Datei nicht mehr vorhanden",
+  "errorRow": "{{filename}}: {{message}}",
+  "errorType": "Dateityp nicht erlaubt (erlaubt: PDF, Bild, Audio, Video)",
+  "errorTooLarge": "Datei zu groß ({{size}}, max. {{max}} MB)",
+  "errorTooLargeNoMax": "Datei zu groß ({{size}})",
+  "errorGeneric": "Hochladen fehlgeschlagen.",
+  "lightbox": {
+    "close": "Schließen",
+    "download": "Herunterladen",
+    "previous": "Vorherige Datei",
+    "next": "Nächste Datei",
+    "counter": "{{current}} / {{total}}",
+    "loading": "Lädt…",
+    "loadFailed": "Datei konnte nicht geladen werden.",
+    "noPreview": "Für diesen Dateityp gibt es keine Vorschau.",
+    "openInTab": "In neuem Tab öffnen"
+  }
+}

@@ -284,6 +284,35 @@ def _normalize_url_value(value: Any) -> Any:
     return _normalize_url_item(value)
 
 
+def drop_file_values(md: dict[str, Any], field_definitions: Iterable[Any]) -> dict[str, Any]:
+    """Remove `file` field values (top-level and group sub-fields) before indexing.
+
+    Attachments are referenced by id only; their filenames and reference shape must
+    not reach Elasticsearch (no full-text, facet or advanced-search use in phase 1).
+    """
+    definitions = list(field_definitions)
+    by_id = {f.id: f for f in definitions if getattr(f, "id", None) is not None}
+    top_level = {f.name for f in definitions if f.field_type == "file" and f.parent_id is None}
+    in_groups: dict[str, set[str]] = {}
+    for f in definitions:
+        parent = by_id.get(f.parent_id) if f.parent_id is not None else None
+        if f.field_type == "file" and parent is not None:
+            in_groups.setdefault(parent.name, set()).add(f.name)
+    if not top_level and not in_groups:
+        return md
+
+    out = {k: v for k, v in md.items() if k not in top_level}
+    for group, children in in_groups.items():
+        instances = out.get(group)
+        if not isinstance(instances, list):
+            continue
+        out[group] = [
+            {k: v for k, v in inst.items() if k not in children} if isinstance(inst, dict) else inst
+            for inst in instances
+        ]
+    return out
+
+
 def normalize_url_values(md: dict[str, Any], field_definitions: Iterable[Any]) -> dict[str, Any]:
     """Bring every URL value (top-level and inside groups) into one shape.
 
@@ -830,6 +859,7 @@ async def build_index_doc(record_type: str, record: Any, db: Any = None) -> dict
             ),
             public_fields,
         )
+        public_metadata = drop_file_values(public_metadata, public_fields)
         facet_extra = await derive_facet_fields(
             public_metadata, await _cached_field_specs(db, record_type), db
         )
@@ -996,6 +1026,7 @@ async def search(
     full_visibility_types: tuple[str, ...] | None = None,
     facet_specs: dict[str, tuple[str, str, str]] | None = None,
     tree_aggs: dict[str, tuple[str, str, list[str]]] | None = None,
+    record_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     from_ = (page - 1) * page_size
     raw = await search_documents(
@@ -1018,6 +1049,7 @@ async def search(
         full_visibility_types=full_visibility_types,
         facet_specs=facet_specs,
         tree_aggs=tree_aggs,
+        record_ids=record_ids,
     )
 
     hits = raw.get("hits", {})

@@ -91,6 +91,16 @@ export async function logout(): Promise<void> {
   await fetch(resolveUrl('/v1/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => {})
 }
 
+/** HTTP failure that keeps the status code, so callers can map 404/413/415 to specific messages. */
+export class HttpStatusError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'HttpStatusError'
+    this.status = status
+  }
+}
+
 export class ConflictError extends Error {
   related_count: number
   child_count: number
@@ -299,7 +309,7 @@ export const entities = {
 
 // Places
 export const places = {
-  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string; parent_id?: string; root?: boolean; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },
@@ -308,6 +318,14 @@ export const places = {
   create: (data: Partial<Place>) => req<Place>('/v1/places', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Place>, version?: number) => req<Place>(`/v1/places/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: ifMatch(version) }),
   delete: (id: string, force?: boolean) => req<void>(`/v1/places/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  /** Delete a place that still has direct sub-places (cascade or reparent), see `api/v1/places.py::delete_place`. */
+  deleteHierarchy: (id: string, opts: { cascade?: boolean; reparent?: boolean; force?: boolean }) => {
+    const params = new URLSearchParams()
+    if (opts.cascade) params.set('cascade', 'true')
+    if (opts.reparent) params.set('reparent', 'true')
+    if (opts.force) params.set('force', 'true')
+    return req<void>(`/v1/places/${id}?${params.toString()}`, { method: 'DELETE' })
+  },
   trashList: () => req<Place[]>('/v1/places/trash/list'),
   restore: (id: string) => req<Place>(`/v1/places/${id}/restore`, { method: 'POST' }),
   purge: (id: string) => req<void>(`/v1/places/${id}/purge`, { method: 'POST' }),
@@ -843,7 +861,7 @@ function fileFormName(file: FolderFile): string {
   return file.webkitRelativePath || file.name
 }
 
-function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (fraction: number) => void, allowRefresh = true): Promise<T> {
+function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (fraction: number) => void, allowRefresh = true, signal?: AbortSignal): Promise<T> {
   const { promise, resolve, reject } = Promise.withResolvers<T>()
   const xhr = new XMLHttpRequest()
   xhr.open('POST', resolveUrl(path))
@@ -853,11 +871,13 @@ function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (f
     if (e.lengthComputable) onProgress?.(e.loaded / e.total)
   }
   xhr.onerror = () => reject(new Error('Netzwerkfehler beim Hochladen.'))
+  xhr.onabort = () => reject(new DOMException('Upload abgebrochen.', 'AbortError'))
+  signal?.addEventListener('abort', () => xhr.abort(), { once: true })
   xhr.onload = () => {
     if (xhr.status === 401 && allowRefresh) {
       refreshAccessToken().then(
         token => (token
-          ? uploadWithProgress<T>(path, formData, onProgress, false).then(resolve, reject)
+          ? uploadWithProgress<T>(path, formData, onProgress, false, signal).then(resolve, reject)
           : reject(new Error('Sitzung abgelaufen. Bitte neu anmelden.'))),
         reject,
       )
@@ -872,11 +892,15 @@ function uploadWithProgress<T>(path: string, formData: FormData, onProgress?: (f
     if (xhr.status < 200 || xhr.status >= 300) {
       let detail: unknown
       try { detail = JSON.parse(xhr.responseText).detail } catch { /* not JSON */ }
-      reject(new Error(typeof detail === 'string' ? detail : xhr.statusText || 'Upload fehlgeschlagen.'))
+      reject(new HttpStatusError(typeof detail === 'string' ? detail : xhr.statusText || 'Upload fehlgeschlagen.', xhr.status))
       return
     }
     onProgress?.(1)
     resolve(xhr.responseText ? JSON.parse(xhr.responseText) : (undefined as T))
+  }
+  if (signal?.aborted) {
+    reject(new DOMException('Upload abgebrochen.', 'AbortError'))
+    return promise
   }
   xhr.send(formData)
   return promise
@@ -892,6 +916,13 @@ export const media = {
   patch: (objectId: string, mediaId: string, data: { media_type?: string | null; is_primary?: boolean; is_public?: boolean; license_uri?: string | null; rights_holder?: { name: string; uri?: string } | null; credit_line?: string | null }) =>
     req<MediaFile>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (objectId: string, mediaId: string) => req<void>(`/v1/objects/${objectId}/media/${mediaId}`, { method: 'DELETE' }),
+  /** Short-lived signed stream URL (valid 5 min) for <video>, <audio> and PDF iframes; no bearer token needed. */
+  link: async (objectId: string, mediaId: string): Promise<string> => {
+    const res = await authorizedFetch(`/v1/objects/${encodeURIComponent(objectId)}/media/${encodeURIComponent(mediaId)}/link`)
+    if (!res.ok) throw await attachmentStatusError(res)
+    const body = await res.json() as { url: string }
+    return `${BASE}${body.url}`
+  },
   batchImport: async (archive: File | null, mapping: File | null, files: File[]): Promise<{ status: string; task_id: string; batch_id: string }> => {
     const formData = new FormData()
     if (archive) formData.append('archive', archive)
@@ -904,6 +935,43 @@ export const media = {
   },
   batchTaskStatus: (taskId: string): Promise<MediaBatchStatus> =>
     req<MediaBatchStatus>(`/v1/media/batch-import/task/${taskId}`),
+}
+
+// Attachments (Feldtyp "file"): files stored per record, referenced from metadata on save
+export type AttachmentRecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
+
+export interface AttachmentRef {
+  id: string
+  filename: string
+  mime_type: string
+  size: number
+}
+
+async function attachmentStatusError(res: Response): Promise<HttpStatusError> {
+  const body = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: unknown }
+  return new HttpStatusError(formatApiErrorDetail(body.detail) || res.statusText, res.status)
+}
+
+export const attachments = {
+  upload: (recordType: AttachmentRecordType, recordId: string, file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<AttachmentRef> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return uploadWithProgress<AttachmentRef>(`/v1/attachments/${recordType}/${encodeURIComponent(recordId)}`, formData, onProgress, true, signal)
+  },
+  /** Configured upload limit (`attachment_max_upload_mb`). */
+  limits: (): Promise<{ max_upload_mb: number }> => req<{ max_upload_mb: number }>('/v1/attachments/limits'),
+  /** Short-lived signed stream URL (valid 5 min), usable directly as <video>/<audio> src. */
+  link: async (id: string): Promise<string> => {
+    const res = await authorizedFetch(`/v1/attachments/${encodeURIComponent(id)}/link`)
+    if (!res.ok) throw await attachmentStatusError(res)
+    const body = await res.json() as { url: string }
+    return `${BASE}${body.url}`
+  },
+  fileBlob: async (id: string): Promise<Blob> => {
+    const res = await authorizedFetch(`/v1/attachments/${encodeURIComponent(id)}/file`)
+    if (!res.ok) throw await attachmentStatusError(res)
+    return res.blob()
+  },
 }
 
 // Relations
@@ -1164,6 +1232,8 @@ export interface TransformConfig {
 export interface MappingEntry {
   target: string
   transforms?: TransformConfig[]
+  /** Place title only: splits "Land>Region>Ort" at this separator into a place hierarchy. */
+  path_separator?: string
 }
 
 export interface ImportMapping {
@@ -1297,6 +1367,7 @@ export interface AdminConfigRead {
   presence_lock_mode: 'warning' | 'blocking'
   auto_purge_enabled: boolean
   purge_retention_days: number
+  usage_stats_enabled: boolean
   pid_providers: ('ark' | 'dnb_urn')[]
   ai_secret: {
     has_key: boolean
@@ -1306,6 +1377,19 @@ export interface AdminConfigRead {
     daily_user_tokens: number
     monthly_global_tokens: number
   }
+}
+
+export interface RecordUsage {
+  enabled: boolean
+  views: number
+  downloads: number
+  views_30d: number
+  downloads_30d: number
+}
+
+export const usageApi = {
+  get: (recordType: string, recordId: string) =>
+    req<RecordUsage>(`/v1/usage/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}`),
 }
 
 export const adminConfig = {

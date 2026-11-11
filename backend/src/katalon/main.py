@@ -29,6 +29,7 @@ from katalon.api.v1 import (
     admin_config,
     ai,
     ark,
+    attachments,
     audit,
     auth,
     authority,
@@ -70,6 +71,7 @@ from katalon.api.v1 import (
     storage_locations,
     theme,
     thumbnail_warmup,
+    usage,
     users,
     vocabularies,
     working_sets,
@@ -776,7 +778,10 @@ app.include_router(storage_locations.router, prefix="/v1", dependencies=_authent
 app.include_router(relations.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(presence.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(locks.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(attachments.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(attachments.stream_router, prefix="/v1")
 app.include_router(media.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(media.stream_router, prefix="/v1")
 app.include_router(media.batch_router, prefix="/v1", dependencies=_authenticated)
 app.include_router(media.internal_router, prefix="/v1")
 app.include_router(media.internal_router, prefix="/api/v1")
@@ -796,6 +801,7 @@ app.include_router(oai.router, prefix="")
 app.include_router(oai_sets.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_authenticated)
 app.include_router(working_sets.router, prefix="/v1", dependencies=_authenticated)
+app.include_router(usage.router, prefix="/v1", dependencies=_authenticated)
 app.include_router(sparql.router, prefix="")
 app.include_router(ark.router)
 app.include_router(portal_public.router, prefix="/portal/v1")

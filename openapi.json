@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.49.0"
+    "version": "1.50.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -1964,6 +1964,33 @@
             }
           },
           {
+            "name": "place_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "include_subplaces",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Subplaces"
+            }
+          },
+          {
             "name": "sort_by",
             "in": "query",
             "required": false,
@@ -3704,7 +3731,7 @@
           "schema"
         ],
         "summary": "Import field definitions from a YAML or JSON file",
-        "description": "Import field definitions from a YAML or JSON file.\n\nExpected format:\n  target_type: object\n  fields:\n    - name: title\n      label: {de: Titel, en: Title}\n      field_type: text\n      is_required: true",
+        "description": "Import field definitions from a YAML or JSON file.\n\nOne record type per document (``target_type`` + ``fields``) or several in ``schemas``:\n\n  relation_types:                  # optional; created in the relation_types vocabulary\n    - {term: found_at, label: {de: Fundort}, applies_from: [object], applies_to: [place]}\n  schemas:\n    - target_type: object\n      fields:\n        - name: material\n          field_type: vocab\n          settings: {vocabulary: material}          # by name, created if missing\n        - name: masse\n          field_type: group\n          is_repeatable: true\n          children:                                  # sub-fields of a group\n            - {name: wert, field_type: number}\n        - name: fundort\n          field_type: relation\n          settings: {target_type: place, relation_type_vocab: relation_types,\n                     fixed_relation_type: found_at}",
         "operationId": "schema_import_schema_post_v1_schema_import",
         "security": [
           {
@@ -7139,6 +7166,33 @@
             }
           },
           {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Root"
+            }
+          },
+          {
             "name": "sort_by",
             "in": "query",
             "required": false,
@@ -7529,6 +7583,30 @@
               "default": false,
               "title": "Force"
             }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete this place and its whole subtree.",
+              "default": false,
+              "title": "Cascade"
+            },
+            "description": "Delete this place and its whole subtree."
+          },
+          {
+            "name": "reparent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Move direct children up to this place's parent before deleting.",
+              "default": false,
+              "title": "Reparent"
+            },
+            "description": "Move direct children up to this place's parent before deleting."
           }
         ],
         "responses": {
@@ -12235,6 +12313,343 @@
         ]
       }
     },
+    "/v1/attachments/limits": {
+      "get": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Upload limits for file fields",
+        "description": "Returns {\"max_upload_mb\": n}, the configured maximum upload size.",
+        "operationId": "attachments_get_attachment_limits_get_v1_attachments_limits",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Attachments Get Attachment Limits Get V1 Attachments Limits"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/attachments/{record_type}/{record_id}": {
+      "post": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Upload an attachment for a record's file field",
+        "operationId": "attachments_upload_attachment_post_v1_attachments__record_type___record_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence",
+                "procedure"
+              ],
+              "type": "string",
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_attachments_upload_attachment_post_v1_attachments__record_type___record_id_"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Attachments Upload Attachment Post V1 Attachments  Record Type   Record Id "
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Record not found"
+          },
+          "413": {
+            "description": "File too large"
+          },
+          "415": {
+            "description": "File content is not an allowed type"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/attachments/{attachment_id}/file": {
+      "get": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Serve an attachment file",
+        "operationId": "attachments_get_attachment_file_get_v1_attachments__attachment_id__file",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Attachment, record or file not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/attachments/{attachment_id}/link": {
+      "get": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Create a short-lived signed stream URL for an attachment",
+        "description": "Returns {\"url\": path}. The path is relative to the API root and streams the file without a bearer token (for <video>/<audio>). Valid for 300 seconds, bound to the attachment and the requesting user; streaming re-checks both.",
+        "operationId": "attachments_get_attachment_link_get_v1_attachments__attachment_id__link",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Attachments Get Attachment Link Get V1 Attachments  Attachment Id  Link"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Attachment or record not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/attachments/{attachment_id}/stream": {
+      "get": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Stream an attachment with a signed link (no bearer token)",
+        "operationId": "attachments_stream_attachment_get_v1_attachments__attachment_id__stream",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uid"
+            }
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exp"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sig"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "Link invalid, expired, or user no longer allowed"
+          },
+          "404": {
+            "description": "Attachment, record or file not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/objects/{object_id}/media": {
       "get": {
         "tags": [
@@ -12566,6 +12981,75 @@
         }
       }
     },
+    "/v1/objects/{object_id}/media/{media_id}/link": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Create a short-lived signed stream URL for a media file",
+        "description": "Returns {\"url\": path}. The path is relative to the API root and streams the file without a bearer token (for <video>, <audio> and PDF iframes). Valid for 300 seconds, bound to the media file and the requesting user; streaming re-checks both.",
+        "operationId": "media_get_media_link_get_v1_objects__object_id__media__media_id__link",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Media Get Media Link Get V1 Objects  Object Id  Media  Media Id  Link"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object or media file not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/objects/{object_id}/media/{media_id}/thumbnail": {
       "get": {
         "tags": [
@@ -12614,6 +13098,111 @@
           },
           "404": {
             "description": "Object, media file, or image not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/objects/{object_id}/media/{media_id}/stream": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Stream a media file with a signed link (no bearer token)",
+        "operationId": "media_stream_media_file_get_v1_objects__object_id__media__media_id__stream",
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uid"
+            }
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exp"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sig"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "Link invalid, expired, or user no longer active"
+          },
+          "404": {
+            "description": "Object or media file not found"
           },
           "422": {
             "description": "Validation Error",
@@ -17473,6 +18062,76 @@
         }
       }
     },
+    "/v1/usage/{record_type}/{record_id}": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "View/download counts of a record (all time and last 30 days)",
+        "operationId": "usage_get_usage_get_v1_usage__record_type___record_id_",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "object",
+                "entity",
+                "place",
+                "occurrence",
+                "collection"
+              ],
+              "type": "string",
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageRead"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sparql/status": {
       "get": {
         "tags": [
@@ -18521,7 +19180,77 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortalPlaceRead"
+                  "$ref": "#/components/schemas/PortalPlaceDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/places/{place_id}/object-ids": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Visible objects linked to a place or, by default, any of its sub-places",
+        "operationId": "portal_place_object_ids_get_portal_v1_places__place_id__object_ids",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "include_subplaces",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Subplaces"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": "Response Portal Place Object Ids Get Portal V1 Places  Place Id  Object Ids"
                 }
               }
             }
@@ -19218,6 +19947,7 @@
           "portal"
         ],
         "summary": "Download Portal Media File",
+        "description": "Attachment download; anonymous only while the portal offers downloads.",
         "operationId": "portal_download_portal_media_file_get_portal_v1_media__media_id__download",
         "parameters": [
           {
@@ -19239,6 +19969,113 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/attachments/{attachment_id}/file": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Serve an attachment of a public `file` field",
+        "description": "Checked on every request: the owning record must be publicly visible, its type must not be a procedure, and the attachment id must appear in the record's public metadata projection (field, group and subfield visibility apply). Never cached.",
+        "operationId": "portal_get_public_attachment_file_get_portal_v1_attachments__attachment_id__file",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Attachment, record, field or file not public"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/v1/usage/{plural_type}/{record_id}/view": {
+      "post": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "Count one detail page view; returns the counts when the portal shows them",
+        "operationId": "portal_record_view_post_portal_v1_usage__plural_type___record_id__view",
+        "parameters": [
+          {
+            "name": "plural_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "objects",
+                "entities",
+                "places",
+                "occurrences",
+                "collections"
+              ],
+              "type": "string",
+              "title": "Plural Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalUsageRead"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Counted (or statistics off); counts not shown publicly"
           },
           "422": {
             "description": "Validation Error",
@@ -20759,6 +21596,10 @@
             "type": "integer",
             "title": "Purge Retention Days"
           },
+          "usage_stats_enabled": {
+            "type": "boolean",
+            "title": "Usage Stats Enabled"
+          },
           "pid_providers": {
             "items": {
               "type": "string"
@@ -20793,6 +21634,7 @@
           "presence_lock_mode",
           "auto_purge_enabled",
           "purge_retention_days",
+          "usage_stats_enabled",
           "pid_providers",
           "ai_secret",
           "ai_usage"
@@ -21015,6 +21857,17 @@
               }
             ],
             "title": "Purge Retention Days"
+          },
+          "usage_stats_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Stats Enabled"
           }
         },
         "type": "object",
@@ -22118,6 +22971,20 @@
           "value"
         ],
         "title": "BatchSetStatus"
+      },
+      "Body_attachments_upload_attachment_post_v1_attachments__record_type___record_id_": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_attachments_upload_attachment_post_v1_attachments__record_type___record_id_"
       },
       "Body_auth_login_post_v1_auth_token": {
         "properties": {
@@ -25586,6 +26453,18 @@
             },
             "type": "array",
             "title": "Transforms"
+          },
+          "path_separator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Separator"
           }
         },
         "type": "object",
@@ -26762,6 +27641,18 @@
             ],
             "title": "Place Type"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
           "lat": {
             "anyOf": [
               {
@@ -26859,6 +27750,18 @@
               }
             ],
             "title": "Place Type"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
           },
           "lat": {
             "anyOf": [
@@ -27420,6 +28323,21 @@
             "title": "Show Iiif Manifest Link",
             "default": true
           },
+          "show_usage_stats": {
+            "type": "boolean",
+            "title": "Show Usage Stats",
+            "default": false
+          },
+          "media_download_enabled": {
+            "type": "boolean",
+            "title": "Media Download Enabled",
+            "default": false
+          },
+          "usage_stats_enabled": {
+            "type": "boolean",
+            "title": "Usage Stats Enabled",
+            "default": true
+          },
           "facet_order": {
             "additionalProperties": {
               "items": {
@@ -27798,6 +28716,28 @@
               }
             ],
             "title": "Show Iiif Manifest Link"
+          },
+          "show_usage_stats": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Usage Stats"
+          },
+          "media_download_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Download Enabled"
           },
           "facet_order": {
             "anyOf": [
@@ -28489,7 +29429,7 @@
         ],
         "title": "PortalOccurrenceRead"
       },
-      "PortalPlaceRead": {
+      "PortalPlaceDetail": {
         "properties": {
           "id": {
             "type": "string",
@@ -28565,6 +29505,34 @@
             ],
             "title": "Lon"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "ancestors": {
+            "items": {
+              "$ref": "#/components/schemas/PortalPlaceHierarchyItem"
+            },
+            "type": "array",
+            "title": "Ancestors",
+            "default": []
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/PortalPlaceHierarchyItem"
+            },
+            "type": "array",
+            "title": "Children",
+            "default": []
+          },
           "_links": {
             "additionalProperties": {
               "additionalProperties": {
@@ -28588,7 +29556,26 @@
           "place_type",
           "_links"
         ],
-        "title": "PortalPlaceRead"
+        "title": "PortalPlaceDetail"
+      },
+      "PortalPlaceHierarchyItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PortalPlaceHierarchyItem"
       },
       "PortalRecordSubtypeRead": {
         "properties": {
@@ -28730,6 +29717,30 @@
           "parent_id"
         ],
         "title": "PortalSearchTermRead"
+      },
+      "PortalUsageRead": {
+        "properties": {
+          "views": {
+            "type": "integer",
+            "title": "Views"
+          },
+          "downloads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downloads"
+          }
+        },
+        "type": "object",
+        "required": [
+          "views"
+        ],
+        "title": "PortalUsageRead"
       },
       "PortalVocabularyRead": {
         "properties": {
@@ -30352,6 +31363,20 @@
               }
             ],
             "title": "Subtype"
+          },
+          "place_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place Path"
           }
         },
         "type": "object",
@@ -31053,6 +32078,39 @@
           "delta"
         ],
         "title": "TypeHealth"
+      },
+      "UsageRead": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "views": {
+            "type": "integer",
+            "title": "Views"
+          },
+          "downloads": {
+            "type": "integer",
+            "title": "Downloads"
+          },
+          "views_30d": {
+            "type": "integer",
+            "title": "Views 30D"
+          },
+          "downloads_30d": {
+            "type": "integer",
+            "title": "Downloads 30D"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "views",
+          "downloads",
+          "views_30d",
+          "downloads_30d"
+        ],
+        "title": "UsageRead"
       },
       "UserCreate": {
         "properties": {

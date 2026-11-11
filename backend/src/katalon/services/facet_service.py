@@ -154,7 +154,9 @@ def relation_facet_specs(relation_facets: dict[str, Any] | None) -> dict[str, di
             name = f"{RELATION_FACET_PREFIX}{key}"
             out.setdefault(record_type, {})[name] = FacetSpec(
                 name,
-                "relation",
+                # Targets that are places form a hierarchy: shown as a tree over the place
+                # tree (counts and subtree filter come from the database, see portal search).
+                "tree" if entry.get("target_type") == "place" else "relation",
                 f"facet_relid_{key}",
                 f"facet_rel_{key}",
                 label=entry.get("label") or {},

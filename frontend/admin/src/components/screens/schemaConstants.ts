@@ -14,5 +14,9 @@ export const FIELD_TYPE_LABELS: Record<string, string> = {
   pid: 'PID',
   url: 'URL (mit Linktitel)',
   authority: 'Normdaten (Authority)',
+  file: 'Datei',
   group: 'Containerfeld (Gruppe)',
 }
+
+/** Record types that can hold file attachments (backend `AttachmentRecordType`). */
+export const FILE_FIELD_TARGET_TYPES: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure']

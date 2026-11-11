@@ -43,6 +43,11 @@ from katalon.core.models import AdminConfig, MediaFile, Object, User
 from katalon.core.thumbnails import thumbnail_path
 from katalon.core.visibility import PUBLIC_STATUSES, ensure_publicly_visible
 from katalon.integrations.cantaloupe import public_iiif_base
+from katalon.services.attachment_service import (
+    build_signed_query,
+    file_security_headers,
+    verify_signed_link,
+)
 from katalon.services.audit_service import diff_fields, log_change
 from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
 from katalon.services.media_service import primary_media_files_by_object, touch_object
@@ -50,6 +55,8 @@ from katalon.workers.celery_app import celery_app
 from katalon.workers.media_tasks import generate_iiif_tiles, import_media_batch_task
 
 router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
+# Signed-link stream: mounted without the app-wide auth dependency (see main.py).
+stream_router = APIRouter(prefix="/objects/{object_id}/media", tags=["media"])
 batch_router = APIRouter(prefix="/media", tags=["media"])
 # Mounted without the app-wide auth dependency (see main.py) — anonymous portal
 # visitors must be able to reach this, same as the /portal/v1 media endpoints.
@@ -333,7 +340,7 @@ async def patch_media(
 def _serve_media_response(media: MediaFile, as_attachment: bool = False) -> Response:
     storage = get_storage()
     disposition = "attachment" if as_attachment else "inline"
-    headers = {"Content-Disposition": f'{disposition}; filename="{media.filename}"'}
+    security_headers = file_security_headers(media.mime_type)
     if isinstance(storage, LocalStorage):
         path = storage.local_path(media.storage_key)
         if not path.exists():
@@ -343,13 +350,17 @@ def _serve_media_response(media: MediaFile, as_attachment: bool = False) -> Resp
             media_type=media.mime_type,
             filename=media.filename,
             content_disposition_type=disposition,
+            headers=security_headers,
         )
     if not storage.exists(media.storage_key):
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     return StreamingResponse(
         storage.stream(media.storage_key),
         media_type=media.mime_type,
-        headers=headers,
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{media.filename}"',
+            **security_headers,
+        },
     )
 
 
@@ -381,14 +392,10 @@ async def serve_media_by_id(
     return _serve_media_response(media, as_attachment=as_attachment)
 
 
-@router.get(
-    "/{media_id}/file",
-    summary="Serve the raw media file",
-    responses={404: {"description": "Object, media file, or file on disk not found"}},
-)
-async def serve_media_file(
-    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
-) -> Response:
+async def _load_readable_media(
+    db: DBDep, object_id: uuid.UUID, media_id: uuid.UUID, current_user: User | None
+) -> MediaFile:
+    """Media file the user may see: object visible to them, file ready and public for anonymous users."""
     obj_result = await db.execute(select(Object).where(Object.id == object_id))
     obj = obj_result.scalar_one_or_none()
     if not obj:
@@ -404,7 +411,60 @@ async def serve_media_file(
     media = result.scalar_one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return media
+
+
+@router.get(
+    "/{media_id}/file",
+    summary="Serve the raw media file",
+    responses={404: {"description": "Object, media file, or file on disk not found"}},
+)
+async def serve_media_file(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+) -> Response:
+    media = await _load_readable_media(db, object_id, media_id, current_user)
     return _serve_media_response(media, as_attachment=False)
+
+
+@router.get(
+    "/{media_id}/link",
+    summary="Create a short-lived signed stream URL for a media file",
+    description=(
+        "Returns {\"url\": path}. The path is relative to the API root and streams the file "
+        "without a bearer token (for <video>, <audio> and PDF iframes). Valid for 300 seconds, "
+        "bound to the media file and the requesting user; streaming re-checks both."
+    ),
+    responses={404: {"description": "Object or media file not found"}},
+)
+async def get_media_link(
+    object_id: uuid.UUID, media_id: uuid.UUID, db: DBDep, current_user: CurrentUser
+) -> dict[str, str]:
+    await _load_readable_media(db, object_id, media_id, current_user)
+    query = build_signed_query(media_id, current_user.id, scope="media")
+    return {"url": f"/v1/objects/{object_id}/media/{media_id}/stream?{query}"}
+
+
+@stream_router.get(
+    "/{media_id}/stream",
+    summary="Stream a media file with a signed link (no bearer token)",
+    responses={
+        403: {"description": "Link invalid, expired, or user no longer active"},
+        404: {"description": "Object or media file not found"},
+    },
+)
+async def stream_media_file(
+    object_id: uuid.UUID,
+    media_id: uuid.UUID,
+    db: DBDep,
+    uid: str | None = None,
+    exp: str | None = None,
+    sig: str | None = None,
+) -> Response:
+    user_id = verify_signed_link(media_id, uid, exp, sig, scope="media")
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=403, detail="Link ungültig oder abgelaufen")
+    return await serve_media_file(object_id, media_id, db, user)
 
 
 @router.get(

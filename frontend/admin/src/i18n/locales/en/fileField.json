@@ -1,0 +1,30 @@
+{
+  "saveFirst": "Save the record first to upload files.",
+  "select": "Choose file",
+  "dropHint": "or drop it here",
+  "hint": "PDF, image, audio, video · max. {{max}} MB",
+  "hintNoMax": "PDF, image, audio, video",
+  "addMore": "Another file",
+  "view": "View",
+  "remove": "Remove",
+  "cancelUpload": "Cancel",
+  "dismiss": "Dismiss message",
+  "uploadPercent": "{{percent}}%",
+  "missing": "File no longer available",
+  "errorRow": "{{filename}}: {{message}}",
+  "errorType": "File type not allowed (allowed: PDF, image, audio, video)",
+  "errorTooLarge": "File too large ({{size}}, max. {{max}} MB)",
+  "errorTooLargeNoMax": "File too large ({{size}})",
+  "errorGeneric": "Upload failed.",
+  "lightbox": {
+    "close": "Close",
+    "download": "Download",
+    "previous": "Previous file",
+    "next": "Next file",
+    "counter": "{{current}} / {{total}}",
+    "loading": "Loading…",
+    "loadFailed": "The file could not be loaded.",
+    "noPreview": "No preview is available for this file type.",
+    "openInTab": "Open in new tab"
+  }
+}

@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Karl Krägelin
 
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, fetchRecord, type ObjectSummary, type PlaceSummary, type PortalUser, type Relation } from '../api/client'
+import { api, fetchRecord, type ObjectSummary, type PlaceDetail, type PortalUser, type Relation } from '../api/client'
 import { loadObjectTeasers } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
@@ -49,7 +49,7 @@ function StaticMap({ lat, lon, name }: { lat: number; lon: number; name: string 
 export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [place, setPlace] = useState<PlaceSummary | null>(null)
+  const [place, setPlace] = useState<PlaceDetail | null>(null)
   const [relations, setRelations] = useState<Relation[]>([])
   const [linkedObjects, setLinkedObjects] = useState<ObjectSummary[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
@@ -72,10 +72,8 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
         const rels = await api.relations.forRecord('place', id).catch(() => [] as Relation[])
         setRelations(rels)
 
-        const objIds = rels
-          .filter(r => r.from_type === 'object' || r.to_type === 'object')
-          .map(r => r.from_type === 'object' ? r.from_id : r.to_id)
-        const uniqueObjIds = [...new Set(objIds)]
+        // Objects of this place and of all its sub-places (a region shows its finds).
+        const uniqueObjIds = await api.places.objectIds(id).catch(() => [] as string[])
         const teasers = await loadObjectTeasers(uniqueObjIds)
         setLinkedObjects(teasers.objects)
         setThumbnails(teasers.thumbnails)
@@ -136,6 +134,12 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
             <a href="#" onClick={e => { e.preventDefault(); navigate('/search?q=&type=place') }}>{t('nav.places')}</a>
           </>
         )}
+        {place.ancestors.map(anc => (
+          <span key={anc.id}>
+            <span className="sep">/</span>
+            <Link to={`/places/${anc.id}`}>{anc.title}</Link>
+          </span>
+        ))}
         <span className="sep">/</span>
         <span>{title}</span>
       </div>
@@ -153,11 +157,26 @@ export function PlaceDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="place"
+        recordId={place.id}
         aiProvenance={place.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}
         media={hasCoords ? <StaticMap lat={place.lat!} lon={place.lon!} name={title} /> : undefined}
-        mainExtra={linkedObjects.length > 0 && <RelatedObjects recordType="place" objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
+        mainExtra={(place.children.length > 0 || linkedObjects.length > 0) && (
+          <>
+            {place.children.length > 0 && (
+              <section style={{ marginTop: 8, marginBottom: 20 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>{t('place.subPlaces')}</h2>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {place.children.map(child => (
+                    <li key={child.id}><Link to={`/places/${child.id}`}>{child.title}</Link></li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {linkedObjects.length > 0 && <RelatedObjects recordType="place" objects={linkedObjects} relations={relations} currentId={place.id} thumbnails={thumbnails} resolveLabel={resolveRelationType} />}
+          </>
+        )}
         relations={nonObjectRelations.length > 0 && (
           <RelationsList
             recordType="place"

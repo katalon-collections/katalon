@@ -24,7 +24,7 @@ Objects represent physical or digital artefacts such as photographs, documents, 
 
 Entities represent people and organizations connected to collection records. The `Entity` model stores a unique optional `idno`, an indexed `entity_type`, publication `status`, JSONB metadata, timestamps, and version counter [@models].
 
-Places represent geographic locations. The `Place` model adds a PostGIS `POINT` geometry column with SRID 4326 and a GiST index, while keeping the shared metadata, status, timestamp, and version shape [@models].
+Places represent geographic locations. The `Place` model adds a PostGIS `POINT` geometry column with SRID 4326 and a GiST index, while keeping the shared metadata, status, timestamp, and version shape [@models]. Places form a hierarchy through an optional self-referential `parent_id` (country -> region -> place), one record per level. Saving rejects cycles, deleting a place with children needs `cascade` or `reparent`, and `GET /v1/objects?place_id=…` includes the subtree by default through a recursive CTE in `place_service`. The portal place detail returns `ancestors`/`children`, place search adds `place_path` and a `place_parent` tree facet, and `/portal/v1/places/{id}/object-ids` lists objects of a place and its sub-places. A configured relation facet targeting places is shown as a tree in object search. Decision: `.agents/knowledge/decisions/orts-hierarchie.md`.
 
 Occurrences represent works, events, and abstract concepts. The concept document uses Occurrence for things that are not objects, actors, or places, including exhibitions, campaigns, works, and concepts [@data-model-doc]. The code stores them in `occurrences` with `occurrence_type`, JSONB metadata, status, timestamps, and version [@models].
 

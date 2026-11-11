@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ImportMapping, MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
@@ -9,7 +9,8 @@ import { getLabel } from '../../../types'
 import { TransformModal } from '../../importer/TransformModal'
 import { SaveMappingModal } from '../../importer/SaveMappingModal'
 import { LoadMappingModal } from '../../importer/LoadMappingModal'
-import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type PendingField, type ProfileApplyResult, type RelationOption, DEFAULT_RELATION_OPTION, type VocabMode } from './types'
+import { readProfileFile } from './profileUtils'
+import { FIELD_TYPE_OPTIONS, RECORD_TYPES, type ImportProfile, type PendingField, type ProfileApplyResult, type RelationOption, DEFAULT_RELATION_OPTION, type VocabMode } from './types'
 
 interface Props {
   uploaded: UploadResult
@@ -43,6 +44,7 @@ interface Props {
   onDryRun: () => void
   onBack: () => void
   onProfileExport?: () => void
+  onProfileLoaded?: (profile: ImportProfile) => void
   profileWarnings?: ProfileApplyResult | null
   /** XML only: structured selector list with human-readable labels */
   xmlSelectors?: XmlSelector[]
@@ -56,12 +58,14 @@ export function StepMapping({
   idnoStrategy, idnoColumn, onIdnoStrategyChange,
   pendingFields, onPendingFieldsChange, vocabModes, onVocabModeChange, onEncodingChange, relationOptions, onRelationOptionChange,
   missingRequired, idnoMissing, mappedCount, ignoredCount,
-  dryRunning, onDryRun, onBack, onProfileExport, profileWarnings, xmlSelectors,
+  dryRunning, onDryRun, onBack, onProfileExport, onProfileLoaded, profileWarnings, xmlSelectors,
 }: Props) {
   const { t } = useTranslation('screenImporter')
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showLoadModal, setShowLoadModal] = useState(false)
+  const profileRef = useRef<HTMLInputElement>(null)
+  const [profileErr, setProfileErr] = useState<string | null>(null)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null)
   const [warningsExpanded, setWarningsExpanded] = useState(false)
   const [newFieldModal, setNewFieldModal] = useState<string | null>(null)
@@ -441,6 +445,27 @@ export function StepMapping({
                         })}
                       </optgroup>
                     </select>
+                    {recordType === 'place' && mapped === 'label' && (
+                      <div style={{ marginTop: 6 }}>
+                        <label className="lbl" style={{ display: 'block', fontSize: 11 }}>{t('mappingPathSeparator')}</label>
+                        <input
+                          className="fld mono"
+                          style={{ width: 80 }}
+                          maxLength={8}
+                          value={mapping[col]?.path_separator ?? ''}
+                          placeholder=">"
+                          aria-label={t('mappingPathSeparator')}
+                          onChange={e => {
+                            const sep = e.target.value
+                            const entry: MappingEntry = { ...mapping[col] }
+                            if (sep.trim()) entry.path_separator = sep
+                            else delete entry.path_separator
+                            onMappingChange({ ...mapping, [col]: entry })
+                          }}
+                        />
+                        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{t('mappingPathSeparatorHint')}</div>
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -565,6 +590,34 @@ export function StepMapping({
           <button className="btn gh" type="button" onClick={() => setShowLoadModal(true)}>
             {t('loadTemplateButton', 'Vorlage laden')}
           </button>
+          {onProfileLoaded && (
+            <>
+              <button className="btn gh" type="button" onClick={() => profileRef.current?.click()}>
+                {t('stepUpload:loadProfileButton')}
+              </button>
+              <input
+                ref={profileRef}
+                type="file"
+                accept=".json"
+                aria-label={t('stepUpload:loadProfileButton')}
+                style={{ display: 'none' }}
+                onChange={async e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!file) return
+                  setProfileErr(null)
+                  let profile: ImportProfile
+                  try {
+                    profile = await readProfileFile(file)
+                  } catch (err) {
+                    setProfileErr(t(`stepUpload:${(err as Error).message}`))
+                    return
+                  }
+                  onProfileLoaded(profile)
+                }}
+              />
+            </>
+          )}
           <button
             className="btn gh"
             type="button"
@@ -573,6 +626,7 @@ export function StepMapping({
           >
             {t('saveTemplateButton', 'Vorlage speichern')}
           </button>
+          {profileErr && <span role="alert" style={{ fontSize: 12, color: '#dc2626' }}>{profileErr}</span>}
           {onProfileExport && Object.keys(mapping).length > 0 && (
             <button className="btn gh" type="button" onClick={onProfileExport}>
               {t('exportProfileButton', 'Profil exportieren')}

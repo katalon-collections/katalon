@@ -10,14 +10,22 @@ from collections.abc import Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
 )
 
 from katalon.core.isolated_session import engine_scope
 from katalon.core.isolated_session import make_session as _make_session
-from katalon.core.models import Collection, Entity, Object, Occurrence, Place, StorageLocation
+from katalon.core.models import (
+    Collection,
+    Entity,
+    Object,
+    Occurrence,
+    Place,
+    RecordUsageDaily,
+    StorageLocation,
+)
 from katalon.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -56,6 +64,10 @@ async def _purge_records(
     the caller already verified the record is trashed).
     """
     from katalon.core.models import MediaFile
+    from katalon.services.attachment_service import (
+        ATTACHMENT_RECORD_TYPES,
+        purge_record_attachments,
+    )
     from katalon.services.audit_service import log_change
     from katalon.services.media_deletion_service import finalize_pending_delete, mark_pending_delete
     from katalon.services.relation_cleanup_service import cleanup_relation_refs
@@ -105,7 +117,15 @@ async def _purge_records(
             )
             continue
         await delete_relations(session, record_type, record.id)
+        await session.execute(
+            delete(RecordUsageDaily).where(
+                RecordUsageDaily.record_type == record_type,
+                RecordUsageDaily.record_id == record.id,
+            )
+        )
         await cleanup_relation_refs(session, record_type, record.id, cutoff=cutoff)
+        if record_type in ATTACHMENT_RECORD_TYPES:
+            await purge_record_attachments(session, record_type, record.id)
         await log_change(
             session, record_type=record_type, record_id=record.id, user_id=user_id, action="purge"
         )

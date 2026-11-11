@@ -25,6 +25,11 @@ ALLOWED_MEDIA_MIME = (
     ALLOWED_IMAGE_MIME | ALLOWED_PDF_MIME | ALLOWED_AUDIO_MIME | ALLOWED_VIDEO_MIME | ALLOWED_MODEL_MIME
 )
 
+# Dateianhänge (Feldtyp "file"): Bild, PDF, Audio, Video. 3D-Modelle, SVG und HTML fehlen absichtlich.
+ALLOWED_ATTACHMENT_MIME = ALLOWED_IMAGE_MIME | ALLOWED_PDF_MIME | ALLOWED_AUDIO_MIME | ALLOWED_VIDEO_MIME
+
+_WEBM_MAGIC = b"\x1a\x45\xdf\xa3"
+
 ALLOWED_PAGE_ASSET_IMAGE_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_PAGE_ASSET_DOC_MIME = {"application/pdf"}
 ALLOWED_PAGE_ASSET_VIDEO_MIME = {"video/mp4"}
@@ -132,3 +137,30 @@ def verify_page_asset(path: Path, mime_type: str) -> str:
 
     raise HTTPException(status_code=415, detail="Nicht unterstützter Medientyp")
 
+
+def sniff_media_mime(path: Path) -> str | None:
+    """Detect the MIME type from the file content; None when no supported format matches.
+
+    The browser-reported type and the file extension are never consulted. Image
+    detection goes through Pillow, all other formats by magic bytes.
+    """
+    with path.open("rb") as f:
+        head = f.read(16)
+    if head.startswith(b"%PDF-"):
+        return "application/pdf"
+    if head.startswith(b"OggS"):
+        return "audio/ogg"
+    if head.startswith(_WEBM_MAGIC):
+        return "video/webm"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+    if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    if head[4:8] == b"ftyp":
+        return "video/mp4"
+    try:
+        with Image.open(path) as image:
+            image.verify()
+            return PIL_MIME_BY_FORMAT.get(image.format or "")
+    except (UnidentifiedImageError, OSError, SyntaxError):
+        return None

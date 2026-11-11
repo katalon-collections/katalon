@@ -11,6 +11,8 @@ import deBatchEditModal from './locales/de/batchEditModal.json'
 import enBatchEditModal from './locales/en/batchEditModal.json'
 import deRichTextEditor from './locales/de/richTextEditor.json'
 import enRichTextEditor from './locales/en/richTextEditor.json'
+import deFileField from './locales/de/fileField.json'
+import enFileField from './locales/en/fileField.json'
 import deScreenForm from './locales/de/screenForm.json'
 import enScreenForm from './locales/en/screenForm.json'
 import deScreenFormVariants from './locales/de/screenFormVariants.json'
@@ -84,6 +86,7 @@ i18next.use(initReactI18next).init({
       batchEditModal: deBatchEditModal,
       richTextEditor: deRichTextEditor,
       screenForm: deScreenForm,
+      fileField: deFileField,
       screenFormVariants: deScreenFormVariants,
       screenFormSections: deScreenFormSections,
       screenImporter: deScreenImporter,
@@ -117,6 +120,7 @@ i18next.use(initReactI18next).init({
       batchEditModal: enBatchEditModal,
       richTextEditor: enRichTextEditor,
       screenForm: enScreenForm,
+      fileField: enFileField,
       screenFormVariants: enScreenFormVariants,
       screenFormSections: enScreenFormSections,
       screenImporter: enScreenImporter,

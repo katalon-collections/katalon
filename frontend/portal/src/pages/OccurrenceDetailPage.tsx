@@ -131,6 +131,7 @@ export function OccurrenceDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="occurrence"
+        recordId={occurrence.id}
         aiProvenance={occurrence.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}

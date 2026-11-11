@@ -98,5 +98,7 @@
   "close": "Close",
   "newImport": "New import",
   "newImportConfirm": "Discard the current import? Mapping and fields to be created will be lost.",
-  "newImportDiscard": "Discard"
+  "newImportDiscard": "Discard",
+  "mappingPathSeparator": "Path separator (optional)",
+  "mappingPathSeparatorHint": "Splits “Country>Region>Place” into a place hierarchy. Missing levels are created as places of their own. Leave empty: the value stays a single name."
 }

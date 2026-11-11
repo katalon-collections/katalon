@@ -14,7 +14,7 @@ import { useRecordSubtypeLabels } from '../hooks/useRecordSubtypeLabels'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
 import { t, typeLabel, useI18n } from '../i18n'
 import { decodeAdvancedQuery, usesRelations } from '../utils/advancedSearch'
-import { dateBucketLabel, facetKind, resolveLabel, splitRelationBucket } from '../utils/facets'
+import { dateBucketLabel, facetKind, pickTreeNode, resolveLabel, splitRelationBucket, treeParents } from '../utils/facets'
 import { QuerySummary } from './AdvancedSearchPage'
 
 function facetLabel(
@@ -134,6 +134,15 @@ function NumericFacetPanel({ label, bounds, from, to, onChange }: {
 }
 
 function resultSubtitle(
+  r: { record_type: string; status: string | null; subtitle_values?: Record<string, string | string[]> | null; place_path?: string[] | null },
+  subtitleConfig: Record<string, string[]>
+): string {
+  const path = r.place_path?.length ? r.place_path.join(' › ') : ''
+  const rest = resultSubtitleFields(r, subtitleConfig)
+  return [path, rest].filter(Boolean).join(' · ')
+}
+
+function resultSubtitleFields(
   r: { record_type: string; status: string | null; subtitle_values?: Record<string, string | string[]> | null },
   subtitleConfig: Record<string, string[]>
 ): string {
@@ -462,6 +471,19 @@ export function SearchPage() {
     toggleParam(`meta_${field}`, value)
   }
 
+  /** Picking a tree node filters by it (replacing selected ancestors/descendants, see
+   *  ``pickTreeNode``); with ``expand`` its children open in the same step. */
+  function selectTreeNode(field: string, id: string, expand = false) {
+    const current = treeExpanded[field] ?? []
+    if (expand && !current.includes(id)) setTreeExpanded({ ...treeExpanded, [field]: [...current, id] })
+    const key = `meta_${field}`
+    const next = new URLSearchParams(params)
+    const picked = pickTreeNode(next.getAll(key), id, treeParents(data?.tree_facets?.[field]))
+    next.delete(key)
+    picked.forEach(value => next.append(key, value))
+    setParams(next)
+  }
+
   function toggleTreeNode(field: string, id: string) {
     const current = treeExpanded[field] ?? []
     const isOpen = current.includes(id)
@@ -680,6 +702,16 @@ export function SearchPage() {
               valueLabel={subtypeLabel}
             />
           )}
+          {effectiveType === 'place' && (
+            <TreeFacetPanel
+              label={t('search.placeTree')}
+              tree={data?.tree_facets?.place_parent}
+              active={metaFilters.place_parent ?? []}
+              expanded={treeExpanded.place_parent ?? []}
+              onToggleExpand={id => toggleTreeNode('place_parent', id)}
+              onSelect={(id, expand) => selectTreeNode('place_parent', id, expand)}
+            />
+          )}
           {configuredMetadataFacets(facetConfig, effectiveType).map(field => {
             const kind = facetKind(facetKinds, effectiveType, field)
             const relatedParam = RELATED_FACET_PARAMS[field]
@@ -710,7 +742,7 @@ export function SearchPage() {
                   active={active}
                   expanded={treeExpanded[field] ?? []}
                   onToggleExpand={id => toggleTreeNode(field, id)}
-                  onSelect={select}
+                  onSelect={(id, expand) => selectTreeNode(field, id, expand)}
                 />
               )
             }

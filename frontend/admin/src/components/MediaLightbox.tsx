@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Karl Krägelin
 
 import { useEffect, useState } from 'react'
-import { authorizedFetch, type MediaFile } from '../api/client'
+import { authorizedFetch, media as mediaApi, type MediaFile } from '../api/client'
 
 interface Props {
   objectId: string
@@ -32,10 +32,11 @@ function ModelStage({ src, alt }: { src: string; alt: string }) {
 }
 
 /**
- * Fullscreen overlay viewer for a media file. The file endpoint is
- * auth-protected, so the blob is fetched with the bearer token and played
- * back from an object URL (plain <img>/<video>/<audio>/<iframe> cannot send
- * the Authorization header).
+ * Fullscreen overlay viewer for a media file. Images and 3D models are fetched
+ * with the bearer token and shown from an object URL. Video, audio and PDF use
+ * the signed same-origin link instead: browser media and PDF viewers cannot send
+ * the Authorization header, and a blob: document inherits the admin page CSP
+ * (object-src 'none'), which blocks the PDF viewer.
  */
 export function MediaLightbox({ objectId, media, onClose }: Props) {
   const [url, setUrl] = useState<string | null>(null)
@@ -45,25 +46,34 @@ export function MediaLightbox({ objectId, media, onClose }: Props) {
     let cancelled = false
     let objectUrl: string | null = null
 
-    authorizedFetch(`/v1/objects/${objectId}/media/${media.id}/file`)
-      .then(res => {
-        if (!res.ok) throw new Error(`Fehler ${res.status}`)
-        return res.blob()
-      })
-      .then(blob => {
-        if (cancelled) return
-        objectUrl = URL.createObjectURL(blob)
-        setUrl(objectUrl)
-      })
-      .catch(e => {
+    const load = async (): Promise<string> => {
+      if (media.category === 'video' || media.category === 'audio' || media.category === 'pdf') {
+        return mediaApi.link(objectId, media.id)
+      }
+      const res = await authorizedFetch(`/v1/objects/${objectId}/media/${media.id}/file`)
+      if (!res.ok) throw new Error(`Fehler ${res.status}`)
+      objectUrl = URL.createObjectURL(await res.blob())
+      return objectUrl
+    }
+
+    load().then(
+      src => {
+        if (cancelled) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl)
+          return
+        }
+        setUrl(src)
+      },
+      (e: unknown) => {
         if (!cancelled) setError((e as Error).message)
-      })
+      },
+    )
 
     return () => {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [objectId, media.id])
+  }, [objectId, media.id, media.category])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

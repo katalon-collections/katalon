@@ -440,6 +440,7 @@ class EntityRead(EntityCreate, RecordRead):
 class PlaceCreate(RecordBase):
     idno: str | None = None
     place_type: str | None = None
+    parent_id: uuid.UUID | None = None
     lat: float | None = None
     lon: float | None = None
 

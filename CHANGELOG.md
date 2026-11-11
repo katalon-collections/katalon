@@ -5,6 +5,55 @@ Katalon Collections, Version für Version. Interne Refactorings, CI-/Test-Infras
 reine Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 Frühere Versionen listen nur neue Funktionen.
 
+## [1.50.0]
+
+### Neu
+
+- **Dateien an Datensätzen:** Mit dem neuen Feldtyp „Datei“ hängt man PDFs, Bilder, Audio und
+  Video an Objekte, Personen, Orte, Werke und Vorgänge, etwa einen Leihvertrag oder ein
+  Programmheft, auch innerhalb einer Gruppe mit weiteren Angaben. Die Dateien lassen sich direkt
+  in einem Vorschaufenster ansehen. Im Portal erscheinen sie nur, wenn das Feld öffentlich ist;
+  Anhänge an Vorgängen bleiben immer intern.
+- **Orte als Hierarchie:** Orte können einen übergeordneten Ort haben (Land, Region, Ort). Im
+  Formular wählt man ihn per Suche, der Wert führt direkt zum übergeordneten Ort. Wer einen Ort
+  mit Unterorten löscht, entscheidet, ob diese mitgelöscht oder eine Ebene nach oben gehängt
+  werden.
+- **Ortspfade im Import:** Steht ein Ort als Pfad in einer Spalte, etwa
+  „Deutschland>Mecklenburg-Vorpommern>Schwerin“, legt der Import die Hierarchie selbst an,
+  einschließlich der fehlenden Zwischenebenen. Das Trennzeichen stellt man im Mapping ein;
+  ohne Trennzeichen bleibt der Wert ein einzelner Name.
+- **Portal: Orte mit Umgebung:** Die Ortsseite zeigt den Pfad nach oben, die Unterorte und
+  alle Objekte des Gebiets. In der Ortssuche steht unter jedem Treffer sein Pfad, dazu gibt es
+  einen aufklappbaren Ortsbaum zum Filtern.
+- **Portal: Fundort-Facette für Objekte:** Eine Facette über verknüpfte Orte erscheint als
+  Baum; ein Klick auf „Mecklenburg-Vorpommern“ zeigt alle Objekte aus diesem Gebiet.
+- **Schema aus einer Datei einrichten:** Die Schema-Importdatei (YAML/JSON) kann jetzt Gruppen mit
+  Unterfeldern, Vokabulare und Beziehungsfelder samt Beziehungstyp enthalten und mehrere
+  Datensatztypen auf einmal. Ein Probelauf zeigt vorab, was angelegt würde.
+- **LIDO-Export: Maße mit eigener Art:** Maße aus einer Gruppe (z. B. Länge, Randdurchmesser) behalten im Export ihre Maßart und Einheit, statt alle als „Maß“ ausgegeben zu werden.
+- **Vokabelwerte direkt öffnen:** Ein Wert in einem Vokabelfeld führt (mit Vokabelrechten) zum
+  Begriff im Vokabular, etwa um eine URI nachzutragen.
+- **Nutzungsstatistik:** Katalon zählt, wie oft öffentliche Datensätze im Portal aufgerufen
+  und ihre Dateien heruntergeladen werden. Gespeichert werden nur Tageszähler, keine
+  IP-Adressen oder Cookies; Mitarbeitende und Suchmaschinen zählen nicht. Die Zahlen stehen im
+  Datensatzformular und auf Wunsch auch auf der Portalseite. Die Erfassung lässt sich in den
+  Einstellungen ganz abschalten.
+- **Portal: Dateien herunterladen:** Besucher können die öffentlichen Mediendateien eines
+  Objekts in Originalqualität herunterladen, wenn die Einrichtung das in den
+  Portal-Einstellungen erlaubt.
+
+### Behoben
+
+- **Suche ohne Leserecht:** Die Suche findet für Besucher und Nutzer ohne Leserecht nur noch
+  Treffer in öffentlichen Feldern, nicht mehr in internen Angaben.
+- **Export ohne Leserecht:** Wer einen Datensatztyp nicht lesen darf, erhält im CSV- und
+  JSON-Export nur noch die öffentlichen Angaben statt aller Felder.
+- **PDF-Vorschau:** PDFs werden im Vorschaufenster und in einem neuen Tab wieder angezeigt,
+  statt mit „This content is blocked“ zu enden.
+- **LIDO-Export mit Absätzen:** Beschreibungen behalten ihre Absätze, statt zu einem Textblock zusammenzufallen.
+- **Import mit doppelten ID-Nummern:** Kommt dieselbe ID-Nummer in einer Datei mehrfach vor, etwa
+  derselbe Ort in mehreren Datensätzen, bricht der Import nicht mehr ab.
+
 ## [1.49.0]
 
 ### Neu

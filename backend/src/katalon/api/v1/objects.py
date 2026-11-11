@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from sqlalchemy import Text, cast, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.config import settings
@@ -53,6 +53,7 @@ from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import (
     load_hidden_relation_targets,
     load_public_fields,
+    metadata_text_clause,
     project_public_record,
 )
 from katalon.services.publish_service import can_publish, publish_record
@@ -97,6 +98,8 @@ async def list_objects(
     q: str | None = None,
     storage_location_id: uuid.UUID | None = None,
     include_sublocations: bool = True,
+    place_id: uuid.UUID | None = None,
+    include_subplaces: bool = True,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
 ) -> dict[str, Any]:
@@ -110,7 +113,7 @@ async def list_objects(
     if q:
         query = query.where(
             Object.idno.icontains(q, autoescape=True)
-            | cast(Object.metadata_, Text).icontains(q, autoescape=True)
+            | await metadata_text_clause(db, Object, "object", q, visibility_user)
         )
     if storage_location_id is not None:
         from katalon.core.models import Relation
@@ -137,6 +140,23 @@ async def list_objects(
             )
         )
         query = query.where(Object.id.in_(rel_subquery))
+
+    if place_id is not None:
+        from katalon.core.models import Relation
+        from katalon.services.place_service import get_place_subtree_ids
+
+        place_ids = (
+            await get_place_subtree_ids(db, place_id) if include_subplaces else [place_id]
+        )
+        query = query.where(
+            Object.id.in_(
+                select(Relation.from_id).where(
+                    Relation.from_type == "object",
+                    Relation.to_type == "place",
+                    Relation.to_id.in_(place_ids),
+                )
+            )
+        )
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
@@ -417,6 +437,7 @@ async def update_object(
         object_type,
         existing=obj.metadata_,
         skip_required=data.status == "draft",
+        record_id=object_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)

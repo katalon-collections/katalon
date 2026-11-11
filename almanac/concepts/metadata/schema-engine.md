@@ -55,6 +55,8 @@ Admins can reset a whole primary-type schema or a single subtype schema from the
 Field definitions reject malformed regular expressions at configuration time. Values for active fields are validated uniformly on create, update, import, batch, and publish: number and boolean values are typed (with automatic string-to-number coercion for valid numeric strings and empty string handling); free vocabulary values are text and geographic values are WGS84 `{lat, lon, accuracy_m?}` objects; controlled-vocabulary values are `{id, label}` references to a term in the configured vocabulary. Metadata keys without an active field definition remain as legacy data, are neither removed nor validated, and the record form renders them in a separate read-only "Nicht im Schema" section where a curator may remove them explicitly [@schema-api] [@schema-service] [@record-form-screen].
 
 
+The `file` field type stores attachments on `object`, `entity`, `place`, `occurrence` and `procedure` records, top-level or in a group. Its values are attachment references, not free data, and they are checked against the record on save; see [File Field Attachments](file-field-attachments) [@schema-service].
+
 Admins can duplicate existing field definitions directly from the schema field list (three-dots action menu) or from the field detail panel. Duplication generates a collision-free technical name (e.g. `title_copy` or `title_copy_2`), appends `(Kopie)` / `(Copy)` to configured labels, resets any non-reusable `description` detail role back to `none`, and places the new field directly after existing fields. For container fields (`field_type == "group"`), the endpoint (`POST /v1/schema/{field_id}/duplicate`) recursively clones all active sub-fields under the new container with unique sub-field names [@schema-api] [@schema-screen] [@schema-container-tests].
 
 ## Moving Unused Fields Between Subtypes
@@ -106,3 +108,6 @@ Field definitions are the field catalog; they say nothing about which subset a g
 ## Related Pages
 
 Read [vocabularies](vocabularies) for controlled terms and relation-type vocabularies, [record subtypes](record-subtypes) for the subtype scope that field definitions use, and [generic relations](../relations/generic-relations) for relation fields after they are mirrored into the relation table.
+
+
+Schema files (`POST /v1/schema/import`, YAML or JSON) may hold several record types in `schemas:`, group sub-fields in `children:`, vocabularies by name (`settings.vocabulary`, created when missing), relation type vocabularies by name and new relation types in `relation_types:`. A dry run creates those inside a savepoint it rolls back. Example: `backend/tests/fixtures/lido_demo_schema.yaml`.

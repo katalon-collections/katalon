@@ -566,6 +566,7 @@ async def search_documents(
     full_visibility_types: tuple[str, ...] | None = None,
     facet_specs: dict[str, tuple[str, str, str]] | None = None,
     tree_aggs: dict[str, tuple[str, str, list[str]]] | None = None,
+    record_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """``facet_specs`` maps a facet name to (filter field, aggregation field,
     kind) for facets whose index fields differ from facet_all_<name> (date
@@ -624,6 +625,9 @@ async def search_documents(
         base_filters.append({"bool": {"should": should, "minimum_should_match": 1}})
     if advanced_filter:
         base_filters.append(advanced_filter)
+    if record_ids is not None:
+        # Document ids are record ids; an empty list matches nothing.
+        base_filters.append({"ids": {"values": record_ids}})
 
     def _term_filter(field: str, values: list[str]) -> dict[str, Any]:
         return {"term": {field: values[0]}} if len(values) == 1 else {"terms": {field: values}}

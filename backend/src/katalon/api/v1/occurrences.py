@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
-from sqlalchemy import Text, cast, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from katalon.config import settings
@@ -43,7 +43,7 @@ from katalon.services.idno_service import (
 )
 from katalon.services.lock_service import enforce_not_locked
 from katalon.services.presence_service import enforce_not_blocked
-from katalon.services.public_metadata_service import project_public_record
+from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
 from katalon.services.schema_service import prepare_metadata, validate_metadata
@@ -89,7 +89,7 @@ async def list_occurrences(
     if q:
         query = query.where(
             Occurrence.idno.icontains(q, autoescape=True)
-            | cast(Occurrence.metadata_, Text).icontains(q, autoescape=True)
+            | await metadata_text_clause(db, Occurrence, "occurrence", q, visibility_user)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     query = apply_sort(
@@ -327,6 +327,7 @@ async def update_occurrence(
         occurrence_type,
         existing=occ.metadata_,
         skip_required=data.status == "draft",
+        record_id=occ_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)

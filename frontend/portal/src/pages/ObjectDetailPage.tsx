@@ -10,7 +10,7 @@ import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { IIIFViewer } from '../components/IIIFViewer'
 import { RelationsList } from '../components/RelationsList'
-import { MediaViewer, MediaThumb, RightsStatement } from '../components/MediaViewer'
+import { MediaDownloads, MediaViewer, MediaThumb, RightsStatement } from '../components/MediaViewer'
 import { useBackToSearch } from '../hooks/useBackToSearch'
 import { usePortalConfig } from '../hooks/usePortalConfig'
 import { useSubtypePlaceholder } from '../hooks/useSubtypePlaceholders'
@@ -187,12 +187,14 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
         metadata={m}
         locale={locale}
         recordType="object"
+        recordId={obj.id}
         aiProvenance={obj.ai_provenance}
         sidebarPosition={portalConfig.detail_sidebar_position}
         metaRowLayout={portalConfig.meta_row_layout}
         media={media && (
           <>
             {media}
+            {portalConfig.media_download_enabled && <MediaDownloads media={readyMedia} label={t('object.downloads')} />}
             {selectedMedia && <RightsStatement media={selectedMedia} label={t('object.rightsStatement')} />}
             {readyMedia.length > 1 && !(showViewer && imageMedia.length === readyMedia.length) && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 16 }}>

@@ -149,10 +149,19 @@ export interface EntitySummary {
 
 export interface PlaceSummary {
   id: string; status: string; place_type?: string | null
+  parent_id?: string | null
   lat: number | null; lon: number | null
   metadata_: Record<string, unknown>
   ai_provenance: AiProvenance
   created_at: string; updated_at: string
+}
+
+export interface PlaceHierarchyItem { id: string; title: string }
+
+/** Portal place detail: visible ancestors (root first) and direct sub-places. */
+export interface PlaceDetail extends PlaceSummary {
+  ancestors: PlaceHierarchyItem[]
+  children: PlaceHierarchyItem[]
 }
 
 export interface OccurrenceSummary {
@@ -258,6 +267,12 @@ export interface PortalConfig {
   homepage_blocks: HomepageBlock[]
   terminology: Record<string, TerminologyEntry>
   show_iiif_manifest_link: boolean
+  /** Show view/download counts on detail pages (only effective with usage_stats_enabled). */
+  show_usage_stats?: boolean
+  /** Offer public media files for download on object detail pages. */
+  media_download_enabled?: boolean
+  /** Global switch from the admin settings: anonymous usage counting on/off. */
+  usage_stats_enabled?: boolean
   /** Per record type and facet name: kind and display hints (derived by the API). */
   facet_kinds?: Record<string, Record<string, FacetKind>>
   relation_facets?: Record<string, RelationFacetConfig[]>
@@ -291,7 +306,14 @@ export interface NoticeConfig {
   accept_label: Record<string, string>
 }
 
-import type { RelationFacetConfig } from '../utils/facets'
+export interface RelationFacetConfig {
+  key: string
+  label: Record<string, string>
+  target_type: string
+  relation_types: string[]
+  target_subtypes?: string[]
+  direction?: 'outgoing' | 'incoming' | 'both'
+}
 
 export interface FacetKind {
   kind: 'terms' | 'numeric' | 'boolean' | 'date' | 'tree' | 'inherited' | 'related' | 'relation'
@@ -330,6 +352,8 @@ export interface SearchResponse {
     media_height?: number | null
     object_type?: string | null
     subtype?: string | null
+    /** Places only: titles of the ancestors, root first. */
+    place_path?: string[] | null
   }>
   facets: Record<string, FacetBucket[]>
   numeric_facets: Record<string, NumericFacetBounds>
@@ -383,6 +407,19 @@ export async function fetchRecord(type: string, id: string): Promise<{ title: st
   }
 }
 
+export interface UsageCounts { views: number; downloads: number | null }
+
+/** Count one detail page view. Returns the counts when the portal shows them, else null. */
+export async function recordView(type: string, id: string): Promise<UsageCounts | null> {
+  const endpoint = TYPE_ENDPOINT[type] ?? `${type}s`
+  try {
+    const res = await portalFetch(`${PORTAL_API}/usage/${endpoint}/${id}/view`, { method: 'POST' })
+    return res.status === 200 ? await res.json() as UsageCounts : null
+  } catch {
+    return null
+  }
+}
+
 export const api = {
   objects: {
     list: (p?: { page?: number; q?: string; status?: string; page_size?: number }) => {
@@ -410,7 +447,9 @@ export const api = {
     get: (id: string) => get<EntitySummary>(`${PORTAL_API}/entities/${id}`),
   },
   places: {
-    get: (id: string) => get<PlaceSummary>(`${PORTAL_API}/places/${id}`),
+    get: (id: string) => get<PlaceDetail>(`${PORTAL_API}/places/${id}`),
+    /** Visible objects linked to the place or any of its sub-places. */
+    objectIds: (id: string) => get<string[]>(`${PORTAL_API}/places/${id}/object-ids`),
   },
   occurrences: {
     get: (id: string) => get<OccurrenceSummary>(`${PORTAL_API}/occurrences/${id}`),

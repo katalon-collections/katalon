@@ -180,3 +180,12 @@ def test_list_selectors_dc_readable_labels():
 def test_list_selectors_kind_scalar():
     selectors = fmt.list_selectors(SIMPLE_XML)
     assert all(s.kind == "scalar" for s in selectors)
+
+
+def test_list_element_levels_offers_deep_record_elements():
+    # LIDO puts lido:place at depth 6; a multi-file batch wrapper adds one more.
+    deep = b"<a><b><c><d><e><f><g><place><id>1</id></place></g></f></e></d></c></b></a>"
+    levels = fmt.list_element_levels(deep)
+    place_depths = [lvl["depth"] for lvl in levels for t in lvl["tags"] if t["label"] == "place"]
+    assert place_depths == [7]
+    assert [r["id"] for r in fmt.parse(deep, "place")] == ["1"]

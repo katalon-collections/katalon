@@ -115,6 +115,20 @@ TARGET_SETTINGS: dict[str, dict[str, object]] = {
                 "Einheit, falls der Wert keine enthält (z. B. cm).",
                 "Unit used when the value carries none (e.g. cm).",
             ),
+            "measurement_type_field": _setting(
+                "Feld für die Maßart",
+                "Measurement type field",
+                "Bei einer Gruppe (z. B. Maße): Unterfeld, dessen Wert je Eintrag als Maßart steht.",
+                "For a group (e.g. measurements): sub-field whose value is the type of each entry.",
+                widget="field",
+            ),
+            "unit_field": _setting(
+                "Feld für die Einheit",
+                "Unit field",
+                "Bei einer Gruppe: Unterfeld, dessen Wert je Eintrag als Einheit steht.",
+                "For a group: sub-field whose value is the unit of each entry.",
+                widget="field",
+            ),
         },
     },
     "lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term": {

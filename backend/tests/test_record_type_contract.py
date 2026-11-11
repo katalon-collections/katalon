@@ -170,12 +170,14 @@ async def test_json_csv_export_supports_procedure_and_storage_location(
         return [record], []
 
     monkeypatch.setattr(export_service, "_load_records", load_records)
+    # Staff with read permission: internal types export with raw metadata.
+    staff = SimpleNamespace(id=uuid.uuid4())
     csv_export = "".join(
-        [chunk async for chunk in export_service.stream_csv(None, record_type, None, None)]
+        [chunk async for chunk in export_service.stream_csv(None, record_type, None, staff)]
     )
     json_export = json.loads(
         "".join(
-            [chunk async for chunk in export_service.stream_json(None, record_type, None, None)]
+            [chunk async for chunk in export_service.stream_json(None, record_type, None, staff)]
         )
     )
 

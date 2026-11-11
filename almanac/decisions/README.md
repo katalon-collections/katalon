@@ -21,6 +21,7 @@ links, and use architecture/workflow pages for detailed current behavior.
 
 - [Multilingual Content](metadata/multilingual-content)
 - [Vocabulary Term Custom Fields](metadata/vocabulary-term-custom-fields)
+- [File Field Attachments](metadata/file-field-attachments)
 
 ## Search
 

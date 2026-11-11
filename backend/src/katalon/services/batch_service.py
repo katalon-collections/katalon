@@ -250,6 +250,8 @@ async def _apply_field_operation(
         raise ValueError(f"Feld '{field_name}' nicht im Schema für {record_type}.")
     if field.field_type == "group":
         raise ValueError(f"Gruppenfelder können nicht per Batch bearbeitet werden: '{field_name}'.")
+    if field.field_type == "file":
+        raise ValueError(f"Dateifelder können nicht per Batch bearbeitet werden: '{field_name}'.")
 
     old_metadata = record.metadata_.copy()
 
@@ -280,7 +282,13 @@ async def _apply_field_operation(
     )
 
     errors = await validate_metadata(
-        db, record_type, metadata, subtype, existing=record.metadata_, skip_required=True
+        db,
+        record_type,
+        metadata,
+        subtype,
+        existing=record.metadata_,
+        skip_required=True,
+        record_id=record.id,
     )
     if errors:
         raise ValueError("; ".join(errors))

@@ -86,6 +86,7 @@
     "geo": "Geodaten",
     "pid": "PID",
     "authority": "Normdaten (Authority)",
+    "file": "Datei",
     "group": "Containerfeld (Gruppe)",
     "url": "URL (mit Linktitel)"
   },

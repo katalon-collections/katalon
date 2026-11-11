@@ -307,3 +307,43 @@ async def test_hard_delete_procedure_cleans_direct_and_group_references(
                 )
             )
         ).scalar_one_or_none() is not None
+
+
+@pytest.mark.asyncio
+async def test_hard_delete_procedure_removes_attachments(app, async_client, auth_headers) -> None:
+    """Procedures have no trash, so DELETE must drop their attachment rows too."""
+    import katalon.database as database_module
+    from katalon.core.models import Attachment, Procedure
+
+    marker = uuid.uuid4().hex[:8]
+    procedure_id = uuid.uuid4()
+    attachment_id = uuid.uuid4()
+    async with database_module.AsyncSessionLocal() as session:
+        session.add(
+            Procedure(
+                id=procedure_id,
+                idno=f"ATTACH-PROCEDURE-{marker}",
+                procedure_type="loan_out",
+                status="draft",
+                metadata_={},
+            )
+        )
+        await session.flush()
+        session.add(
+            Attachment(
+                id=attachment_id,
+                record_type="procedure",
+                record_id=procedure_id,
+                filename="vertrag.pdf",
+                mime_type="application/pdf",
+                size=1,
+                storage_key=f"attachments/{attachment_id.hex[:2]}/{attachment_id}--vertrag.pdf",
+            )
+        )
+        await session.commit()
+
+    response = await async_client.delete(f"/v1/procedures/{procedure_id}", headers=auth_headers)
+    assert response.status_code == 204
+
+    async with database_module.AsyncSessionLocal() as session:
+        assert await session.get(Attachment, attachment_id) is None

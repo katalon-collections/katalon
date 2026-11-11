@@ -29,10 +29,12 @@ from katalon.config import settings
 from katalon.core.dependencies import DBDep, OptionalCurrentUser, has_record_permission
 from katalon.core.limiter import limiter
 from katalon.core.models import (
+    Attachment,
     Banner,
     Collection,
     Entity,
     FieldDefinition,
+    MediaFile,
     Object,
     Occurrence,
     Place,
@@ -45,10 +47,22 @@ from katalon.core.models import (
     VocabularyTerm,
 )
 from katalon.core.schemas import EntityRead, ObjectRead, OccurrenceRead, PlaceRead
-from katalon.core.visibility import PUBLIC_STATUSES, readable_record_types
+from katalon.core.visibility import (
+    PUBLIC_STATUSES,
+    apply_public_visibility,
+    ensure_publicly_visible,
+    readable_record_types,
+)
 from katalon.integrations.jsonld_format import PLURAL_TYPE_MAP
-from katalon.services import relation_service, search_service
+from katalon.services import place_service, relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
+from katalon.services.attachment_service import ATTACHMENT_RECORD_MODELS, attachment_file_response
+from katalon.services.public_metadata_service import (
+    filter_public_metadata_checked,
+    load_public_fields,
+    metadata_text_clause,
+    public_attachment_ids,
+)
 
 router = APIRouter(tags=["portal"])
 _PUBLIC_TYPES = ("object", "entity", "place", "occurrence", "collection")
@@ -123,6 +137,8 @@ class _FacetContext(BaseModel):
     tree_aggs: dict[str, tuple[str, str, list[str]]]
     trees: dict[str, dict[str, Any]]
     sorts: dict[str, str] = {}
+    # Relation facets over places (name -> facet config), shown as a place tree.
+    place_trees: dict[str, dict[str, Any]] = {}
 
 
 async def _facet_context(
@@ -177,7 +193,19 @@ async def _facet_context(
         for parent in [None, *[p for p in expand.get(name, []) if p in terms]]:
             key = f"tree_{name}__{parent or 'root'}"
             tree_aggs[key] = (name, spec.filter_field, children.get(parent, []))
-    return _FacetContext(names=names, specs=specs, tree_aggs=tree_aggs, trees=trees, sorts=sorts)
+    place_trees = {
+        name: spec.extra
+        for name, spec in merged.items()
+        if spec.kind == "tree" and spec.extra.get("target_type") == "place"
+    }
+    return _FacetContext(
+        names=names,
+        specs=specs,
+        tree_aggs=tree_aggs,
+        trees=trees,
+        sorts=sorts,
+        place_trees=place_trees,
+    )
 
 
 def _tree_facets(
@@ -213,6 +241,13 @@ def _tree_facets(
                 paths[value] = chain
         out[name] = {"nodes": nodes, "paths": paths}
     return out
+
+
+def _parse_uuid(value: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
 
 
 def _expand_params(request: Request) -> dict[str, list[str]]:
@@ -275,6 +310,17 @@ class PortalPlaceRead(PortalRecordRead):
     place_type: str | None
     lat: float | None = None
     lon: float | None = None
+    parent_id: uuid.UUID | None = None
+
+
+class PortalPlaceHierarchyItem(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
+class PortalPlaceDetail(PortalPlaceRead):
+    ancestors: list[PortalPlaceHierarchyItem] = []
+    children: list[PortalPlaceHierarchyItem] = []
 
 
 class PortalOccurrenceRead(PortalRecordRead):
@@ -613,7 +659,11 @@ async def export_entity(
     )
 
 
-@router.get("/places/{place_id}", response_model=PortalPlaceRead)
+async def _place_visibility_user(db: DBDep, user: User | None) -> User | None:
+    return user if user and await has_record_permission(db, user, "place", "read") else None
+
+
+@router.get("/places/{place_id}", response_model=PortalPlaceDetail)
 async def get_place(
     place_id: uuid.UUID,
     db: DBDep,
@@ -622,7 +672,7 @@ async def get_place(
     request: Request = None,  # type: ignore[assignment]
     format: str | None = Query(None),
     accept: str | None = Header(None),
-) -> Place | PlaceRead | Response:
+) -> PortalPlaceDetail | Response:
     rdf = await _maybe_export_rdf(
         "place", place_id, db, request, _staff_user(current_user), format, accept
     )
@@ -630,7 +680,59 @@ async def get_place(
         return rdf
     record: Place | PlaceRead = await places.get_place(place_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
-    return record
+    detail = PortalPlaceDetail.model_validate(record)
+    visibility_user = await _place_visibility_user(db, _staff_user(current_user))
+    nodes = await place_service.load_place_nodes(db, public_only=visibility_user is None)
+    children = place_service.children_map(nodes)
+    detail.ancestors = [
+        PortalPlaceHierarchyItem(id=n.id, title=n.title)
+        for n in place_service.ancestors_of(nodes, place_id)
+    ]
+    detail.children = [
+        PortalPlaceHierarchyItem(id=nodes[i].id, title=nodes[i].title)
+        for i in children.get(place_id, [])
+    ]
+    return detail
+
+
+@router.get(
+    "/places/{place_id}/object-ids",
+    response_model=list[uuid.UUID],
+    summary="Visible objects linked to a place or, by default, any of its sub-places",
+)
+async def place_object_ids(
+    place_id: uuid.UUID,
+    db: DBDep,
+    current_user: OptionalCurrentUser,
+    response: Response,
+    include_subplaces: bool = True,
+    limit: int = Query(200, ge=1, le=500),
+) -> list[uuid.UUID]:
+    staff_user = _staff_user(current_user)
+    _cache_for_viewer(response, staff_user)
+    place_viewer = await _place_visibility_user(db, staff_user)
+    nodes = await place_service.load_place_nodes(db, public_only=place_viewer is None)
+    if place_id not in nodes:
+        raise HTTPException(status_code=404, detail="Ort nicht gefunden")
+    place_ids = (
+        place_service.subtree_ids(place_service.children_map(nodes), place_id)
+        if include_subplaces
+        else [place_id]
+    )
+    object_viewer = staff_user if staff_user and await has_record_permission(
+        db, staff_user, "object", "read"
+    ) else None
+    query = select(Object.id).where(
+        Object.id.in_(
+            select(Relation.from_id).where(
+                Relation.from_type == "object",
+                Relation.to_type == "place",
+                Relation.to_id.in_(place_ids),
+            )
+        )
+    )
+    query = apply_public_visibility(query, Object, object_viewer)
+    return list((await db.execute(query.order_by(Object.created_at).limit(limit))).scalars().all())
 
 
 @router.get("/places/{place_id}/export", summary="Export a single place record as JSON-LD or Turtle RDF")
@@ -715,11 +817,9 @@ async def list_collections(
     elif top_level:
         query = query.where(Collection.parent_id.is_(None))
     if q:
-        from sqlalchemy import Text, cast
-
         query = query.where(
             Collection.idno.icontains(q, autoescape=True)
-            | cast(Collection.metadata_, Text).icontains(q, autoescape=True)
+            | await metadata_text_clause(db, Collection, "collection", q, visibility_user)
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
     order: list[Any] = [Collection.created_at.desc()]
@@ -950,9 +1050,114 @@ async def serve_portal_media_file(
 
 @router.get("/media/{media_id}/download")
 async def download_portal_media_file(
-    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser
+    media_id: uuid.UUID, db: DBDep, current_user: OptionalCurrentUser, request: Request
 ) -> Response:
-    return await media.serve_media_by_id(media_id, db, _staff_user(current_user), as_attachment=True)
+    """Attachment download; anonymous only while the portal offers downloads."""
+    from katalon.services import usage_service
+
+    staff_user = _staff_user(current_user)
+    if staff_user is None:
+        config = await db.get(PortalConfig, "default")
+        if config is None or not config.media_download_enabled:
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    response = await media.serve_media_by_id(media_id, db, staff_user, as_attachment=True)
+    # Resumed downloads (Range past byte 0) are the same download, not a new one.
+    resumed = request.headers.get("range", "bytes=0-").replace(" ", "") not in ("bytes=0-", "")
+    if (
+        staff_user is None
+        and not resumed
+        and not usage_service.is_bot(request.headers.get("user-agent"))
+        and await usage_service.usage_stats_enabled(db)
+    ):
+        object_id = await db.scalar(select(MediaFile.object_id).where(MediaFile.id == media_id))
+        if object_id is not None:
+            await usage_service.count(db, "object", object_id, "downloads")
+    return response
+
+
+@router.get(
+    "/attachments/{attachment_id}/file",
+    summary="Serve an attachment of a public `file` field",
+    description=(
+        "Checked on every request: the owning record must be publicly visible, its type must "
+        "not be a procedure, and the attachment id must appear in the record's public metadata "
+        "projection (field, group and subfield visibility apply). Never cached."
+    ),
+    responses={404: {"description": "Attachment, record, field or file not public"}},
+)
+async def get_public_attachment_file(
+    attachment_id: uuid.UUID, request: Request, db: DBDep
+) -> Response:
+    attachment = await db.get(Attachment, attachment_id)
+    if attachment is None or attachment.record_type == "procedure":
+        raise HTTPException(status_code=404, detail="Anhang nicht gefunden")
+    model = ATTACHMENT_RECORD_MODELS.get(attachment.record_type)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Anhang nicht gefunden")
+    record = await db.get(model, attachment.record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Anhang nicht gefunden")
+    ensure_publicly_visible(record, None, "Anhang nicht gefunden")
+
+    subtype = getattr(record, f"{attachment.record_type}_type")
+    fields = await load_public_fields(db, attachment.record_type)
+    applicable = [
+        field for field in fields if field.target_subtype is None or field.target_subtype == subtype
+    ]
+    projected = await filter_public_metadata_checked(db, record.metadata_, fields, subtype)
+    if str(attachment.id) not in public_attachment_ids(projected, applicable):
+        raise HTTPException(status_code=404, detail="Anhang nicht gefunden")
+
+    response = await attachment_file_response(attachment, request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+class PortalUsageRead(BaseModel):
+    views: int
+    # None when the portal offers no downloads (or the record has no media).
+    downloads: int | None = None
+
+
+@router.post(
+    "/usage/{plural_type}/{record_id}/view",
+    response_model=PortalUsageRead,
+    summary="Count one detail page view; returns the counts when the portal shows them",
+    responses={204: {"description": "Counted (or statistics off); counts not shown publicly"}},
+)
+@limiter.limit(lambda: settings.rate_limit_public_search)
+async def record_view(
+    plural_type: Literal["objects", "entities", "places", "occurrences", "collections"],
+    record_id: uuid.UUID,
+    db: DBDep,
+    request: Request,
+    current_user: OptionalCurrentUser,
+) -> PortalUsageRead | Response:
+    from katalon.services import usage_service
+
+    record_type = next(t for t, plural in PLURAL_TYPE_MAP.items() if plural == plural_type)
+    staff_user = _staff_user(current_user)
+    record = await db.get(_MODELS[record_type], record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+    readable = staff_user and await has_record_permission(db, staff_user, record_type, "read")
+    ensure_publicly_visible(record, staff_user if readable else None, "Datensatz nicht gefunden")
+    no_content = Response(status_code=204, headers={"Cache-Control": "no-store"})
+    if not await usage_service.usage_stats_enabled(db):
+        return no_content
+    if staff_user is None and not usage_service.is_bot(request.headers.get("user-agent")):
+        await usage_service.count(db, record_type, record_id, "views")
+    config = await db.get(PortalConfig, "default")
+    if config is None or not config.show_usage_stats:
+        return no_content
+    totals = await usage_service.totals(db, record_type, record_id)
+    downloads = (
+        totals["downloads"] if record_type == "object" and config.media_download_enabled else None
+    )
+    return JSONResponse(
+        PortalUsageRead(views=totals["views"], downloads=downloads).model_dump(),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/objects/{object_id}/iiif/manifest")
@@ -1088,6 +1293,23 @@ async def search(
         }.items()
         if values
     }
+    # Places: a selected tree node filters to its subtree (ids resolved in the database,
+    # no ancestor data in the index); the tree itself and the path line come from the same map.
+    place_nodes: dict[uuid.UUID, place_service.PlaceNode] = {}
+    place_children: dict[uuid.UUID | None, list[uuid.UUID]] = {}
+    place_active: list[uuid.UUID] = []
+    record_ids: list[str] | None = None
+    place_filter = extra_filters.pop("place_parent", [])
+    if type == "place":
+        place_nodes = await place_service.load_place_nodes(
+            db, public_only=await _place_visibility_user(db, staff_user) is None
+        )
+        place_children = place_service.children_map(place_nodes)
+        place_active = [u for v in place_filter if (u := _parse_uuid(v)) in place_nodes]
+        if place_filter:
+            record_ids = sorted(
+                {str(i) for u in place_active for i in place_service.subtree_ids(place_children, u)}
+            )
     if rel_collection:
         from katalon.services.collection_service import get_collection_subtree_titles
 
@@ -1110,6 +1332,22 @@ async def search(
         (type,) if type else _PUBLIC_TYPES,
         _expand_params(request),
     )
+    # Relation facets over places: a selected place filters to its whole subtree.
+    place_selected: dict[str, list[uuid.UUID]] = {}
+    tree_nodes: dict[uuid.UUID, place_service.PlaceNode] = {}
+    tree_kids: dict[uuid.UUID | None, list[uuid.UUID]] = {}
+    if facet_context.place_trees and type:
+        tree_nodes = place_nodes or await place_service.load_place_nodes(
+            db, public_only=await _place_visibility_user(db, staff_user) is None
+        )
+        tree_kids = place_children or place_service.children_map(tree_nodes)
+        for name in facet_context.place_trees:
+            chosen = [u for v in extra_filters.get(name, []) if (u := _parse_uuid(v)) in tree_nodes]
+            place_selected[name] = chosen
+            if name in extra_filters:
+                extra_filters[name] = sorted(
+                    {str(i) for u in chosen for i in place_service.subtree_ids(tree_kids, u)}
+                ) or ["00000000-0000-0000-0000-000000000000"]
     result = await search_service.search(
         query=q,
         record_type=type,
@@ -1130,8 +1368,38 @@ async def search(
         sort=sort,
         facet_specs=facet_context.specs,
         tree_aggs=facet_context.tree_aggs,
+        record_ids=record_ids,
     )
     result["tree_facets"] = _tree_facets(facet_context, result["facets"], extra_filters)
+    for name, cfg in facet_context.place_trees.items():
+        if not type or name not in (facet_context.names or []):
+            continue
+        by_place = await place_service.objects_by_place(
+            db,
+            relation_types=list(cfg.get("relation_types") or []),
+            direction=str(cfg.get("direction") or "outgoing"),
+            public_only=staff_user is None,
+        )
+        result["tree_facets"][name] = place_service.tree_facet(
+            tree_nodes,
+            tree_kids,
+            place_selected.get(name, []),
+            [u for v in _expand_params(request).get(name, []) if (u := _parse_uuid(v))],
+            counts=place_service.rolled_up_counts(tree_kids, by_place),
+        )
+    if type == "place":
+        result["tree_facets"]["place_parent"] = place_service.tree_facet(
+            place_nodes,
+            place_children,
+            place_active,
+            [u for v in _expand_params(request).get("place_parent", []) if (u := _parse_uuid(v))],
+        )
+        for item in result["items"]:
+            place_id = _parse_uuid(item["id"])
+            if place_id is not None:
+                item["place_path"] = [
+                    n.title for n in place_service.ancestors_of(place_nodes, place_id)
+                ] or None
     return SearchResponse(**result)
 
 

@@ -35,6 +35,7 @@ from katalon.services.import_resolution import resolve_relations, resolve_vocab_
 from katalon.services.importer import parse_file
 from katalon.services.importer.formats.csv_format import ENCODINGS, CsvFormat, detect_encoding
 from katalon.services.importer.formats.xml_format import XmlFormat
+from katalon.services.place_path_import import place_path_separator, split_path
 from katalon.services.schema_service import validate_metadata
 from katalon.services.subtype_service import has_any_subtypes
 
@@ -74,6 +75,8 @@ class TransformConfig(BaseModel):
 class MappingEntry(BaseModel):
     target: str
     transforms: list[TransformConfig] = Field(default_factory=list[Any])
+    # Place label only: splits "Land>Region>Ort" at this separator into a place hierarchy.
+    path_separator: str | None = Field(default=None, max_length=8)
 
 
 class MappingRequest(BaseModel):
@@ -175,16 +178,22 @@ def _normalize_transform(value: Any) -> dict[str, Any]:
 def _normalize_mapping_entry(value: Any) -> dict[str, Any]:
     """Convert a MappingEntry model or a stored dict into normalized form."""
     if isinstance(value, MappingEntry):
-        return {
+        entry: dict[str, Any] = {
             "target": value.target,
             "transforms": [_normalize_transform(t) for t in value.transforms],
         }
+        if value.path_separator:
+            entry["path_separator"] = value.path_separator
+        return entry
     if isinstance(value, dict):
         transforms = value.get("transforms") or []
-        return {
+        entry = {
             "target": value.get("target"),
             "transforms": [_normalize_transform(t) for t in transforms],
         }
+        if value.get("path_separator"):
+            entry["path_separator"] = value["path_separator"]
+        return entry
     return {"target": str(value), "transforms": []}
 
 
@@ -387,6 +396,41 @@ async def _ensure_import_write_permission(db: AsyncSession, user: User, record_t
     ):
         raise HTTPException(status_code=403, detail="Keine Schreibberechtigung für diesen Datensatztyp.")
 
+def _apply_place_paths(
+    dry_result: dict[str, Any], records: list[dict[str, Any]], separator: str
+) -> None:
+    """Preview of a place-path import: leaf labels, path errors, count of implicit levels."""
+    full: set[tuple[str, ...]] = set()
+    implicit: set[tuple[str, ...]] = set()
+    for index, meta in enumerate(records):
+        label = meta.get("label")
+        if not isinstance(label, str):
+            continue
+        try:
+            segments = split_path(label, separator)
+        except ValueError as exc:
+            dry_result["errors"].append({"row": index + 2, "message": str(exc)})
+            continue
+        meta["label"] = segments[-1]
+        full.add(tuple(segments))
+        implicit.update(tuple(segments[:depth]) for depth in range(1, len(segments)))
+    # The path itself serves as ID number when a row has none.
+    dry_result["errors"] = [e for e in dry_result["errors"] if "'idno'" not in e["message"]]
+    dry_result["warnings"] = [
+        w for w in dry_result["warnings"] if "keine ID-Nummer" not in w["message"]
+    ]
+    dry_result["valid"] = dry_result["total"] - len(
+        {e["row"] for e in dry_result["errors"] if e.get("row")}
+    )
+    if len(implicit - full):
+        dry_result["warnings"].append(
+            {
+                "row": None,
+                "message": f"{len(implicit - full)} Zwischenebenen werden als eigene Orte angelegt.",
+            }
+        )
+
+
 @router.post(
     "/dry-run",
     summary="Preview an import without persisting records",
@@ -472,6 +516,9 @@ async def dry_run(body: MappingRequest, db: DBDep, current_user: User = require_
     # Run full schema validation per row (catches pid/relation/regex/required errors)
     from katalon.services.importer_service import apply_mapping
     all_records, _ = apply_mapping(rows, norm_mapping, field_defs)
+    path_sep = place_path_separator(norm_mapping) if body.record_type == "place" else None
+    if path_sep:
+        _apply_place_paths(dry_result, all_records, path_sep)
     # Resolve text to vocabulary terms and relation targets exactly like the worker.
     # Missing terms/targets are created inside a savepoint that is rolled back, so the
     # preview validates the real result without persisting anything.
