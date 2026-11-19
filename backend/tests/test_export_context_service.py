@@ -453,3 +453,10 @@ async def test_build_index_doc_embeds_export_context() -> None:
         assert ec["fields"]["title"] == "Index Test"
     finally:
         export_context_service.build_export_context_from_db = orig_build
+
+
+def test_record_title_ignores_internal_title_field() -> None:
+    obj = Object(id=uuid.uuid4(), idno="OBJ-7", metadata_={"title": "Geheimer Spender"})
+    public = FieldDefinition(name="title", field_type="text", is_public=True)
+    assert export_context_service._record_title(obj, "object", [public]) == "Geheimer Spender"
+    assert export_context_service._record_title(obj, "object", []) == "OBJ-7"

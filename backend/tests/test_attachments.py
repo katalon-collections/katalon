@@ -86,16 +86,18 @@ def media_root(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_file_field_rejected_for_collection_target() -> None:
-    data = FieldDefinitionCreate(target_type="collection", name="vertrag", field_type="file")
+async def test_file_field_rejected_for_vocabulary_term_target() -> None:
+    data = FieldDefinitionCreate(target_type="vocabulary_term", name="vertrag", field_type="file")
     with pytest.raises(HTTPException) as exc:
         await _validate_field_settings(AsyncMock(), data)
     assert exc.value.status_code == 422
-    assert "nur für Objekte, Personen, Orte, Werke und Vorgänge" in exc.value.detail
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("target_type", ["object", "entity", "place", "occurrence", "procedure"])
+@pytest.mark.parametrize(
+    "target_type",
+    ["object", "entity", "place", "occurrence", "procedure", "collection", "storage_location"],
+)
 async def test_file_field_allowed_for_record_types(target_type: str) -> None:
     data = FieldDefinitionCreate(target_type=target_type, name="vertrag", field_type="file")
     await _validate_field_settings(AsyncMock(), data)

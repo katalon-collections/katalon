@@ -155,7 +155,7 @@ async def _validate_field_settings(
     if data.field_type == "file" and data.target_type not in ATTACHMENT_RECORD_TYPES:
         raise HTTPException(
             status_code=422,
-            detail="Der Feldtyp 'Datei' ist nur für Objekte, Personen, Orte, Werke und Vorgänge erlaubt.",
+            detail="Der Feldtyp 'Datei' ist nur für Objekte, Personen, Orte, Werke, Sammlungen, Standorte und Vorgänge erlaubt.",
         )
 
     if data.field_type == "group" and not data.is_repeatable:

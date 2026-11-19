@@ -32,28 +32,35 @@ from katalon.core.media_storage import (
 from katalon.core.media_validation import ALLOWED_ATTACHMENT_MIME, sniff_media_mime
 from katalon.core.models import (
     Attachment,
+    Collection,
     Entity,
     Object,
     Occurrence,
     Place,
     Procedure,
     RecordSnapshot,
+    StorageLocation,
     User,
 )
 
 logger = logging.getLogger(__name__)
 
-# Record types that may carry a `file` field. Collections, storage locations and
-# vocabulary terms are excluded on purpose.
+# Record types that may carry a `file` field. Vocabulary terms are excluded on purpose.
 ATTACHMENT_RECORD_MODELS: dict[str, Any] = {
     "object": Object,
     "entity": Entity,
     "place": Place,
     "occurrence": Occurrence,
     "procedure": Procedure,
+    "collection": Collection,
+    "storage_location": StorageLocation,
 }
+# Internal types: never served through the portal.
+INTERNAL_ATTACHMENT_RECORD_TYPES = frozenset({"procedure", "storage_location"})
 ATTACHMENT_RECORD_TYPES = frozenset(ATTACHMENT_RECORD_MODELS)
-AttachmentRecordType = Literal["object", "entity", "place", "occurrence", "procedure"]
+AttachmentRecordType = Literal[
+    "object", "entity", "place", "occurrence", "procedure", "collection", "storage_location"
+]
 
 ATTACHMENT_LINK_TTL_SECONDS = 300
 _CHUNK_SIZE = 1024 * 1024

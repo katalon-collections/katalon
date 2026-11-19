@@ -121,6 +121,7 @@
     "targetInvDe": "Gegenrichtung (de)",
     "targetInvEn": "Gegenrichtung (en)",
     "targetUri": "URI (Kanonisch)",
+    "termFields": "Felder des Vokabulars",
     "targetExactMatch": "Exact Match URIs",
     "skosOptions": "SKOS-Filter & Optionen",
     "conceptScheme": "ConceptScheme URI (Filter)",

@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.50.0"
+    "version": "1.51.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -12373,7 +12373,9 @@
                 "entity",
                 "place",
                 "occurrence",
-                "procedure"
+                "procedure",
+                "collection",
+                "storage_location"
               ],
               "type": "string",
               "title": "Record Type"
@@ -19989,7 +19991,7 @@
           "portal"
         ],
         "summary": "Serve an attachment of a public `file` field",
-        "description": "Checked on every request: the owning record must be publicly visible, its type must not be a procedure, and the attachment id must appear in the record's public metadata projection (field, group and subfield visibility apply). Never cached.",
+        "description": "Checked on every request: the owning record must be publicly visible, its type must not be a procedure or storage location, and the attachment id must appear in the record's public metadata projection (field, group and subfield visibility apply). Never cached.",
         "operationId": "portal_get_public_attachment_file_get_portal_v1_attachments__attachment_id__file",
         "parameters": [
           {

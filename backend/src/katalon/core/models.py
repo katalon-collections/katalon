@@ -750,7 +750,7 @@ class Attachment(Base):
     __table_args__ = (Index("ix_attachments_record", "record_type", "record_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    # object/entity/place/occurrence/procedure; no FK because the target table is polymorphic
+    # every type in ATTACHMENT_RECORD_MODELS; no FK because the target table is polymorphic
     record_type: Mapped[str] = mapped_column(String(32))
     record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     filename: Mapped[str] = mapped_column(String(512))

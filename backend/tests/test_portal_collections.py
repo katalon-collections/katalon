@@ -9,7 +9,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from katalon.core.dependencies import get_db
-from katalon.core.models import Collection
+from katalon.core.models import Collection, FieldDefinition
 from katalon.main import app
 
 
@@ -57,7 +57,8 @@ async def test_portal_list_collections() -> None:
 
 
 @pytest.mark.asyncio
-async def test_portal_get_collection_with_hierarchy_and_members() -> None:
+@pytest.mark.parametrize("title_public", [True, False])
+async def test_portal_get_collection_with_hierarchy_and_members(title_public: bool) -> None:
     parent_id = uuid.uuid4()
     col_id = uuid.uuid4()
     child_id = uuid.uuid4()
@@ -113,7 +114,9 @@ async def test_portal_get_collection_with_hierarchy_and_members() -> None:
     # load_public_fields result
     pub_fields_res = MagicMock()
     pub_fields_scalars = MagicMock()
-    pub_fields_scalars.all.return_value = []
+    pub_fields_scalars.all.return_value = (
+        [FieldDefinition(name="title", field_type="text", is_public=True)] if title_public else []
+    )
     pub_fields_res.scalars.return_value = pub_fields_scalars
 
     # res1: col, res_pub: load_public_fields, res2: parent_col, res2_stop: None, res3: children, res4: count
@@ -137,7 +140,8 @@ async def test_portal_get_collection_with_hierarchy_and_members() -> None:
     assert data["id"] == str(col_id)
     assert data["parent"]["id"] == str(parent_id)
     assert len(data["ancestors"]) == 1
-    assert data["ancestors"][0]["title"] == "Gesamtnachlass"
+    # An internal title field must not surface in breadcrumbs or child collections.
+    assert data["ancestors"][0]["title"] == ("Gesamtnachlass" if title_public else "COLL-001")
+    assert data["children"][0]["title"] == ("Serie 1" if title_public else "COLL-003")
     assert len(data["children"]) == 1
-    assert data["children"][0]["title"] == "Serie 1"
     assert data["member_objects_count"] == 5

@@ -189,9 +189,12 @@ async def test_deleted_record_returns_410(media_root) -> None:
 
 
 @pytest.mark.asyncio
-async def test_procedure_attachment_returns_404_without_loading_record(media_root) -> None:
+@pytest.mark.parametrize("record_type", ["procedure", "storage_location"])
+async def test_internal_type_attachment_returns_404_without_loading_record(
+    media_root, record_type: str
+) -> None:
     file_field = _field("vertrag", "file")
-    attachment = _stored_attachment(record_type="procedure")
+    attachment = _stored_attachment(record_type=record_type)
     session = _session(attachment, None, [file_field])
     response = await _get(session, attachment.id)
 

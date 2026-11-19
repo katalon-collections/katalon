@@ -82,3 +82,13 @@ async def test_load_hidden_relation_targets_skips_the_query_without_relation_val
 
     assert await load_hidden_relation_targets(db, [{"titel": "T"}], [_field("schenker")]) == set()
     db.execute.assert_not_awaited()
+
+
+def test_public_title_uses_public_fields_only() -> None:
+    from katalon.core.models import FieldDefinition
+    from katalon.services.public_metadata_service import public_title
+
+    md = {"title": "Intern", "name": "Öffentlich"}
+    name_field = FieldDefinition(name="name", field_type="text", is_public=True)
+    assert public_title(md, [name_field]) == "Öffentlich"
+    assert public_title(md, []) == ""

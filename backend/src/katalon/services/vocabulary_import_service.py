@@ -15,7 +15,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from katalon.core.models import VocabularyTerm
+from katalon.core.models import FieldDefinition, VocabularyTerm
+from katalon.integrations.authority_uris import (
+    authority_uri,
+    normalize_source,
+    parse_authority_url,
+)
+from katalon.services.schema_service import validate_metadata
 
 DEFAULT_LABEL_LANGUAGE = "de"
 
@@ -89,6 +95,7 @@ def _merge_term(
         for u in item.exact_match_uris:
             if u not in existing.exact_match_uris:
                 existing.exact_match_uris.append(u)
+    existing.metadata.update(item.metadata)
     if item.parent_term and not existing.parent_term:
         existing.parent_term = item.parent_term
     if item.parent_term and existing.parent_term and item.parent_term != existing.parent_term:
@@ -113,9 +120,68 @@ def _decode_csv(content: bytes) -> str:
     return content.decode("utf-8-sig", errors="replace")
 
 
+_TRUE = {"1", "true", "ja", "yes", "wahr", "x"}
+_FALSE = {"0", "false", "nein", "no", "falsch"}
+
+
+def _authority_value(
+    raw: str, settings: dict[str, Any], label: dict[str, str]
+) -> tuple[dict[str, str] | None, str | None]:
+    """Authority-URL oder nackte ID in {source, external_id, label} überführen."""
+    source = settings.get("source")
+    if not isinstance(source, str) or not source:
+        return None, "Authority-Feld hat keine Quelle konfiguriert"
+    if raw.lower().startswith(("http://", "https://")):
+        parsed = parse_authority_url(raw)
+        if parsed is None or parsed[0] != normalize_source(source):
+            return None, f"URL '{raw}' passt nicht zur Quelle '{source}'"
+        external_id = parsed[1].rstrip("/").rsplit("/", 1)[-1]
+    else:
+        external_id = raw
+        if authority_uri(source, raw) is None:
+            return None, f"'{raw}' ist keine gültige ID der Quelle '{source}'"
+    text = label.get(DEFAULT_LABEL_LANGUAGE) or next(iter(label.values()), external_id)
+    return {"source": source, "external_id": external_id, "label": text}, None
+
+
+def _field_value(raw: str, fd: FieldDefinition, label: dict[str, str]) -> tuple[Any, str | None]:
+    """CSV-Zelle in den Metadatenwert des Term-Feldes umwandeln."""
+    parts = [raw]
+    if fd.is_repeatable:
+        delim = "|" if "|" in raw else ";"
+        parts = [p.strip() for p in raw.split(delim) if p.strip()]
+    values: list[Any] = []
+    for part in parts:
+        value: Any
+        if fd.field_type == "authority":
+            value, err = _authority_value(part, fd.settings or {}, label)
+            if err:
+                return None, err
+        elif fd.field_type == "number":
+            try:
+                number = float(part.replace(",", "."))
+            except ValueError:
+                return None, f"'{part}' ist keine Zahl"
+            value = int(number) if number.is_integer() else number
+        elif fd.field_type == "boolean":
+            if part.lower() in _TRUE:
+                value = True
+            elif part.lower() in _FALSE:
+                value = False
+            else:
+                return None, f"'{part}' ist kein Wahrheitswert"
+        elif fd.field_type == "text":
+            value = {DEFAULT_LABEL_LANGUAGE: part} if fd.is_translatable else part
+        else:
+            return None, f"Feldtyp '{fd.field_type}' wird beim Import nicht unterstützt"
+        values.append(value)
+    return (values if fd.is_repeatable else values[0]), None
+
+
 def parse_csv_terms(
     content: bytes,
     mapping: dict[str, str],
+    field_defs: dict[str, FieldDefinition] | None = None,
 ) -> tuple[list[ImportTerm], list[dict[str, Any]]]:
     text = _decode_csv(content)
     reader = csv.DictReader(io.StringIO(text), delimiter=_detect_delimiter(text))
@@ -132,6 +198,7 @@ def parse_csv_terms(
         exact_match_uris: list[str] = []
         label: dict[str, str] = {}
         inverse_label: dict[str, str] = {}
+        raw_fields: dict[str, str] = {}
         for source_col, target_field in mapping.items():
             source_val = row_values.get(source_col, "")
             if not source_val:
@@ -153,6 +220,8 @@ def parse_csv_terms(
                 lang = target_field.split(":", 1)[1].strip()
                 if lang:
                     inverse_label[lang] = source_val
+            elif target_field.startswith("field:"):
+                raw_fields[target_field.split(":", 1)[1].strip()] = source_val
 
         if not term and label:
             term = _term_from_label(label)
@@ -160,6 +229,18 @@ def parse_csv_terms(
         if not term:
             errors.append({"row": i, "message": "Pflichtfeld 'term' fehlt oder ist leer"})
             continue
+
+        metadata: dict[str, Any] = {}
+        for name, raw in raw_fields.items():
+            fd = (field_defs or {}).get(name)
+            if fd is None:
+                errors.append({"row": i, "message": f"Unbekanntes Feld '{name}'"})
+                continue
+            value, err = _field_value(raw, fd, label or {DEFAULT_LABEL_LANGUAGE: term})
+            if err:
+                errors.append({"row": i, "message": f"Feld '{name}': {err}"})
+            else:
+                metadata[name] = value
 
         _merge_term(
             terms,
@@ -171,6 +252,7 @@ def parse_csv_terms(
                 row=i,
                 uri=uri,
                 exact_match_uris=exact_match_uris,
+                metadata=metadata,
             ),
             errors,
         )
@@ -314,6 +396,15 @@ async def import_vocabulary_terms(
                         "row": item.row,
                         "message": f"Unbekannter parent_term '{item.parent_term}' für '{item.term}'",
                     }
+                )
+                continue
+        if item.metadata:
+            fields_errors = await validate_metadata(
+                db, "vocabulary_term", item.metadata, str(vocab_id), skip_required=True
+            )
+            if fields_errors:
+                errors.extend(
+                    {"row": item.row, "message": f"'{item.term}': {msg}"} for msg in fields_errors
                 )
                 continue
         valid_terms.append(item)

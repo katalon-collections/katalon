@@ -42,8 +42,8 @@ from katalon.services.public_metadata_service import (
     filter_public_metadata,
     load_hidden_relation_targets,
     load_public_fields,
+    public_title,
 )
-from katalon.services.search_service import _extract_title
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +79,17 @@ def _record_subtype(record: Any, record_type: str) -> Any:
     return getattr(record, f"{record_type}_type", None) or getattr(record, "subtype", None)
 
 
-def _record_title(record: Any) -> str:
+def _record_title(
+    record: Any, record_type: str, public_fields: Sequence[FieldDefinition]
+) -> str:
+    """Title from public fields only, so an internal title field never leaves via export."""
     md = getattr(record, "metadata_", None) or {}
+    subtype = _record_subtype(record, record_type)
     return str(
-        getattr(record, "title", None) or _extract_title(md) or getattr(record, "idno", None) or ""
+        getattr(record, "title", None)
+        or public_title(md, public_fields, subtype)
+        or getattr(record, "idno", None)
+        or ""
     )
 
 
@@ -267,7 +274,7 @@ def _export_relation(
     hidden_targets: set[str],
 ) -> ExportRelation:
     other_subtype = _record_subtype(other_rec, other_type)
-    title = _record_title(other_rec)
+    title = _record_title(other_rec, other_type, public_fields)
     return ExportRelation(
         id=str(rel.id),
         direction=direction,
@@ -361,7 +368,6 @@ async def build_export_context_from_db(
     # 1. Record summary
     raw_md = getattr(record, "metadata_", None) or {}
     subtype = getattr(record, f"{record_type}_type", None) or getattr(record, "subtype", None)
-    title = getattr(record, "title", None) or _extract_title(raw_md) or getattr(record, "idno", None) or ""
     status = getattr(record, "status", "public") or "public"
 
     canonical_url = f"{clean_base}/{record_type}/{record_id}" if clean_base else None
@@ -395,6 +401,11 @@ async def build_export_context_from_db(
                 dict(alt) for alt in (st_obj.concept_alternatives or []) if isinstance(alt, dict)
             ]
 
+    public_fields = [
+        f for f in await load_public_fields(db, record_type) if f.field_type != "file"
+    ]
+    title = _record_title(record, record_type, public_fields)
+
     summary = ExportRecordSummary(
         id=str(record.id),
         idno=getattr(record, "idno", None),
@@ -414,9 +425,6 @@ async def build_export_context_from_db(
 
     # 2. Public fields only (internal fields excluded); vocab values carry term URIs
     # `file` values stay out of exports and the index.
-    public_fields = [
-        f for f in await load_public_fields(db, record_type) if f.field_type != "file"
-    ]
     hidden_field_targets = await load_hidden_relation_targets(db, [raw_md], public_fields)
     fields = filter_public_metadata(raw_md, public_fields, subtype, hidden_field_targets)
     fields = await _enrich_vocab_values(db, fields, public_fields)

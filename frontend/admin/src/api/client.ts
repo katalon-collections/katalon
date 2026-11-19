@@ -938,7 +938,8 @@ export const media = {
 }
 
 // Attachments (Feldtyp "file"): files stored per record, referenced from metadata on save
-export type AttachmentRecordType = 'object' | 'entity' | 'place' | 'occurrence' | 'procedure'
+export type AttachmentRecordType =
+  | 'object' | 'entity' | 'place' | 'occurrence' | 'procedure' | 'collection' | 'storage_location'
 
 export interface AttachmentRef {
   id: string

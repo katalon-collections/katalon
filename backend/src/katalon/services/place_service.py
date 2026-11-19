@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import Object, Place, Relation
 from katalon.core.visibility import PUBLIC_STATUSES
+from katalon.services.public_metadata_service import load_public_fields, public_title
 from katalon.services.search_service import _extract_title
 
 
@@ -88,14 +89,23 @@ async def load_place_nodes(db: AsyncSession, *, public_only: bool) -> dict[uuid.
     Place trees are small (hundreds to a few thousand rows), so hierarchy views work on this
     map instead of one query per level. A place whose parent is not in the map counts as a root.
     """
-    query = select(Place.id, Place.parent_id, Place.idno, Place.metadata_).where(
+    query = select(
+        Place.id, Place.parent_id, Place.idno, Place.metadata_, Place.place_type
+    ).where(
         Place.deleted_at.is_(None)
     )
     if public_only:
         query = query.where(Place.status.in_(PUBLIC_STATUSES))
     nodes: dict[uuid.UUID, PlaceNode] = {}
+    public_fields = await load_public_fields(db, "place") if public_only else None
     for row in (await db.execute(query)).all():
-        title = _extract_title(row.metadata_ or {}) or row.idno or str(row.id)[:8]
+        md = row.metadata_ or {}
+        found = (
+            public_title(md, public_fields, row.place_type)
+            if public_fields is not None
+            else _extract_title(md)
+        )
+        title = found or row.idno or str(row.id)[:8]
         nodes[row.id] = PlaceNode(row.id, row.parent_id, title)
     return nodes
 

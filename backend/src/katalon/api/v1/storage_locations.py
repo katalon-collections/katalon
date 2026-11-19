@@ -294,7 +294,12 @@ async def update_storage_location(
         can_edit_locked=current_user.role in {"admin", "superuser"},
     )
     errors = await validate_metadata(
-        db, "storage_location", metadata, storage_location_type, existing=loc.metadata_
+        db,
+        "storage_location",
+        metadata,
+        storage_location_type,
+        existing=loc.metadata_,
+        record_id=loc_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)

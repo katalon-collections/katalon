@@ -56,7 +56,11 @@ from katalon.core.visibility import (
 from katalon.integrations.jsonld_format import PLURAL_TYPE_MAP
 from katalon.services import place_service, relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
-from katalon.services.attachment_service import ATTACHMENT_RECORD_MODELS, attachment_file_response
+from katalon.services.attachment_service import (
+    ATTACHMENT_RECORD_MODELS,
+    INTERNAL_ATTACHMENT_RECORD_TYPES,
+    attachment_file_response,
+)
 from katalon.services.public_metadata_service import (
     filter_public_metadata_checked,
     load_public_fields,
@@ -901,6 +905,7 @@ async def get_collection(
     _cache_for_viewer(response, staff_user)
 
     metadata = col.metadata_ or {}
+    pub_fields: list[Any] = []
     if visibility_user is None:
         from katalon.services.public_metadata_service import (
             filter_public_metadata_checked,
@@ -912,7 +917,14 @@ async def get_collection(
             db, metadata, pub_fields, col.collection_type
         )
 
+    from katalon.services.public_metadata_service import public_title
     from katalon.services.search_service import _extract_title
+
+    def _title(c: Collection) -> str:
+        md = c.metadata_ or {}
+        if visibility_user is None:
+            return public_title(md, pub_fields, c.collection_type)
+        return _extract_title(md)
 
     ancestors: list[PortalCollectionHierarchyItem] = []
     curr_parent_id = col.parent_id
@@ -928,7 +940,7 @@ async def get_collection(
         p_col = (await db.execute(p_query)).scalar_one_or_none()
         if not p_col:
             break
-        title = _extract_title(p_col.metadata_ or {}) or p_col.idno or str(p_col.id)[:8]
+        title = _title(p_col) or p_col.idno or str(p_col.id)[:8]
         ancestor_item = PortalCollectionHierarchyItem(
             id=p_col.id,
             idno=p_col.idno,
@@ -955,7 +967,7 @@ async def get_collection(
             id=c.id,
             idno=c.idno,
             collection_type=c.collection_type,
-            title=_extract_title(c.metadata_ or {}) or c.idno or str(c.id)[:8],
+            title=_title(c) or c.idno or str(c.id)[:8],
             parent_id=c.parent_id,
         )
         for c in children_cols
@@ -1080,7 +1092,7 @@ async def download_portal_media_file(
     summary="Serve an attachment of a public `file` field",
     description=(
         "Checked on every request: the owning record must be publicly visible, its type must "
-        "not be a procedure, and the attachment id must appear in the record's public metadata "
+        "not be a procedure or storage location, and the attachment id must appear in the record's public metadata "
         "projection (field, group and subfield visibility apply). Never cached."
     ),
     responses={404: {"description": "Attachment, record, field or file not public"}},
@@ -1089,7 +1101,7 @@ async def get_public_attachment_file(
     attachment_id: uuid.UUID, request: Request, db: DBDep
 ) -> Response:
     attachment = await db.get(Attachment, attachment_id)
-    if attachment is None or attachment.record_type == "procedure":
+    if attachment is None or attachment.record_type in INTERNAL_ATTACHMENT_RECORD_TYPES:
         raise HTTPException(status_code=404, detail="Anhang nicht gefunden")
     model = ATTACHMENT_RECORD_MODELS.get(attachment.record_type)
     if model is None:

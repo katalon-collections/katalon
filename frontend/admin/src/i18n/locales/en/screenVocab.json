@@ -121,6 +121,7 @@
     "targetInvDe": "Inverse label (de)",
     "targetInvEn": "Inverse label (en)",
     "targetUri": "URI (Canonical)",
+    "termFields": "Vocabulary fields",
     "targetExactMatch": "Exact Match URIs",
     "skosOptions": "SKOS Filters & Options",
     "conceptScheme": "ConceptScheme URI (filter)",

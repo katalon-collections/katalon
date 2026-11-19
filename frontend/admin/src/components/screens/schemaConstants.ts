@@ -19,4 +19,6 @@ export const FIELD_TYPE_LABELS: Record<string, string> = {
 }
 
 /** Record types that can hold file attachments (backend `AttachmentRecordType`). */
-export const FILE_FIELD_TARGET_TYPES: readonly string[] = ['object', 'entity', 'place', 'occurrence', 'procedure']
+export const FILE_FIELD_TARGET_TYPES: readonly string[] = [
+  'object', 'entity', 'place', 'occurrence', 'procedure', 'collection', 'storage_location',
+]

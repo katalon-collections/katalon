@@ -249,6 +249,17 @@ async def filter_public_metadata_checked(
     return filter_public_metadata(metadata, fields, target_subtype, hidden)
 
 
+def public_title(
+    metadata: dict[str, Any] | None,
+    fields: Iterable[FieldDefinition],
+    target_subtype: str | None = None,
+) -> str:
+    """Display title from public fields only; empty when the title field is internal."""
+    from katalon.services.search_service import _extract_title
+
+    return _extract_title(filter_public_metadata(metadata, fields, target_subtype))
+
+
 async def project_public_record[T: BaseModel](
     db: AsyncSession,
     record: T,

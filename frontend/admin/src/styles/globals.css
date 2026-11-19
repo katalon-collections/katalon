@@ -141,7 +141,7 @@ textarea.fld { height: auto; padding: 8px 10px; line-height: 1.5; resize: vertic
 .help { font-size: 11.5px; color: var(--fg-3); margin-top: 5px; }
 .help.err { color: #b91c1c; }
 .field { margin-bottom: 14px; }
-.group-instance { position: relative; border: 1px solid var(--border-s); border-radius: 6px; padding: 8px 36px 8px 10px; margin-bottom: 6px; background: var(--panel); }
+.group-instance { position: relative; border: 2px solid var(--accent-100); border-radius: 6px; padding: 8px 36px 8px 10px; margin-bottom: 6px; background: var(--accent-50); }
 .group-instance-remove { position: absolute; top: 6px; right: 6px; }
 .group-instance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px 12px; }
 .group-subfield { min-width: 0; }

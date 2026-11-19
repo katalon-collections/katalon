@@ -19,7 +19,11 @@ from katalon.core.schemas import (
     VocabularyTermUpdate,
 )
 from katalon.services import skos_import_service, vocabulary_import_service
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    get_field_definitions,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.vocabulary_reference_service import (
     SYSTEM_VOCABULARY_NAMES,
     clear_vocabulary_terms,
@@ -682,7 +686,12 @@ async def import_terms(
         if not parsed_mapping:
             raise HTTPException(status_code=422, detail="CSV-Import benötigt ein Mapping")
         try:
-            terms, errors = vocabulary_import_service.parse_csv_terms(content, parsed_mapping)
+            field_defs = {
+                f.name: f for f in await get_field_definitions(db, "vocabulary_term", str(vocab_id))
+            }
+            terms, errors = vocabulary_import_service.parse_csv_terms(
+                content, parsed_mapping, field_defs
+            )
         except Exception as exc:
             raise HTTPException(
                 status_code=422, detail=f"CSV konnte nicht verarbeitet werden: {exc}"

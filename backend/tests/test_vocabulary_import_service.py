@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from katalon.core.models import FieldDefinition
 from katalon.services.vocabulary_import_service import (
     import_vocabulary_terms,
     parse_csv_terms,
@@ -224,3 +225,49 @@ async def test_import_rejects_every_term_in_a_multi_node_cycle_before_persistenc
     ]
     assert result["created"] == 1
     assert [call.args[0].term for call in db.add.call_args_list] == ["root"]
+
+
+def _fd(name: str, field_type: str, **kw: object) -> FieldDefinition:
+    return FieldDefinition(
+        name=name,
+        field_type=field_type,
+        is_repeatable=kw.get("is_repeatable", False),
+        is_translatable=False,
+        settings=kw.get("settings", {}),
+    )
+
+
+def test_parse_csv_terms_authority_fields_from_urls() -> None:
+    content = (
+        b"ID;Begriff;GND;wikidata\n"
+        b"T3;Comic;https://d-nb.info/gnd/4010427-8;https://www.wikidata.org/wiki/Q1004\n"
+    )
+    mapping = {
+        "ID": "term",
+        "Begriff": "label:de",
+        "GND": "field:gnd",
+        "wikidata": "field:wikidata",
+    }
+    defs = {
+        "gnd": _fd("gnd", "authority", settings={"source": "gnd"}),
+        "wikidata": _fd("wikidata", "authority", settings={"source": "wikidata"}),
+    }
+
+    terms, errors = parse_csv_terms(content, mapping, defs)
+
+    assert errors == []
+    assert terms[0].metadata == {
+        "gnd": {"source": "gnd", "external_id": "4010427-8", "label": "Comic"},
+        "wikidata": {"source": "wikidata", "external_id": "Q1004", "label": "Comic"},
+    }
+
+
+def test_parse_csv_terms_authority_wrong_source_and_unknown_field() -> None:
+    content = b"ID;GND;X\nT1;https://www.wikidata.org/wiki/Q1;1\n"
+    mapping = {"ID": "term", "GND": "field:gnd", "X": "field:nope"}
+    defs = {"gnd": _fd("gnd", "authority", settings={"source": "gnd"})}
+
+    terms, errors = parse_csv_terms(content, mapping, defs)
+
+    assert terms[0].metadata == {}
+    assert len(errors) == 2

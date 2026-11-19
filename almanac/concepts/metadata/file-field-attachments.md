@@ -74,7 +74,7 @@ sources:
     path: .agents/knowledge/decisions/feldtyp-datei-anhaenge.md
 ---
 
-The `file` field type attaches files to records of the five inventory and process types: `object`, `entity`, `place`, `occurrence` and `procedure` [@schema-admin]. Files are not media. They have no IIIF pipeline, no primary image and no per-file rights, and they live in their own `attachments` table, not in `media_files` [@decision] [@models]. The rationale and the rejected alternative (a polymorphic `media_files`) are in the decision record [@decision].
+The `file` field type attaches files to records of seven types: `object`, `entity`, `place`, `occurrence`, `collection`, `storage_location` and `procedure` [@schema-admin]. Files are not media. They have no IIIF pipeline, no primary image and no per-file rights, and they live in their own `attachments` table, not in `media_files` [@decision] [@models]. The rationale and the rejected alternative (a polymorphic `media_files`) are in the decision record [@decision].
 
 ## Data Model
 
@@ -109,7 +109,7 @@ Structurally malformed values, such as a non-list in a repeatable field, go to `
 
 `GET /portal/v1/attachments/{id}/file` runs the public check on every request and is never cached [@portal-public]. It returns 404 when:
 
-- the row or its record is missing, or the record type is `procedure`;
+- the row or its record is missing, or the record type is internal (`procedure`, `storage_location`; `INTERNAL_ATTACHMENT_RECORD_TYPES`);
 - the record is not publicly visible (`ensure_publicly_visible`);
 - the id is not in the projected public metadata of the record, which applies field, group and sub-field visibility and the subtype scope [@public-metadata].
 
@@ -129,7 +129,7 @@ The Portal shows a `file` value as a list in `AttachmentList`. The name opens a 
 | Upload without a later save | Row remains without a reference; GC removes it after the age limit |
 | Record moved to trash | Nothing changes; Portal is closed by the public check, Admin returns 404 for the attachment |
 | Snapshot restored | References return; a file that no longer exists shows as "Datei nicht mehr vorhanden" in the form |
-| Record purged (nightly sweep or manual purge; object, entity, place, occurrence) | `purge_record_attachments` deletes the rows and calls storage delete. A storage failure is logged and the rows are still removed, so the file stays on disk without a row |
+| Record purged (nightly sweep or manual purge; object, entity, place, occurrence, collection, storage location) | `purge_record_attachments` deletes the rows and calls storage delete. A storage failure is logged and the rows are still removed, so the file stays on disk without a row |
 | Procedure deleted (`DELETE /v1/procedures/{id}`) | Procedures have no trash; the delete endpoint calls `purge_record_attachments` directly, so rows and files go with the record |
 | Field purged or type changed | `purge_field_data` does not touch attachments; GC removes unreferenced files |
 
@@ -146,7 +146,7 @@ Setting `--older-than 0` also removes recent files. It is meant for an attachmen
 - Search: `drop_file_values` removes `file` values, top-level and in groups, before indexing. Filenames and reference shape do not reach Elasticsearch in phase 1 [@search-service].
 - Export context: `file` fields are excluded from the export field set, so OAI-PMH, LIDO and mapping exports do not emit them [@export-context]. CSV/JSON dumps (`export_service.py`) for callers without read permission use the public projection without `file` fields and return nothing for procedures and storage locations.
 - Cantaloupe: the IIIF manifest text skips `file` values [@cantaloupe].
-- Not supported in phase 1: collections, storage locations and vocabulary terms as record types, per-file visibility, licence or rights holder, import and batch editing of file values, and file type restrictions per field [@decision].
+- Not supported in phase 1: vocabulary terms as record type, per-file visibility, licence or rights holder, import and batch editing of file values, and file type restrictions per field [@decision].
 
 ## Limits
 

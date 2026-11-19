@@ -5,6 +5,26 @@ Katalon Collections, Version für Version. Interne Refactorings, CI-/Test-Infras
 reine Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 Frühere Versionen listen nur neue Funktionen.
 
+## [1.51.0]
+
+### Neu
+
+- **Dateien auch an Sammlungen und Lagerorten:** Der Feldtyp „Datei“ steht jetzt auch für
+  Sammlungen und Lagerorte bereit, etwa für einen Findbuch-Scan oder einen Raumplan. Im Portal
+  erscheinen Dateien an Sammlungen nur, wenn das Feld öffentlich ist; Dateien an Lagerorten
+  bleiben immer intern.
+- **Vokabular-Import mit eigenen Feldern:** Beim CSV-Import von Vokabularen lassen sich Spalten
+  auch auf zusätzliche Felder der Begriffe abbilden, zum Beispiel GND- oder Wikidata-Links. Die
+  Werte werden vor dem Import geprüft, Fehler erscheinen je Zeile.
+- **Übersichtlichere Gruppen im Formular:** Gruppen mit weiteren Angaben sind im
+  Bearbeitungsformular farblich hinterlegt und lassen sich besser vom restlichen Formular
+  unterscheiden.
+
+### Behoben
+
+- **Interne Titelfelder:** Ein als intern markiertes Titelfeld konnte über die öffentliche
+  Titelanzeige sichtbar werden. Es bleibt jetzt intern.
+
 ## [1.50.0]
 
 ### Neu

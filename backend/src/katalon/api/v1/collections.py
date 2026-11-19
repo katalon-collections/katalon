@@ -426,6 +426,7 @@ async def update_collection(
         collection_type,
         existing=col.metadata_,
         skip_required=data.status == "draft",
+        record_id=col_id,
     )
     if errors:
         raise HTTPException(status_code=422, detail=errors)

@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { vocabularies } from '../../api/client'
-import type { Vocabulary, VocabularyImportResult } from '../../types'
+import { schema, vocabularies } from '../../api/client'
+import type { FieldDefinition, Vocabulary, VocabularyImportResult } from '../../types'
 
 const CSV_TARGETS = [
   { value: '', labelKey: 'importDialog.ignore', defaultLabel: 'Ignorieren' },
@@ -31,7 +31,7 @@ export interface VocabularyImportProps {
 }
 
 export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: VocabularyImportProps = {}) {
-  const { t } = useTranslation('screenVocab')
+  const { t, i18n } = useTranslation('screenVocab')
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [vocabId, setVocabId] = useState(initialVocabId ?? '')
   const [file, setFile] = useState<File | null>(null)
@@ -42,6 +42,7 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
   const [feedback, setFeedback] = useState<string | null>(null)
   const [result, setResult] = useState<VocabularyImportResult | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [termFields, setTermFields] = useState<FieldDefinition[]>([])
 
   // SKOS-specific filters & options
   const [conceptScheme, setConceptScheme] = useState('')
@@ -59,10 +60,18 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
     void vocabularies.list().then(setVocabs).catch(error => setFeedback((error as Error).message))
   }, [])
 
+  useEffect(() => {
+    if (!vocabId) { setTermFields([]); return }
+    void schema.list('vocabulary_term', vocabId)
+      .then(list => setTermFields(list.filter(f => ['text', 'number', 'boolean', 'authority'].includes(f.field_type))))
+      .catch(() => setTermFields([]))
+  }, [vocabId])
+
   const vocab = vocabs.find(item => item.id === vocabId)
   const isCsv = file ? /\.(csv|tsv)$/i.test(file.name) : false
   const isSkos = file ? /\.(ttl|rdf|xml|jsonld|json)$/i.test(file.name) && !isCsv : false
-  const csvTargets = vocab?.kind === 'relation' ? CSV_TARGETS.filter(target => target.value !== 'parent_term') : CSV_TARGETS
+  const baseTargets = vocab?.kind === 'relation' ? CSV_TARGETS.filter(target => target.value !== 'parent_term') : CSV_TARGETS
+  const fieldTargets = termFields.map(f => ({ value: `field:${f.name}`, label: f.label[i18n.language] || f.label.de || f.name }))
 
   async function selectFile(nextFile: File | null) {
     setFeedback(null)
@@ -77,7 +86,7 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
     setHeaders(foundHeaders)
     setMapping(foundHeaders.reduce<Record<string, string>>((next, header) => {
       const normalized = header.toLowerCase()
-      next[header] = normalized === 'term' ? 'term'
+      next[header] = normalized === 'term' || normalized === 'id' ? 'term'
         : (normalized === 'parent_term' || normalized === 'parent') && vocab?.kind !== 'relation' ? 'parent_term'
           : normalized === 'label_de' || normalized === 'de' ? 'label:de'
             : normalized === 'label_en' || normalized === 'en' ? 'label:en'
@@ -183,11 +192,18 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
                     <div key={header} className="vocab-mapping-row">
                       <input className="fld mono" value={header} readOnly />
                       <select className="fld" value={mapping[header] ?? ''} onChange={event => setMapping(current => ({ ...current, [header]: event.target.value }))}>
-                        {csvTargets.map(target => (
+                        {baseTargets.map(target => (
                           <option key={target.value || 'ignore'} value={target.value}>
                             {t(target.labelKey, target.defaultLabel)}
                           </option>
                         ))}
+                        {fieldTargets.length > 0 && (
+                          <optgroup label={t('importDialog.termFields')}>
+                            {fieldTargets.map(target => (
+                              <option key={target.value} value={target.value}>{target.label}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                   ))}
