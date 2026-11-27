@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, ClassVar, Literal
 
@@ -51,10 +53,12 @@ from katalon.core.visibility import (
     PUBLIC_STATUSES,
     apply_public_visibility,
     ensure_publicly_visible,
+    gone_error,
+    portal_tombstone_scope,
     readable_record_types,
 )
 from katalon.integrations.jsonld_format import PLURAL_TYPE_MAP
-from katalon.services import place_service, relation_service, search_service
+from katalon.services import oai_state_service, place_service, relation_service, search_service
 from katalon.services.advanced_search_service import AdvancedQuery, resolve_query
 from katalon.services.attachment_service import (
     ATTACHMENT_RECORD_MODELS,
@@ -535,7 +539,13 @@ async def list_objects(
     q: str | None = None,
 ) -> dict[str, Any]:
     return await objects.list_objects(
-        db, _staff_user(current_user), page, page_size, None, object_type, q
+        db,
+        _staff_user(current_user),
+        page=page,
+        page_size=page_size,
+        status=None,
+        object_type=object_type,
+        q=q,
     )
 
 
@@ -572,6 +582,20 @@ async def list_object_summaries(
     ]
 
 
+@asynccontextmanager
+async def _portal_record_scope(
+    db: DBDep, record_type: str, record_id: uuid.UUID
+) -> AsyncIterator[None]:
+    """Detail reads: a record that was public once answers 410 instead of 404."""
+    with portal_tombstone_scope():
+        try:
+            yield
+        except HTTPException as exc:
+            if exc.status_code == 404 and await oai_state_service.was_public(db, record_type, record_id):
+                raise gone_error() from exc
+            raise
+
+
 @router.get("/objects/{object_id}", response_model=PortalObjectRead)
 async def get_object(
     object_id: uuid.UUID,
@@ -582,12 +606,13 @@ async def get_object(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> Object | ObjectRead | Response:
-    rdf = await _maybe_export_rdf(
-        "object", object_id, db, request, _staff_user(current_user), format, accept
-    )
-    if rdf is not None:
-        return rdf
-    record: Object | ObjectRead = await objects.get_object(object_id, db, _staff_user(current_user))
+    async with _portal_record_scope(db, "object", object_id):
+        rdf = await _maybe_export_rdf(
+            "object", object_id, db, request, _staff_user(current_user), format, accept
+        )
+        if rdf is not None:
+            return rdf
+        record: Object | ObjectRead = await objects.get_object(object_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
     return record
 
@@ -603,8 +628,9 @@ async def seo_page(
     from katalon.services.seo_service import render_record_seo
 
     record_type = next(t for t, plural in PLURAL_TYPE_MAP.items() if plural == plural_type)
-    page = await render_record_seo(db, record_type, record_id, str(request.base_url))
-    return HTMLResponse(page, headers={"Cache-Control": _PUBLIC_CACHE})
+    page, status_code = await render_record_seo(db, record_type, record_id, str(request.base_url))
+    cache = "no-store" if status_code == 410 else _PUBLIC_CACHE
+    return HTMLResponse(page, status_code=status_code, headers={"Cache-Control": cache})
 
 
 @router.get("/objects/{object_id}/export", summary="Export a single object record as JSON-LD or Turtle RDF")
@@ -635,12 +661,13 @@ async def get_entity(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> Entity | EntityRead | Response:
-    rdf = await _maybe_export_rdf(
-        "entity", entity_id, db, request, _staff_user(current_user), format, accept
-    )
-    if rdf is not None:
-        return rdf
-    record: Entity | EntityRead = await entities.get_entity(entity_id, db, _staff_user(current_user))
+    async with _portal_record_scope(db, "entity", entity_id):
+        rdf = await _maybe_export_rdf(
+            "entity", entity_id, db, request, _staff_user(current_user), format, accept
+        )
+        if rdf is not None:
+            return rdf
+        record: Entity | EntityRead = await entities.get_entity(entity_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
     return record
 
@@ -677,12 +704,13 @@ async def get_place(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> PortalPlaceDetail | Response:
-    rdf = await _maybe_export_rdf(
-        "place", place_id, db, request, _staff_user(current_user), format, accept
-    )
-    if rdf is not None:
-        return rdf
-    record: Place | PlaceRead = await places.get_place(place_id, db, _staff_user(current_user))
+    async with _portal_record_scope(db, "place", place_id):
+        rdf = await _maybe_export_rdf(
+            "place", place_id, db, request, _staff_user(current_user), format, accept
+        )
+        if rdf is not None:
+            return rdf
+        record: Place | PlaceRead = await places.get_place(place_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
     detail = PortalPlaceDetail.model_validate(record)
     visibility_user = await _place_visibility_user(db, _staff_user(current_user))
@@ -767,12 +795,13 @@ async def get_occurrence(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> Occurrence | OccurrenceRead | Response:
-    rdf = await _maybe_export_rdf(
-        "occurrence", occurrence_id, db, request, _staff_user(current_user), format, accept
-    )
-    if rdf is not None:
-        return rdf
-    record: Occurrence | OccurrenceRead = await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
+    async with _portal_record_scope(db, "occurrence", occurrence_id):
+        rdf = await _maybe_export_rdf(
+            "occurrence", occurrence_id, db, request, _staff_user(current_user), format, accept
+        )
+        if rdf is not None:
+            return rdf
+        record: Occurrence | OccurrenceRead = await occurrences.get_occurrence(occurrence_id, db, _staff_user(current_user))
     _cache_for_viewer(response, _staff_user(current_user))
     return record
 
@@ -886,22 +915,22 @@ async def get_collection(
     format: str | None = Query(None),
     accept: str | None = Header(None),
 ) -> PortalCollectionDetail | Response:
-    rdf = await _maybe_export_rdf(
-        "collection", collection_id, db, request, _staff_user(current_user), format, accept
-    )
-    if rdf is not None:
-        return rdf
-    staff_user = _staff_user(current_user)
-    visibility_user = await _collection_visibility_user(db, staff_user)
-    query = select(Collection).where(
-        Collection.id == collection_id, Collection.deleted_at.is_(None)
-    )
-    if visibility_user is None:
-        query = query.where(Collection.status.in_(PUBLIC_STATUSES))
-    result = await db.execute(query)
-    col = result.scalar_one_or_none()
-    if not col:
-        raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
+    async with _portal_record_scope(db, "collection", collection_id):
+        rdf = await _maybe_export_rdf(
+            "collection", collection_id, db, request, _staff_user(current_user), format, accept
+        )
+        if rdf is not None:
+            return rdf
+        staff_user = _staff_user(current_user)
+        visibility_user = await _collection_visibility_user(db, staff_user)
+        query = select(Collection).where(Collection.id == collection_id)
+        if visibility_user is None:
+            query = query.where(Collection.status.in_(PUBLIC_STATUSES))
+        result = await db.execute(query)
+        col = result.scalar_one_or_none()
+        if not col:
+            raise HTTPException(status_code=404, detail="Sammlung nicht gefunden")
+        ensure_publicly_visible(col, visibility_user, "Sammlung nicht gefunden", tombstone_for_all=True)
     _cache_for_viewer(response, staff_user)
 
     metadata = col.metadata_ or {}
@@ -1153,7 +1182,12 @@ async def record_view(
     if record is None:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
     readable = staff_user and await has_record_permission(db, staff_user, record_type, "read")
-    ensure_publicly_visible(record, staff_user if readable else None, "Datensatz nicht gefunden")
+    ensure_publicly_visible(
+        record,
+        staff_user if readable else None,
+        "Datensatz nicht gefunden",
+        tombstone_for_all=True,
+    )
     no_content = Response(status_code=204, headers={"Cache-Control": "no-store"})
     if not await usage_service.usage_stats_enabled(db):
         return no_content

@@ -9,6 +9,7 @@ Commands:
     katalon-manage import-xml
     katalon-manage reset-admin
     katalon-manage warm-thumbnails
+    katalon-manage reindex [--type <type>] [--sync | --status]
     katalon-manage lido-report
     katalon-manage resync-schema-relations
     katalon-manage attachments-gc --older-than 7d [--dry-run]
@@ -293,3 +294,83 @@ def attachments_gc(older_than: str, dry_run: bool) -> None:
         click.echo(f"Trockenlauf: {report['deleted']} würden gelöscht, nichts geschrieben.")
     else:
         click.echo(f"Gelöscht: {report['deleted']}; Speicherfehler (Zeile bleibt): {report['failed']}.")
+
+
+@cli.command(name="reindex")
+@click.option(
+    "--type",
+    "target_type",
+    type=click.Choice(
+        ["object", "entity", "place", "occurrence", "procedure", "collection", "storage_location"]
+    ),
+    default=None,
+    help="Rebuild only this record type instead of a full index rebuild.",
+)
+@click.option(
+    "--sync",
+    is_flag=True,
+    help="Run the rebuild synchronously in this process instead of queueing it for the worker.",
+)
+@click.option(
+    "--status",
+    "show_status",
+    is_flag=True,
+    help="Show current reindex progress without starting a rebuild.",
+)
+def reindex(target_type: str | None, sync: bool, show_status: bool) -> None:
+    """Trigger or inspect a search index rebuild without needing an Admin login."""
+    if sync and show_status:
+        raise click.UsageError("--sync und --status können nicht kombiniert werden.")
+
+    from katalon.core.schemas import RECORD_TYPES
+    from katalon.workers import index_tasks, reindex_state
+
+    if show_status:
+        state = reindex_state.read_status(sorted(RECORD_TYPES))
+        shown = False
+        for name in [reindex_state.FULL, *sorted(RECORD_TYPES)]:
+            entry = state.get(name) or {}
+            prog = entry.get("progress") or {}
+            if not prog and not entry.get("queued") and not entry.get("dirty"):
+                continue
+            shown = True
+            label = "gesamt" if name == reindex_state.FULL else name
+            run_state = prog.get("state") or ("wartend" if entry.get("queued") else "ausstehend")
+            built = prog.get("built", "0")
+            total = prog.get("total", "0")
+            click.echo(f"{label}: {run_state} ({built}/{total})")
+        if not shown:
+            click.echo("Kein Reindex-Lauf bekannt.")
+        return
+
+    if sync:
+        if target_type:
+            report = index_tasks.bulk_reindex_type_task.run(target_type)
+            click.echo(
+                f"Reindex '{target_type}': {report.get('status')} "
+                f"(indiziert: {report.get('indexed', 0)}, entfernt: {report.get('removed', 0)})."
+            )
+        else:
+            report = index_tasks.reindex_all_task.run()
+            click.echo(
+                f"Komplett-Reindex: {report.get('status')} "
+                f"(Index: {report.get('index', '-')})."
+            )
+        return
+
+    if target_type:
+        enqueued = reindex_state.request_bulk_reindex(target_type, strict=False)
+        msg = (
+            f"Reindex für '{target_type}' eingereiht."
+            if enqueued
+            else f"Reindex für '{target_type}' ist bereits eingereiht oder vorgemerkt."
+        )
+        click.echo(msg)
+    else:
+        enqueued = reindex_state.request_full_rebuild(strict=False)
+        msg = (
+            "Komplett-Reindex eingereiht."
+            if enqueued
+            else "Komplett-Reindex ist bereits eingereiht oder vorgemerkt."
+        )
+        click.echo(msg)

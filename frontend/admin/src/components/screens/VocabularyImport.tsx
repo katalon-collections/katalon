@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { schema, vocabularies } from '../../api/client'
 import type { FieldDefinition, Vocabulary, VocabularyImportResult } from '../../types'
@@ -32,6 +32,7 @@ export interface VocabularyImportProps {
 
 export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: VocabularyImportProps = {}) {
   const { t, i18n } = useTranslation('screenVocab')
+  const formId = useId()
   const [vocabs, setVocabs] = useState<Vocabulary[]>([])
   const [vocabId, setVocabId] = useState(initialVocabId ?? '')
   const [file, setFile] = useState<File | null>(null)
@@ -190,8 +191,8 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
                 <div style={{ display: 'grid', gap: 6 }}>
                   {headers.map(header => (
                     <div key={header} className="vocab-mapping-row">
-                      <input className="fld mono" value={header} readOnly />
-                      <select className="fld" value={mapping[header] ?? ''} onChange={event => setMapping(current => ({ ...current, [header]: event.target.value }))}>
+                      <input className="fld mono" value={header} readOnly aria-label={header} />
+                      <select className="fld" aria-label={header} value={mapping[header] ?? ''} onChange={event => setMapping(current => ({ ...current, [header]: event.target.value }))}>
                         {baseTargets.map(target => (
                           <option key={target.value || 'ignore'} value={target.value}>
                             {t(target.labelKey, target.defaultLabel)}
@@ -216,8 +217,9 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
                 <div className="lbl" style={{ fontWeight: 600 }}>{t('importDialog.skosOptions')}</div>
 
                 <div className="field">
-                  <label className="lbl">{t('importDialog.conceptScheme')}</label>
+                  <label className="lbl" htmlFor={`${formId}-concept-scheme`}>{t('importDialog.conceptScheme')}</label>
                   <input
+                    id={`${formId}-concept-scheme`}
                     className="fld mono"
                     placeholder={t('importDialog.conceptSchemeHelp')}
                     value={conceptScheme}
@@ -226,8 +228,9 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
                 </div>
 
                 <div className="field">
-                  <label className="lbl">{t('importDialog.topConcept')}</label>
+                  <label className="lbl" htmlFor={`${formId}-top-concept`}>{t('importDialog.topConcept')}</label>
                   <input
+                    id={`${formId}-top-concept`}
                     className="fld mono"
                     placeholder={t('importDialog.topConceptHelp')}
                     value={topConcept}
@@ -237,8 +240,9 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div className="field">
-                    <label className="lbl">{t('importDialog.maxDepth')}</label>
+                    <label className="lbl" htmlFor={`${formId}-max-depth`}>{t('importDialog.maxDepth')}</label>
                     <input
+                      id={`${formId}-max-depth`}
                       type="number"
                       min="1"
                       className="fld"
@@ -248,8 +252,9 @@ export function VocabularyImport({ initialVocabId, onImportComplete, onClose }: 
                     />
                   </div>
                   <div className="field">
-                    <label className="lbl">{t('importDialog.maxTerms')}</label>
+                    <label className="lbl" htmlFor={`${formId}-max-terms`}>{t('importDialog.maxTerms')}</label>
                     <input
+                      id={`${formId}-max-terms`}
                       type="number"
                       min="1"
                       className="fld"

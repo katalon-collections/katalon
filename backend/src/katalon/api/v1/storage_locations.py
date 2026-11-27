@@ -106,6 +106,7 @@ async def list_storage_locations(
     page_size: int = Query(50, ge=1, le=200),
     storage_location_type: str | None = None,
     parent_id: uuid.UUID | None = None,
+    schema_incomplete: bool | None = None,
     q: str | None = None,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
@@ -115,6 +116,8 @@ async def list_storage_locations(
         query = query.where(StorageLocation.storage_location_type == storage_location_type)
     if parent_id is not None:
         query = query.where(StorageLocation.parent_id == parent_id)
+    if schema_incomplete is not None:
+        query = query.where(StorageLocation.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             StorageLocation.idno.icontains(q, autoescape=True)
@@ -313,6 +316,7 @@ async def update_storage_location(
     loc.idno = idno
     loc.storage_location_type = storage_location_type
     loc.parent_id = data.parent_id
+    loc.schema_incomplete = False
     loc.metadata_ = metadata
     loc.ai_provenance = data.ai_provenance
 

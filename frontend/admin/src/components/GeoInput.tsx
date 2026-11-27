@@ -26,6 +26,7 @@ function parseCoord(text: string, limit: number): number | null {
 }
 
 interface Props {
+  ariaLabelledBy?: string
   value: GeoEntry | undefined
   onChange: (v: GeoEntry | undefined) => void
   disabled?: boolean
@@ -33,7 +34,7 @@ interface Props {
 }
 
 /** WGS84 point as two decimal-degree inputs plus an optional accuracy; a map click or place search sets the point. */
-export function GeoInput({ value, onChange, disabled, showAccuracy = true }: Props) {
+export function GeoInput({ ariaLabelledBy, value, onChange, disabled, showAccuracy = true }: Props) {
   const { t } = useTranslation('screenForm')
   const [lat, setLat] = useState(value ? String(value.lat) : '')
   const [lon, setLon] = useState(value ? String(value.lon) : '')
@@ -171,7 +172,7 @@ export function GeoInput({ value, onChange, disabled, showAccuracy = true }: Pro
   }, [showMap, showAccuracy, latNum, lonNum, accNum, accInvalid])
 
   return (
-    <div>
+    <div role={ariaLabelledBy ? 'group' : undefined} aria-labelledby={ariaLabelledBy}>
       <div style={{ display: 'flex', gap: 6 }}>
         <input className="fld mono" inputMode="decimal" value={lat} disabled={disabled} style={{ flex: 1 }}
           aria-label={t('geo.lat')} placeholder={t('geo.lat')}

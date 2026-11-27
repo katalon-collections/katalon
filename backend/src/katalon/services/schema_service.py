@@ -10,7 +10,7 @@ from copy import deepcopy
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import or_, select
+from sqlalchemy import literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.models import FieldDefinition, VocabularyTerm
@@ -533,6 +533,165 @@ def _validate_file_values(value: Any, *, repeatable: bool, label: str) -> list[s
     return errors
 
 
+def field_applies(field: FieldDefinition, subtype: str | None) -> bool:
+    """A field scoped to a subtype binds only records of exactly that subtype."""
+    return field.target_subtype in (None, subtype)
+
+
+def _is_required_value_missing(value: Any) -> bool:
+    """Return True when a required metadata value is empty or absent."""
+    if value is None or value == "" or value == []:
+        return True
+    return isinstance(value, dict) and not value
+
+
+def metadata_missing_required_fields(
+    metadata: dict[str, Any] | None,
+    top_fields: list[FieldDefinition],
+    sub_fields_by_parent: dict[uuid.UUID, list[FieldDefinition]],
+) -> list[str]:
+    """Return required field names/paths missing from ``metadata`` for the given schema."""
+    source = metadata if isinstance(metadata, dict) else {}
+    missing: list[str] = []
+
+    for field in top_fields:
+        if field.name == "idno":
+            continue
+        value = source.get(field.name)
+        if field.is_required and _is_required_value_missing(value):
+            missing.append(field.name)
+            continue
+        if field.field_type == "group" and isinstance(value, list):
+            sub_fields = sub_fields_by_parent.get(field.id, [])
+            if not sub_fields:
+                continue
+            for instance in value:
+                if not isinstance(instance, dict):
+                    continue
+                for sf in sub_fields:
+                    if sf.is_required and _is_required_value_missing(instance.get(sf.name)):
+                        path = f"{field.name}.{sf.name}"
+                        if path not in missing:
+                            missing.append(path)
+    return missing
+
+
+async def is_record_schema_incomplete(
+    db: AsyncSession,
+    record_type: str,
+    metadata: dict[str, Any] | None,
+    target_subtype: str | None = None,
+) -> bool:
+    """Return True if ``metadata`` is missing any active required field for ``record_type``."""
+    # Callers hold a modified record; an autoflush here would bump its version a second time.
+    with db.no_autoflush:
+        top_fields = [
+            f
+            for f in await get_field_definitions(db, record_type, target_subtype)
+            # Same field set as recheck_schema_incomplete, also for records without a subtype.
+            if field_applies(f, target_subtype)
+        ]
+        group_ids = [f.id for f in top_fields if f.field_type == "group"]
+        sub_fields_by_parent: dict[uuid.UUID, list[FieldDefinition]] = {}
+        if group_ids:
+            sub_result = await db.execute(
+                select(FieldDefinition)
+                .where(
+                    FieldDefinition.parent_id.in_(group_ids),
+                    FieldDefinition.is_deleted.is_(False),
+                )
+                .order_by(FieldDefinition.sort_order)
+            )
+            for sf in sub_result.scalars().all():
+                if sf.parent_id is not None:
+                    sub_fields_by_parent.setdefault(sf.parent_id, []).append(sf)
+    return bool(metadata_missing_required_fields(metadata, top_fields, sub_fields_by_parent))
+
+
+_SUBTYPE_ATTRS: dict[str, str] = {
+    "object": "object_type",
+    "entity": "entity_type",
+    "place": "place_type",
+    "occurrence": "occurrence_type",
+    "procedure": "procedure_type",
+    "collection": "collection_type",
+    "storage_location": "storage_location_type",
+}
+
+
+async def recheck_schema_incomplete(
+    db: AsyncSession,
+    target_type: str,
+    target_subtype: str | None = None,
+) -> int:
+    """Re-evaluate ``schema_incomplete`` for existing records of ``target_type``.
+
+    Updates only the boolean marker column without modifying ``metadata``,
+    ``version``, or ``updated_at``. Returns the number of records whose flag changed.
+    """
+    from katalon.services.relation_service import _RECORD_MODELS
+
+    model = _RECORD_MODELS.get(target_type)
+    if model is None:
+        return 0
+    subtype_attr = _SUBTYPE_ATTRS.get(target_type)
+    subtype_col = getattr(model, subtype_attr, None) if subtype_attr else None
+
+    fields_result = await db.execute(
+        select(FieldDefinition).where(
+            FieldDefinition.target_type == target_type,
+            FieldDefinition.is_deleted.is_(False),
+        )
+    )
+    all_fields = list(fields_result.scalars().all())
+    generic_top: list[FieldDefinition] = []
+    subtype_top: dict[str, list[FieldDefinition]] = {}
+    sub_fields_by_parent: dict[uuid.UUID, list[FieldDefinition]] = {}
+    for fd in all_fields:
+        if fd.parent_id is not None:
+            sub_fields_by_parent.setdefault(fd.parent_id, []).append(fd)
+        elif fd.target_subtype is None:
+            generic_top.append(fd)
+        else:
+            subtype_top.setdefault(fd.target_subtype, []).append(fd)
+
+    if subtype_col is not None:
+        query = select(model.id, subtype_col, model.metadata_, model.schema_incomplete)
+        if target_subtype is not None:
+            query = query.where(subtype_col == target_subtype)
+    else:
+        query = select(model.id, literal(None), model.metadata_, model.schema_incomplete)
+
+    rows = (await db.execute(query)).all()
+    to_mark_true: list[uuid.UUID] = []
+    to_mark_false: list[uuid.UUID] = []
+    for rec_id, rec_subtype, metadata, current_flag in rows:
+        applicable_top = (
+            generic_top + subtype_top.get(rec_subtype, []) if rec_subtype else generic_top
+        )
+        incomplete = bool(
+            metadata_missing_required_fields(metadata, applicable_top, sub_fields_by_parent)
+        )
+        if incomplete != bool(current_flag):
+            if incomplete:
+                to_mark_true.append(rec_id)
+            else:
+                to_mark_false.append(rec_id)
+
+    chunk_size = 500
+    for flag_value, ids in ((True, to_mark_true), (False, to_mark_false)):
+        for start in range(0, len(ids), chunk_size):
+            chunk = ids[start : start + chunk_size]
+            await db.execute(
+                update(model)
+                .where(model.id.in_(chunk))
+                .values(schema_incomplete=flag_value, updated_at=model.updated_at)
+            )
+    if to_mark_true or to_mark_false:
+        await db.flush()
+    return len(to_mark_true) + len(to_mark_false)
+
+
 async def validate_metadata(
     db: AsyncSession,
     record_type: str,
@@ -560,12 +719,9 @@ async def validate_metadata(
             # the API layer against the dedicated column, not here.
             continue
         value = metadata.get(field.name)
+        check_required = not skip_required and field_applies(field, target_subtype)
 
-        if (
-            not skip_required
-            and field.is_required
-            and (value is None or value == "" or value == [])
-        ):
+        if check_required and field.is_required and _is_required_value_missing(value):
             errors.append(f"Feld '{field.name}' ist erforderlich.")
             continue
 
@@ -592,7 +748,7 @@ async def validate_metadata(
                     sv = instance.get(sf.name)
                     field_path = f"{field.name}.{sf.name}"
                     indexed_prefix = f"Feld '{field_path}' (Eintrag {idx + 1})"
-                    if not skip_required and sf.is_required and (sv is None or sv == ""):
+                    if check_required and sf.is_required and _is_required_value_missing(sv):
                         errors.append(f"{indexed_prefix}: Pflichtfeld.")
                     if sv is not None and sf.field_type == "text":
                         regex = sf.settings.get("validation_regex")
@@ -851,6 +1007,7 @@ async def prepare_metadata(
             field.field_type in {"text", "vocab", "vocab_free", "date", "number"}
             and prepared.get(field.name) in (None, "", [])
             and "default_value" in settings
+            and field_applies(field, target_subtype)
         ):
             prepared[field.name] = deepcopy(settings["default_value"])
         if field.field_type == "number" and field.name in prepared:

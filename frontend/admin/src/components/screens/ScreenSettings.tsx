@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { req, BASE, apiKeys, users, schema, subtypes, vocabularies, adminConfig, authority, authorizedFetch, sparql } from '../../api/client'
 import type { AdminConfigRead, AuthoritySource, SparqlStatus } from '../../api/client'
@@ -51,6 +51,7 @@ const AUTHORITY_TESTS: Record<string, { query: string, href: string }> = {
 
 function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) => void }) {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [pwdCurrent, setPwdCurrent] = useState('')
   const [pwdNew, setPwdNew] = useState('')
   const [pwdConfirm, setPwdConfirm] = useState('')
@@ -139,12 +140,12 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
         <div className="hd">{t('profil.email.title')}</div>
         <div className="bd">
           <div className="field">
-            <div className="lbl">{t('profil.email.newLabel')}</div>
-            <input className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
+            <label className="lbl" htmlFor={`${formId}-email-new`}>{t('profil.email.newLabel')}</label>
+            <input id={`${formId}-email-new`} className="fld" type="email" value={emailNew} onChange={e => setEmailNew(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">{t('profil.email.currentPasswordLabel')}</div>
-            <input className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
+            <label className="lbl" htmlFor={`${formId}-email-pwd`}>{t('profil.email.currentPasswordLabel')}</label>
+            <input id={`${formId}-email-pwd`} className="fld" type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
           </div>
           {emailError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{emailError}</div>}
           {emailSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{t('profil.email.success')}</div>}
@@ -156,16 +157,16 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
         <div className="hd">{t('profil.password.title')}</div>
         <div className="bd">
           <div className="field">
-            <div className="lbl">{t('profil.password.currentLabel')}</div>
-            <input className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
+            <label className="lbl" htmlFor={`${formId}-pwd-current`}>{t('profil.password.currentLabel')}</label>
+            <input id={`${formId}-pwd-current`} className="fld" type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">{t('profil.password.newLabel')}</div>
-            <input className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
+            <label className="lbl" htmlFor={`${formId}-pwd-new`}>{t('profil.password.newLabel')}</label>
+            <input id={`${formId}-pwd-new`} className="fld" type="password" value={pwdNew} onChange={e => setPwdNew(e.target.value)} />
           </div>
           <div className="field">
-            <div className="lbl">{t('profil.password.confirmLabel')}</div>
-            <input className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
+            <label className="lbl" htmlFor={`${formId}-pwd-confirm`}>{t('profil.password.confirmLabel')}</label>
+            <input id={`${formId}-pwd-confirm`} className="fld" type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} />
           </div>
           {pwdError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{pwdError}</div>}
           {pwdSuccess && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{t('profil.password.success')}</div>}
@@ -271,6 +272,7 @@ function SectionProfil({ onStartTour }: { onStartTour?: (variant: TourVariant) =
 
 function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -370,13 +372,13 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
               onChange={(lng, val) => setSiteSubtitle(prev => ({ ...prev, [lng]: val }))} />
           </div>
           {languages.map(lng => (
-            <div className="field" key={lng}><div className="lbl">{t('portal.heroText', { lang: lng.toUpperCase() })}</div>
-              <textarea className="fld" rows={3} value={heroText[lng] ?? ''}
+            <div className="field" key={lng}><label className="lbl" htmlFor={`${formId}-hero-${lng}`}>{t('portal.heroText', { lang: lng.toUpperCase() })}</label>
+              <textarea id={`${formId}-hero-${lng}`} className="fld" rows={3} value={heroText[lng] ?? ''}
                 onChange={e => setHeroText(prev => ({ ...prev, [lng]: e.target.value }))}
                 style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
           ))}
           <div className="field">
-            <div className="lbl">{t('portal.logo')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
+            <label className="lbl" htmlFor={`${formId}-logo-url`}>{t('portal.logo')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
               <button className="btn gh sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>{logoUploading ? t('portal.logoUploading') : t('portal.logoUpload')}</button>
@@ -384,7 +386,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
               <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }} />
             </div>
-            <input className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder={t('portal.logoUrlPlaceholder')} style={{ marginTop: 6, fontSize: 12 }} />
+            <input id={`${formId}-logo-url`} className="fld mono" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder={t('portal.logoUrlPlaceholder')} style={{ marginTop: 6, fontSize: 12 }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 8, opacity: logoUrl ? 1 : 0.6 }}>
               <input type="checkbox" className="ck" checked={headerShowTitle} onChange={e => setHeaderShowTitle(e.target.checked)} />
               {tLayout('header.showTitle')}
@@ -396,13 +398,13 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{tLayout('header.hint')}</div>
           </div>
           <div className="field">
-            <div className="lbl">{t('portal.placeholderImage')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.placeholderImageHint')}</span></div>
-            <input className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
+            <label className="lbl" htmlFor={`${formId}-placeholder-img`}>{t('portal.placeholderImage')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.placeholderImageHint')}</span></label>
+            <input id={`${formId}-placeholder-img`} className="fld mono" value={placeholderImageUrl} onChange={e => setPlaceholderImageUrl(e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
             {placeholderImageUrl && <img src={placeholderImageUrl} alt={t('portal.placeholderImage')} style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
           </div>
           <div className="field">
-            <div className="lbl">{t('portal.featured')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.featuredHint')}</span></div>
-            <textarea className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2'} />
+            <label className="lbl" htmlFor={`${formId}-featured`}>{t('portal.featured')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('portal.featuredHint')}</span></label>
+            <textarea id={`${formId}-featured`} className="fld mono" rows={4} value={featuredIds} onChange={e => setFeaturedIds(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} placeholder={'uuid-1\nuuid-2'} />
           </div>
         </div>
       </div>
@@ -429,8 +431,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="hd">{t('detailLayout.title')}</div>
         <div className="bd">
-          <div className="field">
-            <div className="lbl">{t('detailLayout.sidebar')}</div>
+          <div className="field" role="group" aria-labelledby={`${formId}-sidebar-pos`}>
+            <div id={`${formId}-sidebar-pos`} className="lbl">{t('detailLayout.sidebar')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className={`btn${detailSidebarPosition === 'right' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('right')}>{t('detailLayout.right')}</button>
               <button className={`btn${detailSidebarPosition === 'left' ? ' pri' : ' gh'}`} onClick={() => setDetailSidebarPosition('left')}>{t('detailLayout.left')}</button>
@@ -439,8 +441,8 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
               {t('detailLayout.sidebarHint')}
             </div>
           </div>
-          <div className="field">
-            <div className="lbl">{t('detailLayout.metaRowLabel')}</div>
+          <div className="field" role="group" aria-labelledby={`${formId}-meta-row`}>
+            <div id={`${formId}-meta-row`} className="lbl">{t('detailLayout.metaRowLabel')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className={`btn${metaRowLayout === 'stacked' ? ' pri' : ' gh'}`} onClick={() => setMetaRowLayout('stacked')}>{t('detailLayout.metaRowStacked')}</button>
               <button className={`btn${metaRowLayout === 'inline' ? ' pri' : ' gh'}`} onClick={() => setMetaRowLayout('inline')}>{t('detailLayout.metaRowInline')}</button>
@@ -507,13 +509,13 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="hd">{t('portal.design')}</div>
         <div className="bd">
-          {colorFields.map(({ lbl, val, set, ph }) => (
+          {colorFields.map(({ lbl, val, set, ph }, idx) => (
             <div className="field" key={lbl}>
-              <div className="lbl">{lbl}</div>
+              <label className="lbl" htmlFor={`${formId}-color-${idx}`}>{lbl}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="color" value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
+                <input type="color" aria-label={lbl} value={val || (ph ?? '#000000')} onChange={e => set(e.target.value)}
                   style={{ width: 40, height: 32, padding: 2, border: '1px solid var(--border-s)', borderRadius: 4 }} />
-                <input className="fld mono" value={val} onChange={e => set(e.target.value)} placeholder={ph ?? ''} style={{ flex: 1 }} />
+                <input id={`${formId}-color-${idx}`} className="fld mono" value={val} onChange={e => set(e.target.value)} placeholder={ph ?? ''} style={{ flex: 1 }} />
                 {val && <button className="btn sm gh" onClick={() => set('')} title={t('common.reset')}>✕</button>}
               </div>
             </div>
@@ -524,7 +526,7 @@ function SectionPortal({ config, onSaved }: { config: PortalConfigRead, onSaved:
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="hd">{t('portal.portalLanguage')}</div>
         <div className="bd">
-          <div className="field"><div className="lbl">{t('portal.language')}</div>
+          <div className="field" role="group" aria-labelledby={`${formId}-portal-lang`}><div id={`${formId}-portal-lang`} className="lbl">{t('portal.language')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className={`btn${lang === 'de' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('de')}>Deutsch</button>
               <button className={`btn${lang === 'en' ? ' pri' : ' gh'}`} onClick={() => handleLangChange('en')}>English</button>
@@ -556,6 +558,7 @@ function newBlock(type: HomepageBlock['type']): HomepageBlock {
 
 function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [blocks, setBlocks] = useState<HomepageBlock[]>(config.homepage_blocks ?? [])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -625,25 +628,25 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
               <div className="bd">
                 <div className="fg-2">
                   <div className="field">
-                    <div className="lbl">{t('startseite.titleDE')}</div>
-                    <input className="fld" value={block.title?.de ?? ''} onChange={e => update(block.id, { title: { ...block.title, de: e.target.value } })} />
+                    <label className="lbl" htmlFor={`${formId}-${block.id}-title-de`}>{t('startseite.titleDE')}</label>
+                    <input id={`${formId}-${block.id}-title-de`} className="fld" value={block.title?.de ?? ''} onChange={e => update(block.id, { title: { ...block.title, de: e.target.value } })} />
                   </div>
                   <div className="field">
-                    <div className="lbl">{t('startseite.titleEN')}</div>
-                    <input className="fld" value={block.title?.en ?? ''} onChange={e => update(block.id, { title: { ...block.title, en: e.target.value } })} />
+                    <label className="lbl" htmlFor={`${formId}-${block.id}-title-en`}>{t('startseite.titleEN')}</label>
+                    <input id={`${formId}-${block.id}-title-en`} className="fld" value={block.title?.en ?? ''} onChange={e => update(block.id, { title: { ...block.title, en: e.target.value } })} />
                   </div>
                 </div>
 
                 {block.type === 'text' && (
                   <>
                     <div className="field">
-                      <div className="lbl">{t('startseite.contentDE')}</div>
-                      <textarea className="fld" rows={4} value={block.content?.de ?? ''} onChange={e => update(block.id, { content: { ...block.content, de: e.target.value } })}
+                      <label className="lbl" htmlFor={`${formId}-${block.id}-content-de`}>{t('startseite.contentDE')}</label>
+                      <textarea id={`${formId}-${block.id}-content-de`} className="fld" rows={4} value={block.content?.de ?? ''} onChange={e => update(block.id, { content: { ...block.content, de: e.target.value } })}
                         style={{ resize: 'vertical', fontFamily: 'inherit' }} />
                     </div>
                     <div className="field">
-                      <div className="lbl">{t('startseite.contentEN')}</div>
-                      <textarea className="fld" rows={4} value={block.content?.en ?? ''} onChange={e => update(block.id, { content: { ...block.content, en: e.target.value } })}
+                      <label className="lbl" htmlFor={`${formId}-${block.id}-content-en`}>{t('startseite.contentEN')}</label>
+                      <textarea id={`${formId}-${block.id}-content-en`} className="fld" rows={4} value={block.content?.en ?? ''} onChange={e => update(block.id, { content: { ...block.content, en: e.target.value } })}
                         style={{ resize: 'vertical', fontFamily: 'inherit' }} />
                     </div>
                   </>
@@ -655,8 +658,8 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
 
                 {block.type === 'objects' && (
                   <div className="field">
-                    <div className="lbl">{t('startseite.limitLabel')}</div>
-                    <input className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
+                    <label className="lbl" htmlFor={`${formId}-${block.id}-limit`}>{t('startseite.limitLabel')}</label>
+                    <input id={`${formId}-${block.id}-limit`} className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
                       onChange={e => update(block.id, { limit: Number(e.target.value) })} style={{ width: 90 }} />
                   </div>
                 )}
@@ -664,8 +667,8 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
                 {block.type === 'collections' && (
                   <>
                     <div className="field">
-                      <div className="lbl">{t('startseite.collectionsModeLabel')}</div>
-                      <select className="fld" value={block.collections_mode ?? 'top'}
+                      <label className="lbl" htmlFor={`${formId}-${block.id}-col-mode`}>{t('startseite.collectionsModeLabel')}</label>
+                      <select id={`${formId}-${block.id}-col-mode`} className="fld" value={block.collections_mode ?? 'top'}
                         onChange={e => update(block.id, { collections_mode: e.target.value as HomepageBlock['collections_mode'] })}>
                         <option value="top">{t('startseite.collectionsModeTop')}</option>
                         <option value="all">{t('startseite.collectionsModeAll')}</option>
@@ -674,15 +677,15 @@ function SectionStartseite({ config, onSaved }: { config: PortalConfigRead, onSa
                       </select>
                     </div>
                     {block.collections_mode === 'selected' ? (
-                      <div className="field">
-                        <div className="lbl">{t('startseite.collectionIdsLabel')}</div>
+                      <div className="field" role="group" aria-labelledby={`${formId}-${block.id}-col-ids`}>
+                        <div id={`${formId}-${block.id}-col-ids`} className="lbl">{t('startseite.collectionIdsLabel')}</div>
                         <CollectionPicker value={block.collection_ids ?? []}
                           onChange={ids => update(block.id, { collection_ids: ids })} />
                       </div>
                     ) : (
                       <div className="field">
-                        <div className="lbl">{t('startseite.limitLabel')}</div>
-                        <input className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
+                        <label className="lbl" htmlFor={`${formId}-${block.id}-col-limit`}>{t('startseite.limitLabel')}</label>
+                        <input id={`${formId}-${block.id}-col-limit`} className="fld mono" type="number" min={1} max={100} value={block.limit ?? 12}
                           onChange={e => update(block.id, { limit: Number(e.target.value) })} style={{ width: 90 }} />
                       </div>
                     )}
@@ -719,6 +722,7 @@ const TERMINOLOGY_TYPES = RECORD_TYPES.filter(({ key }) => key !== 'procedure')
 
 function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, onSaved: (c: PortalConfigRead) => void }) {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [terminology, setTerminologyState] = useState<Record<string, TerminologyEntry>>(config.terminology ?? {})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -778,22 +782,22 @@ function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, on
                 <div className="bd">
                   <div className="fg-2">
                     <div className="field">
-                      <div className="lbl">{t('terminologie.singularDE')}</div>
-                      <input className="fld" value={entry.singular.de ?? ''} onChange={e => update(key, 'singular', 'de', e.target.value)} />
+                      <label className="lbl" htmlFor={`${formId}-${key}-s-de`}>{t('terminologie.singularDE')}</label>
+                      <input id={`${formId}-${key}-s-de`} className="fld" value={entry.singular.de ?? ''} onChange={e => update(key, 'singular', 'de', e.target.value)} />
                     </div>
                     <div className="field">
-                      <div className="lbl">{t('terminologie.singularEN')}</div>
-                      <input className="fld" value={entry.singular.en ?? ''} onChange={e => update(key, 'singular', 'en', e.target.value)} />
+                      <label className="lbl" htmlFor={`${formId}-${key}-s-en`}>{t('terminologie.singularEN')}</label>
+                      <input id={`${formId}-${key}-s-en`} className="fld" value={entry.singular.en ?? ''} onChange={e => update(key, 'singular', 'en', e.target.value)} />
                     </div>
                   </div>
                   <div className="fg-2">
                     <div className="field">
-                      <div className="lbl">{t('terminologie.pluralDE')}</div>
-                      <input className="fld" value={entry.plural.de ?? ''} onChange={e => update(key, 'plural', 'de', e.target.value)} />
+                      <label className="lbl" htmlFor={`${formId}-${key}-p-de`}>{t('terminologie.pluralDE')}</label>
+                      <input id={`${formId}-${key}-p-de`} className="fld" value={entry.plural.de ?? ''} onChange={e => update(key, 'plural', 'de', e.target.value)} />
                     </div>
                     <div className="field">
-                      <div className="lbl">{t('terminologie.pluralEN')}</div>
-                      <input className="fld" value={entry.plural.en ?? ''} onChange={e => update(key, 'plural', 'en', e.target.value)} />
+                      <label className="lbl" htmlFor={`${formId}-${key}-p-en`}>{t('terminologie.pluralEN')}</label>
+                      <input id={`${formId}-${key}-p-en`} className="fld" value={entry.plural.en ?? ''} onChange={e => update(key, 'plural', 'en', e.target.value)} />
                     </div>
                   </div>
                 </div>
@@ -818,6 +822,7 @@ function SectionTerminologie({ config, onSaved }: { config: PortalConfigRead, on
 
 function SectionDangerZone() {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [activeType, setActiveType] = useState<(typeof RECORD_TYPES)[number]['key']>('object')
   const [subtypesList, setSubtypesList] = useState<RecordSubtype[]>([])
   const [activeSubtype, setActiveSubtype] = useState('')
@@ -945,14 +950,14 @@ function SectionDangerZone() {
             {t('dangerZone.schemaDescription')} <code>label</code> {t('dangerZone.schemaDescriptionSuffix')}
           </p>
           <div className="field">
-            <div className="lbl">{t('dangerZone.recordType')}</div>
-            <select className="fld" value={activeType} onChange={e => setActiveType(e.target.value as typeof activeType)}>
+            <label className="lbl" htmlFor={`${formId}-record-type`}>{t('dangerZone.recordType')}</label>
+            <select id={`${formId}-record-type`} className="fld" value={activeType} onChange={e => setActiveType(e.target.value as typeof activeType)}>
               {RECORD_TYPES.map(type => <option key={type.key} value={type.key}>{t(type.labelKey)}</option>)}
             </select>
           </div>
           {subtypesList.length > 0 && <div className="field">
-            <div className="lbl">{t('dangerZone.vocabScopeLabel')}</div>
-            <select className="fld" value={activeSubtype} onChange={e => setActiveSubtype(e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-subtype`}>{t('dangerZone.vocabScopeLabel')}</label>
+            <select id={`${formId}-subtype`} className="fld" value={activeSubtype} onChange={e => setActiveSubtype(e.target.value)}>
               <option value="">{t('dangerZone.wholeSchema', { type: t(active.labelKey) })}</option>
               {subtypesList.map(subtype => <option key={subtype.id} value={subtype.name}>{t('dangerZone.onlySubtype', { subtype: subtype.label?.de || subtype.name })}</option>)}
             </select>
@@ -961,8 +966,8 @@ function SectionDangerZone() {
             {summary === null ? t('dangerZone.schemaChecking') : t('dangerZone.schemaSummary', { count: summary })}
           </p>
           <div className="field">
-            <div className="lbl">{t('dangerZone.confirmPrompt')} <code>{expectedConfirmation}</code> {t('dangerZone.confirmPromptSuffix')}</div>
-            <input className="fld" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" />
+            <label className="lbl" htmlFor={`${formId}-schema-confirm`}>{t('dangerZone.confirmPrompt')} <code>{expectedConfirmation}</code> {t('dangerZone.confirmPromptSuffix')}</label>
+            <input id={`${formId}-schema-confirm`} className="fld" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" />
           </div>
           {error && <div style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
           {success && <div style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>{success}</div>}
@@ -987,8 +992,9 @@ function SectionDangerZone() {
           ) : (
             <>
               <div className="field">
-                <div className="lbl">{t('dangerZone.vocabLabel')}</div>
+                <label className="lbl" htmlFor={`${formId}-vocab`}>{t('dangerZone.vocabLabel')}</label>
                 <select
+                  id={`${formId}-vocab`}
                   className="fld"
                   value={activeVocabId}
                   onChange={e => {
@@ -1002,8 +1008,9 @@ function SectionDangerZone() {
                 </select>
               </div>
               <div className="field">
-                <div className="lbl">{t('dangerZone.vocabScopeLabel')}</div>
+                <label className="lbl" htmlFor={`${formId}-vocab-scope`}>{t('dangerZone.vocabScopeLabel')}</label>
                 <select
+                  id={`${formId}-vocab-scope`}
                   className="fld"
                   value={vocabScope}
                   onChange={e => {
@@ -1035,10 +1042,11 @@ function SectionDangerZone() {
                 )}
               </div>
               <div className="field">
-                <div className="lbl">
+                <label className="lbl" htmlFor={`${formId}-vocab-confirm`}>
                   {t('dangerZone.confirmPrompt')} <code>{expectedVocabConfirmation}</code> {t('dangerZone.confirmPromptSuffix')}
-                </div>
+                </label>
                 <input
+                  id={`${formId}-vocab-confirm`}
                   className="fld"
                   value={vocabConfirmation}
                   onChange={e => setVocabConfirmation(e.target.value)}
@@ -1745,8 +1753,8 @@ function IndexHealthWidget() {
           </button>
         </div>
         {cfg && (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <div className="lbl" style={{ marginBottom: 8 }}>{t('search.autoReconcile')}</div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }} role="group" aria-labelledby="search-auto-reconcile-lbl">
+            <div id="search-auto-reconcile-lbl" className="lbl" style={{ marginBottom: 8 }}>{t('search.autoReconcile')}</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>
               <input
                 type="checkbox"
@@ -1857,6 +1865,7 @@ function SectionSparql({
   onNavigate?: (route: string) => void
 }) {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [rebuilding, setRebuilding] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -1974,9 +1983,10 @@ function SectionSparql({
         </div>
 
         <div className="field" style={{ marginBottom: 20 }}>
-          <div className="lbl">{t('sparql.endpointUrl')}</div>
+          <label className="lbl" htmlFor={`${formId}-endpoint`}>{t('sparql.endpointUrl')}</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
+              id={`${formId}-endpoint`}
               type="text"
               readOnly
               className="fld mono"
@@ -2055,6 +2065,7 @@ function SectionSparql({
 
 function SectionIdnoSchemas() {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [schemas, setSchemas] = useState<Record<string, string>>({})
   const [patterns, setPatterns] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -2103,8 +2114,9 @@ function SectionIdnoSchemas() {
           <div className="hd">{t(labelKey)}</div>
           <div className="bd">
             <div className="field">
-              <div className="lbl">{t('idno.schema')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
+              <label className="lbl" htmlFor={`${formId}-${key}-schema`}>{t('idno.schema')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></label>
               <input
+                id={`${formId}-${key}-schema`}
                 className="fld mono"
                 value={schemas[key] ?? ''}
                 onChange={e => setSchema(key, e.target.value)}
@@ -2115,8 +2127,9 @@ function SectionIdnoSchemas() {
               </div>
             </div>
             <div className="field">
-              <div className="lbl">{t('idno.pattern')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></div>
+              <label className="lbl" htmlFor={`${formId}-${key}-pattern`}>{t('idno.pattern')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('common.optional')}</span></label>
               <input
+                id={`${formId}-${key}-pattern`}
                 className="fld mono"
                 value={patterns[key] ?? ''}
                 onChange={e => setPattern(key, e.target.value)}
@@ -2141,6 +2154,7 @@ function SectionIdnoSchemas() {
 
 function SectionAI() {
   const { t, i18n } = useTranslation('screenSettings')
+  const formId = useId()
   const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2238,13 +2252,13 @@ function SectionAI() {
             {t('ai.enabled')}
           </label>
           <div className="field">
-            <div className="lbl">{t('ai.baseUrl')}</div>
-            <input className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
+            <label className="lbl" htmlFor={`${formId}-base-url`}>{t('ai.baseUrl')}</label>
+            <input id={`${formId}-base-url`} className="fld mono" value={cfg.ai_base_url ?? ''} onChange={e => set('ai_base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
             <div className="sub">{t('ai.baseUrlHintBefore')} <code>/chat/completions</code> {t('ai.baseUrlHintMiddle')} <code>https://openrouter.ai/api/v1</code>.</div>
           </div>
           <div className="field">
-            <div className="lbl">{t('ai.model')}</div>
-            <input className="fld mono" value={cfg.ai_model ?? ''} onChange={e => set('ai_model', e.target.value)} placeholder="gpt-4.1-mini" />
+            <label className="lbl" htmlFor={`${formId}-model`}>{t('ai.model')}</label>
+            <input id={`${formId}-model`} className="fld mono" value={cfg.ai_model ?? ''} onChange={e => set('ai_model', e.target.value)} placeholder="gpt-4.1-mini" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button className="btn gh" onClick={checkAi} disabled={checkBusy}>
@@ -2270,8 +2284,8 @@ function SectionAI() {
               : t('ai.noKey')}
           </div>
           <div className="field">
-            <div className="lbl">{t('ai.newKey')}</div>
-            <input className="fld mono" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
+            <label className="lbl" htmlFor={`${formId}-new-key`}>{t('ai.newKey')}</label>
+            <input id={`${formId}-new-key`} className="fld mono" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn pri" onClick={saveSecret} disabled={secretBusy || !apiKey.trim()}>
@@ -2291,23 +2305,23 @@ function SectionAI() {
         <div className="bd">
           <div className="fg-2">
             <div className="field">
-              <div className="lbl">{t('ai.maxInput')}</div>
-              <input className="fld mono" type="number" min={1} value={cfg.ai_max_input_tokens} onChange={e => set('ai_max_input_tokens', Number(e.target.value))} />
+              <label className="lbl" htmlFor={`${formId}-max-input`}>{t('ai.maxInput')}</label>
+              <input id={`${formId}-max-input`} className="fld mono" type="number" min={1} value={cfg.ai_max_input_tokens} onChange={e => set('ai_max_input_tokens', Number(e.target.value))} />
             </div>
             <div className="field">
-              <div className="lbl">{t('ai.maxOutput')}</div>
-              <input className="fld mono" type="number" min={1} value={cfg.ai_max_output_tokens} onChange={e => set('ai_max_output_tokens', Number(e.target.value))} />
+              <label className="lbl" htmlFor={`${formId}-max-output`}>{t('ai.maxOutput')}</label>
+              <input id={`${formId}-max-output`} className="fld mono" type="number" min={1} value={cfg.ai_max_output_tokens} onChange={e => set('ai_max_output_tokens', Number(e.target.value))} />
             </div>
           </div>
           <div className="fg-2">
             <div className="field">
-              <div className="lbl">{t('ai.dailyLimit')}</div>
-              <input className="fld mono" type="number" min={1} value={cfg.ai_daily_user_token_limit} onChange={e => set('ai_daily_user_token_limit', Number(e.target.value))} />
+              <label className="lbl" htmlFor={`${formId}-daily-limit`}>{t('ai.dailyLimit')}</label>
+              <input id={`${formId}-daily-limit`} className="fld mono" type="number" min={1} value={cfg.ai_daily_user_token_limit} onChange={e => set('ai_daily_user_token_limit', Number(e.target.value))} />
               <div className="sub">{t('ai.dailyUsage', { count: cfg.ai_usage.daily_user_tokens.toLocaleString(i18n.language) })}</div>
             </div>
             <div className="field">
-              <div className="lbl">{t('ai.monthlyLimit')}</div>
-              <input className="fld mono" type="number" min={1} value={cfg.ai_monthly_global_token_limit} onChange={e => set('ai_monthly_global_token_limit', Number(e.target.value))} />
+              <label className="lbl" htmlFor={`${formId}-monthly-limit`}>{t('ai.monthlyLimit')}</label>
+              <input id={`${formId}-monthly-limit`} className="fld mono" type="number" min={1} value={cfg.ai_monthly_global_token_limit} onChange={e => set('ai_monthly_global_token_limit', Number(e.target.value))} />
               <div className="sub">{t('ai.monthlyUsage', { count: cfg.ai_usage.monthly_global_tokens.toLocaleString(i18n.language) })}</div>
             </div>
           </div>
@@ -2335,6 +2349,7 @@ function SectionAI() {
 
 function SectionMediaRights() {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [cfg, setCfg] = useState<AdminConfigRead | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -2359,8 +2374,8 @@ function SectionMediaRights() {
   const holder = cfg.media_default_rights_holder ?? { name: '', uri: '' }
   return <div>
     <p style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 16 }}>{t('media.description')}</p>
-    <div className="field"><div className="lbl">{t('media.license')}</div><input className="fld" value={cfg.media_default_license_uri ?? ''} placeholder={t('media.licensePlaceholder')} onChange={e => setCfg({ ...cfg, media_default_license_uri: e.target.value || null })} /></div>
-    <div className="field"><div className="lbl">{t('media.rightsHolder')}</div><input className="fld" value={holder.name} placeholder={t('media.name')} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, name: e.target.value } })} /><input className="fld" style={{ marginTop: 4 }} value={holder.uri ?? ''} placeholder={t('media.uriOptional')} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, uri: e.target.value || undefined } })} /></div>
+    <div className="field"><label className="lbl" htmlFor={`${formId}-license`}>{t('media.license')}</label><input id={`${formId}-license`} className="fld" value={cfg.media_default_license_uri ?? ''} placeholder={t('media.licensePlaceholder')} onChange={e => setCfg({ ...cfg, media_default_license_uri: e.target.value || null })} /></div>
+    <div className="field"><label className="lbl" htmlFor={`${formId}-rights-name`}>{t('media.rightsHolder')}</label><input id={`${formId}-rights-name`} className="fld" value={holder.name} placeholder={t('media.name')} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, name: e.target.value } })} /><input className="fld" style={{ marginTop: 4 }} value={holder.uri ?? ''} placeholder={t('media.uriOptional')} aria-label={`${t('media.rightsHolder')} – ${t('media.uriOptional')}`} onChange={e => setCfg({ ...cfg, media_default_rights_holder: { ...holder, uri: e.target.value || undefined } })} /></div>
     {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
     <button className="btn pri" onClick={save} disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>{saved && <span style={{ marginLeft: 8, fontSize: 12, color: '#166534' }}>{t('common.saved')}</span>}
   </div>
@@ -2477,6 +2492,7 @@ function SectionUeber() {
 
 function SectionLanguages() {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2510,8 +2526,8 @@ function SectionLanguages() {
       <div className="hd">{t('languages.title')}</div>
       <div className="bd">
         <div className="field">
-          <div className="lbl">{t('languages.label')}</div>
-          <input className="fld mono" value={input} onChange={e => setInput(e.target.value)} placeholder="de, en, fr" />
+          <label className="lbl" htmlFor={`${formId}-languages`}>{t('languages.label')}</label>
+          <input id={`${formId}-languages`} className="fld mono" value={input} onChange={e => setInput(e.target.value)} placeholder="de, en, fr" />
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
             {t('languages.hint')}
           </div>
@@ -2574,6 +2590,7 @@ function SectionPresenceLock() {
 
 function SectionAutoPurge() {
   const { t } = useTranslation('screenSettings')
+  const formId = useId()
   const [enabled, setEnabled] = useState(true)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
@@ -2616,8 +2633,9 @@ function SectionAutoPurge() {
           />
           <span>{t('autoPurge.enabledLabel')}</span>
         </label>
-        <div className="lbl">{t('autoPurge.daysLabel')}</div>
+        <label className="lbl" htmlFor={`${formId}-days`}>{t('autoPurge.daysLabel')}</label>
         <input
+          id={`${formId}-days`}
           className="fld mono"
           type="number"
           min={1}

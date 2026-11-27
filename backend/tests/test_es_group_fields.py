@@ -29,9 +29,46 @@ def _parse_error() -> BadRequestError:
 
 
 def test_group_instances_are_not_dynamically_mapped() -> None:
+    assert INDEX_SETTINGS["mappings"]["date_detection"] is False
     templates = INDEX_SETTINGS["mappings"]["dynamic_templates"]
     group = next(t["group_fields"] for t in templates if "group_fields" in t)
     assert group["mapping"] == {"type": "nested", "dynamic": False}
+
+
+def test_bce_dates_in_group_subfields_are_indexed_and_fallback_safe() -> None:
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from katalon.services import search_service
+
+    record = SimpleNamespace(
+        idno="OBJ-BCE-GRP",
+        status="public",
+        object_type="coin",
+        collection_status="active",
+        metadata_={
+            "title": "Antike Münze",
+            "events": [
+                {"event_date": "-0043-06-15", "note": "Prägung"},
+                {"event_date": "0000-02-29", "note": "Fundkontext"},
+            ],
+        },
+        created_at=datetime(2026, 1, 1),
+        updated_at=datetime(2026, 1, 2),
+    )
+
+    doc = search_service._build_doc(
+        "object", record, searchable_fields={"title", "events"}, group_fields={"events"}
+    )
+    assert doc["grp_events"] == record.metadata_["events"]
+    assert "-0043-06-15" in doc["search_text"]
+    assert "0000-02-29" in doc["search_text"]
+
+    es = _BulkES()
+    indexed, failed = asyncio.run(bulk_index_documents(es, "object", [("bce-1", doc)]))
+    assert (indexed, failed) == (1, [])
+    assert all(not key.startswith("grp_") for key in es.requests[1][1])
+    assert "-0043-06-15" in es.requests[1][1]["search_text"]
 
 
 class _BulkES:

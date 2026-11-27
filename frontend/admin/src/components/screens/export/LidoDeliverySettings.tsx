@@ -9,6 +9,7 @@ import { FieldSearch, withGroupPaths } from './SourcePicker'
 
 /** institution_config keys this section owns (kept out of the free key/value rows). */
 export const LIDO_DELIVERY_KEYS = [
+  'lido_rec_id_separator',
   'require_media_license',
   'allowed_license_uris',
   'resource_sets',
@@ -139,6 +140,8 @@ function cleanRows(rows: Row[], required: string): Row[] {
 /** Convert the section's form state back into institution_config values (empty = key removed). */
 export function lidoDeliveryConfig(value: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
+  const recIdSeparator = String(value.lido_rec_id_separator ?? '').trim()
+  if (recIdSeparator) out.lido_rec_id_separator = recIdSeparator
   for (const key of ['resource_rights_fallback', 'resource_rights_default_uri']) {
     const v = String(value[key] ?? '').trim()
     if (v && v !== 'none') out[key] = v
@@ -276,6 +279,18 @@ export function LidoDeliverySettings({ value, fields, onChange }: {
             onChange={e => set('allowed_license_uris', e.target.value)}
           />
           <div style={hint}>{t('deliveryAllowedLicensesHelp')}</div>
+        </div>
+        <div>
+          <label style={lbl} htmlFor="delivery-rec-id-separator">{t('deliveryRecIdSeparatorLabel')}</label>
+          <input
+            id="delivery-rec-id-separator"
+            className="fld mono"
+            style={{ width: '100%' }}
+            placeholder="--"
+            value={String(value.lido_rec_id_separator ?? '')}
+            onChange={e => set('lido_rec_id_separator', e.target.value)}
+          />
+          <div style={hint}>{t('deliveryRecIdSeparatorHelp')}</div>
         </div>
       </div>
 

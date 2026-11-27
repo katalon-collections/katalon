@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { adminConfig, authority, getTokenUser, schema, subtypes, vocabularies } from '../../api/client'
 import type { AuthoritySource, RelationCounterpart, SchemaImportResult } from '../../api/client'
@@ -179,6 +179,7 @@ function emptySubFieldForm(sortOrder: number, authoritySource: string): SubField
 
 function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, showSubtype, authoritySources, pidProviders, aiAvailable, onChange, onSave, onDelete, onDuplicate, onClose, onSubFieldChange, onRequestDeleteSubfield, onRequestHardDeleteSubfield, onRestoreSubfield, isAdmin }: FieldDetailProps) {
   const { t } = useTranslation('screenSchema')
+  const formId = useId()
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const languages = useSupportedLanguages()
   const primaryLang = languages[0] ?? 'de'
@@ -449,8 +450,9 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         <div className="fg-2">
           {languages.map(lang => (
             <div className="field" key={lang}>
-              <div className="lbl">{t('fieldDetail.helpText')} {lang.toUpperCase()}</div>
+              <label className="lbl" htmlFor={`${formId}-help-${lang}`}>{t('fieldDetail.helpText')} {lang.toUpperCase()}</label>
               <textarea
+                id={`${formId}-help-${lang}`}
                 className="fld"
                 rows={2}
                 value={form.help_text[lang] ?? ''}
@@ -461,16 +463,16 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         </div>
         <div className="fg-2">
           <div className="field">
-            <div className="lbl">{t('fieldDetail.internalName')}</div>
-            <input className="fld mono" value={form.name} onChange={e => {
+            <label className="lbl" htmlFor={`${formId}-name`}>{t('fieldDetail.internalName')}</label>
+            <input id={`${formId}-name`} className="fld mono" value={form.name} onChange={e => {
               setNameManuallyEdited(true)
               set('name', e.target.value)
             }} disabled={!isNew} />
           </div>
           {!isSystemField && (
             <div className="field" data-tour="field-type-select">
-              <div className="lbl">{t('fieldDetail.fieldType')}</div>
-              <select className="fld" value={form.field_type} onChange={e => {
+              <label className="lbl" htmlFor={`${formId}-field-type`}>{t('fieldDetail.fieldType')}</label>
+              <select id={`${formId}-field-type`} className="fld" value={form.field_type} onChange={e => {
                 const fieldType = e.target.value
                 onChange({ ...form, field_type: fieldType, ...(fieldType === 'pid' && !pidProviders.includes(form.pid_provider as 'ark' | 'dnb_urn') ? { pid_provider: pidProviders[0] ?? '' } : {}) })
               }}>
@@ -481,8 +483,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         </div>
         {showSubtype && (
           <div className="field">
-            <div className="lbl">{t('fieldDetail.subtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.subtypeHint')}</span></div>
-            <select className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-subtype`}>{t('fieldDetail.subtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.subtypeHint')}</span></label>
+            <select id={`${formId}-subtype`} className="fld" value={form.target_subtype} onChange={e => set('target_subtype', e.target.value)}>
               <option value="">{t('fieldDetail.subtypeAll')}</option>
               {availableSubtypes.map(s => (
                 <option key={s.id} value={s.name}>{s.label.de || s.name}</option>
@@ -528,8 +530,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         )}
         {form.field_type === 'authority' && (
           <div className="field">
-            <div className="lbl">{t('fieldDetail.authoritySource')}</div>
-            <select className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-authority-source`}>{t('fieldDetail.authoritySource')}</label>
+            <select id={`${formId}-authority-source`} className="fld" value={form.authority_source} onChange={e => set('authority_source', e.target.value)}>
               {authoritySources
                 .filter(source => source.is_enabled || source.id === form.authority_source)
                 .map(source => (
@@ -560,8 +562,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         )}
         {form.field_type === 'pid' && !isVocabularyTerm && (
           <div className="field">
-            <div className="lbl">{t('fieldDetail.pidProvider')}</div>
-            <select className="fld" value={form.pid_provider} onChange={e => set('pid_provider', e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-pid-provider`}>{t('fieldDetail.pidProvider')}</label>
+            <select id={`${formId}-pid-provider`} className="fld" value={form.pid_provider} onChange={e => set('pid_provider', e.target.value)}>
               {(['dnb_urn', 'ark'] as const).filter(provider => pidProviders.includes(provider) || provider === form.pid_provider).map(provider => (
                 <option key={provider} value={provider} disabled={!pidProviders.includes(provider)}>
                   {provider === 'ark' ? t('fieldDetail.pidProviderArk') : t('fieldDetail.pidProviderDnbUrn')}
@@ -573,11 +575,11 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
         )}
         {(form.field_type === 'vocab' || form.field_type === 'vocab_free') && (
           <div className="field">
-            <div className="lbl">
+            <label className="lbl" htmlFor={`${formId}-vocabulary`}>
               {t('fieldDetail.vocabLabel')} {form.field_type === 'vocab' && <span className="req">*</span>}
               {form.field_type === 'vocab_free' && <span style={{ fontSize: 11, color: 'var(--fg-3)', marginLeft: 4 }}>{t('fieldDetail.vocabFreeHint')}</span>}
-            </div>
-            <select className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
+            </label>
+            <select id={`${formId}-vocabulary`} className="fld" value={form.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
               <option value="">{t('fieldDetail.vocabPlaceholder')}</option>
               {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
@@ -587,8 +589,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{t('fieldDetail.advancedOptions')}</summary>
           <div style={{ marginTop: 14 }}>
             <div className="field">
-              <div className="lbl">{t('fieldDetail.sortOrder')}</div>
-              <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
+              <label className="lbl" htmlFor={`${formId}-sort-order`}>{t('fieldDetail.sortOrder')}</label>
+              <input id={`${formId}-sort-order`} className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
             </div>
             {isSystemField && (
               <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>{t('fieldDetail.systemLabelHint')}</div>
@@ -662,17 +664,17 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           )}
             {!isIdno && form.field_type === 'text' && (
               <div className="field">
-                <div className="lbl">{t('fieldDetail.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
-                <input className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
+                <label className="lbl" htmlFor={`${formId}-regex`}>{t('fieldDetail.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></label>
+                <input id={`${formId}-regex`} className="fld mono" value={form.validation_regex} onChange={e => set('validation_regex', e.target.value)}
                   placeholder="^97[89]-[0-9]{10}$" />
                 <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{t('fieldDetail.validationExamples')}</div>
               </div>
             )}
         {!isIdno && !isVocabularyTerm && ['text', 'vocab', 'vocab_free', 'date', 'number'].includes(form.field_type) && (
           <div className="field">
-            <div className="lbl">{t('fieldDetail.defaultValue')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.defaultValueHint')}</span></div>
+            <label className="lbl" htmlFor={`${formId}-default-value`}>{t('fieldDetail.defaultValue')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.defaultValueHint')}</span></label>
             {form.field_type === 'vocab' ? (
-              <select className="fld" value={(form.default_value as { id?: string })?.id ?? ''} onChange={e => {
+              <select id={`${formId}-default-value`} className="fld" value={(form.default_value as { id?: string })?.id ?? ''} onChange={e => {
                 const term = defaultTerms.find(t => t.id === e.target.value)
                 set('default_value', term ? { id: term.id, label: getLabel(term) } : '')
               }}>
@@ -680,7 +682,7 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 {defaultTerms.map(t => <option key={t.id} value={t.id}>{getLabel(t, t.term)}</option>)}
               </select>
             ) : (
-              <input className="fld" type={form.field_type === 'number' ? 'number' : 'text'} value={String(form.default_value ?? '')} onChange={e => set('default_value', e.target.value)} />
+              <input id={`${formId}-default-value`} className="fld" type={form.field_type === 'number' ? 'number' : 'text'} value={String(form.default_value ?? '')} onChange={e => set('default_value', e.target.value)} />
             )}
           </div>
         )}
@@ -699,18 +701,18 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
             {form.ai_enabled && (
               <>
                 <div className="field">
-                  <div className="lbl">{t('fieldDetail.aiMode')}</div>
-                  <select className="fld" value={form.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
+                  <label className="lbl" htmlFor={`${formId}-ai-mode`}>{t('fieldDetail.aiMode')}</label>
+                  <select id={`${formId}-ai-mode`} className="fld" value={form.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
                     <option value="text">{t('fieldDetail.aiModeText')}</option>
                     <option value="vision">{t('fieldDetail.aiModeVision')}</option>
                   </select>
                 </div>
                 <div className="field">
-                  <div className="lbl">{t('fieldDetail.aiPrompt')}</div>
-                  <textarea className="fld" value={form.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={5} placeholder={t('fieldDetail.aiPromptPlaceholder')} />
+                  <label className="lbl" htmlFor={`${formId}-ai-prompt`}>{t('fieldDetail.aiPrompt')}</label>
+                  <textarea id={`${formId}-ai-prompt`} className="fld" value={form.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={5} placeholder={t('fieldDetail.aiPromptPlaceholder')} />
                 </div>
-                <div className="field">
-                  <div className="lbl">{t('fieldDetail.aiContextFields')}</div>
+                <div className="field" role="group" aria-labelledby={`${formId}-ai-context`}>
+                  <div id={`${formId}-ai-context`} className="lbl">{t('fieldDetail.aiContextFields')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
                     {availableFields
                       .filter(f => f.id !== fieldId && f.parent_id == null)
@@ -744,8 +746,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
           <>
             <div className="fg-2">
               <div className="field">
-                <div className="lbl">{t('fieldDetail.relationTargetType')} <span className="req">*</span></div>
-                <select className="fld" value={form.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
+                <label className="lbl" htmlFor={`${formId}-rel-target-type`}>{t('fieldDetail.relationTargetType')} <span className="req">*</span></label>
+                <select id={`${formId}-rel-target-type`} className="fld" value={form.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
                   <option value="object">{t('fieldDetail.relationTargetTypeOptions.object')}</option>
                   <option value="entity">{t('fieldDetail.relationTargetTypeOptions.entity')}</option>
                   <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
@@ -756,23 +758,23 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
                 </select>
               </div>
               <div className="field">
-                <div className="lbl">{t('fieldDetail.relationTargetSubtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.relationTargetSubtypeHint')}</span></div>
-                <input className="fld" value={form.relation_target_subtype} onChange={e => set('relation_target_subtype', e.target.value)}
+                <label className="lbl" htmlFor={`${formId}-rel-target-subtype`}>{t('fieldDetail.relationTargetSubtype')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.relationTargetSubtypeHint')}</span></label>
+                <input id={`${formId}-rel-target-subtype`} className="fld" value={form.relation_target_subtype} onChange={e => set('relation_target_subtype', e.target.value)}
                   placeholder={t('fieldDetail.relationTargetSubtypePlaceholder')} />
               </div>
             </div>
             <RelationCounterpartHint counterparts={counterparts} targetTypeLabel={t(`fieldDetail.relationTargetTypeOptions.${form.relation_target_type}`)} />
             <div className="field">
-              <div className="lbl">{t('fieldDetail.relationTypeVocab')} <span className="req">*</span></div>
-              <select className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
+              <label className="lbl" htmlFor={`${formId}-rel-type-vocab`}>{t('fieldDetail.relationTypeVocab')} <span className="req">*</span></label>
+              <select id={`${formId}-rel-type-vocab`} className="fld" value={form.relation_type_vocab} onChange={e => onChange({ ...form, relation_type_vocab: e.target.value, fixed_relation_type: '' })}>
                 <option value="">{t('fieldDetail.relationTypeVocabPlaceholder')}</option>
                 {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
             {form.relation_type_vocab && (
               <div className="field">
-                <div className="lbl">{t('fieldDetail.fixedRelationType')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.fixedRelationTypeHint')}</span></div>
-                <select className="fld" value={form.fixed_relation_type} onChange={e => set('fixed_relation_type', e.target.value)}>
+                <label className="lbl" htmlFor={`${formId}-fixed-rel-type`}>{t('fieldDetail.fixedRelationType')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.fixedRelationTypeHint')}</span></label>
+                <select id={`${formId}-fixed-rel-type`} className="fld" value={form.fixed_relation_type} onChange={e => set('fixed_relation_type', e.target.value)}>
                   <option value="">{t('fieldDetail.fixedRelationTypeAll')}</option>
                   {relationTypeTerms.map(term => <option key={term.id} value={term.term}>{getLabel(term, term.term)}</option>)}
                 </select>
@@ -792,8 +794,8 @@ function FieldDetail({ form, availableFields, fieldId, isNew, saving, error, sho
               </div>
             )}
             {targetTypeFields.filter(f => f.field_type !== 'relation').length > 0 && (
-              <div className="field">
-                <div className="lbl">{t('fieldDetail.inheritedFields')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.inheritedFieldsHint')}</span></div>
+              <div className="field" role="group" aria-labelledby={`${formId}-inherited-fields`}>
+                <div id={`${formId}-inherited-fields`} className="lbl">{t('fieldDetail.inheritedFields')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.inheritedFieldsHint')}</span></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                   {targetTypeFields.filter(f => f.field_type !== 'relation').map(f => (
                     <label key={f.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
@@ -964,6 +966,7 @@ interface SubFieldFormPanelProps {
 
 function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authoritySources, nameManual, saving, error, onChange, onNameManual, onSave, onCancel }: SubFieldFormPanelProps) {
   const { t } = useTranslation('screenSchema')
+  const formId = useId()
   function set<K extends keyof SubFieldFormState>(k: K, v: SubFieldFormState[K]) { onChange({ ...sf, [k]: v }) }
   const languages = useSupportedLanguages()
   const primaryLang = languages[0] ?? 'de'
@@ -988,8 +991,9 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       <div className="fg-2">
         {languages.map(lang => (
           <div className="field" key={lang}>
-            <div className="lbl">{t('fieldDetail.helpText')} {lang.toUpperCase()}</div>
+            <label className="lbl" htmlFor={`${formId}-help-${lang}`}>{t('fieldDetail.helpText')} {lang.toUpperCase()}</label>
             <textarea
+              id={`${formId}-help-${lang}`}
               className="fld"
               rows={2}
               value={sf.help_text[lang] ?? ''}
@@ -1000,12 +1004,12 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       </div>
       <div className="fg-2">
         <div className="field">
-          <div className="lbl">{t('subFieldForm.internalName')}</div>
-          <input className="fld mono" value={sf.name} onChange={e => { onNameManual(); set('name', e.target.value) }} disabled={Boolean(sf.id)} />
+          <label className="lbl" htmlFor={`${formId}-name`}>{t('subFieldForm.internalName')}</label>
+          <input id={`${formId}-name`} className="fld mono" value={sf.name} onChange={e => { onNameManual(); set('name', e.target.value) }} disabled={Boolean(sf.id)} />
         </div>
         <div className="field">
-          <div className="lbl">{t('subFieldForm.fieldType')}</div>
-          <select className="fld" value={sf.field_type} onChange={e => set('field_type', e.target.value as SubFieldType)}>
+          <label className="lbl" htmlFor={`${formId}-field-type`}>{t('subFieldForm.fieldType')}</label>
+          <select id={`${formId}-field-type`} className="fld" value={sf.field_type} onChange={e => set('field_type', e.target.value as SubFieldType)}>
             {SUB_FIELD_TYPES.filter(k => k !== 'file' || FILE_FIELD_TARGET_TYPES.includes(targetType) || sf.field_type === 'file')
               .map(k => <option key={k} value={k}>{t(`fieldTypes.${k}`)}</option>)}
           </select>
@@ -1023,8 +1027,8 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       </div>
       {sf.field_type === 'text' && (
         <div className="field">
-          <div className="lbl">{t('subFieldForm.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></div>
-          <input className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder={t('subFieldForm.validationRegexPlaceholder')} />
+          <label className="lbl" htmlFor={`${formId}-regex`}>{t('subFieldForm.validationRegex')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('fieldDetail.validationRegexHint')}</span></label>
+          <input id={`${formId}-regex`} className="fld mono" value={sf.validation_regex} onChange={e => set('validation_regex', e.target.value)} placeholder={t('subFieldForm.validationRegexPlaceholder')} />
         </div>
       )}
       {sf.field_type === 'date' && (
@@ -1046,8 +1050,8 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       )}
       {(sf.field_type === 'vocab' || sf.field_type === 'vocab_free') && (
         <div className="field">
-          <div className="lbl">{t('subFieldForm.vocabLabel')}</div>
-          <select className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
+          <label className="lbl" htmlFor={`${formId}-vocab`}>{t('subFieldForm.vocabLabel')}</label>
+          <select id={`${formId}-vocab`} className="fld" value={sf.vocabulary_id} onChange={e => set('vocabulary_id', e.target.value)}>
             <option value="">{t('subFieldForm.vocabPlaceholder')}</option>
             {allVocabs.filter(v => v.kind === 'term').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
@@ -1056,8 +1060,8 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       {sf.field_type === 'relation' && (
         <>
           <div className="field">
-            <div className="lbl">{t('subFieldForm.targetType')}</div>
-            <select className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-target-type`}>{t('subFieldForm.targetType')}</label>
+            <select id={`${formId}-target-type`} className="fld" value={sf.relation_target_type} onChange={e => set('relation_target_type', e.target.value)}>
               <option value="object">{t('fieldDetail.relationTargetTypeOptions.object')}</option>
               <option value="entity">{t('fieldDetail.relationTargetTypeOptions.entity')}</option>
               <option value="place">{t('fieldDetail.relationTargetTypeOptions.place')}</option>
@@ -1067,8 +1071,8 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
             </select>
           </div>
           <div className="field">
-            <div className="lbl">{t('subFieldForm.relationTypeVocab')} <span className="req">*</span></div>
-            <select className="fld" value={sf.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-rel-type-vocab`}>{t('subFieldForm.relationTypeVocab')} <span className="req">*</span></label>
+            <select id={`${formId}-rel-type-vocab`} className="fld" value={sf.relation_type_vocab} onChange={e => set('relation_type_vocab', e.target.value)}>
               <option value="">{t('subFieldForm.relationTypeVocabPlaceholder')}</option>
               {allVocabs.filter(v => v.kind === 'relation').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
@@ -1077,8 +1081,8 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
       )}
       {sf.field_type === 'authority' && (
         <div className="field">
-          <div className="lbl">{t('subFieldForm.authoritySource')}</div>
-          <select className="fld" value={sf.authority_source} onChange={e => set('authority_source', e.target.value)}>
+          <label className="lbl" htmlFor={`${formId}-authority-source`}>{t('subFieldForm.authoritySource')}</label>
+          <select id={`${formId}-authority-source`} className="fld" value={sf.authority_source} onChange={e => set('authority_source', e.target.value)}>
             {authoritySources
               .filter(source => source.is_enabled || source.id === sf.authority_source)
               .map(source => (
@@ -1099,18 +1103,18 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
           {sf.ai_enabled && (
             <>
               <div className="field">
-                <div className="lbl">{t('fieldDetail.aiMode')}</div>
-                <select className="fld" value={sf.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
+                <label className="lbl" htmlFor={`${formId}-ai-mode`}>{t('fieldDetail.aiMode')}</label>
+                <select id={`${formId}-ai-mode`} className="fld" value={sf.ai_mode} onChange={e => set('ai_mode', e.target.value as 'text' | 'vision')}>
                   <option value="text">{t('fieldDetail.aiModeText')}</option>
                   <option value="vision">{t('fieldDetail.aiModeVision')}</option>
                 </select>
               </div>
               <div className="field">
-                <div className="lbl">{t('subFieldForm.aiPrompt')}</div>
-                <textarea className="fld" value={sf.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={4} />
+                <label className="lbl" htmlFor={`${formId}-ai-prompt`}>{t('subFieldForm.aiPrompt')}</label>
+                <textarea id={`${formId}-ai-prompt`} className="fld" value={sf.ai_prompt} onChange={e => set('ai_prompt', e.target.value)} rows={4} />
               </div>
-              <div className="field">
-                <div className="lbl">{t('subFieldForm.aiContextFields')}</div>
+              <div className="field" role="group" aria-labelledby={`${formId}-ai-context`}>
+                <div id={`${formId}-ai-context`} className="lbl">{t('subFieldForm.aiContextFields')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
                   {availableFields.filter(f => f.parent_id == null).map(f => (
                     <label key={f.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
@@ -1146,6 +1150,7 @@ function SubFieldFormPanel({ sf, targetType, allVocabs, availableFields, authori
 
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation('screenSchema')
+  const fileId = useId()
   const fileRef = useRef<HTMLInputElement>(null)
   const [dryRun, setDryRun] = useState(true)
   const [overwrite, setOverwrite] = useState(false)
@@ -1203,8 +1208,8 @@ fields:
       vocabulary: materials`}</pre>
           </details>
           <div className="field">
-            <div className="lbl">{t('importModal.fileLabel')}</div>
-            <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="fld" />
+            <label className="lbl" htmlFor={fileId}>{t('importModal.fileLabel')}</label>
+            <input id={fileId} ref={fileRef} type="file" accept=".yaml,.yml,.json" className="fld" />
           </div>
           <div className="field" style={{ display: 'flex', gap: 16, flexDirection: 'row', paddingTop: 4 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>

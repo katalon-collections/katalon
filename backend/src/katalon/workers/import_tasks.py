@@ -95,7 +95,11 @@ def import_records_task(
     from katalon.services.presence_service import enforce_not_blocked
     from katalon.services.publish_service import publish_record
     from katalon.services.relation_service import sync_schema_relations
-    from katalon.services.schema_service import prepare_metadata, validate_metadata
+    from katalon.services.schema_service import (
+        is_record_schema_incomplete,
+        prepare_metadata,
+        validate_metadata,
+    )
     from katalon.services.search_service import index_record
     from katalon.services.subtype_service import ensure_subtype_exists
     from katalon.services.vocabulary_reference_service import ensure_field_vocabulary
@@ -471,6 +475,9 @@ def import_records_task(
                             old_fields = {"metadata": old_meta}
                             new_fields = {"metadata": final_metadata}
                             existing.metadata_ = final_metadata
+                            existing.schema_incomplete = await is_record_schema_incomplete(
+                                session, record_type, final_metadata, subtype
+                            )
                             if parent_id is not None and hasattr(existing, "parent_id"):
                                 existing.parent_id = parent_id
                             if upsert_strategy == "replace" and subtype_field:
@@ -551,6 +558,9 @@ def import_records_task(
                 kwargs: dict[str, Any] = {
                     "metadata_": metadata,
                     "status": "draft",
+                    "schema_incomplete": await is_record_schema_incomplete(
+                        session, record_type, metadata, subtype
+                    ),
                 }
                 if idno:
                     kwargs["idno"] = idno

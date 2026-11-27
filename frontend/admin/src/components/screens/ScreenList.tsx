@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, ConflictError, getTokenUser, locks, presence, users } from '../../api/client'
+import { objects, entities, places, occurrences, procedures, collections, schema, subtypes, getTokenUser, locks, presence, users } from '../../api/client'
 import type { ActivePresence, LockInfo } from '../../api/client'
 import type { AnyRecord, FieldDefinition, ListableRecordType, Page, RecordPermission, RecordSubtype } from '../../types'
 import { getLabel } from '../../types'
@@ -13,7 +13,8 @@ import { ActionMenu } from '../ui/ActionMenu'
 import { BatchEditModal } from './BatchEditModal'
 import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 import { ConfirmModal } from '../ui/ConfirmModal'
-import { DeleteWithChildrenModal } from '../ui/DeleteWithChildrenModal'
+import { useRecordDelete } from '../../hooks/useRecordDelete'
+import { formatDateValue } from '../../lib/dateInput'
 
 const PAGE_SIZE = 50
 
@@ -101,7 +102,7 @@ interface Props {
 }
 
 export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Props) {
-  const { t } = useTranslation('screenList')
+  const { t, i18n } = useTranslation('screenList')
   const api = getApi(recordType)
   const subtypeKey = SUBTYPE_KEYS[recordType]
 
@@ -152,6 +153,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const previousRecordTypeRef = useRef(recordType)
   const [q, setQ] = useState('')
   const [subtypeFilter, setSubtypeFilter] = useState('')
+  const [onlyIncomplete, setOnlyIncomplete] = useState(false)
   const [availableSubtypes, setAvailableSubtypes] = useState<RecordSubtype[]>([])
   const [dueBefore, setDueBefore] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
@@ -179,11 +181,10 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
   const [addToSetOpen, setAddToSetOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [confirmState, setConfirmState] = useState<{ message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void | Promise<void> } | null>(null)
-  const [childDeleteTarget, setChildDeleteTarget] = useState<{ id: string; childCount: number } | null>(null)
   const [treeItems, setTreeItems] = useState<AnyRecord[] | null>(null)
 
   // Hierarchical browse: only when unfiltered/unsorted, so parent/child relations stay complete.
-  const isCollectionTree = recordType === 'collection' && tab === 'all' && !debouncedQ && !subtypeFilter && !sortBy
+  const isCollectionTree = recordType === 'collection' && tab === 'all' && !debouncedQ && !subtypeFilter && !onlyIncomplete && !sortBy
 
   useEffect(() => {
     if (!isCollectionTree) { setTreeItems(null); return }
@@ -199,12 +200,13 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     if (tab !== 'all') f.status = tab
     if (debouncedQ) f.q = debouncedQ
     if (subtypeKey && subtypeFilter) f[subtypeKey] = subtypeFilter
+    if (onlyIncomplete) f.schema_incomplete = true
     if (recordType === 'procedure') {
       if (dueBefore) f.due_before = dueBefore
       if (referenceNumber) f.reference_number = referenceNumber
     }
     return f
-  }, [tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, recordType])
+  }, [tab, debouncedQ, subtypeFilter, subtypeKey, onlyIncomplete, dueBefore, referenceNumber, recordType])
 
   function resetSelection() {
     setSel(new Set())
@@ -245,6 +247,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     setTab('all')
     setQ('')
     setSubtypeFilter('')
+    setOnlyIncomplete(false)
     setDueBefore('')
     setReferenceNumber('')
     setPage(1)
@@ -283,6 +286,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     }
     if (debouncedQ) params.q = debouncedQ
     if (subtypeKey && subtypeFilter) params[subtypeKey] = subtypeFilter
+    if (onlyIncomplete) params.schema_incomplete = true
     if (recordType === 'procedure') {
       if (dueBefore) params.due_before = dueBefore
       if (referenceNumber) params.reference_number = referenceNumber
@@ -304,7 +308,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
       .finally(() => {
         if (requestSeq === requestSeqRef.current) setLoading(false)
       })
-  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, dueBefore, referenceNumber, sortBy, sortDir, api, recordType])
+  }, [page, tab, debouncedQ, subtypeFilter, subtypeKey, onlyIncomplete, dueBefore, referenceNumber, sortBy, sortDir, api, recordType])
 
   useEffect(() => { load() }, [load])
 
@@ -328,74 +332,10 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
     setSel(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
   }
 
-  async function handleDelete(id: string) {
-    setConfirmState({
-      message: t('deleteConfirm', { type: typeSingularLabels[recordType] }),
-      onConfirm: async () => {
-        try {
-          await api.delete(id)
-          removeLocally(id)
-          load()
-          setConfirmState(null)
-        } catch (e) {
-          if (e instanceof ConflictError && e.child_count > 0) {
-            setConfirmState(null)
-            setChildDeleteTarget({ id, childCount: e.child_count })
-            return
-          }
-          if (e instanceof ConflictError) {
-            setConfirmState({
-              message: t('deleteConfirmWithConflicts', { message: e.message }),
-              onConfirm: async () => {
-                try {
-                  await api.delete(id, true)
-                  removeLocally(id)
-                  load()
-                } catch (e2) {
-                  alert((e2 as Error).message)
-                } finally {
-                  setConfirmState(null)
-                }
-              },
-            })
-          } else {
-            alert((e as Error).message)
-            setConfirmState(null)
-          }
-        }
-      },
-    })
-  }
-
-  async function handleChildDelete(id: string, action: 'cascade' | 'reparent') {
-    const hierarchyApi = recordType === 'place' ? places : collections
-    try {
-      await hierarchyApi.deleteHierarchy(id, { [action]: true })
-      removeLocally(id)
-      load()
-      setChildDeleteTarget(null)
-    } catch (e) {
-      if (e instanceof ConflictError) {
-        setChildDeleteTarget(null)
-        setConfirmState({
-          message: t('deleteConfirmWithConflicts', { message: e.message }),
-          onConfirm: async () => {
-            try {
-              await hierarchyApi.deleteHierarchy(id, { [action]: true, force: true })
-              removeLocally(id)
-              load()
-            } catch (e2) {
-              alert((e2 as Error).message)
-            } finally {
-              setConfirmState(null)
-            }
-          },
-        })
-      } else {
-        throw e
-      }
-    }
-  }
+  const { requestDelete, dialogs: deleteDialogs } = useRecordDelete(recordType, typeSingularLabels[recordType], id => {
+    removeLocally(id)
+    load()
+  })
 
   const trashApi = api as unknown as {
     restore: (id: string) => Promise<AnyRecord>
@@ -556,6 +496,14 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
               ))}
             </select>
           )}
+          <button
+            type="button"
+            className={onlyIncomplete ? 'btn pri' : 'btn gh'}
+            aria-pressed={onlyIncomplete}
+            onClick={() => { resetSelection(); setOnlyIncomplete(v => !v); setPage(1) }}
+          >
+            {t('schemaIncompleteFilter')}
+          </button>
           {recordType === 'procedure' && (
             <>
               <input aria-label={t('dueDateAriaLabel')} className="fld mono" type="date" style={{ maxWidth: 150 }} value={dueBefore} onChange={e => { resetSelection(); setDueBefore(e.target.value); setPage(1) }} title={t('dueDateTitle')} />
@@ -677,6 +625,14 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                     ) : (
                       <span className="tt">{getFieldValue(m, primaryKey)}</span>
                     )}
+                    {rec.schema_incomplete && (
+                      <span
+                        title={t('schemaIncompleteBadgeTitle')}
+                        style={{ marginLeft: 6, fontSize: 11, padding: '1px 6px', borderRadius: 10, background: '#fff7ed', color: '#9a3412', border: '1px solid #fdba74' }}
+                      >
+                        {t('schemaIncompleteBadge')}
+                      </span>
+                    )}
                     {presenceMap[rec.id]?.length > 0 && (
                       <span
                         title={t('presenceBadgeTitle', { names: presenceMap[rec.id].map(p => p.user_email).join(', ') })}
@@ -696,7 +652,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                   </td>
                   {extraFields.map(f => (
                     <td key={f.name} style={{ color: 'var(--fg-2)' }}>
-                      {getFieldValue(m, f.name)}
+                      {f.field_type === 'date' ? formatDateValue(getFieldValue(m, f.name), i18n.language) : getFieldValue(m, f.name)}
                     </td>
                   ))}
                   <td><StatusBadge status={(rec as { status?: string }).status ?? 'draft'} /></td>
@@ -739,7 +695,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
                               label: t('deleteRowTitle'),
                               icon: <Trash size={13} />,
                               danger: true,
-                              onClick: () => handleDelete(rec.id),
+                              onClick: () => requestDelete(rec.id),
                             }] : []),
                           ]}
                         />
@@ -818,24 +774,7 @@ export function ScreenList({ recordType, onOpen, initialTab, onTabChange }: Prop
           onCancel={() => setConfirmState(null)}
         />
       )}
-      {childDeleteTarget && (
-        <DeleteWithChildrenModal
-          title={t('deleteChildrenModal.title')}
-          description={t('deleteConfirm', { type: typeSingularLabels[recordType] })}
-          warningTitle={t('deleteChildrenModal.warningTitle')}
-          warningText={t(childDeleteTarget.childCount === 1 ? 'deleteChildrenModal.warning' : 'deleteChildrenModal.warning_plural', { count: childDeleteTarget.childCount })}
-          chooseActionLabel={t('deleteChildrenModal.chooseAction')}
-          reparentLabel={t('deleteChildrenModal.optionReparent')}
-          reparentDesc={t('deleteChildrenModal.optionReparentDesc')}
-          cascadeLabel={t('deleteChildrenModal.optionCascade')}
-          cascadeDesc={t('deleteChildrenModal.optionCascadeDesc')}
-          cancelLabel={t('cancel')}
-          confirmLabel={t('deleteRowTitle')}
-          deletingLabel={t('deleting')}
-          onConfirm={action => handleChildDelete(childDeleteTarget.id, action)}
-          onCancel={() => setChildDeleteTarget(null)}
-        />
-      )}
+      {deleteDialogs}
     </div>
   )
 }

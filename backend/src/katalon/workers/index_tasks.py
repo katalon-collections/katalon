@@ -90,11 +90,27 @@ def _log_index_failure(record_type: str, record_id: str, error: str) -> None:
     max_retries=3,
 )
 def index_record_task(self: Any, record_type: str, record_id: str, doc: dict[str, Any]) -> None:
-    from katalon.integrations.elasticsearch import index_document
+    from katalon.integrations.elasticsearch import get_document, index_document
+
+    async def _write() -> bool:
+        include_subtree = False
+        if record_type == "place":
+            previous = await get_document(record_id)
+            new_key = doc.get("place_path_key")
+            include_subtree = (
+                previous is None
+                or new_key is None
+                or previous.get("place_path_key") != new_key
+            )
+        await index_document(record_id, {"record_type": record_type, **doc})
+        return include_subtree
 
     try:
-        _run(index_document(record_id, {"record_type": record_type, **doc}))
-        cascade_reindex_task.delay(record_type, record_id)
+        include_subtree = _run(_write())
+        if include_subtree:
+            cascade_reindex_task.delay(record_type, record_id, include_subtree=True)
+        else:
+            cascade_reindex_task.delay(record_type, record_id)
     except Exception as exc:
         logger.error(
             "index_record failed %s/%s (attempt %d): %s",
@@ -137,16 +153,23 @@ def remove_record_task(self: Any, record_id: str) -> None:
 
 
 @celery_app.task(name="katalon.cascade_reindex")
-def cascade_reindex_task(record_type: str, record_id: str) -> dict[str, Any]:
+def cascade_reindex_task(
+    record_type: str, record_id: str, include_subtree: bool = False
+) -> dict[str, Any]:
     """Reindex records linked in either direction (1-level cascade).
 
     Triggered after index_record_task succeeds. Propagates inherited field
     changes to records that embed data from this record. Max depth: 1.
+    For places with ``include_subtree=True``, also covers records linked to
+    descendant places so ``target_ancestors`` stays current.
     """
+    import uuid as _uuid_mod
+
     from sqlalchemy import and_, or_, select
 
     from katalon.core.models import Relation
     from katalon.integrations.elasticsearch import index_document
+    from katalon.services import place_service
     from katalon.services.search_service import build_index_doc
 
     model_map = _record_models()
@@ -155,33 +178,44 @@ def cascade_reindex_task(record_type: str, record_id: str) -> dict[str, Any]:
 
     async def _do() -> dict[str, Any]:
         async with AsyncSessionLocal() as session:
+            root_uuid = _uuid_mod.UUID(record_id)
+            if include_subtree and record_type == "place":
+                nodes = await place_service.load_place_nodes(session, public_only=False)
+                source_ids = place_service.subtree_ids(
+                    place_service.children_map(nodes), root_uuid
+                )
+            else:
+                source_ids = [root_uuid]
+            source_id_strs = {str(i) for i in source_ids}
             stmt = select(Relation).where(
                 or_(
-                    and_(Relation.to_type == record_type, Relation.to_id == record_id),
-                    and_(Relation.from_type == record_type, Relation.from_id == record_id),
+                    and_(Relation.to_type == record_type, Relation.to_id.in_(source_ids)),
+                    and_(Relation.from_type == record_type, Relation.from_id.in_(source_ids)),
                 )
             )
             relations = (await session.execute(stmt)).scalars().all()
             count = 0
             seen: set[tuple[str, Any]] = {(record_type, record_id)}
             for rel in relations:
-                if rel.from_type == record_type and str(rel.from_id) == str(record_id):
-                    other_type, other_id = rel.to_type, rel.to_id
-                else:
-                    other_type, other_id = rel.from_type, rel.from_id
-                key = (other_type, str(other_id))
-                if key in seen:
-                    continue
-                seen.add(key)
-                model = model_map.get(other_type)
-                if not model:
-                    continue
-                rec = await session.get(model, other_id)
-                if not rec or getattr(rec, "deleted_at", None) is not None:
-                    continue
-                doc = await build_index_doc(other_type, rec, session)
-                await index_document(str(rec.id), {"record_type": other_type, **doc})
-                count += 1
+                targets: list[tuple[str, Any]] = []
+                if rel.from_type == record_type and str(rel.from_id) in source_id_strs:
+                    targets.append((rel.to_type, rel.to_id))
+                if rel.to_type == record_type and str(rel.to_id) in source_id_strs:
+                    targets.append((rel.from_type, rel.from_id))
+                for other_type, other_id in targets:
+                    key = (other_type, str(other_id))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    model = model_map.get(other_type)
+                    if not model:
+                        continue
+                    rec = await session.get(model, other_id)
+                    if not rec or getattr(rec, "deleted_at", None) is not None:
+                        continue
+                    doc = await build_index_doc(other_type, rec, session)
+                    await index_document(str(rec.id), {"record_type": other_type, **doc})
+                    count += 1
         return {"cascaded": count, "source": f"{record_type}/{record_id}"}
 
     try:

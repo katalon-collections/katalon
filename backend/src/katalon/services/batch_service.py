@@ -31,7 +31,11 @@ from katalon.services.lock_service import enforce_not_locked
 from katalon.services.pid_service import ensure_pids_on_publish
 from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.relation_service import sync_schema_relations, validate_relation_endpoint
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.search_service import index_record
 
 logger = logging.getLogger(__name__)
@@ -148,6 +152,10 @@ async def resolve_record_ids(
     subtype = filters.get(subtype_key) if subtype_key else None
     if subtype:
         stmt = stmt.where(getattr(model, _SUBTYPE_KEY[record_type]) == subtype)
+
+    schema_incomplete = filters.get("schema_incomplete")
+    if isinstance(schema_incomplete, bool):
+        stmt = stmt.where(model.schema_incomplete.is_(schema_incomplete))
 
     q = filters.get("q")
     if q:
@@ -294,6 +302,7 @@ async def _apply_field_operation(
         raise ValueError("; ".join(errors))
 
     record.metadata_ = metadata
+    record.schema_incomplete = await is_record_schema_incomplete(db, record_type, metadata, subtype)
     flag_modified(record, "metadata_")
 
     await sync_schema_relations(db, record_type, record.id, metadata)

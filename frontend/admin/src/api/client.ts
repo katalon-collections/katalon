@@ -263,7 +263,7 @@ export const users = {
 
 // Objects
 export const objects = {
-  list: (params?: { page?: number; page_size?: number; status?: string; object_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; object_type?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<KatalonObject>>(`/v1/objects${qs ? `?${qs}` : ''}`)
   },
@@ -286,7 +286,7 @@ export const objects = {
 
 // Entities
 export const entities = {
-  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; entity_type?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Entity>>(`/v1/entities${qs ? `?${qs}` : ''}`)
   },
@@ -309,7 +309,7 @@ export const entities = {
 
 // Places
 export const places = {
-  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; q?: string; parent_id?: string; root?: boolean; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; place_type?: string; schema_incomplete?: boolean; q?: string; parent_id?: string; root?: boolean; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Place>>(`/v1/places${qs ? `?${qs}` : ''}`)
   },
@@ -340,7 +340,7 @@ export const places = {
 
 // Occurrences
 export const occurrences = {
-  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; occurrence_type?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Occurrence>>(`/v1/occurrences${qs ? `?${qs}` : ''}`)
   },
@@ -363,7 +363,7 @@ export const occurrences = {
 
 // Procedures
 export const procedures = {
-  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; procedure_type?: string; due_before?: string; reference_number?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<Procedure>>(`/v1/procedures${qs ? `?${qs}` : ''}`)
   },
@@ -382,7 +382,7 @@ export const procedures = {
 
 // Collections
 export const collections = {
-  list: (params?: { page?: number; page_size?: number; status?: string; collection_type?: string; parent_id?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; status?: string; collection_type?: string; parent_id?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<KatalonCollection>>(`/v1/collections${qs ? `?${qs}` : ''}`)
   },
@@ -414,7 +414,7 @@ export const collections = {
 
 // Storage Locations
 export const storageLocations = {
-  list: (params?: { page?: number; page_size?: number; storage_location_type?: string; parent_id?: string; q?: string; sort_by?: string; sort_dir?: string }) => {
+  list: (params?: { page?: number; page_size?: number; storage_location_type?: string; parent_id?: string; schema_incomplete?: boolean; q?: string; sort_by?: string; sort_dir?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()
     return req<Page<KatalonStorageLocation>>(`/v1/storage-locations${qs ? `?${qs}` : ''}`)
   },
@@ -1235,6 +1235,8 @@ export interface MappingEntry {
   transforms?: TransformConfig[]
   /** Place title only: splits "Land>Region>Ort" at this separator into a place hierarchy. */
   path_separator?: string
+  /** URL fields only: optional second column/selector providing the URL display label. */
+  label_selector?: string
 }
 
 export interface ImportMapping {
@@ -1259,10 +1261,10 @@ export const importer = {
     if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail ?? res.statusText) }
     return res.json()
   },
-  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, mappingId?: string | null, vocabModes?: Record<string, 'extend' | 'match_only'>, relationOptions?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }>): Promise<DryRunResult> =>
-    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, mapping_id: mappingId ?? null, vocab_modes: vocabModes ?? {}, relation_options: relationOptions ?? {} }) }),
-  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; mapping_id?: string | null; vocab_modes?: Record<string, 'extend' | 'match_only'>; relation_options?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }> }): Promise<{ task_id: string; status: string }> =>
-    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, mapping_id: opts?.mapping_id ?? null, vocab_modes: opts?.vocab_modes ?? {}, relation_options: opts?.relation_options ?? {} }) }),
+  dryRun: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, subtype?: string | null, fieldsToCreate?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[], mediaSelector?: string | null, vocabModes?: Record<string, 'extend' | 'match_only'>, relationOptions?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }>): Promise<DryRunResult> =>
+    req<DryRunResult>('/v1/importer/dry-run', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, subtype: subtype ?? null, fields_to_create: fieldsToCreate ?? [], media_selector: mediaSelector ?? null, vocab_modes: vocabModes ?? {}, relation_options: relationOptions ?? {} }) }),
+  import: (recordType: string, uploadId: string, mapping: Record<string, MappingEntry>, opts?: { idno_strategy?: string; upsert_strategy?: string; auto_publish?: boolean; subtype?: string | null; fields_to_create?: { name: string; field_type: string; label_de?: string; label_en?: string; is_repeatable?: boolean }[]; media_selector?: string | null; vocab_modes?: Record<string, 'extend' | 'match_only'>; relation_options?: Record<string, { lookup: 'idno' | 'label'; on_missing: 'error' | 'create' }> }): Promise<{ task_id: string; status: string }> =>
+    req('/v1/importer/import', { method: 'POST', body: JSON.stringify({ record_type: recordType, upload_id: uploadId, mapping, idno_strategy: opts?.idno_strategy ?? 'auto', upsert_strategy: opts?.upsert_strategy ?? 'skip', auto_publish: opts?.auto_publish ?? false, subtype: opts?.subtype ?? null, fields_to_create: opts?.fields_to_create ?? [], media_selector: opts?.media_selector ?? null, vocab_modes: opts?.vocab_modes ?? {}, relation_options: opts?.relation_options ?? {} }) }),
   taskStatus: (taskId: string): Promise<TaskStatus> =>
     req<TaskStatus>(`/v1/importer/task/${taskId}`),
   cancelTask: (taskId: string): Promise<{ cancelled: boolean }> =>

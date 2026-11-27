@@ -64,6 +64,27 @@ def _row_values(row: dict[str, Any], selector: str) -> list[str]:
     return [s] if s else []
 
 
+def _aligned_row_values(row: dict[str, Any], selector: str) -> list[str]:
+    """Read raw values preserving positional slots in lists for pairwise pairing."""
+    val = row.get(selector, "")
+    if isinstance(val, list):
+        return [str(v).strip() for v in val]
+    s = str(val).strip()
+    return [s] if s else []
+
+
+def _pair_labels(urls: list[str], labels: list[str]) -> list[str]:
+    """One label per URL, matched by position.
+
+    A single URL takes the first label (e.g. one term per language). Several URLs
+    need exactly as many labels: XML parsing drops empty elements, so a shorter list
+    would silently attach labels to the wrong URL.
+    """
+    if len(urls) == 1:
+        return [labels[0] if labels else ""]
+    return labels if len(labels) == len(urls) else [""] * len(urls)
+
+
 def _guess_field_type(values: list[str]) -> str:
     """Heuristic to suggest a field type based on sample values."""
     non_empty = [v.strip() for v in values if v.strip()]
@@ -199,13 +220,15 @@ def apply_mapping(
     result: list[dict[str, Any]] = []
     idnos: list[str | None] = []
 
-    # Normalize mapping to always have target + transforms
-    normalized: dict[str, tuple[str, list[dict[str, Any]]]] = {}
+    # Normalize mapping to always have target + transforms + optional label_selector
+    normalized: dict[str, tuple[str, list[dict[str, Any]], str | None]] = {}
     for selector, val in mapping.items():
         if isinstance(val, dict):
-            normalized[selector] = (val.get("target", ""), val.get("transforms", []))
+            raw_label_sel = val.get("label_selector")
+            label_sel = str(raw_label_sel) if raw_label_sel else None
+            normalized[selector] = (val.get("target", ""), val.get("transforms", []), label_sel)
         else:
-            normalized[selector] = (val, [])
+            normalized[selector] = (val, [], None)
 
     container_targets: dict[str, tuple[str, str]] = {}
     url_children: set[tuple[str, str]] = set()
@@ -220,9 +243,9 @@ def apply_mapping(
 
     for row in rows:
         record: dict[str, Any] = {}
-        containers: dict[str, dict[str, list[str]]] = {}
+        containers: dict[str, dict[str, list[Any]]] = {}
         row_idno: str | None = None
-        for selector, (field_name, transforms) in normalized.items():
+        for selector, (field_name, transforms, label_selector) in normalized.items():
             combine = next((t for t in transforms if t.get("type") == "combine"), None)
             if combine:
                 raws = [_combine_row_values(row, combine)]
@@ -242,7 +265,15 @@ def apply_mapping(
             if container_target:
                 group_name, child_name = container_target
                 container_parts = [part for raw in raws for part in (apply_transforms(raw, transforms) if transforms else [raw])]
-                containers.setdefault(group_name, {}).setdefault(child_name, []).extend(container_parts)
+                if (group_name, child_name) in url_children:
+                    labels = _aligned_row_values(row, label_selector) if label_selector else []
+                    container_items: list[Any] = [
+                        {"value": part, "label": label}
+                        for part, label in zip(container_parts, _pair_labels(container_parts, labels), strict=True)
+                    ]
+                    containers.setdefault(group_name, {}).setdefault(child_name, []).extend(container_items)
+                else:
+                    containers.setdefault(group_name, {}).setdefault(child_name, []).extend(container_parts)
                 continue
             field_type = fd.field_type if fd else "text"
             is_repeatable = fd.is_repeatable if fd else False
@@ -253,11 +284,16 @@ def apply_mapping(
             for raw in raws:
                 parts.extend(apply_transforms(raw, transforms) if transforms else [raw])
 
+            labels = _aligned_row_values(row, label_selector) if field_type == "url" and label_selector else []
+
             # Repeatable fields: store as plain list of strings (form reads string[])
             if is_repeatable:
                 items: list[Any] = parts
                 if field_type == "url":
-                    items = [{"value": part, "label": ""} for part in parts]
+                    items = [
+                        {"value": part, "label": label}
+                        for part, label in zip(parts, _pair_labels(parts, labels), strict=True)
+                    ]
                 elif field_type == "geo":
                     items = [g for g in map(_parse_geo, parts) if g]
                 # Several columns may feed one repeatable field (Genre1..3): append, skip repeats.
@@ -281,7 +317,7 @@ def apply_mapping(
             elif field_type == "boolean":
                 record[field_name] = single.lower() in {"true", "1", "ja", "yes"}
             elif field_type == "url":
-                record[field_name] = {"value": single, "label": ""}
+                record[field_name] = {"value": single, "label": labels[0] if labels else ""}
             elif field_type == "geo":
                 geo = _parse_geo(single)
                 if geo:
@@ -298,7 +334,10 @@ def apply_mapping(
                     if (group_name, child_name) in url_children:
                         # Same {value, label} shape as top-level URL fields; a
                         # plain string here broke the grp_* index mapping.
-                        if part:
+                        if isinstance(part, dict):
+                            if part.get("value"):
+                                instance[child_name] = part
+                        elif part:
                             instance[child_name] = {"value": part, "label": ""}
                         continue
                     instance[child_name] = part

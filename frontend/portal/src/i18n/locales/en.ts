@@ -170,6 +170,12 @@ export default {
   'error.occurrenceNotFound': 'Occurrence not found.',
   'error.objectNotFound': 'Object not found.',
 
+  'gone.badge': 'HTTP 410 · Withdrawn',
+  'gone.defaultTitle': 'Record withdrawn',
+  'gone.defaultText': 'This record has been withdrawn and is no longer publicly available.',
+  'gone.backHome': 'Back to home',
+  'gone.browseCollection': 'Browse collection',
+
   'object.iiifManifest': 'IIIF Manifest',
   'object.imageSingular': 'Image',
   'object.imagePlural': 'Images',

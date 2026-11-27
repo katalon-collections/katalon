@@ -70,6 +70,14 @@ async def mark_withdrawn(db: AsyncSession, record_type: str | None, record_id: A
     await db.execute(update(OaiRecordState).where(*conditions).values(deleted_at=_now()))
 
 
+async def was_public(db: AsyncSession, record_type: str, record_id: Any) -> bool:
+    """A state row exists exactly for records that have been public at some point."""
+    rid = _as_uuid(record_id)
+    if record_type not in TRACKED_TYPES or rid is None:
+        return False
+    return await db.get(OaiRecordState, (record_type, rid)) is not None
+
+
 async def track(db: AsyncSession, record_type: str, record: Any) -> None:
     """Sync the state for a record that is being (re)indexed."""
     public = getattr(record, "status", None) in PUBLIC_STATUSES and getattr(

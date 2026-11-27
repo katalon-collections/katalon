@@ -106,6 +106,8 @@ Authority fields are available in the schema UI as a field type with a selectabl
 
 Authority is also allowed as a group sub-field. `SUB_FIELD_TYPES` includes `authority`, the sub-field editor requires an enabled configured source before saving, and existing authority sub-fields show a warning that changing the source invalidates already stored authority values [@schema-screen]. `ScreenForm` renders authority children with the same `AuthorityInput` component as top-level authority fields, so grouped and ordinary authority metadata share the stored value shape [@screen-form] [@authority-input].
 
+Portal detail pages link every entry of an authority, URL or PID field separately, including repeatable fields (`linkedValues` in `DetailPageLayout.tsx`, `externalHref` in `renderFieldValue.ts`). Fields marked as facet render search links instead.
+
 Backend metadata validation checks authority values for ordinary record fields, repeatable authority fields, and authority children inside group instances. The validator requires non-empty `source`, `external_id`, and `label` strings and rejects values whose `source` differs from the field's configured `settings.source`; unit and integration tests cover top-level authority validation, grouped authority validation, and creating an authority sub-field under a group [@schema-service] [@schema-service-tests] [@schema-container-tests].
 
 ## Related Pages

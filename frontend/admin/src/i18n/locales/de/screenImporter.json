@@ -100,5 +100,9 @@
   "newImportConfirm": "Aktuellen Import verwerfen? Mapping und neu anzulegende Felder gehen verloren.",
   "newImportDiscard": "Verwerfen",
   "mappingPathSeparator": "Pfad-Trenner (optional)",
-  "mappingPathSeparatorHint": "Zerlegt „Land>Region>Ort“ in eine Ortshierarchie. Fehlende Ebenen werden als eigene Orte angelegt. Leer lassen: Der Wert bleibt ein einzelner Name."
+  "mappingPathSeparatorHint": "Zerlegt „Land>Region>Ort“ in eine Ortshierarchie. Fehlende Ebenen werden als eigene Orte angelegt. Leer lassen: Der Wert bleibt ein einzelner Name.",
+  "mappingUrlLabelSelector": "Beschriftung aus Spalte (optional)",
+  "mappingUrlLabelSelectorXml": "Beschriftung aus Selektor (optional)",
+  "mappingUrlLabelNone": "– keine Beschriftung –",
+  "mappingUrlLabelHint": "Übernimmt den Anzeigetext zur URL aus einer zweiten Quelle. Wiederholte Werte werden paarweise nach Position zugeordnet."
 }

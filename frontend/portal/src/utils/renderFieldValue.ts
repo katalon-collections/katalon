@@ -26,6 +26,7 @@ const AUTHORITY_BASE: Record<string, string> = {
   geonames:  'https://www.geonames.org/',
   tgn:       'https://vocab.getty.edu/page/tgn/',
   iconclass: 'https://iconclass.org/',
+  aat:       'https://vocab.getty.edu/aat/',
 }
 
 const PID_RESOLVER_BASE = 'https://nbn-resolving.org/'
@@ -64,6 +65,14 @@ export function urlHref(value: unknown): string | undefined {
   return url
 }
 
+/** External link target of one url, pid or authority value, or undefined. */
+export function externalHref(value: unknown, fieldType: string): string | undefined {
+  if (fieldType === 'url') return urlHref(value)
+  if (fieldType === 'pid') return pidUrl(value)
+  if (fieldType === 'authority') return authorityUrl(value)
+  return undefined
+}
+
 /** Formats a geo value {lat, lon, accuracy_m?} as "52.500000, 13.400000 (±50 m)", or undefined. */
 function formatGeo(value: unknown): string | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
@@ -73,15 +82,21 @@ function formatGeo(value: unknown): string | undefined {
 }
 
 /** Converts a single EDTF-lite qualified date ("1900~", "1900?", "1900~?") to display text. */
-function formatQualifiedDate(value: string): string {
+function formatQualifiedDate(value: string, locale?: string): string {
+  const isEn = locale === 'en'
+  const bceLabel = isEn ? 'BCE' : 'v. Chr.'
+  const uncertainLabel = isEn ? 'uncertain' : 'unsicher'
   const formatBce = (date: string) => {
-    const match = /^-(\d{4})(.*)$/.exec(date)
-    return match ? `${Number(match[1]) + 1}${match[2]} v. Chr.` : date
+    const negative = /^-(\d{4})(.*)$/.exec(date)
+    if (negative) return `${Number(negative[1]) + 1}${negative[2]} ${bceLabel}`
+    const yearZero = /^0000(.*)$/.exec(date)
+    if (yearZero) return `1${yearZero[1]} ${bceLabel}`
+    return date
   }
   for (const [suffix, wrap] of [
-    ['~?', (d: string) => `ca. ${d} (unsicher)`],
+    ['~?', (d: string) => `ca. ${d} (${uncertainLabel})`],
     ['~', (d: string) => `ca. ${d}`],
-    ['?', (d: string) => `${d} (unsicher)`],
+    ['?', (d: string) => `${d} (${uncertainLabel})`],
   ] as const) {
     if (value.endsWith(suffix)) return wrap(formatBce(value.slice(0, -suffix.length)))
   }
@@ -89,14 +104,15 @@ function formatQualifiedDate(value: string): string {
 }
 
 /** Converts a canonical EDTF-lite date value (single or "START/END" range) to display text. */
-export function formatDateValue(value: string): string {
+export function formatDateValue(value: string, locale?: string): string {
+  const isEn = locale === 'en'
   if (value.includes('/')) {
     const [start, end] = value.split('/')
-    if (!start) return `vor ${formatQualifiedDate(end)}`
-    if (!end) return `nach ${formatQualifiedDate(start)}`
-    return `${formatQualifiedDate(start)}–${formatQualifiedDate(end)}`
+    if (!start) return `${isEn ? 'before' : 'vor'} ${formatQualifiedDate(end, locale)}`
+    if (!end) return `${isEn ? 'after' : 'nach'} ${formatQualifiedDate(start, locale)}`
+    return `${formatQualifiedDate(start, locale)}–${formatQualifiedDate(end, locale)}`
   }
-  return formatQualifiedDate(value)
+  return formatQualifiedDate(value, locale)
 }
 
 /**
@@ -118,9 +134,11 @@ export function renderFieldValue(
   }
 
   if (fieldType === 'date') {
-    if (typeof value === 'string') return value ? formatDateValue(value) : null
+    if (typeof value === 'string') return value ? formatDateValue(value, locale) : null
     if (Array.isArray(value)) {
-      const parts = value.filter((v): v is string => typeof v === 'string' && v !== '').map(formatDateValue)
+      const parts = value
+        .filter((v): v is string => typeof v === 'string' && v !== '')
+        .map(v => formatDateValue(v, locale))
       return parts.length > 0 ? parts.join(', ') : null
     }
   }

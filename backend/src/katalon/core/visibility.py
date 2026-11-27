@@ -3,12 +3,36 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import select
 
 PUBLIC_STATUSES = ("public", "published")
+_PORTAL_TOMBSTONE_MODE: ContextVar[bool] = ContextVar("portal_tombstone_mode", default=False)
+
+
+@contextmanager
+def portal_tombstone_scope() -> Iterator[None]:
+    """Return 410 Gone for withdrawn public records even for signed-in portal staff."""
+    token = _PORTAL_TOMBSTONE_MODE.set(True)
+    try:
+        yield
+    finally:
+        _PORTAL_TOMBSTONE_MODE.reset(token)
+
+
+def gone_error() -> HTTPException:
+    """410 for withdrawn records. `no-store`: browsers otherwise cache a 410 indefinitely,
+    which would keep a restored record hidden."""
+    return HTTPException(
+        status_code=410,
+        detail="Dieser Datensatz wurde zurückgezogen.",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 def apply_public_visibility(query: Any, model: Any, current_user: Any | None) -> Any:
@@ -20,13 +44,22 @@ def apply_public_visibility(query: Any, model: Any, current_user: Any | None) ->
     return query
 
 
-def ensure_publicly_visible(record: Any, current_user: Any | None, detail: str) -> None:
-    if getattr(record, "deleted_at", None) is not None:
-        if current_user is None:
-            raise HTTPException(status_code=410, detail="Dieser Datensatz wurde gelöscht.")
-        raise HTTPException(status_code=404, detail=detail)
+def ensure_publicly_visible(
+    record: Any,
+    current_user: Any | None,
+    detail: str,
+    *,
+    tombstone_for_all: bool = False,
+) -> None:
     status = getattr(record, "status", None)
-    if current_user is None and status is not None and status not in PUBLIC_STATUSES:
+    is_public = status is None or status in PUBLIC_STATUSES
+    if getattr(record, "deleted_at", None) is not None:
+        if is_public and (
+            tombstone_for_all or _PORTAL_TOMBSTONE_MODE.get() or current_user is None
+        ):
+            raise gone_error()
+        raise HTTPException(status_code=404, detail=detail)
+    if current_user is None and not is_public:
         raise HTTPException(status_code=404, detail=detail)
 
 

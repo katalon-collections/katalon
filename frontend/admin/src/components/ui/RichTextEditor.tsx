@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 const getMarkdown = (editor: Editor): string => (editor.storage as unknown as { markdown: { getMarkdown(): string } }).markdown.getMarkdown()
 
 interface RichTextEditorProps {
+  ariaLabelledBy?: string
   value: string
   onChange: (markdown: string) => void
   placeholder?: string
@@ -25,7 +26,7 @@ const TOOLBAR_BTN: CSSProperties = {
 }
 
 /** Minimal WYSIWYG editor; stores/reads Markdown so it stays compatible with the portal's marked+DOMPurify renderer. */
-export function RichTextEditor({ value, onChange, placeholder, disabled, style, toolbarEnd }: RichTextEditorProps) {
+export function RichTextEditor({ ariaLabelledBy, value, onChange, placeholder, disabled, style, toolbarEnd }: RichTextEditorProps) {
   const { t } = useTranslation('richTextEditor')
   const editor = useEditor({
     extensions: [
@@ -37,7 +38,13 @@ export function RichTextEditor({ value, onChange, placeholder, disabled, style, 
     editable: !disabled,
     onUpdate: ({ editor }) => { const md = getMarkdown(editor); if (md !== value) onChange(md) },
     editorProps: {
-      attributes: { class: 'fld richtext-editor', style: 'min-height: 76px; padding: 8px 10px;' },
+      attributes: {
+        class: 'fld richtext-editor',
+        style: 'min-height: 76px; padding: 8px 10px;',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
+      },
     },
   })
 

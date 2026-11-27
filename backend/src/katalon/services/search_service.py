@@ -416,6 +416,9 @@ def _build_doc(
         else None,
     }
     doc["subtype"] = getattr(record, f"{record_type}_type", None)
+    if record_type == "place":
+        parent_id = getattr(record, "parent_id", None)
+        doc["place_path_key"] = f"{parent_id or ''}|{doc['status'] or ''}|{title}"
     if record_type == "object":
         doc["object_type"] = getattr(record, "object_type", None)
         doc["collection_status"] = getattr(record, "collection_status", "active") or "active"

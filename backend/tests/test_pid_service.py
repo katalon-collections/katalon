@@ -28,6 +28,7 @@ def make_pid_field(
     is_repeatable: bool = False,
 ) -> MagicMock:
     f = MagicMock()
+    f.target_subtype = None
     f.name = name
     f.field_type = "pid"
     f.is_repeatable = is_repeatable

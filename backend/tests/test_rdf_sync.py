@@ -263,3 +263,77 @@ def test_celery_remove_task_handles_none_type(monkeypatch: pytest.MonkeyPatch) -
     assert res["status"] == "deleted"
     # Should attempt removal across all 7 types
     assert mock_remove.await_count == 7
+
+
+@pytest.mark.asyncio
+async def test_serialize_storage_location_public_with_incoming_object_relation() -> None:
+    from katalon.core.models import FieldDefinition, Object, Relation, StorageLocation
+    from katalon.services.rdf_service import serialize_record_to_jsonld
+
+    loc_id = uuid.uuid4()
+    obj_id = uuid.uuid4()
+
+    loc = StorageLocation(
+        id=loc_id,
+        idno="LOC-1",
+        storage_location_type=None,
+        metadata_={"title": "Depot 1"},
+    )
+    obj = Object(
+        id=obj_id,
+        idno="OBJ-1",
+        object_type="foto",
+        status="published",
+        metadata_={"title": "Historisches Foto"},
+    )
+    rel = Relation(
+        from_type="object",
+        from_id=obj_id,
+        to_type="storage_location",
+        to_id=loc_id,
+        relation_type="normal_location",
+    )
+    title_field = FieldDefinition(
+        name="title",
+        target_type="object",
+        field_type="text",
+        is_public=True,
+        is_deleted=False,
+    )
+
+    def _execute(stmt: Any) -> MagicMock:
+        res = MagicMock()
+        sql = str(stmt)
+        if "FROM field_definitions" in sql:
+            res.scalars.return_value.all.return_value = [title_field]
+        elif "FROM vocabulary_terms" in sql:
+            res.all.return_value = []
+        elif "FROM relations" in sql:
+            res.scalars.return_value.all.return_value = [rel]
+        elif "SELECT objects.id, objects.object_type" in sql:
+            res.all.return_value = [(obj_id, "foto")]
+        elif "SELECT objects.id \nFROM objects" in sql or "SELECT objects.id\nFROM objects" in sql:
+            res.scalars.return_value.all.return_value = [obj_id]
+        elif "FROM objects" in sql:
+            res.scalars.return_value.all.return_value = [obj]
+        else:
+            res.scalars.return_value.all.return_value = []
+            res.all.return_value = []
+        return res
+
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=_execute)
+
+    doc = await serialize_record_to_jsonld(
+        db,
+        "storage_location",
+        loc,
+        base_url="https://glam.test",
+        public=True,
+    )
+
+    assert doc["@id"] == f"https://glam.test/storage-locations/{loc_id}"
+    assert doc["@type"] == "crm:E53_Place"
+    serialized = str(doc)
+    assert f"https://glam.test/objects/{obj_id}" in serialized
+    assert "Historisches Foto" in serialized

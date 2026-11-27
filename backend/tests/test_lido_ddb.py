@@ -580,3 +580,352 @@ def test_subtype_display_url_becomes_linked_data_uri() -> None:
     ])
     root = ET.fromstring(_render(ctx, cms))
     assert root.findtext(".//lido:objectWorkType/lido:conceptID", namespaces=NS) == "http://www.wikidata.org/entity/Q192425"
+
+
+# ---------------------------------------------------------------------------
+# Configurable lidoRecID separator
+# ---------------------------------------------------------------------------
+
+
+def test_lido_rec_id_uses_double_dash_by_default_and_supports_custom_separator() -> None:
+    ctx = _ctx()
+    default_xml = _render(ctx, _minimal(config={"isil": "DE-4399"}))
+    assert validate_lido_xml(default_xml) == []
+    assert ET.fromstring(default_xml).findtext(".//lido:lidoRecID", namespaces=NS) == "DE-4399--INV-1"
+
+    slash_xml = _render(ctx, _minimal(config={"isil": "DE-4399", "lido_rec_id_separator": "/"}))
+    assert validate_lido_xml(slash_xml) == []
+    assert ET.fromstring(slash_xml).findtext(".//lido:lidoRecID", namespaces=NS) == "DE-4399/INV-1"
+
+    underscore_xml = _render(ctx, _minimal(config={"isil": "DE-4399", "lido_rec_id_separator": "_"}))
+    assert validate_lido_xml(underscore_xml) == []
+    assert ET.fromstring(underscore_xml).findtext(".//lido:lidoRecID", namespaces=NS) == "DE-4399_INV-1"
+
+    blank_xml = _render(ctx, _minimal(config={"isil": "DE-4399", "lido_rec_id_separator": "   "}))
+    assert ET.fromstring(blank_xml).findtext(".//lido:lidoRecID", namespaces=NS) == "DE-4399--INV-1"
+
+    no_isil_xml = _render(ctx, _minimal(config={"lido_rec_id_separator": "/"}))
+    assert ET.fromstring(no_isil_xml).findtext(".//lido:lidoRecID", namespaces=NS) == "INV-1"
+
+
+@pytest.mark.asyncio
+async def test_lido_rec_id_separator_survives_yaml_round_trip() -> None:
+    yaml_text = yaml.dump(
+        {
+            "schema_version": "1.0",
+            "format_key": "lido",
+            "record_type": "object",
+            "name": "Custom separator",
+            "institution_config": {"isil": "DE-4399", "lido_rec_id_separator": "/"},
+            "rules": [
+                {
+                    "source_kind": "record",
+                    "source_config": {"property": "title"},
+                    "target_key": "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+                },
+                {
+                    "source_kind": "constant",
+                    "source_config": {"value": "Postkarte"},
+                    "target_key": "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+                },
+            ],
+        },
+        sort_keys=False,
+    )
+
+    async def import_yaml(text: str) -> ExportMappingSet:
+        added: list[object] = []
+        db = AsyncMock()
+        db.add = MagicMock(side_effect=added.append)
+        revs, pub, fields, refresh = MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        revs.scalars.return_value.all.return_value = []
+        pub.scalar_one_or_none.return_value = None
+        fields.scalars.return_value.all.return_value = []
+        refresh.scalar_one_or_none.return_value = None
+        db.execute.side_effect = [revs, pub, fields, refresh]
+        _set, warnings, _count = await metadata_mapping_service.import_mapping_set_from_yaml(db, text)
+        assert warnings == []
+        mapping_set = next(x for x in added if isinstance(x, ExportMappingSet))
+        mapping_set.id = uuid.uuid4()
+        mapping_set.rules = [x for x in added if isinstance(x, ExportMappingRule)]
+        for rule in mapping_set.rules:
+            rule.id = uuid.uuid4()
+            rule.field_definition = None
+        return mapping_set
+
+    first = await import_yaml(yaml_text)
+    assert first.institution_config["lido_rec_id_separator"] == "/"
+
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = first
+    db.execute.return_value = result
+    exported, _filename = await metadata_mapping_service.export_mapping_set_to_yaml(db, first.id)
+    assert "lido_rec_id_separator: /" in exported
+
+    second = await import_yaml(exported)
+    assert second.institution_config["lido_rec_id_separator"] == "/"
+    xml = _render(_ctx(), compile_mapping_set(second))
+    assert validate_lido_xml(xml) == []
+    assert ET.fromstring(xml).findtext(".//lido:lidoRecID", namespaces=NS) == "DE-4399/INV-1"
+
+
+# ---------------------------------------------------------------------------
+# Labeled URL field values (conceptID + term, object_field license fallback)
+# ---------------------------------------------------------------------------
+
+
+def test_url_field_with_label_exports_concept_id_and_term_in_rights_work() -> None:
+    uri = "https://example.org/licenses/restricted/"
+    label = "Nutzungsrechte eingeschränkt. Es gilt das allgemeine deutsche Urheberrecht."
+    cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.FIELD,
+            source_config={"field_name": "rechte_uri"},
+            target_key="lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term",
+        ),
+    ])
+    ctx = _ctx(fields={"rechte_uri": {"value": uri, "label": label}})
+    xml = _render(ctx, cms)
+    assert validate_lido_xml(xml) == []
+    root = ET.fromstring(xml)
+    rights_type = root.find(".//lido:rightsWorkSet/lido:rightsType", NS)
+    assert rights_type is not None
+    assert rights_type.findtext("lido:conceptID", namespaces=NS) == uri
+    assert rights_type.findtext("lido:term", namespaces=NS) == label
+
+
+def test_url_field_without_label_keeps_uri_as_term_fallback() -> None:
+    uri = "https://example.org/licenses/restricted/"
+    cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.FIELD,
+            source_config={"field_name": "rechte_uri"},
+            target_key="lido:rightsWorkWrap/lido:rightsWorkSet/lido:rightsType/lido:term",
+        ),
+    ])
+    ctx = _ctx(fields={"rechte_uri": {"value": uri, "label": ""}})
+    xml = _render(ctx, cms)
+    assert validate_lido_xml(xml) == []
+    root = ET.fromstring(xml)
+    rights_type = root.find(".//lido:rightsWorkSet/lido:rightsType", NS)
+    assert rights_type is not None
+    assert rights_type.findtext("lido:conceptID", namespaces=NS) == uri
+    assert rights_type.findtext("lido:term", namespaces=NS) == uri
+
+
+def test_resource_rights_fallback_object_field_works_with_labeled_url_value() -> None:
+    uri = "http://rightsstatements.org/vocab/InC/1.0/"
+    cms = _minimal(config={
+        "require_media_license": True,
+        "resource_sets": True,
+        "resource_rights_fallback": "object_field:rechte_uri",
+    })
+    ctx = _ctx(
+        media=[_media()],
+        fields={
+            "rechte_uri": {
+                "value": uri,
+                "label": "Nutzungsrechte eingeschränkt.",
+            },
+        },
+    )
+    assert LidoFormat().required_field_errors(ctx, cms) == []
+    xml = _render(ctx, cms)
+    assert validate_lido_xml(xml) == []
+    root = ET.fromstring(xml)
+    assert root.findtext(".//lido:rightsResource/lido:rightsType/lido:conceptID", namespaces=NS) == uri
+
+
+def test_url_field_with_label_in_subject_emits_concept_id_and_term() -> None:
+    uri = "https://example.org/concepts/42"
+    cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.FIELD,
+            source_config={"field_name": "topic_link"},
+            target_key="lido:objectRelationWrap/lido:subjectWrap/lido:subjectSet/lido:subject/lido:subjectConcept/lido:term",
+        ),
+    ])
+    ctx = _ctx(fields={"topic_link": {"value": uri, "label": "Archäologie"}})
+    xml = _render(ctx, cms)
+    assert validate_lido_xml(xml) == []
+    root = ET.fromstring(xml)
+    concept = root.find(".//lido:subjectConcept", NS)
+    assert concept is not None
+    assert concept.findtext("lido:conceptID", namespaces=NS) == uri
+    assert concept.findtext("lido:term", namespaces=NS) == "Archäologie"
+
+
+# ---------------------------------------------------------------------------
+# Place hierarchy path in namePlaceSet
+# ---------------------------------------------------------------------------
+
+
+def test_event_place_path_off_by_default_and_joins_ancestors_when_enabled() -> None:
+    rel = ExportRelation(
+        id="r-place",
+        relation_type="fundort",
+        target_type="place",
+        target_id="p-madeleine",
+        target_label="La Madeleine",
+        target_ancestors=["Frankreich", "Dordogne"],
+    )
+    ctx = _ctx(relations=[rel])
+
+    # Default (off): only the place's own title, no partOfPlace.
+    default_cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.RELATION,
+            source_config={"relation_type": "fundort"},
+            target_key="lido:events/production/place",
+        ),
+    ])
+    default_xml = _render(ctx, default_cms)
+    assert validate_lido_xml(default_xml) == []
+    assert "partOfPlace" not in default_xml
+    default_root = ET.fromstring(default_xml)
+    assert default_root.findtext(".//lido:eventPlace/lido:displayPlace", namespaces=NS) == "La Madeleine"
+    assert (
+        default_root.findtext(".//lido:eventPlace/lido:place/lido:namePlaceSet/lido:appellationValue", namespaces=NS)
+        == "La Madeleine"
+    )
+
+    # Enabled with default separator (" > ").
+    enabled_cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.RELATION,
+            source_config={"relation_type": "fundort"},
+            target_key="lido:events/production/place",
+            settings={"include_ancestors": True},
+        ),
+    ])
+    enabled_xml = _render(ctx, enabled_cms)
+    assert validate_lido_xml(enabled_xml) == []
+    assert "partOfPlace" not in enabled_xml
+    enabled_root = ET.fromstring(enabled_xml)
+    assert enabled_root.findtext(".//lido:eventPlace/lido:displayPlace", namespaces=NS) == "La Madeleine"
+    assert (
+        enabled_root.findtext(".//lido:eventPlace/lido:place/lido:namePlaceSet/lido:appellationValue", namespaces=NS)
+        == "Frankreich > Dordogne > La Madeleine"
+    )
+
+    # Enabled with custom separator (" / ").
+    custom_cms = _minimal([
+        MappingSpec(
+            source_kind=SourceKind.RELATION,
+            source_config={"relation_type": "fundort"},
+            target_key="lido:events/production/place",
+            settings={"include_ancestors": True, "path_separator": " / "},
+        ),
+    ])
+    custom_xml = _render(ctx, custom_cms)
+    assert validate_lido_xml(custom_xml) == []
+    custom_root = ET.fromstring(custom_xml)
+    assert (
+        custom_root.findtext(".//lido:eventPlace/lido:place/lido:namePlaceSet/lido:appellationValue", namespaces=NS)
+        == "Frankreich / Dordogne / La Madeleine"
+    )
+
+    # Root place (no ancestors) emits only its own title even when enabled.
+    root_place_ctx = _ctx(
+        relations=[
+            ExportRelation(
+                id="r-root",
+                relation_type="fundort",
+                target_type="place",
+                target_id="p-root",
+                target_label="Frankreich",
+                target_ancestors=[],
+            )
+        ]
+    )
+    root_xml = _render(root_place_ctx, custom_cms)
+    assert validate_lido_xml(root_xml) == []
+    assert (
+        ET.fromstring(root_xml).findtext(
+            ".//lido:eventPlace/lido:place/lido:namePlaceSet/lido:appellationValue", namespaces=NS
+        )
+        == "Frankreich"
+    )
+
+
+@pytest.mark.asyncio
+async def test_place_path_settings_survive_yaml_round_trip() -> None:
+    yaml_text = yaml.dump(
+        {
+            "schema_version": "1.0",
+            "format_key": "lido",
+            "record_type": "object",
+            "name": "Place path mapping",
+            "rules": [
+                {
+                    "source_kind": "record",
+                    "source_config": {"property": "title"},
+                    "target_key": "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue",
+                },
+                {
+                    "source_kind": "constant",
+                    "source_config": {"value": "Werkzeug"},
+                    "target_key": "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType",
+                },
+                {
+                    "source_kind": "relation",
+                    "source_config": {"relation_type": "fundort"},
+                    "target_key": "lido:events/production/place",
+                    "settings": {"include_ancestors": True, "path_separator": " > "},
+                },
+            ],
+        },
+        sort_keys=False,
+    )
+
+    async def import_yaml(text: str) -> ExportMappingSet:
+        added: list[object] = []
+        db = AsyncMock()
+        db.add = MagicMock(side_effect=added.append)
+        revs, pub, fields, refresh = MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        revs.scalars.return_value.all.return_value = []
+        pub.scalar_one_or_none.return_value = None
+        fields.scalars.return_value.all.return_value = []
+        refresh.scalar_one_or_none.return_value = None
+        db.execute.side_effect = [revs, pub, fields, refresh]
+        _set, warnings, _count = await metadata_mapping_service.import_mapping_set_from_yaml(db, text)
+        assert warnings == []
+        mapping_set = next(x for x in added if isinstance(x, ExportMappingSet))
+        mapping_set.id = uuid.uuid4()
+        mapping_set.rules = [x for x in added if isinstance(x, ExportMappingRule)]
+        for rule in mapping_set.rules:
+            rule.id = uuid.uuid4()
+            rule.field_definition = None
+        return mapping_set
+
+    first = await import_yaml(yaml_text)
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = first
+    db.execute.return_value = result
+    exported, _filename = await metadata_mapping_service.export_mapping_set_to_yaml(db, first.id)
+    assert "include_ancestors: true" in exported
+    assert "path_separator: ' > '" in exported or 'path_separator: " > "' in exported
+
+    second = await import_yaml(exported)
+    ctx = _ctx(
+        relations=[
+            ExportRelation(
+                id="r-1",
+                relation_type="fundort",
+                target_type="place",
+                target_id="p-1",
+                target_label="La Madeleine",
+                target_ancestors=["Frankreich", "Dordogne"],
+            )
+        ]
+    )
+    xml = _render(ctx, compile_mapping_set(second))
+    assert validate_lido_xml(xml) == []
+    assert (
+        ET.fromstring(xml).findtext(
+            ".//lido:eventPlace/lido:place/lido:namePlaceSet/lido:appellationValue", namespaces=NS
+        )
+        == "Frankreich > Dordogne > La Madeleine"
+    )

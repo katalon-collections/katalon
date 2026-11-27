@@ -2,7 +2,11 @@
 # Copyright (c) 2026 Karl Krägelin
 
 import uuid
+from typing import Any
 
+import pytest
+
+from katalon.services import place_service
 from katalon.services.place_service import (
     PlaceNode,
     ancestors_of,
@@ -69,3 +73,19 @@ def test_object_counts_roll_up_distinct_and_hide_empty_places() -> None:
     assert (counts[ids["de"]], counts[ids["mv"]], counts[ids["sn"]], counts[ids["fr"]]) == (2, 2, 2, 0)
     facet = tree_facet(nodes, kids, active=[], expand=[], counts=counts)
     assert [n["label"]["und"] for n in facet["nodes"]["root"]] == ["Deutschland"]  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_load_place_chains_walks_only_parent_levels(monkeypatch: pytest.MonkeyPatch) -> None:
+    nodes, ids = _tree()
+    calls: list[set[uuid.UUID]] = []
+
+    async def _load(_db: Any, *, public_only: bool, ids: set[uuid.UUID]) -> dict[uuid.UUID, PlaceNode]:
+        calls.append(ids)
+        return {i: nodes[i] for i in ids if i in nodes}
+
+    monkeypatch.setattr(place_service, "load_place_nodes", _load)
+    found = await place_service.load_place_chains(None, {ids["ls"]}, public_only=True)  # type: ignore[arg-type]
+    assert [n.title for n in ancestors_of(found, ids["ls"])] == ["Deutschland", "MV", "Schwerin"]
+    assert len(calls) == 4
+    assert ids["fr"] not in found

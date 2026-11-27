@@ -33,6 +33,8 @@ _RECORD_MODELS: dict[str, Any] = {
     "storage_location": StorageLocation,
 }
 
+_NEVER_PUBLIC_TYPES: frozenset[str] = frozenset({"procedure", "storage_location"})
+
 
 async def validate_relation_endpoint(
     db: AsyncSession, record_type: str, record_id: uuid.UUID
@@ -360,7 +362,9 @@ async def resolve_relation_labels(
     labels: dict[tuple[str, uuid.UUID], str | None] = {}
     for record_type, ids in ids_by_type.items():
         model = _RECORD_MODELS.get(record_type)
-        if model is None:
+        if model is None or (
+            public_only and (record_type in _NEVER_PUBLIC_TYPES or not hasattr(model, "status"))
+        ):
             for record_id in ids:
                 labels[(record_type, record_id)] = None
             continue

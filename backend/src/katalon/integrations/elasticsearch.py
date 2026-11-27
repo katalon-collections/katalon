@@ -39,8 +39,12 @@ def _reverse_sort(clauses: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Flip asc/desc on every clause of a deterministic sort spec."""
     flipped: list[dict[str, Any]] = []
     for clause in clauses:
-        for field, direction in clause.items():
-            flipped.append({field: "desc" if direction == "asc" else "asc"})
+        for field, spec in clause.items():
+            if isinstance(spec, dict):
+                direction = spec.get("order", "asc")
+                flipped.append({field: {**spec, "order": "desc" if direction == "asc" else "asc"}})
+            else:
+                flipped.append({field: "desc" if spec == "asc" else "asc"})
     return flipped
 
 
@@ -142,12 +146,19 @@ INDEX_SETTINGS: dict[str, Any] = {
             "primary_media_id": {"type": "keyword"},
             # Returned only, never queried.
             "primary_media_iiif": {"type": "keyword", "index": False, "doc_values": False},
+            "place_path_key": {"type": "keyword", "index": False, "doc_values": False},
             "media_width": {"type": "integer"},
             "media_height": {"type": "integer"},
             "title": {
                 "type": "text",
                 "analyzer": "katalon_default",
                 "fields": {"raw": {"type": "keyword"}},
+            },
+            # Explicit idno mapping so empty-query default sort (idno.keyword) works
+            # on a freshly created empty index before the first document is indexed.
+            "idno": {
+                "type": "text",
+                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
             },
             "status": {"type": "keyword"},
             "metadata": {"type": "object", "enabled": False},
@@ -439,6 +450,14 @@ async def _index_tolerating_group_fields(
             exc,
         )
         await es.index(index=index, id=doc_id, body=stripped, refresh=refresh)
+
+
+async def get_document(doc_id: str) -> dict[str, Any] | None:
+    try:
+        resp = await get_es().get(index=INDEX_NAME, id=doc_id)
+    except NotFoundError:
+        return None
+    return cast(dict[str, Any], resp["_source"]) if resp.get("found") else None
 
 
 async def index_document(doc_id: str, body: dict[str, Any]) -> None:
@@ -777,10 +796,10 @@ async def search_documents(
         aggs[agg_key] = agg
 
     SORT_CLAUSES: dict[str, list[dict[str, Any]]] = {
-        "idno_asc": [{"idno.keyword": "asc"}],
-        "title_asc": [{"title.raw": "asc"}],
-        "newest": [{"created_at": "desc"}],
-        "oldest": [{"created_at": "asc"}],
+        "idno_asc": [{"idno.keyword": {"order": "asc", "unmapped_type": "keyword"}}],
+        "title_asc": [{"title.raw": {"order": "asc", "unmapped_type": "keyword"}}],
+        "newest": [{"created_at": {"order": "desc", "unmapped_type": "date"}}],
+        "oldest": [{"created_at": {"order": "asc", "unmapped_type": "date"}}],
     }
     sort_clauses = SORT_CLAUSES.get(sort or "")
     if sort_clauses is None and not query:
@@ -796,6 +815,8 @@ async def search_documents(
     async def _run(query_body: dict[str, Any]) -> dict[str, Any]:
         try:
             result = await es.search(index=INDEX_NAME, body=query_body)
+        except NotFoundError:
+            return {"hits": {"total": {"value": 0}, "hits": []}, "aggregations": {}}
         except BadRequestError as exc:
             from fastapi import HTTPException
 

@@ -43,3 +43,20 @@ async def test_ark_resolver_redirects_only_public_records(
     assert draft.status_code == 201, draft.text
     assert (await async_client.get("/ark:/12345/draft")).status_code == 404
     assert (await async_client.get("/ark:/99999/public")).status_code == 404
+
+    # Soft-deleting a previously-public record keeps its ARK resolving to the
+    # portal detail URL (which returns HTTP 410 Gone); soft-deleting a draft stays 404.
+    del_public = await async_client.delete(f"/v1/objects/{public.json()['id']}", headers=auth_headers)
+    assert del_public.status_code == 204
+    gone_redirect = await async_client.get("/ark:/12345/public", follow_redirects=False)
+    assert gone_redirect.status_code == 303
+    assert gone_redirect.headers["location"] == f"https://catalog.example.org/objects/{public.json()['id']}"
+    assert (await async_client.get(f"/portal/v1/objects/{public.json()['id']}")).status_code == 410
+    assert (
+        await async_client.get(f"/portal/v1/objects/{public.json()['id']}", headers=auth_headers)
+    ).status_code == 410
+
+    del_draft = await async_client.delete(f"/v1/objects/{draft.json()['id']}", headers=auth_headers)
+    assert del_draft.status_code == 204
+    assert (await async_client.get("/ark:/12345/draft")).status_code == 404
+    assert (await async_client.get(f"/portal/v1/objects/{draft.json()['id']}")).status_code == 404

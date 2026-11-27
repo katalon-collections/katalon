@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { DryRunResult } from '../../../api/client'
 import { UPSERT_STRATEGIES } from './types'
@@ -25,6 +25,7 @@ export function StepDryRun({
   autoPublish, onAutoPublishChange, idnoStrategy, onImport, onApplyCluster, onBack,
 }: Props) {
   const { t } = useTranslation('screenImporter')
+  const formId = useId()
   const [page, setPage] = useState(0)
 
   // Group errors by message to avoid rendering tens of thousands of rows
@@ -153,8 +154,8 @@ export function StepDryRun({
         <div className="hd">{t('dryRun.importOptions')}</div>
         <div className="bd" style={{ display: 'grid', gap: 12 }}>
           <div>
-            <label className="lbl">{t('dryRun.existingRecords')}</label>
-            <select className="fld" value={upsertStrategy} onChange={e => onUpsertStrategyChange(e.target.value)}>
+            <label className="lbl" htmlFor={`${formId}-upsert-strategy`}>{t('dryRun.existingRecords')}</label>
+            <select id={`${formId}-upsert-strategy`} className="fld" value={upsertStrategy} onChange={e => onUpsertStrategyChange(e.target.value)}>
               {UPSERT_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>

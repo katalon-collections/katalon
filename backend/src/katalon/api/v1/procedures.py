@@ -36,7 +36,11 @@ from katalon.services.relation_service import (
     procedure_object_ids,
     sync_schema_relations,
 )
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.subtype_service import ensure_subtype_exists
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -131,6 +135,7 @@ async def list_procedures(
     status: str | None = None,
     due_before: date | None = None,
     reference_number: str | None = None,
+    schema_incomplete: bool | None = None,
     q: str | None = None,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
@@ -144,6 +149,8 @@ async def list_procedures(
         query = query.where(Procedure.due_date <= due_before)
     if reference_number:
         query = query.where(Procedure.reference_number.ilike(f"%{reference_number}%"))
+    if schema_incomplete is not None:
+        query = query.where(Procedure.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             Procedure.idno.icontains(q, autoescape=True)
@@ -199,6 +206,13 @@ async def create_procedure(
         idno=idno,
         procedure_type=data.procedure_type,
         status=data.status,
+        schema_incomplete=(
+            await is_record_schema_incomplete(
+                db, "procedure", data.metadata_, data.procedure_type or None
+            )
+            if data.status == "draft"
+            else False
+        ),
         start_date=data.start_date,
         end_date=data.end_date,
         due_date=data.due_date,
@@ -429,6 +443,13 @@ async def update_procedure(
     proc.idno = idno
     proc.procedure_type = data.procedure_type
     proc.status = data.status
+    proc.schema_incomplete = (
+        await is_record_schema_incomplete(
+            db, "procedure", data.metadata_, data.procedure_type or None
+        )
+        if data.status == "draft"
+        else False
+    )
     proc.start_date = data.start_date
     proc.end_date = data.end_date
     proc.due_date = data.due_date

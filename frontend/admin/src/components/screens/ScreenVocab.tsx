@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { ConflictError, schema, vocabularies } from '../../api/client'
@@ -175,6 +175,7 @@ function CustomFieldsEditor({ fields, value, onChange }: {
   value: Record<string, unknown>
   onChange: (value: Record<string, unknown>) => void
 }) {
+  const idPrefix = useId()
   function set(name: string, fieldValue: unknown) {
     const next = { ...value }
     if (fieldValue === '' || fieldValue === null || (Array.isArray(fieldValue) && fieldValue.length === 0)) {
@@ -185,13 +186,15 @@ function CustomFieldsEditor({ fields, value, onChange }: {
     onChange(next)
   }
 
-  function renderSingle(field: FieldDefinition, current: unknown, update: (next: unknown) => void) {
+  function renderSingle(field: FieldDefinition, current: unknown, update: (next: unknown) => void, inputId: string, ariaLabelledBy?: string) {
     if (field.field_type === 'boolean') {
-      return <input type="checkbox" className="ck" checked={current === true} onChange={e => update(e.target.checked)} />
+      return <input id={inputId} aria-labelledby={ariaLabelledBy} type="checkbox" className="ck" checked={current === true} onChange={e => update(e.target.checked)} />
     }
     if (field.field_type === 'authority') {
       return (
         <AuthorityInput
+          id={inputId}
+          ariaLabelledBy={ariaLabelledBy}
           source={String(field.settings.source ?? '')}
           value={(current as AuthorityEntry | null) ?? null}
           onChange={update}
@@ -200,6 +203,8 @@ function CustomFieldsEditor({ fields, value, onChange }: {
     }
     return (
       <input
+        id={inputId}
+        aria-labelledby={ariaLabelledBy}
         className="fld"
         type={field.field_type === 'number' ? 'number' : 'text'}
         value={current == null ? '' : String(current)}
@@ -215,14 +220,31 @@ function CustomFieldsEditor({ fields, value, onChange }: {
       {fields.map(field => {
         const current = value[field.name]
         const items = field.is_repeatable ? (Array.isArray(current) ? current : []) : []
+        const inputId = `${idPrefix}-${field.id}`
+        const labelId = `${idPrefix}-lbl-${field.id}`
+        const hasInput = field.is_repeatable
+          ? items.length > 0 && (field.field_type !== 'authority' || !items[0])
+          : (field.field_type !== 'authority' || !current)
         return (
           <div className="field" key={field.id}>
-            <div className="lbl">{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</div>
+            {hasInput ? (
+              <label id={labelId} className="lbl" htmlFor={inputId}>{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</label>
+            ) : (
+              <div id={labelId} className="lbl">{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</div>
+            )}
             {field.is_repeatable ? (
               <>
                 {items.map((item, index) => (
                   <div key={index} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ flex: 1 }}>{renderSingle(field, item, next => set(field.name, items.map((old, i) => i === index ? next : old)))}</div>
+                    <div style={{ flex: 1 }}>
+                      {renderSingle(
+                        field,
+                        item,
+                        next => set(field.name, items.map((old, i) => i === index ? next : old)),
+                        index === 0 ? inputId : `${inputId}-${index}`,
+                        index > 0 ? labelId : undefined,
+                      )}
+                    </div>
                     <button type="button" className="btn sm gh" onClick={() => set(field.name, items.filter((_, i) => i !== index))}><X size={12} /></button>
                   </div>
                 ))}
@@ -230,7 +252,7 @@ function CustomFieldsEditor({ fields, value, onChange }: {
                   <Plus size={12} /> Wert
                 </button>
               </>
-            ) : renderSingle(field, current, next => set(field.name, next))}
+            ) : renderSingle(field, current, next => set(field.name, next), inputId)}
           </div>
         )
       })}
@@ -592,6 +614,7 @@ interface ScreenVocabProps {
 
 export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = {}) {
   const { t } = useTranslation('screenVocab')
+  const formId = useId()
   // Route "vocab/<name or id>[/<term id>]": a term id opens that term for editing once.
   const [vocabRef, termRef] = (initialVocab ?? '').split('/')
   const pendingTermId = useRef<string | null>(termRef || null)
@@ -856,12 +879,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
           <div className="bd">
             <div className="fg-2">
               <div className="field">
-                <div className="lbl">Name</div>
-                <input className="fld" value={newVocabName} onChange={e => setNewVocabName(e.target.value)} placeholder="Vokabular-Name" autoFocus />
+                <label className="lbl" htmlFor={`${formId}-new-vocab-name`}>Name</label>
+                <input id={`${formId}-new-vocab-name`} className="fld" value={newVocabName} onChange={e => setNewVocabName(e.target.value)} placeholder="Vokabular-Name" autoFocus />
               </div>
               <div className="field">
-                <div className="lbl">Art</div>
-                <select className="fld" value={newVocabKind} onChange={e => setNewVocabKind(e.target.value as 'term' | 'relation')}>
+                <label className="lbl" htmlFor={`${formId}-new-vocab-kind`}>Art</label>
+                <select id={`${formId}-new-vocab-kind`} className="fld" value={newVocabKind} onChange={e => setNewVocabKind(e.target.value as 'term' | 'relation')}>
                   <option value="term">Termvokabular</option>
                   <option value="relation">Relationsvokabular</option>
                 </select>
@@ -874,13 +897,13 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
               </div>}
               <div className="field">
                 <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
-                  {t('canonicalUri')}
+                  <label htmlFor={`${formId}-new-vocab-uri`}>{t('canonicalUri')}</label>
                   <HelpPopover
                     title={t('canonicalUriHelpPopover.title')}
                     content={<div>{t('canonicalUriHelpPopover.description')}</div>}
                   />
                 </div>
-                <input className="fld mono" value={newVocabCanonicalUri} onChange={e => setNewVocabCanonicalUri(e.target.value)} placeholder={t('canonicalUriPlaceholder')} />
+                <input id={`${formId}-new-vocab-uri`} className="fld mono" value={newVocabCanonicalUri} onChange={e => setNewVocabCanonicalUri(e.target.value)} placeholder={t('canonicalUriPlaceholder')} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1007,8 +1030,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                   <div className="bd">
                     <div className="fg-2">
                       <div className="field">
-                        <div className="lbl">ID (intern) <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span></div>
-                        <input className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
+                        <label className="lbl" htmlFor={`${formId}-new-term-id`}>ID (intern) <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span></label>
+                        <input id={`${formId}-new-term-id`} className="fld mono" value={newTermTerm} onChange={e => setNewTermTerm(e.target.value)} placeholder="z.B. silbergelatine" autoFocus />
                       </div>
                       <LabelEditor
                         languages={languages}
@@ -1036,7 +1059,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                       )}
                       <div className="field">
                         <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
-                          {t('uri')}
+                          <label htmlFor={`${formId}-new-term-uri`}>{t('uri')}</label>
                           <HelpPopover
                             title={t('uriHelpPopover.title')}
                             content={(
@@ -1052,11 +1075,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             )}
                           />
                         </div>
-                        <input className="fld mono" value={newTermUri} onChange={e => setNewTermUri(e.target.value)} placeholder={t('uriPlaceholder')} />
+                        <input id={`${formId}-new-term-uri`} className="fld mono" value={newTermUri} onChange={e => setNewTermUri(e.target.value)} placeholder={t('uriPlaceholder')} />
                       </div>
                       <div className="field">
                         <div className="lbl" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                          <span>{t('exactMatchUris')}</span>
+                          <label htmlFor={`${formId}-new-term-exact-match`}>{t('exactMatchUris')}</label>
                           <span style={{ color: 'var(--fg-3)', fontSize: 11, fontWeight: 'normal' }}>({t('exactMatchUrisHelp')})</span>
                           <HelpPopover
                             title={t('exactMatchUrisHelpPopover.title')}
@@ -1073,7 +1096,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             )}
                           />
                         </div>
-                        <input className="fld mono" value={newTermExactMatchUris} onChange={e => setNewTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
+                        <input id={`${formId}-new-term-exact-match`} className="fld mono" value={newTermExactMatchUris} onChange={e => setNewTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
                       </div>
                     </div>
                     {vocab.kind === 'relation' && (
@@ -1085,12 +1108,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                           to={newTermAppliesTo}
                         />
                         <div className="fg-2" style={{ marginTop: 8 }}>
-                          <div className="field">
-                            <div className="lbl">{t('relationFields.sourceTypes')}</div>
+                          <div className="field" role="group" aria-labelledby={`${formId}-new-source-types`}>
+                            <div id={`${formId}-new-source-types`} className="lbl">{t('relationFields.sourceTypes')}</div>
                             <AppliesCheckboxes value={newTermAppliesFrom} onChange={setNewTermAppliesFrom} />
                           </div>
-                          <div className="field">
-                            <div className="lbl">{t('relationFields.targetTypes')}</div>
+                          <div className="field" role="group" aria-labelledby={`${formId}-new-target-types`}>
+                            <div id={`${formId}-new-target-types`} className="lbl">{t('relationFields.targetTypes')}</div>
                             <AppliesCheckboxes value={newTermAppliesTo} onChange={setNewTermAppliesTo} />
                           </div>
                         </div>
@@ -1130,8 +1153,8 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                             <td colSpan={tableColumnCount} style={{ background: 'var(--panel)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end', padding: '8px 0' }}>
                                 <div className="field">
-                                  <div className="lbl">ID <span style={{ color: '#dc2626', fontSize: 11 }}>{requiredBadge}</span></div>
-                                  <input className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} />
+                                  <label className="lbl" htmlFor={`${formId}-edit-term-id-${termItem.id}`}>ID <span style={{ color: '#dc2626', fontSize: 11 }}>{requiredBadge}</span></label>
+                                  <input id={`${formId}-edit-term-id-${termItem.id}`} className="fld mono" value={editTermTerm} onChange={e => setEditTermTerm(e.target.value)} />
                                 </div>
                                 <LabelEditor languages={languages} value={editTermLabel} onChange={(lang, val) => setEditTermLabel({ ...editTermLabel, [lang]: val })} />
                                 {vocab.kind === 'relation' && <LabelEditor languages={languages} value={editTermInverseLabel} onChange={(lang, val) => setEditTermInverseLabel({ ...editTermInverseLabel, [lang]: val })} labelPrefix={t('inverseLabelPrefix')} />}
@@ -1146,7 +1169,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                 </div>}
                                 <div className="field">
                                 <div className="lbl" style={{ display: 'flex', alignItems: 'center' }}>
-                                  {uriLabel}
+                                  <label htmlFor={`${formId}-edit-term-uri-${termItem.id}`}>{uriLabel}</label>
                                   <HelpPopover
                                     title={uriHelpTitle}
                                     content={(
@@ -1162,11 +1185,11 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                     )}
                                   />
                                 </div>
-                                <input className="fld mono" value={editTermUri} onChange={e => setEditTermUri(e.target.value)} placeholder={uriPlaceholder} />
+                                <input id={`${formId}-edit-term-uri-${termItem.id}`} className="fld mono" value={editTermUri} onChange={e => setEditTermUri(e.target.value)} placeholder={uriPlaceholder} />
                               </div>
                               <div className="field">
                                 <div className="lbl" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                                  <span>{exactMatchUrisLabel}</span>
+                                  <label htmlFor={`${formId}-edit-term-exact-match-${termItem.id}`}>{exactMatchUrisLabel}</label>
                                   <span style={{ color: 'var(--fg-3)', fontSize: 11, fontWeight: 'normal' }}>({exactMatchUrisHelp})</span>
                                   <HelpPopover
                                     title={exactMatchUrisHelpTitle}
@@ -1183,7 +1206,7 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                     )}
                                   />
                                 </div>
-                                <input className="fld mono" value={editTermExactMatchUris} onChange={e => setEditTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
+                                <input id={`${formId}-edit-term-exact-match-${termItem.id}`} className="fld mono" value={editTermExactMatchUris} onChange={e => setEditTermExactMatchUris(e.target.value)} placeholder="https://d-nb.info/gnd/..., http://id.loc.gov/..." />
                               </div>
                                 <div style={{ display: 'flex', gap: 8 }}>
                                   <button className="btn pri" onClick={() => saveEditTerm(termItem)} disabled={savingEditTerm}>Speichern</button>
@@ -1203,12 +1226,12 @@ export function ScreenVocab({ initialVocab, onVocabSelect }: ScreenVocabProps = 
                                     to={editTermAppliesTo}
                                   />
                                   <div className="fg-2" style={{ marginBottom: 8 }}>
-                                    <div className="field">
-                                      <div className="lbl">{t('relationFields.sourceTypes')}</div>
+                                    <div className="field" role="group" aria-labelledby={`${formId}-edit-source-types-${termItem.id}`}>
+                                      <div id={`${formId}-edit-source-types-${termItem.id}`} className="lbl">{t('relationFields.sourceTypes')}</div>
                                       <AppliesCheckboxes value={editTermAppliesFrom} onChange={setEditTermAppliesFrom} />
                                     </div>
-                                    <div className="field">
-                                      <div className="lbl">{t('relationFields.targetTypes')}</div>
+                                    <div className="field" role="group" aria-labelledby={`${formId}-edit-target-types-${termItem.id}`}>
+                                      <div id={`${formId}-edit-target-types-${termItem.id}`} className="lbl">{t('relationFields.targetTypes')}</div>
                                       <AppliesCheckboxes value={editTermAppliesTo} onChange={setEditTermAppliesTo} />
                                     </div>
                                   </div>

@@ -55,17 +55,7 @@ async def can_publish(
 
     # Metadata validation
     metadata = getattr(rec, "metadata_", None) or {}
-    subtype = None
-    if record_type == "object":
-        subtype = getattr(rec, "object_type", None)
-    elif record_type == "entity":
-        subtype = getattr(rec, "entity_type", None)
-    elif record_type == "place":
-        subtype = getattr(rec, "place_type", None)
-    elif record_type == "occurrence":
-        subtype = getattr(rec, "occurrence_type", None)
-    elif record_type == "collection":
-        subtype = getattr(rec, "collection_type", None)
+    subtype = getattr(rec, f"{record_type}_type", None)
 
     val_errors = await validate_metadata(
         db, record_type, metadata, subtype, existing=metadata, record_id=rec.id
@@ -102,6 +92,7 @@ async def publish_record(
         return {"ok": False, "errors": [f"PID-Vergabe fehlgeschlagen: {exc}"]}
 
     rec.status = "public"
+    rec.schema_incomplete = False
     await flush_record(db, rec)
 
     # Audit log

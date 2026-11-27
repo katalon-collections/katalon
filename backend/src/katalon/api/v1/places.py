@@ -46,7 +46,11 @@ from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     normalize_subtype_name,
@@ -75,6 +79,7 @@ async def list_places(
     page_size: int = Query(50, ge=1, le=200),
     place_type: str | None = None,
     status: str | None = None,
+    schema_incomplete: bool | None = None,
     q: str | None = None,
     parent_id: uuid.UUID | None = None,
     root: bool = False,
@@ -92,6 +97,8 @@ async def list_places(
         query = query.where(Place.status == status)
     visibility_user = await _visibility_user(db, current_user)
     query = apply_public_visibility(query, Place, visibility_user)
+    if schema_incomplete is not None and visibility_user is not None:
+        query = query.where(Place.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             Place.idno.icontains(q, autoescape=True)
@@ -175,6 +182,11 @@ async def create_place(
         place_type=place_type,
         parent_id=data.parent_id,
         status=data.status,
+        schema_incomplete=(
+            await is_record_schema_incomplete(db, "place", metadata, place_type)
+            if data.status == "draft"
+            else False
+        ),
         metadata_=metadata,
         ai_provenance=data.ai_provenance,
     )
@@ -355,6 +367,11 @@ async def update_place(
     place.place_type = place_type
     place.parent_id = data.parent_id
     place.status = data.status
+    place.schema_incomplete = (
+        await is_record_schema_incomplete(db, "place", metadata, place_type)
+        if data.status == "draft"
+        else False
+    )
     place.metadata_ = metadata
     place.ai_provenance = data.ai_provenance
     if data.lat is not None and data.lon is not None:
@@ -460,10 +477,11 @@ async def delete_place(
         )
 
     target_ids = [place_id]
+    reparented_ids: list[uuid.UUID] = []
     if cascade and child_count > 0:
         target_ids = await get_place_subtree_ids(db, place_id)
     elif reparent and child_count > 0:
-        await reparent_children(db, place_id, place.parent_id)
+        reparented_ids = await reparent_children(db, place_id, place.parent_id)
 
     related_count = sum([await count_relations(db, "place", tid) for tid in target_ids])
     if related_count > 0 and not force:
@@ -496,6 +514,15 @@ async def delete_place(
             await search_service.remove_record(rec.id, db, record_type="place")
         except Exception:
             logger.warning("ES index/remove failed", exc_info=True)
+    if reparented_ids:
+        reparented = (
+            (await db.execute(select(Place).where(Place.id.in_(reparented_ids)))).scalars().all()
+        )
+        for child in reparented:
+            try:
+                await search_service.index_record("place", child, db)
+            except Exception:
+                logger.warning("ES index/remove failed", exc_info=True)
 
 
 @router.post(
@@ -662,6 +689,9 @@ async def restore_snapshot(
         place.status = data["status"]
     if "metadata" in data:
         place.metadata_ = data["metadata"]
+    place.schema_incomplete = await is_record_schema_incomplete(
+        db, "place", place.metadata_, place.place_type
+    )
     flag_modified(place, "metadata_")
     await flush_record(db, place)
     await sync_schema_relations(db, "place", place.id, place.metadata_)

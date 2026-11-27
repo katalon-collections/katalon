@@ -278,5 +278,7 @@
   "deliveryRequireLicenseLabel": "Require a license per image",
   "deliveryRequireLicenseHelp": "Records with a public image without license (not even through the fallback) are not delivered and are reported as deleted via OAI-PMH.",
   "deliveryAllowedLicensesLabel": "Allowed license URIs",
-  "deliveryAllowedLicensesHelp": "One URI per line, e.g. the recipient's license list. Empty = no restriction. Applies to images and to the metadata rights; stored URIs are written in this list's spelling (http/https, trailing slash)."
+  "deliveryAllowedLicensesHelp": "One URI per line, e.g. the recipient's license list. Empty = no restriction. Applies to images and to the metadata rights; stored URIs are written in this list's spelling (http/https, trailing slash).",
+  "deliveryRecIdSeparatorLabel": "Separator for lidoRecID",
+  "deliveryRecIdSeparatorHelp": "Separates ISIL and inventory number in lidoRecID (default: \"--\", e.g. ISIL--ID). Caution: changing this after publication alters record IDs at the aggregator and may break existing permalinks."
 }

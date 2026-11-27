@@ -354,9 +354,12 @@ def test_dry_run_clusters_pending_vocab_field() -> None:
 
 def _fd(name: str, field_type: str, *, is_repeatable: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
+        id=object(),
         name=name,
         field_type=field_type,
+        is_required=False,
         is_repeatable=is_repeatable,
+        parent_id=None,
         label={"de": name},
     )
 
@@ -412,3 +415,99 @@ def test_dry_run_empty_stat_counts_rows_not_columns() -> None:
     result = dry_run(rows, mapping)
     message = next(w["message"] for w in result["warnings"] if "genre" in w["message"])
     assert "in 7 von 10 Zeilen (70%) leer" in message
+
+
+def test_apply_mapping_url_field_with_label_selector() -> None:
+    rows = [
+        {
+            "rights_uri": "https://example.org/licenses/restricted/",
+            "rights_text": "Nutzungsrechte eingeschränkt.",
+        },
+        {
+            "rights_uri": "https://example.org/licenses/open/",
+            "rights_text": "",
+        },
+    ]
+    field_defs = {"rechte_uri": _fd("rechte_uri", "url")}
+    mapping = {
+        "rights_uri": {"target": "rechte_uri", "label_selector": "rights_text"},
+    }
+    records, _ = apply_mapping(rows, mapping, field_defs)
+    assert records[0]["rechte_uri"] == {
+        "value": "https://example.org/licenses/restricted/",
+        "label": "Nutzungsrechte eingeschränkt.",
+    }
+    assert records[1]["rechte_uri"] == {
+        "value": "https://example.org/licenses/open/",
+        "label": "",
+    }
+    # Dry run produces the exact same preview shape as apply_mapping (worker).
+    preview = dry_run(rows, mapping, field_defs)["preview"]
+    assert preview == records
+
+
+def test_apply_mapping_repeatable_url_pairs_labels_by_position() -> None:
+    rows = [
+        {
+            "uris": ["https://example.org/1", "https://example.org/2", "https://example.org/3"],
+            "labels": ["Erste", "", "Dritte"],
+        },
+        {
+            "uris": ["https://example.org/a", "https://example.org/b"],
+            "labels": ["Nur eins"],
+        },
+    ]
+    field_defs = {"links": _fd("links", "url", is_repeatable=True)}
+    mapping = {"uris": {"target": "links", "label_selector": "labels"}}
+    records, _ = apply_mapping(rows, mapping, field_defs)
+    assert records[0]["links"] == [
+        {"value": "https://example.org/1", "label": "Erste"},
+        {"value": "https://example.org/2", "label": ""},
+        {"value": "https://example.org/3", "label": "Dritte"},
+    ]
+    assert records[1]["links"] == [
+        # Unequal counts: the position of the missing label is unknown.
+        {"value": "https://example.org/a", "label": ""},
+        {"value": "https://example.org/b", "label": ""},
+    ]
+
+
+def test_apply_mapping_group_url_subfield_with_label_selector() -> None:
+    group_id = object()
+    group = SimpleNamespace(id=group_id, name="rights", field_type="group", parent_id=None)
+    link = SimpleNamespace(id=object(), name="uri", field_type="url", parent_id=group_id)
+    records, _ = apply_mapping(
+        [
+            {
+                "u": ["https://example.org/r1", "https://example.org/r2"],
+                "l": ["Recht 1", "Recht 2"],
+            }
+        ],
+        {"u": {"target": "rights.uri", "label_selector": "l"}},
+        {"rights": group, "uri": link},
+    )
+    assert records == [
+        {
+            "rights": [
+                {"uri": {"value": "https://example.org/r1", "label": "Recht 1"}},
+                {"uri": {"value": "https://example.org/r2", "label": "Recht 2"}},
+            ]
+        }
+    ]
+
+
+def test_importer_mapping_entry_normalizes_optional_label_selector() -> None:
+    from katalon.api.v1.importer import MappingEntry, _normalize_mapping
+
+    # Saved templates without label_selector stay valid and clean.
+    legacy = _normalize_mapping({"col": {"target": "rechte_uri"}})
+    assert legacy == {"col": {"target": "rechte_uri", "transforms": []}}
+
+    # MappingEntry with label_selector preserves it in normalized dict.
+    entry = MappingEntry(target="rechte_uri", label_selector="rights_text")
+    assert _normalize_mapping({"col": entry}) == {
+        "col": {"target": "rechte_uri", "transforms": [], "label_selector": "rights_text"}
+    }
+    assert _normalize_mapping({"col": {"target": "rechte_uri", "label_selector": "rights_text"}}) == {
+        "col": {"target": "rechte_uri", "transforms": [], "label_selector": "rights_text"}
+    }

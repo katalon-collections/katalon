@@ -100,5 +100,9 @@
   "newImportConfirm": "Discard the current import? Mapping and fields to be created will be lost.",
   "newImportDiscard": "Discard",
   "mappingPathSeparator": "Path separator (optional)",
-  "mappingPathSeparatorHint": "Splits “Country>Region>Place” into a place hierarchy. Missing levels are created as places of their own. Leave empty: the value stays a single name."
+  "mappingPathSeparatorHint": "Splits “Country>Region>Place” into a place hierarchy. Missing levels are created as places of their own. Leave empty: the value stays a single name.",
+  "mappingUrlLabelSelector": "Label from column (optional)",
+  "mappingUrlLabelSelectorXml": "Label from selector (optional)",
+  "mappingUrlLabelNone": "– no label –",
+  "mappingUrlLabelHint": "Reads the display label for the URL from a second source. Repeated values are paired by position."
 }

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, fetchRecord, type EntitySummary, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { api, fetchRecord, isGoneError, type EntitySummary, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
 import { loadObjectTeasers } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
@@ -17,6 +17,7 @@ import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow, fieldsForSubtype, withoutTitleFields } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
+import { RecordGoneNotice } from '../components/RecordGoneNotice'
 import { entityTypeLabel, useI18n } from '../i18n'
 import { withoutFieldRelations } from '../utils/relations'
 
@@ -31,6 +32,7 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   const [relationMeta, setRelationMeta] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [gone, setGone] = useState(false)
   const [fieldDefs, fieldDefsLoading] = useFieldDefinitions('entity')
   const { t, locale } = useI18n()
   const resolveRelationType = useRelationTypeLabels(locale)
@@ -41,6 +43,8 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setError(null)
+    setGone(false)
     api.entities.get(id)
       .then(async e => {
         setEntity(e)
@@ -70,11 +74,15 @@ export function EntityDetailPage({ user }: { user: PortalUser | null }) {
         setRelationTitles(titleMap)
         setRelationMeta(metaMap)
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        if (isGoneError(e)) setGone(true)
+        else setError(e instanceof Error ? e.message : t('error.entityNotFound'))
+      })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, t])
 
   if (loading || fieldDefsLoading) return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  if (gone) return <RecordGoneNotice />
   if (error || !entity) return (
     <div className="container page">
       <div style={{ color: '#dc2626' }}>{error || t('error.entityNotFound')}</div>

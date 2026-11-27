@@ -257,14 +257,14 @@ async def ensure_pids_on_publish(
     without a PID. Returns the list of mint results (empty if nothing to do).
     """
     from katalon.services.audit_service import log_change
-    from katalon.services.schema_service import get_field_definitions
+    from katalon.services.schema_service import field_applies, get_field_definitions
 
     subtype = _subtype_of(record, record_type)
     fields = await get_field_definitions(db, record_type, subtype)
     minted: list[dict[str, Any]] = []
 
     for field in fields:
-        if field.field_type != "pid":
+        if field.field_type != "pid" or not field_applies(field, subtype):
             continue
         # Auto-mint only runs for fields with an explicitly configured provider —
         # no silent fallback to the (external) DNB default.

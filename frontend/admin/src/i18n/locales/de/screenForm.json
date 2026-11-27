@@ -1,7 +1,7 @@
 {
   "helpTextAriaLabel": "Hilfe zu diesem Feld",
   "dateInput": {
-    "placeholder": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
+    "placeholder": "JJJJ, JJJJ-MM-TT, 43 v. Chr., ca. 1900",
     "pickerTitleEnabled": "Datumsauswahl öffnen",
     "pickerTitleDisabled": "Kein einzelner Tag – manuell bearbeiten",
     "pickerAriaLabel": "Datum auswählen"
@@ -78,6 +78,9 @@
   },
   "collection": {
     "publicWithoutPublicMembers": "Diese Sammlung ist öffentlich, hat aber aktuell keine öffentlich sichtbaren Mitglieder oder Untersammlungen. Im Portal wirkt sie leer."
+  },
+  "schemaIncomplete": {
+    "notice": "Schema unvollständig: Mindestens ein Pflichtfeld fehlt. Bitte fehlende Pflichtfelder ergänzen und speichern."
   },
   "locks": {
     "youLocked": "Dieser Datensatz ist von Ihnen exklusiv gesperrt. Grund: {{reason}}",

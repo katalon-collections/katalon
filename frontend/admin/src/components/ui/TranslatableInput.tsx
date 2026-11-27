@@ -7,6 +7,8 @@ import { Lightning, X } from './Icons'
 import { RichTextEditor } from './RichTextEditor'
 
 interface TranslatableInputProps {
+  id?: string
+  ariaLabelledBy?: string
   languages: string[]
   value: Record<string, string>
   onChange: (lang: string, val: string) => void
@@ -36,6 +38,8 @@ const LANG_TAG: CSSProperties = {
 
 /** Primary language input always visible, "+ XY" buttons inline; added languages get a remove button. */
 export function TranslatableInput({
+  id,
+  ariaLabelledBy,
   languages,
   value,
   onChange,
@@ -72,12 +76,15 @@ export function TranslatableInput({
   const hidden = languages.slice(1).filter(lang => !shown(lang))
   const visibleExtra = languages.slice(1).filter(shown)
 
-  const field = (lang: string) => {
+  const field = (lang: string, inputId: string | undefined, langTagId: string | undefined) => {
     const ph = labels?.[lang] ?? placeholder
+    const labelledBy = lang === primary
+      ? ariaLabelledBy
+      : (ariaLabelledBy && langTagId ? `${ariaLabelledBy} ${langTagId}` : langTagId ?? ariaLabelledBy)
     return richtext ? (
-      <RichTextEditor value={safeValue[lang] ?? ''} onChange={v => onChange(lang, v)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} toolbarEnd={translationAction(lang)} />
+      <RichTextEditor ariaLabelledBy={labelledBy} value={safeValue[lang] ?? ''} onChange={v => onChange(lang, v)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} toolbarEnd={translationAction(lang)} />
     ) : (
-      <input className="fld" value={safeValue[lang] ?? ''} onChange={e => onChange(lang, e.target.value)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} />
+      <input id={inputId} aria-labelledby={lang !== primary ? labelledBy : undefined} className="fld" value={safeValue[lang] ?? ''} onChange={e => onChange(lang, e.target.value)} placeholder={ph} disabled={disabled} style={{ flex: 1, ...style }} />
     )
   }
 
@@ -142,19 +149,27 @@ export function TranslatableInput({
     ) : null
   }
 
-  const row = (lang: string, removable: boolean) => (
-    <div key={lang} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: lang === primary ? 0 : 6 }}>
-      <span style={LANG_TAG}>{lang}</span>
-      {provenance(lang)}
-      {field(lang)}
-      {!richtext && translationAction(lang)}
-      {removable && onRemove && (
-        <button type="button" className="btn sm ico gh" onClick={() => remove(lang)} disabled={disabled} aria-label={t('removeLang', { lang: lang.toUpperCase() })} title={t('removeLang', { lang: lang.toUpperCase() })}>
-          <X size={12} />
-        </button>
-      )}
-    </div>
-  )
+  const row = (lang: string, removable: boolean) => {
+    const inputId = id ? (lang === primary ? id : `${id}-${lang}`) : undefined
+    const langTagId = id ? `${id}-${lang}-tag` : undefined
+    return (
+      <div key={lang} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: lang === primary ? 0 : 6 }}>
+        {lang !== primary && !richtext && inputId ? (
+          <label id={langTagId} htmlFor={inputId} style={LANG_TAG}>{lang}</label>
+        ) : (
+          <span id={langTagId} style={LANG_TAG}>{lang}</span>
+        )}
+        {provenance(lang)}
+        {field(lang, inputId, langTagId)}
+        {!richtext && translationAction(lang)}
+        {removable && onRemove && (
+          <button type="button" className="btn sm ico gh" onClick={() => remove(lang)} disabled={disabled} aria-label={t('removeLang', { lang: lang.toUpperCase() })} title={t('removeLang', { lang: lang.toUpperCase() })}>
+            <X size={12} />
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>

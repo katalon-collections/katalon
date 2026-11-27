@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "identifier": "AGPL-3.0-or-later"
     },
-    "version": "1.51.0"
+    "version": "1.52.0"
   },
   "paths": {
     "/v1/admin/config": {
@@ -1934,6 +1934,22 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
             }
           },
           {
@@ -6190,6 +6206,22 @@
             }
           },
           {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -7147,6 +7179,22 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
             }
           },
           {
@@ -8168,6 +8216,22 @@
             }
           },
           {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -9168,6 +9232,22 @@
             }
           },
           {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -9750,6 +9830,22 @@
                 }
               ],
               "title": "Parent Id"
+            }
+          },
+          {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
             }
           },
           {
@@ -10745,6 +10841,22 @@
                 }
               ],
               "title": "Parent Id"
+            }
+          },
+          {
+            "name": "schema_incomplete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Incomplete"
             }
           },
           {
@@ -21276,7 +21388,7 @@
           "system"
         ],
         "summary": "Health",
-        "description": "Readiness check: verifies DB, Elasticsearch, Redis, Cantaloupe and\n(if enabled) Oxigraph are reachable, plus Celery Beat/Worker liveness via\na heartbeat key (see workers/health_tasks.py).\n\nReturns 503 if any entry in ``checks`` is not \"ok\" so load balancers can\nfail over. ``queue_backlog`` and ``backup_age_hours`` are informational\nonly and never affect the status code — see\ndocs/02_produktion.md#monitoring for suggested alerting thresholds.",
+        "description": "Readiness check: verifies DB, Elasticsearch, Redis, Cantaloupe and\n(if enabled) Oxigraph are reachable, plus Celery Beat/Worker liveness via\na heartbeat key (see workers/health_tasks.py).\n\nReturns 503 if any entry in ``checks`` is not \"ok\" so load balancers can\nfail over. ``queue_backlog`` and ``backup_age_hours`` are informational\nonly and never affect the status code — see\ndocs/02_produktion.md#monitoring for suggested alerting thresholds.\n\n**Auth:** Authenticated callers receive detailed per-service status;\nunauthenticated callers see only ``status`` (without service topology).",
         "operationId": "system_health_get_health",
         "responses": {
           "200": {
@@ -23402,6 +23514,11 @@
             "type": "integer",
             "title": "Version"
           },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
+          },
           "status": {
             "type": "string",
             "title": "Status",
@@ -23853,6 +23970,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
           },
           "status": {
             "type": "string",
@@ -26467,6 +26589,17 @@
               }
             ],
             "title": "Path Separator"
+          },
+          "label_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Selector"
           }
         },
         "type": "object",
@@ -27028,6 +27161,11 @@
             "type": "integer",
             "title": "Version"
           },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
+          },
           "status": {
             "type": "string",
             "title": "Status",
@@ -27171,6 +27309,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
           },
           "status": {
             "type": "string",
@@ -27713,6 +27856,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
           },
           "status": {
             "type": "string",
@@ -30094,6 +30242,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
           }
         },
         "type": "object",
@@ -31762,6 +31915,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "schema_incomplete": {
+            "type": "boolean",
+            "title": "Schema Incomplete",
+            "default": false
           },
           "idno": {
             "anyOf": [

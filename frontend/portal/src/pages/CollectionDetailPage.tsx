@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import {
   api,
+  isGoneError,
   type CollectionDetail,
   type ObjectSummary,
   type PortalUser,
@@ -24,6 +25,7 @@ import { SearchResultNavigation } from '../components/SearchResultNavigation'
 import { RelationsList } from '../components/RelationsList'
 import { useI18n } from '../i18n'
 import { LazyImage } from '../components/LazyImage'
+import { RecordGoneNotice } from '../components/RecordGoneNotice'
 
 export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
   const { id } = useParams<{ id: string }>()
@@ -37,6 +39,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
   const [col, setCol] = useState<CollectionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [gone, setGone] = useState(false)
 
   const [objects, setObjects] = useState<ObjectSummary[]>([])
   const [objectsLoading, setObjectsLoading] = useState(false)
@@ -51,6 +54,7 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
     if (!id) return
     setLoading(true)
     setError(null)
+    setGone(false)
 
     api.collections
       .get(id)
@@ -89,13 +93,18 @@ export function CollectionDetailPage({ user }: { user: PortalUser | null }) {
         }
       })
       .catch(err => {
-        setError(err instanceof Error ? err.message : t('error.collectionNotFound'))
+        if (isGoneError(err)) setGone(true)
+        else setError(err instanceof Error ? err.message : t('error.collectionNotFound'))
         setLoading(false)
       })
   }, [id, t])
 
   if (loading) {
     return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  }
+
+  if (gone) {
+    return <RecordGoneNotice />
   }
 
   if (error || !col) {

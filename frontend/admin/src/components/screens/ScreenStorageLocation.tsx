@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useId } from 'react'
+import { fieldsForSubtype } from '../../lib/subtypeFields'
 import { useTranslation } from 'react-i18next'
 import { ConflictError, getTokenUser, schema, storageLocations, subtypes, users, VersionConflictError } from '../../api/client'
 import { getLabel, type FieldDefinition, type KatalonStorageLocation, type RecordPermission, type RecordSubtype, type StorageLocationObject } from '../../types'
@@ -78,6 +79,7 @@ function CustomFieldsEditor({ fields, value, onChange }: {
   value: Record<string, unknown>
   onChange: (value: Record<string, unknown>) => void
 }) {
+  const idPrefix = useId()
   function set(name: string, fieldValue: unknown) {
     const next = { ...value }
     if (fieldValue === '' || fieldValue === null || (Array.isArray(fieldValue) && fieldValue.length === 0)) {
@@ -92,13 +94,15 @@ function CustomFieldsEditor({ fields, value, onChange }: {
     return field.label.de || field.label.en || field.name
   }
 
-  function renderSingle(field: FieldDefinition, current: unknown, update: (next: unknown) => void) {
+  function renderSingle(field: FieldDefinition, current: unknown, update: (next: unknown) => void, inputId: string, ariaLabelledBy?: string) {
     if (field.field_type === 'boolean') {
-      return <input type="checkbox" className="ck" checked={current === true} onChange={e => update(e.target.checked)} />
+      return <input id={inputId} aria-labelledby={ariaLabelledBy} type="checkbox" className="ck" checked={current === true} onChange={e => update(e.target.checked)} />
     }
     if (field.field_type === 'authority') {
       return (
         <AuthorityInput
+          id={inputId}
+          ariaLabelledBy={ariaLabelledBy}
           source={String(field.settings.source ?? '')}
           value={(current as AuthorityEntry | null) ?? null}
           onChange={update}
@@ -107,6 +111,8 @@ function CustomFieldsEditor({ fields, value, onChange }: {
     }
     return (
       <input
+        id={inputId}
+        aria-labelledby={ariaLabelledBy}
         className="fld"
         type={field.field_type === 'number' ? 'number' : 'text'}
         value={current == null ? '' : String(current)}
@@ -122,14 +128,31 @@ function CustomFieldsEditor({ fields, value, onChange }: {
       {fields.map(field => {
         const current = value[field.name]
         const items = field.is_repeatable ? (Array.isArray(current) ? current : []) : []
+        const inputId = `${idPrefix}-${field.id}`
+        const labelId = `${idPrefix}-lbl-${field.id}`
+        const hasInput = field.is_repeatable
+          ? items.length > 0 && (field.field_type !== 'authority' || !items[0])
+          : (field.field_type !== 'authority' || !current)
         return (
           <div className="field" key={field.id}>
-            <div className="lbl">{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</div>
+            {hasInput ? (
+              <label id={labelId} className="lbl" htmlFor={inputId}>{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</label>
+            ) : (
+              <div id={labelId} className="lbl">{fieldLabel(field)}{field.is_required && <span className="req"> *</span>}</div>
+            )}
             {field.is_repeatable ? (
               <>
                 {items.map((item, index) => (
                   <div key={index} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ flex: 1 }}>{renderSingle(field, item, next => set(field.name, items.map((old, i) => i === index ? next : old)))}</div>
+                    <div style={{ flex: 1 }}>
+                      {renderSingle(
+                        field,
+                        item,
+                        next => set(field.name, items.map((old, i) => i === index ? next : old)),
+                        index === 0 ? inputId : `${inputId}-${index}`,
+                        index > 0 ? labelId : undefined,
+                      )}
+                    </div>
                     <button type="button" className="btn sm gh" onClick={() => set(field.name, items.filter((_, i) => i !== index))}><X size={12} /></button>
                   </div>
                 ))}
@@ -137,7 +160,7 @@ function CustomFieldsEditor({ fields, value, onChange }: {
                   <Plus size={12} /> Wert
                 </button>
               </>
-            ) : renderSingle(field, current, next => set(field.name, next))}
+            ) : renderSingle(field, current, next => set(field.name, next), inputId)}
           </div>
         )
       })}
@@ -163,6 +186,7 @@ interface Props {
 
 export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onOpenObject }: Props = {}) {
   const { t } = useTranslation('screenStorageLocation')
+  const formId = useId()
 
   const [locations, setLocations] = useState<KatalonStorageLocation[]>([])
   const [loading, setLoading] = useState(true)
@@ -478,7 +502,8 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
 
   const idnoField = fields.find(f => f.name === 'idno')
   const idnoLabel = getLabel(idnoField, t('fieldIdno'))
-  const customFields = fields.filter(f => f.name !== 'idno')
+  const customFields = fieldsForSubtype(fields, form?.storage_location_type ?? '', form?.metadata_)
+    .filter(f => f.name !== 'idno')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -548,18 +573,18 @@ export function ScreenStorageLocation({ initialLocationId, onLocationSelect, onO
 
               <div className="fg-2">
                 <div className="field">
-                  <div className="lbl">{idnoLabel} <span className="req">*</span></div>
-                  <input className="fld mono" value={form.idno} onChange={e => set('idno', e.target.value)} autoFocus />
+                  <label className="lbl" htmlFor={`${formId}-idno`}>{idnoLabel} <span className="req">*</span></label>
+                  <input id={`${formId}-idno`} className="fld mono" value={form.idno} onChange={e => set('idno', e.target.value)} autoFocus />
                 </div>
                 <div className="field">
                   <div className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {t('fieldType')}
+                    <label htmlFor={`${formId}-type`}>{t('fieldType')}</label>
                     <HelpPopover
                       title={t('fieldTypeHelpPopover.title')}
                       content={<div>{t('fieldTypeHelpPopover.description')}</div>}
                     />
                   </div>
-                  <select className="fld" value={form.storage_location_type} onChange={e => set('storage_location_type', e.target.value)}>
+                  <select id={`${formId}-type`} className="fld" value={form.storage_location_type} onChange={e => set('storage_location_type', e.target.value)}>
                     <option value="">{t('fieldTypeNone')}</option>
                     {availableSubtypes.map(st => (
                       <option key={st.id} value={st.name}>{st.label.de || st.label.en || st.name}</option>

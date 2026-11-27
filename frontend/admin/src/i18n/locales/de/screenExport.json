@@ -277,5 +277,7 @@
   "deliveryRequireLicenseLabel": "Lizenz je Digitalisat verlangen",
   "deliveryRequireLicenseHelp": "Datensätze mit einem öffentlichen Bild ohne Lizenz (auch nicht über den Fallback) werden nicht ausgeliefert und per OAI-PMH als gelöscht gemeldet.",
   "deliveryAllowedLicensesLabel": "Erlaubte Lizenz-URIs",
-  "deliveryAllowedLicensesHelp": "Eine URI pro Zeile, z. B. die Lizenzliste des Empfängers. Leer = keine Einschränkung. Gilt für Bilder und die Rechte der Metadaten; gespeicherte URIs werden in der Schreibweise dieser Liste ausgegeben (http/https, Schrägstrich)."
+  "deliveryAllowedLicensesHelp": "Eine URI pro Zeile, z. B. die Lizenzliste des Empfängers. Leer = keine Einschränkung. Gilt für Bilder und die Rechte der Metadaten; gespeicherte URIs werden in der Schreibweise dieser Liste ausgegeben (http/https, Schrägstrich).",
+  "deliveryRecIdSeparatorLabel": "Trennzeichen für lidoRecID",
+  "deliveryRecIdSeparatorHelp": "Trennt ISIL und Inventarnummer in lidoRecID (Standard: „--“, z. B. ISIL--ID). Achtung: Ein Wechsel nach einer Veröffentlichung ändert die Datensatz-IDs beim Aggregator und kann bestehende Permalinks ungültig machen."
 }

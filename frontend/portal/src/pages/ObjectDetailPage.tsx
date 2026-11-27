@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { api, BASE, PORTAL_API, fetchRecord, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
+import { api, BASE, PORTAL_API, fetchRecord, isGoneError, type MediaFile, type ObjectSummary, type PortalUser, type Relation } from '../api/client'
 import { thumbnailUrl } from '../utils/thumbnails'
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
@@ -18,6 +18,7 @@ import { recordTitle, renderFieldValue } from '../utils/renderFieldValue'
 import { DetailPageLayout, MetaRow, fieldsForSubtype, withoutTitleFields } from '../components/DetailPageLayout'
 import { EditRecordLink } from '../components/EditRecordLink'
 import { SearchResultNavigation } from '../components/SearchResultNavigation'
+import { RecordGoneNotice } from '../components/RecordGoneNotice'
 import { useI18n } from '../i18n'
 import { withoutFieldRelations } from '../utils/relations'
 
@@ -52,6 +53,7 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [gone, setGone] = useState(false)
 
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationTitles, setRelationTitles] = useState<Record<string, string>>({})
@@ -68,6 +70,8 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setError(null)
+    setGone(false)
     Promise.all([
       api.objects.get(id),
       api.objects.media(id).catch(() => [] as MediaFile[]),
@@ -93,12 +97,19 @@ export function ObjectDetailPage({ user }: { user: PortalUser | null }) {
             setRelationMeta(metaMap)
           })
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        if (isGoneError(e)) setGone(true)
+        else setError(e instanceof Error ? e.message : t('error.objectNotFound'))
+      })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, t])
 
   if (loading || fieldDefsLoading) {
     return <div className="container page" style={{ color: 'var(--fg-3)' }}>{t('common.loading')}</div>
+  }
+
+  if (gone) {
+    return <RecordGoneNotice />
   }
 
   if (error || !obj) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useMemo } from 'react'
+import { useId, useState, useMemo } from 'react'
 import type { TransformConfig, MappingEntry } from '../../api/client'
 
 interface TransformModalProps {
@@ -134,6 +134,7 @@ function applyTransformsLocal(value: unknown, transforms: TransformConfig[], row
 }
 
 export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleRows, mappingEntry, onSave, onClose }: TransformModalProps) {
+  const modalId = useId()
   const [transforms, setTransforms] = useState<TransformConfig[]>(mappingEntry.transforms ?? [])
   const [addingType, setAddingType] = useState<TransformConfig['type'] | ''>('')
 
@@ -234,8 +235,8 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
               {t.type === 'split' && (
                 <div style={{ display: 'grid', gap: 8 }}>
                   <div className="field">
-                    <label className="lbl">Trennzeichen</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-delimiter`}>Trennzeichen</label>
+                    <input id={`${modalId}-t-${i}-delimiter`} className="fld" style={{ height: 28, fontSize: 12 }}
                       value={t.delimiter ?? ','} onChange={e => updateTransform(i, { delimiter: e.target.value })}
                       placeholder="," />
                   </div>
@@ -250,13 +251,13 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
               {t.type === 'replace' && (
                 <div style={{ display: 'grid', gap: 8 }}>
                   <div className="field">
-                    <label className="lbl">Suchen</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-search`}>Suchen</label>
+                    <input id={`${modalId}-t-${i}-search`} className="fld" style={{ height: 28, fontSize: 12 }}
                       value={t.search ?? ''} onChange={e => updateTransform(i, { search: e.target.value })} />
                   </div>
                   <div className="field">
-                    <label className="lbl">Ersetzen durch</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-replace`}>Ersetzen durch</label>
+                    <input id={`${modalId}-t-${i}-replace`} className="fld" style={{ height: 28, fontSize: 12 }}
                       value={t.replace ?? ''} onChange={e => updateTransform(i, { replace: e.target.value })} />
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
@@ -270,14 +271,14 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
               {t.type === 'regex_extract' && (
                 <div style={{ display: 'grid', gap: 8 }}>
                   <div className="field">
-                    <label className="lbl">Regex-Pattern</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-pattern`}>Regex-Pattern</label>
+                    <input id={`${modalId}-t-${i}-pattern`} className="fld" style={{ height: 28, fontSize: 12 }}
                       value={t.pattern ?? ''} onChange={e => updateTransform(i, { pattern: e.target.value })}
                       placeholder="z.B. \d{4}" />
                   </div>
                   <div className="field">
-                    <label className="lbl">Capture Group (0 = ganzer Match)</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12, width: 80 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-group`}>Capture Group (0 = ganzer Match)</label>
+                    <input id={`${modalId}-t-${i}-group`} className="fld" style={{ height: 28, fontSize: 12, width: 80 }}
                       type="number" min={0}
                       value={t.group ?? 0} onChange={e => updateTransform(i, { group: parseInt(e.target.value) || 0 })} />
                   </div>
@@ -307,8 +308,8 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
               {t.type === 'expression' && (
                 <div style={{ display: 'grid', gap: 8 }}>
                   <div className="field">
-                    <label className="lbl">Expression</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-expr`}>Expression</label>
+                    <input id={`${modalId}-t-${i}-expr`} className="fld" style={{ height: 28, fontSize: 12 }}
                       value={t.expression ?? '${value}'} onChange={e => updateTransform(i, { expression: e.target.value })}
                       placeholder="${value:upper}" />
                   </div>
@@ -332,8 +333,8 @@ export function TransformModal({ csvColumn, sourceColumns, sampleValues, sampleR
                     </label>
                   ))}
                   <div className="field">
-                    <label className="lbl">Format</label>
-                    <input className="fld" style={{ height: 28, fontSize: 12 }} value={t.template ?? '{0}'}
+                    <label className="lbl" htmlFor={`${modalId}-t-${i}-format`}>Format</label>
+                    <input id={`${modalId}-t-${i}-format`} className="fld" style={{ height: 28, fontSize: 12 }} value={t.template ?? '{0}'}
                       onChange={e => updateTransform(i, { template: e.target.value })} placeholder="{0}: {1}{2}" />
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Platzhalter: {'{0}'}, {'{1}'}, {'{2}'} entsprechen der Reihenfolge.</div>

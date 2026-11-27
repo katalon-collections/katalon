@@ -46,6 +46,9 @@ class Object(Base):
     object_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     collection_status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -74,6 +77,9 @@ class Entity(Base):
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -102,6 +108,9 @@ class Place(Base):
         index=True,
     )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -134,6 +143,9 @@ class Occurrence(Base):
     idno: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     occurrence_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -159,6 +171,9 @@ class Procedure(Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     reference_number: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -185,6 +200,9 @@ class Collection(Base):
         index=True,
     )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -216,6 +234,9 @@ class StorageLocation(Base):
         ForeignKey("storage_locations.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    schema_incomplete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
     )
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict[str, Any])
     ai_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict[str, Any], server_default="{}")

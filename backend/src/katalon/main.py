@@ -79,7 +79,7 @@ from katalon.api.v1 import (
 from katalon.api.v1.api_keys import router as api_keys_router
 from katalon.api.v1.auth import hash_password
 from katalon.config import settings
-from katalon.core.dependencies import get_current_user
+from katalon.core.dependencies import DBDep, get_current_user, try_get_current_user
 from katalon.core.limiter import limiter
 from katalon.core.models import (
     AdminConfig,
@@ -906,8 +906,21 @@ def _backup_age_hours() -> float | None:
     return (datetime.now(UTC) - last_success).total_seconds() / 3600
 
 
+async def _health_caller(request: Request, db: DBDep) -> User | None:
+    """Resolve the caller without letting a database outage turn the 503 into a 500."""
+    try:
+        return await try_get_current_user(request, db)
+    except Exception:
+        logger.warning("health: could not authenticate caller", exc_info=True)
+        await db.rollback()
+        return None
+
+
 @app.get("/health", tags=["system"])
-async def health(response: Response) -> dict[str, object]:
+async def health(
+    response: Response,
+    user: User | None = Depends(_health_caller),
+) -> dict[str, object]:
     """Readiness check: verifies DB, Elasticsearch, Redis, Cantaloupe and
     (if enabled) Oxigraph are reachable, plus Celery Beat/Worker liveness via
     a heartbeat key (see workers/health_tasks.py).
@@ -916,6 +929,9 @@ async def health(response: Response) -> dict[str, object]:
     fail over. ``queue_backlog`` and ``backup_age_hours`` are informational
     only and never affect the status code — see
     docs/02_produktion.md#monitoring for suggested alerting thresholds.
+
+    **Auth:** Authenticated callers receive detailed per-service status;
+    unauthenticated callers see only ``status`` (without service topology).
     """
     from sqlalchemy import text
 
@@ -954,9 +970,12 @@ async def health(response: Response) -> dict[str, object]:
     healthy = all(v == "ok" for v in checks.values())
     if not healthy:
         response.status_code = 503
-    return {
-        "status": "ok" if healthy else "degraded",
-        "checks": checks,
-        "queue_backlog": queue_backlog,
-        "backup_age_hours": _backup_age_hours(),
-    }
+
+    if user is not None:
+        return {
+            "status": "ok" if healthy else "degraded",
+            "checks": checks,
+            "queue_backlog": queue_backlog,
+            "backup_age_hours": _backup_age_hours(),
+        }
+    return {"status": "ok" if healthy else "degraded"}

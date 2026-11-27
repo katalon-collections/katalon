@@ -30,6 +30,7 @@ def make_relation_field(
     settings: dict | None = None,
 ) -> MagicMock:
     f = MagicMock()
+    f.target_subtype = None
     f.name = name
     f.field_type = "relation"
     f.is_required = is_required

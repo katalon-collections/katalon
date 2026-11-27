@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useId, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiKeys, getTokenUser, users as usersApi } from '../../api/client'
 import type { ApiKey, ApiKeyCreated, UserRead } from '../../types'
@@ -152,6 +152,7 @@ function ApiKeysPanel({ userId }: { userId: string }) {
 
 export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => void }) {
   const { t } = useTranslation('screenUsers')
+  const formId = useId()
   const currentUser = getTokenUser()
   const ROLES: Record<string, string> = {
     admin: t('admin'), editor: t('editor'), cataloger: t('cataloger'), viewer: t('viewer'),
@@ -340,16 +341,16 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
           <div className="hd">{t('newUserTitle')}</div>
           <div className="bd">
             <div className="field">
-              <div className="lbl">{t('email')}</div>
-              <input className="fld" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+              <label className="lbl" htmlFor={`${formId}-new-email`}>{t('email')}</label>
+              <input id={`${formId}-new-email`} className="fld" type="email" value={email} onChange={e => setEmail(e.target.value)} />
             </div>
             <div className="field">
-              <div className="lbl">{t('password')}</div>
-              <input className="fld" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+              <label className="lbl" htmlFor={`${formId}-new-password`}>{t('password')}</label>
+              <input id={`${formId}-new-password`} className="fld" type="password" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             <div className="field">
-              <div className="lbl">{t('role')}</div>
-              <select className="fld" value={role} onChange={e => setRole(e.target.value)}>
+              <label className="lbl" htmlFor={`${formId}-new-role`}>{t('role')}</label>
+              <select id={`${formId}-new-role`} className="fld" value={role} onChange={e => setRole(e.target.value)}>
                 {Object.entries(ROLES).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
@@ -484,12 +485,12 @@ export function ScreenUsers({ onNavigate }: { onNavigate?: (route: string) => vo
                          <div style={{ background: 'var(--bg-s, #f9fafb)', border: '1px solid var(--border-s)', borderRadius: 6, padding: '12px 16px', marginTop: 4 }}>
 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('credentialsTitle')}</div>
                             <div className="field">
-                              <div className="lbl">{t('email')}</div>
-                              <input className="fld" type="email" value={draftEmail[u.id] ?? ''} onChange={e => setDraftEmail(prev => ({ ...prev, [u.id]: e.target.value }))} />
+                              <label className="lbl" htmlFor={`${formId}-cred-email-${u.id}`}>{t('email')}</label>
+                              <input id={`${formId}-cred-email-${u.id}`} className="fld" type="email" value={draftEmail[u.id] ?? ''} onChange={e => setDraftEmail(prev => ({ ...prev, [u.id]: e.target.value }))} />
                             </div>
                             <div className="field">
-                              <div className="lbl">{t('newPassword')}</div>
-                              <input className="fld" type="password" value={draftPassword[u.id] ?? ''} onChange={e => setDraftPassword(prev => ({ ...prev, [u.id]: e.target.value }))} />
+                              <label className="lbl" htmlFor={`${formId}-cred-password-${u.id}`}>{t('newPassword')}</label>
+                              <input id={`${formId}-cred-password-${u.id}`} className="fld" type="password" value={draftPassword[u.id] ?? ''} onChange={e => setDraftPassword(prev => ({ ...prev, [u.id]: e.target.value }))} />
                             </div>
                             {saveError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{saveError}</div>}
                             <div style={{ display: 'flex', gap: 8 }}>

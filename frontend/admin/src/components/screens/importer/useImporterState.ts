@@ -107,7 +107,12 @@ function migrateOldMapping(mapping: Record<string, unknown>): Record<string, Map
       if (e.delimiter && !transforms?.some(t => t.type === 'split')) {
         transforms?.push({ type: 'split', delimiter: e.delimiter as string, filter_empty: true })
       }
-      result[col] = { target: e.target as string, transforms: transforms?.length ? transforms : undefined }
+      result[col] = {
+        target: e.target as string,
+        transforms: transforms?.length ? transforms : undefined,
+        ...(typeof e.path_separator === 'string' && e.path_separator ? { path_separator: e.path_separator } : {}),
+        ...(typeof e.label_selector === 'string' && e.label_selector ? { label_selector: e.label_selector } : {}),
+      }
     }
   }
   return result
@@ -215,6 +220,8 @@ export function importerReducer(state: ImporterState, action: ImporterAction): I
         uploaded: action.payload,
         sourceType: action.payload.source_type ?? 'csv',
         mapping: {},
+        mappingId: null,
+        savedMappingName: null,
         mediaSelector: state.mediaSelector && action.payload.headers.includes(state.mediaSelector)
           ? state.mediaSelector
           : null,
@@ -245,6 +252,8 @@ export function importerReducer(state: ImporterState, action: ImporterAction): I
         xmlSelectors: action.payload.selectors,
         uploaded: action.payload.uploaded,
         mapping: {},
+        mappingId: null,
+        savedMappingName: null,
         mediaSelector: state.mediaSelector && action.payload.uploaded.headers.includes(state.mediaSelector)
           ? state.mediaSelector
           : null,
@@ -426,11 +435,25 @@ export function useImporterState(): ImporterStateAndHandlers {
     && uploaded.headers.includes(state.mediaSelector)
     && !state.mapping[state.mediaSelector]?.target
   )
+  const labelSelectorsCountedSeparately = uploaded
+    ? new Set(
+        Object.values(state.mapping)
+          .map(m => m.label_selector)
+          .filter(
+            (sel): sel is string =>
+              !!sel && uploaded.headers.includes(sel) && !state.mapping[sel]?.target && sel !== state.mediaSelector,
+          ),
+      ).size
+    : 0
   const ignoredCount = uploaded
-    ? uploaded.headers.length
-      - mappedCount
-      - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
-      - (mediaSelectorCountedSeparately ? 1 : 0)
+    ? Math.max(
+        0,
+        uploaded.headers.length
+          - mappedCount
+          - (state.idnoStrategy === 'column' && state.idnoColumn ? 1 : 0)
+          - (mediaSelectorCountedSeparately ? 1 : 0)
+          - labelSelectorsCountedSeparately,
+      )
     : 0
   const mappedTargets = new Set(Object.values(state.mapping).map(m => m.target).filter(Boolean))
   // The idno card maps the ID column to the pseudo target "__idno__".
@@ -507,7 +530,7 @@ export function useImporterState(): ImporterStateAndHandlers {
     if (!state.uploaded) return
     dispatch({ type: 'DRY_RUN_STARTED' })
     try {
-      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.mappingId, state.vocabModes, state.relationOptions)
+      const result = await importer.dryRun(state.recordType, state.uploaded.upload_id, state.mapping, state.subtype, pendingFieldsPayload(), state.mediaSelector, state.vocabModes, state.relationOptions)
       dispatch({ type: 'DRY_RUN_OK', payload: result })
     } catch (e) {
       dispatch({ type: 'OPTIONS_CHANGED', payload: {} })
@@ -550,7 +573,6 @@ export function useImporterState(): ImporterStateAndHandlers {
         subtype: state.subtype,
         fields_to_create: pendingFieldsPayload(),
         media_selector: state.mediaSelector,
-        mapping_id: state.mappingId,
         vocab_modes: state.vocabModes,
         relation_options: state.relationOptions,
       })

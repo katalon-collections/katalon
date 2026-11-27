@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { staticPages, PORTAL_URL, PORTAL_ENABLED } from '../../api/client'
 import type { PageAsset, StaticPage } from '../../api/client'
@@ -46,6 +46,7 @@ type Props = { initialSlug?: string | null; onSlugChange?: (slug: string | null)
 
 export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
   const { t } = useTranslation('screenPages')
+  const formId = useId()
   const [pages, setPages] = useState<StaticPage[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
@@ -319,8 +320,8 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
 
                 <div className="fg-2">
                   <div className="field">
-                    <div className="lbl">{t('slugLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('slugHint')}</span></div>
-                    <input className="fld mono" value={form.slug} onChange={e => set('slug', e.target.value)} disabled={!isNew} />
+                    <label className="lbl" htmlFor={`${formId}-slug`}>{t('slugLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('slugHint')}</span></label>
+                    <input id={`${formId}-slug`} className="fld mono" value={form.slug} onChange={e => set('slug', e.target.value)} disabled={!isNew} />
                   </div>
                   <div className="field" style={{ display: 'flex', gap: 16, flexDirection: 'row', paddingTop: 22 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -328,34 +329,35 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
                       {t('published')}
                     </label>
                     <div className="field" style={{ margin: 0 }}>
-                      <div className="lbl">{t('placementLabel')}</div>
-                      <select className="fld" value={form.placement} onChange={e => set('placement', e.target.value as FormState['placement'])}>
+                      <label className="lbl" htmlFor={`${formId}-placement`}>{t('placementLabel')}</label>
+                      <select id={`${formId}-placement`} className="fld" value={form.placement} onChange={e => set('placement', e.target.value as FormState['placement'])}>
                         <option value="footer">{t('placementFooter')}</option>
                         <option value="header">{t('placementHeader')}</option>
                         <option value="none">{t('placementNone')}</option>
                       </select>
                     </div>
                     <div className="field" style={{ margin: 0 }}>
-                      <div className="lbl">{t('sortOrder')}</div>
-                      <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} style={{ width: 70 }} />
+                      <label className="lbl" htmlFor={`${formId}-sort-order`}>{t('sortOrder')}</label>
+                      <input id={`${formId}-sort-order`} className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} style={{ width: 70 }} />
                     </div>
                   </div>
                 </div>
 
                 <div className="fg-2">
                   <div className="field">
-                    <div className="lbl">{t('titleDE')}</div>
-                    <input className="fld" value={form.title_de} onChange={e => set('title_de', e.target.value)} />
+                    <label className="lbl" htmlFor={`${formId}-title-de`}>{t('titleDE')}</label>
+                    <input id={`${formId}-title-de`} className="fld" value={form.title_de} onChange={e => set('title_de', e.target.value)} />
                   </div>
                   <div className="field">
-                    <div className="lbl">{t('titleEN')}</div>
-                    <input className="fld" value={form.title_en} onChange={e => set('title_en', e.target.value)} />
+                    <label className="lbl" htmlFor={`${formId}-title-en`}>{t('titleEN')}</label>
+                    <input id={`${formId}-title-en`} className="fld" value={form.title_en} onChange={e => set('title_en', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="field">
-                  <div className="lbl">{t('contentDE')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentDEHint')}</span></div>
+                  <label className="lbl" htmlFor={`${formId}-content-de`}>{t('contentDE')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentDEHint')}</span></label>
                   <textarea
+                    id={`${formId}-content-de`}
                     ref={contentDeRef}
                     className="fld mono"
                     rows={10}
@@ -366,8 +368,9 @@ export function ScreenPages({ initialSlug, onSlugChange }: Props = {}) {
                   />
                 </div>
                 <div className="field">
-                  <div className="lbl">{t('contentEN')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentENHint')}</span></div>
+                  <label className="lbl" htmlFor={`${formId}-content-en`}>{t('contentEN')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{t('contentENHint')}</span></label>
                   <textarea
+                    id={`${formId}-content-en`}
                     ref={contentEnRef}
                     className="fld mono"
                     rows={6}

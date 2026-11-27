@@ -34,6 +34,7 @@ from katalon.core.models import (
 from katalon.core.thumbnails import THUMBNAIL_HEIGHT_HIDPI, thumbnail_path
 from katalon.core.visibility import PUBLIC_STATUSES
 from katalon.integrations.jsonld_format import PLURAL_TYPE_MAP, map_primary_type
+from katalon.services import oai_state_service
 from katalon.services.media_service import primary_media_files_by_object
 from katalon.services.public_metadata_service import (
     filter_public_metadata_checked,
@@ -154,10 +155,34 @@ def build_seo_html(
     )
 
 
+_DEFAULT_GONE_TITLE = "Datensatz zurückgezogen"
+_DEFAULT_GONE_TEXT = (
+    "Dieser Datensatz wurde zurückgezogen und ist nicht mehr öffentlich verfügbar."
+)
+
+
+def build_gone_seo_html(*, site_name: str, title: str, text: str) -> str:
+    full_title = f"{title} | {site_name}" if site_name else title
+    tags = [
+        f"<title>{html.escape(full_title)}</title>",
+        '<meta name="robots" content="noindex">',
+    ]
+    if text:
+        tags.append(f'<meta name="description" content="{html.escape(text, quote=True)}">')
+    body = f"<h1>{html.escape(title)}</h1>"
+    if text:
+        body += f"<p>{html.escape(text)}</p>"
+    return (
+        '<!doctype html>\n<html><head><meta charset="utf-8">\n'
+        + "\n".join(tags)
+        + f"\n</head><body>{body}</body></html>\n"
+    )
+
+
 async def render_record_seo(
     db: AsyncSession, record_type: str, record_id: uuid.UUID, request_base_url: str = ""
-) -> str:
-    """Meta-tag HTML for one public record; 404 for anything not publicly visible."""
+) -> tuple[str, int]:
+    """Meta-tag HTML for one public record; 410 for withdrawn public records, 404 otherwise."""
     if record_type not in SEO_TYPES:
         raise HTTPException(status_code=404, detail="Datensatztyp unbekannt")
     model, subtype_attr = SEO_TYPES[record_type]
@@ -165,13 +190,21 @@ async def render_record_seo(
         await db.execute(
             select(model).where(
                 model.id == record_id,
-                model.deleted_at.is_(None),
-                model.status.in_(PUBLIC_STATUSES),
             )
         )
     ).scalar_one_or_none()
-    if record is None:
-        raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+    if record is None or record.status not in PUBLIC_STATUSES or record.deleted_at is not None:
+        is_public = record is not None and record.status in PUBLIC_STATUSES
+        if not is_public and not await oai_state_service.was_public(db, record_type, record_id):
+            raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+        config = (
+            await db.execute(select(PortalConfig).where(PortalConfig.key == "default"))
+        ).scalar_one_or_none()
+        site_name = resolve_lang_text(config.site_title) if config else ""
+        return (
+            build_gone_seo_html(site_name=site_name or "", title=_DEFAULT_GONE_TITLE, text=_DEFAULT_GONE_TEXT),
+            410,
+        )
 
     subtype = getattr(record, subtype_attr, None)
     fields = await load_public_fields(db, record_type)
@@ -191,13 +224,16 @@ async def render_record_seo(
             path = thumbnail_path(identifier, THUMBNAIL_HEIGHT_HIDPI)
             image_url = f"{base_url}{path}"
 
-    return build_seo_html(
-        record_type=record_type,
-        record_id=str(record.id),
-        idno=record.idno,
-        subtype=subtype,
-        metadata=metadata,
-        site_name=site_name or "",
-        base_url=base_url,
-        image_url=image_url,
+    return (
+        build_seo_html(
+            record_type=record_type,
+            record_id=str(record.id),
+            idno=record.idno,
+            subtype=subtype,
+            metadata=metadata,
+            site_name=site_name or "",
+            base_url=base_url,
+            image_url=image_url,
+        ),
+        200,
     )

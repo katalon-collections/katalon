@@ -87,6 +87,10 @@ reindex_required = true
 [releases."1.49.0"]
 reindex_required = true
 
+# 1.52.0: Export-Kontext Version 4 (URL-Beschriftungen, Ortspfade) gilt nach einem Voll-Reindex.
+[releases."1.52.0"]
+reindex_required = true
+
 # 1.50.0: Feldtyp "Datei"; eigene Größengrenze für Anhänge.
 [[releases."1.50.0".env_vars]]
 key = "ATTACHMENT_MAX_UPLOAD_MB"

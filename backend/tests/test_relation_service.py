@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from katalon.core.models import FieldDefinition, VocabularyTerm
+from katalon.core.models import FieldDefinition, Object, Relation, StorageLocation, VocabularyTerm
 from katalon.services.relation_service import (
     count_relations,
     delete_relations,
+    resolve_relation_labels,
     sync_schema_relations,
     validate_relation_endpoint,
 )
@@ -163,3 +164,86 @@ async def test_sync_schema_relations_filters_unresolvable_targets() -> None:
 
     # Ensure db.add was NOT called because target did not resolve
     db.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_resolve_relation_labels_public_only_skips_storage_location_and_procedure() -> None:
+    obj_id = uuid.uuid4()
+    loc_id = uuid.uuid4()
+    proc_id = uuid.uuid4()
+
+    obj = Object(
+        id=obj_id,
+        idno="OBJ-1",
+        status="published",
+        metadata_={"title": "Öffentliches Objekt", "internal_note": "Geheim"},
+    )
+    title_field = FieldDefinition(
+        name="title",
+        target_type="object",
+        field_type="text",
+        is_public=True,
+        is_deleted=False,
+    )
+    relations = [
+        Relation(
+            from_type="object",
+            from_id=obj_id,
+            to_type="storage_location",
+            to_id=loc_id,
+            relation_type="normal_location",
+        ),
+        Relation(
+            from_type="procedure",
+            from_id=proc_id,
+            to_type="object",
+            to_id=obj_id,
+            relation_type="loan_out",
+        ),
+    ]
+
+    def _execute(stmt):
+        res = MagicMock()
+        sql = str(stmt)
+        if "FROM objects" in sql:
+            res.scalars.return_value.all.return_value = [obj]
+        elif "FROM field_definitions" in sql:
+            res.scalars.return_value.all.return_value = [title_field]
+        else:
+            raise AssertionError(f"Unexpected query in public_only mode: {sql}")
+        return res
+
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=_execute)
+
+    labels = await resolve_relation_labels(db, relations, public_only=True)
+
+    assert labels[("object", obj_id)] == "Öffentliches Objekt"
+    assert labels[("storage_location", loc_id)] is None
+    assert labels[("procedure", proc_id)] is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_relation_labels_non_public_resolves_storage_location() -> None:
+    loc_id = uuid.uuid4()
+    loc = StorageLocation(
+        id=loc_id,
+        idno="LOC-1",
+        metadata_={"title": "Depot 1, Regal A"},
+    )
+    rel = Relation(
+        from_type="storage_location",
+        from_id=loc_id,
+        to_type="storage_location",
+        to_id=loc_id,
+        relation_type="contains",
+    )
+
+    res = MagicMock()
+    res.scalars.return_value.all.return_value = [loc]
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=res)
+
+    labels = await resolve_relation_labels(db, [rel], public_only=False)
+
+    assert labels[("storage_location", loc_id)] == "Depot 1, Regal A"

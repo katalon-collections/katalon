@@ -38,6 +38,7 @@ from katalon.integrations.metadata_format import (
     ExportRecordSummary,
     ExportRelation,
 )
+from katalon.services.place_service import ancestors_of, load_place_chains
 from katalon.services.public_metadata_service import (
     filter_public_metadata,
     load_hidden_relation_targets,
@@ -472,6 +473,21 @@ async def build_export_context_from_db(
     if via_relation_types is None:
         via_relation_types = await collect_via_relation_types(db)
     await _attach_second_level(db, relations, via_relation_types)
+
+    place_rels = [
+        place_rel
+        for top in relations
+        for place_rel in (top, *top.target_relations)
+        if place_rel.target_type == "place"
+    ]
+    if place_rels:
+        # Relation targets come from the database, so the ids are valid UUIDs.
+        place_nodes = await load_place_chains(
+            db, {uuid.UUID(rel.target_id) for rel in place_rels}, public_only=True
+        )
+        for place_rel in place_rels:
+            ancestors = ancestors_of(place_nodes, uuid.UUID(place_rel.target_id))
+            place_rel.target_ancestors = [node.title for node in ancestors]
 
     # 4. Public media representations only (non-public media excluded)
     media: list[ExportMediaItem] = []

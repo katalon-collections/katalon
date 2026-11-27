@@ -64,6 +64,8 @@ LIDO_TERMS: dict[str, str] = {
 }
 LIDO_TERMINOLOGY_SOURCE = "LIDO-Terminologie"
 DEFAULT_RECORD_RIGHTS = "https://creativecommons.org/publicdomain/zero/1.0/"
+DEFAULT_LIDO_REC_ID_SEPARATOR = "--"
+DEFAULT_PLACE_PATH_SEPARATOR = " > "
 
 TITLE_TARGET = "lido:objectIdentificationWrap/lido:titleWrap/lido:titleSet/lido:appellationValue"
 WORK_TYPE_TARGET = "lido:objectClassificationWrap/lido:objectWorkTypeWrap/lido:objectWorkType"
@@ -218,6 +220,10 @@ def _item_from_value(value: Any) -> _Item | None:
             if isinstance(candidate, str) and (parsed := parse_authority_url(candidate)):
                 source, uri = parsed
                 break
+    if not uri and isinstance(value.get("value"), str):
+        raw_url = _clean_text(value["value"])
+        if raw_url.lower().startswith(("http://", "https://")):
+            uri = raw_url
     extra = [str(u) for u in value.get("exact_match_uris") or [] if u]
     if not text and not uri:
         return None
@@ -523,7 +529,7 @@ def media_license(ctx: ExportRecordContext, media: ExportMediaItem, config: dict
         for leaf in _field_leaves(ctx, field_name):
             item = _item_from_value(leaf)
             candidate = (item.uri if item else None) or (item.text if item else "")
-            if candidate and candidate.startswith("http"):
+            if candidate and candidate.lower().startswith(("http://", "https://")):
                 return _license(candidate, config)
         return None
     if fallback == "default":
@@ -533,6 +539,16 @@ def media_license(ctx: ExportRecordContext, media: ExportMediaItem, config: dict
 
 def record_rights_uri(config: dict[str, Any]) -> str:
     return _license(config.get("record_rights"), config) or DEFAULT_RECORD_RIGHTS
+
+
+def lido_rec_id(isil: str, idno: str, config: dict[str, Any] | None = None) -> str:
+    """Format lidoRecID from ISIL and record identifier using the configured separator."""
+    if not isil:
+        return idno
+    separator = (
+        _clean_text((config or {}).get("lido_rec_id_separator")) or DEFAULT_LIDO_REC_ID_SEPARATOR
+    )
+    return f"{isil}{separator}{idno}"
 
 
 def _public_media(ctx: ExportRecordContext) -> list[ExportMediaItem]:
@@ -822,6 +838,16 @@ def _render_actor(event: ET.Element, item: _Item, rule: MappingSpec, config: dic
         _sub(role_actor, "lido:term", role)
 
 
+def _place_name(item: _Item, rule: MappingSpec) -> str:
+    rel = item.relation
+    if not (rel and rel.target_ancestors and rule.settings.get("include_ancestors")):
+        return item.text
+    raw_sep = rule.settings.get("path_separator")
+    sep = raw_sep if isinstance(raw_sep, str) and raw_sep.strip() else DEFAULT_PLACE_PATH_SEPARATOR
+    parts = [part for part in (*rel.target_ancestors, item.text) if part]
+    return sep.join(parts)
+
+
 def _render_place(event: ET.Element, item: _Item, rule: MappingSpec, config: dict[str, Any]) -> None:
     event_place = _sub(event, "lido:eventPlace")
     _sub(event_place, "lido:displayPlace", item.text)
@@ -832,7 +858,7 @@ def _render_place(event: ET.Element, item: _Item, rule: MappingSpec, config: dic
         ids = [(item.uri, item.source)]
     for uri, source in ids:
         _sub(place, "lido:placeID", uri, lido__type=LIDO_TERMS["uri"], lido__source=source_label(source))
-    _sub(_sub(place, "lido:namePlaceSet"), "lido:appellationValue", item.text)
+    _sub(_sub(place, "lido:namePlaceSet"), "lido:appellationValue", _place_name(item, rule))
 
 
 def _render_event(
@@ -948,7 +974,7 @@ def build_lido_element(
         "xsi:schemaLocation": SCHEMA_LOC,
     })
     lido = ET.SubElement(wrap, "lido:lido")
-    _sub(lido, "lido:lidoRecID", f"{isil}--{idno}" if isil else idno, lido__type=LIDO_TERMS["local_id"])
+    _sub(lido, "lido:lidoRecID", lido_rec_id(isil, idno, config), lido__type=LIDO_TERMS["local_id"])
 
     category = _sub(lido, "lido:category")
     _sub(category, "lido:conceptID", "http://www.cidoc-crm.org/cidoc-crm/E22_Human-Made_Object",

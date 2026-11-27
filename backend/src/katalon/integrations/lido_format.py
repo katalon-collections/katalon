@@ -169,7 +169,27 @@ EVENT_TARGET_SETTINGS: dict[str, dict[str, object]] = {
         },
     },
     # The editor offers source_config.via (second relation step) for these targets.
-    "place": {"properties": {}, "supports_via": True},
+    "place": {
+        "properties": {
+            "include_ancestors": {
+                "type": "boolean",
+                "title": {"de": "Ortspfad ausgeben", "en": "Output place path"},
+                "description": {
+                    "de": "Gibt in namePlaceSet den vollständigen Pfad aller öffentlichen Vorfahren von der Wurzel an aus statt nur den Ortsnamen.",
+                    "en": "Outputs the full path of all public ancestors from the root in namePlaceSet instead of only the place name.",
+                },
+            },
+            "path_separator": _setting(
+                "Pfad-Trennzeichen",
+                "Path separator",
+                "Trennzeichen zwischen den Ortsebenen (Standard: „ > “).",
+                "Separator between place hierarchy levels (default: ' > ').",
+                placeholder=" > ",
+                visible_when="include_ancestors",
+            ),
+        },
+        "supports_via": True,
+    },
     "materials_tech_term": {
         "properties": {
             "kind": _setting(

@@ -460,3 +460,113 @@ def test_record_title_ignores_internal_title_field() -> None:
     public = FieldDefinition(name="title", field_type="text", is_public=True)
     assert export_context_service._record_title(obj, "object", [public]) == "Geheimer Spender"
     assert export_context_service._record_title(obj, "object", []) == "OBJ-7"
+
+
+@pytest.mark.asyncio
+async def test_build_export_context_populates_only_public_place_ancestors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from katalon.services.place_service import PlaceNode
+
+    obj_id = uuid.uuid4()
+    country_id = uuid.uuid4()
+    region_id = uuid.uuid4()
+    site_id = uuid.uuid4()
+    hidden_parent_id = uuid.uuid4()
+    isolated_site_id = uuid.uuid4()
+
+    mock_obj = MagicMock(spec=Object)
+    mock_obj.id = obj_id
+    mock_obj.idno = "F-1"
+    mock_obj.title = "Faustkeil"
+    mock_obj.object_type = None
+    mock_obj.status = "public"
+    mock_obj.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    mock_obj.updated_at = datetime(2026, 1, 2, tzinfo=UTC)
+    mock_obj.deleted_at = None
+    mock_obj.metadata_ = {}
+
+    rel_public_chain = MagicMock(spec=Relation)
+    rel_public_chain.id = uuid.uuid4()
+    rel_public_chain.from_type = "object"
+    rel_public_chain.from_id = obj_id
+    rel_public_chain.to_type = "place"
+    rel_public_chain.to_id = site_id
+    rel_public_chain.relation_type = "fundort"
+    rel_public_chain.metadata_ = {}
+
+    rel_hidden_parent = MagicMock(spec=Relation)
+    rel_hidden_parent.id = uuid.uuid4()
+    rel_hidden_parent.from_type = "object"
+    rel_hidden_parent.from_id = obj_id
+    rel_hidden_parent.to_type = "place"
+    rel_hidden_parent.to_id = isolated_site_id
+    rel_hidden_parent.relation_type = "fundort"
+    rel_hidden_parent.metadata_ = {}
+
+    mock_site = MagicMock()
+    mock_site.id = site_id
+    mock_site.title = "La Madeleine"
+    mock_site.idno = "P-3"
+    mock_site.status = "public"
+    mock_site.deleted_at = None
+    mock_site.metadata_ = {"label": "La Madeleine"}
+    mock_site.place_type = None
+
+    mock_isolated = MagicMock()
+    mock_isolated.id = isolated_site_id
+    mock_isolated.title = "Fundstelle X"
+    mock_isolated.idno = "P-4"
+    mock_isolated.status = "public"
+    mock_isolated.deleted_at = None
+    mock_isolated.metadata_ = {"label": "Fundstelle X"}
+    mock_isolated.place_type = None
+
+    mock_db = AsyncMock()
+    mock_db.get = AsyncMock(return_value=mock_obj)
+
+    def _mock_exec(stmt: Any) -> Any:
+        s = str(stmt)
+        if "relations.from_type = " in s:
+            res = MagicMock()
+            res.scalars.return_value.all.return_value = [rel_public_chain, rel_hidden_parent]
+            return res
+        if "count(" in s:
+            res = MagicMock()
+            res.scalar_one.return_value = 0
+            return res
+        if "FROM places" in s:
+            res = MagicMock()
+            res.scalars.return_value = [mock_site, mock_isolated]
+            return res
+        res = MagicMock()
+        res.scalars.return_value.all.return_value = []
+        res.all.return_value = []
+        return res
+
+    mock_db.execute = AsyncMock(side_effect=_mock_exec)
+    monkeypatch.setattr(export_context_service, "load_public_fields", AsyncMock(return_value=[]))
+    monkeypatch.setattr(export_context_service, "filter_public_metadata", MagicMock(return_value={}))
+    monkeypatch.setattr(export_context_service, "load_hidden_relation_targets", AsyncMock(return_value=set()))
+
+    # Portal visibility: hidden_parent_id is absent from public_only=True nodes,
+    # so isolated_site_id has no visible ancestors while site_id gets [Frankreich, Dordogne].
+    public_nodes = {
+        country_id: PlaceNode(country_id, None, "Frankreich"),
+        region_id: PlaceNode(region_id, country_id, "Dordogne"),
+        site_id: PlaceNode(site_id, region_id, "La Madeleine"),
+        isolated_site_id: PlaceNode(isolated_site_id, hidden_parent_id, "Fundstelle X"),
+    }
+    load_nodes_mock = AsyncMock(return_value=public_nodes)
+    monkeypatch.setattr(export_context_service, "load_place_chains", load_nodes_mock)
+
+    ctx = await export_context_service.build_export_context_from_db(
+        mock_db, "object", obj_id, via_relation_types=set()
+    )
+
+    load_nodes_mock.assert_awaited_once_with(
+        mock_db, {site_id, isolated_site_id}, public_only=True
+    )
+    by_id = {r.target_id: r for r in ctx.relations}
+    assert by_id[str(site_id)].target_ancestors == ["Frankreich", "Dordogne"]
+    assert by_id[str(isolated_site_id)].target_ancestors == []

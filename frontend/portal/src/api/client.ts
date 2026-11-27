@@ -18,6 +18,20 @@ export function mediaThumbnailUrl(objectId: string, mediaId: string): string {
   return `${BASE}${PORTAL_API}/objects/${objectId}/media/${mediaId}/thumbnail`
 }
 
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+export function isGoneError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 410
+}
+
 async function extractErrorMessage(res: Response): Promise<string> {
   try {
     const payload = await res.json().catch(() => null) as { detail?: string } | null
@@ -30,7 +44,7 @@ async function extractErrorMessage(res: Response): Promise<string> {
 
 async function get<T>(path: string): Promise<T> {
   const res = await portalFetch(path)
-  if (!res.ok) throw new Error(await extractErrorMessage(res))
+  if (!res.ok) throw new ApiError(await extractErrorMessage(res), res.status)
   return res.json()
 }
 
@@ -117,7 +131,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error(await extractErrorMessage(res))
+    throw new ApiError(await extractErrorMessage(res), res.status)
   }
   return res.json()
 }

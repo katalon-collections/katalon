@@ -78,7 +78,14 @@ export function applyProfile(
       missedSelectors.push(selector)
       continue
     }
-    appliedMapping[selector] = entry
+    if (entry.label_selector && !selectorSet.has(entry.label_selector)) {
+      missedSelectors.push(entry.label_selector)
+      const copy = { ...entry }
+      delete copy.label_selector
+      appliedMapping[selector] = copy
+    } else {
+      appliedMapping[selector] = entry
+    }
     if (!existingFieldNames.has(entry.target)) {
       const fd = profile.field_definitions[entry.target]
       if (fd) {
@@ -120,7 +127,14 @@ export function applySavedMapping(
       missedSelectors.push(selector)
       continue
     }
-    appliedMapping[selector] = entry
+    if (entry.label_selector && !selectorSet.has(entry.label_selector)) {
+      missedSelectors.push(entry.label_selector)
+      const copy = { ...entry }
+      delete copy.label_selector
+      appliedMapping[selector] = copy
+    } else {
+      appliedMapping[selector] = entry
+    }
     if (!existingFieldNames.has(entry.target)) {
       missingFieldNames.push(entry.target)
     }

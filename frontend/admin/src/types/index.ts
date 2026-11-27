@@ -17,6 +17,7 @@ export interface KatalonObject {
   object_type: string | null
   collection_status?: string
   status: Status
+  schema_incomplete?: boolean
   metadata_: Record<string, unknown>
   ai_provenance: AiProvenance
   created_at: string
@@ -29,6 +30,7 @@ export interface Entity {
   idno: string | null
   entity_type: string
   status: Status
+  schema_incomplete?: boolean
   metadata_: Record<string, unknown>
   ai_provenance: AiProvenance
   created_at: string
@@ -42,6 +44,7 @@ export interface Place {
   place_type: string | null
   parent_id?: string | null
   status: Status
+  schema_incomplete?: boolean
   lat: number | null
   lon: number | null
   metadata_: Record<string, unknown>
@@ -56,6 +59,7 @@ export interface Occurrence {
   idno: string | null
   occurrence_type: string
   status: Status
+  schema_incomplete?: boolean
   metadata_: Record<string, unknown>
   ai_provenance: AiProvenance
   created_at: string
@@ -68,6 +72,7 @@ export interface Procedure {
   idno: string | null
   procedure_type: string
   status: ProcedureStatus
+  schema_incomplete?: boolean
   start_date: string | null
   end_date: string | null
   due_date: string | null
@@ -85,6 +90,7 @@ export interface KatalonCollection {
   collection_type: string | null
   parent_id: string | null
   status: Status
+  schema_incomplete?: boolean
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -96,6 +102,7 @@ export interface KatalonStorageLocation {
   idno: string
   storage_location_type: string | null
   parent_id: string | null
+  schema_incomplete?: boolean
   metadata_: Record<string, unknown>
   created_at: string
   updated_at: string

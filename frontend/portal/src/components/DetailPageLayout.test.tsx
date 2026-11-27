@@ -69,6 +69,25 @@ describe('group fields on detail pages', () => {
     expect(screen.getByRole('link', { name: 'Musik' }).getAttribute('href')).toBe('/search?type=entity&meta_Normdaten__Schlagwort=Musik')
   })
 
+  it.each(['sidebar', 'main'] as const)('links every entry of a repeatable authority field (%s)', slot => {
+    render(
+      <MemoryRouter>
+        <DetailPageLayout
+          fieldDefs={[def('a', 'Normdaten', 'authority', { is_repeatable: true, detail_slot: slot })]}
+          metadata={{ Normdaten: [
+            { source: 'wikidata', external_id: 'Q173626', label: 'Wikidata-Eintrag' },
+            { source: 'aat', external_id: '300025103', label: 'AAT-Eintrag' },
+          ] }}
+          locale="de"
+          recordType="occurrence"
+          sidebarPosition="right"
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: 'Wikidata-Eintrag' }).getAttribute('href')).toBe('https://www.wikidata.org/wiki/Q173626')
+    expect(screen.getByRole('link', { name: 'AAT-Eintrag' }).getAttribute('href')).toBe('https://vocab.getty.edu/aat/300025103')
+  })
+
   it('withoutTitleFields drops top-level title/name but keeps group sub-fields of that name', () => {
     const defs = [
       def('t', 'title', 'text'),

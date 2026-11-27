@@ -1133,6 +1133,8 @@ async def test_portal_collection_detail_denied_for_staff_without_permission() ->
     session = AsyncMock()
     session.execute = execute
 
+    session.get.return_value = None  # never public
+
     async def override_db():
         yield session
 
@@ -1420,6 +1422,7 @@ async def test_portal_record_errors_are_not_cacheable() -> None:
     missing = MagicMock()
     missing.scalar_one_or_none.return_value = None
     session.execute.return_value = missing
+    session.get.return_value = None  # never public
 
     async def override_db():
         yield session
@@ -1433,6 +1436,29 @@ async def test_portal_record_errors_are_not_cacheable() -> None:
 
     assert response.status_code == 404
     assert "cache-control" not in response.headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["objects", "entities", "places", "occurrences", "collections"])
+async def test_portal_once_public_record_is_gone_and_not_cached(path: str) -> None:
+    session = AsyncMock()
+    missing = MagicMock()
+    missing.scalar_one_or_none.return_value = None
+    session.execute.return_value = missing
+    session.get.return_value = MagicMock()  # state row: was public once
+
+    async def override_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/portal/v1/{path}/{uuid.uuid4()}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 410
+    assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.asyncio

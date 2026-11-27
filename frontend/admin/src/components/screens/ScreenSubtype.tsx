@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { authority, subtypes } from '../../api/client'
 import type { RecordSubtype, SubtypeConceptAlternative } from '../../types'
@@ -83,6 +83,7 @@ type Props = { initialType?: string | null; onTypeChange?: (type: string) => voi
 
 export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
   const { t } = useTranslation('screenSubtype')
+  const formId = useId()
   const [activeType, setActiveType] = useState(initialType && TYPE_IDS.includes(initialType) ? initialType : 'object')
   const [items, setItems] = useState<RecordSubtype[]>([])
   const [loading, setLoading] = useState(true)
@@ -253,8 +254,9 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
               />
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
-              <div className="lbl">{t('descriptionLabel')}</div>
+              <label className="lbl" htmlFor={`${formId}-description`}>{t('descriptionLabel')}</label>
               <textarea
+                id={`${formId}-description`}
                 className="fld"
                 value={form.description}
                 onChange={e => set('description', e.target.value)}
@@ -265,26 +267,32 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
             </div>
             <div className="fg-2" style={{ marginBottom: 10 }}>
               <div className="field">
-                <div className="lbl">{t('internalNameLabel')} <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span> <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('internalNameHint')})</span></div>
-                <input className="fld mono" value={form.name} onChange={e => { setNameTouched(true); set('name', e.target.value) }} disabled={!!editId} />
+                <label className="lbl" htmlFor={`${formId}-name`}>{t('internalNameLabel')} <span style={{ color: '#dc2626', fontSize: 11 }}>{t('requiredBadge')}</span> <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('internalNameHint')})</span></label>
+                <input id={`${formId}-name`} className="fld mono" value={form.name} onChange={e => { setNameTouched(true); set('name', e.target.value) }} disabled={!!editId} />
               </div>
               <div className="field">
-                <div className="lbl">{t('sortOrderLabel')}</div>
-                <input className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
+                <label className="lbl" htmlFor={`${formId}-sort-order`}>{t('sortOrderLabel')}</label>
+                <input id={`${formId}-sort-order`} className="fld mono" type="number" value={form.sort_order} onChange={e => set('sort_order', Number(e.target.value))} />
               </div>
             </div>
             {form.primary_type === 'object' && (
               <div className="field" style={{ marginBottom: 10 }}>
-                <div className="lbl">{t('placeholderImageLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('placeholderImageHint')})</span></div>
-                <input className="fld mono" value={form.placeholder_image_url} onChange={e => set('placeholder_image_url', e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
+                <label className="lbl" htmlFor={`${formId}-placeholder-image`}>{t('placeholderImageLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('placeholderImageHint')})</span></label>
+                <input id={`${formId}-placeholder-image`} className="fld mono" value={form.placeholder_image_url} onChange={e => set('placeholder_image_url', e.target.value)} placeholder="https://..." style={{ fontSize: 12 }} />
                 {form.placeholder_image_url && <img src={form.placeholder_image_url} alt="" style={{ marginTop: 6, height: 40, maxWidth: 120, objectFit: 'contain', border: '1px solid var(--border-s)', borderRadius: 4, padding: 4, background: '#fff' }} />}
               </div>
             )}
             <div className="field" style={{ marginBottom: 14, background: 'var(--bg-subtle, rgba(0,0,0,0.02))', padding: 12, borderRadius: 6, border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div className="lbl" style={{ margin: 0 }}>
-                  {t('authoritySectionTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('authoritySectionHint')})</span>
-                </div>
+                {selectedAuthoritySource && !form.concept_id ? (
+                  <label className="lbl" htmlFor={`${formId}-concept`} style={{ margin: 0 }}>
+                    {t('authoritySectionTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('authoritySectionHint')})</span>
+                  </label>
+                ) : (
+                  <div className="lbl" style={{ margin: 0 }}>
+                    {t('authoritySectionTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('authoritySectionHint')})</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 6 }}>
                   {enabledAuthoritySources.map(source => (
                     <button
@@ -301,6 +309,7 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
               </div>
               {selectedAuthoritySource ? (
                 <AuthorityInput
+                  id={`${formId}-concept`}
                   source={selectedAuthoritySource}
                   value={form.concept_id ? {
                     source: form.concept_source || selectedAuthoritySource,
@@ -329,8 +338,9 @@ export function ScreenSubtype({ initialType, onTypeChange }: Props = {}) {
                 />
               ) : (
                 <div className="field">
-                  <div className="lbl">{t('authorityDirectUri')}</div>
+                  <label className="lbl" htmlFor={`${formId}-concept-uri`}>{t('authorityDirectUri')}</label>
                   <input
+                    id={`${formId}-concept-uri`}
                     className="fld mono"
                     type="url"
                     value={form.concept_uri}
@@ -475,13 +485,20 @@ function AlternativeConcepts({ sources, value, onChange }: {
   onChange: (next: SubtypeConceptAlternative[]) => void
 }) {
   const { t } = useTranslation('screenSubtype')
+  const altId = useId()
   const [source, setSource] = useState('')
   const active = source || sources[0] || ''
   return (
     <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-s)' }}>
-      <div className="lbl" style={{ marginBottom: 6 }}>
-        {t('alternativeConceptsTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('alternativeConceptsHint')})</span>
-      </div>
+      {active ? (
+        <label className="lbl" htmlFor={altId} style={{ marginBottom: 6 }}>
+          {t('alternativeConceptsTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('alternativeConceptsHint')})</span>
+        </label>
+      ) : (
+        <div className="lbl" style={{ marginBottom: 6 }}>
+          {t('alternativeConceptsTitle')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('alternativeConceptsHint')})</span>
+        </div>
+      )}
       {value.length > 0 && (
         <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {value.map((alt, i) => (
@@ -524,6 +541,7 @@ function AlternativeConcepts({ sources, value, onChange }: {
       </div>
       {active && (
         <AuthorityInput
+          id={altId}
           key={`${active}-${value.length}`}
           source={active}
           value={null}

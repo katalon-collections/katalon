@@ -34,6 +34,14 @@ transaktional mit der Statusänderung und unabhängig vom Indexzustand. Abgelehn
 Löschmeldungen aus `deleted_at`/`status` der Datensatztabellen direkt ableiten. Das hätte
 die IDs nie veröffentlichter Entwürfe preisgegeben.
 
+# Portal, SEO und ARK
+
+Die Tabelle dient auch als Merkmal „war einmal öffentlich“: Portal-Detailrouten, SEO-HTML und
+ARK-Resolver antworten für solche Datensätze mit `410` („zurückgezogen“), auch nach einer
+Umstellung auf intern oder Entwurf. Das `410` trägt `Cache-Control: no-store`, weil Browser es
+sonst unbegrenzt cachen und ein wiederhergestellter Datensatz unsichtbar bliebe. Abgelehnt:
+eine eigene Spalte je Datensatztabelle (zweite Quelle für dieselbe Information).
+
 # Citations
 
 [1] backend/src/katalon/services/oai_state_service.py

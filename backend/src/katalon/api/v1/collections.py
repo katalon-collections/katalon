@@ -52,7 +52,11 @@ from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     normalize_subtype_name,
@@ -155,6 +159,7 @@ async def list_collections(
     collection_type: str | None = None,
     status: str | None = None,
     parent_id: uuid.UUID | None = None,
+    schema_incomplete: bool | None = None,
     q: str | None = None,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
@@ -168,6 +173,8 @@ async def list_collections(
         query = query.where(Collection.parent_id == parent_id)
     visibility_user = await _visibility_user(db, current_user)
     query = apply_public_visibility(query, Collection, visibility_user)
+    if schema_incomplete is not None and visibility_user is not None:
+        query = query.where(Collection.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             Collection.idno.icontains(q, autoescape=True)
@@ -257,6 +264,11 @@ async def create_collection(
         collection_type=collection_type,
         parent_id=data.parent_id,
         status=data.status,
+        schema_incomplete=(
+            await is_record_schema_incomplete(db, "collection", metadata, collection_type)
+            if data.status == "draft"
+            else False
+        ),
         metadata_=metadata,
     )
     db.add(col)
@@ -442,6 +454,11 @@ async def update_collection(
     col.collection_type = collection_type
     col.parent_id = data.parent_id
     col.status = data.status
+    col.schema_incomplete = (
+        await is_record_schema_incomplete(db, "collection", metadata, collection_type)
+        if data.status == "draft"
+        else False
+    )
     col.metadata_ = metadata
     col.ai_provenance = data.ai_provenance
 
@@ -764,6 +781,9 @@ async def restore_snapshot(
         col.status = data["status"]
     if "metadata" in data:
         col.metadata_ = data["metadata"]
+    col.schema_incomplete = await is_record_schema_incomplete(
+        db, "collection", col.metadata_, col.collection_type
+    )
     flag_modified(col, "metadata_")
     await flush_record(db, col)
     await sync_schema_relations(db, "collection", col.id, col.metadata_)

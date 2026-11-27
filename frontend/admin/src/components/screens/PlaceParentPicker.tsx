@@ -8,6 +8,7 @@ import type { Place } from '../../types'
 import { X } from '../ui/Icons'
 
 export interface PlaceParentPickerProps {
+  id?: string
   value: string | null
   /** The place being edited; it can not be its own parent. */
   excludeId?: string | null
@@ -24,7 +25,7 @@ function placeTitle(place: Place): string {
   return place.idno ? `${label} · ${place.idno}` : label
 }
 
-export function PlaceParentPicker({ value, excludeId, disabled, renderSelected, onChange }: PlaceParentPickerProps) {
+export function PlaceParentPicker({ id, value, excludeId, disabled, renderSelected, onChange }: PlaceParentPickerProps) {
   const { t } = useTranslation('screenForm')
   const [selected, setSelected] = useState<Place | null>(null)
   const [query, setQuery] = useState('')
@@ -80,12 +81,13 @@ export function PlaceParentPicker({ value, excludeId, disabled, renderSelected, 
   return (
     <div ref={containerRef} style={{ position: 'relative', maxWidth: 360 }}>
       <input
+        id={id}
         className="fld"
         type="search"
         value={query}
         disabled={disabled}
         placeholder={t('placeParentPlaceholder')}
-        aria-label={t('placeParentLabel')}
+        aria-label={id ? undefined : t('placeParentLabel')}
         onChange={e => { setQuery(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}

@@ -44,7 +44,7 @@ Katalon's API router surface is mounted in `backend/src/katalon/main.py`. The wo
 | `/api/docs` | Swagger UI | Configured as FastAPI `docs_url` [@app]. |
 | `/api/redoc` | ReDoc UI | Configured as FastAPI `redoc_url` [@app]. |
 | `/api/openapi.json` | OpenAPI schema | Configured as FastAPI `openapi_url` [@app]. |
-| `/health` | Readiness | Checks database, Elasticsearch, Redis, Celery Beat/Worker heartbeat, Cantaloupe, and optional Oxigraph; informational `queue_backlog` and `backup_age_hours` do not gate the status code [@app]. |
+| `/health` | Readiness | Checks database, Elasticsearch, Redis, Celery Beat/Worker heartbeat, Cantaloupe, and optional Oxigraph; anonymous callers get only `status`, authenticated callers (JWT or API key) get `checks`, `queue_backlog`, and `backup_age_hours`; the latter two do not gate the status code [@app]. |
 
 ## `/v1` Routers
 
@@ -106,7 +106,7 @@ Procedures have no `/portal/v1` route. Relation results require both endpoints t
 
 The authenticated `/v1` representations provide navigational `_links`: records link to themselves and relations (Objects additionally link to media); vocabularies link to themselves, terms, and trees; vocabulary terms link to themselves, their vocabulary, ancestors, and where applicable their parent; media link to their Object, file, and — when present — license URI [@api-dir]. The public Portal projections provide the same relative `_links` under `/portal/v1`, pointing at the anonymous read-model endpoints rather than the authenticated `/v1` paths [@portal-public].
 
-The ARK resolver is separate from `/portal/v1`. It stays reachable even when ARK minting is disabled, but it only accepts the configured production NAAN, rejects the reserved test NAAN `99999`, and looks up public, non-deleted inventory records; Procedures are not part of ARK resolution [@ark-api] [@ark-service]. Because `resolve_ark()` filters `deleted_at IS NULL`, a soft-deleted record's ARK currently returns the resolver's generic `404` rather than redirecting to the portal detail route that would return the collection tombstone response [@ark-api] [@ark-service].
+The ARK resolver is separate from `/portal/v1`. It stays reachable even when ARK minting is disabled, only accepts the configured production NAAN, rejects the reserved test NAAN `99999`, and looks up public inventory records (including previously public records that are soft-deleted or unpublished, ordered with active rows first); Procedures and never-published drafts are excluded [@ark-api] [@ark-service]. Redirecting withdrawn public ARKs to the canonical portal detail URL lets human visitors land on the portal's HTTP `410 Gone` notice page while RDF clients and SEO crawlers receive `410 Gone` directly [@ark-api] [@ark-service] [@portal-public].
 
 ## API Key Routes
 

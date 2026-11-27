@@ -197,3 +197,191 @@ async def test_portal_place_detail_shows_ancestors_children_and_subtree_objects(
         await async_client.get(f"/portal/v1/places/{land}/object-ids?include_subplaces=false")
     ).json() == []
     assert (await async_client.get(f"/portal/v1/places/{hidden}/object-ids")).status_code == 404
+
+
+def _place_index_harness(monkeypatch: pytest.MonkeyPatch):
+    """In-memory ES + synchronous task capture for place-cascade tests."""
+    from types import SimpleNamespace
+
+    from katalon.integrations import elasticsearch
+    from katalon.workers import index_tasks
+
+    docs: dict[str, dict] = {}
+    writes: list[str] = []
+    index_calls: list[tuple[str, str, dict]] = []
+    cascade_calls: list[tuple[str, str, bool]] = []
+
+    async def fake_get(doc_id: str):
+        return docs.get(doc_id)
+
+    async def fake_index(doc_id: str, body: dict):
+        docs[doc_id] = body
+        writes.append(doc_id)
+
+    def capture_index(record_type: str, record_id: str, doc: dict):
+        index_calls.append((record_type, record_id, doc))
+        return SimpleNamespace(id="idx")
+
+    def capture_cascade(record_type: str, record_id: str, include_subtree: bool = False):
+        cascade_calls.append((record_type, record_id, include_subtree))
+        index_tasks.cascade_reindex_task.run(
+            record_type, record_id, include_subtree=include_subtree
+        )
+        return SimpleNamespace(id="cas")
+
+    monkeypatch.setattr(elasticsearch, "get_document", fake_get)
+    monkeypatch.setattr(elasticsearch, "index_document", fake_index)
+    monkeypatch.setattr(index_tasks.index_record_task, "delay", capture_index)
+    monkeypatch.setattr(index_tasks.cascade_reindex_task, "delay", capture_cascade)
+
+    async def drain() -> None:
+        while index_calls:
+            record_type, record_id, doc = index_calls.pop(0)
+            await asyncio.to_thread(index_tasks.index_record_task.run, record_type, record_id, doc)
+
+    return SimpleNamespace(
+        docs=docs,
+        writes=writes,
+        index_calls=index_calls,
+        cascade_calls=cascade_calls,
+        drain=drain,
+    )
+
+
+async def _public_place(client, headers, label: str, parent_id: str | None = None) -> dict:
+    response = await client.post(
+        "/v1/places",
+        headers=headers,
+        json={
+            "idno": f"PP-{uuid.uuid4().hex[:8]}",
+            "status": "public",
+            "parent_id": parent_id,
+            "metadata_": {"label": label},
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def _public_object(client, headers, label: str = "Fund") -> str:
+    response = await client.post(
+        "/v1/objects",
+        headers=headers,
+        json={
+            "idno": f"OB-{uuid.uuid4().hex[:8]}",
+            "status": "public",
+            "metadata_": {"label": label},
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def _link_object_to_place(client, headers, object_id: str, place_id: str) -> None:
+    response = await client.post(
+        "/v1/relations",
+        headers=headers,
+        json={
+            "from_type": "object",
+            "from_id": object_id,
+            "to_type": "place",
+            "to_id": place_id,
+            "relation_type": "related_to",
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+
+
+@pytest.mark.asyncio
+async def test_place_rename_cascades_target_ancestors_to_grandchild_object(
+    async_client, auth_headers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _place_index_harness(monkeypatch)
+    root = await _public_place(async_client, auth_headers, "Frankreich")
+    child = await _public_place(async_client, auth_headers, "Dordogne", root["id"])
+    grandchild = await _public_place(async_client, auth_headers, "Lascaux", child["id"])
+    obj = await _public_object(async_client, auth_headers)
+    await _link_object_to_place(async_client, auth_headers, obj, child["id"])
+    await _link_object_to_place(async_client, auth_headers, obj, grandchild["id"])
+    await harness.drain()
+
+    harness.writes.clear()
+    harness.cascade_calls.clear()
+    update = await async_client.put(
+        f"/v1/places/{root['id']}",
+        headers={**auth_headers, "If-Match": str(root["version"])},
+        json={
+            "idno": root["idno"],
+            "status": "public",
+            "parent_id": None,
+            "metadata_": {"label": "Republik Frankreich"},
+        },
+    )
+    assert update.status_code == 200, update.text
+    await harness.drain()
+
+    assert harness.cascade_calls == [("place", root["id"], True)]
+    assert harness.writes.count(obj) == 1
+    rels = {r["target_id"]: r for r in harness.docs[obj]["export_context"]["relations"]}
+    assert rels[grandchild["id"]]["target_ancestors"] == ["Republik Frankreich", "Dordogne"]
+
+
+@pytest.mark.asyncio
+async def test_place_description_change_cascades_only_direct_relations(
+    async_client, auth_headers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _place_index_harness(monkeypatch)
+    root = await _public_place(async_client, auth_headers, "Frankreich")
+    child = await _public_place(async_client, auth_headers, "Dordogne", root["id"])
+    grandchild = await _public_place(async_client, auth_headers, "Lascaux", child["id"])
+    direct_obj = await _public_object(async_client, auth_headers, "Direkt")
+    descendant_obj = await _public_object(async_client, auth_headers, "Enkel")
+    await _link_object_to_place(async_client, auth_headers, direct_obj, root["id"])
+    await _link_object_to_place(async_client, auth_headers, descendant_obj, grandchild["id"])
+    await harness.drain()
+
+    harness.writes.clear()
+    harness.cascade_calls.clear()
+    update = await async_client.put(
+        f"/v1/places/{root['id']}",
+        headers={**auth_headers, "If-Match": str(root["version"])},
+        json={
+            "idno": root["idno"],
+            "status": "public",
+            "parent_id": None,
+            "metadata_": {"label": "Frankreich", "description": "Nur Beschreibung geändert"},
+        },
+    )
+    assert update.status_code == 200, update.text
+    await harness.drain()
+
+    assert harness.cascade_calls == [("place", root["id"], False)]
+    assert direct_obj in harness.writes
+    assert descendant_obj not in harness.writes
+
+
+@pytest.mark.asyncio
+async def test_delete_place_reparent_indexes_moved_children_and_refreshes_subtree(
+    async_client, auth_headers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _place_index_harness(monkeypatch)
+    root = await _public_place(async_client, auth_headers, "Frankreich")
+    middle = await _public_place(async_client, auth_headers, "Dordogne", root["id"])
+    child = await _public_place(async_client, auth_headers, "Lascaux", middle["id"])
+    grandchild = await _public_place(async_client, auth_headers, "Höhle", child["id"])
+    obj = await _public_object(async_client, auth_headers)
+    await _link_object_to_place(async_client, auth_headers, obj, grandchild["id"])
+    await harness.drain()
+
+    harness.writes.clear()
+    harness.cascade_calls.clear()
+    response = await async_client.delete(
+        f"/v1/places/{middle['id']}?reparent=true", headers=auth_headers
+    )
+    assert response.status_code == 204, response.text
+    assert [(rt, rid) for rt, rid, _ in harness.index_calls] == [("place", child["id"])]
+    await harness.drain()
+
+    assert harness.cascade_calls == [("place", child["id"], True)]
+    rels = {r["target_id"]: r for r in harness.docs[obj]["export_context"]["relations"]}
+    assert rels[grandchild["id"]]["target_ancestors"] == ["Frankreich", "Lascaux"]

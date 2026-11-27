@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from katalon.core.visibility import PUBLIC_STATUSES
+from katalon.integrations.lido.builder import lido_rec_id
 from katalon.services import export_context_service, metadata_format_service
 from katalon.services.metadata_mapping_service import compile_mapping_set, get_mapping_set
 
@@ -84,7 +85,7 @@ async def build_report(db: AsyncSession, set_id: uuid.UUID) -> ExportReport:
             idno = ctx.record.idno or ctx.record.id
             report.problems.append(
                 RecordProblem(
-                    rec_id=f"{isil}--{idno}" if isil else idno,
+                    rec_id=lido_rec_id(isil, idno, compiled.institution_config),
                     record_id=ctx.record.id,
                     messages=messages,
                 )

@@ -82,6 +82,10 @@ The list screen chooses an API module from `recordType`, loads records with pagi
 
 `ScreenForm` uses the same `recordType` to choose its endpoint wrapper and to enable type-specific scalars: object collection assignment (a `member_of` relation to a Collection, created/updated/deleted alongside the save) and media, place coordinates (edited through the shared `GeoInput` with interactive Leaflet map picker and Nominatim place search), procedure dates and reference number, a Collection's own optional `parent_id` (rendered as a select of other collections, excluding the record itself, for archival hierarchies), and subtype fields for the supported record types [@screen-form]. On new forms it asks the ID-number endpoint for the next id, loads subtypes when needed, and loads schema definitions for the current record type and subtype [@screen-form].
 
+## Date Fields
+
+Stored date values use ISO astronomical years (`-0042` is 43 BCE, `0000` is 1 BCE); API, import, and exports carry that form. The admin `DateInput` and list columns show the same human form as the portal (`43 v. Chr.`, `ca. 1900`, `vor 1800`). `parseDateText` converts typed text, where a leading minus counts BCE years the way people do (`-43` = 43 BCE); it applies to user input only, while `normalizeDateInput` and `isValidDateInput` work on stored values (`frontend/admin/src/lib/dateInput.ts`).
+
 ## Dynamic Metadata Inputs
 
 Field definitions control both default values and rendered controls. The form applies `settings.default_value` on new records, reloads subtype-specific definitions when a new record's subtype changes, and renders specialized controls for vocabularies, free vocabulary text, authority links, schema relation fields, groups, read-only PID fields, URL fields (a `type="url"` input plus an optional link title), booleans, numbers (compact input with `maxWidth: 200px`, locale-aware placeholder hint, and numeric sanitization on save), dates, and text [@screen-form].

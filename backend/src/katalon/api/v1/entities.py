@@ -46,7 +46,11 @@ from katalon.services.presence_service import enforce_not_blocked
 from katalon.services.public_metadata_service import metadata_text_clause, project_public_record
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     normalize_subtype_name,
@@ -75,6 +79,7 @@ async def list_entities(
     page_size: int = Query(50, ge=1, le=200),
     entity_type: str | None = None,
     status: str | None = None,
+    schema_incomplete: bool | None = None,
     q: str | None = None,
     sort_by: SortBy | None = None,
     sort_dir: SortDir = "desc",
@@ -86,6 +91,8 @@ async def list_entities(
         query = query.where(Entity.status == status)
     visibility_user = await _visibility_user(db, current_user)
     query = apply_public_visibility(query, Entity, visibility_user)
+    if schema_incomplete is not None and visibility_user is not None:
+        query = query.where(Entity.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             Entity.idno.icontains(q, autoescape=True)
@@ -168,6 +175,11 @@ async def create_entity(
         idno=idno,
         entity_type=entity_type,
         status=data.status,
+        schema_incomplete=(
+            await is_record_schema_incomplete(db, "entity", metadata, entity_type)
+            if data.status == "draft"
+            else False
+        ),
         metadata_=metadata,
         ai_provenance=data.ai_provenance,
     )
@@ -341,6 +353,11 @@ async def update_entity(
     entity.idno = idno
     entity.entity_type = entity_type
     entity.status = data.status
+    entity.schema_incomplete = (
+        await is_record_schema_incomplete(db, "entity", metadata, entity_type)
+        if data.status == "draft"
+        else False
+    )
     entity.metadata_ = metadata
     entity.ai_provenance = data.ai_provenance
 
@@ -609,6 +626,9 @@ async def restore_snapshot(
         entity.status = data["status"]
     if "metadata" in data:
         entity.metadata_ = data["metadata"]
+    entity.schema_incomplete = await is_record_schema_incomplete(
+        db, "entity", entity.metadata_, entity.entity_type
+    )
     flag_modified(entity, "metadata_")
     await flush_record(db, entity)
     await sync_schema_relations(db, "entity", entity.id, entity.metadata_)

@@ -62,6 +62,7 @@ async def test_seo_page_not_public_is_404() -> None:
     result = MagicMock()
     result.scalar_one_or_none.return_value = None
     session.execute.return_value = result
+    session.get.return_value = None  # never public
 
     async def override_db():
         yield session

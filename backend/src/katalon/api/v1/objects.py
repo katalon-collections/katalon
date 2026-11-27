@@ -58,7 +58,11 @@ from katalon.services.public_metadata_service import (
 )
 from katalon.services.publish_service import can_publish, publish_record
 from katalon.services.relation_service import count_relations, sync_schema_relations
-from katalon.services.schema_service import prepare_metadata, validate_metadata
+from katalon.services.schema_service import (
+    is_record_schema_incomplete,
+    prepare_metadata,
+    validate_metadata,
+)
 from katalon.services.subtype_service import (
     ensure_subtype_exists,
     normalize_subtype_name,
@@ -96,6 +100,7 @@ async def list_objects(
     status: str | None = None,
     object_type: str | None = None,
     q: str | None = None,
+    schema_incomplete: bool | None = None,
     storage_location_id: uuid.UUID | None = None,
     include_sublocations: bool = True,
     place_id: uuid.UUID | None = None,
@@ -110,6 +115,8 @@ async def list_objects(
     query = apply_public_visibility(query, Object, visibility_user)
     if object_type:
         query = query.where(Object.object_type == object_type)
+    if schema_incomplete is not None and visibility_user is not None:
+        query = query.where(Object.schema_incomplete.is_(schema_incomplete))
     if q:
         query = query.where(
             Object.idno.icontains(q, autoescape=True)
@@ -243,11 +250,17 @@ async def create_object(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="ID-Nr. bereits vergeben.")
 
+    schema_incomplete = (
+        await is_record_schema_incomplete(db, "object", metadata, object_type)
+        if data.status == "draft"
+        else False
+    )
     obj = Object(
         idno=idno,
         object_type=object_type,
         collection_status=data.collection_status,
         status=data.status,
+        schema_incomplete=schema_incomplete,
         metadata_=metadata,
         ai_provenance=data.ai_provenance,
     )
@@ -455,6 +468,11 @@ async def update_object(
     obj.object_type = object_type
     obj.collection_status = data.collection_status
     obj.status = data.status
+    obj.schema_incomplete = (
+        await is_record_schema_incomplete(db, "object", metadata, object_type)
+        if data.status == "draft"
+        else False
+    )
     obj.metadata_ = metadata
     obj.ai_provenance = data.ai_provenance
 
@@ -819,6 +837,9 @@ async def restore_snapshot(
         obj.collection_status = data["collection_status"]
     if "metadata" in data:
         obj.metadata_ = data["metadata"]
+    obj.schema_incomplete = await is_record_schema_incomplete(
+        db, "object", obj.metadata_, obj.object_type
+    )
     flag_modified(obj, "metadata_")
     await flush_record(db, obj)
     await sync_schema_relations(db, "object", obj.id, obj.metadata_)

@@ -77,6 +77,8 @@ class MappingEntry(BaseModel):
     transforms: list[TransformConfig] = Field(default_factory=list[Any])
     # Place label only: splits "Land>Region>Ort" at this separator into a place hierarchy.
     path_separator: str | None = Field(default=None, max_length=8)
+    # URL fields only: optional second column/selector supplying the URL display label.
+    label_selector: str | None = None
 
 
 class MappingRequest(BaseModel):
@@ -184,6 +186,8 @@ def _normalize_mapping_entry(value: Any) -> dict[str, Any]:
         }
         if value.path_separator:
             entry["path_separator"] = value.path_separator
+        if value.label_selector:
+            entry["label_selector"] = value.label_selector
         return entry
     if isinstance(value, dict):
         transforms = value.get("transforms") or []
@@ -193,6 +197,8 @@ def _normalize_mapping_entry(value: Any) -> dict[str, Any]:
         }
         if value.get("path_separator"):
             entry["path_separator"] = value["path_separator"]
+        if value.get("label_selector"):
+            entry["label_selector"] = value["label_selector"]
         return entry
     return {"target": str(value), "transforms": []}
 

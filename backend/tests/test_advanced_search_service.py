@@ -347,3 +347,42 @@ async def test_incoming_relation_type_rejects_too_large_intermediate_sets(monkey
     with pytest.raises(ValueError, match="Zwischenergebnis zu groß"):
         await advanced_search_service.resolve_query(_DB(fields), query)
 
+
+@pytest.mark.asyncio
+async def test_date_clauses_support_bce_and_year_zero_chronological_bounds() -> None:
+    fields = {
+        "object": [
+            SimpleNamespace(
+                name="dating",
+                field_type="date",
+                is_public=True,
+                is_searchable=True,
+                parent_id=None,
+                settings={},
+            )
+        ]
+    }
+    query = AdvancedQuery(
+        record_type="object",
+        group=AdvancedGroup(
+            clauses=[
+                AdvancedFieldClause(field="dating", operator="between", value=["-0100", "0000"]),
+                AdvancedFieldClause(field="dating", operator="before", value="-0043"),
+                AdvancedFieldClause(field="dating", operator="after", value="-0043"),
+            ]
+        ),
+    )
+
+    resolved = await advanced_search_service.resolve_query(_DB(fields), query)
+    between_clause, before_clause, after_clause = resolved["bool"]["filter"]
+
+    between_filters = between_clause["nested"]["query"]["bool"]["filter"]
+    assert {"range": {"adv_fields.date_min": {"lte": 1231}}} in between_filters[1]["bool"]["should"]
+    assert {"range": {"adv_fields.date_max": {"gte": -999899}}} in between_filters[2]["bool"]["should"]
+    assert before_clause["nested"]["query"]["bool"]["filter"][1] == {
+        "range": {"adv_fields.date_max": {"lt": -429899}}
+    }
+    assert after_clause["nested"]["query"]["bool"]["filter"][1] == {
+        "range": {"adv_fields.date_min": {"gt": -428769}}
+    }
+

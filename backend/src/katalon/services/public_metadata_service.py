@@ -283,6 +283,8 @@ async def project_public_record[T: BaseModel](
         getattr(record, "metadata_", None), fields, target_subtype, hidden_targets
     )
     updates: dict[str, Any] = {"metadata_": metadata}
+    if hasattr(record, "schema_incomplete"):
+        updates["schema_incomplete"] = False
     ai_provenance = getattr(record, "ai_provenance", None)
     if ai_provenance:
         updates["ai_provenance"] = filter_public_ai_provenance(ai_provenance, metadata)

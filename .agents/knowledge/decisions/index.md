@@ -17,6 +17,7 @@
 * [Presence Lock](presence-lock.md) - generische edit_presence-Tabelle, Heartbeat/TTL statt Cleanup-Worker, admin-konfigurierbarer warning/blocking-Modus serverseitig erzwungen (#371)
 * [Broker-toleranter Enqueue](broker-tolerant-enqueue.md) - fire-and-forget schluckt+loggt Broker-Ausfall, Job-ID-Pfade liefern 503 statt 500 (#274)
 * [LIDO-DDB-Export](lido-ddb-export-konfiguration.md) - DDB-Anforderungen über Mapping-Settings/institution_config, Normalisierung zur Renderzeit, via-Relationen nur auf Anforderung
+* [Datumsschreibweise](datumsschreibweise-admin-portal.md) - ISO speichern, Admin-Eingabe und -Anzeige wie im Portal
 * [OAI-Löschmeldungen](oai-deleted-records.md) - oai_record_states im Indexpfad, deletedRecord transient, keine IDs nie öffentlicher Datensätze
 * [Reindex-Koordination und Streaming](reindex-koordination-und-streaming.md) - queued/dirty-Marker pro Typ, nicht-blockierende Lease mit Watchdog, batchweises Überschreiben statt Vorab-Löschen
 * [Mehrsprachigkeit](mehrsprachigkeit.md) - konfigurierbare Sprachliste, is_translatable + {lang: text}-Dict, dependency-freies Portal-i18n

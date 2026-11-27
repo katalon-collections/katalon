@@ -25,13 +25,15 @@ async def count_direct_children(db: AsyncSession, parent_id: uuid.UUID) -> int:
 
 async def reparent_children(
     db: AsyncSession, parent_id: uuid.UUID, new_parent_id: uuid.UUID | None
-) -> None:
+) -> list[uuid.UUID]:
     """Move active direct children of ``parent_id`` to ``new_parent_id``."""
-    await db.execute(
+    result = await db.execute(
         update(Place)
         .where(Place.parent_id == parent_id, Place.deleted_at.is_(None))
         .values(parent_id=new_parent_id)
+        .returning(Place.id)
     )
+    return list(result.scalars().all())
 
 
 async def get_place_subtree_ids(db: AsyncSession, root_id: uuid.UUID) -> list[uuid.UUID]:
@@ -83,7 +85,28 @@ class PlaceNode:
     title: str
 
 
-async def load_place_nodes(db: AsyncSession, *, public_only: bool) -> dict[uuid.UUID, PlaceNode]:
+async def load_place_chains(
+    db: AsyncSession, place_ids: set[uuid.UUID], *, public_only: bool
+) -> dict[uuid.UUID, PlaceNode]:
+    """The given places plus their parent chains, one query per hierarchy level.
+
+    For per-record callers (export contexts), where loading the whole tree each time
+    would multiply the number of records by the number of places.
+    """
+    nodes: dict[uuid.UUID, PlaceNode] = {}
+    pending = set(place_ids)
+    seen: set[uuid.UUID] = set()
+    while pending:
+        seen |= pending
+        level = await load_place_nodes(db, public_only=public_only, ids=pending)
+        nodes.update(level)
+        pending = {n.parent_id for n in level.values() if n.parent_id} - seen
+    return nodes
+
+
+async def load_place_nodes(
+    db: AsyncSession, *, public_only: bool, ids: set[uuid.UUID] | None = None
+) -> dict[uuid.UUID, PlaceNode]:
     """All active places (public ones only for anonymous callers) as one id -> node map.
 
     Place trees are small (hundreds to a few thousand rows), so hierarchy views work on this
@@ -96,6 +119,8 @@ async def load_place_nodes(db: AsyncSession, *, public_only: bool) -> dict[uuid.
     )
     if public_only:
         query = query.where(Place.status.in_(PUBLIC_STATUSES))
+    if ids is not None:
+        query = query.where(Place.id.in_(ids))
     nodes: dict[uuid.UUID, PlaceNode] = {}
     public_fields = await load_public_fields(db, "place") if public_only else None
     for row in (await db.execute(query)).all():

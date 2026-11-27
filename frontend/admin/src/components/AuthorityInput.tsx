@@ -60,7 +60,9 @@ export function GeoNamesMap({ value }: { value: AuthorityEntry }) {
   )
 }
 
-export function AuthorityInput({ source, value, onChange, disabled, autoFocus, onCancel }: {
+export function AuthorityInput({ id, ariaLabelledBy, source, value, onChange, disabled, autoFocus, onCancel }: {
+  id?: string
+  ariaLabelledBy?: string
   source: string
   value: AuthorityEntry | null
   onChange: (v: AuthorityEntry | null) => void
@@ -190,6 +192,7 @@ export function AuthorityInput({ source, value, onChange, disabled, autoFocus, o
   return (
     <div style={{ position: 'relative' }}>
       <input
+        id={id}
         ref={inputRef}
         className="fld"
         value={q}
@@ -199,7 +202,8 @@ export function AuthorityInput({ source, value, onChange, disabled, autoFocus, o
         disabled={disabled}
         autoFocus={autoFocus}
         role="combobox"
-        aria-label={t('searchAriaLabel', { source: source.toUpperCase() })}
+        aria-label={id || ariaLabelledBy ? undefined : t('searchAriaLabel', { source: source.toUpperCase() })}
+        aria-labelledby={ariaLabelledBy}
         aria-autocomplete="list"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}

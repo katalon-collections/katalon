@@ -1,7 +1,7 @@
 {
   "helpTextAriaLabel": "Help for this field",
   "dateInput": {
-    "placeholder": "YYYY, YYYY-MM or YYYY-MM-DD",
+    "placeholder": "YYYY, YYYY-MM-DD, 43 BCE, ca. 1900",
     "pickerTitleEnabled": "Open date picker",
     "pickerTitleDisabled": "Date is not a single day – edit manually",
     "pickerAriaLabel": "Pick a date"
@@ -78,6 +78,9 @@
   },
   "collection": {
     "publicWithoutPublicMembers": "This collection is public, but currently has no publicly visible members or child collections. It will appear empty in the portal."
+  },
+  "schemaIncomplete": {
+    "notice": "Schema incomplete: At least one required field is missing. Please fill in the missing required fields and save."
   },
   "locks": {
     "youLocked": "This record is exclusively locked by you. Reason: {{reason}}",

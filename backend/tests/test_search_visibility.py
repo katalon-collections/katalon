@@ -59,10 +59,63 @@ def test_date_bounds_cover_partial_and_open_edtf_dates() -> None:
     assert date_bounds("/1950") == (None, 19501231)
 
 
-@pytest.mark.parametrize("value", ["1950-13", "1950-02-30", "1951/1950"])
+def test_date_bounds_orders_bce_and_year_zero_chronologically() -> None:
+    chronological = [
+        "-9999",
+        "-0100",
+        "-0043-01-01",
+        "-0043-06-15",
+        "-0043-12-31",
+        "-0004-02-29",
+        "-0001-12-31",
+        "0000-01-01",
+        "0000-02-29",
+        "0000-12-31",
+        "0001-01-01",
+    ]
+    lowers = [date_bounds(value)[0] for value in chronological]
+    assert all(lower is not None for lower in lowers)
+    assert lowers == sorted(lowers)
+    assert len(set(lowers)) == len(lowers)
+    assert date_bounds("-0100/-0043") == (-999899, -428769)
+    assert date_bounds("-0043~/0000?") == (-429899, 1231)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["1950-13", "1950-02-30", "1951/1950", "-0043-02-29", "-0043/-0100"],
+)
 def test_date_bounds_rejects_invalid_values(value: str) -> None:
     with pytest.raises(ValueError):
         date_bounds(value)
+
+
+def test_index_doc_indexes_bce_dates_as_signed_sortable_adv_fields() -> None:
+    obj = Object(
+        id=uuid.uuid4(),
+        idno="OBJ-BCE",
+        status="public",
+        collection_status="active",
+        metadata_={"title": "Römische Münze", "dating": "-0043-06-15"},
+        created_at=datetime(2026, 1, 1),
+        updated_at=datetime(2026, 1, 2),
+    )
+    fields = [
+        SimpleNamespace(
+            name="dating",
+            field_type="date",
+            is_searchable=True,
+            is_public=True,
+            is_facet=False,
+            settings={},
+        ),
+    ]
+
+    doc = search_service._build_doc(
+        "object", obj, searchable_fields={"dating"}, field_definitions=fields
+    )
+
+    assert {"name": "dating", "date_min": -429385, "date_max": -429385} in doc["adv_fields"]
 
 
 def test_index_doc_builds_typed_advanced_fields_and_relation_ids() -> None:
@@ -412,7 +465,9 @@ async def test_search_documents_empty_query_defaults_to_idno_sort(monkeypatch) -
 
     await elasticsearch.search_documents(None, "object", "public", 0, 20)
 
-    assert captured["body"]["sort"] == [{"idno.keyword": "asc"}]
+    assert captured["body"]["sort"] == [
+        {"idno.keyword": {"order": "asc", "unmapped_type": "keyword"}}
+    ]
 
 
 @pytest.mark.asyncio

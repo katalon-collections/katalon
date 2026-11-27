@@ -5,6 +5,31 @@ Katalon Collections, Version für Version. Interne Refactorings, CI-/Test-Infras
 reine Dokumentationsänderungen sind bewusst nicht enthalten, um die Historie lesbar zu halten.
 Frühere Versionen listen nur neue Funktionen.
 
+## [1.52.0]
+
+### Neu
+
+- **Unvollständige Datensätze finden:** Wird ein Feld nachträglich zum Pflichtfeld, markiert die
+  Verwaltung die betroffenen Datensätze. Die Liste lässt sich danach filtern.
+- **LIDO-Export anpassen:** Das Trennzeichen der Datensatz-Kennung ist einstellbar,
+  Web-Adressen können mit Beschriftung ausgegeben werden, und Orte erscheinen auf Wunsch mit
+  ihrem übergeordneten Pfad.
+- **Suchindex per Kommandozeile neu aufbauen:** etwa nach einer Wiederherstellung aus dem Backup.
+- **Subtyp-Felder erweitern:** Ein Feld, das bisher nur für einen Subtyp galt, kann auf alle
+  Subtypen erweitert werden, auch wenn schon Daten darin stehen.
+- **Löschen im Formular:** Datensätze lassen sich direkt aus der Bearbeitung löschen.
+
+### Behoben
+
+- **Gespeicherte Import-Vorlagen:** Der Import berücksichtigt genau die sichtbaren Zuordnungen,
+  auch wenn der neuen Datei Spalten der Vorlage fehlen.
+- **Normdaten-Links im Portal:** Bei mehreren Einträgen ist jeder einzeln verlinkt.
+- **Pflichtfelder von Subtypen** gelten nur noch für Datensätze des jeweiligen Subtyps.
+- **Zurückgezogene Datensätze** zeigen unter ihrer dauerhaften Adresse einen Hinweis.
+- **Datumsangaben vor Christus** werden korrekt erfasst und angezeigt.
+- **Zustandsabfrage:** Ohne Anmeldung ist nur noch der Gesamtstatus sichtbar.
+- Außerdem Korrekturen an Suche, Ortspfaden, RDF-Abgleich und Formularbeschriftungen.
+
 ## [1.51.0]
 
 ### Neu

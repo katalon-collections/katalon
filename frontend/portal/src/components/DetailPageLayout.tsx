@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify'
 import type { FieldDefinition } from '../hooks/useFieldDefinitions'
 import { useRelationTypeLabels } from '../hooks/useRelationTypeLabels'
 import { usePortalConfig } from '../hooks/usePortalConfig'
-import { authorityUrl, facetItems, pidUrl, renderFieldValue, urlHref } from '../utils/renderFieldValue'
+import { externalHref, facetItems, renderFieldValue } from '../utils/renderFieldValue'
 import { RelationFieldRow, type RelationEntry } from './RelationFieldRow'
 import { AttachmentList } from './AttachmentField'
 import { attachmentFiles } from '../utils/attachments'
@@ -58,7 +58,7 @@ export function relationFilterHref(
 
 export function MetaRow({ label, value, href, items, children }: {
   label: ReactNode
-  value?: string
+  value?: ReactNode
   href?: string
   /** Extra content shown inside the row below the value (e.g. a map). */
   children?: ReactNode
@@ -244,19 +244,18 @@ function GroupChildValue({ group, child, value, locale, recordType, vocabularyLa
   }
   if (child.field_type === 'richtext' && typeof value === 'string') return richText(value)
   if (child.field_type === 'file') return <AttachmentList files={attachmentFiles(value)} />
-  const entries = child.field_type === 'url' || child.field_type === 'authority' || child.field_type === 'pid'
-    ? (Array.isArray(value) ? value : [value])
-    : [value]
+  return linkedValues(value, locale, child.field_type, vocabularyLabels)
+}
+
+/** Value(s) of a field as text, each url/pid/authority entry linked on its own.
+ *  Returns null without any value. */
+function linkedValues(value: unknown, locale: string, fieldType: string, vocabularyLabels: ReadonlyMap<string, string>): ReactNode {
+  const isLinkType = fieldType === 'url' || fieldType === 'authority' || fieldType === 'pid'
+  const entries = isLinkType && Array.isArray(value) ? value : [value]
   const nodes = entries.map((entry, i) => {
-    const rendered = renderFieldValue(entry, locale, child.field_type, vocabularyLabels)
+    const rendered = renderFieldValue(entry, locale, fieldType, vocabularyLabels)
     if (!rendered) return null
-    const href = child.field_type === 'url'
-      ? urlHref(entry)
-      : child.field_type === 'authority'
-        ? authorityUrl(entry)
-        : child.field_type === 'pid'
-          ? pidUrl(entry)
-          : undefined
+    const href = externalHref(entry, fieldType)
     return <Fragment key={i}>{i > 0 && ', '}{href ? <a href={href} target="_blank" rel="noreferrer">{rendered}</a> : rendered}</Fragment>
   }).filter(Boolean)
   return nodes.length > 0 ? <>{nodes}</> : null
@@ -368,13 +367,6 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
   }
   const rendered = renderFieldValue(value, locale, field.field_type, vocabularyLabels)
   if (!rendered) return null
-  const href = field.field_type === 'url'
-    ? urlHref(value)
-    : field.field_type === 'pid'
-      ? pidUrl(value)
-      : field.field_type === 'authority'
-        ? authorityUrl(value)
-        : undefined
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>
@@ -383,7 +375,7 @@ function MainField({ field, value, locale, recordType, aiProvenance, resolveRela
       </div>
       {field.field_type === 'richtext' ? richText(rendered) : (
         <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--fg-2)' }}>
-          {href ? <a href={href} target="_blank" rel="noreferrer">{rendered}</a> : rendered}
+          {linkedValues(value, locale, field.field_type, vocabularyLabels)}
         </div>
       )}
       {field.field_type === 'authority' && <GeoNamesMaps value={value} />}
@@ -435,16 +427,9 @@ function SidebarField({ field, value, locale, recordType, aiProvenance, resolveR
     const kind = facetKinds?.[recordType]?.[field.name]
     return <MetaRow label={label} items={items.map(item => ({ text: item.display, href: facetHref(recordType, field, item.raw, kind, item.id) }))} />
   }
-  const rendered = renderFieldValue(value, locale, field.field_type, vocabularyLabels)
-  const href = field.field_type === 'url'
-    ? urlHref(value)
-    : field.field_type === 'authority'
-      ? authorityUrl(value)
-      : field.field_type === 'pid'
-        ? pidUrl(value)
-        : undefined
-  return rendered ? <>
-    <MetaRow label={label} value={rendered} href={href}>
+  const content = linkedValues(value, locale, field.field_type, vocabularyLabels)
+  return content ? <>
+    <MetaRow label={label} value={content}>
       {field.field_type === 'geo' && <GeoMaps value={value} label={fieldLabel(field, locale)} />}
     </MetaRow>
     {field.field_type === 'authority' && <GeoNamesMaps value={value} />}

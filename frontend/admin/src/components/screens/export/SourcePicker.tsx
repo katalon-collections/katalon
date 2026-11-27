@@ -31,10 +31,13 @@ export interface SourcePickerProps {
 }
 
 interface SettingSpec {
+  type?: string
   title?: Record<string, string>
   description?: Record<string, string>
   enum?: string[]
   widget?: string
+  placeholder?: string
+  visible_when?: string
 }
 
 function schemaEntries(schema: Record<string, unknown> | undefined): [string, SettingSpec][] {
@@ -378,8 +381,11 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
     })
   }
 
-  function setSetting(key: string, next: string) {
-    onChange({ ...value, settings: { ...value.settings, [key]: next || undefined } })
+  function setSetting(key: string, next: string | boolean) {
+    const updated = { ...value.settings }
+    if (next === '' || next === false) delete updated[key]
+    else updated[key] = next
+    onChange({ ...value, settings: updated })
   }
 
   function setVia(patch: { relation_type?: string; target_type?: string }) {
@@ -645,7 +651,27 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
       )}
 
       {extraSettings.map(([key, spec]) => {
+        if (spec.visible_when && !value.settings[spec.visible_when]) return null
         const label = spec.title?.[lang] || spec.title?.de || key
+        if (spec.type === 'boolean') {
+          const checked = value.settings[key] === true
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', cursor: disabled ? 'default' : 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={e => setSetting(key, e.target.checked)}
+                />
+                {label}
+              </label>
+              {spec.description?.[lang] && (
+                <HelpPopover title={label} content={<div style={{ fontSize: 12 }}>{spec.description[lang]}</div>} />
+              )}
+            </div>
+          )
+        }
         const current = String(value.settings[key] ?? '')
         return (
           <div key={key}>
@@ -678,7 +704,13 @@ export function SourcePicker({ allowedKinds, value, fields, acceptedFieldTypes, 
                 ))}
               </select>
             ) : (
-              <CommitInput value={current} ariaLabel={label} disabled={disabled} onCommit={next => setSetting(key, next)} />
+              <CommitInput
+                value={current}
+                placeholder={spec.placeholder}
+                ariaLabel={label}
+                disabled={disabled}
+                onCommit={next => setSetting(key, next)}
+              />
             )}
           </div>
         )

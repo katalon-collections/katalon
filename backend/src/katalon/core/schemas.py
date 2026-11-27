@@ -401,6 +401,12 @@ class RecordCommon(BaseModel):
     updated_at: datetime
     deleted_at: datetime | None = None
     version: int
+    schema_incomplete: bool = False
+
+    @field_validator("schema_incomplete", mode="before")
+    @classmethod
+    def _coerce_none_schema_incomplete(cls, v: Any) -> Any:
+        return False if v is None else v
 
     _api_path: ClassVar[str]
     _record_type: ClassVar[str]
@@ -505,6 +511,12 @@ class ProcedureRead(ProcedureCreate):
     created_at: datetime
     updated_at: datetime
     version: int
+    schema_incomplete: bool = False
+
+    @field_validator("schema_incomplete", mode="before")
+    @classmethod
+    def _coerce_none_schema_incomplete(cls, v: Any) -> Any:
+        return False if v is None else v
 
 
 class ProcedureComplete(BaseModel):

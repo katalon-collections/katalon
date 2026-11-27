@@ -59,13 +59,25 @@ The `file` field type stores attachments on `object`, `entity`, `place`, `occurr
 
 Admins can duplicate existing field definitions directly from the schema field list (three-dots action menu) or from the field detail panel. Duplication generates a collision-free technical name (e.g. `title_copy` or `title_copy_2`), appends `(Kopie)` / `(Copy)` to configured labels, resets any non-reusable `description` detail role back to `none`, and places the new field directly after existing fields. For container fields (`field_type == "group"`), the endpoint (`POST /v1/schema/{field_id}/duplicate`) recursively clones all active sub-fields under the new container with unique sub-field names [@schema-api] [@schema-screen] [@schema-container-tests].
 
-## Moving Unused Fields Between Subtypes
+## Subtype Scope
+
+A field with a `target_subtype` binds records of exactly that subtype: required
+checks, default values, and PID auto-minting use `field_applies()`, and records
+without a subtype follow the generic fields only. The admin record forms show a
+field of another subtype only while the record holds stored data for it, as an
+optional field (`frontend/admin/src/lib/subtypeFields.ts`).
+
+## Changing A Field's Subtype
 
 An unused top-level field can move to another subtype of the same primary type
 through its `target_subtype`. A group moves together with its active children.
 The backend counts usage of the field and children before changing scope and
 returns 409 if any stored values would become hidden in the old subtype.
-Duplicate into the target scope instead when the field is in use. The API also
+Duplicate into the target scope instead when the field is in use.
+
+Widening to all subtypes (`target_subtype` null) keeps every value visible and
+is allowed for used fields. It returns 409 while another active top-level field
+of the same primary type shares the internal name. The API also
 checks naming collisions and target subtype existence [@schema-api] [@schema-screen].
 
 ## System Fields: `idno` And `label`

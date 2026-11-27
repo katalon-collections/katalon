@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useState, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, useId, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi, exportApi } from '../../api/client'
+import { users, objects, entities, places, occurrences, procedures, collections, storageLocations, schema, media, vocabularies, relations as relationsApi, search as searchApi, pids, subtypes, idno as idnoApi, formSections, formVariants, PORTAL_URL, PORTAL_ENABLED, ai, getTokenUser, VersionConflictError, authorizedFetch, workingSets, presence, locks, preservationApi, exportApi } from '../../api/client'
 import type { MediaFile, ActivePresence, LockInfo, ExportFormatInfo, AttachmentRecordType, AttachmentRef } from '../../api/client'
 import { AuthorityInput, GeoNamesMap, type AuthorityEntry } from '../AuthorityInput'
 import { GeoInput, type GeoEntry } from '../GeoInput'
@@ -22,6 +22,9 @@ import { AddToWorkingSetModal } from './AddToWorkingSetModal'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { RecordUsageLine } from '../RecordUsageLine'
 import { resolveActiveVariant } from '../../lib/formVariants'
+import { formatDateValue, isValidDateInput, normalizeDateInput, parseDateText } from '../../lib/dateInput'
+import { useRecordDelete } from '../../hooks/useRecordDelete'
+import { fieldsForSubtype } from '../../lib/subtypeFields'
 
 const INVALID_DATE_MESSAGE = 'Ungültiges Datum'
 
@@ -43,140 +46,28 @@ function pidHref(value: string): string | undefined {
   return undefined
 }
 
-/** Proleptic Gregorian leap rule; also correct for BCE years (year 0 = 1 v. Chr.). */
-function isLeapYear(year: number): boolean {
-  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-}
-
-function daysInMonth(year: number, month: number): number {
-  return [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
-}
-
-/** Normalizes a single (unqualified) date: European dd.mm.yyyy → ISO, BCE year padding. */
-function normalizeBareDate(value: string): string {
-  const trimmed = value.trim()
-  const european = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed)
-  if (european) {
-    const [, day, month, year] = european
-    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-    const parsed = new Date(`${iso}T00:00:00Z`)
-    if (parsed.getUTCFullYear() === Number(year) &&
-      parsed.getUTCMonth() + 1 === Number(month) &&
-      parsed.getUTCDate() === Number(day)) {
-      return iso
-    }
-    return trimmed
-  }
-  // BCE years: pad the year to 4 digits, e.g. "-43" → "-0043" (44 v. Chr.)
-  const bce = /^-(\d{1,4})(-\d{2}(-\d{2})?)?$/.exec(trimmed)
-  if (bce) return `-${bce[1].padStart(4, '0')}${bce[2] ?? ''}`
-  // CE years under 1000: pad the year to 4 digits, e.g. "100" → "0100"
-  const ce = /^(\d{1,4})(-\d{2}(-\d{2})?)?$/.exec(trimmed)
-  if (ce) return `${ce[1].padStart(4, '0')}${ce[2] ?? ''}`
-  return trimmed
-}
-
-/**
- * Normalizes a single date with optional uncertainty qualifier into canonical
- * EDTF-lite form ("1900~" = circa, "1900?" = unsicher, "1900~?" = beides).
- * Accepts German words ("ca.", "um", "(unsicher)") as well as the symbols directly.
- */
-function normalizeQualifiedDate(value: string): string {
-  let s = value.trim()
-  let circa = false
-  let uncertain = false
-  const unsicher = /^(.*?)\s*\(\s*unsicher\s*\)$/i.exec(s)
-  if (unsicher) {
-    uncertain = true
-    s = unsicher[1].trim()
-  }
-  if (s.endsWith('?')) {
-    uncertain = true
-    s = s.slice(0, -1).trim()
-  }
-  if (s.endsWith('~')) {
-    circa = true
-    s = s.slice(0, -1).trim()
-  }
-  const ca = /^(ca\.?|um)\s+(.+)$/i.exec(s)
-  if (ca) {
-    circa = true
-    s = ca[2].trim()
-  }
-  const bare = normalizeBareDate(s)
-  const suffix = circa && uncertain ? '~?' : circa ? '~' : uncertain ? '?' : ''
-  return `${bare}${suffix}`
-}
-
-/**
- * Normalizes date input into canonical storage form. Supports ranges via "START/END",
- * "START bis END", "vor END" (offener Anfang) and "nach START" (offenes Ende).
- */
-function normalizeDateInput(value: string): string {
-  const trimmed = value.trim()
-  const bis = /^(.*?)\s+bis\s+(.*)$/i.exec(trimmed)
-  if (bis) {
-    const [, left, right] = bis
-    return `${left.trim() ? normalizeQualifiedDate(left) : ''}/${right.trim() ? normalizeQualifiedDate(right) : ''}`
-  }
-  if (trimmed.split('/').length === 2) {
-    const [left, right] = trimmed.split('/')
-    return `${left.trim() ? normalizeQualifiedDate(left) : ''}/${right.trim() ? normalizeQualifiedDate(right) : ''}`
-  }
-  const vor = /^vor\s+(.+)$/i.exec(trimmed)
-  if (vor) return `/${normalizeQualifiedDate(vor[1])}`
-  const nach = /^nach\s+(.+)$/i.exec(trimmed)
-  if (nach) return `${normalizeQualifiedDate(nach[1])}/`
-  return normalizeQualifiedDate(trimmed)
-}
-
-function isValidDatePart(value: string): boolean {
-  if (/^-?\d{4}$/.test(value)) return true
-  if (/^-?\d{4}-(0[1-9]|1[0-2])$/.test(value)) return true
-  const full = /^(-?\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (!full) return false
-  const year = Number(full[1])
-  const month = Number(full[2])
-  const day = Number(full[3])
-  return day >= 1 && day <= daysInMonth(year, month)
-}
-
-function isValidQualifiedDate(value: string): boolean {
-  for (const suffix of ['~?', '~', '?']) {
-    if (value.endsWith(suffix)) return isValidDatePart(value.slice(0, -suffix.length))
-  }
-  return isValidDatePart(value)
-}
-
-function isValidDateInput(value: string): boolean {
-  const normalized = normalizeDateInput(value)
-  if (normalized.includes('/')) {
-    const parts = normalized.split('/')
-    if (parts.length !== 2) return false
-    const [start, end] = parts
-    if (!start && !end) return false
-    return (start === '' || isValidQualifiedDate(start)) && (end === '' || isValidQualifiedDate(end))
-  }
-  return isValidQualifiedDate(normalized)
-}
-
-function DateInput({ value, onChange, onBlur, disabled, style }: {
+function DateInput({ id, ariaLabelledBy, value, onChange, onBlur, disabled, style }: {
+  id?: string
+  ariaLabelledBy?: string
   value: string
   onChange: (value: string) => void
   onBlur?: () => void
   disabled?: boolean
   style?: CSSProperties
 }) {
-  const { t } = useTranslation('screenForm')
+  const { t, i18n } = useTranslation('screenForm')
   const pickerRef = useRef<HTMLInputElement>(null)
+  // Typed text while the field has focus; otherwise the stored value in display form.
+  const [draft, setDraft] = useState<string | null>(null)
   const normalized = normalizeDateInput(value)
-  const isPlainDate = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(normalized)
-  const pickerValue = /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+  const isPlainDate = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(normalized) && !normalized.startsWith('0000')
+  const pickerValue = /^\d{4}-\d{2}-\d{2}$/.test(normalized) && !normalized.startsWith('0000') ? normalized : ''
   return (
     <div style={{ display: 'flex', gap: 6 }}>
-      <input className="fld" type="text" value={value}
-        onChange={e => onChange(e.target.value)}
-        onBlur={() => { const n = normalizeDateInput(value); if (n !== value) onChange(n); onBlur?.() }}
+      <input id={id} aria-labelledby={ariaLabelledBy} className="fld" type="text"
+        value={draft ?? formatDateValue(value, i18n.language)}
+        onChange={e => { setDraft(e.target.value); onChange(parseDateText(e.target.value)) }}
+        onBlur={() => { setDraft(null); onBlur?.() }}
         placeholder={t('dateInput.placeholder')} disabled={disabled} style={{ flex: 1, ...style }} />
       <button type="button" className="btn sm ico gh" title={isPlainDate ? t('dateInput.pickerTitleEnabled') : t('dateInput.pickerTitleDisabled')}
         disabled={disabled || !isPlainDate} onClick={() => pickerRef.current?.showPicker()}>
@@ -289,6 +180,8 @@ function isValidNumberInput(raw: unknown): boolean {
 }
 
 function NumberInput({
+  id,
+  ariaLabelledBy,
   value,
   onChange,
   onBlur,
@@ -296,6 +189,8 @@ function NumberInput({
   disabled,
   style,
 }: {
+  id?: string
+  ariaLabelledBy?: string
   value: unknown
   onChange: (value: string) => void
   onBlur?: () => void
@@ -366,6 +261,8 @@ function NumberInput({
 
   return (
     <input
+      id={id}
+      aria-labelledby={ariaLabelledBy}
       className="fld"
       type="text"
       inputMode="decimal"
@@ -854,7 +751,8 @@ function mediaRightsFromInputs(root: ParentNode | null) {
   }
 }
 
-function VocabInput({ vocabId, value, onChange, disabled, autoFocus, onCancel }: {
+function VocabInput({ id, vocabId, value, onChange, disabled, autoFocus, onCancel }: {
+  id?: string
   vocabId: string
   value: VocabEntry | null
   onChange: (v: VocabEntry | null) => void
@@ -1024,6 +922,7 @@ function VocabInput({ vocabId, value, onChange, disabled, autoFocus, onCancel }:
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: 4 }}>
         <input
+          id={id}
           ref={inputRef}
           className="fld"
           style={{ flex: 1 }}
@@ -1100,7 +999,8 @@ function VocabInput({ vocabId, value, onChange, disabled, autoFocus, onCancel }:
  * - Non-repeatable: use `value` + `onChange` (live update on each keystroke).
  * - Repeatable: use `onAdd` (fires with committed text, then clears the input).
  */
-function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder, autoFocus, onCancel }: {
+function VocabFreeInput({ id, vocabId, value, onChange, onAdd, disabled, placeholder, autoFocus, onCancel }: {
+  id?: string
   vocabId: string
   value?: string
   onChange?: (v: string) => void
@@ -1242,6 +1142,7 @@ function VocabFreeInput({ vocabId, value, onChange, onAdd, disabled, placeholder
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: 4 }}>
         <input
+          id={id}
           ref={inputRef}
           className="fld"
           style={{ flex: 1 }}
@@ -1426,6 +1327,7 @@ function QuickCreateDialog({
 }
 
 function RelationInput({
+  id,
   targetType,
   targetSubtype,
   relTypeVocabId,
@@ -1435,6 +1337,7 @@ function RelationInput({
   disabled,
   allowCreate = true,
 }: {
+  id?: string
   targetType: RecordType | ''
   targetSubtype?: string
   relTypeVocabId?: string
@@ -1640,6 +1543,7 @@ function RelationInput({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
         <div style={{ position: 'relative', flex: '1 1 280px' }}>
           <input
+            id={id}
             ref={inputRef}
             className="fld"
             value={q}
@@ -1782,6 +1686,7 @@ function ConflictDialog({ conflict, saving, onCancel, onResolve }: {
   onCancel: () => void
   onResolve: (mergedMetadata: Record<string, unknown>) => void
 }) {
+  const dialogId = useId()
   const [choices, setChoices] = useState<Record<string, 'server' | 'mine'>>(
     () => Object.fromEntries(conflict.items.map(it => [it.name, 'mine' as const])),
   )
@@ -1801,19 +1706,22 @@ function ConflictDialog({ conflict, saving, onCancel, onResolve }: {
           Für die folgenden Felder gibt es unterschiedliche Werte. Wähle je Feld, welcher gelten soll.
           Deine übrigen Änderungen bleiben erhalten.
         </p>
-        {conflict.items.map(it => (
-          <div key={it.name} className="field" style={{ borderTop: '1px solid var(--border-s)', paddingTop: 10, marginTop: 10 }}>
-            <div className="lbl" style={{ fontWeight: 600 }}>{it.label}</div>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 6 }}>
-              <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'server'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'server' }))} />
-              <span><span style={{ color: 'var(--muted)' }}>Aktuell gespeichert (andere Person):</span> {formatConflictValue(it.server)}</span>
-            </label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 4 }}>
-              <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'mine'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'mine' }))} />
-              <span><span style={{ color: 'var(--muted)' }}>Meine Änderung:</span> {formatConflictValue(it.mine)}</span>
-            </label>
-          </div>
-        ))}
+        {conflict.items.map(it => {
+          const groupLabelId = `${dialogId}-${it.name}`
+          return (
+            <div key={it.name} className="field" role="radiogroup" aria-labelledby={groupLabelId} style={{ borderTop: '1px solid var(--border-s)', paddingTop: 10, marginTop: 10 }}>
+              <div id={groupLabelId} className="lbl" style={{ fontWeight: 600 }}>{it.label}</div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 6 }}>
+                <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'server'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'server' }))} />
+                <span><span style={{ color: 'var(--muted)' }}>Aktuell gespeichert (andere Person):</span> {formatConflictValue(it.server)}</span>
+              </label>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 4 }}>
+                <input type="radio" name={`c-${it.name}`} checked={choices[it.name] === 'mine'} onChange={() => setChoices(c => ({ ...c, [it.name]: 'mine' }))} />
+                <span><span style={{ color: 'var(--muted)' }}>Meine Änderung:</span> {formatConflictValue(it.mine)}</span>
+              </label>
+            </div>
+          )
+        })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-s)' }}>
         <button className="btn gh" onClick={onCancel} disabled={saving}>Abbrechen</button>
@@ -1907,7 +1815,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     : null
   const label = TYPE_LABELS[recordType]
   const subtypeKey = SUBTYPE_KEY[recordType]
-  const subtypeInputId = useId()
+  const formId = useId()
+  const subtypeInputId = `${formId}-subtype`
   const showIdno  = true
   const showMedia = recordType === 'object' && !quickCreate
   const showGeo   = recordType === 'place'
@@ -1922,11 +1831,25 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
   const user = getTokenUser()
   const features = user?.features ?? []
+  const { t: tList } = useTranslation('screenList')
+  const [canDelete, setCanDelete] = useState(false)
+  useEffect(() => {
+    users.recordPermissions()
+      .then(list => setCanDelete(list.some(p => p.record_type === recordType && p.action === 'delete')))
+      .catch(() => setCanDelete(false))
+  }, [recordType])
+  // Storage locations have their own screen with its own delete flow.
+  const listType = recordType === 'storage_location' ? null : recordType
+  const { requestDelete, dialogs: deleteDialogs } = useRecordDelete(
+    listType ?? 'object',
+    tList(`typeSingular${(listType ?? 'object').replace(/^./, c => c.toUpperCase())}`),
+    () => { onDirtyChange?.(false); onBack?.() },
+  )
   const canExport = features.includes('export')
   const canEditLocked = user?.role === 'admin' || user?.role === 'superuser'
   const canManageContent = !user || user.role === 'viewer' ? false : features.includes('import') || user.role === 'admin' || user.role === 'superuser'
 
-  const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [allFields, setFields] = useState<FieldDefinition[]>([])
   const [sections, setSections] = useState<FormSection[]>([])
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [variants, setVariants] = useState<FormVariant[]>([])
@@ -1939,6 +1862,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   const [loadedStatus, setLoadedStatus] = useState<Status | ProcedureStatus>('draft')
   const [collectionStatus, setCollectionStatus] = useState('active')
   const [publicWithoutPublicMembers, setPublicWithoutPublicMembers] = useState(false)
+  const [schemaIncomplete, setSchemaIncomplete] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -1950,6 +1874,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
   // loaded (base), so a save conflict can be resolved field-by-field.
   const [version, setVersion] = useState<number | null>(null)
   const [baseValues, setBaseValues] = useState<Record<string, unknown>>({})
+  const fields = useMemo(() => fieldsForSubtype(allFields, subtype, baseValues), [allFields, subtype, baseValues])
   // Presence Lock (#371): heartbeat while an existing record is open for editing.
   const [otherEditors, setOtherEditors] = useState<ActivePresence[]>([])
   // Manual Exclusive Lock (#371, Phase 2): persistent lock set by the user.
@@ -2191,6 +2116,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     setLoadedStatus('draft')
     setCollectionStatus('active')
     setPublicWithoutPublicMembers(false)
+    setSchemaIncomplete(false)
     setValues({})
     setMediaFiles([])
     setRels([])
@@ -2239,6 +2165,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           setPublicWithoutPublicMembers(
             (rec as { public_without_public_members?: boolean }).public_without_public_members ?? false
           )
+          setSchemaIncomplete(Boolean(rec.schema_incomplete))
           setValues(rec.metadata_)
           setAiProvenance('ai_provenance' in rec ? rec.ai_provenance : {})
           setVersion(rec.version)
@@ -2279,9 +2206,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         const fieldDefs = await schema.list(recordType, recSubtype)
         setFields(fieldDefs)
         if (!rec) {
-          const defaults = defaultsFor(fieldDefs)
+          const scoped = fieldsForSubtype(fieldDefs, recSubtype ?? '')
+          const defaults = defaultsFor(scoped)
           if (initialLabel) {
-            const labelField = fieldDefs.find(f => f.field_type === 'text' && TITLE_FIELD_NAMES.includes(f.name))
+            const labelField = scoped.find(f => f.field_type === 'text' && TITLE_FIELD_NAMES.includes(f.name))
             if (labelField) defaults[labelField.name] = labelField.is_repeatable ? [initialLabel] : initialLabel
           }
           setValues(defaults)
@@ -2313,7 +2241,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     if (!isNew || !subtypeKey || !subtype) return
     schema.list(recordType, subtype).then(fieldDefs => {
       setFields(fieldDefs)
-      setValues(prev => ({ ...defaultsFor(fieldDefs), ...prev }))
+      setValues(prev => ({ ...defaultsFor(fieldsForSubtype(fieldDefs, subtype)), ...prev }))
     }).catch(() => {})
     formVariants.list(recordType, subtype).then(variantList => {
       setVariants(variantList)
@@ -2721,7 +2649,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
     }
   }
 
-  function renderSubFieldInput(sf: FieldDefinition, val: unknown, onChange: (v: unknown) => void, disabled: boolean) {
+  function renderSubFieldInput(
+    sf: FieldDefinition,
+    val: unknown,
+    onChange: (v: unknown) => void,
+    disabled: boolean,
+    inputId: string,
+    labelId: string,
+  ) {
     switch (sf.field_type) {
       case 'boolean':
         return (
@@ -2733,6 +2668,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       case 'number':
         return (
           <NumberInput
+            id={inputId}
             value={val}
             onChange={onChange}
             disabled={disabled}
@@ -2740,10 +2676,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           />
         )
       case 'date':
-        return <DateInput value={(val as string) ?? ''} onChange={onChange} disabled={disabled} />
+        return <DateInput id={inputId} value={(val as string) ?? ''} onChange={onChange} disabled={disabled} />
       case 'vocab':
         return (
           <VocabInput
+            id={inputId}
             vocabId={(sf.settings?.vocabulary_id as string) ?? ''}
             value={(val as VocabEntry | undefined) ?? null}
             onChange={v => onChange(v ?? undefined)}
@@ -2753,6 +2690,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       case 'vocab_free':
         return (
           <VocabFreeInput
+            id={inputId}
             vocabId={(sf.settings?.vocabulary_id as string) ?? ''}
             value={(val as string) ?? ''}
             onChange={v => onChange(v)}
@@ -2767,6 +2705,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           </div>
         ) : (
           <RelationInput
+            id={inputId}
             targetType={(sf.settings?.target_type as RecordType) ?? ''}
             targetSubtype={sf.settings?.target_subtype as string | undefined}
             relTypeVocabId={(sf.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
@@ -2779,6 +2718,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       case 'authority':
         return (
           <AuthorityInput
+            id={inputId}
             source={(sf.settings?.source as string) ?? ''}
             value={(val as AuthorityEntry | undefined) ?? null}
             onChange={value => onChange(value ?? undefined)}
@@ -2786,10 +2726,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           />
         )
       case 'richtext':
-        return <RichTextEditor value={(val as string) ?? ''} onChange={v => onChange(v)} placeholder={getLabel(sf, sf.name)} disabled={disabled} />
+        return <RichTextEditor ariaLabelledBy={labelId} value={(val as string) ?? ''} onChange={v => onChange(v)} placeholder={getLabel(sf, sf.name)} disabled={disabled} />
       case 'file':
         return (
           <FileField
+            id={inputId}
             recordType={recordType as AttachmentRecordType}
             recordId={savedId}
             repeatable={sf.is_repeatable}
@@ -2799,22 +2740,23 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           />
         )
       case 'geo':
-        return <GeoInput value={val as GeoEntry | undefined} onChange={onChange} disabled={disabled} />
+        return <GeoInput ariaLabelledBy={labelId} value={val as GeoEntry | undefined} onChange={onChange} disabled={disabled} />
       case 'url': {
         const entry = (val as PidEntry | undefined) ?? { value: '', label: '' }
         return (
           <div style={{ display: 'flex', gap: 6 }}>
-            <input className="fld mono" type="url" value={entry.value} style={{ flex: 2 }}
+            <input id={inputId} className="fld mono" type="url" value={entry.value} style={{ flex: 2 }}
               onChange={e => onChange({ ...entry, value: e.target.value })}
               placeholder="https://…" disabled={disabled} />
             <input className="fld" value={entry.label} style={{ flex: 1 }}
+              aria-label={`${getLabel(sf, sf.name)} – ${t('url.linkLabel')}`}
               onChange={e => onChange({ ...entry, label: e.target.value })}
               placeholder={t('url.linkLabel')} disabled={disabled} />
           </div>
         )
       }
       default:
-        return <input className="fld" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
+        return <input id={inputId} className="fld" value={(val as string) ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder={getLabel(sf, sf.name)} />
     }
   }
 
@@ -3216,6 +3158,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         }
         setSavedId(created.id)
         setLoadedStatus((created as { status?: string }).status as Status)
+        setSchemaIncomplete(Boolean(created.schema_incomplete))
         onSaved?.(created.id)
         if (showMedia) loadMedia(created.id)
         await syncCollectionMembership(created.id)
@@ -3231,6 +3174,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
         try {
           const updated = await (api.update as (id: string, d: typeof payload, v?: number) => Promise<AnyRecord>)(recordId!, payload, version ?? undefined)
           setVersion(updated.version)
+          setSchemaIncomplete(Boolean(updated.schema_incomplete))
           setBaseValues(payload.metadata_ as Record<string, unknown>)
         } catch (e) {
           if (e instanceof VersionConflictError) {
@@ -3315,6 +3259,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       setBaseValues(cleanMerged)
       setVersion(updated.version)
       setLoadedStatus((updated as { status?: string }).status as Status)
+      setSchemaIncomplete(Boolean(updated.schema_incomplete))
       setConflict(null)
       setIsDirty(false)
       setSaveOk(true)
@@ -3831,6 +3776,11 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </button>
               : null
           )}
+          {listType && currentId && !isNew && !quickCreate && canDelete && (
+            <button className="btn gh dn" onClick={() => requestDelete(currentId)} disabled={saving}>
+              <Trash size={13} /> {tList('deleteRowTitle')}
+            </button>
+          )}
           <button className="btn gh" onClick={() => {
             if (quickCreate) { onBack?.(); return }
             if (isDirty) {
@@ -3858,6 +3808,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
       {recordType === 'collection' && publicWithoutPublicMembers && (
         <div className="record-notice" style={{ background: '#fffbeb', borderBottom: '1px solid #fcd34d', color: '#92400e' }}>
           {t('collection.publicWithoutPublicMembers')}
+        </div>
+      )}
+
+      {schemaIncomplete && (
+        <div className="record-notice" role="status" style={{ background: '#fff7ed', borderBottom: '1px solid #fdba74', color: '#9a3412' }}>
+          {t('schemaIncomplete.notice')}
         </div>
       )}
 
@@ -3958,10 +3914,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
               <div className="bd">
                 {showIdno && (() => {
                   const idnoField = fields.find(f => f.name === 'idno')
+                  const idnoInputId = `${formId}-idno`
                   return (
                   <div className="field">
-                    <div className="lbl">{getLabel(idnoField, 'ID-Nr.')} <span className="req">*</span></div>
+                    <label className="lbl" htmlFor={idnoInputId}>{getLabel(idnoField, 'ID-Nr.')} <span className="req">*</span></label>
                     <input
+                      id={idnoInputId}
                       className="fld mono"
                       value={idno}
                       onChange={e => { setIdno(e.target.value); setIsDirty(true) }}
@@ -3990,16 +3948,22 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   const labelField = fields.find(f => f.name === 'label')
                   if (!labelField) return null
                   const labelVal = values.label
+                  const labelInputId = `${formId}-label`
+                  const labelHeadingId = `${formId}-label-lbl`
                   return (
                     <div className="field">
                       <div className="lbl">
-                        {getLabel(labelField, 'Label')} <span className="req">*</span>
+                        <label id={labelHeadingId} htmlFor={labelInputId}>
+                          {getLabel(labelField, 'Label')} <span className="req">*</span>
+                        </label>
                         {getLabel({ label: labelField.help_text }) && (
                           <HelpPopover content={<div>{getLabel({ label: labelField.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
                         )}
                       </div>
                       {labelField.is_translatable ? (
                         <TranslatableInput
+                          id={labelInputId}
+                          ariaLabelledBy={labelHeadingId}
                           languages={languages}
                           value={(labelVal as Record<string, string> | undefined) ?? {}}
                           onChange={(lang, v) => updateTranslatable('label', lang, v)}
@@ -4012,6 +3976,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         />
                       ) : (
                         <input
+                          id={labelInputId}
                           className="fld"
                           value={(labelVal as string | undefined) ?? ''}
                           onChange={e => {
@@ -4075,8 +4040,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {showCollectionStatus && (
                   <div className="field">
-                    <div className="lbl">Bestandsstatus</div>
+                    <label className="lbl" htmlFor={`${formId}-collection-status`}>Bestandsstatus</label>
                     <select
+                      id={`${formId}-collection-status`}
                       className="fld"
                       value={collectionStatus}
                       onChange={e => { setCollectionStatus(e.target.value); setIsDirty(true) }}
@@ -4089,8 +4055,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {showParentCollection && (
                   <div className="field">
-                    <div className="lbl">Übergeordnete Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                    <label className="lbl" htmlFor={`${formId}-parent-collection`}>Übergeordnete Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></label>
                     <select
+                      id={`${formId}-parent-collection`}
                       className="fld"
                       value={parentId ?? ''}
                       onChange={e => { setParentId(e.target.value || null); setIsDirty(true) }}
@@ -4106,8 +4073,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {showParentPlace && (
                   <div className="field">
-                    <div className="lbl">{t('placeParentLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('subtypeOptional')})</span></div>
+                    {parentId ? (
+                      <div className="lbl">{t('placeParentLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('subtypeOptional')})</span></div>
+                    ) : (
+                      <label className="lbl" htmlFor={`${formId}-parent-place`}>{t('placeParentLabel')} <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>({t('subtypeOptional')})</span></label>
+                    )}
                     <PlaceParentPicker
+                      id={`${formId}-parent-place`}
                       value={parentId}
                       excludeId={currentId}
                       disabled={justCreated}
@@ -4119,8 +4091,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                 {showGeo && (
                   <div className="field">
-                    <div className="lbl">Koordinaten</div>
+                    <div id={`${formId}-geo-lbl`} className="lbl">Koordinaten</div>
                     <GeoInput
+                      ariaLabelledBy={`${formId}-geo-lbl`}
                       showAccuracy={false}
                       value={lat !== '' && lon !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? { lat: Number(lat), lon: Number(lon) } : undefined}
                       onChange={v => {
@@ -4136,12 +4109,12 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 {showProcedureFields && (
                   <>
                     <div className="field">
-                      <div className="lbl">Referenznummer</div>
-                      <input className="fld mono" value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setIsDirty(true) }} disabled={justCreated} />
+                      <label className="lbl" htmlFor={`${formId}-reference-number`}>Referenznummer</label>
+                      <input id={`${formId}-reference-number`} className="fld mono" value={referenceNumber} onChange={e => { setReferenceNumber(e.target.value); setIsDirty(true) }} disabled={justCreated} />
                     </div>
                     <div className="field">
-                      <div className="lbl">Daten</div>
-                      <div className="fg-3">
+                      <div id={`${formId}-dates-lbl`} className="lbl">Daten</div>
+                      <div className="fg-3" role="group" aria-labelledby={`${formId}-dates-lbl`}>
                         <input className="fld mono" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Startdatum" aria-label="Startdatum" />
                         <input className="fld mono" type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Fälligkeitsdatum" aria-label="Fälligkeitsdatum" />
                         <input className="fld mono" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setIsDirty(true) }} disabled={justCreated} title="Enddatum" aria-label="Enddatum" />
@@ -4185,11 +4158,40 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     ? ((val as PidEntry | undefined) ?? { value: '', label: '' })
                     : undefined
 
+                  const fieldInputId = `${formId}-input-${f.name}`
+                  const fieldLabelId = `${formId}-lbl-${f.name}`
+                  const hasDirectInput = f.is_translatable
+                    ? f.field_type !== 'richtext'
+                    : f.field_type === 'vocab'
+                      ? (repeatable ? (((val as VocabEntry[] | undefined) ?? []).length === 0 || addingRepeatableField === f.name) : !val)
+                      : f.field_type === 'vocab_free'
+                        ? (repeatable ? (((val as string[] | undefined) ?? []).length === 0 || addingRepeatableField === f.name) : true)
+                        : f.field_type === 'authority'
+                          ? (repeatable ? (((val as AuthorityEntry[] | undefined) ?? []).length === 0 || addingRepeatableField === f.name) : !val)
+                          : f.field_type === 'relation'
+                            ? (repeatable ? (((val as RelationEntry[] | undefined) ?? []).length === 0 || addingRepeatableField === f.name) : !val)
+                            : f.field_type === 'file'
+                              ? savedId != null
+                              : f.field_type === 'url'
+                                ? (repeatable ? ((val as PidEntry[] | undefined) ?? []).length > 0 : true)
+                                : f.field_type === 'group' || f.field_type === 'pid' || f.field_type === 'geo' || f.field_type === 'boolean' || f.field_type === 'richtext'
+                                  ? false
+                                  : (repeatable ? (vals?.length ?? 0) > 0 : true)
+
                   return (
-                    <fieldset id={`field-${f.name}`} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: '6px 8px', margin: '0 -8px', borderRadius: 4, transition: 'background .2s', background: highlightedField === f.name ? 'rgba(30, 58, 138, .10)' : undefined }}>
+                    <fieldset id={`field-${f.name}`} aria-labelledby={hasDirectInput ? undefined : fieldLabelId} key={f.id} className="field" disabled={Boolean(f.settings?.is_locked) && !canEditLocked} style={{ border: 0, padding: '6px 8px', margin: '0 -8px', borderRadius: 4, transition: 'background .2s', background: highlightedField === f.name ? 'rgba(30, 58, 138, .10)' : undefined }}>
                       <div className="lbl" title={repeatable ? (t('repeatable.hint') || 'Wiederholbares Feld') : undefined}>
-                        {getLabel(f, f.name)}
-                        {f.is_required && <span className="req">*</span>}
+                        {hasDirectInput ? (
+                          <label id={fieldLabelId} htmlFor={fieldInputId}>
+                            {getLabel(f, f.name)}
+                            {f.is_required && <span className="req"> *</span>}
+                          </label>
+                        ) : (
+                          <span id={fieldLabelId}>
+                            {getLabel(f, f.name)}
+                            {f.is_required && <span className="req"> *</span>}
+                          </span>
+                        )}
                         {getLabel({ label: f.help_text }) && (
                           <HelpPopover content={<div>{getLabel({ label: f.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
                         )}
@@ -4211,6 +4213,8 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
 
                       {f.is_translatable ? (
                         <TranslatableInput
+                          id={fieldInputId}
+                          ariaLabelledBy={fieldLabelId}
                           languages={languages}
                           value={(val as Record<string, string> | undefined) ?? {}}
                           onChange={(lang, v) => updateTranslatable(f.name, lang, v)}
@@ -4231,6 +4235,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         repeatable ? (
                           ((val as VocabEntry[] | undefined) ?? []).length === 0 ? (
                             <VocabInput
+                              id={fieldInputId}
                               vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                               value={null}
                               onChange={v => { if (v) addVocab(f.name, v) }}
@@ -4274,6 +4279,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                                   <div style={{ flex: 1 }}>
                                     <VocabInput
+                                      id={fieldInputId}
                                       vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                                       value={null}
                                       onChange={v => { if (v) addVocab(f.name, v) }}
@@ -4297,6 +4303,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           )
                         ) : (
                           <VocabInput
+                            id={fieldInputId}
                             vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                             value={(val as VocabEntry | undefined) ?? null}
                             onChange={v => setVocab(f.name, v)}
@@ -4307,6 +4314,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         repeatable ? (
                           ((val as string[] | undefined) ?? []).length === 0 ? (
                             <VocabFreeInput
+                              id={fieldInputId}
                               vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                               onAdd={v => addFreeVocab(f.name, v)}
                               disabled={justCreated}
@@ -4350,6 +4358,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                                   <div style={{ flex: 1 }}>
                                     <VocabFreeInput
+                                      id={fieldInputId}
                                       vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                                       onAdd={v => addFreeVocab(f.name, v)}
                                       disabled={justCreated}
@@ -4373,6 +4382,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           )
                         ) : (
                           <VocabFreeInput
+                            id={fieldInputId}
                             vocabId={(f.settings?.vocabulary_id as string) ?? ''}
                             value={(val as string | undefined) ?? ''}
                             onChange={v => setValues(prev => ({ ...prev, [f.name]: v }))}
@@ -4383,6 +4393,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         repeatable ? (
                           ((val as AuthorityEntry[] | undefined) ?? []).length === 0 ? (
                             <AuthorityInput
+                              id={fieldInputId}
                               source={(f.settings?.source as string) ?? 'gnd'}
                               value={null}
                               onChange={v => { if (v) addAuthority(f.name, v) }}
@@ -4432,6 +4443,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                                   <div style={{ flex: 1 }}>
                                     <AuthorityInput
+                                      id={fieldInputId}
                                       source={(f.settings?.source as string) ?? 'gnd'}
                                       value={null}
                                       onChange={v => { if (v) addAuthority(f.name, v) }}
@@ -4455,6 +4467,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           )
                         ) : (
                           <AuthorityInput
+                            id={fieldInputId}
                             source={(f.settings?.source as string) ?? 'gnd'}
                             value={(val as AuthorityEntry | undefined) ?? null}
                             onChange={v => setAuthority(f.name, v)}
@@ -4465,6 +4478,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         repeatable ? (
                           ((val as RelationEntry[] | undefined) ?? []).length === 0 ? (
                             <RelationInput
+                              id={fieldInputId}
                               targetType={(f.settings?.target_type as RecordType) ?? ''}
                               targetSubtype={f.settings?.target_subtype as string | undefined}
                               relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
@@ -4488,6 +4502,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
                                   <div style={{ flex: 1 }}>
                                     <RelationInput
+                                      id={fieldInputId}
                                       targetType={(f.settings?.target_type as RecordType) ?? ''}
                                       targetSubtype={f.settings?.target_subtype as string | undefined}
                                       relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
@@ -4536,6 +4551,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             )}
                             {!val && (
                               <RelationInput
+                                id={fieldInputId}
                                 targetType={(f.settings?.target_type as RecordType) ?? ''}
                                 targetSubtype={f.settings?.target_subtype as string | undefined}
                                 relTypeVocabId={(f.settings?.relation_type_vocab as string | undefined) ?? relTypeVocabId}
@@ -4553,12 +4569,32 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             <div key={i} className="group-instance">
                               <button className="btn sm ico gh dn group-instance-remove" onClick={() => removeGroupInstance(f.name, i)} disabled={justCreated} title={t('remove')} aria-label={t('remove')}><X size={12} /></button>
                               <div className="group-instance-grid">
-                              {(f.children ?? []).map(sf => (
+                              {(f.children ?? []).map(sf => {
+                                const subInputId = `${formId}-group-${f.name}-${i}-${sf.name}`
+                                const subLabelId = `${formId}-group-lbl-${f.name}-${i}-${sf.name}`
+                                const subVal = instance[sf.name]
+                                const subHasDirectInput = sf.field_type === 'boolean' || sf.field_type === 'richtext' || sf.field_type === 'geo'
+                                  ? false
+                                  : sf.field_type === 'vocab' || sf.field_type === 'authority' || sf.field_type === 'relation'
+                                    ? !subVal
+                                    : sf.field_type === 'file'
+                                      ? savedId != null
+                                      : true
+                                return (
                                 <div key={sf.id} className={`group-subfield${sf.field_type === 'richtext' ? ' wide' : ''}`}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                                     <div className="lbl" style={{ marginBottom: 0, flex: 1 }}>
-                                      {getLabel(sf, sf.name)}
-                                      {sf.is_required && <span className="req">*</span>}
+                                      {subHasDirectInput ? (
+                                        <label id={subLabelId} htmlFor={subInputId}>
+                                          {getLabel(sf, sf.name)}
+                                          {sf.is_required && <span className="req"> *</span>}
+                                        </label>
+                                      ) : (
+                                        <span id={subLabelId}>
+                                          {getLabel(sf, sf.name)}
+                                          {sf.is_required && <span className="req"> *</span>}
+                                        </span>
+                                      )}
                                       {getLabel({ label: sf.help_text }) && (
                                         <HelpPopover content={<div>{getLabel({ label: sf.help_text })}</div>} ariaLabel={t('helpTextAriaLabel') || 'Hilfe zu diesem Feld'} />
                                       )}
@@ -4576,9 +4612,10 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                       </button>
                                     )}
                                   </div>
-                                  {renderSubFieldInput(sf, instance[sf.name], v => updateGroupSubField(f.name, i, sf.name, v), justCreated)}
+                                  {renderSubFieldInput(sf, subVal, v => updateGroupSubField(f.name, i, sf.name, v), justCreated, subInputId, subLabelId)}
                                 </div>
-                              ))}
+                                )
+                              })}
                               </div>
                               {(() => {
                                 const activeSubFieldNames = new Set((f.children ?? []).map(sf => sf.name))
@@ -4689,6 +4726,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         })()
                       ) : f.field_type === 'file' ? (
                         <FileField
+                          id={fieldInputId}
                           recordType={recordType as AttachmentRecordType}
                           recordId={savedId}
                           repeatable={repeatable}
@@ -4702,7 +4740,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             {((val as GeoEntry[] | undefined) ?? []).map((entry, i) => (
                               <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                                 <div style={{ flex: 1 }}>
-                                  <GeoInput value={entry} disabled={justCreated}
+                                  <GeoInput ariaLabelledBy={fieldLabelId} value={entry} disabled={justCreated}
                                     onChange={v => {
                                       const cur = [...((val as GeoEntry[] | undefined) ?? [])]
                                       cur[i] = v as GeoEntry
@@ -4717,7 +4755,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             </button>
                           </>
                         ) : (
-                          <GeoInput value={val as GeoEntry | undefined} onChange={v => setField(f.name, v)} disabled={justCreated} />
+                          <GeoInput ariaLabelledBy={fieldLabelId} value={val as GeoEntry | undefined} onChange={v => setField(f.name, v)} disabled={justCreated} />
                         )
                       ) : f.field_type === 'url' ? (
                         repeatable ? (
@@ -4730,12 +4768,16 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                 <>
                                   {urlEntries.map((entry, i) => (
                                     <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                                      <input className="fld mono" value={entry.value}
+                                      <input
+                                        id={i === 0 ? fieldInputId : `${fieldInputId}-${i}`}
+                                        aria-labelledby={i > 0 ? fieldLabelId : undefined}
+                                        className="fld mono" value={entry.value}
                                         type="url"
                                         onChange={e => updateUrl(f.name, i, 'value', e.target.value)}
                                         placeholder="https://…"
                                         disabled={justCreated} style={{ flex: 2 }} />
                                       <input className="fld" value={entry.label}
+                                        aria-label={`${getLabel(f, f.name)} – ${t('url.linkLabel')}`}
                                         onChange={e => updateUrl(f.name, i, 'label', e.target.value)}
                                         placeholder={t('url.linkLabel')}
                                         disabled={justCreated} style={{ flex: 1 }} />
@@ -4754,12 +4796,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                             const entry = ((val as PidEntry | undefined) ?? { value: '', label: '' })
                             return (
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <input className="fld mono" value={entry.value}
+                            <input id={fieldInputId} className="fld mono" value={entry.value}
                               type="url"
                               onChange={e => setField(f.name, { ...entry, value: e.target.value })}
                               placeholder="https://…"
                               disabled={justCreated} style={{ flex: 2 }} />
                             <input className="fld" value={entry.label}
+                              aria-label={`${getLabel(f, f.name)} – ${t('url.linkLabel')}`}
                               onChange={e => setField(f.name, { ...entry, label: e.target.value })}
                               placeholder={t('url.linkLabel')}
                               disabled={justCreated} style={{ flex: 1 }} />
@@ -4772,16 +4815,27 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           {(vals ?? []).map((v, i) => (
                             <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                               {f.field_type === 'date' ? (
-                                <DateInput value={String(v)} onChange={value => updateRepeat(f.name, i, value)} disabled={justCreated} />
+                                <DateInput
+                                  id={i === 0 ? fieldInputId : `${fieldInputId}-${i}`}
+                                  ariaLabelledBy={i > 0 ? fieldLabelId : undefined}
+                                  value={String(v)}
+                                  onChange={value => updateRepeat(f.name, i, value)}
+                                  disabled={justCreated}
+                                />
                               ) : f.field_type === 'number' ? (
                                 <NumberInput
+                                  id={i === 0 ? fieldInputId : `${fieldInputId}-${i}`}
+                                  ariaLabelledBy={i > 0 ? fieldLabelId : undefined}
                                   value={v}
                                   onChange={value => updateRepeat(f.name, i, value)}
                                   placeholder={t('numberInput.placeholder')}
                                   disabled={justCreated}
                                 />
                               ) : (
-                                <input className="fld" value={v}
+                                <input
+                                  id={i === 0 ? fieldInputId : `${fieldInputId}-${i}`}
+                                  aria-labelledby={i > 0 ? fieldLabelId : undefined}
+                                  className="fld" value={v}
                                   onChange={e => updateRepeat(f.name, i, e.target.value)}
                                   placeholder={getLabel(f, f.name)}
                                   disabled={justCreated} />
@@ -4808,7 +4862,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           <span style={{ fontSize: 13 }}>{f.label.de}</span>
                         </label>
                       ) : f.field_type === 'date' ? (
-                        <DateInput value={(val as string) ?? ''}
+                        <DateInput id={fieldInputId} value={(val as string) ?? ''}
                           onChange={value => {
                             setField(f.name, value)
                             clearFieldFeedback(f.name)
@@ -4818,6 +4872,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                           style={getFeedbackStyle(f.name)} />
                       ) : f.field_type === 'number' ? (
                         <NumberInput
+                          id={fieldInputId}
                           value={val}
                           onChange={value => {
                             setField(f.name, value)
@@ -4830,13 +4885,14 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                         />
                       ) : f.field_type === 'richtext' ? (
                         <RichTextEditor
+                          ariaLabelledBy={fieldLabelId}
                           value={(val as string) ?? ''}
                           onChange={v => { setField(f.name, v); clearFieldFeedback(f.name) }}
                           placeholder={getLabel(f, f.name)}
                           disabled={justCreated}
                           style={getFeedbackStyle(f.name)} />
                       ) : (
-                        <input className="fld"
+                        <input id={fieldInputId} className="fld"
                           value={(val as string) ?? ''}
                           onChange={e => {
                             setField(f.name, e.target.value)
@@ -4893,8 +4949,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                   <div className="hd">Sammlung</div>
                   <div className="bd">
                     <div className="field">
-                      <div className="lbl">Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></div>
+                      <label className="lbl" htmlFor={`${formId}-collection`}>Sammlung <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>(optional)</span></label>
                       <select
+                        id={`${formId}-collection`}
                         className="fld"
                         value={selectedCollectionId}
                         onChange={e => { setSelectedCollectionId(e.target.value); setIsDirty(true) }}
@@ -5203,8 +5260,9 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                       <div className="empty" style={{ padding: '8px 0 14px' }}>Noch keine Objekte verknüpft.</div>
                     )}
                     <div className="field" style={{ marginBottom: 0 }}>
-                      <div className="lbl">Objekt hinzufügen</div>
+                      <label className="lbl" htmlFor={`${formId}-rel-add-object`}>Objekt hinzufügen</label>
                       <RelationInput
+                        id={`${formId}-rel-add-object`}
                         targetType="object"
                         fixedRelationType="concerns"
                         onAdd={entry => handleAddObjectRelation({ id: entry.id, title: entry.label, record_type: 'object', status: 'draft', score: null })}
@@ -5242,17 +5300,18 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                     )}
                     {genericAddOpen && (
                       <div className="generic-relation-picker">
-                        <div className="lbl">1&nbsp; Zieltyp</div>
+                        <label className="lbl" htmlFor={`${formId}-rel-target-type`}>1&nbsp; Zieltyp</label>
                         <select
+                          id={`${formId}-rel-target-type`}
                           className="fld"
                           value={addTargetType}
                           onChange={e => setAddTargetType(e.target.value as RecordType)}
-                          aria-label="Zieltyp"
                         >
                           {(Object.keys(TYPE_LABELS) as RecordType[]).map(type => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
                         </select>
-                        <div className="lbl" style={{ marginTop: 10 }}>2–3&nbsp; Relationstyp und Datensatz</div>
+                        <label className="lbl" htmlFor={`${formId}-rel-generic`} style={{ marginTop: 10 }}>2–3&nbsp; Relationstyp und Datensatz</label>
                         <RelationInput
+                          id={`${formId}-rel-generic`}
                           key={addTargetType}
                           targetType={addTargetType}
                           relTypeVocabId={relTypeVocabId}
@@ -5336,6 +5395,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                                     setValues(restored.metadata_ as Record<string, unknown>)
                                     setAiProvenance({})
                                     setVersion(restored.version)
+                                    setSchemaIncomplete(Boolean(restored.schema_incomplete))
                                     if (showCollectionStatus) {
                                       setCollectionStatus((restored as { collection_status?: string | null }).collection_status ?? 'active')
                                     }
@@ -5458,13 +5518,13 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
                 </div>
               )}
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Grund (optional)</label>
-                <textarea className="fld" rows={3} value={lockReason} onChange={e => setLockReason(e.target.value)} placeholder="z.B. Übernahme aus Altbestand, warte auf Rückmeldung…" style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
+                <label htmlFor={`${formId}-lock-reason`} style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Grund (optional)</label>
+                <textarea id={`${formId}-lock-reason`} className="fld" rows={3} value={lockReason} onChange={e => setLockReason(e.target.value)} placeholder="z.B. Übernahme aus Altbestand, warte auf Rückmeldung…" style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Ablaufdatum (optional)</label>
+                <label htmlFor={`${formId}-lock-expires`} style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--fg-2)' }}>Ablaufdatum (optional)</label>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input className="fld" type="date" value={lockExpires} onChange={e => setLockExpires(e.target.value)} min={new Date().toISOString().split('T')[0]} style={{ flex: 1, boxSizing: 'border-box' }} />
+                  <input id={`${formId}-lock-expires`} className="fld" type="date" value={lockExpires} onChange={e => setLockExpires(e.target.value)} min={new Date().toISOString().split('T')[0]} style={{ flex: 1, boxSizing: 'border-box' }} />
                   {lockExpires && (
                     <button type="button" className="btn ico gh" onClick={() => setLockExpires('')} aria-label="Datum entfernen" style={{ flexShrink: 0 }}><X size={14} /></button>
                   )}
@@ -5518,6 +5578,7 @@ export function ScreenForm({ recordType, recordId, onBack, onSaved, onDirtyChang
           </div>
         </div>
       )}
+      {deleteDialogs}
       {confirmState && (
         <ConfirmModal
           message={confirmState.message}

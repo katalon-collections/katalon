@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Karl Krägelin
 
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ImportMapping, MappingEntry, UploadResult, XmlSelector } from '../../../api/client'
 import type { FieldDefinition } from '../../../types'
@@ -61,6 +61,7 @@ export function StepMapping({
   dryRunning, onDryRun, onBack, onProfileExport, onProfileLoaded, profileWarnings, xmlSelectors,
 }: Props) {
   const { t } = useTranslation('screenImporter')
+  const formId = useId()
   const [transformModalCol, setTransformModalCol] = useState<string | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showLoadModal, setShowLoadModal] = useState(false)
@@ -136,6 +137,16 @@ export function StepMapping({
     return segs.length > 1 ? segs.slice(0, -1).join('/') : ''
   }
 
+  function targetFieldDef(target: string): FieldDefinition | undefined {
+    if (!target) return undefined
+    const [groupName, childName] = target.split('.')
+    if (childName) {
+      const group = fields.find(f => f.name === groupName && f.field_type === 'group')
+      return group?.children?.find(c => c.name === childName)
+    }
+    return fields.find(f => f.name === target)
+  }
+
   // Strict vocab fields (existing vocabulary) that receive at least one column
   const mappedTargets = new Set(Object.values(mapping).map(m => m.target))
   const vocabFields = fields.filter(
@@ -202,8 +213,9 @@ export function StepMapping({
           </div>
           {idnoStrategy === 'column' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{xmlLabelMap ? 'Element:' : 'Spalte:'}</span>
+              <label htmlFor={`${formId}-idno-column`} style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{xmlLabelMap ? 'Element:' : 'Spalte:'}</label>
               <select
+                id={`${formId}-idno-column`}
                 className="fld" style={{ height: 28, fontSize: 12, width: 320 }}
                 value={idnoColumn ?? ''}
                 onChange={e => onIdnoStrategyChange('column', e.target.value || null)}
@@ -447,14 +459,14 @@ export function StepMapping({
                     </select>
                     {recordType === 'place' && mapped === 'label' && (
                       <div style={{ marginTop: 6 }}>
-                        <label className="lbl" style={{ display: 'block', fontSize: 11 }}>{t('mappingPathSeparator')}</label>
+                        <label className="lbl" htmlFor={`${formId}-path-sep-${col}`} style={{ display: 'block', fontSize: 11 }}>{t('mappingPathSeparator')}</label>
                         <input
+                          id={`${formId}-path-sep-${col}`}
                           className="fld mono"
                           style={{ width: 80 }}
                           maxLength={8}
                           value={mapping[col]?.path_separator ?? ''}
                           placeholder=">"
-                          aria-label={t('mappingPathSeparator')}
                           onChange={e => {
                             const sep = e.target.value
                             const entry: MappingEntry = { ...mapping[col] }
@@ -464,6 +476,49 @@ export function StepMapping({
                           }}
                         />
                         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{t('mappingPathSeparatorHint')}</div>
+                      </div>
+                    )}
+                    {targetFieldDef(mapped)?.field_type === 'url' && (
+                      <div style={{ marginTop: 6 }}>
+                        <label className="lbl" htmlFor={`${formId}-url-label-${col}`} style={{ display: 'block', fontSize: 11 }}>
+                          {xmlLabelMap ? t('mappingUrlLabelSelectorXml') : t('mappingUrlLabelSelector')}
+                        </label>
+                        <select
+                          id={`${formId}-url-label-${col}`}
+                          className="fld"
+                          style={{ height: 28, fontSize: 12, width: '100%', maxWidth: 320 }}
+                          value={mapping[col]?.label_selector ?? ''}
+                          onChange={e => {
+                            const sel = e.target.value
+                            const entry: MappingEntry = { ...mapping[col] }
+                            if (sel) entry.label_selector = sel
+                            else delete entry.label_selector
+                            onMappingChange({ ...mapping, [col]: entry })
+                          }}
+                        >
+                          <option value="">{t('mappingUrlLabelNone')}</option>
+                          {xmlLabelMap
+                            ? Object.entries(
+                                uploaded.headers
+                                  .filter(h => h !== col)
+                                  .reduce<Record<string, string[]>>((groups, h) => {
+                                    const label = xmlLabelMap[h] ?? h
+                                    const key = groupKey(label) || label
+                                    ;(groups[key] ??= []).push(h)
+                                    return groups
+                                  }, {}),
+                              ).map(([grp, selectors]) => (
+                                <optgroup key={grp} label={grp}>
+                                  {selectors.map(h => (
+                                    <option key={h} value={h}>{shortSelectorLabel(xmlLabelMap[h] ?? h)}</option>
+                                  ))}
+                                </optgroup>
+                              ))
+                            : uploaded.headers.filter(h => h !== col).map(h => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                        </select>
+                        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{t('mappingUrlLabelHint')}</div>
                       </div>
                     )}
                   </td>
@@ -536,18 +591,18 @@ export function StepMapping({
               {xmlLabelMap ? 'Element' : 'Spalte'}: <span className="mono">{xmlLabelMap ? shortSelectorLabel(xmlLabelMap[newFieldModal] ?? newFieldModal) : newFieldModal}</span>
             </div>
             <div className="field">
-              <label className="lbl">Feldtyp</label>
-              <select className="fld" value={newFieldType} onChange={e => setNewFieldType(e.target.value)}>
+              <label className="lbl" htmlFor={`${formId}-new-field-type`}>Feldtyp</label>
+              <select id={`${formId}-new-field-type`} className="fld" value={newFieldType} onChange={e => setNewFieldType(e.target.value)}>
                 {FIELD_TYPE_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
             </div>
             <div className="field">
-              <label className="lbl">Label (Deutsch)</label>
-              <input className="fld" value={newFieldLabelDe} onChange={e => setNewFieldLabelDe(e.target.value)} />
+              <label className="lbl" htmlFor={`${formId}-new-field-label-de`}>Label (Deutsch)</label>
+              <input id={`${formId}-new-field-label-de`} className="fld" value={newFieldLabelDe} onChange={e => setNewFieldLabelDe(e.target.value)} />
             </div>
             <div className="field">
-              <label className="lbl">Label (Englisch)</label>
-              <input className="fld" value={newFieldLabelEn} onChange={e => setNewFieldLabelEn(e.target.value)} />
+              <label className="lbl" htmlFor={`${formId}-new-field-label-en`}>Label (Englisch)</label>
+              <input id={`${formId}-new-field-label-en`} className="fld" value={newFieldLabelEn} onChange={e => setNewFieldLabelEn(e.target.value)} />
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', marginBottom: 8 }}>
               <input type="checkbox" checked={newFieldRepeatable} onChange={e => setNewFieldRepeatable(e.target.checked)} />

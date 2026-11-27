@@ -170,6 +170,12 @@ export default {
   'error.occurrenceNotFound': 'Eintrag nicht gefunden.',
   'error.objectNotFound': 'Objekt nicht gefunden.',
 
+  'gone.badge': 'HTTP 410 · Zurückgezogen',
+  'gone.defaultTitle': 'Datensatz zurückgezogen',
+  'gone.defaultText': 'Dieser Datensatz wurde zurückgezogen und ist nicht mehr öffentlich verfügbar.',
+  'gone.backHome': 'Zur Startseite',
+  'gone.browseCollection': 'Sammlung durchsuchen',
+
   'object.iiifManifest': 'IIIF Manifest',
   'object.imageSingular': 'Bild',
   'object.imagePlural': 'Bilder',

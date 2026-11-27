@@ -434,6 +434,10 @@ async def reset_schema(
     result = await db.execute(update(FieldDefinition).where(*conditions).values(is_deleted=True))
     deleted_fields = cast("CursorResult[Any]", result).rowcount or 0
     await db.flush()
+    if deleted_fields > 0:
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(db, target_type, subtype)
     _enqueue_reindex(db, target_type)
     return SchemaResetResult(deletable_fields=deleted_fields, deleted_fields=deleted_fields)
 
@@ -524,6 +528,12 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
             setattr(reused, key, value)
         reused.is_deleted = False
         await db.flush()
+        if reused.is_required:
+            from katalon.services.schema_service import recheck_schema_incomplete
+
+            await recheck_schema_incomplete(
+                db, data.target_type, None if reused.parent_id else reused.target_subtype
+            )
         _enqueue_reindex(db, data.target_type)
         return _fd_read(reused)
 
@@ -536,6 +546,12 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
             status_code=409,
             detail="Ein Feld mit diesem internen Namen existiert bereits für diesen Typ/Subtyp.",
         ) from exc
+    if field.is_required:
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(
+            db, data.target_type, None if field.parent_id else field.target_subtype
+        )
     _enqueue_reindex(db, data.target_type)
     return _fd_read(field)
 
@@ -554,7 +570,13 @@ async def create_field(data: FieldDefinitionCreate, db: DBDep) -> FieldDefinitio
 async def update_field(
     field_id: uuid.UUID, data: FieldDefinitionCreate, db: DBDep, current_user: CurrentUser
 ) -> FieldDefinitionRead:
-    field, needs_reindex = await _apply_field_update(db, field_id, data, current_user.id)
+    field, needs_reindex, recheck_scope = await _apply_field_update(
+        db, field_id, data, current_user.id
+    )
+    if recheck_scope is not None:
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(db, field.target_type, recheck_scope[0])
     if needs_reindex:
         _enqueue_reindex(db, field.target_type)
     return _fd_read(field)
@@ -589,6 +611,8 @@ async def bulk_update_fields(
         raise HTTPException(status_code=422, detail="Feld-IDs müssen eindeutig sein")
     updated: list[FieldDefinition] = []
     needs_reindex = False
+    needs_recheck = False
+    recheck_subtypes: set[str | None] = set()
     for item in items:
         if item.target_type != target_type:
             raise HTTPException(
@@ -596,9 +620,19 @@ async def bulk_update_fields(
                 detail=f"Feld {item.id} gehört nicht zum Typ {target_type}",
             )
         data = FieldDefinitionCreate.model_validate(item.model_dump(exclude={"id"}))
-        field, changed = await _apply_field_update(db, item.id, data, current_user.id)
+        field, changed, recheck_scope = await _apply_field_update(
+            db, item.id, data, current_user.id
+        )
         updated.append(field)
         needs_reindex = needs_reindex or changed
+        if recheck_scope is not None:
+            needs_recheck = True
+            recheck_subtypes.add(recheck_scope[0])
+    if needs_recheck:
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        scope = next(iter(recheck_subtypes)) if len(recheck_subtypes) == 1 else None
+        await recheck_schema_incomplete(db, target_type, scope)
     if needs_reindex:
         _enqueue_reindex(db, target_type)
     return [_fd_read(field) for field in updated]
@@ -606,8 +640,8 @@ async def bulk_update_fields(
 
 async def _apply_field_update(
     db: DBDep, field_id: uuid.UUID, data: FieldDefinitionCreate, user_id: uuid.UUID
-) -> tuple[FieldDefinition, bool]:
-    """Validate and apply one field update; returns (field, needs_reindex)."""
+) -> tuple[FieldDefinition, bool, tuple[str | None] | None]:
+    """Validate and apply one field update; returns (field, needs_reindex, recheck_scope)."""
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=422, detail="Feldname darf nicht leer sein")
     if not data.is_public:
@@ -642,10 +676,32 @@ async def _apply_field_update(
             name=data.name,
             exclude_id=field.id,
         )
+    if data.target_subtype is None and field.target_subtype is not None and not field.parent_id:
+        # A field for all subtypes shares its metadata key with every subtype.
+        same_name = await db.scalar(
+            select(FieldDefinition.id)
+            .where(
+                FieldDefinition.target_type == data.target_type,
+                FieldDefinition.name == data.name,
+                FieldDefinition.parent_id.is_(None),
+                FieldDefinition.is_deleted.is_(False),
+                FieldDefinition.id != field.id,
+            )
+            .limit(1)
+        )
+        if same_name is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Ein anderer Subtyp hat ein Feld mit diesem internen Namen. "
+                    "Für die Erweiterung auf alle Subtypen muss der Name eindeutig sein."
+                ),
+            )
     moved_children: list[FieldDefinition] = []
     if data.target_subtype != field.target_subtype and not field.parent_id:
         # Values stay in record metadata under the field name; a move would hide them
         # from records of the old subtype, so only unused fields (and groups) may move.
+        # Widening to all subtypes keeps every value visible and is always allowed.
         from katalon.services.schema_service import count_field_usage
 
         moved_children = list(
@@ -663,17 +719,20 @@ async def _apply_field_update(
         used = await count_field_usage(db, field)
         for child in moved_children:
             used += await count_field_usage(db, child)
-        if used:
+        if used and data.target_subtype is not None:
             raise HTTPException(
                 status_code=409,
                 detail=(
                     f"Das Feld wird in {used} Datensätzen verwendet und kann nicht in einen "
-                    "anderen Subtyp verschoben werden. Feld stattdessen duplizieren "
-                    "(im Ziel-Subtyp) und das ursprüngliche Feld löschen."
+                    "anderen Subtyp verschoben werden. Möglich ist die Erweiterung auf alle "
+                    "Subtypen oder ein Duplikat im Ziel-Subtyp."
                 ),
             )
     old_is_public = field.is_public
     old_settings = field.settings or {}
+    old_is_required = field.is_required
+    old_name = field.name
+    old_target_subtype = field.target_subtype
     old_is_translatable = field.is_translatable
     old_is_repeatable = field.is_repeatable
     old_field_type = field.field_type
@@ -731,13 +790,32 @@ async def _apply_field_update(
     # field and the portal whitelists aggregations against is_facet at query
     # time. Only content-affecting changes (visibility, inherited relation
     # settings, translatable/repeatable shape, field type) require a rebuild.
-    return field, (
-        field.is_public != old_is_public
-        or inherited_settings_changed
-        or old_is_translatable != field.is_translatable
-        or old_is_repeatable != field.is_repeatable
-        or old_field_type != field.field_type
-        or facet_granularity_changed
+    requires_recheck = (
+        old_is_required != field.is_required
+        or (old_name != field.name and (old_is_required or field.is_required))
+        or (old_target_subtype != field.target_subtype and (old_is_required or field.is_required))
+        or (
+            field.is_required
+            and (old_is_translatable != field.is_translatable or old_is_repeatable != field.is_repeatable)
+        )
+    )
+    recheck_scope: tuple[str | None] | None = None
+    if requires_recheck:
+        if field.parent_id is not None or old_target_subtype != field.target_subtype:
+            recheck_scope = (None,)
+        else:
+            recheck_scope = (field.target_subtype,)
+    return (
+        field,
+        (
+            field.is_public != old_is_public
+            or inherited_settings_changed
+            or old_is_translatable != field.is_translatable
+            or old_is_repeatable != field.is_repeatable
+            or old_field_type != field.field_type
+            or facet_granularity_changed
+        ),
+        recheck_scope,
     )
 
 
@@ -897,6 +975,12 @@ async def delete_field(
         await purge_field_data(db, field, user_id=current_user.id)
 
     await db.flush()
+    if field.is_required or field.field_type == "group":
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(
+            db, target_type, None if field.parent_id else field.target_subtype
+        )
     _enqueue_reindex(db, target_type)
 
 
@@ -963,6 +1047,12 @@ async def restore_field(
 
     target_type = field.target_type
     await db.flush()
+    if field.is_required or field.field_type == "group":
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(
+            db, target_type, None if field.parent_id else field.target_subtype
+        )
     _enqueue_reindex(db, target_type)
 
     children_reads = []
@@ -1026,8 +1116,14 @@ async def hard_delete_field(field_id: uuid.UUID, db: DBDep) -> None:
                 )
 
     target_type = field.target_type
+    was_required_or_group = field.is_required or field.field_type == "group"
+    scope_subtype = None if field.parent_id else field.target_subtype
     await db.delete(field)
     await db.flush()
+    if was_required_or_group:
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(db, target_type, scope_subtype)
     _enqueue_reindex(db, target_type)
 
 
@@ -1174,6 +1270,12 @@ async def duplicate_field(field_id: uuid.UUID, db: DBDep) -> FieldDefinitionRead
             cloned_children.append(new_child)
         await db.flush()
 
+    if new_field.is_required or any(c.is_required for c in cloned_children):
+        from katalon.services.schema_service import recheck_schema_incomplete
+
+        await recheck_schema_incomplete(
+            db, field.target_type, None if field.parent_id else field.target_subtype
+        )
     _enqueue_reindex(db, field.target_type)
     children_read = [_fd_read(c) for c in cloned_children] if field.field_type == "group" else []
     return _fd_read(new_field, children_read)
@@ -1465,6 +1567,9 @@ async def import_schema(
                     await upsert(child, child_idx, field)
         if not dry_run:
             await db.flush()
+            from katalon.services.schema_service import recheck_schema_incomplete
+
+            await recheck_schema_incomplete(db, target_type)
             _enqueue_reindex(db, target_type)
 
     if savepoint is not None:

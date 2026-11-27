@@ -131,6 +131,8 @@ class ExportRelation(BaseModel):
     # Second-level relations of the target (only types a published mapping asks
     # for via source_config.via, only public targets).
     target_relations: list[ExportRelation] = Field(default_factory=list)
+    # Public ancestor titles (root first) for hierarchical relation targets such as places.
+    target_ancestors: list[str] = Field(default_factory=list)
 
 
 class ExportMediaItem(BaseModel):
@@ -158,7 +160,7 @@ class ExportMediaItem(BaseModel):
 # gains, loses or reshapes data an exporter reads (new media keys, field order, ...).
 # Index copies with an older version are rebuilt from the database at export time
 # (export_context_service.refresh_index_contexts) until the next full reindex.
-EXPORT_CONTEXT_VERSION = 3  # 3: richtext values as plain text
+EXPORT_CONTEXT_VERSION = 4  # 4: target_ancestors on place relations
 
 
 class ExportRecordContext(BaseModel):

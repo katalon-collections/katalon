@@ -10,6 +10,7 @@ import { attachmentKind, formatFileSize, type AttachmentKind } from './attachmen
 import { Alert, Eye, File as FileIcon, FileText, Image as ImageIcon, Music, Plus, Trash, Upload, Video, X } from './ui/Icons'
 
 interface Props {
+  id?: string
   recordType: AttachmentRecordType
   /** Id of the saved record; null while the record is still unsaved. */
   recordId: string | null
@@ -57,7 +58,7 @@ function toList(value: AttachmentRef | AttachmentRef[] | undefined): AttachmentR
  * (requires a saved record); the reference is written into the form value and only
  * persisted with the rest of the form.
  */
-export function FileField({ recordType, recordId, repeatable, value, onChange, disabled = false }: Props) {
+export function FileField({ id, recordType, recordId, repeatable, value, onChange, disabled = false }: Props) {
   const { t, i18n } = useTranslation('fileField')
   // null while the limit is unknown: the pre-check is skipped and the backend enforces it.
   const maxUploadMb = useAttachmentMaxUploadMb()
@@ -230,7 +231,7 @@ export function FileField({ recordType, recordId, repeatable, value, onChange, d
         </div>
       ))}
 
-      <input ref={inputRef} type="file" hidden multiple={repeatable} accept={ACCEPT} disabled={!canUpload} onChange={onInputChange} />
+      <input id={id} ref={inputRef} type="file" hidden multiple={repeatable} accept={ACCEPT} disabled={!canUpload} onChange={onInputChange} />
 
       {showDropZone ? (
         <div

@@ -18,6 +18,7 @@ def make_field(
     is_translatable: bool = False,
 ) -> MagicMock:
     f = MagicMock()
+    f.target_subtype = None
     f.name = name
     f.is_required = is_required
     f.is_repeatable = is_repeatable

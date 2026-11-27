@@ -715,4 +715,48 @@ async def test_move_used_field_to_other_subtype_rejected(
         json=_as_payload(field, target_subtype="acquisition"),
     )
     assert r.status_code == 409, r.text
-    assert "duplizieren" in r.json()["detail"]
+    assert "Duplikat" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_widen_used_field_to_all_subtypes(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    name = f"widen_{uuid.uuid4().hex[:8]}"
+    field = await _create_procedure_field(async_client, auth_headers, name)
+    created = await async_client.post(
+        "/v1/procedures",
+        headers=auth_headers,
+        json={
+            "idno": f"PROC-{uuid.uuid4().hex[:12]}",
+            "procedure_type": "conservation",
+            "status": "draft",
+            "metadata_": {name: "x"},
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    r = await async_client.put(
+        f"/v1/schema/{field['id']}",
+        headers=auth_headers,
+        json=_as_payload(field, target_subtype=None),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["target_subtype"] is None
+
+
+@pytest.mark.asyncio
+async def test_widen_field_rejected_when_other_subtype_shares_name(
+    async_client: AsyncClient, auth_headers: dict
+) -> None:
+    name = f"widen_clash_{uuid.uuid4().hex[:8]}"
+    field = await _create_procedure_field(async_client, auth_headers, name)
+    await _create_procedure_field(async_client, auth_headers, name, target_subtype="acquisition")
+
+    r = await async_client.put(
+        f"/v1/schema/{field['id']}",
+        headers=auth_headers,
+        json=_as_payload(field, target_subtype=None),
+    )
+    assert r.status_code == 409, r.text
+    assert "eindeutig" in r.json()["detail"]
